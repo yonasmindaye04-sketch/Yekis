@@ -1,0 +1,197 @@
+/* Original Yekis dark palette for the Telegram Mini App. */
+:root[data-theme="dark"] body:has(.mini-app-shell),
+:root[data-theme="dark"] body:has(.welcome-screen),
+:root[data-theme="dark"] body:has(.crash-screen) {
+  background: #0b1116 !important;
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell,
+:root[data-theme="dark"] .welcome-screen,
+:root[data-theme="dark"] .crash-screen {
+  background: #0b1116 !important;
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell h1,
+:root[data-theme="dark"] .mini-app-shell h2,
+:root[data-theme="dark"] .mini-app-shell h3,
+:root[data-theme="dark"] .welcome-screen h1,
+:root[data-theme="dark"] .crash-screen h1 {
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell .page-heading > p:last-child,
+:root[data-theme="dark"] .mini-app-shell .welcome-copy,
+:root[data-theme="dark"] .mini-app-shell .glass-card p,
+:root[data-theme="dark"] .welcome-copy,
+:root[data-theme="dark"] .welcome-note,
+:root[data-theme="dark"] .crash-screen p {
+  color: #9aacb1 !important;
+}
+
+:root[data-theme="dark"] .welcome-screen .welcome-rule span {
+  background: #26343d;
+}
+
+:root[data-theme="dark"] .welcome-screen .role-choice,
+:root[data-theme="dark"] .mini-app-shell .glass-card,
+:root[data-theme="dark"] .mini-app-shell .metric-card,
+:root[data-theme="dark"] .mini-app-shell .list-card,
+:root[data-theme="dark"] .mini-app-shell .quick-grid button,
+:root[data-theme="dark"] .mini-app-shell .payment-account {
+  background: #121c23 !important;
+  border-color: #26343d !important;
+  color: #f7faf9 !important;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .welcome-screen .role-choice:hover {
+  background: #18272f !important;
+  border-color: #d8f36b !important;
+}
+
+:root[data-theme="dark"] .welcome-screen .role-choice small,
+:root[data-theme="dark"] .mini-app-shell .metric-card span,
+:root[data-theme="dark"] .mini-app-shell .metric-card small,
+:root[data-theme="dark"] .mini-app-shell .empty-state,
+:root[data-theme="dark"] .mini-app-shell .list-card small {
+  color: #9aacb1 !important;
+}
+
+:root[data-theme="dark"] .welcome-screen .role-choice b,
+:root[data-theme="dark"] .welcome-screen .role-icon,
+:root[data-theme="dark"] .mini-app-shell .quick-grid span,
+:root[data-theme="dark"] .mini-app-shell .list-icon {
+  color: #d8f36b !important;
+}
+
+:root[data-theme="dark"] .welcome-screen .role-icon {
+  background: #1e3038 !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell input,
+:root[data-theme="dark"] .mini-app-shell textarea,
+:root[data-theme="dark"] .mini-app-shell select {
+  background: #111b22 !important;
+  border-color: #384b55 !important;
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell .bottom-nav {
+  background: rgba(18, 28, 35, .96);
+  border-color: #26343d;
+}
+
+:root[data-theme="dark"] .mini-app-shell .bottom-nav button {
+  color: #84979f;
+}
+
+:root[data-theme="dark"] .mini-app-shell .bottom-nav button.active {
+  background: #d8f36b;
+  color: #0b1116;
+}
+
+:root[data-theme="dark"] .mini-app-shell .hero-action {
+  background: #d8f36b;
+  color: #0b1116;
+}
+
+:root[data-theme="dark"] .mini-app-shell .hero-action-teal {
+  background: #77d9c5;
+}
+
+:root[data-theme="dark"] .mini-app-shell .payment-account span,
+:root[data-theme="dark"] .mini-app-shell .payment-account code {
+  color: #9aacb1;
+}
+
+:root[data-theme="dark"] .mini-app-shell .payment-account code {
+  color: #d8f36b;
+}
+
+:root[data-theme="dark"] .crash-screen code {
+  background: #121c23;
+  color: #f3b8bd;
+}
+
+/* Full Mini App workspace pass: every shared surface follows the dark palette. */
+:root[data-theme="dark"] .mini-platform-shell {
+  background: #0b1116 !important;
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-sidebar,
+:root[data-theme="dark"] .mini-platform-shell .platform-topbar,
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav {
+  background: #101a20 !important;
+  border-color: #26343d !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-topbar h1,
+:root[data-theme="dark"] .mini-platform-shell .sidebar-brand strong,
+:root[data-theme="dark"] .mini-platform-shell .sidebar-role strong,
+:root[data-theme="dark"] .mini-platform-shell .platform-content h2,
+:root[data-theme="dark"] .mini-platform-shell .platform-content h3,
+:root[data-theme="dark"] .mini-platform-shell .panel-heading button {
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .sidebar-role small,
+:root[data-theme="dark"] .mini-platform-shell .content-toolbar p,
+:root[data-theme="dark"] .mini-platform-shell .panel p,
+:root[data-theme="dark"] .mini-platform-shell .job-platform-card p,
+:root[data-theme="dark"] .mini-platform-shell .table-row span,
+:root[data-theme="dark"] .mini-platform-shell .table-head,
+:root[data-theme="dark"] .mini-platform-shell .empty-state {
+  color: #9aacb1 !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .panel,
+:root[data-theme="dark"] .mini-platform-shell .job-platform-card,
+:root[data-theme="dark"] .mini-platform-shell .contract-table,
+:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card {
+  background: #121c23 !important;
+  border-color: #26343d !important;
+  color: #f7faf9 !important;
+  box-shadow: none;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .sidebar-nav button,
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button {
+  color: #84979f;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .sidebar-nav button.active,
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button.active {
+  background: #436a56 !important;
+  color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .nav-icon,
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav span,
+:root[data-theme="dark"] .mini-platform-shell .panel-heading button,
+:root[data-theme="dark"] .mini-platform-shell .list-icon {
+  color: #d8f36b !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card h2 {
+  margin: 4px 0;
+  color: #d8f36b !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card p:last-child {
+  color: #9aacb1 !important;
+}

@@ -1,0 +1,1064 @@
+
+Ethiopian Freelance Marketplace
+Development & Engineering Department
+Technical Playbook & Implementation Roadmap
+
+Version: 1.0 | Date: July 2026Classification: Internal — Development & Engineering Use OnlyCross-reference: Master Design, Legal & Compliance Document (Draft 1)
+
+Table of Contents
+1. Must-Have Resources, Tools & Roles
+2. System Architecture & Infrastructure
+3. Core Platform Foundation
+4. KYC & Compliance Layer
+5. Escrow & Payment Engine
+6. In-App Evidence & Dispute Flow
+7. Security Audits & Pilot Launch
+8. Testing, Security, and Launch Verification
+9. Compliance Integration (KYC/AML + PDPP)
+10. Technical Decision Logs
+11. Escrow & Payment Integration — Open Questions
+12. Development Roadmap (Phases 0–5)
+Appendix A: Architecture × Integration Comparison Matrix
+Appendix B: Compliance Implementation Checklist
+Appendix C: Budget Summary (Year 1)
+Appendix D: Glossary of Terms
+
+Document Purpose & Scope
+This document is the authoritative technical playbook for the Development & Engineering department building the Ethiopian Freelance Marketplace. It consolidates all engineering requirements, compliance obligations, architectural decisions, and implementation timelines into a single, actionable reference.
+This playbook is designed to answer four questions:
+WHAT to build: Features, architecture, data models, and integrations required.
+HOW to build it compliantly: KYC/AML, PDPP data protection, security, and audit requirements embedded in every technical decision.
+WHEN to build it: Phased roadmap with sprint allocations, dependencies, and hard gates.
+WHAT remains open: Regulatory questions, partner dependencies, and technical risks to monitor.
+
+Cross-reference: For legal strategy, contract templates, and regulatory analysis, see the Master Design, Legal & Compliance Document (Draft 1). This playbook assumes familiarity with that document but is self-contained for day-to-day engineering work.
+
+1. Must-Have Resources, Tools & Roles
+1.1 Key Personnel (Roles)
+System Architect / Lead Backend Engineer: Designs the escrow state machine, payment flow architecture, and ensures WORM storage compliance. Owns the technical integration of KYC/AML systems and data localization strategy.
+Frontend / Mobile Developers (2–3): Build lightweight, responsive UIs optimized for low-bandwidth environments. Primary stack: React/Next.js or Vue. Responsible for the Telegram bot front-end as a parallel channel.
+DevSecOps Engineer: Manages local Ethiopian cloud infrastructure (Ethio Telecom Cloud / Safaricom Ethiopia), configures encryption, handles ECA-compliant backups, and maintains CI/CD pipelines.
+QA / Testing Engineer: Builds automated tests for payment edge cases, escrow state transitions, and manual testing protocols for dispute flows. Validates KYC hard-block logic across all user journeys.
+1.2 Core Technology Stack
+Layer
+Technology
+Rationale
+Frontend
+React we will use react +vite
+Optimized for minimal bundle size; supports Amharic i18n; Telegram bot API integration
+Backend
+Node.js, we  will use node 
+High concurrency for payment webhooks; strong async handling for escrow state machine
+Database
+PostgreSQL + pgaudit extension
+ACID compliance for financial data; immutable audit logging; WORM storage support
+Infrastructure
+Ethio Telecom Cloud or Safaricom Ethiopia
+PDPP Art. 22 data localization mandate; domestic hosting for all personal data
+1.3 Critical API Credentials & Third-Party Tools
+Service
+Credential Type
+Purpose
+Fayda ID
+Sandbox API Key + Webhook Secret
+Automated KYC verification (biometric eKYC, OTP, facial recognition)
+Telebirr
+Merchant ID + API Key + Callback URL
+Mobile money payments; USSD (*127#) support for non-smartphone users
+Chapa
+Secret Key + Public Key + Webhook Secret
+Payment aggregator (Telebirr, CBE Birr, cards, bank transfers)
+We wont be using this for no ow 
+Merchant API Credentials (pending)
+Direct bank wallet integration; reference-based verification fallback
+
+Security Note: All API credentials must be stored in a secrets manager (e.g., HashiCorp Vault, AWS Secrets Manager with Ethiopian-hosted instance) — never in code, environment files, or version control. Rotate keys quarterly.
+1.4 Monitoring & Security Tools
+Sentry (or equivalent): Error tracking and performance monitoring for production
+Automated Rate-Limiting Middleware: Prevents API abuse and DDoS on payment endpoints
+pgaudit (PostgreSQL extension): Detailed activity logging for all database operations — required for 10-year audit trail
+Immudb Vault (or equivalent): Immutable ledger for compliance records (KYC, transactions, disputes) — WORM-compliant storage
+
+2. System Architecture & Infrastructure
+2.1 Data Localization & Hosting (PDPP Art. 22)
+Personal Data Protection Proclamation No. 1321/2024, Article 22, mandates that all personal data collected in Ethiopia must be stored on domestic servers. Cross-border transfers are permitted only with: (a) ECA determination of adequate protection, (b) ECA-approved Standard Contractual Clauses (SCCs), or (c) explicit informed consent after risk disclosure.
+Environment
+Provider
+Data Stored
+Production Primary
+Ethio Telecom Cloud OR Safaricom Ethiopia OR On-Premise
+All personal data: KYC docs, profiles, messages, transactions, contracts, dispute records
+Production CDN
+Ethio Telecom Cloud CDN
+Static assets, cached content (no PII)
+Disaster Recovery
+AWS/Azure/GCP (with ECA-approved SCCs)
+Encrypted backups only — no live PII
+2.2 Database Setup
+Primary Database (PostgreSQL 15+): ACID-compliant relational database for all transactional data
+Audit Extension (pgaudit): Logs every SELECT, INSERT, UPDATE, DELETE with user identity and timestamp
+Immutable Storage (Immudb Vault (or PostgreSQL WORM partition)): Tamper-evident storage for KYC, transaction, and dispute records — 10-year retention
+Encryption at Rest (AES-256): Database-level encryption for all tables; row-level encryption for TIN, bank accounts, ID numbers
+Encryption in Transit (TLS 1.3): All API and database connections
+Backup Strategy (Daily encrypted backups to Ethiopian cloud + weekly encrypted backups to DR site with SCCs): RPO: 1 hour; RTO: 4 hours
+2.3 Repository & CI/CD
+Initialize Git repository (GitHub/GitLab) with GitFlow branching model (main, develop, feature/*, hotfix/*)
+Set up automated CI/CD pipelines: build → unit tests → integration tests → security scan → deploy to staging → deploy to production
+Secret management: Use HashiCorp Vault or AWS Secrets Manager (Ethiopian-hosted instance). No secrets in code or .env files committed to repo.
+Environment separation: development (local), staging (pre-prod), production (live). Each with isolated database and API credentials.
+Infrastructure as Code (IaC): Terraform or CloudFormation for reproducible Ethiopian cloud infrastructure deployment.
+2.4 Sandbox API Keys — Registration Checklist
+Provider
+Registration URL / Contact
+Required Documents
+Estimated Timeline
+Fayda ID (NIDP)
+developer.fayda.et (pending public portal)
+Business registration, platform description, DPO contact
+2–4 weeks
+Telebirr
+Ethio Telecom Developer Portal (private)
+Merchant registration, KYC of platform, business license
+4–6 weeks
+Chapa
+developer.chapa.co
+Business registration, TIN, bank account, website URL
+1–2 weeks
+Remove this option
+CBE Merchant Services (direct relationship)
+Corporate account, business license, platform description
+6–8 weeks
+
+3. Core Platform Foundation
+3.1 User Authentication & Security
+Session Management: JWT (JSON Web Tokens) with short expiry (15-min access token, 7-day refresh token)
+Transport Security: TLS 1.3 enforced on all endpoints; HSTS headers; secure cookie flags (HttpOnly, Secure, SameSite=Strict)
+Two-Factor Authentication: OTP via SMS (Twilio/Infobip Ethiopian route) or TOTP authenticator app for sensitive actions (withdrawals, profile changes)
+Password Storage: bcrypt with cost factor 12+; minimum password complexity enforced
+Rate Limiting: 100 requests/minute per IP for auth endpoints; 10 failed login attempts trigger a 15-minute lockout + email alert
+Device Fingerprinting: Track device ID + IP geolocation; flag logins from new devices or foreign IPs for review
+3.2 User Profiles & Roles
+Role
+Capabilities
+KYC Requirement
+Freelancer
+Browse jobs, submit proposals, deliver work, receive payments, build portfolio
+Tier 2 (ID + TIN/business reg + bank details)
+Client
+Post jobs, review proposals, fund escrow, approve deliverables, rate freelancers
+Tier 1 (ID + phone + address)
+Admin / Mediator
+Review disputes, access evidence bundles, issue mediation recommendations, suspend accounts
+Tier 2 + background check
+
+Legal Marking: All freelancer profiles must display a clear 'Independent Contractor' status badge. This is a legal requirement to prevent misclassification under Labour Proclamation No. 1156/2019.
+3.3 Job Engine
+Job Posting: Clients create standardized job posts using templates that enforce independent-contractor terms.
+Proposal Submission: Freelancers browse/filter jobs and submit proposals with price, timeline, and portfolio links.
+Contract Generation: On bid acceptance, the system auto-generates a PDF/digital Master Service Agreement (MSA) from the contract template. The MSA is stored in the user's project history and linked to the escrow record.
+Milestone Definition: Each contract includes 1–3 milestones with defined deliverables, payment tranches, and review periods.
+Status Tracking: Real-time project status visible to both parties: Draft → Funded → In Progress → Under Review → Completed / Disputed.
+3.4 Security from Day 1
+Encryption Everywhere: TLS 1.3 for all traffic; AES-256 at rest for all databases and file stores
+Access Controls: RBAC (Role-Based Access Control) on every endpoint; principle of least privilege
+Audit Trails: Every action (login, profile change, payment, dispute action) logged with user ID, timestamp, IP, and action type
+Input Validation: Strict validation on all API inputs; parameterized queries to prevent SQL injection; CSP headers to prevent XSS
+API Rate Limiting: Tiered rate limits: 100 req/min for authenticated users, 20 req/min for anonymous, 5 req/min for auth endpoints
+Dependency Scanning: Automated vulnerability scanning (Snyk/Dependabot) in CI/CD pipeline; block deployment on critical findings
+
+4. KYC & Compliance Layer
+4.1 Fayda ID Integration (Primary KYC Method)
+Ethiopia's national digital ID system (Fayda ID, Proclamation No. 1284/2023) provides biometric-linked, government-verified identity. The National Bank of Ethiopia (NBE) mandates that all financial accounts be Fayda-linked by 2026. Integration with VeriFayda 2 API is the strongest defense against ghost accounts.
+Step
+Action
+Technical Implementation
+1. Initiate
+User clicks 'Verify Identity' in profile
+Backend calls Fayda eKYC API with user's phone number
+2. OTP Verification
+User receives SMS OTP and enters it
+API validates OTP; returns session token
+3. Biometric Match
+User captures face photo + fingerprint (if supported)
+API compares against NIDP database; returns match score
+4. Result
+Pass → KYC status updated to VERIFIED; Fail → manual review queue
+Store hashed ID number + verification timestamp only; discard raw biometric data
+
+Data Minimization: Store only the hashed national ID number, verification timestamp, and KYC status. Raw biometric data (photos, fingerprints) must NOT be retained on platform servers — only the verification result from Fayda.
+4.2 Tiered KYC Architecture
+Tier
+User Type
+Required Documents
+Platform Access
+Tier 1 — Basic
+All users (Client & Freelancer)
+Govt ID (Fayda preferred), phone, address, email
+Browse jobs, save drafts, view public listings
+Tier 2 — Payout-Eligible
+Freelancers withdrawing funds
+Tier 1 + TIN/business reg + bank details
+Bid on jobs, receive payments, withdraw funds
+Tier 3 — High-Risk
+PEPs, large volumes, sanctions-adjacent
+Tier 2 + enhanced due diligence
+Enhanced monitoring; all transactions manually reviewed
+
+
+
+4.3 Hard-Block Logic
+The system must enforce a 'hard block' preventing any financial action until KYC is verified. This is not a soft warning — it is a technical enforcement of AML compliance.
+KYC Status
+Allowed Actions
+Blocked Actions
+UNVERIFIED
+Browse jobs, save drafts, view public listings, edit profile (non-financial fields)
+Bid, accept jobs, deposit funds, withdraw funds, receive payments, change bank details
+PENDING REVIEW
+Same as UNVERIFIED + view KYC status dashboard
+All financial actions (same as UNVERIFIED)
+VERIFIED
+Full platform access: bid, accept, deposit, withdraw, receive payments
+None
+SUSPENDED
+View account status, contact support, download personal data
+All actions; triggered by PEP hit, STR filing, sanctions match, or confirmed suspicious activity
+4.4 Transaction Monitoring System (TMS)
+The TMS must automatically detect AML red flags and trigger internal review. Suspicious activity must be reported to the Financial Intelligence Center (FIC) within 24 hours.
+Red Flag Category
+Detection Pattern
+Threshold / Trigger
+Structuring (Smurfing)
+Multiple small deposits just below reporting threshold
+≥3 deposits totaling >ETB 500,000 within 7 days
+Velocity
+Unusual spike in transaction volume vs. historical pattern
+>300% of user's 90-day average
+Remove this part since it is a local mony movment
+Transactions to/from high-risk or sanctioned jurisdictions
+Any transfer to sanctioned country list (UN/OFAC)
+Round Amounts
+Repeated round-figure transfers suggesting structuring
+≥5 transactions of exactly ETB 10,000, 50,000, etc.
+Rapid Movement
+Funds deposited and immediately withdrawn without work completion
+Deposit and withdrawal within 24 hours
+PEP Activity
+Any transaction by a flagged Politically Exposed Person
+All transactions require enhanced manual review
+
+STR Filing Workflow: Detection → Internal Review (Compliance Officer) → File STR to FIC within 24h → If confirmed: freeze funds, suspend account, preserve records. Designate a Manager-level Compliance Officer responsible for STR filing per NBE Directive FIS/04/2021.
+4.5 Data Retention & Erasure (AML vs. PDPP)
+The 10-year AML retention requirement conflicts with PDPP erasure rights. The system must handle this tension through logical deletion and data segregation.
+Data Category
+AML Retention
+PDPP Erasure
+Technical Implementation
+KYC Documents (ID, TIN)
+10 years from account closure
+Anonymize after 10 years; inform user
+WORM storage; logical delete flag; anonymization hash
+Transaction Records
+10 years from transaction date
+Cannot delete per AML
+Immutable ledger; no delete permissions
+Chat / Messages
+10 years if related to dispute; 30 days otherwise
+Delete after 30 days (non-dispute)
+Auto-purge job after 30 days; flag dispute-related messages
+Marketing Preferences
+N/A
+Delete on request immediately
+Soft delete with 30-day grace period; hard delete after
+
+User Communication: When a user requests account deletion, the system must: (1) confirm receipt within 24 hours, (2) explain that KYC/transaction data is retained per AML law for 10 years, (3) delete all non-AML data immediately, (4) anonymize retained data where possible, (5) provide final confirmation within 30 days.
+
+5. Escrow & Payment Engine
+5.1 Payment Gateway Integration
+The platform must support multiple payment rails to maximize accessibility. Chapa is recommended as the primary aggregator for launch speed; direct Telebirr integration can be added post-launch for cost optimization.
+Provider
+Type
+Limits
+Settlement
+Fee
+Telebirr
+Mobile Money (Ethio Telecom)
+75k ETB/tx; 150k ETB/day
+Instant to merchant wallet
+~0.5%
+CBE Birr
+Mobile Wallet (CBE)
+150k ETB/tx
+Real-time to CBE account
+Bank tariff
+CBE Bank Transfer
+Bank Transfer
+~10M ETB/tx
+Real-time (CBE-to-CBE)
+Bank fee
+Chapa (Aggregator)
+Gateway (Telebirr + CBE + Cards)
+Varies by rail
+1–3 hours
+~2% per transaction
+5.2 Escrow State Machine
+The escrow logic is the core financial engine. It must be robust, idempotent, and fully auditable. All state transitions must be logged immutably.
+State
+Trigger
+Actions
+Next States
+PAYMENT PENDING
+Client clicks 'Fund Escrow'
+Generate payment request; redirect to chosen payment rail; set 24h expiry timer
+ESCROW HELD (on success) | EXPIRED (on timeout)
+ESCROW HELD
+Payment provider confirms deposit via webhook
+Notify freelancer; mark project 'Funded'; start work timer
+UNDER REVIEW (on delivery) | DISPUTED (on rejection) | REFUNDED (on cancellation)
+UNDER REVIEW
+Freelancer submits milestone deliverable
+Notify client; start 5-day review countdown; lock funds from freelancer withdrawal
+RELEASED (on acceptance) | DISPUTED (on rejection) | AUTO-RELEASED (on silence)
+RELEASED
+Client accepts OR 5-day silence period expires
+Calculate net payment (gross - 10% platform fee - withholding tax); transfer to freelancer
+COMPLETED
+DISPUTED
+Client rejects deliverable OR raises dispute
+Freeze funds; open dispute thread; notify mediator; start 14-day mediation timer
+MEDIATED (on resolution) | ARBITRATION (on rejection) | RELEASED/REFUNDED (on settlement)
+5.3 Automated Cron Jobs
+Auto-Release Escrow (Every hour): Check all 'Under Review' milestones where review period (5 days) has expired → auto-release funds to freelancer
+Payment Reminder (Daily at 9 AM): Send reminder to clients with pending milestone reviews 24h before auto-release
+KYC Expiry Check (Daily at midnight): Flag users whose KYC documents expire within 30 days; send renewal reminder
+TMS Red Flag Scan (Every 15 minutes): Run automated TMS rules across last 24h of transactions; flag anomalies for Compliance Officer review
+PEP List Refresh (Daily at 2 AM): Download updated UN/OFAC/domestic PEP lists; re-screen all active users against new entries
+Data Retention Purge (Weekly on Sunday): Purge non-AML data past retention period; anonymize AML data where retention period expired
+5.4 Platform Accounting & Tax Calculation
+Every transaction must automatically calculate and record: platform commission, withholding tax, and VAT. The system must produce audit-ready reports for ERCA (Ethiopian Revenue and Customs Authority).
+Component
+Rate / Rule
+Calculation Example (ETB 100,000 project)
+Gross Project Fee
+Client deposits 100% upfront
+ETB 100,000
+Platform Commission
+10% of gross (split 5% from client, 5% from freelancer)
+ETB 10,000 (ETB 5,000 + ETB 5,000)
+Withholding Tax
+3% if freelancer has TIN; 30% if no TIN
+ETB 3,000 (with TIN) OR ETB 30,000 (without TIN)
+Net to Freelancer
+Gross - platform fee (freelancer share) - withholding tax
+ETB 100,000 - ETB 5,000 - ETB 3,000 = ETB 92,000 (with TIN)
+
+VAT Note: The platform's commission revenue is subject to 15% VAT once annual revenue exceeds ETB 1,000,000. VAT is NOT deducted from freelancer payouts — it is the platform's tax obligation on its own revenue. The system must track platform revenue separately and generate VAT reports quarterly.
+5.5 Idempotency and Reliability
+Idempotent Payment EndpointsAll payment-related API endpoints must be idempotent (same request ID = same result). Use idempotency keys for all escrow operations to prevent double-charging or double-payout.
+Webhook VerificationVerify every payment webhook signature before processing. Re-query payment provider API for status confirmation if webhook is delayed or missing.
+Dead Letter QueueFailed payment operations (webhook failures, API timeouts) must be queued for retry with exponential backoff (max 5 retries, then manual review).
+Reconciliation JobDaily automated reconciliation: sum of all escrow balances must equal sum of all client deposits minus released funds minus platform fees. Any mismatch triggers immediate alert.
+Circuit Breaker PatternIf a payment provider API is down, circuit breaker opens; queue new payments; notify users; retry every 5 minutes. Prevent cascading failures.
+
+6. In-App Evidence & Dispute Flow
+6.1 Real-Time Messaging
+All project communication must occur within the platform's messaging system. Off-platform communication (WhatsApp, Telegram DMs) is explicitly excluded from dispute evidence. This is stated in the Terms of Service and reinforced with UI warnings.
+Encryption: All messages encrypted at rest (AES-256) and in transit (TLS 1.3)
+Immutability: Messages cannot be edited or deleted by users once sent. Admins can append moderator notes but cannot alter original content.
+File Attachments: Max 50MB per file; scanned for malware; stored in encrypted file store with retention tied to project lifecycle
+Read Receipts: Timestamped delivery and read confirmations stored as evidence metadata
+Export Capability: Full message thread exportable as PDF/JSON for dispute evidence bundles
+6.2 Milestone Submission UI
+Freelancer uploads files or provides links for each milestone deliverable.
+System auto-generates a submission record with: timestamp, file hash (SHA-256), uploader identity, and linked milestone ID.
+Client receives notification with preview capability (for images, PDFs, videos) and download links.
+All submissions are versioned — if freelancer submits revised work, previous versions are retained for audit.
+6.3 Dispute Resolution Dashboard (Admin View)
+The dispute dashboard is the primary tool for platform mediators. It must present all evidence in a structured, non-editable format with clear audit trails.
+Stage
+Mediator Actions
+Evidence Access
+Stage 1: Direct Negotiation (Days 0–7)
+Monitor only; no intervention. Track message exchanges and deadline adherence.
+Read-only access to full project thread, contract terms, and milestone history
+Stage 2: Evidence Submission
+Acknowledge dispute within 1 business day. Confirm both parties have submitted all required evidence.
+Auto-compiled evidence bundle: contract PDF, milestone submissions, message thread, payment records
+Stage 3: Platform Mediation (Days 7–14)
+Review evidence against contract terms. Issue non-binding recommendation within 3–5 business days.
+Full evidence bundle + external reference materials (industry standards, prior similar disputes)
+Stage 4: Arbitration Handoff (Day 14+)
+If mediation is rejected, compile the final evidence package and transfer to AACCSA. Close platform case.
+Complete, tamper-evident evidence archive with chain-of-custody documentation
+6.4 Audit Trails for Disputes
+Admin Action Logging: Every mediator action (status change, message to user, evidence review) logged with: admin ID, timestamp, action type, before/after state
+Immutable Storage: Admin logs stored in WORM-compliant storage (Immudb Vault). No delete or edit permissions for any role, including super-admin.
+Chain of Custody: Evidence bundles must include: hash of each file, timestamp of compilation, mediator identity, and digital signature
+Retention: All dispute records retained for 10 years per AML Proclamation, regardless of dispute outcome
+
+7. Security Audits & Pilot Launch
+7.1 Penetration Testing
+Scope: External perimeter (web app, APIs, mobile), internal infrastructure (database, file store), and social engineering (phishing simulation)
+Focus Areas: Escrow logic bypass attempts, KYC hard-block circumvention, payment webhook manipulation, privilege escalation, SQL injection, XSS
+Provider: Engage an Ethiopian-registered or internationally certified security firm (e.g., CREST-accredited)
+Timeline: 2–3 weeks for initial test; 1 week for remediation validation
+Deliverables: Executive summary, detailed vulnerability report with CVSS scores, remediation roadmap, re-test confirmation
+7.2 Encryption & Hardening Checklist
+TLS Configuration: TLS 1.3 only; disable TLS 1.0/1.1; strong cipher suites (ECDHE-RSA-AES256-GCM-SHA384); HSTS max-age=31536000
+Server Hardening: Disable unused ports/services; fail2ban for SSH; automated OS patching; minimal container images (Distroless/Alpine)
+Database Hardening: No direct internet exposure; connection via VPC/private network; parameterized queries only; regular vulnerability scans
+API Security: Rate limiting, input validation, CORS restrictions, API key rotation, OAuth 2.0 for third-party integrations
+Frontend Security: Content Security Policy (CSP), XSS protection headers, CSRF tokens, secure cookie attributes
+7.3 Closed Beta Protocol
+Cohort Size: 50 freelancers in ONE category (recommended: Graphic Design — high demand, clear deliverables, easy to evaluate)
+Client Recruitment: 10–15 local SMEs/startups with real design needs; offer discounted platform fees (5% instead of 10%) for beta participation
+Test Funds: Use Chapa sandbox mode for all payments during beta. No real money moves until security audit passes.
+Success Criteria: 100% of escrow-funded projects complete without manual intervention; <5% dispute rate; <2% payment failure rate; KYC pass rate >80%
+Feedback Collection: In-app feedback widget; weekly check-in calls with 10% of beta users; structured exit survey
+7.4 User Flow Analytics
+Signup Flow: Track: landing page → registration start → email verification → KYC initiation → KYC completion. Target: >60% completion rate.
+Job Posting Flow: Track: client login → create job → define milestones → fund escrow. Target: >70% fund-after-post rate.
+Proposal Flow: Track: freelancer login → browse jobs → submit proposal → bid accepted. Target: >15% proposal-to-accept rate.
+Payment Flow: Track: milestone delivery → client review → acceptance → fund release. Target: >90% on-time release rate.
+Drop-off Alerts: Automated alerts when drop-off rate at any step exceeds 20% in a 7-day window
+7.5 Feedback Loop & Iteration
+Daily standup during beta: review yesterday's bug reports, plan today's fixes.
+Weekly sprint retrospective: what worked, what didn't, what to change before public launch.
+Bi-weekly stakeholder demo: show progress to leadership, legal, and compliance teams.
+Go/No-Go Decision Gate: After 4 weeks of beta, evaluate against success criteria. If 3+ criteria met → schedule public launch. If <3 met → extend beta by 2 weeks.
+
+8. Testing, Security, and Launch Verification
+8.1 Automated Testing
+8.1.1 Unit Tests
+Escrow State Machine: Test ALL valid transitions: Payment Pending → Escrow Held → Under Review → Released/Disputed/Refunded. Test invalid transitions (e.g., cannot move from 'Released' back to 'Escrow Held'). Target: 100% state coverage.
+KYC Hard-Block Logic: Test that unverified users are blocked from: bidding, accepting jobs, depositing, withdrawing, receiving payments. Test edge cases: user verified mid-transaction, user suspended after deposit.
+Tax Calculation Engine: Test withholding tax at 3% (with TIN) and 30% (without TIN). Test VAT calculation on platform commission. Test rounding behavior and edge cases (ETB 0.01 precision).
+Payment Idempotency: Test that duplicate payment requests with same idempotency key return identical results without double-charging.
+Cron Job Logic: Test auto-release trigger at exactly 5 days + 0 hours. Test timezone handling (EAT, UTC+3).
+8.1.2 Integration Tests
+Mock Payment Flows: Mock Chapa, Telebirr, and CBE APIs to simulate: successful payment, failed payment, delayed webhook, duplicate webhook, timeout.
+Fayda ID Verification: Mock Fayda API responses: valid ID, invalid ID, expired OTP, biometric mismatch, API downtime.
+Dispute Evidence Compilation: Test automatic evidence bundle generation: contract PDF, message thread, milestone submissions, payment records. Verify bundle hash integrity.
+Data Rights Tools: Test 'Download My Data' export: verify all user data included, format compliance (JSON/CSV), 30-day SLA. Test 'Delete Account' flow: verify non-AML data purged, AML data retained with logical delete flag.
+8.2 Manual End-to-End Testing
+Happy Path: Client posts job → Freelancer bids → Client accepts → Client funds escrow (Chapa/Telebirr) → Freelancer delivers → Client accepts → Funds release → Both parties rate each other.
+Dispute Path: Client posts job → Freelancer bids → Client accepts → Client funds escrow → Freelancer delivers → Client rejects → Dispute opened → Evidence submitted → Mediator recommends → Client accepts recommendation → Partial release.
+Auto-Release Path: Client posts job → Freelancer bids → Client accepts → Client funds escrow → Freelancer delivers → Client silent for 5 days → Auto-release triggered → Funds released → Client can still rate.
+KYC Block Path: Unverified freelancer tries to bid → Blocked with clear message → Freelancer completes KYC → Bid succeeds.
+Suspicious Activity Path: New user deposits ETB 600,000 in 3 transactions within 6 hours → TMS flags structuring → Compliance Officer notified → Account suspended → STR filed within 24h.
+8.3 Security Compliance Verification
+10-Year Retention: Verify WORM storage is operational: attempt to delete a 1-year-old transaction record → must fail. Attempt to modify an audit log entry → must fail.
+Data Erasure Rules: Submit test 'Delete Account' request → verify non-AML data (marketing prefs, chat history) is purged within 30 days. Verify AML data (KYC docs, transactions) is retained with anonymization.
+Encryption Verification: Run SSL Labs scan on production domain → must score A+. Run database encryption verification → confirm AES-256 at rest.
+Access Control Audit: Attempt to access admin endpoints with client credentials → must return 403. Attempt to access another user's escrow data → must return 403.
+Backup Recovery Test: Quarterly: restore from backup to isolated environment → verify data integrity → confirm RTO (4 hours) and RPO (1 hour) met.
+8.4 Pilot Launch Metrics
+Metric
+Target
+Measurement Method
+Action if Missed
+Escrow Completion Rate
+>95% of funded projects complete without manual intervention
+Automated tracking of escrow state transitions
+Review payment flow UX; fix integration bugs
+Dispute Rate
+<5% of completed projects enter dispute
+Dispute creation / total completed projects
+Review contract clarity; improve milestone definition
+KYC Pass Rate
+>80% of users achieve VERIFIED status
+Verified users / total registered users
+Simplify KYC flow; add Fayda ID support docs
+Payment Success Rate
+>98% of payment attempts succeed
+Successful payments / total payment attempts
+Debug payment provider integrations
+User Retention (30-day)
+>40% of freelancers return within 30 days
+Active freelancers (Day 30) / total freelancers (Day 1)
+Improve job matching; add notification features
+Platform Uptime
+>99.5% during beta period
+Monitoring dashboard (Sentry/UptimeRobot)
+Investigate downtime root cause; add redundancy
+
+9. Compliance Integration (KYC/AML + PDPP)
+9.1 Integrated Compliance Architecture
+The following architecture diagram describes how KYC/AML and PDPP compliance work together through the entire user lifecycle, from registration to account deletion.
+[USER REGISTRATION]    │    ├──► Account Creation ──► Granular Consent (PDPP Arts. 8 & 11)    │                            │    │                            ├──► KYC/AML Identity Verification [Required]    │                            ├──► Financial Data Processing [Required]    │                            ├──► Platform Notifications [Optional]    │                            ├──► Marketing Use of Profile [Optional]    │                            └──► Anonymized Analytics [Optional]    │    ├──► KYC Form (Tier 1) ──► HARD BLOCK activated    │                            │    │                            ├──► Cannot: bid, withdraw, receive payments    │                            └──► Can: browse, save drafts, view listings    │    ├──► ID Upload + Liveness Check (OCR/Biometric via Fayda)    │         │    │         ├──► PASS ──► "Verified" Badge ──► Full Features Unlocked    │         │                │    │         │                └──► Ongoing Transaction Monitoring (TMS)    │         │                         │    │         │                         ├──► Real-time risk scoring    │         │                         ├──► Threshold alerts    │         │                         ├──► PEP/sanctions screening (daily refresh)    │         │                         └──► Pattern detection (structuring, velocity)    │         │    │         └──► FAIL/MANUAL ──► Request More Documents ──► Loop back    │    ├──► SUSPICIOUS ACTIVITY detected?    │         │    │         ├──► YES ──► File STR to FIC within 24h ──► Freeze funds ──► Suspend account    │         │    │         └──► NO ──► Normal Escrow & Payment Flow    │    └──► USER REQUESTS DATA DELETION              │              ├──► Retain KYC/transaction data per AML (10 years)              ├──► Delete marketing/chat/profile data (non-AML)              ├──► Anonymize retained data where possible              └──► Confirm to user within 30 days (PDPP requirement)
+9.2 Security by Design
+Security Layer
+Requirement
+Implementation
+Data at Rest
+AES-256 encryption
+Database-level encryption + encrypted file storage for KYC documents
+Data in Transit
+TLS 1.3
+All API and web traffic; HSTS headers
+Database
+Row-level encryption
+Separate encryption for TIN, bank accounts, ID numbers
+Access Control
+RBAC + MFA
+Role-based access control; multi-factor auth for all admin accounts
+Audit Logging
+Immutable logs
+All data access logged; logs retained 10 years in WORM storage
+Penetration Testing
+Annual minimum
+Third-party security audits with CVSS scoring
+Anonymization
+For analytics/ML
+Hash + salt identifiers before analytics pipelines; aggregated data only
+9.3 Record Retention Matrix
+Record Type
+Retention Period
+Legal Basis
+Storage Type
+KYC/Identification Records
+10 years from account closure
+AML Proclamation No. 1387/2025 + NBE Directive FIS/04/2021
+WORM (Immudb Vault)
+Transaction Records
+10 years from transaction date
+AML Proclamation + NBE Directive
+WORM + PostgreSQL pgaudit
+STRs & Supporting Documentation
+10 years from filing date
+FIC Requirements
+WORM + encrypted backup
+Dispute Records
+10 years from resolution
+AML + Arbitration enforceability
+WORM + evidence bundle archive
+Audit Reports
+10 years
+NBE Best Practice
+Encrypted document store
+Training Records
+5 years
+NBE Best Practice
+Standard document storage
+
+10. Technical Decision Logs
+10.1 DPO Appointment Decision Log
+PDPP Art. 37 requires appointment of a Data Protection Officer (DPO) if: (a) processing is carried out by a public authority, (b) core activities require regular/systematic monitoring of data subjects on a large scale, OR (c) core activities consist of large-scale processing of special categories of data (Art. 32).
+Factor
+Assessment
+Year 1 Users (projected)
+5,000 freelancers + 1,000 clients = 6,000 data subjects
+Year 1 Transactions
+~15,000 projects → ~45,000 payment events
+Core Activities
+KYC (ID docs, biometric), payment processing, dispute evidence, communications logging — all regular & systematic
+Special Category Data
+Financial data (bank accounts, transaction history) qualifies as sensitive under PDPP Art. 32
+Conclusion
+BOTH thresholds (b) and (c) are MET → DPO appointment is MANDATORY
+
+Decision: Engage a fractional DPO via a law firm or specialist consultant from Week 1. Reassess at 10,000 users. Document this decision in board minutes.
+10.2 DPO Engagement Model Comparison
+Model
+Cost (ETB/yr)
+Independence
+Speed to Appoint
+Best For
+Fractional (Law Firm)
+600k–1.2M
+High (external)
+1–2 weeks
+Pre-Series A, compliance-first
+Fractional (Consultant)
+400k–800k
+High
+1 week
+Cost-optimized
+In-House (Hire)
+1.5M–3.0M+
+Medium (employee)
+2–3 months
+Post-Series A, >50k users
+Hybrid (Consultant + Internal)
+500k–1M
+High
+2 weeks
+RECOMMENDED: Start here, hire later
+10.3 ECA Registration Decision Log
+PDPP Art. 33: 'Data controllers and processors must register with the Ethiopian Communications Authority (ECA) before engaging in data processing activities.' The platform is a DATA CONTROLLER (determines purposes and means of processing).
+Mandatory?: YES — registration must be COMPLETE before ANY user data collection, including KYC onboarding
+Required Documents: Company registration certificate + TIN; Board resolution authorizing DPO; DPO engagement letter/CV + independence declaration; ROPA (Register of Processing Activities); Privacy Notice (Amharic + English); Data Processing Agreements with subprocessors (Chapa, cloud provider, Fayda); Security measures summary; Cross-border transfer assessment
+Application Fee: ~ETB 10,000–20,000 (confirm current amount with ECA)
+Timeline: Week 1–2: Finalize ROPA, privacy notice, DPO engagement. Week 3: Submit application. Week 4–8: ECA review (1–2 rounds of questions). Week 8–10: Receive certificate.
+Status Tracking: Create live tracker (Notion/Airtable/Sheets) with fields: Document | Owner | Status | Due Date | ECA Reference # | Notes
+10.4 ROPA Template Structure (Per PDPP Art. 30)
+Processing Activity
+Data Categories
+Data Subjects
+Purpose
+Legal Basis
+Retention
+User Registration & KYC
+Name, ID, photo, biometric (Fayda), phone, address, TIN
+Freelancers, Clients
+Identity verification, AML compliance
+Legal obligation (AML), Contract
+10 years (AML)
+Payment Processing
+Bank accounts, wallet IDs, transaction amounts, timestamps
+Freelancers, Clients
+Escrow hold/release, payouts
+Contract, Legal obligation
+10 years (AML)
+Dispute Resolution
+Communications, deliverables, evidence, mediator notes
+Freelancers, Clients
+Contract enforcement, mediation, arbitration
+Contract, Legitimate interest
+10 years (AML) + dispute period
+Communications & Notifications
+Message content, metadata, preferences
+Freelancers, Clients
+Service delivery, platform notifications
+Contract, Consent (marketing)
+30 days (non-marketing) / until withdrawal (marketing)
+Analytics & Product Improvement
+Pseudonymized usage, feature adoption, performance
+Freelancers, Clients
+Product improvement, fraud detection
+Legitimate interest
+2 years (aggregated)
+Compliance & Regulatory Reporting
+STR filings, KYC audit logs, breach records
+Freelancers, Clients
+FIC reporting, NBE/ECA audits
+Legal obligation
+10 years
+10.5 Ongoing Compliance Calendar
+Frequency
+Activity
+Owner
+Monthly
+Review STR filings, KYC rejection rates, breach log; verify WORM integrity; backup restore test
+DPO / Engineering
+Quarterly
+ROPA review & update; DPIA refresh (if new processing); staff training; vendor security review
+DPO / Legal / Security
+Semi-Annual
+Independent internal audit of KYC/AML systems (per NBE Directive); penetration test
+Internal Audit / Security
+Annual
+Review KYC/AML policies; re-certify staff training; ECA registration renewal; external privacy audit; DPO independence review; full DR test; encryption key rotation
+All departments
+Event-Driven
+New processing activity → DPIA + ROPA update; Data breach → 72h notification; Regulatory change → impact assessment; Subprocessor change → DPA update
+DPO / Legal
+
+11. Escrow & Payment Integration — Open Questions for Regulators & Partners
+The following questions must be resolved with regulators and payment partners before finalizing the escrow architecture. These are technical dependencies that block engineering decisions.
+11.1 NBE Licensing Clarification
+Does the chosen escrow model (in-wallet, bank custodian, or third-party PSP) require a Payment System Operator or Payment Instrument Issuer license?
+If the platform holds client funds internally (even briefly), does NBE classify it as a payment gateway?
+Are there any exemptions for escrow-only services that do not offer wallet storage beyond the project duration?
+What is the minimum capital requirement for each license type (quoted as ETB 3M+ for payment gateway operators)?
+Does NBE offer a sandbox or regulatory guidance program for fintech startups?
+11.2 Telebirr Onboarding Questions
+What is the exact process to register as a Telebirr merchant/agent for the platform?
+What API integration requirements, fees, and settlement times apply?
+Confirm daily and per-transaction limits (NBE directive: 75k ETB/tx, 150k ETB/day).
+Does Telebirr support split disbursements (e.g., simultaneous payout to freelancer and platform commission deduction)?
+What is the dispute/reversal process for incorrect Telebirr payments?
+Is there a public sandbox environment, or must all testing be done against production with test accounts?
+11.3 CBE Integration Questions
+Does CBE provide a direct API for CBE Birr merchant integration, or is reference-based verification the only path?
+How can merchants automatically verify CBE fund transfers (FT reference system)?
+What fees apply to corporate escrow accounts?
+Does CBE support instant interbank transfers via EthSwitch for freelancer payouts?
+What is the timeline and documentation required for a corporate merchant account?
+11.4 Chapa Details
+Can Chapa act purely as a passthrough (non-custodial) if desired, or does it always hold funds temporarily?
+What fees and settlement schedule apply specifically to a marketplace model (vs. standard merchant)?
+Does Chapa support split disbursements (instantaneous payouts to freelancers net of platform fee)?
+What is the refund/dispute process for Chapa-processed payments?
+Can Chapa provide webhook reliability SLAs (delivery guarantee, retry policy)?
+Does Chapa's KYC process satisfy NBE requirements, or must the platform run parallel KYC?
+11.5 KYC/AML Compliance Questions
+What transaction thresholds trigger enhanced KYC for an online marketplace (vs. a bank)?
+How does the platform register with the Financial Intelligence Center (FIC) for STR filing?
+What specific record-keeping formats does FIC require (10-year retention per Proclamation No. 1387/2025)?
+Can the platform rely on Chapa's KYC for payment users, or must it maintain independent KYC records?
+What are the penalties for delayed or missed STR filing?
+11.6 Data / Telecom Regulations
+Does routing payments via telecom networks (Telebirr, M-PESA) require additional telecom licenses or ECA security standards?
+What are the data localization requirements for payment transaction logs (beyond PDPP Art. 22)?
+Are there specific encryption standards mandated by ECA for telecom-integrated fintech platforms?
+11.7 Arbitration Logistics
+Contact AACCSA to confirm: current name, arbitration rules, fee schedule, and typical timeline.
+How to formally include AACCSA rules in platform contracts (incorporation by reference vs. explicit terms)?
+Does AACCSA offer online/virtual arbitration hearings?
+What evidence format does AACCSA accept (digital bundles, PDFs, authenticated chat exports)?
+11.8 Tax and Float Questions
+If the platform holds funds in escrow (even briefly), does this create a VAT or interest tax obligation?
+Can the platform earn interest on escrow float, or is this prohibited by NBE or Ethiopian banking law?
+How does Safaricom's M-PESA entry into Ethiopia affect Telebirr usage limits and competitive dynamics?
+What are the exact ERCA reporting requirements for a platform acting as a withholding agent?
+
+12. Development Roadmap (Phases 0–5)
+This roadmap breaks the project into 6 phases with concrete tasks, timelines, and compliance checkpoints. At each phase, technical work is aligned with Ethiopia's legal requirements (PDPP, AML/KYC, tax law) and fintech best practices.
+12.1 Phase 0: System Architecture & Infrastructure (Sprint 1)
+Duration: 2 weeks | Sprint: Sprint 1 | Blocking Risk: ALL downstream engineering blocked until infrastructure is provisioned
+Data Localization & Hosting: Provision local servers in Ethiopia (Ethio Telecom Cloud or Safaricom Ethiopia). Verify PDPP Art. 22 compliance: all personal data stored domestically. Configure full encryption at rest (AES-256) and in transit (TLS 1.3).
+Database Setup: Deploy PostgreSQL 15+ with pgaudit extension for detailed activity logging. Configure WORM storage or immutable ledger (Immudb Vault) for 10+ year retention of audit logs and financial records.
+Repository & CI/CD: Initialize Git repository (GitHub/GitLab) with GitFlow branching model. Set up automated pipelines for build, test, and deploy to staging and production. Implement secret management (HashiCorp Vault or AWS Secrets Manager).
+Sandbox API Keys: Register for sandbox credentials: Fayda ID (national eKYC), Chapa (payment aggregator), Telebirr (mobile money), CBE Birr (bank wallet). Document all API credentials in secrets manager — never in code.
+12.2 Phase 1: Core Platform Foundation (Sprints 2–3)
+Duration: 4 weeks | Sprints: 2–3 | Blocking Risk: No user-facing features until auth and profiles are functional
+User Authentication: Build secure login/registration: JWT sessions, TLS enforcement, 2FA (OTP via SMS or authenticator app). Password storage: bcrypt with cost factor 12+. Implement device fingerprinting and geolocation checks.
+User Profiles & Roles: Create Freelancer and Client profiles with portfolio uploads. Mark profiles as 'Independent Contractor' for legal clarity. Implement role-based access control (RBAC) on all endpoints.
+Job Engine: Develop job posting and bidding UIs. Clients create standardized job posts (templates enforce independent-contractor terms). Freelancers browse, filter, and submit proposals. Auto-generate PDF/digital Service Agreement on bid acceptance.
+Security from Day 1: Integrate encryption (TLS everywhere), access controls on every endpoint, audit trails for all actions. Biometric or PIN login for mobile. Follow fintech best practices.
+12.3 Phase 2: KYC & Compliance Layer (Sprints 4–5)
+Duration: 4 weeks | Sprints: 4–5 | Blocking Risk: NO financial transactions allowed until KYC is operational
+Fayda ID Integration: Link user onboarding to Ethiopia's Fayda digital ID system. Call VeriFayda 2 API for OTP, facial recognition, and fingerprint matching. Align with NBE mandate: all financial accounts Fayda-linked by 2026. Store only hashed ID number and verification timestamp.
+Hard-Block Logic: Enforce: unverified users CANNOT deposit, withdraw, or accept jobs. Mark unverified accounts in database. Disable escrow actions until verification succeeds. Build user-facing KYC status dashboard.
+Data Retention & Erasure: Implement account-deletion feature: purge personal/profile data on request, except financial/KYC logs retained 10 years for AML. Use logical delete flag to segregate 'deleted' profiles while preserving transactions and audit trails. Explain in UI that full deletion is not immediate due to legal retention.
+Transaction Monitoring System (TMS): Build automated red-flag detection: structuring, velocity spikes, round amounts, rapid movement, PEP activity. Integrate PEP/sanctions screening with daily list refreshes.
+12.4 Phase 3: Escrow & Payment Engine (Sprints 6–7)
+Duration: 4 weeks | Sprints: 6–7 | Blocking Risk: Platform cannot generate revenue without working payments
+Payment Gateway Integration: Implement APIs for Telebirr (Ethio Telecom mobile money) and CBE Birr (Commercial Bank of Ethiopia wallet). User flow: client chooses method → backend sends payment request → user confirms on device → webhook notifies backend of success/failure. For Chapa: integrate aggregator API for card/bank payments. Use merchant sandbox accounts for development.
+Escrow State Machine: Code escrow logic: Payment Pending → Escrow Held (all funds secured) → Partially/Fully Released or Refunded. Handle multi-milestone jobs by releasing partial payments on each milestone approval.
+Automated Cron Jobs: Auto-release escrow if client is silent for defined period after milestone delivery. Send reminders before timeouts. Run every hour; handle timezone (EAT, UTC+3).
+Platform Accounting: On each transaction, compute: platform fee (10%), withholding tax (3% with TIN, 30% without), VAT (15% on commission). Freelancer share: 90% minus withholding. Platform revenue: 10% plus 15% VAT on commission.
+Tax Reporting: Log all payment events with details for tax filings (gross amount, tax withheld, VAT). Ensure accounting can produce CSV/statement for ERCA on demand.
+Idempotency and Reliability: All payment endpoints idempotent (same request ID = same result). Verify each payment status with provider rather than assuming webhook success. Re-query Telebirr transaction if webhook is delayed. Implement dead letter queue for failed operations.
+12.5 Phase 4: In-App Evidence & Dispute Flow (Sprints 8–9)
+Duration: 4 weeks | Sprints: 8–9 | Blocking Risk: Disputes cannot be resolved without evidence infrastructure
+Real-Time Messaging: Build in-app chat between client and freelancer per project. Log all messages and file attachments (encrypted at rest). Include UI warnings: off-platform communications (WhatsApp) won't count in disputes.
+Milestone Submission UI: Enable freelancers to submit files/links for each milestone. Tag submissions in chat/project record. Auto-generate submission record: timestamp, file hash (SHA-256), uploader identity, milestone ID.
+Dispute Resolution Dashboard: Create admin view for disputes: Stage 1 (Direct Negotiation — monitor only), Stage 2 (Mediation — admin intervention). Compile evidence bundle: chat logs, contracts, deliverables. Maintain versioned records.
+Audit Trails: Ensure every admin action (status change, message to user) is logged immutably (pgaudit + WORM). Audit trail supports fair resolution and compliance.
+12.6 Phase 5: Security Audits & Pilot Launch (Sprints 10–11)
+Duration: 4 weeks | Sprints: 10–11 | Blocking Risk: Public launch blocked until security audit passes
+Penetration Testing: Engage external security firm to test escrow logic, KYC bypass attempts, payment webhook manipulation, privilege escalation. Scope: external perimeter, internal infrastructure, social engineering.
+Encryption & Hardening: Verify TLS 1.3 everywhere, AES-256 at rest, strong ciphers, disabled unused ports/services, automated patching. Review server configurations and security headers.
+Closed Beta: Invite 50 freelancers in ONE category (Graphic Design recommended) and 10–15 local SMEs. Use Chapa sandbox for all payments. Success criteria: 100% escrow completion without manual intervention, <5% dispute rate, <2% payment failure.
+Monitor User Flows: Instrument analytics on key flows: signup → KYC → job post → escrow fund → delivery → release. Watch for drop-offs (e.g., Fayda verification abandonment).
+Feedback Loop: Collect bug reports and feedback. Schedule quick iterations (UX tweaks, bug fixes) before full launch. Go/No-Go decision after 4 weeks: 3+ criteria met → public launch; <3 met → extend beta 2 weeks.
+12.7 Roadmap Summary Table
+Phase
+Sprints
+Duration
+Key Deliverable
+Compliance Checkpoint
+Phase 0
+Sprint 1
+2 weeks
+Local infrastructure + sandbox APIs
+PDPP Art. 22 data localization verified
+Phase 1
+Sprints 2–3
+4 weeks
+Auth, profiles, job engine
+RBAC + audit logging operational
+Phase 2
+Sprints 4–5
+4 weeks
+Fayda KYC + hard-block + TMS
+NBE KYC requirements met; STR workflow ready
+Phase 3
+Sprints 6–7
+4 weeks
+Payment integration + escrow engine
+Tax calculation automated; idempotency tested
+Phase 4
+Sprints 8–9
+4 weeks
+Messaging + dispute dashboard
+Evidence bundle generation tested
+Phase 5
+Sprints 10–11
+4 weeks
+Security audit + closed beta
+Penetration test passed; beta metrics met
+
+Appendix A: Architecture × Integration Comparison Matrix
+This matrix compares all viable escrow architecture and payment integration combinations. Use this to make the final escrow architecture decision (Phase 0).
+Model × Integration
+Legal Risk
+Implementation Complexity
+Trust Level
+Cost (ETB/yr)
+Speed to Launch
+Best For
+In-Wallet + Chapa
+Very High (needs PSP license)
+Very Complex (ledger + compliance)
+Moderate
+Low/Med (no PSP fee, high dev cost)
+Moderate
+Full control over flow
+In-Wallet + Telebirr Direct
+Very High
+Very Complex (single rail + ledger)
+Moderate
+Low (0.5% fee, high dev cost)
+Fast (instant wallet)
+Telebirr-only market
+Bank Custodian + Chapa
+Medium (banked funds)
+Moderate (bank APIs + reconciliation)
+High
+Medium (bank + PSP fees)
+Medium
+Balanced risk/trust
+Bank Custodian + CBE Direct
+Medium
+Moderate (CBE API/verification)
+High (CBE escrow)
+Low (bank fees only)
+Fast (EthSwitch instant)
+CBE-dominant clients
+3rd-Party PSP (Chapa Escrow) + Chapa
+Low (non-custodial)
+Low (integrate PSP API)
+High (PSP brand)
+High (2-3% + fees)
+High (instant wallet)
+Fastest to market
+3rd-Party PSP + Telebirr/CBE
+Low
+Low
+High
+High (PSP fees)
+High
+Multi-rail without custody
+
+Recommendation: Start with 'Bank Custodian + Chapa' for launch. This balances legal risk (medium), implementation complexity (moderate), and user trust (high). It avoids the PSP licensing burden of in-wallet while providing multi-rail coverage via Chapa. Revisit '3rd-Party PSP' if Chapa launches an escrow-specific product, or 'In-Wallet' once PSP licensing is secured.
+
+Appendix B: Compliance Implementation Checklist
+B.1 Phase 1: Immediate (0–30 days) — Legal Foundation
+#
+Action
+Owner
+Deadline
+1.1
+Obtain final gazetted text of AML Proclamation No. 1387/2025; update KYC policies
+Legal Counsel
+Day 7
+1.2
+Register as Data Controller with ECA (PDPP Art. 33)
+Legal/Compliance
+Day 14
+1.3
+Appoint DPO or designate privacy lead
+Management
+Day 14
+1.4
+Draft and publish Privacy Notice (Amharic + English)
+Legal/Product
+Day 21
+1.5
+Implement granular consent collection at registration
+Engineering
+Day 30
+1.6
+Determine platform classification under NBE regulations
+Legal Counsel
+Day 15
+1.7
+Engage law firm with corrected contract brief
+CEO
+Day 10
+B.2 Phase 2: Short-Term (30–90 days) — Technical Build
+#
+Action
+Owner
+Deadline
+2.1
+Build KYC document upload portal with encrypted storage
+Engineering
+Day 45
+2.2
+Implement hard-block logic on withdrawals/profile changes
+Engineering
+Day 45
+2.3
+Integrate Fayda ID verification API
+Engineering
+Day 60
+2.4
+Build 'Verified' badge and KYC status dashboard
+Engineering
+Day 60
+2.5
+Implement Unique Customer ID architecture
+Engineering
+Day 45
+2.6
+Deploy Transaction Monitoring System with red-flag rules
+Engineering
+Day 90
+2.7
+Implement PEP/sanctions screening (automated daily)
+Engineering
+Day 75
+2.8
+Build user data rights portal (access, rectify, export, delete)
+Engineering
+Day 90
+2.9
+Extend DB schema for 10-year WORM storage
+Engineering
+Day 75
+2.10
+Configure primary hosting on Ethiopian cloud
+DevOps
+Day 60
+B.3 Phase 3: Medium-Term (90–180 days) — Operational Maturity
+#
+Action
+Owner
+Deadline
+3.1
+Establish Compliance Officer role and KYC unit
+Management
+Day 100
+3.2
+Create STR filing workflow with 24-hour SLA
+Compliance
+Day 105
+3.3
+Conduct DPIA for high-risk processing
+DPO/Legal
+Day 120
+3.4
+Execute ECA-approved SCCs for international backups
+Legal/DevOps
+Day 120
+3.5
+Implement immutable audit logging
+Engineering
+Day 135
+3.6
+Conduct penetration test and remediate
+Security
+Day 150
+3.7
+Establish 72-hour breach notification runbook
+DPO/Legal
+Day 120
+3.8
+Train all staff on AML/PDPP
+HR/Compliance
+Day 180
+3.9
+Establish Register of Processing Activities
+DPO
+Day 105
+3.10
+Implement HSM for encryption key management
+Engineering
+Day 150
+B.4 Phase 4: Ongoing — Continuous Compliance
+Frequency
+Action
+Owner
+Daily
+Refresh PEP/sanctions screening lists
+Engineering
+Monthly
+Review STR filings, KYC rates, breach log
+Compliance
+Quarterly
+ROPA review, DPIA refresh, staff training, vendor security review
+DPO/Legal/Security
+Semi-Annual
+Independent internal KYC/AML audit; penetration test
+Internal Audit/Security
+Annual
+Policy review, staff re-certification, ECA renewal, external privacy audit, DR test
+All departments
+Event-Driven
+New processing → DPIA; Breach → 72h notification; Regulatory change → impact assessment
+DPO/Legal
+
+Appendix C: Budget Summary (Year 1)
+C.1 Compliance & Legal Costs
+Item
+Frequency
+Estimated Cost (ETB)
+Estimated Cost (USD)
+Fractional DPO (law firm/consultant)
+Monthly (12 months)
+600,000–1,200,000
+~$11k–22k
+ECA Registration Fee
+One-time
+10,000–20,000
+~$200–400
+Legal Fees (ROPA, filing, privacy notice)
+One-time
+200,000–500,000
+~$3.7k–9k
+Annual ECA Renewal
+Annual
+10,000–20,000
+~$200–400
+Penetration Testing
+Bi-annual (2x)
+300,000–600,000
+~$5.6k–11k
+DPIA (Initial + Annual Refresh)
+Annual
+100,000–200,000
+~$1.8k–3.7k
+Staff Training (Quarterly)
+Quarterly (4x)
+200,000–400,000
+~$3.7k–7.4k
+TOTAL YEAR 1
+
+~1,420,000–2,940,000
+~$26k–54k
+
+Note: This budget excludes engineering security work (encryption implementation, WORM storage setup, HSM procurement) and infrastructure costs (cloud hosting, bandwidth, API fees), which should be budgeted separately under Engineering CapEx/OpEx.
+
+Appendix D: Glossary of Terms
+AACCSA: Addis Ababa Chamber of Commerce and Sectoral Associations — arbitral institution for commercial disputes.
+AML: Anti-Money Laundering — laws and procedures to prevent money laundering and terrorist financing.
+CDD: Customer Due Diligence — the process of verifying the identity of customers to assess risk.
+DPIA: Data Protection Impact Assessment — mandatory assessment under PDPP for high-risk processing activities.
+DPO: Data Protection Officer — mandatory role under PDPP for large-scale or sensitive data processing.
+ECA: Ethiopian Communications Authority — regulator for data protection and telecom under PDPP.
+ERCA: Ethiopian Revenue and Customs Authority — tax collection agency.
+Fayda ID: Ethiopia's national digital ID system (Proclamation No. 1284/2023) — biometric-linked, government-verified identity.
+FIC: Financial Intelligence Center — receives and analyzes Suspicious Transaction Reports (STRs).
+HSM: Hardware Security Module — physical device for secure key management.
+KYC: Know Your Customer — identity verification process required by AML regulations.
+NBE: National Bank of Ethiopia — central bank regulating payment systems and AML.
+PDPP: Personal Data Protection Proclamation No. 1321/2024 — Ethiopia's GDPR-like data protection law.
+PEP: Politically Exposed Person — individual with prominent public function, requiring enhanced due diligence.
+PSP: Payment Service Provider — licensed entity authorized to provide payment services.
+ROPA: Register of Processing Activities — mandatory documentation of all data processing under PDPP Art. 30.
+SCCs: Standard Contractual Clauses — ECA-approved contractual safeguards for cross-border data transfers.
+STR: Suspicious Transaction Report — mandatory filing to FIC within 24 hours of detecting suspicious activity.
+TIN: Tax Identification Number — required for 3% withholding tax rate (30% without TIN).
+TMS: Transaction Monitoring System — automated system for detecting AML red flags.
+WORM: Write Once Read Many — immutable storage that prevents deletion or modification of records.
+VAT: Value Added Tax — 15% on platform commission revenue once annual revenue exceeds ETB 1,000,000.
+
+Document Control
+Document Title
+Ethiopian Freelance Marketplace — Development & Engineering Playbook
+Version
+1.0
+Date
+July 2026
+Classification
+Internal — Development & Engineering Use Only
+Owner
+CTO / Head of Engineering
+Review Cycle
+Quarterly or upon significant regulatory/technical change
+Cross-References:• Master Design, Legal & Compliance Document (Draft 1) — for legal strategy, contract templates, and regulatory analysis• Ethiopian KYC/AML & PDPP Compliance Roadmap — for detailed compliance implementation guidance• Development Roadmap (Phases 0–5) — for sprint-level technical planning
+Disclaimer:This document is for internal engineering use and does not constitute legal advice. All contract language, regulatory interpretations, and compliance procedures must be reviewed and finalized by qualified Ethiopian legal counsel before implementation.

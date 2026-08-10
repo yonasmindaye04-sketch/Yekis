@@ -1,0 +1,416 @@
+
+Ethiopian Freelance Marketplace
+
+Master Engineering & Product Roadmap (Revised)
+Document Owner: Head of Engineering   |   Status: Living Document — Updated as phases complete   |   Last Updated: July 2026 (Revision 2 — gap analysis incorporated)
+Project Vision: Build Ethiopia's first trusted freelance marketplace where a client can post work, pay into escrow, and receive a delivered result — or get their money back — without ever needing informal trust or a lawyer.
+What Changed in This Revision
+Summary — Items new since the original draft are tagged NEW throughout.
+In summary:
+–  KYC is now explicitly tiered (Tier 1/2/3), not a single flat verification flow.
+–  Added: Compliance Officer hire, ROPA, DPIA, subprocessor DPAs, cloud-vendor DPA, anti-circumvention protections, age/contractual-capacity gate, Fayda-based deduplication, periodic KYC refresh, insurance, certified-translation decision, and AACCSA escalation mechanics.
+–  Backup/disaster-recovery testing moved earlier — from Phase 3 into Phase 1, since it protects KYC and escrow records from day one, not just at public launch.
+–  App store submission lead time flagged as a conditional Phase 3 dependency if a native app is planned.
+How to Read This Roadmap
+Each phase has a Goal, a Duration, and tasks broken down by department with a clear Definition of Done (DoD). Tasks marked [BLOCKING] cannot be skipped — later phases cannot start without them. Tasks marked [PARALLEL] are parallel tracks that can run concurrently. NEW marks items added in this revision.
+Master Timeline Overview
+Phase
+Name
+Duration
+Milestone
+Phase 0
+Pre-Conditions & Foundations
+Weeks 1–6
+All blocking decisions resolved
+Phase 1
+Build the MVP
+Weeks 7–22
+Internal alpha running with test transactions
+Phase 2
+Beta & Trust Verification
+Weeks 23–30
+Closed beta with 50 real freelancers & 20 clients
+Phase 3
+Pilot Launch
+Weeks 31–40
+Public launch in 1 sector, 1 city
+Phase 4
+Growth & Scale
+Weeks 41–65
+500 completed transactions, monetization active
+
+Sequencing note — send the legal brief in Week 1, day one — it has the longest lead time of anything in Phase 0, and the contract template, KYC tiers, and DPO decision all depend on counsel's answers. Everything else in Phase 0 can run while you wait on that.
+
+PHASE 0 — Pre-Conditions & Foundations
+Duration: Weeks 1–6
+Goal: Resolve all strategic blocking decisions so that Engineering, Design, and Legal can start work without reversing course later.
+Caution — Nothing in Phase 1 can begin with full commitment until Phase 0 decisions are locked. Building the escrow UI without knowing the escrow architecture, or designing KYC without Fayda API access, wastes engineering time. That said, auth, job posting, and bidding can start on engineering's side before escrow architecture is finalized — only the escrow/payment engine itself needs to wait.
+Legal & Compliance   [BLOCKING]
+ Engage an Ethiopian Law Firm — Issue a formal brief covering: ToS drafting, Service Agreement template, KYC/AML framework, PDPP compliance, and payment facilitator classification. Send this in Week 1 — it is the longest lead-time item in Phase 0.
+ Confirm AML Proclamation Number — Get the final gazetted number for the 2024 AML Proclamation (cited provisionally as No. 1387/2025) from the lawyer.
+ Determine Platform Classification — Is the platform a “payment instrument issuer” or “money transfer operator” under NBE Directives? This affects licensing burden.
+ Fayda ID API Access — Begin formal application process for Fayda ID API access for KYC verification. Confirm timeline.
+ECA Registration — Begin registration process as a Data Controller with the Ethiopian Communications Authority (ECA) under PDPP No. 1321/2024. Confirm timeline and fees.
+Appoint (or designate) a Data Protection Officer (DPO) — Confirm with lawyer whether transaction volume triggers mandatory DPO under PDPP Art. 37.
+NEW: Decide the KYC tier model — Confirm explicitly whether the MVP launches with the full three-tier design (Tier 1 basic / Tier 2 payout-eligible, requiring a TIN or business registration / Tier 3 high-risk PEP) or a deliberately simplified single-tier flow for launch. Either is legitimate — but make it a documented decision, not a default by omission, since Tier 2's TIN/business-registration requirement protects the tax-withholding obligation.
+NEW  Confirm certified-translation requirement — Ask counsel whether Ethiopian courts require a certified Amharic translation of the Service Agreement for enforcement, or whether naming English as the authoritative language is sufficient.
+NEW  Register the Register of Processing Activities (ROPA) — PDPP Art. 33 registration requires this alongside the Data Controller application; draft it now rather than as an afterthought.
+ NEW  Scope the DPIA requirement — Confirm with counsel/DPO whether a Data Protection Impact Assessment is required before launch given the platform's processing of ID and financial data.
+NEW  Draft subprocessor DPAs — Data Processing Agreements with Fayda ID, the chosen cloud provider, and each payment gateway (Telebirr, Chapa, CBE), not just the user-facing Privacy Policy.
+NEW  Confirm contractual-capacity / minimum-age policy — Fayda ID is issued regardless of age; get counsel's confirmation on the minimum age for binding contracts under the Civil Code, and require it as a KYC gate.
+NEW  Scope insurance needs — Research cyber liability insurance and a fidelity/crime bond, given the platform indirectly custodies user funds through escrow. Confirm availability and cost with a broker.
+Open a separate Escrow Bank Account — Platform operating revenue must be strictly separated from user funds held in escrow.
+
+DoD — Law firm engaged and all open legal questions above answered in a written memo from counsel.
+
+
+
+
+Product & Design Decisions   [BLOCKING]
+ Lock Escrow Architecture — Choose one: (A) In-platform wallet — higher licensing risk, full control. (B) Bank custodian model — lower risk, slower. (C) Third-party PSP via Chapa — fastest to launch, less control. This decision directly dictates the escrow dashboard screen and the payment webhook architecture.
+Lock Launch Categories — Confirm exactly 4–6 subcategories for launch. Recommended: Web/App Development, Graphic Design, Digital Marketing, Content Writing, Translation (Amharic to English), Data Entry.
+Lock Take-Rate & Fee Split — Confirm the 10% platform fee (recommended: 5% from freelancer / 5% from client). This is displayed on the Contract and Checkout screens.
+Hire Bilingual Content Writer — A bilingual (Amharic + English) content writer is non-negotiable for MVP. Hire or contract before design begins.
+NEW  Decide native app vs. web-first launch — If a native mobile app is planned, Apple/Google review adds 1–2+ weeks of non-negotiable lead time; this needs to be on the Phase 3 critical path now, not discovered in Week 35.
+
+DoD — All product decisions documented in a single “Phase 0 Decision Log” signed off by the founder/PM.
+
+Engineering Setup   [PARALLEL]
+Set Up Version Control & Branching Strategy — Initialize monorepo or multi-repo on GitHub/GitLab. Define main/develop/feature branch workflow.
+Create Developer Accounts — Obtain sandbox API credentials for: Telebirr, Chapa, CBE Birr, EthSwitch.
+Select & Provision Infrastructure — Spin up accounts with Ethio Telecom Cloud or Safaricom Ethiopia for primary hosting (PDPP Art. 22 compliance). Set up dev, staging, and production environment structure.
+NEW  Execute the cloud vendor DPA — Sign the Data Processing Agreement with whichever cloud provider is chosen before any real user data touches it — not just the future cross-border Standard Contractual Clauses planned for Phase 4.
+Define Tech Stack — Finalize and document: Frontend: React + Next.js. Backend: Node.js or Go. Database: PostgreSQL with pgaudit extension enabled. Cache: Redis. File Storage: Ethiopian-hosted S3-compatible object store.
+Set Up CI/CD Pipeline — GitHub Actions or equivalent. Auto-run tests on every PR. Block merge if tests fail.
+Configure Monitoring & Alerting — Set up Sentry for error tracking. Configure uptime monitoring.
+ NEW  Design backup & disaster recovery from day one — Define the backup schedule and recovery procedure for the database and object store now; this gets tested in Phase 1, not deferred to Phase 3.
+
+DoD — All engineers can clone the repo, run the app locally, and push a feature branch. Sandbox API keys are securely stored.
+
+
+
+
+Finance & Accounting   [PARALLEL]
+Company Registration — Confirm legal entity type (PLC) is registered with the relevant Ethiopian authority.
+TIN Registration — Ensure the platform entity has its own TIN for tax remittance purposes.
+Accounting System Setup — Set up accounting software (e.g., QuickBooks or a local Ethiopian equivalent). Chart of accounts must separate: Platform Revenue, Escrow Held Funds, Tax Withholding Payable, VAT Payable.
+NEW  Procure insurance — Bind the cyber liability and fidelity/crime coverage scoped by Legal above, before any real transaction volume flows.
+
+DoD — Company is registered, has a TIN, has a bank account separate from the escrow custodian account, and insurance is bound.
+
+PHASE 1 — Build the MVP
+Duration: Weeks 7–22 (16 weeks)
+Goal: A working internal alpha with real (but sandboxed/test) transaction flows running end-to-end.
+Note — The rule for Phase 1 is: build only what is necessary for the trust loop to work. That loop is: Register → KYC → Post Job → Bid → Contract → Escrow → Deliver → Accept/Dispute → Payout. Everything else is Phase 2.
+Engineering — Core Backend (Weeks 7–12) [BLOCKING]
+Authentication & User Management
+ User Registration & Login — Email + phone OTP. Support both Amharic and English language preference stored on the user record.
+
+Role System — Users have a role: CLIENT, FREELANCER, or BOTH. Roles affect what screens they see.
+Session Management — JWT with refresh tokens. Secure cookie storage. 2FA (SMS OTP) optional at MVP, mandatory for withdrawals.
+Hard Block System — Unverified users are blocked from: withdrawing funds, changing profile, bidding on projects, or receiving payments. This is a non-negotiable AML requirement.
+NEW  Age / contractual-capacity gate — Registration blocks users below the legal age of majority, as confirmed by counsel in Phase 0, and checks against Fayda's date-of-birth field.
+KYC Module
+Document Upload — Secure upload for National ID, Passport, or Driver's License. Store in WORM-compliant, encrypted object store on Ethiopian servers.
+Fayda ID Integration — Implement an API call to Fayda ID for biometric/document verification. Build a manual review fallback queue for when the API fails.
+NEW  Implement the tiered KYC model decided in Phase 0 — If three tiers: Tier 1 (basic ID, phone, address — required for browsing/bidding), Tier 2 (TIN or business registration, bank details — required for withdrawal), Tier 3 (enhanced due diligence for PEP/high-volume users). If single-tier for MVP, document that as the explicit simplification and revisit at Phase 4.
+Unique Customer ID Assignment — Generate and assign a platform-wide Unique Customer ID (UCID) to every user upon KYC completion. All transactions are linked to the UCID, not just the username.
+NEW  Fayda-based deduplication — Cross-reference new KYC submissions against Fayda's biometric identifier (not just self-reported document fields) to catch a rejected or suspended user re-registering under slightly different details.
+KYC Status State Machine — States: PENDING → UNDER_REVIEW → VERIFIED / REJECTED. Send in-app and SMS notifications on each state change.
+PEP Screening — Integrate automated Politically Exposed Persons (PEP) screening on KYC submission. Flag matches for manual compliance review.
+NEW  Periodic KYC refresh job — Scheduled re-verification for Tier 2/3 users, and for any account after an extended dormancy period, per ongoing AML due-diligence practice.
+Job & Bidding System
+Job Posting — Clients can post a job with: title, category (from locked launch list), description, budget range, milestones, and deadline.
+Proposal Submission — Freelancers can submit proposals: cover letter, timeline, quoted price, and milestone breakdown.
+Proposal Review — Client sees all proposals. Can shortlist, message, and accept one.
+Category & Search — Basic search/filter by category, budget, and delivery time. Pagination.
+Trust & Anti-Circumvention
+NEW  Mask contact information in pre-contract messaging — Automatically detect and redact phone numbers, emails, and common off-platform-contact patterns in messages exchanged before a contract is signed.
+NEW  Off-platform solicitation policy in the ToS — Explicit terms prohibiting circumventing the platform for a job connection made on it, with a real enforcement consequence (warning then suspension), since once trust is established between two parties nothing else stops them from transacting directly and skipping the fee.
+NEW  Monitor for circumvention patterns — Lightweight detection (e.g., repeated contact-info-masking triggers between the same two users) feeding into the moderation queue.
+Contract Engine
+Auto-Generated Service Agreement — Upon a client accepting a proposal, the system auto-generates a Service Agreement PDF using the approved template. Pulls in: freelancer name, client name, scope, milestones, payment terms, revision policy, arbitration clause.
+NEW  Language/authoritative-version handling — Implement per counsel's Phase 0 answer: either bilingual contract generation with a certified-translation path, or an explicit “English is the authoritative version” clause rendered in both languages.
+Digital Acceptance — Both parties must click “I Accept” on the contract. Each acceptance is timestamped and stored immutably, as required for legal enforceability under Proclamation No. 1205/2020.
+Contract Storage — Contracts are stored immutably and associated with both parties' UCID and the job ID.
+Escrow & Payment Engine (Most Critical Module)
+Escrow State Machine — Implement a strict state machine for each milestone:
+PAYMENT_PENDING → ESCROW_HELD → WORK_IN_PROGRESS →SUBMITTED_FOR_REVIEW → ACCEPTED (→ RELEASED) | DISPUTED (→ REFUNDED/PARTIAL)
+Payment Integration (Telebirr) — Implement Telebirr Merchant API: initiate payment, handle callbacks, validate webhook signatures with HMAC. Test against Telebirr sandbox.
+Payment Integration (Chapa) — Implement Chapa as the secondary/fallback gateway. Handle webhooks.
+Payment Integration (CBE Birr) — Implement CBE API as a tertiary option.
+Fee Calculation Engine — On every transaction, automatically calculate and route: Freelancer Net (95%), Platform Fee (5% from freelancer + 5% added to client total), Payment Provider Fee (0.5–2%).
+Withholding Tax Logic — For payouts of 10,000 ETB or more: deduct 3% if TIN is on file, or 30% if TIN is missing. Create a tax ledger entry. Flag for monthly remittance batch.
+Auto-Release Cron Job — If a client takes no action within 5 days of a freelancer submitting a milestone, funds automatically release to the freelancer. Notify both parties 24 hours before auto-release.
+Wallet System — Each user has an internal wallet (balance). Freelancers can withdraw to Telebirr/CBE from their wallet—minimum withdrawal floor to be confirmed by Finance.
+Transaction Monitoring System (TMS)
+AML Rule Engine — Build automated flagging for: Structuring (multiple payments just below the 10,000 ETB threshold within 24 hours); Velocity (abnormal job frequency, e.g. 20 completed jobs in 48 hours); Pass-through (funds deposited and immediately withdrawn with no job activity); Wallet mismatch (withdrawal destination does not match KYC-verified identity).
+Compliance Review Queue — Flagged transactions enter an internal compliance queue for manual review, owned by the Compliance Officer. The platform must file a Suspicious Transaction Report (STR) with the FIC within 24 hours of a confirmed flag.
+
+
+Dispute Module
+Stage 0 Prevention — Job creation wizard enforces template-based scope. Pop-up reminder: “All work communication must happen on-platform.”
+Stage 1: Direct Negotiation (Days 0–7) — “Raise Dispute” button on a milestone triggers a structured form. System opens a dispute thread. 7-day countdown timer visible to both parties.
+Stage 2: Evidence Package — If unresolved after 7 days, system auto-compiles: contract terms, all submitted files, and message log. Categorizes dispute type: non-delivery, scope creep, quality issue, non-payment.
+Stage 3: Mediator Queue — Dispute and evidence package queued for a human mediator. Mediator UI to review and issue a non-binding recommendation within 3–5 days.
+NEW  Stage 4: AACCSA escalation mechanics — Define who represents the platform if a case truly escalates to arbitration, how the Stage 2 evidence package gets formally submitted to AACCSA, and how arbitration costs are allocated between the parties and the platform. This was designed at the policy level earlier but never turned into an operational task.
+Immutable Audit Log — Every dispute event (raised, message sent, evidence submitted, ruling issued) is logged with a timestamp and stored immutably for 10 years, per AML requirement.
+PDPP & Data Compliance Infrastructure
+WORM Storage — Configure PostgreSQL with pgaudit and append-only partitioned tables for all KYC and transaction records. Verify with a write-attempt test.
+Consent Management — Registration flow includes granular, unbundled consent checkboxes: KYC data processing (required), Marketing communications (optional), Analytics (optional). Store consent timestamps.
+Data Erasure Tooling — Build an admin tool that, upon a verified user deletion request, wipes marketing data, profile photos, and chat messages — but securely preserves AML transaction data under the 10-year hold.
+Breach Notification Workflow — Document and implement a 72-hour incident response protocol: detect → contain → notify ECA → notify affected users → file report.
+NEW  Backup & disaster recovery test — Actually run the recovery procedure designed in Phase 0 against a restored environment; confirm RTO/RPO before real user data accumulates. Moved up from Phase 3 — too late to discover a broken backup after KYC/escrow records exist.
+Engineering — Frontend (Weeks 9–18, overlapping backend) [BLOCKING]
+Design handoff from Product must complete before frontend build starts for each screen group.
+Core Screens (Build in this order)
+ Onboarding & Registration — Bilingual (Amharic/English) toggle on first screen. Phone + email registration.
+ KYC Upload & Status — ID upload flow. Status screen: Pending / Under Review / Verified / Rejected. Clear explanation of why KYC is required. Reflects the tier the user is on and what is needed to reach the next tier.
+ Client: Job Posting — Step-by-step job wizard. Category selector (launch categories only). Milestone builder.
+ Freelancer: Browse & Bid — Job board with filters. Proposal submission form.
+ Contract View — Full contract screen. Both-party acceptance flow with digital signature confirmation.
+Escrow Dashboard — The most critical screen. Visual status: a clear, colored status indicator per milestone. “Funded / Held / Released / In Dispute.” Countdown timer for auto-release. “Accept & Release” and “Raise Dispute” primary action buttons.
+ Milestone Submission — Freelancer uploads deliverables (files, links, text). Submission confirmation.
+ Dispute Flow — Structured dispute form. Evidence thread. Mediator recommendation display.
+ User Profile — Verified badge (prominent). Star rating (aggregate). Portfolio gallery. On-time completion rate. Reviews (double-blind, only on completed escrow jobs).
+ Wallet & Withdrawal — Balance display. Withdrawal request form with destination (Telebirr/CBE). Withholding tax deduction shown transparently before confirmation.
+☐  11. Notifications Centre — In-app notification list. SMS for critical events (escrow funded, dispute raised, payout sent).
+Engineering Standards for All Frontend Work
+☐  Mobile-first, bandwidth-first — Every page must score 80 or above on Lighthouse Performance on a simulated 3G connection. No image over 200KB uncompressed.
+☐  Amharic/English i18n — All strings must be in i18n files (e.g., en.json, am.json). No hardcoded copy in component files.
+☐  Ethiopic font support — Use Noto Sans Ethiopic from Google Fonts for all Amharic text.
+☐  Accessible — All interactive elements have unique IDs. Labels on all form inputs. Keyboard navigable.
+Product & Design (Weeks 7–15) [PARALLEL]
+☐  Establish Design System in Figma — Before any screen design: brand color palette (1 primary, 1 accent, semantic colors: green for released, red for dispute, yellow for pending); typography (Noto Sans Ethiopic for Amharic, Inter or Outfit for English); spacing (4px/8px grid); component library (buttons, form fields, status badges, cards, modals, nav bars).
+☐  Run UX Research (Discovery) — Minimum 5 user interviews per user type (freelancer and client). Use Google Forms for a broader survey. Document personas.
+☐  Write Feature Briefs — For each of the 9 MVP screens: user story, acceptance criteria, edge cases.
+☐  Low-Fidelity Wireframes — Black and white wireframes for all 9 MVP screens in Figma. Internal review.
+☐  High-Fidelity Mockups — Apply design system to all wireframes. Produce interactive Figma prototype.
+☐  Usability Testing — Recruit 3–5 Ethiopian freelancers and clients. Give tasks (“Fund escrow”, “Submit a bid”, “Raise a dispute”). Record results. Fix critical issues before handoff.
+☐  Design Handoff — Export all screens with specs (padding, font sizes, hex codes). Export all Amharic and English copy strings in a spreadsheet for content writer review.
+☐  Design QA — After Engineering builds each screen group, UX/UI designer does a pixel-perfect review. File issues in the project tracker.
+Legal & Compliance (Weeks 7–12) [PARALLEL]
+☐  Finalize ToS & Privacy Policy — Law firm delivers final Terms of Service and Privacy Policy. Must include: KYC requirements, escrow rules, fee disclosure, dispute process, arbitration clause (Seat: Addis Ababa, AACCSA, with the cassation-waiver sub-clause under Proclamation No. 1237/2021 Art. 49(2)), 7-day cooling-off right, and the off-platform-circumvention policy.
+☐  Finalize Service Agreement Template — Law firm delivers the auto-generated per-job contract template. Must include: independent contractor status, scope, milestones, payment terms, IP (work-for-hire), confidentiality, liability cap, termination, arbitration.
+☐  Integrate Legal Text into Platform — Engineering integrates ToS and Privacy Policy as screen-rendered text (not external PDF) so it is displayed in the language the user selected.
+☐  KYC/AML Procedures Manual — Document the internal procedures for: handling a failed verification, handling an STR filing, and responding to an ECA data request.
+☐  NEW  Finalize subprocessor DPAs — Execute the Data Processing Agreements with Fayda ID, the cloud provider, and each payment gateway drafted in Phase 0.
+Operations (Weeks 14–22) [PARALLEL]
+☐  Hire / Train Mediators — Recruit and train at least 2 human mediators for Stage 3 dispute resolution. Train them on the contract template and how to apply the mediation protocol.
+☐  Set Up Helpdesk — Configure a helpdesk tool (Freshdesk, Zendesk, or similar). Define SLAs: disputes within 3 business days, general support within 24 hours.
+☐  Write Internal Playbooks — Document procedures for: account suspension, KYC manual review, STR filing, breach notification, and AACCSA arbitration escalation.
+☐  Set Up Moderation Queue — Define categories of prohibited listings. Set up a moderation review queue for flagged listings, user reports, and circumvention-pattern flags.
+Finance (Weeks 7–10) [PARALLEL]
+☐  Accounting Integration — Connect escrow bank account and platform operating account to accounting software. Confirm real-time reconciliation of in-flow and out-flow.
+☐  Tax Remittance Process — Define the monthly batch process for remitting withheld taxes (3% or 30%) to the relevant Ethiopian Revenue Authority. Confirm forms and deadlines with the accountant.
+☐  VAT Monitoring Threshold — Set up an alert in the accounting system when platform fee revenue approaches the VAT registration threshold. Confirm the exact threshold with the accountant.
+
+PHASE 2 — Beta & Trust Verification
+Duration: Weeks 23–30 (8 weeks)
+Goal: A closed, invite-only beta with 50 freelancers and 20 clients running real (but small-value) transactions. Validate the trust loop with real money before any public announcement.
+Important — Beta participants should sign a Beta User Agreement. All transactions should be small (e.g., a maximum of 5,000 ETB per milestone) to limit financial risk during this phase.
+Engineering
+☐  Alpha Bug Fixes — Resolve all Priority-1 and Priority-2 bugs found during internal testing.
+☐  Load Testing — Simulate 200 concurrent users on the payment webhook endpoint. Identify and fix bottlenecks before public launch.
+☐  Security Audit — Conduct a formal security review: penetration testing on the authentication and payment endpoints; verify all secrets are in a secrets manager (not in code); confirm HTTPS enforced everywhere; validate API rate-limiting on all endpoints; test for SQL injection and XSS vulnerabilities.
+☐  Payment Gateway Go-Live — Switch from sandbox keys to production keys for Telebirr and Chapa (under low-value limits). Verify real webhook delivery.
+☐  AML Rule Engine Tuning — Review the first set of flagged transactions. Tune thresholds to reduce false positives while maintaining detection rate.
+☐  Performance Optimization — Achieve 80 or above Lighthouse Performance score on all core screens under simulated 3G.
+☐  Uptime Monitoring — Configure PagerDuty or equivalent for on-call alerts. Define on-call rotation.
+☐  NEW  Validate anti-circumvention detection — Confirm the contact-masking and pattern-monitoring built in Phase 1 actually behaves correctly against real (small-scale) beta usage.
+Product & Operations
+☐  Beta Onboarding — Personally onboard each beta freelancer and client. Walk them through KYC, job posting, and escrow flow.
+☐  Feedback Collection — Weekly structured feedback sessions. Use a feedback tracker (Linear or Notion).
+☐  Run First Real Dispute — Stage a practice dispute scenario with a willing beta user pair to test the full mediation flow end-to-end.
+☐  First Iteration Sprint — Run a 2-week sprint to fix the top-10 most-reported UX issues from beta feedback.
+Legal
+☐  Beta User Agreements — All beta participants sign a Beta User Agreement accepting reduced liability during testing.
+☐  Compliance Mock Audit — Internal walkthrough of the AML procedures manual. Simulate receiving an external regulator inquiry.
+Marketing
+☐  Beta Waitlist — Launch a landing page (no app yet) to collect waitlist emails. Run targeted social posts on LinkedIn and Facebook for early adopters.
+☐  Document Beta Stories — With participant consent, document 2–3 success story case studies from beta transactions for use in public launch marketing.
+
+PHASE 3 — Pilot Launch
+Duration: Weeks 31–40 (10 weeks)
+Goal: Public launch in one sector (e.g., Tech / Web Development) and one primary city (Addis Ababa). Collect feedback on the payment and dispute process specifically — the points most likely to break trust.
+Engineering
+☐  Production Hardening — Full production infrastructure review. Confirm all data is on Ethiopian servers. Backup/DR is already tested per Phase 1 — this step re-confirms it under production config.
+☐  Telegram Mini-App or Bot — Build a Telegram bot or mini-app for job alert notifications and quick bidding actions (high priority for Telegram-first users).
+☐  USSD Support (Stretch goal) — Evaluate feasibility of Telebirr USSD integration for users without smartphones. Confirm the correct short-code directly with Ethio Telecom before publishing it. Deprioritize if it delays launch.
+☐  Monitoring Dashboard — Internal dashboard showing: daily active users, jobs posted, escrow funded, dispute rate, average time to payout, p99 payment latency.
+☐  NEW  App store submission (if a native app was chosen in Phase 0) — Submit for Apple/Google review with enough lead time (1–2+ weeks) built into this phase's critical path, not discovered late.
+Marketing & Growth
+☐  University Partnership Rollout — Partner with Addis Ababa University, AAiT, and 2 coding schools. Place flyers, host info sessions, and recruit freelancers from graduating classes.
+☐  SME Outreach Campaign — Targeted LinkedIn and Facebook campaign for local SMEs and startups in Addis. Focus message: “Escrow = your money is safe.”
+☐  Escrow Webinar — Host a recorded demo webinar showing exactly how funds flow: client deposits, freelancer works, client approves, freelancer is paid. Publish on YouTube.
+☐  Referral Program Launch — Activate referral bonuses: e.g., 200 ETB credit for both the referrer and the referred party upon their first completed escrow transaction.
+☐  ICT Ministry / Taskforce Engagement — Meet with Ministry of Innovation and Technology or ICT Taskforce for potential institutional endorsement or co-marketing.
+Operations
+☐  Publish Dispute Statistics — Commit to a monthly public transparency report: dispute rate, median resolution time, outcome breakdown. This is a trust signal, not a weakness.
+☐  Publish Platform Uptime — Set up a public status page (e.g., statuspage.io) showing real-time and historical uptime.
+☐  Fraud Monitoring Escalation — As transaction volume grows, review AML flags weekly. Establish a clear escalation path: Compliance Officer → Legal Counsel → FIC.
+Finance
+☐  First Tax Remittance — Execute the first batch withholding tax remittance. Verify the process works end-to-end with the accountant.
+☐  VAT Review — Assess whether fee revenue has crossed the VAT registration threshold. Register if required.
+
+PHASE 4 — Growth & Scale
+Duration: Weeks 41–65 (6 months)
+Goal: 500 completed transactions. Monetization features active. Second city or sector expanding.
+Note — Do not build Phase 2 features until Phase 3 proves the core trust loop at scale. Transaction volume is the signal.
+Engineering — Phase 2 Features (Build in order of ROI)
+☐  Premium / Verified Profiles — Subscription tier for freelancers: better search visibility, faster payout processing, a “Premium” badge. Requires Stripe or local subscription billing integration.
+☐  Featured Job Listings — Clients pay to boost urgent postings to the top of search. Simple bidding/auction for slots.
+☐  Skill Verification & Badges — Partner with local training providers (Coursera Ethiopia, ALX Africa) for verified skill badges. Or build an internal proctored skill test.
+☐  Expand Payment Methods — Add EthSwitch interoperability (HelloCash, Amole, M-PESA). Monitor NBE updates for direct bank transfer API access.
+☐  Agency / Team Accounts — Allow a freelancer to create a “studio” account with sub-profiles for team members. Enterprise bulk-posting for large SME clients.
+☐  AI-Assisted Matching — Simple ML model: given a job description, surface the top 5 freelancers by category, past completion rate, and price fit.
+☐  Diaspora / Foreign Client Support — Expand cross-border payment support once domestic compliance is stable and ECA has approved Standard Contractual Clauses for international payment rails.
+☐  NEW  Revisit KYC tier simplification — If MVP launched with a single-tier KYC flow, this is the point to build out the full Tier 2/3 model as volume and risk grow.
+Marketing & Growth
+☐  Second City Expansion — Replicate the Addis Ababa playbook in a second city (e.g., Dire Dawa, Hawassa, Bahir Dar). Local university partnerships and SME outreach.
+☐  Second Sector Expansion — Add 2–3 new categories beyond the launch set (e.g., Video Production, Accounting & Bookkeeping, Legal Research).
+☐  Content Marketing Engine — Launch a blog/YouTube channel with Ethiopian freelancing tips, client success stories, and income reports from top freelancers. SEO-optimized.
+☐  B2B Sales Motion — Hire a dedicated B2B account executive to close enterprise and NGO accounts that need recurring freelance services.
+Operations
+☐  AI-Assisted Dispute Pre-Screening — Train a simple classifier to categorize disputes and auto-suggest resolution based on similar past cases. Human mediator makes the final call.
+☐  Mediator Expansion — Hire and train 2–3 additional mediators. Define a senior mediator tier for high-value or complex disputes.
+☐  Community Forum — Launch a peer-support community forum or Telegram channel moderated by the Operations team. Reduces tier-1 support volume.
+
+KPIs, Risk Register & Team Plan
+Key Performance Indicators (KPIs) by Phase
+KPI
+Phase 2 Target
+Phase 3 Target
+Phase 4 Target
+Registered & KYC-Verified Users
+70
+500
+5,000
+Completed Escrow Transactions
+30
+200
+500
+Dispute Rate (% of transactions)
+< 20%
+< 12%
+< 8%
+Median Time to Payout (days)
+< 10
+< 7
+< 5
+Avg. Lighthouse Performance Score
+≥ 70
+≥ 80
+≥ 85
+Platform Uptime
+99%
+99.5%
+99.9%
+Median KYC Verification Time
+< 48 hrs
+< 24 hrs
+< 4 hrs (auto)
+STR Filing Timeliness
+100% within 24h
+100%
+100%
+Off-platform circumvention flags (NEW)
+Track only
+< 5% of active pairs
+< 3% of active pairs
+
+Risk Register
+Risk
+Likelihood
+Impact
+Mitigation
+Fayda API access delayed or unavailable
+Medium
+High
+Build manual KYC review fallback on Day 1. Do not block launch on Fayda.
+NBE classifies platform as requiring payment license
+Medium
+High
+Engage lawyer immediately (Phase 0). Consider partnering with a licensed PSP (Chapa) as the escrow holder to shift the licensing burden.
+Telebirr webhook failures cause double-charge or missed escrow
+Medium
+Critical
+Idempotency keys on every payment request. Dead-letter queue for failed webhooks. Manual reconciliation dashboard.
+PDPP breach before ECA registration completes
+Low
+Critical
+Minimize data collection in beta. Encrypt everything. Breach notification protocol ready before first real user.
+Low freelancer supply at launch
+High
+High
+University partnerships and referral program are Phase 3 blockers, not nice-to-haves.
+Low client demand at launch
+High
+High
+B2B SME outreach begins in Phase 2. Do not wait for public launch.
+AML false positives freeze legitimate accounts
+Medium
+Medium
+Tune TMS thresholds during beta (Phase 2). Build a fast manual review appeal flow.
+Escrow fund misreconciliation
+Low
+Critical
+Automated daily reconciliation between escrow DB and bank statement. Alert on any mismatch above 0 ETB.
+(NEW) Off-platform circumvention erodes revenue
+High
+High
+Contact-info masking and ToS enforcement from Phase 1, not bolted on later once habits form.
+(NEW) Minor or incapacitated user forms a contract
+Low
+Medium
+Age/capacity gate at KYC, tied to Fayda's date-of-birth field.
+(NEW) Uninsured loss from a custodial/fraud event
+Low
+Critical
+Bind cyber liability and fidelity/crime coverage in Phase 0, before real transaction volume.
+
+Team & Hiring Plan
+Role
+Phase Needed
+Priority
+System Architect / Lead Backend Engineer
+Phase 0
+Critical
+Frontend Developer (React/Next.js)
+Phase 0
+Critical
+DevSecOps Engineer
+Phase 0
+Critical
+Product Manager / Founder
+Phase 0
+Critical
+Bilingual Content Writer (Amharic/English)
+Phase 0
+Critical
+UX/UI Designer
+Phase 0
+Critical
+Ethiopian Law Firm (Engaged)
+Phase 0
+Critical
+Compliance Officer (Manager-level, owns AML/STR and PDPP operations) (NEW)
+Phase 0–1
+Critical
+QA / Testing Engineer
+Phase 1
+Important
+Human Mediator (x2)
+Phase 1
+Important
+Marketing / Growth Lead
+Phase 2
+Important
+B2B Account Executive
+Phase 4
+Later
+Data Protection Officer (DPO)
+TBD by Lawyer
+Conditional
+
+This roadmap is a living document. It should be reviewed and updated at the end of each phase based on what was learned in the previous phase.

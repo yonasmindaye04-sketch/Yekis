@@ -1,0 +1,510 @@
+// Ethiopian Freelance Marketplace — Core Data Model
+// Encodes: tiered KYC, the escrow state machine, the dispute flow, and
+// append-only audit logging required for AML (10-year retention).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum StaffRole {
+  COMPLIANCE_OFFICER
+  ADMIN
+}
+
+enum KycDocumentType {
+  NATIONAL_ID
+  PASSPORT
+  DRIVERS_LICENSE
+  SELFIE_LIVENESS
+  TIN_CERTIFICATE
+  BUSINESS_REGISTRATION
+}
+
+enum UserRole {
+  CLIENT
+  FREELANCER
+  BOTH
+}
+
+enum KycTier {
+  TIER_1 // basic ID, phone, address — required for browsing/bidding
+  TIER_2 // + TIN or business registration, bank details — required for withdrawal
+  TIER_3 // enhanced due diligence — PEP / high-volume
+}
+
+enum KycStatus {
+  PENDING
+  UNDER_REVIEW
+  VERIFIED
+  REJECTED
+}
+
+enum EscrowState {
+  PAYMENT_PENDING
+  ESCROW_HELD
+  WORK_IN_PROGRESS
+  SUBMITTED_FOR_REVIEW
+  ACCEPTED
+  RELEASED
+  DISPUTED
+  REFUNDED
+  PARTIAL_REFUND
+}
+
+enum DisputeStage {
+  NONE
+  STAGE_1_NEGOTIATION
+  STAGE_2_EVIDENCE
+  STAGE_3_MEDIATION
+  STAGE_4_ARBITRATION
+  RESOLVED
+}
+
+enum DisputeCategory {
+  NON_DELIVERY
+  LATE_DELIVERY
+  QUALITY_ISSUE
+  SCOPE_CREEP
+  NON_PAYMENT
+  COMMUNICATION_BREAKDOWN
+}
+
+enum PaymentProvider {
+  TELEBIRR
+  CHAPA
+  CBE_BIRR
+}
+
+enum JobStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ProposalStatus {
+  SUBMITTED
+  SHORTLISTED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+}
+
+enum LaunchCategory {
+  WEB_APP_DEVELOPMENT
+  GRAPHIC_DESIGN
+  DIGITAL_MARKETING
+  CONTENT_WRITING
+  TRANSLATION
+  DATA_ENTRY
+}
+
+// ---------- Core identity ----------
+
+model User {
+  id                String    @id @default(cuid())
+  ucid              String    @unique @default(cuid()) // platform-wide Unique Customer ID
+  email             String    @unique
+  phone             String    @unique
+  passwordHash      String
+  role              UserRole
+  languagePreference String   @default("en")
+  dateOfBirth       DateTime
+  faydaBiometricId  String?   @unique // set once Fayda verification succeeds — used for dedup
+  isSuspended       Boolean   @default(false)
+  staffRole         StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  kyc               KycRecord?
+  wallet            Wallet?
+  jobsPosted        Job[]            @relation("ClientJobs")
+  proposals         Proposal[]
+  contractsAsClient Contract[]       @relation("ClientContracts")
+  contractsAsFreelancer Contract[]   @relation("FreelancerContracts")
+  consents          ConsentRecord[]
+  auditLogs         AuditLog[]
+  notifications     Notification[]
+  transactionFlags  TransactionFlag[]
+  walletTopUps      WalletTopUp[]
+  conversationsCreated Conversation[]         @relation("ConversationCreator")
+  conversationsAssigned Conversation[]        @relation("ConversationAssignedStaff")
+  conversationParticipants ConversationParticipant[]
+  chatMessages      ChatMessage[]
+
+  @@index([faydaBiometricId])
+}
+
+model ConsentRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  purpose     String   // e.g. "kyc_data_processing", "marketing", "analytics"
+  granted     Boolean
+  grantedAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+// ---------- KYC (tiered) ----------
+
+model KycRecord {
+  id                String     @id @default(cuid())
+  userId            String     @unique
+  user              User       @relation(fields: [userId], references: [id])
+  tier              KycTier    @default(TIER_1)
+  status            KycStatus  @default(PENDING)
+  fullName          String?
+  documentNumber    String?
+  tin               String?    // required for Tier 2 (withdrawal eligibility)
+  businessRegNumber String?
+  isPepMatch        Boolean    @default(false)
+  pepScreenedAt     DateTime?
+  faydaVerificationAttempted Boolean  @default(false)
+  faydaVerificationSucceeded Boolean  @default(false)
+  reviewedByStaffId String?    // staff user who made the manual VERIFIED/REJECTED call
+  rejectionReason   String?
+  lastVerifiedAt    DateTime?
+  nextReviewDueAt   DateTime?  // periodic KYC refresh job reads this
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  documents         KycDocument[]
+  reviewEvents      KycReviewEvent[]
+}
+
+model KycReviewEvent {
+  id            String    @id @default(cuid())
+  kycRecordId   String
+  kycRecord     KycRecord @relation(fields: [kycRecordId], references: [id])
+  staffUserId   String
+  decision      KycStatus // VERIFIED or REJECTED (PENDING/UNDER_REVIEW never logged here)
+  tierAtDecision KycTier
+  reason        String?
+  createdAt     DateTime  @default(now())
+
+  @@index([kycRecordId])
+}
+
+model KycDocument {
+  id           String          @id @default(cuid())
+  kycRecordId  String
+  kycRecord    KycRecord       @relation(fields: [kycRecordId], references: [id])
+  documentType KycDocumentType
+  storagePath  String          // pointer into WORM object store — never the raw file in the DB
+  uploadedAt   DateTime        @default(now())
+
+  @@index([kycRecordId])
+}
+
+// ---------- Jobs & Proposals ----------
+
+model Job {
+  id          String         @id @default(cuid())
+  clientId    String
+  client      User           @relation("ClientJobs", fields: [clientId], references: [id])
+  title       String
+  category    LaunchCategory
+  description String
+  budgetMinMinor Int
+  budgetMaxMinor Int
+  deadline    DateTime
+  status      JobStatus      @default(OPEN)
+  // Client's proposed milestone plan at posting time — informational until
+  // a proposal is accepted, at which point Contracts.milestones are seeded
+  // from whichever plan (this one, possibly renegotiated via the accepted
+  // Proposal) the two parties actually agreed to.
+  proposedMilestones Json
+  createdAt   DateTime       @default(now())
+
+  proposals   Proposal[]
+  contract    Contract?
+
+  @@index([category, status])
+}
+
+model Proposal {
+  id             String         @id @default(cuid())
+  jobId          String
+  job            Job            @relation(fields: [jobId], references: [id])
+  freelancerId   String
+  freelancer     User           @relation(fields: [freelancerId], references: [id])
+  coverLetter    String
+  quotedAmountMinor Int
+  estimatedDays  Int
+  milestoneBreakdown Json       // freelancer's proposed milestone/payment split
+  status         ProposalStatus @default(SUBMITTED)
+  createdAt      DateTime       @default(now())
+
+  @@index([jobId])
+  @@index([freelancerId])
+  @@unique([jobId, freelancerId]) // one active proposal per freelancer per job
+}
+
+// ---------- Contracts ----------
+
+model Contract {
+  id             String     @id @default(cuid())
+  jobId          String     @unique
+  job            Job        @relation(fields: [jobId], references: [id])
+  clientId       String
+  client         User       @relation("ClientContracts", fields: [clientId], references: [id])
+  freelancerId   String
+  freelancer     User       @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  templateVersion String    // which Service Agreement template version was used
+  documentStoragePath String // the generated, immutable PDF
+  clientAcceptedAt     DateTime?
+  freelancerAcceptedAt DateTime?
+  createdAt      DateTime   @default(now())
+
+  milestones     Milestone[]
+  dispute        Dispute?
+}
+
+model Milestone {
+  id           String      @id @default(cuid())
+  contractId   String
+  contract     Contract    @relation(fields: [contractId], references: [id])
+  title        String
+  amountMinor  Int
+  dueDate      DateTime
+  escrowState  EscrowState @default(PAYMENT_PENDING)
+  submittedAt  DateTime?
+  deliverableUrl String?   // added to track the submitted file/link for review & disputes
+  autoReleaseAt DateTime?  // set when freelancer submits; cron releases at this time if untouched
+  releasedAt   DateTime?
+  createdAt    DateTime    @default(now())
+
+  paymentTransactions PaymentTransaction[]
+
+  @@index([contractId])
+  @@index([escrowState, autoReleaseAt])
+}
+
+// ---------- Payments ----------
+
+model PaymentTransaction {
+  id                 String          @id @default(cuid())
+  milestoneId        String
+  milestone          Milestone       @relation(fields: [milestoneId], references: [id])
+  provider           PaymentProvider
+  providerTransactionId String        @unique
+  amountMinor        Int
+  status             String          // PENDING | SUCCESS | FAILED
+  withholdingTaxMinor Int            @default(0)
+  rawWebhookPayload  Json?
+  createdAt          DateTime        @default(now())
+
+  @@index([milestoneId])
+}
+
+model Wallet {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  balanceMinor Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  topUps       WalletTopUp[]
+}
+
+enum TopUpStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+// Manual receipt-based top-up: the client pays directly into the platform's
+// own Telebirr/CBE account outside the app, then submits a receipt photo +
+// reference number for staff to manually verify. Distinct from the
+// milestone-funding escrow flow (escrow.service.ts / PaymentTransaction),
+// which is webhook-driven — this exists specifically because Telebirr/CBE
+// don't currently offer a confirmed webhook-based collection path for
+// direct wallet top-ups the way they do for a per-milestone charge.
+model WalletTopUp {
+  id                String          @id @default(cuid())
+  userId            String
+  user              User            @relation(fields: [userId], references: [id])
+  walletId          String
+  wallet            Wallet          @relation(fields: [walletId], references: [id])
+  provider          PaymentProvider
+  amountMinor       Int
+  referenceNumber   String
+  receiptImagePath  String          // object store pointer — never a public URL
+  status            TopUpStatus     @default(PENDING)
+  reviewedByStaffId String?
+  rejectionReason   String?
+  reviewedAt        DateTime?
+  createdAt         DateTime        @default(now())
+
+  @@index([status])
+  @@index([userId])
+}
+
+// ---------- Disputes ----------
+
+enum DisputeResolutionOutcome {
+  RELEASE_TO_FREELANCER
+  REFUND_TO_CLIENT
+  PARTIAL_SPLIT
+}
+
+model Dispute {
+  id                  String                    @id @default(cuid())
+  contractId          String                    @unique
+  contract            Contract                  @relation(fields: [contractId], references: [id])
+  milestoneId         String
+  category            DisputeCategory
+  stage               DisputeStage              @default(STAGE_1_NEGOTIATION)
+  raisedByUserId      String
+  description         String
+  negotiationDeadlineAt DateTime?                // Stage 1 — 7 days from raise
+  mediationDeadlineAt   DateTime?                // Stage 3 — 3-5 business days from escalation
+  evidenceBundlePath  String?                    // compiled Stage 2 package (object store pointer)
+  mediatorRecommendation String?
+  resolvedByStaffId   String?
+  resolutionOutcome   DisputeResolutionOutcome?
+  freelancerShareMinor Int?                      // set only when resolutionOutcome is PARTIAL_SPLIT
+  resolvedAt          DateTime?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  evidence            DisputeEvidence[]
+}
+
+model DisputeEvidence {
+  id          String   @id @default(cuid())
+  disputeId   String
+  dispute     Dispute  @relation(fields: [disputeId], references: [id])
+  submittedByUserId String
+  statement   String
+  createdAt   DateTime @default(now())
+
+  @@index([disputeId])
+}
+
+// ---------- Compliance: append-only audit log (10-year AML retention) ----------
+// This table must NEVER be updated or deleted from application code — only
+// inserted into. Enforce with a Postgres REVOKE UPDATE/DELETE at the DB role
+// level in addition to this Prisma model (see prisma/README.md).
+
+// ---------- Transaction Monitoring (AML) ----------
+
+enum TransactionFlagType {
+  STRUCTURING
+  VELOCITY
+  PASS_THROUGH
+  WALLET_MISMATCH
+  STAFF_FLAGGED
+}
+
+enum TransactionFlagStatus {
+  PENDING_REVIEW
+  STR_FILED
+  DISMISSED
+}
+
+model TransactionFlag {
+  id                 String                 @id @default(cuid())
+  userId             String
+  user               User                   @relation(fields: [userId], references: [id])
+  type               TransactionFlagType
+  status             TransactionFlagStatus  @default(PENDING_REVIEW)
+  details            Json                   // rule-specific context (e.g. matched transaction IDs, amounts)
+  relatedEntityId    String?                // milestoneId, PaymentTransaction id, or withdrawal reference
+  reviewedByStaffId  String?
+  reviewNotes        String?
+  strFiledAt         DateTime?
+  strReferenceNumber String?                // the FIC filing reference the Compliance Officer received — filed manually, not via any API
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([status])
+  @@index([userId])
+}
+
+// ---------- Notifications ----------
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  type      String   // matches the BullMQ job name, e.g. "dispute-raised", "escrow-funded"
+  message   String
+  metadata  Json?
+  isRead    Boolean  @default(false)
+  smsSentAt DateTime? // null if this type isn't SMS-critical, or SMS send failed/is stubbed
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  eventType  String   // e.g. "ESCROW_RELEASED", "DISPUTE_RAISED", "KYC_STATUS_CHANGE"
+  entityType String   // e.g. "Milestone", "Dispute"
+  entityId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ---------- Support Chat ----------
+
+model Conversation {
+  id               String    @id @default(cuid())
+  creatorId        String
+  creator          User      @relation("ConversationCreator", fields: [creatorId], references: [id])
+  assignedStaffId  String?   // staff member who claimed/was assigned to this conversation
+  assignedStaff    User?     @relation("ConversationAssignedStaff", fields: [assignedStaffId], references: [id])
+  subject          String
+  status           String    @default("OPEN") // OPEN | CLOSED
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  participants     ConversationParticipant[]
+  messages         ChatMessage[]
+
+  @@index([status])
+  @@index([creatorId])
+  @@index([assignedStaffId])
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  userId         String
+  user           User      @relation(fields: [userId], references: [id])
+  lastReadAt     DateTime?
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String    @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  sender         User      @relation(fields: [senderId], references: [id])
+  body           String
+  attachmentUrl  String?   // optional file attachment stored in object store
+  createdAt      DateTime  @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+}

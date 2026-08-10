@@ -1,0 +1,51 @@
+// === IMPORTS ===
+import { useCallback, useEffect, useState } from "react";
+import { Check, Fingerprint, Upload } from "lucide-react";
+import { api, type KycStatusResponse } from "./api/client";
+
+
+// === MAIN COMPONENT ===
+export function BrowserVerification() {
+  const [status, setStatus] = useState<KycStatusResponse | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [dob, setDob] = useState("");
+  const [documentNumber, setDocumentNumber] = useState("");
+  const [idPhoto, setIdPhoto] = useState<File | null>(null);
+  const [selfie, setSelfie] = useState<File | null>(null);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [tin, setTin] = useState("");
+  const [businessRegNumber, setBusinessRegNumber] = useState("");
+
+  const refresh = useCallback(async () => { try { setStatus(await api.getKycStatus()); } catch (err) { setMessage(err instanceof Error ? err.message : "Unable to load verification status"); } }, []);
+  useEffect(() => {
+    const load = async () => { await refresh(); };
+    void load();
+  }, [refresh]);
+
+  const submit = async () => {
+    if (!fullName || !dob || !documentNumber || !idPhoto || !selfie) { setMessage("Add your name, date of birth, Fayda ID number, ID photo, and selfie holding the ID."); return; }
+    setSending(true); setMessage("");
+    try {
+      for (const [documentType, file] of [["NATIONAL_ID", idPhoto], ["SELFIE_LIVENESS", selfie]] as const) {
+        const data = new FormData(); data.append("file", file); data.append("documentType", documentType); data.append("fullName", fullName); data.append("dateOfBirth", dob); data.append("documentNumber", documentNumber); await api.submitKycDocument(data);
+      }
+      setMessage("Submitted for manual review."); await refresh();
+    } catch (err) { setMessage(err instanceof Error ? err.message : "Unable to submit verification"); }
+    finally { setSending(false); }
+  };
+
+  const requestTier2 = async () => {
+    if (!tin.trim() && !businessRegNumber.trim()) { setMessage("Enter a TIN or business registration number."); return; }
+    setSending(true); setMessage("");
+    try {
+      await api.upgradeKycTier2({ tin: tin.trim() || undefined, businessRegNumber: businessRegNumber.trim() || undefined });
+      setMessage("Tier 2 review requested. A compliance officer will review the screening result.");
+      await refresh();
+    } catch (err) { setMessage(err instanceof Error ? err.message : "Unable to request Tier 2"); }
+    finally { setSending(false); }
+  };
+
+  const canRequestTier2 = status?.status === "VERIFIED" && status.tier === "TIER_1";
+  return <div className="verification-stack"><section className="panel browser-verification-panel"><div className="verification-intro"><span className="step-number"><Fingerprint size={18} /></span><div><p className="eyebrow">Fayda identity review</p><h2>Verify your identity</h2><p>Upload your Fayda ID and a selfie holding it. Fayda verification may clear Tier 1 automatically or route it to staff review.</p></div></div><div className="form-grid verification-form"><label>Full name<input value={fullName} onChange={(event) => setFullName(event.target.value)} placeholder="As shown on your ID" /></label><label>Date of birth<input type="date" value={dob} onChange={(event) => setDob(event.target.value)} /></label><label className="form-wide">Fayda ID number<input value={documentNumber} onChange={(event) => setDocumentNumber(event.target.value)} placeholder="Enter your Fayda ID number" /></label><label className="verification-upload">Fayda ID photo<small><Upload size={16} />{idPhoto?.name ?? "Choose ID photo"}</small><input type="file" accept="image/*" onChange={(event) => setIdPhoto(event.target.files?.[0] ?? null)} /></label><label className="verification-upload">Selfie holding Fayda ID<small><Upload size={16} />{selfie?.name ?? "Choose selfie"}</small><input type="file" accept="image/*" onChange={(event) => setSelfie(event.target.files?.[0] ?? null)} /></label></div>{message && <p className="verification-message"><Check size={16} />{message}</p>}<button className="btn-primary" onClick={() => void submit()} disabled={sending}>{sending ? "Submitting..." : "Submit Tier 1 documents"}</button></section><section className="panel verification-status-panel"><div><p className="eyebrow">Current status</p><h2>{status?.status?.replace("_", " ") ?? "Loading..."}</h2><p>Tier: {status?.tier ?? "TIER_1"}</p></div><span className="status-pill">{status?.status ?? "PENDING"}</span></section>{canRequestTier2 && <section className="panel tier2-panel"><div><p className="eyebrow">Withdrawal access</p><h2>Request Tier 2 verification</h2><p>Tier 2 requires a PEP screening and staff approval before withdrawals are enabled.</p></div><div className="form-grid"><label>TIN<input value={tin} onChange={(event) => setTin(event.target.value)} placeholder="Tax identification number" /></label><label>Business registration<input value={businessRegNumber} onChange={(event) => setBusinessRegNumber(event.target.value)} placeholder="Optional if TIN supplied" /></label></div><button className="btn-primary" onClick={() => void requestTier2()} disabled={sending}>Request Tier 2</button></section>}</div>;
+}
