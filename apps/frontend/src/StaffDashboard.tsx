@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Paperclip,
   Send,
+  Users,
 } from "lucide-react";
 import { api, type ChatMessage, type MeResponse, type StaffConversation } from "./api/client";
 import { StaffCompliancePanel } from "./StaffCompliancePanel";
@@ -20,6 +21,7 @@ import { EvidenceViewer, type EvidenceDocument } from "./EvidenceViewer";
 import { KycQueue } from "./KycQueue";
 import { TopUpQueue } from "./TopUpQueue";
 import { DisputeQueue } from "./DisputeQueue";
+import { ProfileReportsQueue } from "./ProfileReportsQueue";
 
 
 
@@ -59,7 +61,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   const [conversations, setConversations] = useState<StaffConversation[]>([]);
   const [queueCounts, setQueueCounts] = useState({ kyc: 0, topups: 0, disputes: 0 });
   const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
-  const [activeTab, setActiveTab] = useState<"OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES">("OVERVIEW");
+  const [activeTab, setActiveTab] = useState<"OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES">("OVERVIEW");
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reply, setReply] = useState("");
@@ -260,6 +262,12 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               <span className="nav-label">Disputes</span>
             </button>
           )}
+          {user.staffRole === "ADMIN" && (
+            <button className={activeTab === "PROFILES" ? "active" : ""} onClick={() => setActiveTab("PROFILES")}>
+              <span className="nav-icon"><Users size={18} /></span>
+              <span className="nav-label">Profiles</span>
+            </button>
+          )}
         </nav>
 
         <button className="sidebar-settings" onClick={onLogout}>Sign out</button>
@@ -277,6 +285,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 {activeTab === "TOPUPS" && "Receipt reviews"}
                 {activeTab === "KYC" && "Identity reviews"}
                 {activeTab === "DISPUTES" && "Disputes"}
+                {activeTab === "PROFILES" && "Profile Moderation"}
               </h1>
               <div className="staff-filter-toggle">
                 <button className={queueScope === "ALL" ? "active" : ""} onClick={() => setQueueScope("ALL")}>All Queues</button>
@@ -521,6 +530,33 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         {activeTab === "DISPUTES" && (
           <section id="panel-disputes">
             <DisputeQueue onResolve={async (id, o, r, s) => { await api.resolveDispute(id, { outcome: o, recommendation: r, freelancerShareMinor: s }); await loadConversations(); }} />
+          </section>
+        )}
+
+        {/* Profiles Tab */}
+        {activeTab === "PROFILES" && (
+          <section id="panel-profiles" className="staff-panel" style={{ padding: "1.5rem" }}>
+             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
+                <div>
+                   <h2 style={{ margin: 0, fontSize: "1.2rem" }}>Featured Profiles</h2>
+                   <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>Manage featured talent on the landing page</p>
+                </div>
+                <button 
+                  onClick={async () => {
+                     try {
+                        await api.refreshFeaturedCarousel();
+                        alert("Featured carousel refreshed successfully.");
+                     } catch(err: any) {
+                        alert(err.message || "Failed to refresh carousel");
+                     }
+                  }}
+                  className="btn-secondary"
+                  style={{ display: "flex", alignItems: "center", gap: 5 }}
+                >
+                  <RefreshCw size={15} /> Refresh Carousel
+                </button>
+             </div>
+             <ProfileReportsQueue />
           </section>
         )}
 

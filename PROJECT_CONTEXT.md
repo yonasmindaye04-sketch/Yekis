@@ -53,6 +53,15 @@ Users may have `CLIENT`, `FREELANCER`, or `BOTH` marketplace roles. Staff author
 - Staff queue for dismissal or recording an externally filed STR.
 - Append-only audit events for important transitions.
 
+### Profiles And Reputation
+
+- Rich user profiles featuring bio, titles, verified skills, and portfolio items.
+- Profile completeness tracking to encourage robust freelancer presence.
+- A Featured Talent Carousel managed by staff to highlight top performers.
+- Double-blind contract review system: ratings and feedback remain hidden until both parties submit or the review window closes.
+- Bayesian average rating calculation to ensure fair representation of user reputation.
+- Staff moderation capabilities via profile reporting.
+
 ### Supporting Experiences
 
 - Wallet balance and Tier 2 withdrawal request.

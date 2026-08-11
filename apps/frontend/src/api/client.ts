@@ -633,6 +633,79 @@ class ApiClient {
   async escalateDisputeToArbitration(disputeId: string): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/arbitration`, { method: "POST" });
   }
+
+  // --- Profiles ---
+  async getPublicProfile(userId: string): Promise<any> {
+    return this.request(`/api/v1/profiles/${userId}`);
+  }
+  async updateProfile(data: any): Promise<any> {
+    return this.request(`/api/v1/profiles/me`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  async getProfileCompleteness(): Promise<any> {
+    return this.request(`/api/v1/profiles/me/completeness`);
+  }
+  async reportProfile(userId: string, reason: string, details: string): Promise<any> {
+    return this.request(`/api/v1/profiles/${userId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });
+  }
+  async getProfileViews(): Promise<any> {
+    return this.request(`/api/v1/profiles/me/views`);
+  }
+  async getSkills(category?: string): Promise<any> {
+    const params = new URLSearchParams();
+    if (category) params.set("category", category);
+    return this.request(`/api/v1/skills?${params.toString()}`);
+  }
+  async getFeaturedTalent(): Promise<any> {
+    return this.request(`/api/v1/profiles/featured`);
+  }
+  async pinFeaturedTalent(userId: string, category: string, notes: string): Promise<any> {
+    return this.request(`/api/v1/profiles/featured`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
+  }
+  async refreshFeaturedCarousel(): Promise<any> {
+    return this.request(`/api/v1/profiles/featured/refresh`, { method: "POST" });
+  }
+  
+  // --- Reviews ---
+  async submitReview(contractId: string, rating: number, comment: string): Promise<any> {
+    return this.request(`/api/v1/reviews`, { method: "POST", body: JSON.stringify({ contractId, rating, comment }) });
+  }
+  async getReviews(userId: string): Promise<any> {
+    return this.request(`/api/v1/reviews/user/${userId}`);
+  }
+  async respondToReview(reviewId: string, response: string): Promise<any> {
+    return this.request(`/api/v1/reviews/${reviewId}/respond`, { method: "POST", body: JSON.stringify({ response }) });
+  }
+  async disputeReview(reviewId: string, reason: string): Promise<any> {
+    return this.request(`/api/v1/reviews/${reviewId}/dispute`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+
+  // --- Portfolio ---
+  async getPortfolio(userId: string): Promise<any> {
+    return this.request(`/api/v1/portfolios/${userId}`);
+  }
+  async createPortfolioItem(data: FormData): Promise<any> {
+    const headers: Record<string, string> = {};
+    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, { method: "POST", headers, body: data });
+    if (!response.ok) { const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" })); throw new Error(error.message || error.error || `HTTP ${response.status}`); }
+    return response.json();
+  }
+  async updatePortfolioItem(itemId: string, data: any): Promise<any> {
+    return this.request(`/api/v1/portfolios/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  async deletePortfolioItem(itemId: string): Promise<any> {
+    return this.request(`/api/v1/portfolios/${itemId}`, { method: "DELETE" });
+  }
+
+  // --- Staff Profile Reports ---
+  async getProfileReports(page?: number): Promise<any> {
+    const params = new URLSearchParams();
+    if (page) params.set("page", String(page));
+    return this.request(`/api/v1/admin/profile-reports?${params.toString()}`);
+  }
+  async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<any> {
+    return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
+  }
 }
 
 export const api = new ApiClient();

@@ -233,6 +233,21 @@ Resolve body:
 
 Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 
+## Profiles And Reputation
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/users/:userId/profile` | Public/Authenticated | Get user profile and portfolio |
+| `PATCH` | `/api/v1/users/me/profile` | Authenticated | Update bio, title, location, etc. |
+| `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
+| `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
+| `GET` | `/api/v1/skills` | Public | List available skills |
+| `POST` | `/api/v1/contracts/:id/review` | Contract party | Submit double-blind review for contract |
+| `GET` | `/api/v1/users/:userId/reviews` | Public/Authenticated | List user's published reviews |
+| `GET` | `/api/v1/featured` | Public | List featured talent carousel |
+| `POST` | `/api/v1/portfolio` | Authenticated Freelancer | Add portfolio item |
+| `GET` | `/api/v1/staff/reports` | Staff | List and manage profile reports |
+
 ## TMS
 
 All TMS routes require staff access.

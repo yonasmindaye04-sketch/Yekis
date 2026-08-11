@@ -16,6 +16,12 @@ import { notificationsRouter } from "./modules/notifications/notification.routes
 import { tmsRouter } from "./modules/tms/tms.routes.js";
 import { topupsRouter } from "./modules/topups/topup.routes.js";
 import { chatRouter } from "./modules/chat/chat.routes.js";
+import { profileRouter } from "./modules/profiles/profile.routes.js";
+import { skillsRouter } from "./modules/skills/skills.routes.js";
+import { reviewRouter } from "./modules/reviews/review.routes.js";
+import { featuredRouter } from "./modules/featured/featured.routes.js";
+import { portfolioRouter } from "./modules/portfolio/portfolio.routes.js";
+import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
 export function buildApp() {
   const app = express();
@@ -56,6 +62,12 @@ export function buildApp() {
   app.use("/api/v1/tms", tmsRouter);
   app.use("/api/v1/wallet/topups", topupsRouter);
   app.use("/api/v1/chat", chatRouter);
+  app.use("/api/v1/users", profileRouter);
+  app.use("/api/v1/skills", skillsRouter);
+  app.use("/api/v1/reviews", reviewRouter);
+  app.use("/api/v1/featured", featuredRouter);
+  app.use("/api/v1/portfolio", portfolioRouter);
+  app.use("/api/v1/staff", staffProfileRouter);
 
   // 404
   app.use((req, res) => {

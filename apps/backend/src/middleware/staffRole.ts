@@ -5,7 +5,7 @@ import type { AuthedRequest } from "./auth.js";
 
 
 // === MAIN FUNCTIONS ===
-export function requireStaffRole(...allowedRoles: Array<"COMPLIANCE_OFFICER" | "ADMIN">) {
+export function requireStaffRole(...allowedRoles: Array<"COMPLIANCE_OFFICER" | "ADMIN" | "SUPPORT">) {
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Unauthenticated" });
 

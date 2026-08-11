@@ -1,40 +1,101 @@
 # Local Setup
 
-Last updated: 2026-08-07
+Last updated: 2026-08-10
 
-## Prerequisites
+## 1. Overview
+
+This guide describes the local environment setup for the Yekis repository.
+
+Use PowerShell examples on Windows. Equivalent shell commands are fine on macOS/Linux.
+
+## 2. Prerequisites
 
 - Node.js 20 or newer
 - pnpm 9 or newer
 - Docker Desktop/Engine with Compose
-- PowerShell examples below; equivalent shell commands are fine
+- Git
 
-## Install And Configure
+## 3. Install pnpm
+
+If `pnpm` is not installed, run one of these commands:
+
+```powershell
+npm install -g pnpm
+```
+
+or with Corepack:
+
+```powershell
+corepack enable
+corepack prepare pnpm@9 --activate
+```
+
+Verify installation:
+
+```powershell
+pnpm --version
+```
+
+## 4. Install Dependencies
 
 From the repository root:
 
 ```powershell
 pnpm install
-docker compose up -d
-Copy-Item apps/backend/.env.example apps/backend/.env
-pnpm --filter backend prisma:generate
-pnpm --filter backend prisma:migrate
 ```
 
-The example environment is ready for local infrastructure. Replace JWT secrets before shared or long-lived use.
+If install skips package build scripts or Prisma binaries are missing, run:
 
-## Local Services
+```powershell
+pnpm install --ignore-scripts=false
+```
+
+Then verify backend Prisma support:
+
+```powershell
+pnpm --filter backend prisma:generate
+```
+
+## 5. Configure Environment Files
+
+Copy the example backend env file:
+
+```powershell
+Copy-Item apps/backend/.env.example apps/backend/.env
+```
+
+Confirm the following groups are configured in `apps/backend/.env`:
+
+- Runtime: `NODE_ENV`, `PORT`
+- Database: `DATABASE_URL`, `REDIS_URL`
+- JWT: access and refresh secrets
+- Object storage: endpoint, bucket, access key, secret key
+- Provider credentials: Telebirr/Chapa and webhook secret
+- Policy values: minimum age, withholding threshold/rates, auto-release days
+- Observability: `SENTRY_DSN`
+
+> Blank provider credentials use development stub behavior only.
+
+## 6. Start Local Infrastructure
+
+From the repo root:
+
+```powershell
+docker compose up -d
+```
+
+### Local services
 
 | Service | Address | Local credentials |
 |---|---|---|
 | PostgreSQL | `localhost:5433` | `marketplace` / `marketplace_dev_only` |
 | Redis | `localhost:6379` | None |
 | MinIO API | `http://localhost:9000` | `marketplace` / `marketplace_dev_only` |
-| MinIO console | `http://localhost:9001` | Same as MinIO API |
+| MinIO console | `http://localhost:9001` | Same credentials as API |
 
-PostgreSQL intentionally uses host port `5433` to avoid collisions with a native PostgreSQL installation on `5432`. The custom image preloads pgaudit.
+PostgreSQL uses `5433` to avoid collisions with native installations on `5432`.
 
-## Run The Application
+## 7. Run the Application
 
 Use separate terminals:
 
@@ -46,28 +107,16 @@ pnpm dev:backend
 pnpm --filter frontend dev
 ```
 
-Open:
+### Open in browser
 
 - Frontend: `http://127.0.0.1:5173`
 - API health: `http://127.0.0.1:4000/health`
 
-The root currently has no `dev` script, and `dev:web` targets a package name that does not match `frontend`; use the commands above.
+> Note: the root package currently has no generic `dev` script, and `dev:web` does not target the `frontend` package.
 
-## Environment Groups
+## 8. Verify Setup
 
-`apps/backend/.env.example` documents the complete local set:
-
-- Runtime: `NODE_ENV`, `PORT`
-- Data: `DATABASE_URL`, `REDIS_URL`
-- JWT: access/refresh secrets and TTLs
-- Object storage: endpoint, bucket, access key, secret key
-- Providers: Telebirr/Chapa credentials and webhook secret
-- Policy: minimum age, withholding threshold/rates, auto-release days
-- Observability: `SENTRY_DSN`
-
-Blank provider credentials mean the development adapter/stub behavior is used. Do not interpret a locally completed provider workflow as proof of live fund movement.
-
-## Verification
+Run these commands:
 
 ```powershell
 docker compose ps
@@ -76,14 +125,7 @@ pnpm --filter backend build
 pnpm --filter frontend build
 ```
 
-Expected results as of 2026-08-07:
-
-- PostgreSQL, Redis, and MinIO report running/healthy.
-- Backend tests pass, including three frontend/API linkage tests.
-- Backend TypeScript build passes.
-- Frontend TypeScript and Vite production build pass.
-
-Health check:
+Check health:
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:4000/health
@@ -95,23 +137,24 @@ Expected response:
 { "status": "ok" }
 ```
 
-## Reset And Migrations
+## 9. Migrations and Schema Changes
 
-For ordinary schema updates, create a new Prisma migration; do not edit applied SQL.
+Create a new Prisma migration and regenerate the client:
 
 ```powershell
 pnpm --filter backend prisma:migrate -- --name describe_change
 pnpm --filter backend prisma:generate
 ```
 
-Removing Docker volumes destroys local data. Only do that deliberately after confirming no test or development records are needed.
+Do not manually edit applied SQL.
 
-## Common Issues
+## 10. Common Issues
 
-- Prisma authentication reaches the wrong database: verify `DATABASE_URL` uses port `5433`.
-- pgaudit startup failure: rebuild the custom PostgreSQL image and confirm Compose passes `shared_preload_libraries=pgaudit`.
-- MinIO upload failure: confirm ports `9000/9001`, credentials, and container health; the development bucket is created automatically.
-- Queue actions do not run: confirm Redis is available and start the backend through `src/server.ts`, which starts workers.
-- Provider webhook is rejected: send the raw JSON body with the HMAC expected by the selected provider adapter.
+- `pnpm` not found: install with `npm install -g pnpm` or enable Corepack.
+- `prisma` binary missing: rerun `pnpm install --ignore-scripts=false` and then `pnpm --filter backend prisma:generate`.
+- Wrong database port: confirm `DATABASE_URL` uses `localhost:5433`.
+- MinIO upload failure: verify `9000/9001`, credentials, and container health.
+- Queue worker issues: ensure Redis is running and backend starts successfully.
+- Provider webhook failure: send raw JSON with the expected HMAC.
 
-See `TROUBLESHOOTING.md` for deeper database notes and `WALKTHROUGH.md` for functional verification scenarios.
+See `TROUBLESHOOTING.md` for further diagnostics and `WALKTHROUGH.md` for verification scenarios.

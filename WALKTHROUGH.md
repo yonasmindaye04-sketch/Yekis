@@ -105,6 +105,12 @@ Important controls:
 | Support chat | Guest or authenticated conversations and messages |
 | Staff dashboard | KYC/top-up queues, dispute resolution, TMS filing and dismissal |
 
+## Featured Talent and Moderation
+
+Staff have additional controls over user presence:
+- **Featured Talent Carousel**: Admins can pin exceptional, fully-verified freelancers to the homepage carousel for increased visibility. This history is tracked via a featured log.
+- **Profile Reports**: Users can flag inappropriate profiles. Staff review these reports in a dedicated queue and can take moderation actions, such as clearing offensive content or suspending the user.
+
 ## Backend State Machines
 
 Milestone escrow:
@@ -172,11 +178,11 @@ When implementation changes, update this walkthrough if the user journey, state 
 1. A staff account (`staffRole = COMPLIANCE_OFFICER | ADMIN`) logs in via the normal login form.
 2. `FullPlatformApp` detects `user.staffRole` and immediately renders `StaffDashboard`.
 3. On load, all four queues are fetched in parallel: support conversations, KYC queue, top-up queue, dispute queue.
-4. Auto-polling fires every 8 seconds — new user messages surface without a manual refresh.
+4. Auto-polling fires every 8 seconds â new user messages surface without a manual refresh.
 5. Unread conversations show a lime dot in the conversation list and a red badge count on the metric card.
-6. Staff select a conversation → messages load, thread is marked read, auto-scroll puts staff at the latest message.
-7. Staff type a reply and press Enter or Send → message delivered, list refreshes silently.
-8. Staff press **Close** → `PATCH /api/v1/chat/admin/conversations/:id/status` sets status to `CLOSED`; reply box locks.
+6. Staff select a conversation â messages load, thread is marked read, auto-scroll puts staff at the latest message.
+7. Staff type a reply and press Enter or Send â message delivered, list refreshes silently.
+8. Staff press **Close** â `PATCH /api/v1/chat/admin/conversations/:id/status` sets status to `CLOSED`; reply box locks.
 9. Closed conversations remain visible under the **All** filter and can be **Reopened** at any time.
 10. See `ADMIN_ACCESS.md` for instructions on creating a staff account.
 
@@ -230,7 +236,7 @@ When implementation changes, update this walkthrough if the user journey, state 
 
 - 2026-08-10: Configured Telegram bot API properties (setMyCommands, setMyDescription, setMyShortDescription) and redesigned the /help command to provide an excellent 'BotFather-style' onboarding UX.
 
-- 2026-08-10: Fixed root cause of 'errors_generic' bug � session initial function was incorrectly calling createRedisSessionStorage().read() asynchronously; replaced with synchronous createInitialSessionData(). Fixed ESLint errors: no-explicit-any in client.ts (added PaginatedResponse<T> generic type) and react-hooks/purity in StaffDashboard.tsx (pre-computed Date.now()). Added HTTPS guard on setChatMenuButton to skip Web App button in local dev.
+- 2026-08-10: Fixed root cause of 'errors_generic' bug  session initial function was incorrectly calling createRedisSessionStorage().read() asynchronously; replaced with synchronous createInitialSessionData(). Fixed ESLint errors: no-explicit-any in client.ts (added PaginatedResponse<T> generic type) and react-hooks/purity in StaffDashboard.tsx (pre-computed Date.now()). Added HTTPS guard on setChatMenuButton to skip Web App button in local dev.
 
 - 2026-08-10: Fixed cascading TypeScript errors caused by the PaginatedResponse generic type change. Reverted component-specific endpoint return types back to 'any' to satisfy rigid prop expectations in KycQueue, TopUpQueue, and StaffCompliancePanel.
 

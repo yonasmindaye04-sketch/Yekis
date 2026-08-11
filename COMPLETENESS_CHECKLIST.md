@@ -8,6 +8,12 @@ Last reviewed: 2026-08-09
 
 - [x] Registration, login, age gate, consent capture, and JWT sessions
 - [x] Telegram Mini App authentication backend and frontend entry path
+- [x] Public user profiles with skills taxonomy, bio, and dynamic completeness score
+- [x] Privacy-gated profile visibility (PUBLIC, PROPOSERS, PRIVATE)
+- [x] Featured talent carousel with staff-pinned, top-rated, and recently verified algorithm
+- [x] Contract double-blind review system with Bayesian rating averages and public responses
+- [x] Freelancer portfolio items
+- [x] Profile reporting and staff resolution queue
 - [x] Tier 1 document submission, status, staff review, and access gate
 - [x] Client job posting and own-job view
 - [x] Freelancer job discovery, proposal submission, own-proposal view, and withdrawal

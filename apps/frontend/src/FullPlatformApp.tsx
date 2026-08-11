@@ -12,13 +12,16 @@ import { ContractsWorkspace, DisputesWorkspace, JobsWorkspace } from "./Workflow
 import {
   LayoutDashboard, Briefcase, Search, FileText, Wallet, MessageCircle,
   ShieldCheck, Scale, Settings, ChevronDown, Plus,
-  LogOut, ArrowLeft,
+  LogOut, ArrowLeft, User as UserIcon, Edit
 } from "lucide-react";
+import { ProfilePage } from "./ProfilePage";
+import { ProfileEditPage } from "./ProfileEditPage";
+import { FeaturedCarousel } from "./FeaturedCarousel";
 
 
 // === INTERFACES & TYPES ===
 type PlatformRole = "CLIENT" | "FREELANCER" | "ADMIN" | "MEDIATOR";
-type View = "overview" | "jobs" | "contracts" | "wallet" | "chat" | "verification" | "cases" | "settings";
+type View = "overview" | "jobs" | "contracts" | "wallet" | "chat" | "verification" | "cases" | "settings" | "profile" | "profile-edit";
 type AuthMode = "login" | "register" | "forgot-password" | "reset-password";
 
 const categoryLabels: Record<string, string> = {
@@ -47,6 +50,7 @@ const navIconMap: Record<string, React.ReactNode> = {
   chat: <MessageCircle size={18} />,
   verification: <ShieldCheck size={18} />,
   cases: <Scale size={18} />,
+  profile: <UserIcon size={18} />,
 };
 
 export function FullPlatformApp() {
@@ -62,6 +66,7 @@ export function FullPlatformApp() {
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
+  const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
@@ -142,6 +147,7 @@ export function FullPlatformApp() {
       { view: "contracts" as View, iconKey: "contracts", label: "Contracts" },
       { view: "wallet" as View, iconKey: "wallet", label: "Wallet" },
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
+      { view: "profile" as View, iconKey: "profile", label: "Profile" },
     ];
     return platformRole === "ADMIN" || platformRole === "MEDIATOR"
       ? [...common, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
@@ -157,13 +163,21 @@ return <main className="platform-auth"><button type="button" className="auth-bac
   }
 
 return <div className="platform-shell"><aside className="platform-sidebar"><div className="sidebar-brand"><img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" /><strong>Yekis</strong></div><div className="sidebar-role"><span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span><span><strong>{roleLabel(platformRole)}</strong><small>{user.email}</small></span></div><nav className="sidebar-nav">{navItems.map((item) => <button key={item.view} className={view === item.view ? "active" : ""} onClick={() => setView(item.view)}><span className="nav-icon">{navIconMap[item.iconKey]}</span><span className="nav-label">{item.label}</span></button>)}</nav><button className="sidebar-settings" onClick={() => setView("settings")}><Settings size={16} /> <span className="nav-label">Settings</span></button></aside><main className="platform-main"><header className="platform-topbar"><div><span className="eyebrow">{roleLabel(platformRole)} workspace</span><h1>{view === "overview" ? "Good morning" : navItems.find((item) => item.view === view)?.label || "Settings"}</h1></div><div className="topbar-actions"><NotificationCenter /><button className="user-menu" onClick={logout}><span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span><ChevronDown size={14} /></button></div></header>
-      {view === "overview" && <section className="platform-content"><div className="overview-hero"><div><p className="eyebrow">Your work, in one view</p><h2>{platformRole === "FREELANCER" ? "Make your next move count." : platformRole === "CLIENT" ? "Turn your brief into progress." : "Keep every review moving."}</h2><p>{platformRole === "FREELANCER" ? "Find relevant work and keep delivery, verification, and payout status close at hand." : platformRole === "CLIENT" ? "Post a clear job, compare proposals, and fund milestones with confidence." : "Monitor receipts, identity checks, escrow, and open cases from one desk."}</p></div>{platformRole === "CLIENT" && <button className="btn-primary" onClick={() => setView("jobs")}>Post a job <Plus size={16} /></button>}{platformRole === "FREELANCER" && <button className="btn-primary" onClick={() => setView("jobs")}>Find work <Search size={16} /></button>}</div><div className="platform-metrics"><article><small>Wallet balance</small><strong>ETB {(wallet.balanceMinor / 100).toLocaleString()}</strong><span>Available balance</span></article><article><small>Open jobs</small><strong>{jobs.length}</strong><span>Matching opportunities</span></article><article><small>Active milestones</small><strong>{milestones.filter((milestone) => milestone.escrowState !== "RELEASED").length}</strong><span>Across your contracts</span></article></div><div className="platform-grid"><section className="panel"><div className="panel-heading"><h2>Recent activity</h2><button onClick={() => setView("contracts")}>View contracts</button></div>{milestones.length === 0 ? <p className="empty-state">Your active contracts will appear here.</p> : milestones.slice(0, 4).map((milestone) => <div className="activity-row" key={milestone.id}><span className="activity-dot" /><span><strong>{milestone.title}</strong><small>{milestone.escrowState.replaceAll("_", " ")}</small></span><b>ETB {(milestone.amountMinor / 100).toLocaleString()}</b></div>)}</section><section className="panel"><div className="panel-heading"><h2>Next step</h2></div><div className="next-step"><span className="step-number">1</span><div><strong>{platformRole === "FREELANCER" ? "Complete Fayda verification" : "Add funds to your wallet"}</strong><p>{platformRole === "FREELANCER" ? "Unlock payout access after manual review." : "Upload a Telebirr or CBE receipt for approval."}</p></div><button onClick={() => setView(platformRole === "FREELANCER" ? "verification" : "wallet")}>Open</button></div></section></div></section>}
+      {view === "overview" && <section className="platform-content"><div className="overview-hero"><div><p className="eyebrow">Your work, in one view</p><h2>{platformRole === "FREELANCER" ? "Make your next move count." : platformRole === "CLIENT" ? "Turn your brief into progress." : "Keep every review moving."}</h2><p>{platformRole === "FREELANCER" ? "Find relevant work and keep delivery, verification, and payout status close at hand." : platformRole === "CLIENT" ? "Post a clear job, compare proposals, and fund milestones with confidence." : "Monitor receipts, identity checks, escrow, and open cases from one desk."}</p></div>{platformRole === "CLIENT" && <button className="btn-primary" onClick={() => setView("jobs")}>Post a job <Plus size={16} /></button>}{platformRole === "FREELANCER" && <button className="btn-primary" onClick={() => setView("jobs")}>Find work <Search size={16} /></button>}</div><FeaturedCarousel /><div className="platform-metrics"><article><small>Wallet balance</small><strong>ETB {(wallet.balanceMinor / 100).toLocaleString()}</strong><span>Available balance</span></article><article><small>Open jobs</small><strong>{jobs.length}</strong><span>Matching opportunities</span></article><article><small>Active milestones</small><strong>{milestones.filter((milestone) => milestone.escrowState !== "RELEASED").length}</strong><span>Across your contracts</span></article></div><div className="platform-grid"><section className="panel"><div className="panel-heading"><h2>Recent activity</h2><button onClick={() => setView("contracts")}>View contracts</button></div>{milestones.length === 0 ? <p className="empty-state">Your active contracts will appear here.</p> : milestones.slice(0, 4).map((milestone) => <div className="activity-row" key={milestone.id}><span className="activity-dot" /><span><strong>{milestone.title}</strong><small>{milestone.escrowState.replaceAll("_", " ")}</small></span><b>ETB {(milestone.amountMinor / 100).toLocaleString()}</b></div>)}</section><section className="panel"><div className="panel-heading"><h2>Next step</h2></div><div className="next-step"><span className="step-number">1</span><div><strong>{platformRole === "FREELANCER" ? "Complete Fayda verification" : "Add funds to your wallet"}</strong><p>{platformRole === "FREELANCER" ? "Unlock payout access after manual review." : "Upload a Telebirr or CBE receipt for approval."}</p></div><button onClick={() => setView(platformRole === "FREELANCER" ? "verification" : "wallet")}>Open</button></div></section></div></section>}
       {view === "jobs" && <section className="platform-content"><div className="content-toolbar"><div><h2>{platformRole === "CLIENT" ? "Job postings" : "Find work"}</h2><p>{platformRole === "CLIENT" ? "Create a clear brief and manage the talent pipeline." : "Browse open opportunities across the marketplace."}</p></div></div>{platformRole === "CLIENT" && <form className="panel job-form" onSubmit={submitJob}><h3>New job brief</h3><div className="form-grid"><label>Title<input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="What do you need done?" required /></label><label>Category<select value={jobCategory} onChange={(event) => setJobCategory(event.target.value)}>{categories.map((category) => <option key={category} value={category}>{categoryLabels[category]}</option>)}</select></label><label className="form-wide">Description<textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Describe the outcome, scope, and expectations." minLength={20} required /></label><label>Minimum budget<input type="number" value={jobBudgetMin} onChange={(event) => setJobBudgetMin(event.target.value)} placeholder="ETB" required /></label><label>Maximum budget<input type="number" value={jobBudgetMax} onChange={(event) => setJobBudgetMax(event.target.value)} placeholder="ETB" required /></label><label>Deadline<input type="date" value={jobDeadline} onChange={(event) => setJobDeadline(event.target.value)} required /></label></div><button className="btn-primary" disabled={isLoading}>Publish job</button></form>}<JobsWorkspace role={platformRole as "CLIENT" | "FREELANCER"} openJobs={jobs} onChanged={loadWorkspace} /></section>}
       {view === "contracts" && <section className="platform-content"><div className="content-toolbar"><div><h2>Contracts and milestones</h2><p>Sign agreements, fund escrow, submit work, and release completed milestones.</p></div></div><ContractsWorkspace role={platformRole as "CLIENT" | "FREELANCER"} onChanged={loadWorkspace} /></section>}
       {view === "wallet" && <section className="platform-content"><BrowserWallet wallet={wallet} topUps={topUps} onChanged={loadWorkspace} canWithdraw={platformRole === "FREELANCER"} /></section>}
       {view === "chat" && <section className="platform-content"><div className="content-toolbar"><div><h2>Support chat</h2><p>Get help with jobs, contracts, payments, verification, or disputes.</p></div></div><SupportChat userId={user.id} /></section>}
       {view === "verification" && <section className="platform-content"><div className="content-toolbar"><div><h2>Verification</h2><p>Manage your identity and payout readiness.</p></div></div><BrowserVerification /></section>}
       {view === "cases" && <section className="platform-content"><div className="content-toolbar"><div><h2>Disputes</h2><p>Negotiate, submit evidence, and track mediation or arbitration.</p></div></div><DisputesWorkspace /></section>}
+      {view === "profile" && <section className="platform-content">
+        <div className="content-toolbar"><div><h2>Profile</h2><p>View user profile details.</p></div><button className="btn-secondary" onClick={() => setView("profile-edit")}><Edit size={16} /> Edit Profile</button></div>
+        <ProfilePage userId={viewUserId || user.id} />
+      </section>}
+      {view === "profile-edit" && <section className="platform-content">
+        <div className="content-toolbar"><div><h2>Edit Profile</h2><p>Update your public profile details.</p></div><button className="btn-secondary" onClick={() => setView("profile")}><ArrowLeft size={16} /> Back to Profile</button></div>
+        <ProfileEditPage />
+      </section>}
       {view === "settings" && <section className="platform-content"><div className="content-toolbar"><div><h2>Settings</h2><p>Account preferences and access.</p></div></div><div className="panel settings-list"><div><strong>Account email</strong><span>{user.email}</span></div><div><strong>Workspace role</strong><span>{roleLabel(platformRole)}</span></div><button className="btn-secondary" onClick={logout}><LogOut size={16} /> Sign out</button></div></section>}
     </main><nav className="platform-mobile-nav">{navItems.map((item) => <button key={item.view} className={view === item.view ? "active" : ""} onClick={() => setView(item.view)}><span>{navIconMap[item.iconKey]}</span><small>{item.label}</small></button>)}</nav></div>;
 }

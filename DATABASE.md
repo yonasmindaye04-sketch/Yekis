@@ -26,6 +26,15 @@ erDiagram
   User ||--o{ AuditLog : acts_in
   Conversation ||--o{ ConversationParticipant : includes
   Conversation ||--o{ ChatMessage : contains
+  User ||--o{ UserSkill : has
+  Skill ||--o{ UserSkill : assigned_to
+  User ||--o{ Review : writes (as author)
+  User ||--o{ Review : receives (as target)
+  Contract ||--o{ Review : contains
+  User ||--o{ PortfolioItem : showcases
+  User ||--o{ FeaturedLog : featured_in
+  User ||--o{ ProfileReport : reported_in
+  User ||--o{ ProfileView : viewed_in
 ```
 
 ## Entity Responsibilities
@@ -49,6 +58,13 @@ erDiagram
 | `Notification` | User notification ledger and delivery metadata |
 | `Conversation` | Support thread with participant relations and `assignedStaffId` for scoped staff access |
 | `AuditLog` | Append-only event record for important state transitions |
+| `Skill` | Standardized skills available for profiles |
+| `UserSkill` | Junction table for user skills and proficiency |
+| `Review` | Double-blind contract feedback (author, target, contract, rating, comment) |
+| `PortfolioItem` | Freelancer work samples (title, description, URL, attachments) |
+| `FeaturedLog` | History of users featured in the talent carousel |
+| `ProfileReport` | Moderation flags against inappropriate profile content |
+| `ProfileView` | Analytical tracking of profile views |
 
 ## Monetary Representation
 
@@ -65,6 +81,9 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 - A wallet and KYC record are each one-to-one with a user.
 - Release/refund/split services combine guarded updates with Prisma transactions; constraints support, but do not replace, service state checks.
 - `AuditLog` is insert-only by application convention and database privileges.
+- A contract has at most two reviews, one from each party, enforcing the double-blind system.
+- Reviews are only visible once both parties have submitted them, or the 14-day window expires.
+- Profile completeness percentage is dynamically calculated based on skills, bio, portfolio, and verified status.
 
 ## Important Enums
 
