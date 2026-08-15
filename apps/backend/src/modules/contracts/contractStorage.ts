@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { ensureObjectStoreBucket, objectStoreClient } from "../../lib/objectStore.js";
+import { objectStoreClient } from "../../lib/objectStore.js";
 import { env } from "../../config/env.js";
 
 /**
@@ -12,7 +12,6 @@ import { env } from "../../config/env.js";
 
 // === MAIN FUNCTIONS ===
 export async function uploadContractDocument(params: { jobId: string; fileBuffer: Buffer }): Promise<string> {
-  await ensureObjectStoreBucket();
   const key = `contracts/${params.jobId}/service-agreement-${Date.now()}.pdf`;
 
   await objectStoreClient.send(

@@ -79,6 +79,20 @@ export const translations = {
       evidenceVault: "Evidence Vault",
       mediatorRuling: "Mediator Non-Binding Ruling",
     },
+    marketing: {
+      hero: { eyebrow: "The Right Talent, Right Now", headline: "Ethiopia's Trusted Freelance Escrow Marketplace", subheadline: "Hire top Ethiopian talent safely. Your funds are protected in escrow until the work is approved.", ctaHire: "Post a Job", ctaWork: "Find Work" },
+      escrow: { headline: "How Escrow Protects You", step1Title: "1. Agree on Terms", step1Desc: "Client and freelancer agree on project milestones and budget.", step2Title: "2. Deposit Funds", step2Desc: "Client deposits funds into secure escrow.", step3Title: "3. Work Begins", step3Desc: "Freelancer completes the work and submits it for review.", step4Title: "4. Funds Released", step4Desc: "Client approves the work and funds are released to the freelancer.", trustLine: "Backed by secure banking partners.", disputeLink: "Learn about our dispute process" },
+      counters: { freelancers: "10k+ Verified Freelancers", jobs: "5k+ Jobs Posted", escrow: "100M+ ETB in Escrow" },
+      faq: { title: "Frequently Asked Questions", trustTitle: "Trust & Safety", startTitle: "Getting Started", paidTitle: "Getting Paid" },
+      fees: { title: "Transparent Pricing", subtitle: "No hidden fees. Just clear, fair pricing for everyone." },
+      "404": { title: "Page Not Found", subtitle: "Sorry, the page you are looking for does not exist.", homeLink: "Go to Home", jobsLink: "Browse Jobs" },
+      thankYou: { signup: "Thanks for joining Yekis!", jobPosted: "Your job has been posted successfully.", contact: "We will be in touch soon." },
+      about: { title: "About Yekis", mission: "Empowering Ethiopia's digital workforce through secure, transparent freelance opportunities." },
+      caseStudies: { title: "Success Stories", comingSoon: "More case studies coming soon!" },
+      cookie: { title: "Cookie Preferences", description: "We use cookies to improve your experience.", essential: "Essential", analytics: "Analytics", marketing: "Marketing", acceptAll: "Accept All", manage: "Manage Preferences", save: "Save Preferences" },
+      footer: { telegram: "Join our Telegram", privacy: "Privacy Policy", terms: "Terms of Service", faq: "FAQ", fees: "Pricing & Fees", about: "About Us" },
+      mobileCta: { postJob: "Post a Job", findWork: "Find Work" }
+    },
   },
   am: {
     appName: "ሙያሎጂ (Yekis)",
@@ -155,6 +169,20 @@ export const translations = {
       stage4: "ደረጃ 4: የAACCSA ህጋዊ ዳኝነት",
       evidenceVault: "የማስረጃ ቋት",
       mediatorRuling: "የአስታራቂ ውሳኔ",
+    },
+    marketing: {
+      hero: { eyebrow: "[TODO: Professional Amharic translation needed]", headline: "[TODO: Professional Amharic translation needed]", subheadline: "[TODO: Professional Amharic translation needed]", ctaHire: "[TODO: Professional Amharic translation needed]", ctaWork: "[TODO: Professional Amharic translation needed]" },
+      escrow: { headline: "[TODO: Professional Amharic translation needed]", step1Title: "[TODO: Professional Amharic translation needed]", step1Desc: "[TODO: Professional Amharic translation needed]", step2Title: "[TODO: Professional Amharic translation needed]", step2Desc: "[TODO: Professional Amharic translation needed]", step3Title: "[TODO: Professional Amharic translation needed]", step3Desc: "[TODO: Professional Amharic translation needed]", step4Title: "[TODO: Professional Amharic translation needed]", step4Desc: "[TODO: Professional Amharic translation needed]", trustLine: "[TODO: Professional Amharic translation needed]", disputeLink: "[TODO: Professional Amharic translation needed]" },
+      counters: { freelancers: "[TODO: Professional Amharic translation needed]", jobs: "[TODO: Professional Amharic translation needed]", escrow: "[TODO: Professional Amharic translation needed]" },
+      faq: { title: "[TODO: Professional Amharic translation needed]", trustTitle: "[TODO: Professional Amharic translation needed]", startTitle: "[TODO: Professional Amharic translation needed]", paidTitle: "[TODO: Professional Amharic translation needed]" },
+      fees: { title: "[TODO: Professional Amharic translation needed]", subtitle: "[TODO: Professional Amharic translation needed]" },
+      "404": { title: "[TODO: Professional Amharic translation needed]", subtitle: "[TODO: Professional Amharic translation needed]", homeLink: "[TODO: Professional Amharic translation needed]", jobsLink: "[TODO: Professional Amharic translation needed]" },
+      thankYou: { signup: "[TODO: Professional Amharic translation needed]", jobPosted: "[TODO: Professional Amharic translation needed]", contact: "[TODO: Professional Amharic translation needed]" },
+      about: { title: "[TODO: Professional Amharic translation needed]", mission: "[TODO: Professional Amharic translation needed]" },
+      caseStudies: { title: "[TODO: Professional Amharic translation needed]", comingSoon: "[TODO: Professional Amharic translation needed]" },
+      cookie: { title: "[TODO: Professional Amharic translation needed]", description: "[TODO: Professional Amharic translation needed]", essential: "[TODO: Professional Amharic translation needed]", analytics: "[TODO: Professional Amharic translation needed]", marketing: "[TODO: Professional Amharic translation needed]", acceptAll: "[TODO: Professional Amharic translation needed]", manage: "[TODO: Professional Amharic translation needed]", save: "[TODO: Professional Amharic translation needed]" },
+      footer: { telegram: "[TODO: Professional Amharic translation needed]", privacy: "[TODO: Professional Amharic translation needed]", terms: "[TODO: Professional Amharic translation needed]", faq: "[TODO: Professional Amharic translation needed]", fees: "[TODO: Professional Amharic translation needed]", about: "[TODO: Professional Amharic translation needed]" },
+      mobileCta: { postJob: "[TODO: Professional Amharic translation needed]", findWork: "[TODO: Professional Amharic translation needed]" }
     },
   },
 };

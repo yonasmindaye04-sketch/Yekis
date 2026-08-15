@@ -1,6 +1,6 @@
 # Database Guide
 
-Last updated: 2026-08-09
+Last updated: 2026-08-15
 
 PostgreSQL is the transactional source of truth. Prisma defines the application model in `apps/backend/prisma/schema.prisma`; SQL migrations in `apps/backend/prisma/migrations` define the deployed history.
 
@@ -41,15 +41,15 @@ erDiagram
 
 | Model | Responsibility and important invariants |
 |---|---|
-| `User` | Unique email, phone, UCID, optional Fayda/Telegram IDs; marketplace and staff roles |
+| `User` | Unique email, phone, UCID, optional Fayda/Telegram IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals |
 | `ConsentRecord` | Purpose-specific consent history captured at registration |
 | `KycRecord` | One per user; tier/status, Fayda/PEP fields, review metadata, `periodicReviewPending` |
 | `KycDocument` | Metadata/path for object-stored identity evidence |
 | `Job` | Client-owned scope, category, budget, deadline, proposed milestone JSON |
 | `Proposal` | Freelancer offer; unique on `(jobId, freelancerId)` |
-| `Contract` | One per job; client/freelancer parties, immutable PDF path, independent signatures |
+| `Contract` | One per job; client/freelancer parties, immutable PDF path, independent signatures, contract status |
 | `Milestone` | Contract amount/due date and escrow state; can have one dispute |
-| `PaymentTransaction` | Provider attempt/status/payload; unique provider transaction ID |
+| `PaymentTransaction` | Provider attempt/status/payload; unique provider transaction ID. Telebirr transactions store the merchant order ID formatted as `YKS-<timestamp>-<6char>` |
 | `Wallet` | One balance per user in integer minor units |
 | `TopUpRequest` | Receipt-backed manual credit request and staff decision |
 | `Dispute` | Unique milestone case, staged deadlines, resolution outcome and optional split |
@@ -68,13 +68,14 @@ erDiagram
 
 ## Monetary Representation
 
-All monetary values are integers in minor units. For ETB, `100` represents ETB 1.00. This applies to budgets, proposal amounts, milestones, payments, wallets, withholding, top-ups, and dispute splits. Floating-point values are accepted only at selected UI/form boundaries and converted before persistence.
+All monetary values are integers in minor units. For ETB, `100` represents ETB 1.00. This applies to budgets, proposal amounts, milestones, payments, wallets, withholding, top-ups, and dispute splits. Floating-point values are accepted only at selected UI/form boundaries and converted before persistence. (Telebirr API communication converts minor units to decimal strings e.g. `500.00` externally without affecting DB storage).
 
 ## Enforced Invariants
 
 - `Job.jobId -> Contract` is one-to-one through unique `Contract.jobId`.
 - A freelancer has at most one proposal per job.
-- Each provider transaction identifier is unique.
+- Each provider transaction identifier is unique (e.g. Telebirr order ID format: `YKS-<timestamp>-<6char>`).
+- Telebirr C2B Web Checkout integration requires no schema changes (`TELEBIRR` already exists in the `PaymentProvider` enum).
 - A partial unique SQL index permits at most one `PENDING` payment transaction per milestone.
 - A milestone has at most one dispute through unique `Dispute.milestoneId`.
 - A dispute also retains `contractId` for efficient party and queue queries.
@@ -89,6 +90,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 
 | Enum | Values |
 |---|---|
+| `ContractStatus` | `ACTIVE`, `COMPLETED`, `TERMINATED` |
 | `UserRole` | `CLIENT`, `FREELANCER`, `BOTH` |
 | `StaffRole` | `COMPLIANCE_OFFICER`, `ADMIN` |
 | `KycTier` | `TIER_1`, `TIER_2`, `TIER_3` |

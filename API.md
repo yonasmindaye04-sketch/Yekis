@@ -1,6 +1,6 @@
 # API Reference
 
-Last updated: 2026-08-09
+Last updated: 2026-08-15
 
 Base URL: `http://127.0.0.1:4000`
 
@@ -141,23 +141,29 @@ Funding is unavailable until both `clientAcceptedAt` and `freelancerAcceptedAt` 
 ## Escrow And Wallet
 
 | Method | Path | Access | Purpose |
+| Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/escrow/fund` | Contract client, Tier 1 verified | Initiate milestone funding |
+| `POST` | `/api/v1/escrow/fund` | Contract client, Tier 1 verified | (Deprecated) Old external-provider funding path |
+| `POST` | `/api/v1/escrow/fund-from-wallet` | Contract client, Tier 1 verified | Initiate milestone funding from client wallet |
 | `GET` | `/api/v1/escrow/milestones` | Authenticated party | List milestones across current user's contracts |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/submit` | Contract freelancer | Mark funded work delivered and schedule auto-release |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
-| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 2 verified | Request payout and run TMS checks |
+| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 2 verified | Request payout to provider account |
 
-Funding body:
+Funding body (wallet-first):
 
 ```json
 {
-  "contractId": "contract-id",
-  "milestoneId": "milestone-id",
-  "provider": "TELEBIRR"
+  "milestoneId": "milestone-id"
 }
 ```
+
+Funding response (`200 OK`): returns the updated milestone object with `escrowState: "ESCROW_HELD"`.
+
+*(Note: The old `/fund` route expecting `provider` is deprecated. Escrow funding is now automatically triggered when both parties accept the contract, provided the client has topped up their wallet. The `/fund-from-wallet` route is available for manual retry.)*
+
+When `provider` is `TELEBIRR`, `initiatePayment` creates a preOrder via the Telebirr Merchant API, utilizes a Redis-cached Fabric token, and returns a real `redirectUrl` for web checkout. In mock mode (when Telebirr credentials are not configured), it falls back to returning a mock transaction ID and `redirectUrl: null`.
 
 Withdrawal body:
 
@@ -187,13 +193,45 @@ Manual top-up is `multipart/form-data` with `receipt`, `amountEtb`, `rail`, `sen
 
 ## Signed Payment Webhooks
 
-| Method | Path | Signature header |
-|---|---|---|
-| `POST` | `/api/v1/webhooks/telebirr` | `x-telebirr-signature` |
-| `POST` | `/api/v1/webhooks/chapa` | `x-chapa-signature` |
-| `POST` | `/api/v1/webhooks/cbe` | `x-cbe-signature` |
+| Method | Path | Signature Location | Algorithm / Header |
+|---|---|---|---|
+| `POST` | `/api/v1/webhooks/telebirr` | Body (`sign` field) | RSA-PSS (`SHA256withRSAandMGF1`) |
+| `POST` | `/api/v1/webhooks/chapa` | Header | `x-chapa-signature` (HMAC-SHA256) |
+| `POST` | `/api/v1/webhooks/cbe` | Header | `x-cbe-signature` (HMAC-SHA256) |
 
-These public provider callbacks accept a raw body, enforce a dedicated rate limit, verify HMAC, normalize provider status, and process provider transaction IDs idempotently. Exact production provider fields still require sandbox validation.
+These public provider callbacks accept a raw body, enforce a dedicated rate limit (`120 req/min`), verify signatures, normalize provider status, and process provider transaction IDs idempotently.
+
+### Telebirr Webhook (`POST /api/v1/webhooks/telebirr`)
+
+Telebirr embeds the signature directly in the JSON payload body (`sign` field) rather than in an HTTP header, and uses RSA-PSS verification against `TELEBIRR_PUBLIC_KEY`.
+
+**Webhook Payload Shape:**
+
+```json
+{
+  "merch_order_id": "YKS-1723720000000-ABC123",
+  "trade_status": "Completed",
+  "total_amount": "5000.00",
+  "sign": "i8+X...<base64-rsa-pss-signature>",
+  "sign_type": "SHA256WithRSA"
+}
+```
+
+**Webhook Response:**
+
+```json
+{
+  "code": 0,
+  "msg": "success"
+}
+```
+
+If the signature is invalid or JSON parsing fails, the endpoint returns `{ "code": -1, "msg": "INVALID_SIGNATURE" }` (`401`) or `{ "code": -1, "msg": "INVALID_JSON" }` (`400`).
+
+Status mappings:
+- `Completed`, `Success` -> `SUCCESS` (milestone moves to `ESCROW_HELD`)
+- `Fail`, `Failed`, `Closed`, `Cancelled` -> `FAILED`
+- Other -> `PENDING`
 
 ## Disputes
 

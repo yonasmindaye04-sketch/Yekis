@@ -55,12 +55,40 @@ export async function submitTopUp(params: {
  * at a glance whether this is a first-time submission or an established
  * pattern, without a separate lookup per item.
  */
-export async function getTopUpQueue() {
-  const pending = await prisma.walletTopUp.findMany({
-    where: { status: "PENDING" },
-    include: { user: { select: { id: true, email: true, phone: true, ucid: true } } },
-    orderBy: { createdAt: "asc" },
-  });
+export async function getTopUpQueue(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
+  const page = Math.max(1, params?.page || 1);
+  const limit = Math.max(1, Math.min(100, params?.pageSize || 20));
+
+  const where: any = {};
+  if (params?.status) {
+    if (params.status === "PENDING_REVIEW") {
+      where.status = "PENDING";
+    } else {
+      where.status = params.status;
+    }
+  } else {
+    where.status = "PENDING";
+  }
+
+  if (params?.search) {
+    where.user = {
+      OR: [
+        { email: { contains: params.search, mode: 'insensitive' } },
+        { phone: { contains: params.search } }
+      ]
+    };
+  }
+
+  const [total, pending] = await Promise.all([
+    prisma.walletTopUp.count({ where }),
+    prisma.walletTopUp.findMany({
+      where,
+      include: { user: { select: { id: true, email: true, phone: true, ucid: true } } },
+      orderBy: { createdAt: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+    })
+  ]);
 
   const withHistory = await Promise.all(
     pending.map(async (topUp) => {
@@ -83,7 +111,7 @@ export async function getTopUpQueue() {
     })
   );
 
-  return withHistory;
+  return { items: withHistory, total, page, pageSize: limit };
 }
 
 /** Powers the EvidenceViewer for the receipt photo — same short-lived-URL pattern as KYC documents. */

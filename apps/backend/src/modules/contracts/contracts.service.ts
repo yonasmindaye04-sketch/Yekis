@@ -1,4 +1,3 @@
-// === IMPORTS ===
 import { z } from "zod";
 import { MilestonePlanItem } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
@@ -8,9 +7,10 @@ import {
   generateServiceAgreementPdf,
   SERVICE_AGREEMENT_TEMPLATE_VERSION,
 } from "./serviceAgreement.template.js";
+import { calculateFees } from "../escrow/fees.js";
+import { notificationQueue } from "../../queue/queues.js";
+import { logger } from "../../lib/logger.js";
 
-
-// === MAIN FUNCTIONS ===
 export class ContractNotFoundError extends Error {}
 export class NotContractPartyError extends Error {}
 export class AlreadyAcceptedError extends Error {}
@@ -146,10 +146,135 @@ export async function acceptContract(userId: string, contractId: string) {
       entityType: "Contract",
       entityId: contractId,
     });
-    // TODO (Escrow module): this is the trigger point to notify the client
-    // that escrow funding is now available — wire a notification here once
-    // the Notifications module exists.
+
+    // Auto-fund all PAYMENT_PENDING milestones from the client's wallet.
+    // This makes the flow seamless: once both parties sign, work can begin
+    // immediately without a separate "Fund" click.
+    try {
+      const milestones = await prisma.milestone.findMany({
+        where: { contractId, escrowState: "PAYMENT_PENDING" },
+      });
+
+      if (milestones.length > 0) {
+        const freelancerKyc = await prisma.kycRecord.findUnique({
+          where: { userId: updated.freelancerId },
+        });
+
+        // Calculate total charge across all milestones
+        const totalChargeMinor = milestones.reduce((sum, m) => {
+          const fees = calculateFees({
+            milestoneAmountMinor: m.amountMinor,
+            freelancerHasTin: !!freelancerKyc?.tin,
+          });
+          return sum + fees.clientTotalChargeMinor;
+        }, 0);
+
+        const clientWallet = await prisma.wallet.findUnique({
+          where: { userId: updated.clientId },
+        });
+
+        if (!clientWallet || clientWallet.balanceMinor < totalChargeMinor) {
+          // Insufficient balance — notify client to top up rather than blocking signature
+          await notificationQueue.add("topup-required", {
+            userId: updated.clientId,
+            contractId,
+            message: `Contract fully signed! Please top up your wallet with at least ETB ${
+              (totalChargeMinor / 100).toFixed(2)
+            } to fund the project escrow and allow work to begin.`,
+          });
+          logger.warn(
+            { contractId, requiredMinor: totalChargeMinor, availableMinor: clientWallet?.balanceMinor ?? 0 },
+            "Contract fully executed but client has insufficient wallet balance — notified to top up"
+          );
+        } else {
+          // Sufficient balance — atomically debit wallet and lock all milestones
+          await prisma.$transaction([
+            prisma.wallet.update({
+              where: { userId: updated.clientId },
+              data: { balanceMinor: { decrement: totalChargeMinor } },
+            }),
+            ...milestones.map((m) =>
+              prisma.milestone.update({
+                where: { id: m.id },
+                data: { escrowState: "ESCROW_HELD" },
+              })
+            ),
+          ]);
+
+          for (const m of milestones) {
+            const fees = calculateFees({
+              milestoneAmountMinor: m.amountMinor,
+              freelancerHasTin: !!freelancerKyc?.tin,
+            });
+            await recordAuditEvent({
+              userId: updated.clientId,
+              eventType: "ESCROW_FUNDED_FROM_WALLET",
+              entityType: "Milestone",
+              entityId: m.id,
+              metadata: {
+                chargedMinor: fees.clientTotalChargeMinor,
+                grossMinor: fees.grossAmountMinor,
+                platformFeeMinor: fees.platformFeeFromClientMinor,
+                source: "auto_on_contract_execution",
+              },
+            });
+          }
+
+          await notificationQueue.add("escrow-funded", {
+            userId: updated.freelancerId,
+            contractId,
+            message: "Contract fully signed and escrow funded — work can begin!",
+          });
+
+          logger.info(
+            { contractId, milestonesCount: milestones.length, totalChargeMinor },
+            "Escrow auto-funded from client wallet on contract full execution"
+          );
+        }
+      }
+    } catch (err) {
+      // Auto-funding failure must NOT block the contract acceptance response —
+      // the signature itself is valid and legally binding regardless. The client
+      // can manually fund from the Contracts page in the rare failure case.
+      logger.error({ err, contractId }, "Auto-fund on contract execution failed — client must fund manually");
+    }
   }
 
   return { ...updated, fullyExecuted };
+}
+
+/**
+ * Recomputes and persists Contract.status. Called from escrow.service.ts
+ * whenever a milestone reaches a terminal escrow state (RELEASED, REFUNDED,
+ * or PARTIAL_REFUND) — a contract is COMPLETED once every one of its
+ * milestones has landed in one of those three states. This is what
+ * Review.isEligible (profiles/reviews feature) should actually check
+ * instead of a Contract.status field that didn't previously exist.
+ */
+const TERMINAL_ESCROW_STATES = ["RELEASED", "REFUNDED", "PARTIAL_REFUND"];
+
+export async function checkAndUpdateContractCompletion(milestoneId: string) {
+  const milestone = await prisma.milestone.findUniqueOrThrow({
+    where: { id: milestoneId },
+    select: { contractId: true },
+  });
+
+  const siblingMilestones = await prisma.milestone.findMany({
+    where: { contractId: milestone.contractId },
+    select: { escrowState: true },
+  });
+
+  const allTerminal = siblingMilestones.every((m) => TERMINAL_ESCROW_STATES.includes(m.escrowState));
+  if (!allTerminal) return;
+
+  await prisma.contract.update({
+    where: { id: milestone.contractId },
+    data: { status: "COMPLETED" },
+  });
+
+  await recordAuditEvent({
+    eventType: "CONTRACT_COMPLETED",
+    entityType: "Contract",
+    entityId: milestone.contractId,
+  });
 }

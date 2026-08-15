@@ -1,0 +1,48 @@
+import { useState, useEffect, useRef } from 'react';
+import { Briefcase, Search } from 'lucide-react';
+
+interface MobileCTAProps {
+  onStart: (mode: 'login' | 'register') => void;
+}
+
+export function MobileCTA({ onStart }: MobileCTAProps) {
+  const [visible, setVisible] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Hide when footer is in view
+    const footer = document.querySelector('.landing-footer');
+    if (!footer) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!entry.isIntersecting),
+      { threshold: 0.1 }
+    );
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, []);
+
+  // Only show on mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  if (!isMobile || !visible) return null;
+
+  return (
+    <div className="mobile-cta-bar">
+      <button className="mobile-cta-hire" onClick={() => onStart('register')}>
+        <Briefcase size={16} />
+        Post a Job
+      </button>
+      <button className="mobile-cta-work" onClick={() => onStart('register')}>
+        <Search size={16} />
+        Find Work
+      </button>
+    </div>
+  );
+}

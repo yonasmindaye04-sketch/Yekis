@@ -4,6 +4,7 @@ import { useTelegramMiniApp } from "./telegram/useTelegramMiniApp";
 import { api, type TelegramAuthResponse, type TopUpRequest, type Milestone, type Job } from "./api/client";
 import { FullPlatformApp } from "./FullPlatformApp";
 import { Home, Search, Briefcase, Wallet, UserCircle, ShieldAlert, ArrowLeft, PlusCircle, User, Briefcase as BriefcaseIcon } from "lucide-react";
+import { PaymentReturn } from "./PaymentReturn";
 
 
 // === INTERFACES & TYPES ===
@@ -17,8 +18,8 @@ const getDefaultMilestoneDueDate = (): string =>
   new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0];
 
 const paymentAccounts = {
-  TELEBIRR: { label: "Telebirr", accountName: "Yekis Jobs", accountNumber: "09 00 000 000" },
-  CBE_BIRR: { label: "CBE Bank", accountName: "Yekis Jobs", accountNumber: "1000 0000 0000 0000" },
+  TELEBIRR: { label: "Telebirr", accountName: "Yekis Jobs", accountNumber: "09 00 000 000", image: "/payment/Telebirr.png", imgStyle: { width: '70px', height: '70px', objectFit: 'contain', borderRadius: '8px', flexShrink: 0 } as React.CSSProperties },
+  CBE_BIRR: { label: "CBE Bank", accountName: "Yekis Jobs", accountNumber: "1000 0000 0000 0000", image: "/payment/cbe payment.jpg", imgStyle: { width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 } as React.CSSProperties },
 };
 
 const roleOptions: { role: Role; title: string; description: string; icon: React.ReactNode }[] = [
@@ -31,6 +32,10 @@ function formatRole(role: Role) {
 }
 
 export function App() {
+  if (window.location.pathname === "/payment/return") {
+    return <PaymentReturn />;
+  }
+
   const telegram = useTelegramMiniApp();
 
   const [telegramSession, setTelegramSession] = useState<TelegramAuthResponse | null>(null);
@@ -349,7 +354,7 @@ export function App() {
                 <section className="panel">
                   <div className="panel-heading"><h2>Add Funds</h2></div>
                   <p style={{marginBottom: 14, color: 'var(--text-secondary)', fontSize: '0.85rem'}}>Send money to one of the accounts below, then upload your receipt for approval.</p>
-                  <div className="payment-grid">{Object.entries(paymentAccounts).map(([key, account]) => <button className={topUpRail === key ? "payment-account selected" : "payment-account"} key={key} onClick={() => setTopUpRail(key as "TELEBIRR" | "CBE_BIRR")}><strong>{account.label}</strong><span>{account.accountName}</span><code>{account.accountNumber}</code></button>)}</div>
+                  <div className="payment-grid">{Object.entries(paymentAccounts).map(([key, account]) => <button className={topUpRail === key ? "payment-account selected" : "payment-account"} key={key} onClick={() => setTopUpRail(key as "TELEBIRR" | "CBE_BIRR")}><img src={account.image} alt={account.label} style={account.imgStyle} /><div className="payment-account-text"><strong>{account.label}</strong><span>{account.accountName}</span><code>{account.accountNumber}</code></div></button>)}</div>
                   <label>Amount sent<input value={topUpAmount} onChange={(event) => setTopUpAmount(event.target.value)} inputMode="decimal" placeholder="e.g. 5000" /></label>
                   <label>Transaction/reference number<input value={topUpReference} onChange={(event) => setTopUpReference(event.target.value)} placeholder="e.g. TB-12345" /></label>
                   <label>Receipt image<input type="file" accept="image/*,.pdf" onChange={(event) => setTopUpReceipt(event.target.files?.[0] ?? null)} /></label>

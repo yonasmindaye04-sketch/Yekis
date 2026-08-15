@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-08-09
+Last updated: 2026-08-15
 
 ## System Overview
 
@@ -49,7 +49,7 @@ request
   -> JSON response
 ```
 
-Webhook routes are deliberately mounted before `express.json()` so HMAC validation uses the exact raw bytes sent by the provider.
+Webhook routes are deliberately mounted before `express.json()` so raw request bytes are preserved for header-based HMAC and body-embedded RSA-PSS signature verification.
 
 ## Domain Modules
 
@@ -121,6 +121,68 @@ Each dispute has a unique `milestoneId`. Resolution can release to the freelance
 - Wallet mismatch is blocking: the API returns `202 HELD_FOR_REVIEW`, creates a TMS flag, and leaves balance unchanged.
 - Structuring, velocity, and pass-through checks create review flags without silently changing the financial result.
 
+## Telebirr Payment Integration
+
+The platform integrates Telebirr C2B Web Checkout as the primary payment rail for funding milestone escrow.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor Client as Client Browser
+  participant API as Express API
+  participant Redis as Redis Cache
+  participant Telebirr as Telebirr Gateway
+
+  Client->>API: POST /api/v1/escrow/fund (provider: TELEBIRR)
+  API->>Redis: Get cached fabric token (telebirr:fabric_token)
+  alt Token missing or expired
+    API->>Telebirr: POST /payment/v1/token (X-APP-Key, appSecret)
+    Telebirr-->>API: { code: 200, token: "..." }
+    API->>Redis: SETEX telebirr:fabric_token (3000s / 50m TTL)
+  end
+  API->>API: Build & RSA-PSS sign preOrder payload (SHA256withRSAandMGF1)
+  API->>Telebirr: POST /payment/v1/merchant/preOrder (Bearer token, signed body)
+  Telebirr-->>API: { code: 200, biz_content: { prepay_id: "..." } }
+  API->>API: Assemble web checkout URL with signed rawRequest
+  API-->>Client: { providerTransactionId: "YKS-...", redirectUrl: "https://..." }
+  Client->>Telebirr: Redirect to Web Checkout (complete payment)
+  Telebirr->>API: POST /api/v1/webhooks/telebirr (body-embedded sign)
+  API->>API: Verify RSA-PSS signature with TELEBIRR_PUBLIC_KEY
+  API->>API: Update milestone to ESCROW_HELD
+  API-->>Telebirr: { code: 0, msg: "success" }
+```
+
+### Technical Components
+
+1. **C2B Web Checkout Flow (`telebirr.client.ts`)**:
+   - `POST /api/v1/escrow/fund` validates contract parties and milestone eligibility.
+   - Monetary amounts are converted from integer minor units (ETB cents) to formatted decimal strings (`total_amount: "500.00"`).
+   - Generates a unique merchant order ID formatted as `YKS-<timestamp>-<6char_random>`, stored as `PaymentTransaction.providerTransactionId`.
+   - Sends a `payment.preorder` request to Telebirr, receives a `prepay_id`, and constructs the full web checkout redirect URL with signed query parameters.
+   - The frontend redirects the client to Telebirr Web Checkout; upon payment, Telebirr redirects back to `PaymentReturn.tsx` while sending an asynchronous server-to-server webhook.
+
+2. **Cryptographic RSA-PSS Signing (`telebirr.signing.ts`)**:
+   - Implemented using native Node.js `crypto` with zero third-party dependencies (eliminating `jsrsasign`).
+   - Algorithm: `SHA256withRSAandMGF1` with PKCS#1 PSS padding and 32-byte salt length (`RSA_PSS_SALTLEN_DIGEST`).
+   - Canonical string generation: extracts root fields and flattens `biz_content` (excluding `sign`, `sign_type`, `header`, `refund_info`, `openType`, `raw_request`, `biz_content`), sorts keys in ASCII alphabetical order, and joins as `key=value&key=value`.
+   - Signs outbound requests with `TELEBIRR_PRIVATE_KEY` (PKCS#8 PEM) and verifies inbound webhook payloads against `TELEBIRR_PUBLIC_KEY`.
+
+3. **Fabric Token Management & Redis Caching (`telebirr.token.ts`)**:
+   - Authenticated Telebirr API calls require a Fabric access token (`POST /payment/v1/token`), which has a 1-hour validity period.
+   - `getFabricToken()` caches the token in Redis under `telebirr:fabric_token` with a 50-minute (3000s) TTL to ensure seamless renewals before expiry.
+   - Gracefully falls back to direct API fetching if Redis is temporarily unreachable.
+   - `invalidateFabricToken()` purges the Redis cache upon receiving HTTP 401 responses to immediately recover from invalid or expired tokens.
+
+4. **Webhook Processing & Verification (`webhooks.routes.ts`)**:
+   - Uses dedicated `handleTelebirrWebhook` mounted before `express.json()` to parse raw body bytes.
+   - Verifies the body-embedded RSA-PSS `sign` field rather than HTTP headers.
+   - Extracts `merch_order_id`, `trade_status`, and `total_amount`, mapping `trade_status` (`Completed`/`Success` -> `SUCCESS`, `Fail`/`Closed`/`Cancelled` -> `FAILED`).
+   - Transitions milestone escrow state to `ESCROW_HELD` in a database transaction and responds with `{ code: 0, msg: "success" }`.
+
+5. **Mock Mode Fallback**:
+   - When required credentials (`TELEBIRR_FABRIC_APP_ID`, `TELEBIRR_APP_SECRET`, `TELEBIRR_MERCHANT_APP_ID`, `TELEBIRR_MERCHANT_CODE`, `TELEBIRR_PRIVATE_KEY`) are unset, `telebirrClient` falls back to mock mode.
+   - Generates a mock transaction ID (`mock-telebirr-<uuid>`) and returns `redirectUrl: null`, allowing full development and testing workflows without live Telebirr credentials.
+
 ## Background Processing
 
 | Queue/worker | Trigger | Behavior |
@@ -150,7 +212,7 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 |---|---|---|
 | Fayda | Mock verification | Formal integration and credentials |
 | PEP | Stub screening | Approved sanctions/PEP source |
-| Payment collection | Adapter + signed webhook | Sandbox/live mapping and reconciliation |
+| Payment collection | Telebirr C2B Web Checkout (RSA-PSS) + Chapa/CBE adapters | Sandbox/live mapping and reconciliation |
 | Payout | Wallet debit/audit only | Real disbursement and failure/reversal workflow |
 | SMS/Telegram | Worker clients | Credentials, templates, account linking, monitoring |
 | STR | Records a human filing | External human/regulatory process |

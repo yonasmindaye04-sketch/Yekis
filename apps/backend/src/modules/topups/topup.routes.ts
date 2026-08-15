@@ -77,8 +77,13 @@ topupsRouter.post("/", requireAuth, upload.single("receipt"), async (req: Authed
 
 // ---------- Staff-only ----------
 
-topupsRouter.get("/queue", requireAuth, requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"), async (_req, res) => {
-  const queue = await getTopUpQueue();
+topupsRouter.get("/queue", requireAuth, requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"), async (req: AuthedRequest, res) => {
+  const page = req.query.page ? parseInt(req.query.page as string) : undefined;
+  const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined;
+  const search = req.query.search as string | undefined;
+  const status = req.query.status as string | undefined;
+
+  const queue = await getTopUpQueue({ page, pageSize, search, status });
   return res.json(queue);
 });
 

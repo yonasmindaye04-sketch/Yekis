@@ -16,7 +16,6 @@ datasource db {
 enum StaffRole {
   COMPLIANCE_OFFICER
   ADMIN
-  SUPPORT
 }
 
 enum KycDocumentType {
@@ -35,18 +34,22 @@ enum UserRole {
 }
 
 enum KycTier {
-  TIER_0 // unverified — no identity documents submitted
   TIER_1 // basic ID, phone, address — required for browsing/bidding
   TIER_2 // + TIN or business registration, bank details — required for withdrawal
   TIER_3 // enhanced due diligence — PEP / high-volume
 }
 
 enum KycStatus {
-  UNVERIFIED
   PENDING
   UNDER_REVIEW
   VERIFIED
   REJECTED
+}
+
+enum ContractStatus {
+  ACTIVE
+  COMPLETED
+  TERMINATED
 }
 
 enum EscrowState {
@@ -98,6 +101,7 @@ enum ProposalStatus {
   ACCEPTED
   REJECTED
   WITHDRAWN
+  COUNTER_OFFERED
 }
 
 enum LaunchCategory {
@@ -169,10 +173,16 @@ model User {
   passwordHash          String
   role                  UserRole
   languagePreference    String    @default("en")
+  timezone              String    @default("Africa/Addis_Ababa") @db.VarChar(60)
   dateOfBirth           DateTime
   faydaBiometricId      String?   @unique // set once Fayda verification succeeds — used for dedup
   isSuspended           Boolean   @default(false)
   staffRole             StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
+
+  cachedKycTier         KycTier?
+  cachedKycStatus       KycStatus? @default(PENDING)
+  totalEarnedNetMinor   Int @default(0)
+  totalSpentGrossMinor  Int @default(0)
 
   // --- PROFILE FIELDS ---
   firstName             String    @default("") @db.VarChar(50)
@@ -221,6 +231,10 @@ model User {
   conversationParticipants ConversationParticipant[]
   chatMessages      ChatMessage[]
 
+  sentDirectMessages DirectMessage[]
+  directThreadsAsClient DirectThread[] @relation("ClientThreads")
+  directThreadsAsFreelancer DirectThread[] @relation("FreelancerThreads")
+
   // --- PROFILE RELATIONS ---
   skills                UserSkill[]
   portfolioItems        PortfolioItem[]
@@ -251,6 +265,7 @@ model KycRecord {
   user              User       @relation(fields: [userId], references: [id])
   tier              KycTier    @default(TIER_1)
   status            KycStatus  @default(PENDING)
+  highestVerifiedTier KycTier?
   fullName          String?
   documentNumber    String?
   tin               String?    // required for Tier 2 (withdrawal eligibility)
@@ -312,10 +327,12 @@ model Job {
   // from whichever plan (this one, possibly renegotiated via the accepted
   // Proposal) the two parties actually agreed to.
   proposedMilestones Json
+  screeningQuestions Json?
   createdAt   DateTime       @default(now())
 
   proposals   Proposal[]
   contract    Contract?
+  directThreads DirectThread[]
 
   @@index([category, status])
 }
@@ -330,8 +347,12 @@ model Proposal {
   quotedAmountMinor Int
   estimatedDays  Int
   milestoneBreakdown Json       // freelancer's proposed milestone/payment split
+  screeningAnswers   Json?
+  attachmentPaths    String[]
   status         ProposalStatus @default(SUBMITTED)
   createdAt      DateTime       @default(now())
+
+  counterOffer   CounterOffer?
 
   @@index([jobId])
   @@index([freelancerId])
@@ -350,6 +371,7 @@ model Contract {
   freelancer     User       @relation("FreelancerContracts", fields: [freelancerId], references: [id])
   templateVersion String    // which Service Agreement template version was used
   documentStoragePath String // the generated, immutable PDF
+  status         ContractStatus @default(ACTIVE)
   clientAcceptedAt     DateTime?
   freelancerAcceptedAt DateTime?
   createdAt      DateTime   @default(now())
@@ -743,4 +765,57 @@ model ProfileView {
 
   @@index([targetUserId, viewedAt])
   @@index([viewedAt])
+}
+
+// ---------- Counter Offers ----------
+
+model CounterOffer {
+  id                  String         @id @default(cuid())
+  proposalId          String         @unique   // one counter per proposal
+  proposal            Proposal       @relation(fields: [proposalId], references: [id])
+  proposedByClientId  String
+  revisedAmountMinor  Int
+  revisedEstimatedDays Int
+  revisedMilestones   Json           // same shape as Proposal.milestoneBreakdown
+  message             String         @db.VarChar(1000)
+  status              String         @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt           DateTime       @default(now())
+
+  @@index([proposalId])
+}
+
+// ---------- Direct Messaging ----------
+
+// A thread is tied to a specific (job, client, freelancer) triple.
+// It is created automatically when either party sends the first message.
+model DirectThread {
+  id           String    @id @default(cuid())
+  jobId        String
+  job          Job       @relation(fields: [jobId], references: [id])
+  clientId     String
+  client       User      @relation("ClientThreads", fields: [clientId], references: [id])
+  freelancerId String
+  freelancer   User      @relation("FreelancerThreads", fields: [freelancerId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  messages     DirectMessage[]
+
+  @@unique([jobId, clientId, freelancerId])
+  @@index([clientId])
+  @@index([freelancerId])
+}
+
+model DirectMessage {
+  id        String       @id @default(cuid())
+  threadId  String
+  thread    DirectThread @relation(fields: [threadId], references: [id])
+  senderId  String
+  sender    User         @relation(fields: [senderId], references: [id])
+  body      String       @db.VarChar(4000) // sanitized by antiCircumventionMiddleware
+  isRead    Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
 }

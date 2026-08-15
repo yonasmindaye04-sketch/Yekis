@@ -1,4 +1,3 @@
-// === IMPORTS ===
 import type { KycDocumentType } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
@@ -7,8 +6,6 @@ import { verifyWithFayda } from "./fayda.client.js";
 import { screenForPep } from "./pep.client.js";
 import { logger } from "../../lib/logger.js";
 
-
-// === MAIN FUNCTIONS ===
 export class DuplicateIdentityError extends Error {}
 export class KycNotFoundError extends Error {}
 export class InvalidTierTransitionError extends Error {}
@@ -83,14 +80,10 @@ export async function submitKycDocument(params: {
   if (!faydaResult.success) {
     // Manual review fallback — do not block the user's application, just
     // route a human into the loop.
+    await prisma.user.update({ where: { id: params.userId }, data: { cachedKycStatus: "UNDER_REVIEW" } });
     return prisma.kycRecord.update({
       where: { id: kyc.id },
-      data: { 
-        status: "UNDER_REVIEW", 
-        faydaVerificationAttempted: true,
-        fullName: params.fullName,
-        documentNumber: params.documentNumber,
-      },
+      data: { status: "UNDER_REVIEW", faydaVerificationAttempted: true },
     });
   }
 
@@ -111,14 +104,13 @@ export async function submitKycDocument(params: {
     // Route to manual review rather than auto-rejecting — a false positive
     // here (e.g. Fayda API returning a stale/reused ID) shouldn't silently
     // lock out a legitimate user.
+    await prisma.user.update({ where: { id: params.userId }, data: { cachedKycStatus: "UNDER_REVIEW" } });
     return prisma.kycRecord.update({
       where: { id: kyc.id },
       data: {
         status: "UNDER_REVIEW",
         faydaVerificationAttempted: true,
         rejectionReason: "DUPLICATE_IDENTITY_FLAGGED_FOR_REVIEW",
-        fullName: params.fullName,
-        documentNumber: params.documentNumber,
       },
     });
   }
@@ -130,17 +122,20 @@ export async function submitKycDocument(params: {
       data: {
         status: "VERIFIED",
         tier: "TIER_1",
+        highestVerifiedTier: "TIER_1",
         faydaVerificationAttempted: true,
         faydaVerificationSucceeded: true,
         lastVerifiedAt: new Date(),
         nextReviewDueAt: monthsFromNow(REVIEW_CYCLE_MONTHS),
-        fullName: params.fullName,
-        documentNumber: params.documentNumber,
       },
     }),
     prisma.user.update({
       where: { id: params.userId },
-      data: { faydaBiometricId: faydaResult.biometricId },
+      data: {
+        faydaBiometricId: faydaResult.biometricId,
+        cachedKycTier: "TIER_1",
+        cachedKycStatus: "VERIFIED",
+      },
     }),
   ]);
 
@@ -197,6 +192,13 @@ export async function upgradeToTier2(params: {
     },
   });
 
+  // Deliberately NOT touching User.cachedKycTier/cachedKycStatus here.
+  // The user is still in good standing at their highestVerifiedTier
+  // (TIER_1) while this upgrade is pending — their public badge should
+  // keep showing that, not flicker to "under review" or an unverified
+  // higher tier, while a Compliance Officer decides. The cache only
+  // changes on a final decision — see reviewKycRecord below.
+
   await recordAuditEvent({
     userId: params.userId,
     eventType: "KYC_TIER_UPGRADE_REQUESTED",
@@ -222,15 +224,42 @@ export async function reviewKycRecord(params: {
   const kyc = await prisma.kycRecord.findUnique({ where: { userId: params.targetUserId } });
   if (!kyc) throw new KycNotFoundError();
 
+  // On rejection, `tier` reverts to the last tier that actually passed —
+  // NOT left sitting at the rejected, never-verified tier. If this is a
+  // first-time review (no prior verified tier at all), there's nothing to
+  // revert to, so it stays as requested but the status makes clear it
+  // isn't usable.
+  const revertedTier = kyc.highestVerifiedTier ?? kyc.tier;
+
   const updated = await prisma.kycRecord.update({
     where: { id: kyc.id },
     data: {
       status: params.decision,
+      tier: params.decision === "REJECTED" ? revertedTier : kyc.tier,
+      highestVerifiedTier: params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
       reviewedByStaffId: params.staffUserId,
       rejectionReason: params.decision === "REJECTED" ? params.rejectionReason : null,
       lastVerifiedAt: params.decision === "VERIFIED" ? new Date() : kyc.lastVerifiedAt,
       nextReviewDueAt:
         params.decision === "VERIFIED" ? monthsFromNow(REVIEW_CYCLE_MONTHS) : kyc.nextReviewDueAt,
+    },
+  });
+
+  // Sync the public-facing cache to the user's ACTUAL current standing,
+  // which is not always identical to the raw decision above:
+  //  - VERIFIED -> cache shows the newly verified tier.
+  //  - REJECTED but they had prior verified standing (a Tier 2/3 upgrade
+  //    that didn't pan out) -> cache keeps showing that prior tier as
+  //    VERIFIED. Their badge must not regress just because a *higher*
+  //    tier request was declined.
+  //  - REJECTED with no prior standing at all -> cache genuinely shows
+  //    REJECTED; there's nothing to fall back to.
+  const hadPriorStanding = !!kyc.highestVerifiedTier;
+  await prisma.user.update({
+    where: { id: params.targetUserId },
+    data: {
+      cachedKycStatus: params.decision === "VERIFIED" || hadPriorStanding ? "VERIFIED" : "REJECTED",
+      cachedKycTier: params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
     },
   });
 
@@ -252,7 +281,7 @@ export async function reviewKycRecord(params: {
     eventType: params.decision === "VERIFIED" ? "KYC_MANUALLY_VERIFIED" : "KYC_REJECTED",
     entityType: "KycRecord",
     entityId: kyc.id,
-    metadata: { reviewedBy: params.staffUserId, reason: params.rejectionReason },
+    metadata: { reviewedBy: params.staffUserId, reason: params.rejectionReason, revertedTier: params.decision === "REJECTED" ? revertedTier : undefined },
   });
 
   logger.info({ kycId: kyc.id, decision: params.decision }, "KYC manual review decision recorded");

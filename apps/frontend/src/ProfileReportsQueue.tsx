@@ -1,38 +1,49 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { api } from "./api/client";
 import { AlertCircle, User, ShieldAlert, Check } from "lucide-react";
 
+export interface ProfileReport {
+  id: string;
+  reportedUserId: string;
+  reportedUser?: { email: string };
+  reporterUserId: string;
+  reporterUser?: { email: string };
+  reason: string;
+  details: string;
+  createdAt: string;
+}
+
 export function ProfileReportsQueue() {
-  const [reports, setReports] = useState<any[]>([]);
+  const [reports, setReports] = useState<ProfileReport[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [selectedReport, setSelectedReport] = useState<any>(null);
+  const [selectedReport, setSelectedReport] = useState<ProfileReport | null>(null);
   const [resolveStatus, setResolveStatus] = useState("RESOLVED_NO_ACTION");
   const [staffNotes, setStaffNotes] = useState("");
   const [isResolving, setIsResolving] = useState(false);
 
-  useEffect(() => {
-    loadReports();
-  }, [page]);
-
-  const loadReports = async () => {
+  const loadReports = useCallback(async () => {
     setIsLoading(true);
     setError("");
     try {
-      const data = await api.getProfileReports(page);
+      const data = (await api.getProfileReports(page)) as { items: ProfileReport[]; total: number; pageSize: number };
       setReports(data.items || []);
       setTotalPages(Math.ceil((data.total || 0) / (data.pageSize || 20)) || 1);
-    } catch (err: any) {
-      setError(err.message || "Failed to load profile reports");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load profile reports");
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page]);
 
-  const openResolveModal = (report: any) => {
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  const openResolveModal = (report: ProfileReport) => {
     setSelectedReport(report);
     setResolveStatus("RESOLVED_NO_ACTION");
     setStaffNotes("");
@@ -45,8 +56,8 @@ export function ProfileReportsQueue() {
       await api.resolveProfileReport(selectedReport.id, resolveStatus, staffNotes);
       setSelectedReport(null);
       loadReports();
-    } catch (err: any) {
-      alert(err.message || "Failed to resolve report");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to resolve report");
     } finally {
       setIsResolving(false);
     }

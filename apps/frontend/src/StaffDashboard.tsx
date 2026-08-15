@@ -110,7 +110,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         api.getTopUpReviewQueue({ pageSize: 1 }),
         api.getDisputeQueue({ pageSize: 1 })
       ]);
-      setConversations(chat.items || chat);
+      setConversations(Array.isArray(chat) ? chat : chat.items);
       setQueueCounts({
         kyc: kyc.total || 0,
         topups: topups.total || 0,
@@ -546,8 +546,8 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                      try {
                         await api.refreshFeaturedCarousel();
                         alert("Featured carousel refreshed successfully.");
-                     } catch(err: any) {
-                        alert(err.message || "Failed to refresh carousel");
+                     } catch(err) {
+                        alert(err instanceof Error ? err.message : "Failed to refresh carousel");
                      }
                   }}
                   className="btn-secondary"

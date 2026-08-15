@@ -45,9 +45,9 @@ export interface TopUpRequest {
   id: string;
   userId: string;
   amountMinor: number;
-  rail: "TELEBIRR" | "CBE_BIRR";
+  provider: "TELEBIRR" | "CBE_BIRR";
   senderName: string;
-  senderReference: string;
+  referenceNumber: string;
   receiptPath: string;
   status: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
   createdAt: string;
@@ -239,10 +239,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
 class ApiClient {
-  private accessToken: string | null = null;
+  private accessToken: string | null = window.localStorage.getItem("yekis-api-token");
 
   setToken(token: string | null) {
     this.accessToken = token;
+    if (token) {
+      window.localStorage.setItem("yekis-api-token", token);
+    } else {
+      window.localStorage.removeItem("yekis-api-token");
+    }
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -596,7 +601,7 @@ class ApiClient {
     });
   }
 
-  async fundMilestoneFromWallet(milestoneId: string): Promise<{ milestoneId: string; balanceMinor: number }> {
+  async fundMilestoneFromWallet(milestoneId: string): Promise<{ id: string; escrowState: string; amountMinor: number; dueDate: string; title: string; contractId: string; submittedAt: string | null; autoReleaseAt: string | null; releasedAt: string | null }> {
     return this.request("/api/v1/escrow/fund-from-wallet", {
       method: "POST",
       body: JSON.stringify({ milestoneId }),
@@ -635,75 +640,75 @@ class ApiClient {
   }
 
   // --- Profiles ---
-  async getPublicProfile(userId: string): Promise<any> {
+  async getPublicProfile(userId: string): Promise<unknown> {
     return this.request(`/api/v1/profiles/${userId}`);
   }
-  async updateProfile(data: any): Promise<any> {
+  async updateProfile(data: unknown): Promise<unknown> {
     return this.request(`/api/v1/profiles/me`, { method: "PATCH", body: JSON.stringify(data) });
   }
-  async getProfileCompleteness(): Promise<any> {
+  async getProfileCompleteness(): Promise<unknown> {
     return this.request(`/api/v1/profiles/me/completeness`);
   }
-  async reportProfile(userId: string, reason: string, details: string): Promise<any> {
+  async reportProfile(userId: string, reason: string, details: string): Promise<unknown> {
     return this.request(`/api/v1/profiles/${userId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });
   }
-  async getProfileViews(): Promise<any> {
+  async getProfileViews(): Promise<unknown> {
     return this.request(`/api/v1/profiles/me/views`);
   }
-  async getSkills(category?: string): Promise<any> {
+  async getSkills(category?: string): Promise<unknown> {
     const params = new URLSearchParams();
     if (category) params.set("category", category);
     return this.request(`/api/v1/skills?${params.toString()}`);
   }
-  async getFeaturedTalent(): Promise<any> {
+  async getFeaturedTalent(): Promise<unknown> {
     return this.request(`/api/v1/profiles/featured`);
   }
-  async pinFeaturedTalent(userId: string, category: string, notes: string): Promise<any> {
+  async pinFeaturedTalent(userId: string, category: string, notes: string): Promise<unknown> {
     return this.request(`/api/v1/profiles/featured`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
   }
-  async refreshFeaturedCarousel(): Promise<any> {
+  async refreshFeaturedCarousel(): Promise<unknown> {
     return this.request(`/api/v1/profiles/featured/refresh`, { method: "POST" });
   }
   
   // --- Reviews ---
-  async submitReview(contractId: string, rating: number, comment: string): Promise<any> {
+  async submitReview(contractId: string, rating: number, comment: string): Promise<unknown> {
     return this.request(`/api/v1/reviews`, { method: "POST", body: JSON.stringify({ contractId, rating, comment }) });
   }
-  async getReviews(userId: string): Promise<any> {
+  async getReviews(userId: string): Promise<unknown> {
     return this.request(`/api/v1/reviews/user/${userId}`);
   }
-  async respondToReview(reviewId: string, response: string): Promise<any> {
+  async respondToReview(reviewId: string, response: string): Promise<unknown> {
     return this.request(`/api/v1/reviews/${reviewId}/respond`, { method: "POST", body: JSON.stringify({ response }) });
   }
-  async disputeReview(reviewId: string, reason: string): Promise<any> {
+  async disputeReview(reviewId: string, reason: string): Promise<unknown> {
     return this.request(`/api/v1/reviews/${reviewId}/dispute`, { method: "POST", body: JSON.stringify({ reason }) });
   }
 
   // --- Portfolio ---
-  async getPortfolio(userId: string): Promise<any> {
+  async getPortfolio(userId: string): Promise<unknown> {
     return this.request(`/api/v1/portfolios/${userId}`);
   }
-  async createPortfolioItem(data: FormData): Promise<any> {
+  async createPortfolioItem(data: FormData): Promise<unknown> {
     const headers: Record<string, string> = {};
     if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
     const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, { method: "POST", headers, body: data });
     if (!response.ok) { const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" })); throw new Error(error.message || error.error || `HTTP ${response.status}`); }
     return response.json();
   }
-  async updatePortfolioItem(itemId: string, data: any): Promise<any> {
+  async updatePortfolioItem(itemId: string, data: unknown): Promise<unknown> {
     return this.request(`/api/v1/portfolios/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
   }
-  async deletePortfolioItem(itemId: string): Promise<any> {
+  async deletePortfolioItem(itemId: string): Promise<unknown> {
     return this.request(`/api/v1/portfolios/${itemId}`, { method: "DELETE" });
   }
 
   // --- Staff Profile Reports ---
-  async getProfileReports(page?: number): Promise<any> {
+  async getProfileReports(page?: number): Promise<unknown> {
     const params = new URLSearchParams();
     if (page) params.set("page", String(page));
     return this.request(`/api/v1/admin/profile-reports?${params.toString()}`);
   }
-  async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<any> {
+  async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
     return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
   }
 }

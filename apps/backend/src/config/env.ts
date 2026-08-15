@@ -21,9 +21,29 @@ const EnvSchema = z.object({
   OBJECT_STORE_ACCESS_KEY: z.string().min(1),
   OBJECT_STORE_SECRET_KEY: z.string().min(1),
 
-  TELEBIRR_MERCHANT_ID: z.string().optional(),
-  TELEBIRR_API_KEY: z.string().optional(),
-  TELEBIRR_WEBHOOK_SECRET: z.string().optional(),
+  // ── Telebirr C2B Web Checkout credentials ──
+  // Gateway base URL (test vs production)
+  TELEBIRR_BASE_URL: z.string().default("https://developerportal.ethiotelebirr.et:38443/apiaccess/payment/gateway"),
+  // Web checkout redirect base URL
+  TELEBIRR_WEB_BASE_URL: z.string().default("https://developerportal.ethiotelebirr.et:38443/payment/web/paygate?"),
+  // Fabric App Key — sent as X-APP-Key header
+  TELEBIRR_FABRIC_APP_ID: z.string().optional(),
+  // Secret for obtaining the fabric token
+  TELEBIRR_APP_SECRET: z.string().optional(),
+  // Merchant App ID — used as appid in order payloads
+  TELEBIRR_MERCHANT_APP_ID: z.string().optional(),
+  // 6-digit merchant shortcode / till number
+  TELEBIRR_MERCHANT_CODE: z.string().optional(),
+  // RSA PKCS#8 PEM private key for signing requests
+  TELEBIRR_PRIVATE_KEY: z.string().optional(),
+  // Telebirr's RSA public key for verifying webhook signatures
+  TELEBIRR_PUBLIC_KEY: z.string().optional(),
+  // Server-to-server webhook callback URL
+  TELEBIRR_NOTIFY_URL: z.string().optional(),
+  // Browser redirect URL after payment completion
+  TELEBIRR_REDIRECT_URL: z.string().optional(),
+  // Payment link expiry (Telebirr format, e.g. "120m")
+  TELEBIRR_TIMEOUT_EXPRESS: z.string().default("120m"),
 
   SMS_ETHIOPIA_API_KEY: z.string().optional(),
 
@@ -65,7 +85,6 @@ const EnvSchema = z.object({
   TMS_PASS_THROUGH_WINDOW_HOURS: z.coerce.number().default(24),
   TMS_STR_FILING_SLA_HOURS: z.coerce.number().default(24),
 
-  TELEBIRR_WEBHOOK_SECRET_HEADER: z.string().default("x-telebirr-signature"),
   CHAPA_WEBHOOK_SECRET_HEADER: z.string().default("x-chapa-signature"),
 });
 

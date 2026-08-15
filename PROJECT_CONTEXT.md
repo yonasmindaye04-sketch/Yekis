@@ -69,6 +69,7 @@ Users may have `CLIENT`, `FREELANCER`, or `BOTH` marketplace roles. Staff author
 - In-app notifications with SMS/Telegram worker integration.
 - Guest and authenticated support conversations with automated load-balanced staff assignment and file attachments.
 - Staff dashboard for KYC, top-up, dispute, and TMS queues.
+- Public-facing marketing site with escrow explanation, FAQ, transparent pricing, and technical SEO infrastructure (robots.txt, sitemap.xml, structured data).
 
 ## Current Implementation Status
 

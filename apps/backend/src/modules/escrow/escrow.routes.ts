@@ -8,6 +8,7 @@ import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import {
   fundMilestone,
+  fundMilestoneFromWallet,
   submitMilestone,
   acceptMilestone,
   withdrawFromWallet,
@@ -16,6 +17,7 @@ import {
   InvalidEscrowStateError,
   ContractNotFullyExecutedError,
   InsufficientBalanceError,
+  ActiveContractWithdrawalBlockedError,
 } from "./escrow.service.js";
 import { WithdrawalHeldForReviewError } from "../tms/tms.service.js";
 
@@ -38,6 +40,10 @@ function handleKnownErrors(err: unknown, res: import("express").Response): boole
   }
   if (err instanceof InsufficientBalanceError) {
     res.status(422).json({ error: "INSUFFICIENT_BALANCE", message: err.message });
+    return true;
+  }
+  if (err instanceof ActiveContractWithdrawalBlockedError) {
+    res.status(409).json({ error: "ACTIVE_CONTRACT_BLOCKS_WITHDRAWAL", message: err.message });
     return true;
   }
   if (err instanceof WithdrawalHeldForReviewError) {
@@ -65,6 +71,26 @@ escrowRouter.post("/fund", requireAuth, requireKycVerified("TIER_1"), async (req
   } catch (err) {
     if (handleKnownErrors(err, res)) return;
     logger.error({ err }, "Escrow funding failed");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+// Primary escrow-funding path: deducts directly from the client's in-platform
+// wallet balance. Requires the contract to be fully signed by both parties
+// and the client to have sufficient wallet balance (topped up via receipt).
+escrowRouter.post("/fund-from-wallet", requireAuth, requireKycVerified("TIER_1"), async (req: AuthedRequest, res) => {
+  const parsed = z.object({ milestoneId: z.string().min(1) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+
+  try {
+    const result = await fundMilestoneFromWallet({
+      clientId: req.user!.id,
+      milestoneId: parsed.data.milestoneId,
+    });
+    return res.json(result);
+  } catch (err) {
+    if (handleKnownErrors(err, res)) return;
+    logger.error({ err }, "Wallet-funded escrow failed");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
