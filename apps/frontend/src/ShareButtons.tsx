@@ -49,7 +49,7 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
 
   return (
     <div className={`share-buttons ${compact ? 'share-compact' : ''}`}>
-      {navigator.share && (
+      {'share' in navigator && (
         <button onClick={handleNativeShare} className="share-btn share-native" aria-label="Share">
           <Share2 size={16} />
           {!compact && <span>Share</span>}

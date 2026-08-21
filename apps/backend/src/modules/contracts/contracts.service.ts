@@ -64,6 +64,14 @@ export async function createContractFromProposal(proposalId: string) {
   });
 
   const contract = await prisma.$transaction(async (tx) => {
+    // T2-E: 7-day cooling-off right — Electronic Transactions Proclamation No. 1205/2020.
+    // Client may cancel the contract within 7 days of creation, but ONLY if no milestone
+    // has progressed past PAYMENT_PENDING (i.e. no work has started yet).
+    // See contracts.service.ts cancelDuringCoolingOff() and autoRelease.worker.ts guard.
+    const coolingOffWindowDays = 7;
+    const cancellableUntil = new Date();
+    cancellableUntil.setDate(cancellableUntil.getDate() + coolingOffWindowDays);
+
     const created = await tx.contract.create({
       data: {
         jobId: proposal.jobId,
@@ -71,6 +79,7 @@ export async function createContractFromProposal(proposalId: string) {
         freelancerId: proposal.freelancerId,
         templateVersion: SERVICE_AGREEMENT_TEMPLATE_VERSION,
         documentStoragePath: storagePath,
+        cancellableUntil,
         milestones: {
           create: milestonePlan.map((m) => ({
             title: m.title,
@@ -278,3 +287,63 @@ export async function checkAndUpdateContractCompletion(milestoneId: string) {
     entityId: milestone.contractId,
   });
 }
+
+export class CoolingOffWindowExpiredError extends Error {}
+export class CoolingOffCancellationBlockedByWorkError extends Error {}
+
+/**
+ * T2-E: Allows the client to cancel a contract within the 7-day cooling-off
+ * window mandated by the Electronic Transactions Proclamation No. 1205/2020,
+ * but ONLY if no milestone has progressed past PAYMENT_PENDING — i.e. no
+ * work has actually started yet.
+ *
+ * ⚠️ Conflict note: AUTO_RELEASE_WINDOW_DAYS (default 5) is shorter than
+ * the 7-day cooling-off window. The autoRelease.worker guards against firing
+ * during the cooling-off period, but this creates an edge case: if a freelancer
+ * submits work on day 1 and the cooling-off window is still open on day 6, the
+ * auto-release is blocked AND cancellation is also blocked (because a milestone
+ * is past PAYMENT_PENDING). This is the correct behavior — once work is submitted,
+ * the cooling-off right is extinguished and the normal dispute path applies.
+ */
+export async function cancelDuringCoolingOff(userId: string, contractId: string) {
+  const contract = await prisma.contract.findUnique({
+    where: { id: contractId },
+    include: { milestones: true },
+  });
+  if (!contract) throw new ContractNotFoundError();
+  if (contract.clientId !== userId) throw new NotContractPartyError("Only the client can cancel during cooling-off.");
+
+  const now = new Date();
+  if (!contract.cancellableUntil || contract.cancellableUntil <= now) {
+    throw new CoolingOffWindowExpiredError(
+      `The 7-day cooling-off window expired at ${contract.cancellableUntil?.toISOString() ?? "unknown"}. ` +
+      `Use the dispute flow if you have a disagreement about work quality.`
+    );
+  }
+
+  // Check that no milestone has progressed past PAYMENT_PENDING.
+  // ESCROW_HELD means funds are locked; anything beyond that means work is in flight.
+  const workStarted = contract.milestones.some((m) => m.escrowState !== "PAYMENT_PENDING");
+  if (workStarted) {
+    throw new CoolingOffCancellationBlockedByWorkError(
+      "Cannot cancel: one or more milestones have progressed past PAYMENT_PENDING. " +
+      "Work has started — the cooling-off cancellation right only applies before any escrow is funded."
+    );
+  }
+
+  await prisma.contract.update({
+    where: { id: contractId },
+    data: { status: "TERMINATED" },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "CONTRACT_CANCELLED_COOLING_OFF",
+    entityType: "Contract",
+    entityId: contractId,
+    metadata: { cancellableUntil: contract.cancellableUntil },
+  });
+
+  return { cancelled: true, contractId };
+}
+

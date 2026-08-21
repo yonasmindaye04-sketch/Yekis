@@ -19,7 +19,7 @@ const TMS_STR_FILING_SLA_HOURS = 24;
 export function StaffCompliancePanel({ onChanged, onError }: StaffCompliancePanelProps) {
   const [flags, setFlags] = useState<TransactionFlag[]>([]);
   const [meta, setMeta] = useState<QueueMeta | null>(null);
-  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 20, search: "", status: "PENDING_REVIEW", flagType: "" });
+  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 10, search: "", status: "PENDING_REVIEW", flagType: "" });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -31,7 +31,7 @@ export function StaffCompliancePanel({ onChanged, onError }: StaffCompliancePane
     try {
       const res = await api.getTmsQueue(state);
       setFlags(res.items || []);
-      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 20 });
+      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 10 });
       setLastUpdated(new Date());
     } catch (err) {
       onError(err instanceof Error ? err.message : "Unable to load compliance flags");
@@ -132,7 +132,7 @@ export function StaffCompliancePanel({ onChanged, onError }: StaffCompliancePane
               return (
                 <button
                   key={flag.id}
-                  className={`staff-conversation-row ${selectedFlagId === flag.id ? "selected" : ""}`}
+                  className={`staff-queue-card ${selectedFlagId === flag.id ? "selected" : ""}`}
                   onClick={() => setSelectedFlagId(flag.id)}
                 >
                   <div className="row-header">

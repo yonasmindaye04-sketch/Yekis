@@ -34,7 +34,7 @@ export function ThankYouPage({ action, onNavigate, onStart }: ThankYouPageProps)
     <div className="marketing-page" style={{ justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
       {/* TODO: fire GA4 event here for conversion tracking */}
       <div className="glass-panel" style={{ maxWidth: '600px', width: '100%' }}>
-        <h1 style={{ color: 'var(--yekis-lime)' }}>{current.title}</h1>
+        <h1 style={{ color: 'var(--color-primary)' }}>{current.title}</h1>
         <p style={{ fontSize: '18px', margin: '20px 0 40px' }}>{current.message}</p>
         <button className="btn-primary" onClick={current.btnAction}>{current.btnText}</button>
       </div>

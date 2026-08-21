@@ -168,11 +168,11 @@ export const ProfilePage = ({ userId = "123" }: { userId?: string }) => {
             </div>
 
             {/* Portfolio */}
-            {profile.portfolio?.length > 0 && (
+            {(profile.portfolio?.length ?? 0) > 0 && (
               <div className="panel profile-portfolio">
                 <h3>Portfolio</h3>
                 <div className="portfolio-grid">
-                  {profile.portfolio.map((item: PortfolioItem) => (
+                  {profile.portfolio?.map((item: PortfolioItem) => (
                     <div key={item.id} className="portfolio-card">
                       <div className="portfolio-img-container">
                         <img src={item.image} alt={item.title} />
@@ -188,11 +188,11 @@ export const ProfilePage = ({ userId = "123" }: { userId?: string }) => {
             )}
 
             {/* Reviews */}
-            {profile.reviews?.length > 0 && (
+            {(profile.reviews?.length ?? 0) > 0 && (
               <div className="panel profile-reviews">
                 <h3>Reviews</h3>
                 <div className="reviews-list">
-                  {profile.reviews.map((review: ReviewItem) => (
+                  {profile.reviews?.map((review: ReviewItem) => (
                     <div key={review.id} className="review-item">
                       <div className="review-header">
                         <div className="review-author">

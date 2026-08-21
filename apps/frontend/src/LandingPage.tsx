@@ -2,7 +2,8 @@ import {
   Wallet, Briefcase, CheckCircle, Shield, ShieldCheck,
   MessageCircle, Paperclip, Send, Clock,
   Code, Palette, Megaphone, PenTool, Languages, Database,
-  Star, ArrowRight, Users, Award, WalletCards, Fingerprint
+  Star, ArrowRight, Users, Award, WalletCards, Fingerprint,
+  Mail, Bot
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { api } from "./api/client";
@@ -130,28 +131,6 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
 
   return (
     <main className="landing-page marketing-page">
-      {/* === HEADER === */}
-      <header className="landing-nav">
-        <a className="landing-brand" href="#top">
-          <img src="/svgviewer-output.svg" alt="Yekis — Ethiopian freelance marketplace logo" className="platform-logo small" />
-          <strong>YEKIS</strong>
-        </a>
-        <nav>
-          <a href="#how-it-works">How it works</a>
-          <button onClick={() => onNavigate("faq")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit" }}>FAQ</button>
-          <button onClick={() => onNavigate("fees")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit" }}>Fees</button>
-          <button onClick={() => onNavigate("about")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", font: "inherit" }}>About</button>
-        </nav>
-        <div className="landing-actions">
-          {/* TODO: Replace with actual Telegram links */}
-          <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer" className="telegram-link" aria-label="Yekis Telegram Channel">
-            <MessageCircle size={18} />
-          </a>
-          <button className="landing-signin" onClick={() => onStart("login")}>Sign in</button>
-          <button className="btn-primary" onClick={() => onStart("register")}>Get started</button>
-        </div>
-      </header>
-
       {/* === HERO SECTION (Item 2: Dual CTA above the fold) === */}
       <section className="hero-section" id="top">
         <p className="hero-eyebrow">Ethiopia's escrow-protected freelance marketplace</p>
@@ -179,7 +158,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           <h2 style={{ textAlign: "center", fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 12, color: "#fff", fontFamily: "Hanken Grotesk, sans-serif" }}>
             Clear money. Clear evidence. Clear next steps.
           </h2>
-          <p style={{ textAlign: "center", color: "var(--yekis-muted)", maxWidth: 700, margin: "0 auto 50px", fontSize: 18 }}>
+          <p style={{ textAlign: "center", color: "var(--color-text-secondary)", maxWidth: 700, margin: "0 auto 50px", fontSize: 18 }}>
             Every payment follows four transparent steps — no exceptions.
           </p>
           <div className="step-grid">
@@ -187,7 +166,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
               <div className="step-icon"><Wallet size={32} /></div>
               <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>01</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Fund</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, lineHeight: 1.6 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
                 You deposit the agreed amount into escrow before work starts. It's held safely — not sent to the freelancer yet.
               </p>
             </div>
@@ -195,7 +174,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
               <div className="step-icon"><Briefcase size={32} /></div>
               <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>02</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Work</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, lineHeight: 1.6 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
                 Your freelancer delivers the job. You review it before anything is released.
               </p>
             </div>
@@ -203,7 +182,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
               <div className="step-icon"><CheckCircle size={32} /></div>
               <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>03</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Approve</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, lineHeight: 1.6 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
                 Happy with the work? Approve it and payment releases instantly. Don't respond in 5 days?
                 It releases automatically — so freelancers are never left waiting indefinitely either.
               </p>
@@ -212,19 +191,19 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
               <div className="step-icon"><Shield size={32} /></div>
               <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>04</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Protected</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, lineHeight: 1.6 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
                 Something wrong with the delivery? Raise it before approving, and our team steps in to help
                 sort it out — your money stays safely held until it's resolved.
               </p>
             </div>
           </div>
-          <p style={{ textAlign: "center", color: "var(--yekis-muted)", marginTop: 40, fontStyle: "italic", fontSize: 15 }}>
+          <p style={{ textAlign: "center", color: "var(--color-text-secondary)", marginTop: 40, fontStyle: "italic", fontSize: 15 }}>
             Every step is logged and time-stamped. Nobody — including Yekis — can move your money without following this process.
           </p>
           <div style={{ textAlign: "center", marginTop: 24 }}>
             <button
               onClick={() => onNavigate("faq")}
-              style={{ background: "none", border: "none", color: "var(--yekis-lime)", cursor: "pointer", fontSize: 16, fontWeight: 600 }}
+              style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: 16, fontWeight: 600 }}
             >
               See how disputes get resolved <ArrowRight size={16} style={{ verticalAlign: "text-bottom", marginLeft: 4 }} />
             </button>
@@ -238,15 +217,15 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           <div className="stats-grid">
             <div ref={freelancerCount.ref}>
               <div className="stat-number">{freelancerCount.count}+</div>
-              <div style={{ color: "var(--yekis-muted)", fontSize: 16 }}>Verified Freelancers</div>
+              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Verified Freelancers</div>
             </div>
             <div ref={jobCount.ref}>
               <div className="stat-number">{jobCount.count}+</div>
-              <div style={{ color: "var(--yekis-muted)", fontSize: 16 }}>Jobs Completed</div>
+              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Jobs Completed</div>
             </div>
             <div ref={escrowCount.ref}>
               <div className="stat-number">ETB {escrowCount.count.toLocaleString()}+</div>
-              <div style={{ color: "var(--yekis-muted)", fontSize: 16 }}>Protected in Escrow</div>
+              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Protected in Escrow</div>
             </div>
           </div>
         </div>
@@ -257,11 +236,11 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         <div className="marketing-container">
           <p className="hero-eyebrow">Browse by category</p>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Find the right expertise.</h2>
-          <p style={{ color: "var(--yekis-muted)", fontSize: 17, marginBottom: 40 }}>Six launch categories covering Ethiopia's most in-demand digital skills.</p>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>Six launch categories covering Ethiopia's most in-demand digital skills.</p>
           <div className="categories-grid">
             {Object.entries(categoryLabels).map(([key, label]) => (
               <button key={key} className="category-card" onClick={() => onStart("register")}>
-                <div style={{ color: "var(--yekis-teal)", marginBottom: 16 }}>{categoryIcons[key]}</div>
+                <div style={{ color: "var(--color-teal)", marginBottom: 16 }}>{categoryIcons[key]}</div>
                 <h3 style={{ fontSize: 16, margin: 0 }}>{label}</h3>
               </button>
             ))}
@@ -270,11 +249,11 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       </section>
 
       {/* === CASE STUDIES (Item 3: placeholder structure) === */}
-      <section className="content-section" style={{ background: "var(--yekis-surface)" }}>
+      <section className="content-section">
         <div className="marketing-container">
           <p className="hero-eyebrow">Success stories</p>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Real projects. Real results.</h2>
-          <p style={{ color: "var(--yekis-muted)", fontSize: 17, marginBottom: 40 }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>
             Case studies from verified, escrow-protected projects on Yekis.
           </p>
           <div className="case-study-grid">
@@ -282,18 +261,18 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
               <div key={i} className="card">
                 <span className="placeholder-badge">Coming soon</span>
                 <h3 style={{ margin: "12px 0 8px", fontSize: 18 }}>Project #{i}</h3>
-                <p style={{ color: "var(--yekis-muted)", fontSize: 14, marginBottom: 16 }}>
+                <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 16 }}>
                   Real case studies from verified, completed projects will appear here as they are completed on the platform.
                 </p>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--yekis-border)", paddingTop: 12, marginTop: 12 }}>
-                  <span style={{ color: "var(--yekis-muted)", fontSize: 13 }}>Escrow-protected</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: 12, marginTop: 12 }}>
+                  <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Escrow-protected</span>
                   <ShareButtons title={`Yekis Case Study #${i}`} compact />
                 </div>
               </div>
             ))}
           </div>
           <div style={{ textAlign: "center", marginTop: 32 }}>
-            <button onClick={() => onNavigate("case-studies")} style={{ background: "none", border: "none", color: "var(--yekis-lime)", cursor: "pointer", fontSize: 15, fontWeight: 600 }}>
+            <button onClick={() => onNavigate("case-studies")} style={{ background: "none", border: "none", color: "var(--color-primary)", cursor: "pointer", fontSize: 15, fontWeight: 600 }}>
               View all case studies <ArrowRight size={14} style={{ verticalAlign: "text-bottom", marginLeft: 4 }} />
             </button>
           </div>
@@ -305,7 +284,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         <div className="marketing-container">
           <p className="hero-eyebrow">What our users say</p>
           <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Authentic feedback from real projects.</h2>
-          <p style={{ color: "var(--yekis-muted)", fontSize: 17, marginBottom: 40 }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>
             Real reviews from escrow-funded, completed jobs will appear here as the platform grows. We never fabricate testimonials.
           </p>
           <div className="case-study-grid">
@@ -314,14 +293,14 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
                 <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
                   {[1, 2, 3, 4, 5].map((s) => <Star key={s} size={16} style={{ color: "#333" }} />)}
                 </div>
-                <p style={{ color: "var(--yekis-muted)", fontStyle: "italic", fontSize: 15, marginBottom: 16 }}>
+                <p style={{ color: "var(--color-text-secondary)", fontStyle: "italic", fontSize: 15, marginBottom: 16 }}>
                   "Review from a verified, escrow-funded completed job will appear here."
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--yekis-border)" }} />
+                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--color-border)" }} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>Verified User</div>
-                    <div style={{ fontSize: 12, color: "var(--yekis-muted)" }}>Coming soon</div>
+                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Coming soon</div>
                   </div>
                 </div>
               </div>
@@ -331,23 +310,23 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       </section>
 
       {/* === TRUST INDICATORS === */}
-      <section className="content-section" style={{ background: "var(--yekis-surface)" }}>
+      <section className="content-section">
         <div className="marketing-container">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 30 }}>
             <div className="glass-panel">
-              <WalletCards size={24} style={{ color: "var(--yekis-lime)", marginBottom: 16 }} />
+              <WalletCards size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
               <h3 style={{ fontSize: 18, marginBottom: 8 }}>Receipt-based top-ups</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 14 }}>Local payment with manual review before wallet credit. Pay via Telebirr, CBE, or Chapa.</p>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Local payment with manual review before wallet credit. Pay via Telebirr, CBE, or Chapa.</p>
             </div>
             <div className="glass-panel">
-              <Fingerprint size={24} style={{ color: "var(--yekis-lime)", marginBottom: 16 }} />
+              <Fingerprint size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
               <h3 style={{ fontSize: 18, marginBottom: 8 }}>Fayda identity review</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 14 }}>Freelancers verify via National ID for payout readiness. Clients know who they're hiring.</p>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Freelancers verify via National ID for payout readiness. Clients know who they're hiring.</p>
             </div>
             <div className="glass-panel">
-              <ShieldCheck size={24} style={{ color: "var(--yekis-lime)", marginBottom: 16 }} />
+              <ShieldCheck size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
               <h3 style={{ fontSize: 18, marginBottom: 8 }}>Milestone protection</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 14 }}>Delivery and release decisions follow a visible, time-stamped contract state machine.</p>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Delivery and release decisions follow a visible, time-stamped contract state machine.</p>
             </div>
           </div>
         </div>
@@ -357,9 +336,9 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       {/* TODO: Confirm actual support SLA before launch */}
       <section className="support-promise">
         <div className="marketing-container" style={{ textAlign: "center" }}>
-          <Clock size={32} style={{ color: "var(--yekis-teal)", marginBottom: 16 }} />
+          <Clock size={32} style={{ color: "var(--color-teal)", marginBottom: 16, marginInline: "auto" }} />
           <h2 style={{ fontSize: 24, marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>We respond within 24 hours</h2>
-          <p style={{ color: "var(--yekis-muted)", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>
             Real people available to help with jobs, contracts, payments, verification, or disputes. Reach us anytime via chat or Telegram.
           </p>
         </div>
@@ -371,18 +350,18 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           <p className="hero-eyebrow" style={{ textAlign: "center" }}>Built around your side of the table</p>
           <h2 style={{ textAlign: "center", fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 40, fontFamily: "Hanken Grotesk, sans-serif" }}>One platform, two clear paths.</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30 }}>
-            <div className="glass-panel" style={{ borderColor: "var(--yekis-lime)" }}>
+            <div className="glass-panel" style={{ borderColor: "var(--color-primary)" }}>
               <p className="hero-eyebrow" style={{ marginBottom: 12 }}>For clients</p>
               <h3 style={{ fontSize: 22, marginBottom: 12 }}>Bring the right talent into the room.</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, marginBottom: 24 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, marginBottom: 24 }}>
                 Post your brief, compare proposals, fund approved milestones, and keep contract progress in one place.
               </p>
               <button className="btn-primary" onClick={() => onStart("register")}>Create a client workspace</button>
             </div>
-            <div className="glass-panel" style={{ borderColor: "var(--yekis-teal)" }}>
+            <div className="glass-panel" style={{ borderColor: "var(--color-teal)" }}>
               <p className="hero-eyebrow" style={{ marginBottom: 12 }}>For freelancers</p>
               <h3 style={{ fontSize: 22, marginBottom: 12 }}>Make your next opportunity count.</h3>
-              <p style={{ color: "var(--yekis-muted)", fontSize: 15, marginBottom: 24 }}>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 15, marginBottom: 24 }}>
                 Find work that fits your skills, send thoughtful proposals, deliver in milestones, and build a reliable work record.
               </p>
               <button className="btn-secondary" onClick={() => onStart("register")}>Join as a freelancer</button>
@@ -396,7 +375,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         <div className="marketing-container">
           <p className="hero-eyebrow">Ready when you are</p>
           <h2 style={{ fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 16, fontFamily: "Hanken Grotesk, sans-serif" }}>Put your next project in motion.</h2>
-          <p style={{ color: "var(--yekis-muted)", fontSize: 18, maxWidth: 600, margin: "0 auto 32px" }}>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 18, maxWidth: 600, margin: "0 auto 32px" }}>
             Start with a focused workspace for finding work, hiring talent, and delivering with confidence.
           </p>
           <div className="hero-actions">
@@ -462,39 +441,44 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       <footer className="landing-footer marketing-footer">
         <div className="marketing-container">
           <div className="footer-grid">
-            <div className="footer-col">
+            <div className="footer-col footer-brand">
               <div className="landing-brand" style={{ marginBottom: 16 }}>
                 <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
                 <strong>Yekis</strong>
               </div>
-              <span style={{ color: "var(--yekis-muted)", fontSize: 14 }}>Work that moves forward.</span>
+              <p className="footer-desc">
+                Ethiopia's escrow-protected freelance marketplace. Post work, pay into
+                escrow, and get your result — or your money back.
+              </p>
+              <div className="footer-social">
+                <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram channel"><Send size={16} /></a>
+                <a href="https://t.me/yekis_group" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram community"><MessageCircle size={16} /></a>
+                <a href="https://t.me/yekis_bot" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram bot"><Bot size={16} /></a>
+                <a href="mailto:support@yekis.com" aria-label="Email Yekis support"><Mail size={16} /></a>
+              </div>
             </div>
-            <div className="footer-col">
+            <nav className="footer-col" aria-label="Platform">
               <h4>Platform</h4>
               <button onClick={() => onNavigate("faq")}>FAQ</button>
               <button onClick={() => onNavigate("fees")}>Fees</button>
-              <button onClick={() => onNavigate("about")}>About</button>
               <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
-            </div>
-            <div className="footer-col">
+            </nav>
+            <nav className="footer-col" aria-label="Company">
+              <h4>Company</h4>
+              <button onClick={() => onNavigate("about")}>About Us</button>
+              <a href="mailto:support@yekis.com">Contact Support</a>
+            </nav>
+            <nav className="footer-col" aria-label="Legal">
               <h4>Legal</h4>
               <button onClick={() => onNavigate("privacy")}>Privacy Policy</button>
               <button onClick={() => onNavigate("terms")}>Terms of Service</button>
-            </div>
-            <div className="footer-col">
-              <h4>Connect</h4>
-              {/* TODO: Replace with actual Telegram links */}
-              <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer">Telegram Channel</a>
-              <a href="https://t.me/yekis_group" target="_blank" rel="noopener noreferrer">Telegram Group</a>
-              <a href="https://t.me/yekis_bot" target="_blank" rel="noopener noreferrer">Telegram Bot</a>
-            </div>
+            </nav>
           </div>
-          <div style={{ borderTop: "1px solid var(--yekis-border)", marginTop: 40, paddingTop: 20, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-            <span style={{ color: "var(--yekis-muted)", fontSize: 13 }}>© {new Date().getFullYear()} Yekis. All rights reserved.</span>
+          <div className="footer-bottom">
+            <span>© {new Date().getFullYear()} Yekis. All rights reserved.</span>
+            <span className="footer-escrow-note"><ShieldCheck size={14} /> Payments secured by Yekis Escrow</span>
             {/* TODO: Language toggle — connect to i18n */}
-            <button style={{ background: "none", border: "1px solid var(--yekis-border)", borderRadius: 6, color: "var(--yekis-muted)", cursor: "pointer", padding: "4px 12px", fontSize: 13 }}>
-              EN / አማ
-            </button>
+            <button className="footer-lang-toggle">EN / አማ</button>
           </div>
         </div>
       </footer>

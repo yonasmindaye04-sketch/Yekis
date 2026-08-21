@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, XCircle, Loader2 } from "lucide-react";
-import { api } from "./api/client";
 
 export function PaymentReturn() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");

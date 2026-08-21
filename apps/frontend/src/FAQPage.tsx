@@ -6,14 +6,26 @@ type FAQPageProps = {
   onStart: (mode: "login" | "register") => void;
 };
 
-export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
+type Question = {
+  q: string;
+  a: string;
+  id?: string;
+  link?: string;
+};
+
+type FaqCategory = {
+  category: string;
+  questions: Question[];
+};
+
+export function FAQPage({ onNavigate, onStart: _onStart }: FAQPageProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   const toggle = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
   };
 
-  const faqs = [
+  const faqs: FaqCategory[] = [
     {
       category: "Trusting the platform",
       questions: [
@@ -55,7 +67,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           <div className="faq-accordion">
             {faqs.map((cat, catIdx) => (
               <div key={catIdx} style={{ marginBottom: '40px' }}>
-                <h2 style={{ marginBottom: '20px', color: 'var(--yekis-teal)' }}>{cat.category}</h2>
+                <h2 style={{ marginBottom: '20px', color: 'var(--color-teal)' }}>{cat.category}</h2>
                 {cat.questions.map((q) => {
                   const currentIndex = qIndex++;
                   return (
@@ -68,7 +80,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                         <p style={{ paddingTop: '10px' }}>
                           {q.a}
                           {q.link === 'fees' && (
-                            <button onClick={() => onNavigate('fees')} style={{ background: 'none', border: 'none', color: 'var(--yekis-lime)', cursor: 'pointer', padding: 0, marginLeft: '5px', textDecoration: 'underline' }}>
+                            <button onClick={() => onNavigate('fees')} style={{ background: 'none', border: 'none', color: 'var(--color-primary)', cursor: 'pointer', padding: 0, marginLeft: '5px', textDecoration: 'underline' }}>
                               View fees page
                             </button>
                           )}

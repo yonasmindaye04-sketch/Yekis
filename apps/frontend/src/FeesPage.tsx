@@ -18,7 +18,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           
           <div className="glass-panel">
             <h2>Platform Fees</h2>
-            <ul style={{ listStyleType: 'disc', paddingLeft: '20px', color: 'var(--yekis-copy)' }}>
+            <ul style={{ listStyleType: 'disc', paddingLeft: '20px', color: 'var(--color-text)' }}>
               <li>Platform fee: [TODO: X%] of each completed milestone, split between client and freelancer</li>
               <li>No listing fees</li>
               <li>No subscription fees</li>
@@ -32,23 +32,23 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
             <div style={{ overflowX: 'auto', marginTop: '20px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
-                  <tr style={{ borderBottom: '2px solid var(--yekis-border)' }}>
+                  <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
                     <th style={{ padding: '16px', color: '#fff' }}>Feature</th>
-                    <th style={{ padding: '16px', color: 'var(--yekis-lime)' }}>Yekis</th>
+                    <th style={{ padding: '16px', color: 'var(--color-primary)' }}>Yekis</th>
                     <th style={{ padding: '16px', color: '#fff' }}>Informal Trust</th>
                     <th style={{ padding: '16px', color: '#fff' }}>Hiring a Lawyer</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr style={{ borderBottom: '1px solid var(--yekis-border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '16px' }}>Payment Protection</td>
-                    <td style={{ padding: '16px', color: 'var(--yekis-lime)' }}>Escrow Held</td>
+                    <td style={{ padding: '16px', color: 'var(--color-primary)' }}>Escrow Held</td>
                     <td style={{ padding: '16px' }}>None</td>
                     <td style={{ padding: '16px' }}>High retainers</td>
                   </tr>
-                  <tr style={{ borderBottom: '1px solid var(--yekis-border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                     <td style={{ padding: '16px' }}>Dispute Resolution</td>
-                    <td style={{ padding: '16px', color: 'var(--yekis-lime)' }}>Included</td>
+                    <td style={{ padding: '16px', color: 'var(--color-primary)' }}>Included</td>
                     <td style={{ padding: '16px' }}>"He said, she said"</td>
                     <td style={{ padding: '16px' }}>Expensive litigation</td>
                   </tr>

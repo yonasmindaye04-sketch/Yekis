@@ -146,11 +146,17 @@ export async function checkWalletMismatch(params: { userId: string; payoutAccoun
   const normalizedPayout = params.payoutAccountIdentifier.replace(/\s+/g, "");
 
   if (normalizedPhone !== normalizedPayout) {
-    await createFlag({
-      userId: params.userId,
-      type: "WALLET_MISMATCH",
-      details: { registeredPhone: user.phone, payoutAccountIdentifier: params.payoutAccountIdentifier },
+    const existingFlag = await prisma.transactionFlag.findFirst({
+      where: { userId: params.userId, type: "WALLET_MISMATCH", status: "PENDING_REVIEW" },
     });
+
+    if (!existingFlag) {
+      await createFlag({
+        userId: params.userId,
+        type: "WALLET_MISMATCH",
+        details: { registeredPhone: user.phone, payoutAccountIdentifier: params.payoutAccountIdentifier },
+      });
+    }
     return false; // mismatch
   }
   return true; // matches

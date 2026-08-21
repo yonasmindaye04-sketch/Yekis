@@ -41,6 +41,19 @@ export const autoReleaseWorker = new Worker(
       return;
     }
 
+    // T2-E: 7-day cooling-off guard — Electronic Transactions Proclamation No. 1205/2020.
+    // AUTO_RELEASE_WINDOW_DAYS default (5) is shorter than the cooling-off window (7 days).
+    // If the auto-release job fires while the cooling-off window is still open, skip it —
+    // the client's cancellation right takes legal precedence over the auto-release timer.
+    // ⚠️ Conflict note documented in schema.prisma on Contract.cancellableUntil.
+    if (milestone.contract.cancellableUntil && milestone.contract.cancellableUntil > new Date()) {
+      logger.warn(
+        { milestoneId, cancellableUntil: milestone.contract.cancellableUntil },
+        "Auto-release skipped: contract is still within the 7-day cooling-off window (ECA Proclamation 1205/2020)"
+      );
+      return;
+    }
+
     if (kind === "warn") {
       await notificationQueue.add("auto-release-warning", {
         userId: milestone.contract.clientId,

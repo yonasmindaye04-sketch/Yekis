@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Briefcase, Search } from 'lucide-react';
 
 interface MobileCTAProps {
@@ -7,7 +7,6 @@ interface MobileCTAProps {
 
 export function MobileCTA({ onStart }: MobileCTAProps) {
   const [visible, setVisible] = useState(true);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Hide when footer is in view

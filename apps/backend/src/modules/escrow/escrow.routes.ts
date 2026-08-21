@@ -63,7 +63,6 @@ escrowRouter.post("/fund", requireAuth, requireKycVerified("TIER_1"), async (req
   try {
     const result = await fundMilestone({
       clientId: req.user!.id,
-      contractId: parsed.data.contractId,
       milestoneId: parsed.data.milestoneId,
       provider: parsed.data.provider,
     });
@@ -97,13 +96,9 @@ escrowRouter.post("/fund-from-wallet", requireAuth, requireKycVerified("TIER_1")
 
 escrowRouter.post("/milestones/:milestoneId/submit", requireAuth, async (req: AuthedRequest, res) => {
   try {
-    const parsed = z.object({ deliverableUrl: z.string().url().optional() }).safeParse(req.body);
-    const deliverableUrl = parsed.success ? parsed.data.deliverableUrl : undefined;
-    
     const result = await submitMilestone({
       freelancerId: req.user!.id,
       milestoneId: req.params.milestoneId as string,
-      deliverableUrl,
     });
     return res.json(result);
   } catch (err) {

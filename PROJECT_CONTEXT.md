@@ -1,6 +1,8 @@
 # Project Context
 
-Last updated: 2026-08-09
+Last updated: 2026-08-21
+
+> **Update 2026-08-21:** Aligned the marketing and landing page spacing to match the AFRO-TECH system, using a full-bleed layout with consistent 6% horizontal gutters instead of a constrained 1200px container.
 
 ## Product Vision
 

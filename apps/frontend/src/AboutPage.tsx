@@ -5,7 +5,7 @@ type AboutPageProps = {
   onStart: (mode: "login" | "register") => void;
 };
 
-export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
+export function AboutPage({ onNavigate, onStart: _onStart }: AboutPageProps) {
   return (
     <div className="marketing-page">
       <div className="marketing-container">
@@ -17,7 +17,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           
           <div className="glass-panel" style={{ marginTop: '40px' }}>
             <h2>Our Mission</h2>
-            <p style={{ fontSize: '20px', color: 'var(--yekis-teal)', fontStyle: 'italic', margin: '20px 0' }}>
+            <p style={{ fontSize: '20px', color: 'var(--color-teal)', fontStyle: 'italic', margin: '20px 0' }}>
               "Yekis exists to give Ethiopian freelancers and their clients a workspace where good work can happen without needing informal trust or a lawyer."
             </p>
             
@@ -28,10 +28,10 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           <div style={{ marginTop: '60px' }}>
             <h2>Our Team</h2>
             <div className="category-card" style={{ maxWidth: '300px', margin: '20px 0' }}>
-              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'var(--yekis-border)', marginBottom: '20px' }}></div>
+              <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: 'var(--color-border)', marginBottom: '20px' }}></div>
               {/* TODO: Add real photo */}
               <h3>Placeholder Name</h3>
-              <p style={{ color: 'var(--yekis-muted)' }}>Founder</p>
+              <p style={{ color: 'var(--color-text-secondary)' }}>Founder</p>
             </div>
           </div>
 
@@ -40,9 +40,9 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
             <p>Email: hello@yekis.com</p>
             <p>Phone: +251 900 000000</p>
             <div style={{ marginTop: '20px' }}>
-              <a href="#" style={{ color: 'var(--yekis-lime)', marginRight: '20px', textDecoration: 'none' }}>Telegram Channel</a>
-              <a href="#" style={{ color: 'var(--yekis-lime)', marginRight: '20px', textDecoration: 'none' }}>Telegram Group</a>
-              <a href="#" style={{ color: 'var(--yekis-lime)', textDecoration: 'none' }}>Telegram Bot</a>
+              <a href="#" style={{ color: 'var(--color-primary)', marginRight: '20px', textDecoration: 'none' }}>Telegram Channel</a>
+              <a href="#" style={{ color: 'var(--color-primary)', marginRight: '20px', textDecoration: 'none' }}>Telegram Group</a>
+              <a href="#" style={{ color: 'var(--color-primary)', textDecoration: 'none' }}>Telegram Bot</a>
             </div>
           </div>
         </section>

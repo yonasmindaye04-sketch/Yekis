@@ -4,9 +4,8 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './telegram/miniApp.css'
 import './website-icons.css'
+import { ThemeProvider } from './theme/ThemeContext'
 import App from './App.tsx'
-
-document.documentElement.dataset.theme = 'dark';
 
 
 // === MAIN COMPONENT ===
@@ -40,6 +39,8 @@ class AppErrorBoundary extends Component<{ children: ReactNode }, { error: Error
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AppErrorBoundary><App /></AppErrorBoundary>
+    <ThemeProvider>
+      <AppErrorBoundary><App /></AppErrorBoundary>
+    </ThemeProvider>
   </StrictMode>,
 )

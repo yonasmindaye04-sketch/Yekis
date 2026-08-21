@@ -84,3 +84,36 @@ export async function getSignedObjectUrl(storageKey: string, expiresInSeconds = 
 export async function getKycDocumentUrl(storageKey: string, expiresInSeconds = 300): Promise<string> {
   return getSignedObjectUrl(storageKey, expiresInSeconds);
 }
+
+/**
+ * T2-G: Uploads a compiled evidence bundle (JSON) for a dispute to the object
+ * store. Returns the storage key (not a public URL). The bundle includes
+ * contract terms, evidence statements, and the direct message log.
+ */
+export async function uploadEvidenceBundle(params: {
+  disputeId: string;
+  fileBuffer: Buffer;
+}): Promise<string> {
+  const key = `dispute-evidence/${params.disputeId}/bundle-${Date.now()}.json`;
+
+  await objectStoreClient.send(
+    new PutObjectCommand({
+      Bucket: env.OBJECT_STORE_BUCKET,
+      Key: key,
+      Body: params.fileBuffer,
+      ContentType: "application/json",
+    })
+  );
+
+  return key;
+}
+
+// TIER 3 — PDPP Art. 22 DATA LOCALIZATION BLOCKER:
+// This objectStoreClient is configured to connect to a local MinIO instance
+// (OBJECT_STORE_ENDPOINT env var). For production, the primary bucket MUST
+// be hosted on an Ethiopian cloud provider (Ethio Telecom Cloud or Safaricom
+// Ethiopia) to comply with PDPP No. 1321/2024 Art. 22 data localization.
+// Cross-border backups require ECA approval and signed Standard Contractual
+// Clauses. DO NOT point OBJECT_STORE_ENDPOINT at a foreign-hosted bucket
+// (AWS S3, Azure Blob, GCP) to make this look resolved — it isn't.
+// See COMPLIANCE_BLOCKERS.md §Data Localization for the full blocker details.

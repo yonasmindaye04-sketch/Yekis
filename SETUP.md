@@ -56,6 +56,8 @@ Then verify backend Prisma support:
 pnpm --filter backend prisma:generate
 ```
 
+> **Note:** For a full list of database commands (migrations, resetting, and viewing data), see the [`docs/PRISMA_RUNBOOK.md`](docs/PRISMA_RUNBOOK.md).
+
 ## 5. Configure Environment Files
 
 Copy the example backend env file:

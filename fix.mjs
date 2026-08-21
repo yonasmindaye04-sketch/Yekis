@@ -1,51 +1,110 @@
 import fs from 'fs';
 
-function replaceInFile(path, from, to) {
-    if (fs.existsSync(path)) {
-        let content = fs.readFileSync(path, 'utf8');
-        content = content.replace(from, to);
-        content = content.replace(from, to); // In case of multiples, though a regex is better
-        fs.writeFileSync(path, content);
-    }
-}
+const newIndex = fs.readFileSync('apps/frontend/src/index.css', 'utf-8');
+const oldIndex = fs.readFileSync('temp-old-index-utf8.css', 'utf-8');
 
-replaceInFile('apps/backend/src/middleware/hardBlock.ts', 'if (tierOrder[kyc.tier] < tierOrder[requiredTier])', 'if (tierOrder[kyc.tier as "TIER_1" | "TIER_2" | "TIER_3"] < tierOrder[requiredTier])');
-replaceInFile('apps/backend/src/middleware/requireKycVerified.ts', 'if (tierOrder[kyc.tier] < tierOrder[requiredTier])', 'if (tierOrder[kyc.tier as "TIER_1" | "TIER_2" | "TIER_3"] < tierOrder[requiredTier])');
+// Convert newIndex :root into @theme for Tailwind utilities, but keep :root for CSS vars!
+// Actually, Tailwind v4 allows mapping CSS vars in @theme.
+const themeBlock = `
+@theme {
+  --color-bg: var(--color-bg);
+  --color-bg-elevated: var(--color-bg-elevated);
+  --color-bg-subtle: var(--color-bg-subtle);
+  --color-bg-hover: var(--color-bg-hover);
+  --color-bg-active: var(--color-bg-active);
 
-let auth = fs.readFileSync('apps/backend/src/modules/auth/auth.service.ts', 'utf8');
-auth = auth.replace('async (tx) =>', 'async (tx: any) =>');
-if (!auth.includes('export async function createAuthTokens')) {
-    auth += `
-export async function createAuthTokens(user: any) {
-  const accessToken = await new import("jose").SignJWT({ role: user.role })
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(user.id)
-    .setExpirationTime(env.JWT_ACCESS_TTL)
-    .sign(new TextEncoder().encode(env.JWT_ACCESS_SECRET));
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-border-focus: var(--color-border-focus);
 
-  const refreshToken = await new import("jose").SignJWT({})
-    .setProtectedHeader({ alg: "HS256" })
-    .setSubject(user.id)
-    .setExpirationTime(env.JWT_REFRESH_TTL)
-    .sign(new TextEncoder().encode(env.JWT_REFRESH_SECRET));
+  --color-text: var(--color-text);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-tertiary: var(--color-text-tertiary);
+  --color-text-inverse: var(--color-text-inverse);
+  --color-text-link: var(--color-text-link);
 
-  return { accessToken, refreshToken };
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-active: var(--color-primary-active);
+  --color-primary-light: var(--color-primary-light);
+  --color-primary-text: var(--color-primary-text);
+
+  --color-teal: var(--color-teal);
+  --color-teal-hover: var(--color-teal-hover);
+  --color-teal-light: var(--color-teal-light);
+  --color-teal-text: var(--color-teal-text);
+
+  --color-lime: var(--color-lime);
+  --color-lime-hover: var(--color-lime-hover);
+  --color-lime-light: var(--color-lime-light);
+  --color-lime-text: var(--color-lime-text);
+
+  --color-success: var(--color-success);
+  --color-success-light: var(--color-success-light);
+  --color-success-text: var(--color-success-text);
+
+  --color-warning: var(--color-warning);
+  --color-warning-light: var(--color-warning-light);
+  --color-warning-text: var(--color-warning-text);
+
+  --color-error: var(--color-error);
+  --color-error-light: var(--color-error-light);
+  --color-error-text: var(--color-error-text);
+
+  --color-info: var(--color-info);
+  --color-info-light: var(--color-info-light);
+  --color-info-text: var(--color-info-text);
+
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --font-mono: var(--font-mono);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
 }
 `;
-}
-fs.writeFileSync('apps/backend/src/modules/auth/auth.service.ts', auth);
 
-let envTs = fs.readFileSync('apps/backend/src/config/env.ts', 'utf8');
-if (!envTs.includes('TELEGRAM_BOT_TOKEN')) {
-    envTs = envTs.replace('SENTRY_DSN: z.string().optional(),', `SENTRY_DSN: z.string().optional(),\n  TELEGRAM_BOT_TOKEN: z.string().optional(),\n  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: z.coerce.number().default(86400),`);
-    fs.writeFileSync('apps/backend/src/config/env.ts', envTs);
-}
+// Remove the first few lines of oldIndex (imports and root blocks)
+let oldComponents = oldIndex;
+oldComponents = oldComponents.replace(/@import url\('[^']+'\);\n?/g, '');
+oldComponents = oldComponents.replace(/:root\s*\{[^}]+\}\n?/g, '');
+oldComponents = oldComponents.replace(/:root\[data-theme="[^"]+"\]\s*\{[^}]+\}\n?/g, '');
+oldComponents = oldComponents.replace(/:root\[data-theme="[^"]+"\]\s*body\s*\{[^}]+\}\n?/g, '');
 
-replaceInFile('apps/backend/src/modules/contracts/contracts.service.ts', 'async (tx) =>', 'async (tx: any) =>');
-replaceInFile('apps/backend/src/modules/disputes/disputes.routes.ts', 'req.params.contractId)', 'req.params.contractId as string)');
-replaceInFile('apps/backend/src/modules/disputes/disputes.routes.ts', 'disputeId: req.params.id,', 'disputeId: req.params.id as string,');
-replaceInFile('apps/backend/src/modules/kyc/fayda.client.ts', "'../lib/logger.js'", "'../../lib/logger.js'");
-replaceInFile('apps/backend/src/modules/kyc/pep.client.ts', "'../lib/logger.js'", "'../../lib/logger.js'");
-replaceInFile('apps/backend/src/modules/kyc/kyc.service.ts', 'documents.map((d) =>', 'documents.map((d: any) =>');
+// Replace old variables with new variables
+let mappedComponents = oldComponents
+  .replace(/var\(--card\)/g, 'var(--color-bg-elevated)')
+  .replace(/var\(--border\)/g, 'var(--color-border)')
+  .replace(/var\(--radius\)/g, 'var(--radius-md)')
+  .replace(/var\(--primary\)/g, 'var(--color-primary)')
+  .replace(/var\(--secondary\)/g, 'var(--color-bg-subtle)')
+  .replace(/var\(--foreground\)/g, 'var(--color-text)')
+  .replace(/var\(--muted-foreground\)/g, 'var(--color-text-secondary)')
+  .replace(/var\(--shadow\)/g, 'var(--shadow-md)')
+  .replace(/var\(--yekis-card\)/g, 'var(--color-bg-elevated)')
+  .replace(/var\(--yekis-border\)/g, 'var(--color-border)')
+  .replace(/var\(--yekis-muted\)/g, 'var(--color-text-secondary)')
+  .replace(/var\(--yekis-teal\)/g, 'var(--color-teal)')
+  .replace(/var\(--yekis-lime\)/g, 'var(--color-lime)')
+  .replace(/var\(--yekis-bg\)/g, 'var(--color-bg)')
+  .replace(/var\(--yekis-surface\)/g, 'var(--color-bg-subtle)')
+  .replace(/var\(--yekis-copy\)/g, 'var(--color-text)')
+  .replace(/var\(--yekis-border-hover\)/g, 'var(--color-border-strong)')
+  .replace(/#2b3631/gi, 'var(--color-text)')
+  .replace(/#f9f6f0/gi, 'var(--color-bg)')
+  .replace(/#d8f36b/gi, 'var(--color-lime)')
+  .replace(/#77d9c5/gi, 'var(--color-teal)');
 
-console.log('Fixes applied.');
+const finalCss = newIndex + '\n/* === RESTORED COMPONENTS === */\n' + themeBlock + '\n' + mappedComponents;
+
+fs.writeFileSync('apps/frontend/src/index.css', finalCss);
+console.log('Restored old CSS components to index.css and mapped them to new tokens.');

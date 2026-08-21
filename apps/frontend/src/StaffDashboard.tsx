@@ -543,6 +543,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 </div>
                 <button 
                   onClick={async () => {
+                     if (!window.confirm("Are you sure you want to refresh the featured carousel? This will update the featured talent shown on the landing page.")) {
+                       return;
+                     }
                      try {
                         await api.refreshFeaturedCarousel();
                         alert("Featured carousel refreshed successfully.");

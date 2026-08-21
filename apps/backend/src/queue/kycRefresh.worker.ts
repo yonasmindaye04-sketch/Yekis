@@ -4,7 +4,7 @@ import { redis } from "../lib/redis.js";
 import { prisma } from "../lib/prisma.js";
 import { recordAuditEvent } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
-import { kycRefreshQueue } from "./queues.js";
+import { kycRefreshQueue, notificationQueue } from "./queues.js";
 
 /**
  * Scheduled daily (see scheduleRecurringJobs() below). Finds every VERIFIED
@@ -14,6 +14,11 @@ import { kycRefreshQueue } from "./queues.js";
  * flags the record. If you want re-review to also restrict the hard-block
  * middleware, that's a deliberate policy call to make explicitly, not a
  * side effect of this job.
+ *
+ * T2-J: Also enqueues a notification to the affected user so they are prompted
+ * to re-submit their documents. The flag alone (periodicReviewPending) is not
+ * enough — staff can see it in the review queue, but the user has no way to
+ * know they're due for re-verification without this notification.
  */
 export const kycRefreshWorker = new Worker(
   "kyc-refresh",
@@ -34,6 +39,16 @@ export const kycRefreshWorker = new Worker(
         entityType: "KycRecord",
         entityId: record.id,
         metadata: { previousReviewDueAt: record.nextReviewDueAt },
+      });
+
+      // T2-J: Notify the user so they know re-submission is needed.
+      // Uses the same notificationQueue pattern as dispute-raised, escrow-released etc.
+      await notificationQueue.add("kyc-periodic-review-due", {
+        userId: record.userId,
+        kycRecordId: record.id,
+        message:
+          "Your identity verification is due for a periodic review. " +
+          "Please re-submit your documents to continue using the platform without interruption.",
       });
     }
 

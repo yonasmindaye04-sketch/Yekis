@@ -22,6 +22,7 @@ import { reviewRouter } from "./modules/reviews/review.routes.js";
 import { featuredRouter } from "./modules/featured/featured.routes.js";
 import { portfolioRouter } from "./modules/portfolio/portfolio.routes.js";
 import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
+import { financeRouter } from "./modules/finance/finance.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
 export function buildApp() {
   const app = express();
@@ -68,6 +69,7 @@ export function buildApp() {
   app.use("/api/v1/featured", featuredRouter);
   app.use("/api/v1/portfolio", portfolioRouter);
   app.use("/api/v1/staff", staffProfileRouter);
+  app.use("/api/v1/finance", financeRouter);
 
   // 404
   app.use((req, res) => {

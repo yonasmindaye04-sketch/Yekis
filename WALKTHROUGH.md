@@ -2,6 +2,7 @@
 
 Last validated: 2026-08-15
 
+> **Design spacing update (2026-08-21):** Fully unified Yekis landing and marketing page space utilization to match AFRO-TECH's full-bleed layout. Implemented 6% horizontal gutters across the fixed horizontal navigation bar, left-aligned hero section, content containers (`.marketing-container`), and footer. Configured responsive fluid gutters (6% desktop -> 5% tablet -> 4% mobile) with clean component layouts.
 > **Payment flow update (2026-08-15):** Escrow is now funded directly from the client's in-platform wallet. The old external-provider (Telebirr/CBE direct) Fund button has been replaced with a "Fund from wallet" button. When both parties sign a contract, the platform automatically debits the client wallet and locks funds in escrow. See [`docs/FLOW.md`](docs/FLOW.md) for the full canonical payment lifecycle.
 
 This document is the fastest way to understand the product as a whole. It translates the supplied Ethiopian Freelance Marketplace linkage map and journey images into the workflow currently exposed by the frontend and API.
@@ -82,12 +83,15 @@ flowchart LR
 
 Important controls:
 
-- Submitting work schedules a 24-hour warning and final release job.
+- Submitting work schedules a 24-hour warning and final release job (unless the contract is still within its 7-day cooling-off window, which takes precedence).
 - Explicit acceptance cancels delayed release jobs.
+- Client can cancel the contract during the 7-day cooling-off window if no escrow is funded or work started yet.
 - Release and refund paths use guarded database updates to prevent duplicate wallet credits.
-- Fees and withholding are calculated on the server.
+- Fees and withholding are calculated on the server. Platform fees are credited to the `PlatformOperatingAccount` and monitored against the VAT alert threshold.
 - Disputes are attached to individual milestones, so a multi-milestone contract can have separate cases.
-- Partial-split amounts cannot exceed the milestone value.
+- Disputes can be mutually withdrawn if both parties propose the same outcome and split.
+- Submitting dispute evidence automatically compiles a JSON bundle containing contract terms and the direct message log.
+- Partial-split amounts cannot exceed the milestone value, and guarantee contract completion once applied.
 - Tier 2 is required for withdrawal.
 - A payout identifier that does not match the verified phone is held for review with HTTP `202`; no wallet debit occurs.
 - Pass-through checks are flag-only. Staff can dismiss a flag or record an externally filed STR.

@@ -86,6 +86,20 @@ const EnvSchema = z.object({
   TMS_STR_FILING_SLA_HOURS: z.coerce.number().default(24),
 
   CHAPA_WEBHOOK_SECRET_HEADER: z.string().default("x-chapa-signature"),
+
+  // T2-D: VAT threshold alert — alert logged + TransactionFlag created when
+  // PlatformOperatingAccount.accumulatedFeeMinor exceeds this value.
+  // Ethiopian VAT applies at 500,000 ETB annual turnover (50,000,000 minor units).
+  // Set conservatively lower to give Finance lead time. Confirm with accountant.
+  VAT_THRESHOLD_MINOR: z.coerce.number().default(45_000_000), // 450,000 ETB
+
+  // T2-K: PEP provider selection. Set to "mock" in development, "real" in production.
+  // The startup check in server.ts refuses to boot in NODE_ENV=production unless
+  // this is NOT "mock". This prevents the mock watchlist from silently reaching
+  // production — a real AML failure mode, not just a missing feature.
+  // Blocked on: Compliance Officer selecting a real screening vendor (UN/OFAC/FIC).
+  // See COMPLIANCE_BLOCKERS.md §PEP Screening for details.
+  PEP_PROVIDER: z.enum(["mock", "real"]).default("mock"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

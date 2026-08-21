@@ -386,23 +386,94 @@ export async function releaseMilestoneFunds(milestoneId: string, freelancerId: s
   const freelancerKyc = await prisma.kycRecord.findUnique({ where: { userId: freelancerId } });
   const fees = calculateFees({ milestoneAmountMinor: amountMinor, freelancerHasTin: !!freelancerKyc?.tin });
 
-  await prisma.$transaction([
-    prisma.milestone.update({
+  // T1-B / T2-A: Credit PlatformOperatingAccount with the platform fee in the same
+  // atomic transaction as the freelancer wallet credit. Previously fees.platformFeeFromFreelancerMinor
+  // was calculated and then silently discarded — this closes that financial tracking gap.
+  // The client-side fee (platformFeeFromClientMinor) was already collected when the client
+  // funded escrow; we record it here in the PlatformFeeCredit log for reconciliation.
+  const updatedPlatformAccount = await prisma.$transaction(async (tx) => {
+    await tx.milestone.update({
       where: { id: milestoneId },
       data: { escrowState: "RELEASED", releasedAt: new Date() },
-    }),
-    prisma.wallet.update({
+    });
+    await tx.wallet.update({
       where: { userId: freelancerId },
       data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-    }),
+    });
     // Lifetime total, distinct from the wallet balance above (which
     // withdrawal decreases) — this is what a public profile's "earned"
     // figure should read from, and it's already net of fees/withholding.
-    prisma.user.update({
+    await tx.user.update({
       where: { id: freelancerId },
       data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    }),
-  ]);
+    });
+    // Upsert the singleton platform operating account row, incrementing accumulated revenue.
+    const updated = await tx.platformOperatingAccount.upsert({
+      where: { id: "singleton" },
+      create: {
+        id: "singleton",
+        accumulatedFeeMinor: fees.platformFeeFromFreelancerMinor,
+        accumulatedWithholdingMinor: fees.withholdingTaxMinor,
+      },
+      update: {
+        accumulatedFeeMinor: { increment: fees.platformFeeFromFreelancerMinor },
+        accumulatedWithholdingMinor: { increment: fees.withholdingTaxMinor },
+      },
+    });
+    // Append-only credit log for per-milestone reconciliation.
+    await tx.platformFeeCredit.create({
+      data: {
+        milestoneId,
+        feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+        feeFromClientMinor: fees.platformFeeFromClientMinor,
+        withholdingMinor: fees.withholdingTaxMinor,
+      },
+    });
+    return updated;
+  });
+
+  // T2-D: VAT threshold monitoring — check if cumulative platform fee revenue has
+  // crossed the configurable alert threshold. This does NOT register for VAT —
+  // it creates a staff-visible flag so Finance has lead time before VAT applies.
+  // VAT_THRESHOLD_MINOR defaults to 450,000 ETB (50,000,000 minor = 500,000 ETB threshold,
+  // alert set 50,000 ETB below to give lead time). Configure in .env.
+  if (updatedPlatformAccount.accumulatedFeeMinor >= env.VAT_THRESHOLD_MINOR) {
+    // Check if a flag already exists for this threshold crossing to avoid spamming.
+    const existingFlag = await prisma.transactionFlag.findFirst({
+      where: { type: "VAT_THRESHOLD_REACHED", status: "PENDING_REVIEW" },
+    });
+    if (!existingFlag) {
+      await prisma.transactionFlag.create({
+        data: {
+          userId: freelancerId, // closest user context; this is a platform-level event
+          type: "VAT_THRESHOLD_REACHED",
+          details: {
+            accumulatedFeeMinor: updatedPlatformAccount.accumulatedFeeMinor,
+            thresholdMinor: env.VAT_THRESHOLD_MINOR,
+            triggeredByMilestoneId: milestoneId,
+            message:
+              "Platform fee revenue has crossed the VAT alert threshold. " +
+              "Finance must confirm whether VAT registration is now required before the next milestone release.",
+          },
+        },
+      });
+      logger.warn(
+        { accumulatedFeeMinor: updatedPlatformAccount.accumulatedFeeMinor, thresholdMinor: env.VAT_THRESHOLD_MINOR },
+        "VAT threshold crossed — created compliance flag for Finance review"
+      );
+    }
+  }
+
+  await recordAuditEvent({
+    eventType: "PLATFORM_FEE_CREDITED",
+    entityType: "Milestone",
+    entityId: milestoneId,
+    metadata: {
+      feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      feeFromClientMinor: fees.platformFeeFromClientMinor,
+      withholdingMinor: fees.withholdingTaxMinor,
+    },
+  });
 
   // A contract is only "complete" once every one of its milestones lands
   // in a terminal state — this milestone releasing may or may not be the

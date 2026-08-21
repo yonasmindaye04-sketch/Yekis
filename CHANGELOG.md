@@ -16,9 +16,22 @@ All notable implementation and documentation changes are recorded here.
 - **Role-aware wallet UI** (`BrowserWallet.tsx`): Component accepts a `role` prop; withdrawal section shown only to freelancers; top-up available to all roles; provider selector cards added to the withdrawal form.
 - **"Fund from wallet" button** (`WorkflowWorkspace.tsx`): Replaces the old external-provider Fund button; calls `fundMilestoneFromWallet`. Unsigned contracts show an informational note instead.
 - **`docs/FLOW.md`**: New canonical payment lifecycle documentation covering all stages from wallet top-up through freelancer withdrawal, withdrawal rules per role, and error code reference.
+- **`docs/TELEBIRR_INTEGRATION.md`**: New comprehensive documentation on the Telebirr payment integration, covering architecture, files, cryptography (RSA-PSS), and webhook handling.
+- **`SYSTEM_DESIGN.md`**: Authoritative system design document covering system architecture, comprehensive Prisma ER diagram, per-module specifications, state machines, API surfaces, cross-cutting AML/audit concerns, end-to-end trust loop, and an integration stub matrix.
 
 ### Changed
 
+- **Payment Card Styling & Assets** (`BrowserWallet.tsx`, `App.tsx`, `index.css`):
+  - Added visual branding images for Telebirr and CBE Bank in payout and deposit methods with horizontal card layout.
+  - Enhanced layout centering and increased card width for improved spacing.
+- **Compliance AML Queue & UI Fixes** (`StaffCompliancePanel.tsx`, `DisputeQueue.tsx`, `KycQueue.tsx`, `TopUpQueue.tsx`, `tms.service.ts`, `index.css`):
+  - Created dedicated `.staff-queue-card` CSS layout with flex column positioning to eliminate text overlapping in AML/dispute/KYC queues.
+  - Reduced queue page size from 20 to 10 rows for cleaner pagination across staff queues.
+  - Fixed duplicate `WALLET_MISMATCH` flag creation on repeated payout attempts with phone mismatches.
+  - Added proper visual styling for disabled primary action buttons.
+- **Frontend Syntax & Build Fixes** (`FullPlatformApp.tsx`, `FAQPage.tsx`, `AboutPage.tsx`, `MobileCTA.tsx`, `ProfileEditPage.tsx`, `ProfilePage.tsx`, `ShareButtons.tsx`, `PaymentReturn.tsx`):
+  - Resolved JSX syntax and unclosed tag errors in `FullPlatformApp.tsx`.
+  - Cleaned up unused parameters, variables, and strict TypeScript null/union types across marketing and profile pages.
 - `BrowserWallet.tsx`: Replaced `canWithdraw` boolean prop with `role` string prop for clearer role-based gating.
 - `FullPlatformApp.tsx`: Passes `role` to `<BrowserWallet>` instead of `canWithdraw`.
 - `contracts.routes.ts`: Now handles `InsufficientBalanceError` (HTTP 402) so clients get a clear message if wallet balance is insufficient at contract signing.

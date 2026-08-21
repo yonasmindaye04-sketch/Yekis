@@ -9,7 +9,23 @@ import { startBot, stopBot } from "./modules/bot/bot.service.js";
 import "./queue/autoRelease.worker.js";
 import "./queue/kycRefresh.worker.js";
 import "./queue/notification.worker.js";
+import "./queue/withholdingRemittance.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
+import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
+
+// T2-K: PEP stub safety guard — structurally impossible to run production with the mock.
+// A silent mock PEP check in production is a real AML/CTF regulatory violation, not
+// just a missing feature. This must throw before the HTTP server starts.
+if (env.NODE_ENV === "production" && env.PEP_PROVIDER === "mock") {
+  // eslint-disable-next-line no-console
+  console.error(
+    "FATAL: PEP_PROVIDER is set to 'mock' in production. " +
+    "This means all PEP/sanctions checks pass silently. " +
+    "Set PEP_PROVIDER=real and wire up a real watchlist provider before deploying. " +
+    "See COMPLIANCE_BLOCKERS.md §PEP Screening."
+  );
+  process.exit(1);
+}
 
 const app = buildApp();
 
@@ -25,7 +41,9 @@ const server = app.listen(env.PORT, async () => {
   }
 });
 
-scheduleRecurringJobs().catch((err) => logger.error({ err }, "Failed to schedule recurring jobs"));
+scheduleRecurringJobs().catch((err) => logger.error({ err }, "Failed to schedule KYC refresh jobs"));
+scheduleWithholdingRemittanceJob().catch((err) => logger.error({ err }, "Failed to schedule withholding remittance job"));
+
 
 
 // === MAIN FUNCTIONS ===

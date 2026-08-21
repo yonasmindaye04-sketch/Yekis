@@ -14,7 +14,7 @@ export function TopUpQueue({ onReview, onFlag }: {
 }) {
   const [queue, setQueue] = useState<TopUpQueueItem[]>([]);
   const [meta, setMeta] = useState<QueueMeta | null>(null);
-  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 20, search: "", status: "PENDING_REVIEW" });
+  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 10, search: "", status: "PENDING_REVIEW" });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -31,7 +31,7 @@ export function TopUpQueue({ onReview, onFlag }: {
     try {
       const res = await api.getTopUpReviewQueue(state);
       setQueue(res.items || []);
-      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 20 });
+      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 10 });
       setLastUpdated(new Date());
     } catch (err) {
       console.error(err);

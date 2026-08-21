@@ -14,7 +14,7 @@ const mockApi = {
     profileCompleteness: 85
   }),
   getSkills: async () => ["Full Stack Developer", "Frontend Developer", "Backend Developer", "UI/UX Designer", "Product Manager"],
-  updateProfile: async () => { return true; }
+  updateProfile: async (_data?: ProfileEditData) => { return true; }
 };
 
 interface ProfileEditData {
@@ -63,16 +63,18 @@ export const ProfileEditPage = () => {
   };
 
   const addSecondarySkill = () => {
-    if (newSkill && !formData.skills.includes(newSkill)) {
-      setFormData({ ...formData, skills: [...formData.skills, newSkill] });
+    const currentSkills = formData.skills ?? [];
+    if (newSkill && !currentSkills.includes(newSkill)) {
+      setFormData({ ...formData, skills: [...currentSkills, newSkill] });
       setNewSkill("");
     }
   };
 
   const removeSecondarySkill = (skillToRemove: string) => {
+    const currentSkills = formData.skills ?? [];
     setFormData({ 
       ...formData, 
-      skills: formData.skills.filter((s: string) => s !== skillToRemove) 
+      skills: currentSkills.filter((s: string) => s !== skillToRemove) 
     });
   };
 

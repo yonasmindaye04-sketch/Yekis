@@ -27,11 +27,17 @@ Last reviewed: 2026-08-15
 - [x] Delivery submission and BullMQ auto-release scheduling
 - [x] Client acceptance and atomic wallet release
 - [x] Per-milestone dispute negotiation, evidence, mediation, arbitration, and resolution
+- [x] Mutual dispute withdrawal via matched outcomes
+- [x] Evidence bundle auto-compilation in object store
+- [x] Mediator atomic queue claiming and arbitration award application
 - [x] Tier 2 request/review and withdrawal gate
 - [x] Wallet-mismatch compliance hold with no debit
 - [x] Manual top-up submission, staff review, and wallet credit
 - [x] In-app notifications and support chat surfaces
-- [x] Staff KYC, top-up, dispute, and TMS queues
+- [x] Staff KYC, top-up, dispute, TMS, and Finance queues
+- [x] Finance reconciliation read models and fee credit ledger
+- [x] Monthly withholding tax remittance reporting job
+- [x] 7-day contract cooling-off right cancellation
 
 ## Backend And Data Integrity
 
@@ -56,7 +62,12 @@ Last reviewed: 2026-08-15
 - [x] Append-only audit intent and database permission guidance
 - [x] Cached KYC status correctly falls back to prior verified tier on upgrade rejection
 - [x] Escrow release and refund track lifetime net earnings and gross spend
-- [x] Contract completion checked synchronously when milestones reach terminal escrow states
+- [x] Contract completion checked synchronously when milestones reach terminal escrow states (handles partial splits)
+- [x] Escrow release automatically credits PlatformOperatingAccount and logs PlatformFeeCredit
+- [x] Escrow release monitors VAT threshold and alerts Finance
+- [x] Auto-release worker respects the 7-day cooling-off window
+- [x] KYC refresh worker sends re-review notifications to users
+- [x] Server refuses to boot in production with a mocked PEP provider
 
 ## Frontend
 

@@ -31,7 +31,7 @@ interface KycQueueItem {
 export function KycQueue({ onReview }: { onReview: (userId: string, decision: "VERIFIED" | "REJECTED", reason?: string) => Promise<void> }) {
   const [queue, setQueue] = useState<KycQueueItem[]>([]);
   const [meta, setMeta] = useState<QueueMeta | null>(null);
-  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 20, search: "", status: "UNDER_REVIEW" });
+  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 10, search: "", status: "UNDER_REVIEW" });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -46,7 +46,7 @@ export function KycQueue({ onReview }: { onReview: (userId: string, decision: "V
     try {
       const res = await api.getKycReviewQueue(state);
       setQueue(res.items || []);
-      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 20 });
+      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 10 });
       setLastUpdated(new Date());
     } catch (err) {
       console.error(err);
@@ -172,7 +172,7 @@ export function KycQueue({ onReview }: { onReview: (userId: string, decision: "V
             queue.map(item => (
               <button 
                 key={item.userId} 
-                className={`staff-conversation-row ${selectedItem?.userId === item.userId ? "selected" : ""}`}
+                className={`staff-queue-card ${selectedItem?.userId === item.userId ? "selected" : ""}`}
                 onClick={() => setSelectedItem(item)}
               >
                 <div className="row-header">

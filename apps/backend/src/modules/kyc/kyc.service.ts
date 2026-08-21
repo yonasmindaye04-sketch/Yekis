@@ -310,7 +310,14 @@ export async function getReviewQueue(params?: { page?: number; limit?: number; s
   const limit = Math.max(1, Math.min(100, params?.limit || 20));
   
   const where: any = {};
-  if (params?.status) {
+
+  // T2-J: "PERIODIC_REVIEW" is a virtual status — it queries for records where
+  // periodicReviewPending is true, regardless of their KycStatus. This allows
+  // staff to see re-review cases (existing verified users due for refresh) in a
+  // separate queue from first-time UNDER_REVIEW submissions.
+  if (params?.status === "PERIODIC_REVIEW") {
+    where.periodicReviewPending = true;
+  } else if (params?.status) {
     where.status = params.status;
   } else {
     // Default to UNDER_REVIEW if no specific status requested

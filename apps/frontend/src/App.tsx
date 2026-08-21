@@ -3,8 +3,9 @@ import { useState, useEffect } from "react";
 import { useTelegramMiniApp } from "./telegram/useTelegramMiniApp";
 import { api, type TelegramAuthResponse, type TopUpRequest, type Milestone, type Job } from "./api/client";
 import { FullPlatformApp } from "./FullPlatformApp";
-import { Home, Search, Briefcase, Wallet, UserCircle, ShieldAlert, ArrowLeft, PlusCircle, User, Briefcase as BriefcaseIcon } from "lucide-react";
+import { Home, Search, Briefcase, Wallet, UserCircle, ShieldAlert, ArrowLeft, PlusCircle, User, Briefcase as BriefcaseIcon, Sun, Moon } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
+import { useTheme } from "./theme/ThemeContext";
 
 
 // === INTERFACES & TYPES ===
@@ -32,10 +33,8 @@ function formatRole(role: Role) {
 }
 
 export function App() {
-  if (window.location.pathname === "/payment/return") {
-    return <PaymentReturn />;
-  }
 
+  const { theme, toggleTheme } = useTheme();
   const telegram = useTelegramMiniApp();
 
   const [telegramSession, setTelegramSession] = useState<TelegramAuthResponse | null>(null);
@@ -203,7 +202,17 @@ export function App() {
     catch (err) { alert(`Error: ${err instanceof Error ? err.message : "Failed to submit proposal"}`); } finally { setIsLoading(false); }
   };
 
-  if (!telegram.isTelegram) return <FullPlatformApp />;
+  // Derived display flags (no hooks — just booleans from already-called hooks)
+  const isPaymentReturn = window.location.pathname === "/payment/return";
+  const isNonTelegram = !telegram.isTelegram;
+
+  if (isPaymentReturn) {
+    return <PaymentReturn />;
+  }
+
+  if (isNonTelegram) {
+    return <FullPlatformApp />;
+  }
   
   if (telegramAuthStatus !== "ready") {
     return (
@@ -267,10 +276,13 @@ export function App() {
             <span className="eyebrow">{formatRole(role)} workspace</span>
             <h1>{activeTab === "home" ? "Good morning" : navItems.find((item) => item.tab === activeTab)?.label || "Yekis"}</h1>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions" style={{ gap: 12, alignItems: 'center' }}>
             {activeTab !== "home" && !telegram.isTelegram && (
               <button className="icon-button" aria-label="Go back" onClick={() => { setActiveTab("home"); setShowJobForm(false); }}><ArrowLeft size={18} /></button>
             )}
+            <button className="theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}>
+              {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
+            </button>
             <button className="user-menu" onClick={() => setActiveTab("kyc")}>
               <span className="avatar">{telegramSession?.telegram.firstName?.slice(0, 1).toUpperCase() || "Y"}</span>
               <span>Profile</span>
@@ -363,7 +375,7 @@ export function App() {
                 <section className="panel">
                   <div className="panel-heading"><h2>Recent top-ups</h2></div>
                   <div className="list-card" style={{marginTop: 14}}>
-                    {topUpRequests.length === 0 ? <p className="empty-state">No top-ups submitted yet.</p> : topUpRequests.map((request) => <div className="list-row" key={request.id}><div><strong>ETB {(request.amountMinor / 100).toLocaleString()}</strong><span>{request.rail === "TELEBIRR" ? "Telebirr" : "CBE Bank"} · {request.senderReference}</span></div><span className="status-pill">{request.status.replace("_", " ")}</span></div>)}
+                    {topUpRequests.length === 0 ? <p className="empty-state">No top-ups submitted yet.</p> : topUpRequests.map((request) => <div className="list-row" key={request.id}><div><strong>ETB {(request.amountMinor / 100).toLocaleString()}</strong><span>{request.provider === "TELEBIRR" ? "Telebirr" : "CBE Bank"} · {request.referenceNumber}</span></div><span className="status-pill">{request.status.replace("_", " ")}</span></div>)}
                   </div>
                 </section>
               </div>

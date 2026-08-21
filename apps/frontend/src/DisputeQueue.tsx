@@ -44,7 +44,7 @@ const WITHHOLDING_RATE_WITHOUT_TIN = 0.3;
 export function DisputeQueue({ onResolve }: DisputeQueueProps) {
   const [queue, setQueue] = useState<DisputeQueueItem[]>([]);
   const [meta, setMeta] = useState<QueueMeta | null>(null);
-  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 20, search: "", status: "STAGE_3_MEDIATION" });
+  const [state, setState] = useState<PaginationState>({ page: 1, pageSize: 10, search: "", status: "STAGE_3_MEDIATION" });
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -55,7 +55,7 @@ export function DisputeQueue({ onResolve }: DisputeQueueProps) {
     try {
       const res = await api.getDisputeQueue(state);
       setQueue(res.items || []);
-      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 20 });
+      setMeta({ total: res.total || 0, page: res.page || 1, pageSize: res.pageSize || 10 });
       setLastUpdated(new Date());
     } catch (err) {
       console.error(err);
@@ -129,7 +129,7 @@ export function DisputeQueue({ onResolve }: DisputeQueueProps) {
             queue.map((item) => (
               <button
                 key={item.id}
-                className={`staff-conversation-row ${selectedDisputeId === item.id ? "selected" : ""}`}
+                className={`staff-queue-card ${selectedDisputeId === item.id ? "selected" : ""}`}
                 onClick={() => setSelectedDisputeId(item.id)}
               >
                 <div className="row-header">
