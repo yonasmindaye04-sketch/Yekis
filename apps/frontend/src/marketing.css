@@ -31,7 +31,6 @@
 
 /* Base Marketing Page Structure */
 .marketing-page {
-  background-color: var(--yekis-bg);
   color: var(--yekis-copy);
   font-family: var(--font-sans);
   line-height: 1.6;
@@ -88,6 +87,11 @@
   background: color-mix(in srgb, var(--color-bg) 85%, transparent);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+.marketing-header-left {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .marketing-header-left {
@@ -441,7 +445,6 @@
 .support-promise {
   text-align: center;
   padding: 60px 0;
-  margin: 40px 0;
 }
 
 .final-cta {
