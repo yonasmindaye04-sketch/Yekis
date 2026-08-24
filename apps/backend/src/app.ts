@@ -23,11 +23,28 @@ import { featuredRouter } from "./modules/featured/featured.routes.js";
 import { portfolioRouter } from "./modules/portfolio/portfolio.routes.js";
 import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
 import { financeRouter } from "./modules/finance/finance.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
+import { env } from "./config/env.js";
 export function buildApp() {
   const app = express();
 
-  app.use(helmet());
+  // Behind a reverse proxy (ngrok in dev, nginx/ALB in prod) Express must be
+  // told how many hops to trust, otherwise req.ip is the proxy's IP — which
+  // breaks rate limiting (all users share one bucket) and audit attribution.
+  // Set TRUST_PROXY=1 for ngrok; unset it when running directly on localhost.
+  if (env.TRUST_PROXY !== undefined) {
+    app.set("trust proxy", env.TRUST_PROXY);
+  }
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: false,
+      frameguard: false,
+    })
+  );
   app.use(cors()); // tighten to your actual frontend origin(s) before production
   app.use(pinoHttp({ logger })); // doesn't touch the body, safe to run before the raw-body webhook routes
 
@@ -70,6 +87,7 @@ export function buildApp() {
   app.use("/api/v1/portfolio", portfolioRouter);
   app.use("/api/v1/staff", staffProfileRouter);
   app.use("/api/v1/finance", financeRouter);
+  app.use("/api/v1/admin", adminRouter);
 
   // 404
   app.use((req, res) => {

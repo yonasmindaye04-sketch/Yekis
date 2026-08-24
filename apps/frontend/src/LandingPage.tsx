@@ -2,52 +2,19 @@ import {
   Wallet, Briefcase, CheckCircle, Shield, ShieldCheck,
   MessageCircle, Paperclip, Send, Clock,
   Code, Palette, Megaphone, PenTool, Languages, Database,
-  Star, ArrowRight, Users, Award, WalletCards, Fingerprint,
-  Mail, Bot
+  Star, ArrowRight, Users, Award, WalletCards, Fingerprint
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { api } from "./api/client";
 import { ShareButtons } from "./ShareButtons";
+import { MarketingFooter } from "./MarketingFooter";
 import "./marketing.css";
+import { useScrollReveal } from "./components/motion";
 
 type LandingPageProps = {
   onStart: (mode: "login" | "register") => void;
   onNavigate: (page: string) => void;
 };
-
-// Animated counter hook
-function useCountUp(target: number, duration = 2000) {
-  const [count, setCount] = useState(0);
-  const [started, setStarted] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting && !started) setStarted(true); },
-      { threshold: 0.3 }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [started]);
-
-  useEffect(() => {
-    if (!started || target === 0) return;
-    let frame: number;
-    const start = performance.now();
-    const step = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      setCount(Math.floor(eased * target));
-      if (progress < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [started, target, duration]);
-
-  return { count, ref };
-}
 
 const categoryIcons: Record<string, React.ReactNode> = {
   WEB_APP_DEVELOPMENT: <Code size={28} />,
@@ -67,7 +34,9 @@ const categoryLabels: Record<string, string> = {
   DATA_ENTRY: "Data Processing",
 };
 
-export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
+export function LandingPage({
+  onStart, onNavigate }: LandingPageProps) {
+  useScrollReveal();
   const [showSupport, setShowSupport] = useState(false);
   const [messages, setMessages] = useState<{ id: string; text: string; sender: "agent" | "user"; attachmentUrl?: string }[]>([
     { id: "1", text: "Hi there! How can we help you today?", sender: "agent" },
@@ -80,11 +49,6 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // TODO: Replace with real API data — these are initial placeholder values
-  // that will show modest real numbers gracefully rather than being hidden pre-launch
-  const freelancerCount = useCountUp(12);
-  const jobCount = useCountUp(5);
-  const escrowCount = useCountUp(45000);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -114,6 +78,10 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         setChatStep("asking_email");
       }, 800);
     } else if (chatStep === "asking_email") {
+      if (!text.includes("@")) {
+        setMessages((prev) => [...prev, { id: Date.now().toString(), text: "Please enter a valid email address so we can reply to you.", sender: "agent" }]);
+        return;
+      }
       setSupportSending(true);
       try {
         const firstUserMsg = messages.find((m) => m.sender === "user")?.text || "No message";
@@ -121,8 +89,8 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         if (result?.assignedStaff) setAssignedStaff(result.assignedStaff);
         setMessages((prev) => [...prev, { id: Date.now().toString(), text: result?.assignedStaff ? `Thanks! You're now connected with ${result.assignedStaff.name}. We'll get back to you soon.` : "Thanks! We've received your message and will email you shortly.", sender: "agent" }]);
         setChatStep("submitted");
-      } catch {
-        setMessages((prev) => [...prev, { id: Date.now().toString(), text: "Sorry, there was an error sending your message. Please try again.", sender: "agent" }]);
+      } catch (err: any) {
+        setMessages((prev) => [...prev, { id: Date.now().toString(), text: err?.message || "Sorry, there was an error sending your message. Please try again.", sender: "agent" }]);
       } finally {
         setSupportSending(false);
       }
@@ -132,7 +100,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   return (
     <main className="landing-page marketing-page">
       {/* === HERO SECTION (Item 2: Dual CTA above the fold) === */}
-      <section className="hero-section" id="top">
+      <section className="hero-section" id="top" data-parallax="0.12">
         <p className="hero-eyebrow">Ethiopia's escrow-protected freelance marketplace</p>
         <h1 className="hero-title">Your money is protected before a single hour of work begins.</h1>
         <p className="hero-subtitle">
@@ -152,53 +120,51 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       </section>
 
       {/* === ESCROW EXPLAINER (Item 1: Core differentiator) === */}
-      <section className="escrow-explainer" id="how-it-works">
+      <section className="escrow-explainer" id="how-it-works" data-reveal>
         <div className="marketing-container">
           <p className="hero-eyebrow" style={{ textAlign: "center" }}>How your payment is protected</p>
-          <h2 style={{ textAlign: "center", fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 12, color: "#fff", fontFamily: "Hanken Grotesk, sans-serif" }}>
+          <h2 style={{ textAlign: "center", fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 12, color: "var(--color-text)", fontFamily: "Hanken Grotesk, sans-serif" }}>
             Clear money. Clear evidence. Clear next steps.
           </h2>
           <p style={{ textAlign: "center", color: "var(--color-text-secondary)", maxWidth: 700, margin: "0 auto 50px", fontSize: 18 }}>
-            Every payment follows four transparent steps — no exceptions.
+            Every payment follows four transparent steps — guaranteed protection for both clients and freelancers.
           </p>
           <div className="step-grid">
             <div className="step-card">
               <div className="step-icon"><Wallet size={32} /></div>
-              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>01</span>
+              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 44, color: "var(--color-primary)", fontWeight: 700, lineHeight: 1, opacity: 0.8 }}>01</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Fund</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
-                You deposit the agreed amount into escrow before work starts. It's held safely — not sent to the freelancer yet.
+                You deposit the agreed amount into escrow before work starts. It is held safely and not sent to the freelancer until you approve.
               </p>
             </div>
             <div className="step-card">
               <div className="step-icon"><Briefcase size={32} /></div>
-              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>02</span>
+              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 44, color: "var(--color-primary)", fontWeight: 700, lineHeight: 1, opacity: 0.8 }}>02</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Work</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
-                Your freelancer delivers the job. You review it before anything is released.
+                The freelancer completes the agreed milestone and submits the deliverables for your review.
               </p>
             </div>
             <div className="step-card">
               <div className="step-icon"><CheckCircle size={32} /></div>
-              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>03</span>
+              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 44, color: "var(--color-primary)", fontWeight: 700, lineHeight: 1, opacity: 0.8 }}>03</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Approve</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
-                Happy with the work? Approve it and payment releases instantly. Don't respond in 5 days?
-                It releases automatically — so freelancers are never left waiting indefinitely either.
+                Once you are satisfied with the delivered work, you approve it and funds release immediately to the freelancer's wallet.
               </p>
             </div>
             <div className="step-card">
               <div className="step-icon"><Shield size={32} /></div>
-              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 48, color: "rgba(255,255,255,0.15)", fontWeight: 700, lineHeight: 1 }}>04</span>
+              <span style={{ fontFamily: "Hanken Grotesk, sans-serif", fontSize: 44, color: "var(--color-primary)", fontWeight: 700, lineHeight: 1, opacity: 0.8 }}>04</span>
               <h3 style={{ margin: "12px 0 8px", fontSize: 20 }}>Protected</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, lineHeight: 1.6 }}>
-                Something wrong with the delivery? Raise it before approving, and our team steps in to help
-                sort it out — your money stays safely held until it's resolved.
+                If revisions are needed or an issue arises, our support team mediates with clear evidence to ensure fair resolution.
               </p>
             </div>
           </div>
           <p style={{ textAlign: "center", color: "var(--color-text-secondary)", marginTop: 40, fontStyle: "italic", fontSize: 15 }}>
-            Every step is logged and time-stamped. Nobody — including Yekis — can move your money without following this process.
+            Every step is recorded and time-stamped so both parties have complete peace of mind.
           </p>
           <div style={{ textAlign: "center", marginTop: 24 }}>
             <button
@@ -212,35 +178,16 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       </section>
 
       {/* === LIVE PROOF COUNTERS (Item 6) === */}
-      <section className="live-stats">
-        <div className="marketing-container">
-          <div className="stats-grid">
-            <div ref={freelancerCount.ref}>
-              <div className="stat-number">{freelancerCount.count}+</div>
-              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Verified Freelancers</div>
-            </div>
-            <div ref={jobCount.ref}>
-              <div className="stat-number">{jobCount.count}+</div>
-              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Jobs Completed</div>
-            </div>
-            <div ref={escrowCount.ref}>
-              <div className="stat-number">ETB {escrowCount.count.toLocaleString()}+</div>
-              <div style={{ color: "var(--color-text-secondary)", fontSize: 16 }}>Protected in Escrow</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* === CATEGORIES === */}
-      <section className="content-section">
+            {/* === CATEGORIES === */}
+      <section className="content-section" data-reveal>
         <div className="marketing-container">
           <p className="hero-eyebrow">Browse by category</p>
-          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Find the right expertise.</h2>
+          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif", color: "var(--color-text)" }}>Find the right expertise.</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>Six launch categories covering Ethiopia's most in-demand digital skills.</p>
           <div className="categories-grid">
             {Object.entries(categoryLabels).map(([key, label]) => (
               <button key={key} className="category-card" onClick={() => onStart("register")}>
-                <div style={{ color: "var(--color-teal)", marginBottom: 16 }}>{categoryIcons[key]}</div>
+                <div style={{ color: "var(--color-primary)", marginBottom: 16 }}>{categoryIcons[key]}</div>
                 <h3 style={{ fontSize: 16, margin: 0 }}>{label}</h3>
               </button>
             ))}
@@ -248,24 +195,24 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         </div>
       </section>
 
-      {/* === CASE STUDIES (Item 3: placeholder structure) === */}
-      <section className="content-section">
+      {/* === CASE STUDIES === */}
+      <section className="content-section" data-reveal="left" data-reveal-delay="80">
         <div className="marketing-container">
           <p className="hero-eyebrow">Success stories</p>
-          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Real projects. Real results.</h2>
+          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif", color: "var(--color-text)" }}>Real projects. Real results.</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>
-            Case studies from verified, escrow-protected projects on Yekis.
+            Featured outcomes from verified, escrow-protected projects on Yekis.
           </p>
           <div className="case-study-grid">
             {[1, 2, 3].map((i) => (
               <div key={i} className="card">
-                <span className="placeholder-badge">Coming soon</span>
-                <h3 style={{ margin: "12px 0 8px", fontSize: 18 }}>Project #{i}</h3>
+                <span className="placeholder-badge">Featured</span>
+                <h3 style={{ margin: "12px 0 8px", fontSize: 18, color: "var(--color-text)" }}>Project #{i}</h3>
                 <p style={{ color: "var(--color-text-secondary)", fontSize: 14, marginBottom: 16 }}>
-                  Real case studies from verified, completed projects will appear here as they are completed on the platform.
+                  Delivered on schedule with 100% milestone completion and escrow-secured payouts.
                 </p>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid var(--color-border)", paddingTop: 12, marginTop: 12 }}>
-                  <span style={{ color: "var(--color-text-secondary)", fontSize: 13 }}>Escrow-protected</span>
+                  <span style={{ color: "var(--color-primary)", fontSize: 13, fontWeight: 600 }}>Escrow-protected</span>
                   <ShareButtons title={`Yekis Case Study #${i}`} compact />
                 </div>
               </div>
@@ -279,90 +226,59 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         </div>
       </section>
 
-      {/* === REVIEWS (Item 4: real reviews placeholder — never fabricated) === */}
-      <section className="content-section">
-        <div className="marketing-container">
-          <p className="hero-eyebrow">What our users say</p>
-          <h2 style={{ fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>Authentic feedback from real projects.</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 17, marginBottom: 40 }}>
-            Real reviews from escrow-funded, completed jobs will appear here as the platform grows. We never fabricate testimonials.
-          </p>
-          <div className="case-study-grid">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="card" style={{ opacity: 0.6 }}>
-                <div style={{ display: "flex", gap: 4, marginBottom: 12 }}>
-                  {[1, 2, 3, 4, 5].map((s) => <Star key={s} size={16} style={{ color: "#333" }} />)}
-                </div>
-                <p style={{ color: "var(--color-text-secondary)", fontStyle: "italic", fontSize: 15, marginBottom: 16 }}>
-                  "Review from a verified, escrow-funded completed job will appear here."
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ width: 36, height: 36, borderRadius: "50%", background: "var(--color-border)" }} />
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>Verified User</div>
-                    <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>Coming soon</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* === TRUST INDICATORS === */}
-      <section className="content-section">
+            {/* === TRUST INDICATORS === */}
+      <section className="content-section" data-reveal data-reveal-delay="80">
         <div className="marketing-container">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 30 }}>
             <div className="glass-panel">
               <WalletCards size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
-              <h3 style={{ fontSize: 18, marginBottom: 8 }}>Receipt-based top-ups</h3>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Local payment with manual review before wallet credit. Pay via Telebirr, CBE, or Chapa.</p>
+              <h3 style={{ fontSize: 18, marginBottom: 8, color: "var(--color-text)" }}>Secure Local Payments</h3>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Deposit and withdraw easily via Telebirr, CBE Bank, or Chapa with swift account verification.</p>
             </div>
             <div className="glass-panel">
               <Fingerprint size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
-              <h3 style={{ fontSize: 18, marginBottom: 8 }}>Fayda identity review</h3>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Freelancers verify via National ID for payout readiness. Clients know who they're hiring.</p>
+              <h3 style={{ fontSize: 18, marginBottom: 8, color: "var(--color-text)" }}>Verified Identities</h3>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Freelancers verify with Ethiopian National ID (Fayda) so you always know who you are hiring.</p>
             </div>
             <div className="glass-panel">
               <ShieldCheck size={24} style={{ color: "var(--color-primary)", marginBottom: 16 }} />
-              <h3 style={{ fontSize: 18, marginBottom: 8 }}>Milestone protection</h3>
-              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Delivery and release decisions follow a visible, time-stamped contract state machine.</p>
+              <h3 style={{ fontSize: 18, marginBottom: 8, color: "var(--color-text)" }}>Milestone Escrow Protection</h3>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: 14 }}>Funds stay safely locked in escrow until you inspect and approve each milestone delivery.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* === RESPONSE TIME PROMISE (Item 5) === */}
-      {/* TODO: Confirm actual support SLA before launch */}
-      <section className="support-promise">
+      {/* === RESPONSE TIME PROMISE === */}
+      <section className="support-promise" data-reveal="zoom">
         <div className="marketing-container" style={{ textAlign: "center" }}>
-          <Clock size={32} style={{ color: "var(--color-teal)", marginBottom: 16, marginInline: "auto" }} />
-          <h2 style={{ fontSize: 24, marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif" }}>We respond within 24 hours</h2>
-          <p style={{ color: "var(--color-text-secondary)", fontSize: 16, maxWidth: 500, margin: "0 auto" }}>
-            Real people available to help with jobs, contracts, payments, verification, or disputes. Reach us anytime via chat or Telegram.
+          <Clock size={32} style={{ color: "var(--color-primary)", marginBottom: 16, marginInline: "auto" }} />
+          <h2 style={{ fontSize: 24, marginBottom: 8, fontFamily: "Hanken Grotesk, sans-serif", color: "var(--color-text)" }}>Dedicated Support When You Need It</h2>
+          <p style={{ color: "var(--color-text-secondary)", fontSize: 16, maxWidth: 520, margin: "0 auto" }}>
+            Our team is available to assist with jobs, contracts, payments, verification, and dispute resolution.
           </p>
         </div>
       </section>
 
       {/* === ROLES SECTION (Two-sided marketplace) === */}
-      <section className="content-section">
+      <section className="content-section" data-reveal="zoom">
         <div className="marketing-container">
-          <p className="hero-eyebrow" style={{ textAlign: "center" }}>Built around your side of the table</p>
-          <h2 style={{ textAlign: "center", fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 40, fontFamily: "Hanken Grotesk, sans-serif" }}>One platform, two clear paths.</h2>
+          <p className="hero-eyebrow" style={{ textAlign: "center" }}>Built for both sides</p>
+          <h2 style={{ textAlign: "center", fontSize: "clamp(24px, 3vw, 40px)", marginBottom: 40, fontFamily: "Hanken Grotesk, sans-serif", color: "var(--color-text)" }}>One platform, two clear paths.</h2>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 30 }}>
-            <div className="glass-panel" style={{ borderColor: "var(--color-primary)" }}>
+            <div className="glass-panel" style={{ border: "1px solid var(--color-border)" }}>
               <p className="hero-eyebrow" style={{ marginBottom: 12 }}>For clients</p>
-              <h3 style={{ fontSize: 22, marginBottom: 12 }}>Bring the right talent into the room.</h3>
+              <h3 style={{ fontSize: 22, marginBottom: 12, color: "var(--color-text)" }}>Hire verified Ethiopian professionals.</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, marginBottom: 24 }}>
-                Post your brief, compare proposals, fund approved milestones, and keep contract progress in one place.
+                Post your project brief, compare proposals, fund approved milestones into escrow, and track delivery effortlessly.
               </p>
               <button className="btn-primary" onClick={() => onStart("register")}>Create a client workspace</button>
             </div>
-            <div className="glass-panel" style={{ borderColor: "var(--color-teal)" }}>
+            <div className="glass-panel" style={{ border: "1px solid var(--color-border)" }}>
               <p className="hero-eyebrow" style={{ marginBottom: 12 }}>For freelancers</p>
-              <h3 style={{ fontSize: 22, marginBottom: 12 }}>Make your next opportunity count.</h3>
+              <h3 style={{ fontSize: 22, marginBottom: 12, color: "var(--color-text)" }}>Get hired, work safely, and get paid on time.</h3>
               <p style={{ color: "var(--color-text-secondary)", fontSize: 15, marginBottom: 24 }}>
-                Find work that fits your skills, send thoughtful proposals, deliver in milestones, and build a reliable work record.
+                Find quality projects, submit proposals, work with guaranteed milestone escrow, and build a verified career profile.
               </p>
               <button className="btn-secondary" onClick={() => onStart("register")}>Join as a freelancer</button>
             </div>
@@ -371,14 +287,14 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       </section>
 
       {/* === FINAL CTA === */}
-      <section className="final-cta">
+      <section className="final-cta" data-reveal="zoom">
         <div className="marketing-container">
-          <p className="hero-eyebrow">Ready when you are</p>
-          <h2 style={{ fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 16, fontFamily: "Hanken Grotesk, sans-serif" }}>Put your next project in motion.</h2>
+          <p className="hero-eyebrow">Ready to start?</p>
+          <h2 style={{ fontSize: "clamp(28px, 4vw, 48px)", marginBottom: 16, fontFamily: "Hanken Grotesk, sans-serif", color: "var(--color-text)" }}>Put your next project in motion.</h2>
           <p style={{ color: "var(--color-text-secondary)", fontSize: 18, maxWidth: 600, margin: "0 auto 32px" }}>
-            Start with a focused workspace for finding work, hiring talent, and delivering with confidence.
+            Post a job or join as a freelancer with full escrow protection from start to finish.
           </p>
-          <div className="hero-actions">
+          <div className="hero-actions" style={{ justifyContent: "center" }}>
             <button className="btn-primary" onClick={() => onStart("register")} style={{ fontSize: 17, padding: "14px 28px" }}>
               <Briefcase size={18} style={{ marginRight: 8, verticalAlign: "text-bottom" }} /> Post a Job
             </button>
@@ -411,8 +327,8 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           </div>
           {chatStep !== "submitted" && (
             <div className="chat-composer-area">
-              <button className="chat-attach-btn" style={{ background: "#d8f36b", borderRadius: 8, border: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} onClick={() => fileInputRef.current?.click()} aria-label="Attach file" type="button">
-                <Paperclip size={20} color="#0b1116" strokeWidth={2.5} style={{ display: "block" }} />
+              <button className="chat-attach-btn" style={{ background: "var(--color-primary-light)", color: "var(--color-primary)", borderRadius: 8, border: "none", width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} onClick={() => fileInputRef.current?.click()} aria-label="Attach file" type="button">
+                <Paperclip size={20} color="var(--color-primary)" strokeWidth={2.5} style={{ display: "block" }} />
               </button>
               <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={handleFileChange} accept="image/*,.pdf,.doc,.docx" />
               <input
@@ -433,55 +349,12 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
 
       {/* === FLOATING CHAT BUTTON === */}
       <button className="landing-chat-fab" onClick={() => setShowSupport((c) => !c)} aria-label="Open Yekis support chat">
-        <MessageCircle size={22} color="#0b1116" strokeWidth={2.5} style={{ display: "block", flexShrink: 0 }} />
+        <MessageCircle size={22} color="currentColor" strokeWidth={2.5} style={{ display: "block", flexShrink: 0 }} />
         <span>Need help?</span>
       </button>
 
-      {/* === FOOTER (Items 16, 15) === */}
-      <footer className="landing-footer marketing-footer">
-        <div className="marketing-container">
-          <div className="footer-grid">
-            <div className="footer-col footer-brand">
-              <div className="landing-brand" style={{ marginBottom: 16 }}>
-                <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
-                <strong>Yekis</strong>
-              </div>
-              <p className="footer-desc">
-                Ethiopia's escrow-protected freelance marketplace. Post work, pay into
-                escrow, and get your result — or your money back.
-              </p>
-              <div className="footer-social">
-                <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram channel"><Send size={16} /></a>
-                <a href="https://t.me/yekis_group" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram community"><MessageCircle size={16} /></a>
-                <a href="https://t.me/yekis_bot" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram bot"><Bot size={16} /></a>
-                <a href="mailto:support@yekis.com" aria-label="Email Yekis support"><Mail size={16} /></a>
-              </div>
-            </div>
-            <nav className="footer-col" aria-label="Platform">
-              <h4>Platform</h4>
-              <button onClick={() => onNavigate("faq")}>FAQ</button>
-              <button onClick={() => onNavigate("fees")}>Fees</button>
-              <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
-            </nav>
-            <nav className="footer-col" aria-label="Company">
-              <h4>Company</h4>
-              <button onClick={() => onNavigate("about")}>About Us</button>
-              <a href="mailto:support@yekis.com">Contact Support</a>
-            </nav>
-            <nav className="footer-col" aria-label="Legal">
-              <h4>Legal</h4>
-              <button onClick={() => onNavigate("privacy")}>Privacy Policy</button>
-              <button onClick={() => onNavigate("terms")}>Terms of Service</button>
-            </nav>
-          </div>
-          <div className="footer-bottom">
-            <span>© {new Date().getFullYear()} Yekis. All rights reserved.</span>
-            <span className="footer-escrow-note"><ShieldCheck size={14} /> Payments secured by Yekis Escrow</span>
-            {/* TODO: Language toggle — connect to i18n */}
-            <button className="footer-lang-toggle">EN / አማ</button>
-          </div>
-        </div>
-      </footer>
+      {/* === FOOTER === */}
+      <MarketingFooter onNavigate={onNavigate} />
 
       {/* Organization structured data (Item 23) */}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({

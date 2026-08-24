@@ -1,14 +1,15 @@
-/* Original Yekis dark palette for the Telegram Mini App. */
+/* Telegram Mini App — Complete High-Contrast Theme System (Light & Dark) */
+
+/* ==========================================================================
+   1. DARK THEME
+   ========================================================================== */
 :root[data-theme="dark"] body:has(.mini-app-shell),
 :root[data-theme="dark"] body:has(.welcome-screen),
-:root[data-theme="dark"] body:has(.crash-screen) {
-  background: #0b1116 !important;
-  color: #f7faf9 !important;
-}
-
+:root[data-theme="dark"] body:has(.crash-screen),
 :root[data-theme="dark"] .mini-app-shell,
 :root[data-theme="dark"] .welcome-screen,
-:root[data-theme="dark"] .crash-screen {
+:root[data-theme="dark"] .crash-screen,
+:root[data-theme="dark"] .mini-platform-shell {
   background: #0b1116 !important;
   color: #f7faf9 !important;
 }
@@ -17,8 +18,21 @@
 :root[data-theme="dark"] .mini-app-shell h2,
 :root[data-theme="dark"] .mini-app-shell h3,
 :root[data-theme="dark"] .welcome-screen h1,
-:root[data-theme="dark"] .crash-screen h1 {
+:root[data-theme="dark"] .welcome-screen h2,
+:root[data-theme="dark"] .welcome-screen h3,
+:root[data-theme="dark"] .welcome-screen strong,
+:root[data-theme="dark"] .crash-screen h1,
+:root[data-theme="dark"] .mini-platform-shell h1,
+:root[data-theme="dark"] .mini-platform-shell h2,
+:root[data-theme="dark"] .mini-platform-shell h3 {
   color: #f7faf9 !important;
+}
+
+:root[data-theme="dark"] .welcome-screen label,
+:root[data-theme="dark"] .mini-app-shell label,
+:root[data-theme="dark"] .mini-platform-shell label {
+  color: #f7faf9 !important;
+  font-weight: 600;
 }
 
 :root[data-theme="dark"] .mini-app-shell .page-heading > p:last-child,
@@ -27,23 +41,32 @@
 :root[data-theme="dark"] .welcome-copy,
 :root[data-theme="dark"] .welcome-note,
 :root[data-theme="dark"] .crash-screen p {
-  color: #9aacb1 !important;
+  color: #f7faf9 !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .welcome-rule span {
-  background: #26343d;
+  background: #26343d !important;
+}
+:root[data-theme="dark"] .welcome-screen .welcome-rule small {
+  color: #f7faf9 !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .role-choice,
+:root[data-theme="dark"] .welcome-screen .glass-card,
 :root[data-theme="dark"] .mini-app-shell .glass-card,
 :root[data-theme="dark"] .mini-app-shell .metric-card,
 :root[data-theme="dark"] .mini-app-shell .list-card,
 :root[data-theme="dark"] .mini-app-shell .quick-grid button,
-:root[data-theme="dark"] .mini-app-shell .payment-account {
+:root[data-theme="dark"] .mini-app-shell .payment-account,
+:root[data-theme="dark"] .mini-platform-shell .panel,
+:root[data-theme="dark"] .mini-platform-shell .job-platform-card,
+:root[data-theme="dark"] .mini-platform-shell .contract-table,
+:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card,
+:root[data-theme="dark"] .glass-card {
   background: #121c23 !important;
-  border-color: #26343d !important;
+  border: 1px solid #26343d !important;
   color: #f7faf9 !important;
-  box-shadow: none;
+  box-shadow: none !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .role-choice:hover {
@@ -55,143 +78,293 @@
 :root[data-theme="dark"] .mini-app-shell .metric-card span,
 :root[data-theme="dark"] .mini-app-shell .metric-card small,
 :root[data-theme="dark"] .mini-app-shell .empty-state,
-:root[data-theme="dark"] .mini-app-shell .list-card small {
-  color: #9aacb1 !important;
+:root[data-theme="dark"] .mini-app-shell .list-card small,
+:root[data-theme="dark"] .mini-platform-shell .table-row span,
+:root[data-theme="dark"] .mini-platform-shell .empty-state {
+  color: #f7faf9 !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .role-choice b,
 :root[data-theme="dark"] .welcome-screen .role-icon,
 :root[data-theme="dark"] .mini-app-shell .quick-grid span,
-:root[data-theme="dark"] .mini-app-shell .list-icon {
-  color: #d8f36b !important;
+:root[data-theme="dark"] .mini-app-shell .list-icon,
+:root[data-theme="dark"] .mini-platform-shell .nav-icon,
+:root[data-theme="dark"] .mini-platform-shell .list-icon {
+  color: #22c55e !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .role-icon {
-  background: #1e3038 !important;
+  background: transparent !important;
 }
 
+:root[data-theme="dark"] .welcome-screen input,
+:root[data-theme="dark"] .welcome-screen textarea,
+:root[data-theme="dark"] .welcome-screen select,
 :root[data-theme="dark"] .mini-app-shell input,
 :root[data-theme="dark"] .mini-app-shell textarea,
-:root[data-theme="dark"] .mini-app-shell select {
-  background: #111b22 !important;
-  border-color: #384b55 !important;
-  color: #f7faf9 !important;
-}
-
-:root[data-theme="dark"] .mini-app-shell .bottom-nav {
-  background: rgba(18, 28, 35, .96);
-  border-color: #26343d;
-}
-
-:root[data-theme="dark"] .mini-app-shell .bottom-nav button {
-  color: #84979f;
-}
-
-:root[data-theme="dark"] .mini-app-shell .bottom-nav button.active {
-  background: #d8f36b;
-  color: #0b1116;
-}
-
-:root[data-theme="dark"] .mini-app-shell .hero-action {
-  background: #d8f36b;
-  color: #0b1116;
-}
-
-:root[data-theme="dark"] .mini-app-shell .hero-action-teal {
-  background: #77d9c5;
-}
-
-:root[data-theme="dark"] .mini-app-shell .payment-account span,
-:root[data-theme="dark"] .mini-app-shell .payment-account code {
-  color: #9aacb1;
-}
-
-:root[data-theme="dark"] .mini-app-shell .payment-account code {
-  color: #d8f36b;
-}
-
-:root[data-theme="dark"] .crash-screen code {
-  background: #121c23;
-  color: #f3b8bd;
-}
-
-/* Full Mini App workspace pass: every shared surface follows the dark palette. */
-:root[data-theme="dark"] .mini-platform-shell {
+:root[data-theme="dark"] .mini-app-shell select,
+:root[data-theme="dark"] .mini-platform-shell input,
+:root[data-theme="dark"] .mini-platform-shell textarea,
+:root[data-theme="dark"] .mini-platform-shell select {
   background: #0b1116 !important;
+  border: 1px solid #384b55 !important;
   color: #f7faf9 !important;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .platform-sidebar,
-:root[data-theme="dark"] .mini-platform-shell .platform-topbar,
+:root[data-theme="dark"] .welcome-screen input::placeholder,
+:root[data-theme="dark"] .mini-app-shell input::placeholder,
+:root[data-theme="dark"] .mini-platform-shell input::placeholder {
+  color: #0f172a !important;
+}
+
+:root[data-theme="dark"] .mini-app-shell .bottom-nav,
 :root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav {
-  background: #101a20 !important;
+  background: rgba(18, 28, 35, 0.96) !important;
   border-color: #26343d !important;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .platform-topbar h1,
-:root[data-theme="dark"] .mini-platform-shell .sidebar-brand strong,
-:root[data-theme="dark"] .mini-platform-shell .sidebar-role strong,
-:root[data-theme="dark"] .mini-platform-shell .platform-content h2,
-:root[data-theme="dark"] .mini-platform-shell .platform-content h3,
-:root[data-theme="dark"] .mini-platform-shell .panel-heading button {
-  color: #f7faf9 !important;
-}
-
-:root[data-theme="dark"] .mini-platform-shell .sidebar-role small,
-:root[data-theme="dark"] .mini-platform-shell .content-toolbar p,
-:root[data-theme="dark"] .mini-platform-shell .panel p,
-:root[data-theme="dark"] .mini-platform-shell .job-platform-card p,
-:root[data-theme="dark"] .mini-platform-shell .table-row span,
-:root[data-theme="dark"] .mini-platform-shell .table-head,
-:root[data-theme="dark"] .mini-platform-shell .empty-state {
-  color: #9aacb1 !important;
-}
-
-:root[data-theme="dark"] .mini-platform-shell .panel,
-:root[data-theme="dark"] .mini-platform-shell .job-platform-card,
-:root[data-theme="dark"] .mini-platform-shell .contract-table,
-:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card {
-  background: #121c23 !important;
-  border-color: #26343d !important;
-  color: #f7faf9 !important;
-  box-shadow: none;
-}
-
-:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .sidebar-nav button,
+:root[data-theme="dark"] .mini-app-shell .bottom-nav button,
 :root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button {
-  color: #84979f;
-}
-
-:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .sidebar-nav button.active,
-:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button.active {
-  background: #436a56 !important;
   color: #f7faf9 !important;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .platform-sidebar .nav-icon,
-:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav span,
-:root[data-theme="dark"] .mini-platform-shell .panel-heading button,
-:root[data-theme="dark"] .mini-platform-shell .list-icon {
-  color: #d8f36b !important;
+:root[data-theme="dark"] .mini-app-shell .bottom-nav button.active,
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button.active {
+  background: #22c55e !important;
+  color: #09090b !important;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav {
-  grid-template-columns: repeat(4, 1fr) !important;
+:root[data-theme="dark"] .welcome-screen .btn-primary,
+:root[data-theme="dark"] .mini-app-shell .hero-action,
+:root[data-theme="dark"] .mini-platform-shell .btn-primary {
+  background: #22c55e !important;
+  color: #09090b !important;
+  font-weight: 700 !important;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card {
+:root[data-theme="dark"] .text-button {
+  color: #22c55e !important;
+}
+
+:root[data-theme="dark"] .auth-error {
+  background: #2a1215 !important;
+  border: 1px solid #5c2227 !important;
+  color: #fca5a5 !important;
+}
+
+:root[data-theme="dark"] .auth-error strong {
+  color: #fecaca !important;
+}
+
+:root[data-theme="dark"] .auth-error span {
+  color: #fca5a5 !important;
+}
+
+/* ==========================================================================
+   2. LIGHT THEME
+   ========================================================================== */
+:root[data-theme="light"] body:has(.mini-app-shell),
+:root[data-theme="light"] body:has(.welcome-screen),
+:root[data-theme="light"] body:has(.crash-screen),
+:root[data-theme="light"] .mini-app-shell,
+:root[data-theme="light"] .welcome-screen,
+:root[data-theme="light"] .crash-screen,
+:root[data-theme="light"] .mini-platform-shell {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .mini-app-shell h1,
+:root[data-theme="light"] .mini-app-shell h2,
+:root[data-theme="light"] .mini-app-shell h3,
+:root[data-theme="light"] .welcome-screen h1,
+:root[data-theme="light"] .welcome-screen h2,
+:root[data-theme="light"] .welcome-screen h3,
+:root[data-theme="light"] .welcome-screen strong,
+:root[data-theme="light"] .crash-screen h1,
+:root[data-theme="light"] .mini-platform-shell h1,
+:root[data-theme="light"] .mini-platform-shell h2,
+:root[data-theme="light"] .mini-platform-shell h3 {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .welcome-screen label,
+:root[data-theme="light"] .mini-app-shell label,
+:root[data-theme="light"] .mini-platform-shell label {
+  color: #0f172a !important;
+  font-weight: 600;
+}
+
+:root[data-theme="light"] .mini-app-shell .page-heading > p:last-child,
+:root[data-theme="light"] .mini-app-shell .welcome-copy,
+:root[data-theme="light"] .mini-app-shell .glass-card p,
+:root[data-theme="light"] .welcome-copy,
+:root[data-theme="light"] .welcome-note,
+:root[data-theme="light"] .crash-screen p {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .welcome-screen .welcome-rule span {
+  background: #e2e8f0 !important;
+}
+:root[data-theme="light"] .welcome-screen .welcome-rule small {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .welcome-screen .role-choice,
+:root[data-theme="light"] .welcome-screen .glass-card,
+:root[data-theme="light"] .mini-app-shell .glass-card,
+:root[data-theme="light"] .mini-app-shell .metric-card,
+:root[data-theme="light"] .mini-app-shell .list-card,
+:root[data-theme="light"] .mini-app-shell .quick-grid button,
+:root[data-theme="light"] .mini-app-shell .payment-account,
+:root[data-theme="light"] .mini-platform-shell .panel,
+:root[data-theme="light"] .mini-platform-shell .job-platform-card,
+:root[data-theme="light"] .mini-platform-shell .contract-table,
+:root[data-theme="light"] .mini-platform-shell .profile-wallet-card,
+:root[data-theme="light"] .glass-card {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+}
+
+:root[data-theme="light"] .welcome-screen .role-choice:hover {
+  background: #f1f5f9 !important;
+  border-color: #16a34a !important;
+}
+
+:root[data-theme="light"] .welcome-screen .role-choice small,
+:root[data-theme="light"] .mini-app-shell .metric-card span,
+:root[data-theme="light"] .mini-app-shell .metric-card small,
+:root[data-theme="light"] .mini-app-shell .empty-state,
+:root[data-theme="light"] .mini-app-shell .list-card small,
+:root[data-theme="light"] .mini-platform-shell .table-row span,
+:root[data-theme="light"] .mini-platform-shell .empty-state {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .welcome-screen .role-choice b,
+:root[data-theme="light"] .welcome-screen .role-icon,
+:root[data-theme="light"] .mini-app-shell .quick-grid span,
+:root[data-theme="light"] .mini-app-shell .list-icon,
+:root[data-theme="light"] .mini-platform-shell .nav-icon,
+:root[data-theme="light"] .mini-platform-shell .list-icon {
+  color: #16a34a !important;
+}
+
+:root[data-theme="light"] .welcome-screen .role-icon {
+  background: transparent !important;
+}
+
+:root[data-theme="light"] .welcome-screen input,
+:root[data-theme="light"] .welcome-screen textarea,
+:root[data-theme="light"] .welcome-screen select,
+:root[data-theme="light"] .mini-app-shell input,
+:root[data-theme="light"] .mini-app-shell textarea,
+:root[data-theme="light"] .mini-app-shell select,
+:root[data-theme="light"] .mini-platform-shell input,
+:root[data-theme="light"] .mini-platform-shell textarea,
+:root[data-theme="light"] .mini-platform-shell select {
+  background: #ffffff !important;
+  border: 1px solid #f7faf9 !important;
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .welcome-screen input::placeholder,
+:root[data-theme="light"] .mini-app-shell input::placeholder,
+:root[data-theme="light"] .mini-platform-shell input::placeholder {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .mini-app-shell .bottom-nav,
+:root[data-theme="light"] .mini-platform-shell .platform-mobile-nav {
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: #e2e8f0 !important;
+}
+
+:root[data-theme="light"] .mini-app-shell .bottom-nav button,
+:root[data-theme="light"] .mini-platform-shell .platform-mobile-nav button {
+  color: #0f172a !important;
+}
+
+:root[data-theme="light"] .mini-app-shell .bottom-nav button.active,
+:root[data-theme="light"] .mini-platform-shell .platform-mobile-nav button.active {
+  background: #16a34a !important;
+  color: #ffffff !important;
+}
+
+:root[data-theme="light"] .welcome-screen .btn-primary,
+:root[data-theme="light"] .mini-app-shell .hero-action,
+:root[data-theme="light"] .mini-platform-shell .btn-primary {
+  background: #16a34a !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+}
+
+:root[data-theme="light"] .text-button {
+  color: #16a34a !important;
+}
+
+:root[data-theme="light"] .auth-error {
+  background: #fef2f2 !important;
+  border: 1px solid #fecaca !important;
+  color: #991b1b !important;
+}
+
+:root[data-theme="light"] .auth-error strong {
+  color: #7f1d1d !important;
+}
+
+:root[data-theme="light"] .auth-error span {
+  color: #991b1b !important;
+}
+
+/* ==========================================================================
+   3. UNIVERSAL CONTROLS & UTILITIES
+   ========================================================================== */
+.welcome-topbar {
+  width: 100%;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 10;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card h2 {
-  margin: 4px 0;
-  color: #d8f36b !important;
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border-subtle, #384b55);
+  background: var(--color-bg-elevated, #121c23);
+  color: var(--color-text, #f7faf9);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-:root[data-theme="dark"] .mini-platform-shell .profile-wallet-card p:last-child {
-  color: #9aacb1 !important;
+.theme-toggle-btn:hover {
+  transform: scale(1.05);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle, #384b55);
+  background: var(--color-bg-elevated, #121c23);
+  color: var(--color-text, #f7faf9);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.back-btn:hover {
+  background: var(--color-bg-hover, #1e3038);
 }

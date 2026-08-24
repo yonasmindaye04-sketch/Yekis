@@ -4,7 +4,37 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Changed
+- **Sign In UI**:
+  - Redesigned social sign-in buttons to use a cleaner, horizontally aligned circular icon layout (Google, Apple, Facebook).
+  - Fixed a CSS grid inheritance issue that was squishing the Terms of Service checkbox layout on the registration form.
+  - Restructured the auth panel for a cleaner, simpler layout by moving the Social Sign-in buttons below the main form.
+  - Simplified the Terms and Privacy Policy acceptance text on the registration form.
+  - Added a "View Password" toggle to the password input box for better user experience.
+  - Improved visibility of the "Back to Yekis" button in light mode by using theme-aware CSS variables instead of hardcoded colors.
+
 ### Added
+
+- **Multi-User Simulated Negotiations & Dispute End-to-End Test Suite** (`simulated-negotiations-and-disputes.test.ts`):
+  - Added comprehensive multi-user integration tests simulating full real-world marketplace lifecycles:
+    - **Multi-User Proposal Negotiation & Contract Flow**: Client posts job -> Multiple freelancers submit custom milestone proposals -> Competing proposal withdrawal -> Atomic proposal acceptance -> Synchronous PDF contract generation -> Dual digital e-signatures -> Wallet-first escrow funding -> Milestone delivery -> Work review & instant wallet release.
+    - **Dispute Flow A (Mutual Settlement)**: Milestone dispute -> Freelancer proposes partial split settlement -> Mismatched proposal rejection -> Client confirms matching split -> Atomic direct settlement and contract completion without mediator.
+    - **Dispute Flow B (Evidence & Staff Mediation)**: Dispute escalation -> Written evidence submission & bundle compilation -> Mediation queue appearance -> Atomic mediator claim (prevention of double-claiming) -> Mediator resolution with `RELEASE_TO_FREELANCER`.
+    - **Dispute Flow C (Arbitration Escalation & Award)**: Rejection of mediation -> Escalation to `STAGE_4_ARBITRATION` -> Official AACCSA arbitration award application (`applyArbitrationAward`) with reference tracking -> Client refund and wallet balance credit.
+  - Fixed `applyArbitrationAward` in `dispute.service.ts` to return the updated dispute model with `awardReferenceNumber`.
+  - Added frontend `api` client test coverage for proposal decisions, withdrawals, milestone delivery, and multi-stage disputes.
+
+- **Unified Schema Migration & Synchronization** (`20260821215600_add_profile_reviews_chat_platform_models`):
+  - Synchronized database with complete `schema.prisma` definitions covering `Review`, `PortfolioItem`, `FeaturedLog`, `ProfileReport`, `ProfileView`, `UserSkill`, `Skill`, `CounterOffer`, `DirectThread`, `DirectMessage`, `PlatformOperatingMetrics`, `StaffActionAudit`, `PasswordResetToken`, and `WithholdingRemittanceReport`.
+  - Re-generated Prisma Client and verified end-to-end database seeding (`db:seed`).
+  - Added `PasswordResetToken` and `notificationSettings` relations to `User`.
+
+- **Comprehensive TypeScript Strict Build Resolution** (`apps/backend` & `apps/frontend`):
+  - Fixed dispute service duplication and streamlined dispute stages/settlement workflows.
+  - Aligned all dispute, escrow, profile, reviews, and featured modules with updated schema relations and strict Pino logger signatures (`logger.error({ err }, message)`).
+  - Fixed Telebirr payment and signing clients for non-null parameter indexing.
+  - Aligned Telegram Bot handlers, scene builders, formatters, and middleware with grammy and conversations types.
+  - Safely guarded `window.localStorage` in frontend API client for SSR and Node test environments.
 
 - **Wallet-first escrow funding** (`escrow.service.ts`, `contracts.service.ts`):
   - Added `fundMilestoneFromWallet()` — deducts milestone charge atomically from client wallet balance and sets milestone to `ESCROW_HELD` in a single Prisma transaction.

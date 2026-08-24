@@ -113,6 +113,8 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260807120000_disputes_per_milestone` | Replace contract-wide dispute uniqueness with unique milestone disputes and contract index |
 | `20260807123000_periodic_review_access` | Add/index `periodicReviewPending` so periodic review does not revoke verified access |
 | `20260807130000_one_pending_funding` | Add partial unique index for one pending funding attempt per milestone |
+| `20260809150000_add_chat_with_staff_assignment` | Staff support assignment and scoped chat management |
+| `20260821215600_add_profile_reviews_chat_platform_models` | Profile items, reviews, user skills, counter offers, direct messaging, platform metrics, and password reset tokens |
 
 Do not edit an applied migration. Change `schema.prisma`, create a new migration, review its SQL, then regenerate the Prisma client.
 

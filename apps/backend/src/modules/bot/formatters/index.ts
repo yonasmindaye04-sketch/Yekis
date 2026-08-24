@@ -210,3 +210,18 @@ export function formatNotification(event: string, data: any, ctx: BotContext): s
 function escapeMd(text: string): string {
  return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
 }
+
+export function formatKycQueueItem(item: any, ctx: BotContext): string {
+  const locale = ctx.i18n?.locale || "en";
+  return `*KYC Record*: ${escapeMd(item.id)}\nUser: ${escapeMd(item.user?.email || item.user?.phone || item.userId)}\nTier: ${item.tier}\nStatus: ${item.status}`;
+}
+
+export function formatTopupQueueItem(item: any, ctx: BotContext): string {
+  const locale = ctx.i18n?.locale || "en";
+  return `*Top-up*: ${escapeMd(item.id)}\nUser: ${escapeMd(item.user?.email || item.userId)}\nAmount: ${(item.amountMinor / 100).toLocaleString(locale)} ETB\nProvider: ${item.provider}`;
+}
+
+export function formatDisputeQueueItem(item: any, ctx: BotContext): string {
+  return `*Dispute*: ${escapeMd(item.id)}\nContract: ${escapeMd(item.contractId)}\nStage: ${item.stage}\nCategory: ${item.category}`;
+}
+

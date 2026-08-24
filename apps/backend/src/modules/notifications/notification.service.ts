@@ -25,12 +25,34 @@ const CRITICAL_NOTIFICATION_TYPES = new Set([
   "auto-release-warning",
 ]);
 
+import { sendPlatformMovementEmail } from "../../lib/email/email.service.js";
+
+function formatNotificationTitle(type: string): string {
+  switch (type) {
+    case "escrow-funded":
+      return "Escrow Milestone Funded";
+    case "escrow-released":
+      return "Payment Released to Wallet";
+    case "milestone-submitted":
+      return "Milestone Work Delivered";
+    case "dispute-raised":
+      return "Dispute Opened on Milestone";
+    case "dispute-resolved":
+      return "Dispute Resolution Reached";
+    case "auto-release-warning":
+      return "Escrow Review Window Reminder";
+    case "kyc-verified":
+      return "Identity Verification Approved";
+    default:
+      return "Account Movement Update";
+  }
+}
+
 /**
  * The single entry point the BullMQ worker calls for every job on the
  * "notifications" queue — persists the in-app record, then fans out to
- * SMS (if critical) and Telegram (always attempted; currently a no-op stub)
- * without letting either delivery channel's failure block the other or
- * the in-app record itself.
+ * SMS (if critical), Email, and Telegram without letting any single
+ * delivery channel's failure block the others or the in-app record itself.
  */
 export async function processNotification(params: {
   userId: string;
@@ -58,9 +80,18 @@ export async function processNotification(params: {
   const results = await Promise.allSettled([
     isCritical ? sendSms({ phone: user.phone, message: params.message }) : Promise.resolve({ sent: false }),
     sendTelegramPush({ userId: params.userId, message: params.message }),
+    user.email && !user.email.endsWith("@yekis.local")
+      ? sendPlatformMovementEmail({
+          email: user.email,
+          recipientName: user.displayName || user.firstName || undefined,
+          title: formatNotificationTitle(params.type),
+          message: params.message,
+          eventType: params.type,
+        })
+      : Promise.resolve({ success: true }),
   ]);
 
-  if (isCritical && results[0].status === "fulfilled" && results[0].value.sent) {
+  if (isCritical && results[0].status === "fulfilled" && (results[0].value as { sent?: boolean })?.sent) {
     await prisma.notification.update({ where: { id: notification.id }, data: { smsSentAt: new Date() } });
   }
 

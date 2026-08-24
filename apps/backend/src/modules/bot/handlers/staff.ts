@@ -23,65 +23,65 @@ export function registerStaffHandlers(bot: Bot<BotContext>) {
 
  // KYC Queue
  bot.callbackQuery(/^staff:kyc_queue:(\d+)$/, async (ctx) => {
- const page = parseInt(ctx.match[1], 10);
+ const page = parseInt(ctx.match[1]!, 10);
  await showKycQueue(ctx, page);
  await ctx.answerCallbackQuery();
  });
 
  bot.callbackQuery(/^staff:kyc:approve:(\w+)$/, async (ctx) => {
- const kycId = ctx.match[1];
+ const kycId = ctx.match[1]!;
  await handleKycAction(ctx, kycId, "VERIFIED", "KYC approved");
  await ctx.answerCallbackQuery({ text: " Approved" });
  });
 
  bot.callbackQuery(/^staff:kyc:reject:(\w+)$/, async (ctx) => {
- const kycId = ctx.match[1];
+ const kycId = ctx.match[1]!;
  startScene(ctx, "staff_kyc_reject", { kycId });
  await ctx.editMessageText("Enter rejection reason:");
  await ctx.answerCallbackQuery();
  });
 
- bot.callbackQuery(/^staff:kyc:flag:(\w+)$/, async (ctx) => {
- const kycId = ctx.match[1];
- await handleKycAction(ctx, kycId, "FLAGGED", "KYC flagged for review");
- await ctx.answerCallbackQuery({ text: " Flagged" });
- });
+  bot.callbackQuery(/^staff:kyc:flag:(\w+)$/, async (ctx) => {
+  const kycId = ctx.match[1]!;
+  await handleKycAction(ctx, kycId, "UNDER_REVIEW", "KYC flagged for review");
+  await ctx.answerCallbackQuery({ text: " Flagged" });
+  });
 
  // TopUp Queue
  bot.callbackQuery(/^staff:topup_queue:(\d+)$/, async (ctx) => {
- const page = parseInt(ctx.match[1], 10);
+ const page = parseInt(ctx.match[1]!, 10);
  await showTopupQueue(ctx, page);
  await ctx.answerCallbackQuery();
  });
 
  bot.callbackQuery(/^staff:topup:approve:(\w+)$/, async (ctx) => {
- const topupId = ctx.match[1];
+ const topupId = ctx.match[1]!;
  await handleTopupAction(ctx, topupId, "APPROVED");
  await ctx.answerCallbackQuery({ text: " Approved & credited" });
  });
 
  bot.callbackQuery(/^staff:topup:reject:(\w+)$/, async (ctx) => {
- const topupId = ctx.match[1];
+ const topupId = ctx.match[1]!;
  startScene(ctx, "staff_topup_reject", { topupId });
  await ctx.editMessageText("Enter rejection reason:");
  await ctx.answerCallbackQuery();
  });
 
  bot.callbackQuery(/^staff:topup:flag:(\w+)$/, async (ctx) => {
- const topupId = ctx.match[1];
+ const topupId = ctx.match[1]!;
  await handleTopupAction(ctx, topupId, "FLAGGED");
  await ctx.answerCallbackQuery({ text: " Flagged" });
  });
 
  // Dispute Queue
  bot.callbackQuery(/^staff:dispute_queue:(\d+)$/, async (ctx) => {
- const page = parseInt(ctx.match[1], 10);
+ const page = parseInt(ctx.match[1]!, 10);
  await showDisputeQueue(ctx, page);
  await ctx.answerCallbackQuery();
  });
 
  bot.callbackQuery(/^staff:dispute:mediate:(\w+)$/, async (ctx) => {
- const disputeId = ctx.match[1];
+ const disputeId = ctx.match[1]!;
  startScene(ctx, "staff_mediation", { disputeId });
  await showMediationView(ctx, disputeId);
  await ctx.answerCallbackQuery();
@@ -89,19 +89,19 @@ export function registerStaffHandlers(bot: Bot<BotContext>) {
 
  // TMS Queue
  bot.callbackQuery(/^staff:tms_queue:(\d+)$/, async (ctx) => {
- const page = parseInt(ctx.match[1], 10);
+ const page = parseInt(ctx.match[1]!, 10);
  await showTmsQueue(ctx, page);
  await ctx.answerCallbackQuery();
  });
 
  bot.callbackQuery(/^staff:tms:dismiss:(\w+)$/, async (ctx) => {
- const flagId = ctx.match[1];
+ const flagId = ctx.match[1]!;
  await handleTmsAction(ctx, flagId, "DISMISSED");
  await ctx.answerCallbackQuery({ text: " Dismissed" });
  });
 
  bot.callbackQuery(/^staff:tms:str:(\w+)$/, async (ctx) => {
- const flagId = ctx.match[1];
+ const flagId = ctx.match[1]!;
  startScene(ctx, "staff_tms_str", { flagId });
  await ctx.editMessageText("Enter STR reference number:");
  await ctx.answerCallbackQuery();
@@ -221,11 +221,11 @@ async function showKycQueue(ctx: CallbackQueryContext<BotContext>, page: number)
  }
 }
 
-async function handleKycAction(ctx: CallbackQueryContext<BotContext>, kycId: string, status: "VERIFIED" | "FLAGGED", auditEvent: string) {
- await prisma.kycRecord.update({
- where: { id: kycId },
- data: { status, reviewedByStaffId: ctx.session.userId },
- });
+async function handleKycAction(ctx: CallbackQueryContext<BotContext>, kycId: string, status: "VERIFIED" | "REJECTED" | "UNDER_REVIEW", auditEvent: string) {
+  await prisma.kycRecord.update({
+    where: { id: kycId },
+    data: { status, reviewedByStaffId: ctx.session.userId },
+  });
 
  const kyc = await prisma.kycRecord.findUnique({
  where: { id: kycId },

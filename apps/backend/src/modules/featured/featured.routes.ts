@@ -14,7 +14,7 @@ featuredRouter.get("/", async (req, res) => {
     const featured = await getFeaturedTalent();
     res.json(featured);
   } catch (error) {
-    logger.error("GET /featured error", error);
+    logger.error({ err: error }, "GET /featured error");
     res.status(500).json({ error: "Failed to fetch featured talent" });
   }
 });
@@ -31,7 +31,7 @@ featuredRouter.post("/staff/pin", requireAuth, requireStaffRole("ADMIN", "COMPLI
     await pinUser(req.user.id, data.userId, data.category, data.notes);
     res.json({ message: "User pinned successfully" });
   } catch (error) {
-    logger.error("POST /featured/staff/pin error", error);
+    logger.error({ err: error }, "POST /featured/staff/pin error");
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }
@@ -44,7 +44,7 @@ featuredRouter.post("/staff/refresh", requireAuth, requireStaffRole("ADMIN"), as
     await refreshFeaturedCarousel();
     res.json({ message: "Featured carousel refreshed successfully" });
   } catch (error) {
-    logger.error("POST /featured/staff/refresh error", error);
+    logger.error({ err: error }, "POST /featured/staff/refresh error");
     res.status(500).json({ error: "Failed to refresh featured carousel" });
   }
 });

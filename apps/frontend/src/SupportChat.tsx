@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Paperclip, Send, Smile } from "lucide-react";
 import { api, type ChatMessage } from "./api/client";
+import "./SupportChat.css";
 
 
 // === MAIN COMPONENT ===

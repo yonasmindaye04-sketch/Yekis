@@ -33,10 +33,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid var(--color-border)' }}>
-                    <th style={{ padding: '16px', color: '#fff' }}>Feature</th>
+                    <th style={{ padding: '16px', color: 'var(--color-text)' }}>Feature</th>
                     <th style={{ padding: '16px', color: 'var(--color-primary)' }}>Yekis</th>
-                    <th style={{ padding: '16px', color: '#fff' }}>Informal Trust</th>
-                    <th style={{ padding: '16px', color: '#fff' }}>Hiring a Lawyer</th>
+                    <th style={{ padding: '16px', color: 'var(--color-text)' }}>Informal Trust</th>
+                    <th style={{ padding: '16px', color: 'var(--color-text)' }}>Hiring a Lawyer</th>
                   </tr>
                 </thead>
                 <tbody>

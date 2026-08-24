@@ -1,18 +1,25 @@
 // Consent-aware GA4 analytics for Yekis marketing site
 // Only loads gtag.js AFTER user consents to analytics cookies
 
-const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX'; // TODO: Replace with real GA4 ID
+// Set VITE_GA_MEASUREMENT_ID in apps/frontend/.env (e.g. G-ABCDEF1234).
+// Without it, analytics stays disabled - no placeholder ID is ever loaded.
+const GA_MEASUREMENT_ID = (import.meta.env.VITE_GA_MEASUREMENT_ID as string | undefined) ?? "";
+
+export function isAnalyticsConfigured(): boolean {
+  return GA_MEASUREMENT_ID.startsWith("G-");
+}
 
 let initialized = false;
 
 export function initAnalytics(): void {
   if (initialized) return;
   if (typeof window === 'undefined') return;
-  
+  if (!isAnalyticsConfigured()) return;
+
   // Check if user has consented to analytics
   const consent = localStorage.getItem('yekis_consent');
   if (!consent) return;
-  
+
   try {
     const parsed = JSON.parse(consent);
     if (!parsed.analytics) return;
@@ -26,17 +33,19 @@ export function initAnalytics(): void {
   script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
   document.head.appendChild(script);
   
-  // Initialize gtag
+  // Initialize gtag - MUST be assigned to window: GA's script replaces the
+  // dataLayer push target, and trackEvent() relies on window.gtag existing.
   (window as any).dataLayer = (window as any).dataLayer || [];
-  function gtag(...args: any[]) {
+  const gtag = (...args: unknown[]) => {
     (window as any).dataLayer.push(args);
-  }
+  };
+  (window as any).gtag = gtag;
   gtag('js', new Date());
   gtag('config', GA_MEASUREMENT_ID, {
-    send_page_view: true,
+    send_page_view: false, // SPA - page views tracked explicitly on navigation
     cookie_flags: 'SameSite=None;Secure',
   });
-  
+
   initialized = true;
 }
 

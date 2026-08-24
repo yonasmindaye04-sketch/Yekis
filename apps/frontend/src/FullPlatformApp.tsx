@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { api, type Job, type MeResponse, type Milestone, type TopUpRequest, type WalletResponse } from "./api/client";
 import { LandingPage } from "./LandingPage";
@@ -12,7 +12,8 @@ import { ContractsWorkspace, DisputesWorkspace, JobsWorkspace } from "./Workflow
 import {
   LayoutDashboard, Briefcase, Search, FileText, Wallet, MessageCircle,
   ShieldCheck, Scale, Settings, ChevronDown, Plus,
-  LogOut, ArrowLeft, User as UserIcon, Edit
+  LogOut, ArrowLeft, User as UserIcon, Edit, Sun, Moon,
+  Eye, EyeOff
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -28,7 +29,13 @@ import { CaseStudiesPage } from "./CaseStudiesPage";
 import { CookieBanner } from "./CookieBanner";
 import { MobileCTA } from "./MobileCTA";
 import { MarketingHeader } from "./MarketingHeader";
+import { MarketingFooter } from "./MarketingFooter";
+import { useTheme } from "./theme/ThemeContext";
 import "./marketing.css";
+import { PageLoadSplash, ScrollEffects } from "./components/motion";
+import { initAnalytics, events } from "./analytics";
+import { SocialSignInButtons } from "./components/SocialSignInButtons";
+import "./components/scroll.css";
 
 
 // === INTERFACES & TYPES ===
@@ -67,19 +74,22 @@ const navIconMap: Record<string, React.ReactNode> = {
 };
 
 export function FullPlatformApp() {
+  const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [showLanding, setShowLanding] = useState(true);
   const [user, setUser] = useState<MeResponse | null>(null);
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("+251");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<"CLIENT" | "FREELANCER">("CLIENT");
   const [dateOfBirth, setDateOfBirth] = useState("2000-01-01");
   const [resetToken, setResetToken] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
-  const [viewUserId] = useState<string | null>(null);
+  const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -94,6 +104,31 @@ export function FullPlatformApp() {
   const [jobDeadline, setJobDeadline] = useState("");
 
 
+  useEffect(() => {
+    // Auto-resume active session on visit without prompting to re-register
+    const token = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
+    if (token) {
+      loadWorkspace()
+        .then(() => {
+          setShowLanding(false);
+        })
+        .catch(() => {
+          api.clearToken();
+        });
+    }
+
+    // Deep link from the password-reset email: /reset-password?token=...
+    // Land the user directly on the reset form with the token prefilled.
+    if (window.location.pathname === "/reset-password") {
+      const urlToken = new URLSearchParams(window.location.search).get("token");
+      if (urlToken) {
+        setResetToken(urlToken);
+        setAuthMode("reset-password");
+        setShowLanding(false);
+      }
+    }
+  }, []);
+
   const loadWorkspace = async () => {
     const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] = await Promise.allSettled([
       api.getMe(), api.getWallet(), api.getJobs({ status: "OPEN" }), api.getMilestones(), api.getTopUpRequests(),
@@ -106,12 +141,12 @@ export function FullPlatformApp() {
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
   };
 
-  const submitAuth = async (event: FormEvent) => {
+const submitAuth = async (event: FormEvent) => {
     event.preventDefault(); setError(""); setSuccessMessage(""); setIsLoading(true);
     try {
       if (authMode === "forgot-password") {
         await api.requestPasswordReset(email);
-        setSuccessMessage("If an account exists, a reset token has been sent to your email (check terminal in dev).");
+        setSuccessMessage("If an account exists, a reset token has been sent to your email.");
         setAuthMode("reset-password");
         return;
       }
@@ -197,11 +232,19 @@ export function FullPlatformApp() {
       "thank-you-contact": "Message Sent — Yekis",
     };
     document.title = pageTitles[marketingPage] || pageTitles.home;
+    initAnalytics();
+    events.pageView(marketingPage);
 
     return (
       <>
         <MarketingHeader onNavigate={handleNavigate} onStart={handleStart} />
-        {marketingPage === "home" && <LandingPage onStart={handleStart} onNavigate={handleNavigate} />}
+        <ScrollEffects />
+        {marketingPage === "home" && (
+          <>
+            <PageLoadSplash />
+            <LandingPage onStart={handleStart} onNavigate={handleNavigate} />
+          </>
+        )}
         {marketingPage === "faq" && <FAQPage onNavigate={handleNavigate} onStart={handleStart} />}
         {marketingPage === "fees" && <FeesPage onNavigate={handleNavigate} onStart={handleStart} />}
         {marketingPage === "privacy" && <PrivacyPage onNavigate={handleNavigate} />}
@@ -212,6 +255,7 @@ export function FullPlatformApp() {
         {marketingPage === "thank-you-signup" && <ThankYouPage action="signup" onNavigate={handleNavigate} onStart={handleStart} />}
         {marketingPage === "thank-you-job-posted" && <ThankYouPage action="job-posted" onNavigate={handleNavigate} onStart={handleStart} />}
         {marketingPage === "thank-you-contact" && <ThankYouPage action="contact" onNavigate={handleNavigate} onStart={handleStart} />}
+        {marketingPage !== "home" && <MarketingFooter onNavigate={handleNavigate} />}
         <CookieBanner />
         <MobileCTA onStart={handleStart} />
       </>
@@ -221,9 +265,20 @@ export function FullPlatformApp() {
   if (!user) {
     return (
       <main className="platform-auth">
-        <button type="button" className="auth-back" onClick={() => { setShowLanding(true); setError(""); setSuccessMessage(""); }}>
-          <ArrowLeft size={17} /> Back to Yekis
-        </button>
+        <div style={{ position: "absolute", top: 20, left: 24, right: 24, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 10 }}>
+          <button type="button" className="auth-back" style={{ position: "static" }} onClick={() => { setShowLanding(true); setError(""); setSuccessMessage(""); }}>
+            <ArrowLeft size={17} /> Back to Yekis
+          </button>
+          <button
+            type="button"
+            className="theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+          >
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
+        </div>
         <div className="platform-auth-art">
           <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo" />
           <p className="eyebrow">Yekis jobs</p>
@@ -236,10 +291,10 @@ export function FullPlatformApp() {
           <div className="auth-panel-header">
             <div>
               <p className="eyebrow">
-                {authMode === "login" ? "Welcome back" : authMode === "forgot-password" ? "Recover account" : authMode === "reset-password" ? "Set new password" : "Create your workspace"}
+                {authMode === "login" ? "Welcome back" : authMode === "forgot-password" ? "Recover account" : authMode === "reset-password" ? "Set new password" : "Get started"}
               </p>
               <h2>
-                {authMode === "login" ? "Sign in to Yekis" : authMode === "forgot-password" ? "Forgot password" : authMode === "reset-password" ? "Reset password" : "Start with Yekis"}
+                {authMode === "login" ? "Sign in to Yekis" : authMode === "forgot-password" ? "Forgot password" : authMode === "reset-password" ? "Reset password" : "Create an account"}
               </h2>
             </div>
             <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
@@ -254,7 +309,7 @@ export function FullPlatformApp() {
             <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
           )}
           {authMode === "register" && (
-            <label>Ethiopian phone<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+251911223344" required /></label>
+            <label>Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+251911223344" required /></label>
           )}
           {authMode === "reset-password" && (
             <label>Reset token<input type="text" value={resetToken} onChange={(event) => setResetToken(event.target.value)} placeholder="Enter reset token" required /></label>
@@ -262,30 +317,59 @@ export function FullPlatformApp() {
           {(authMode === "login" || authMode === "register" || authMode === "reset-password") && (
             <label>
               {authMode === "reset-password" ? "New Password" : "Password"}
-              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" minLength={authMode === "register" || authMode === "reset-password" ? 10 : undefined} required />
+              <div style={{ position: "relative", marginTop: "6px" }}>
+                <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" minLength={authMode === "register" || authMode === "reset-password" ? 10 : undefined} required style={{ paddingRight: "40px", margin: 0 }} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-text-secondary)", display: "flex", alignItems: "center", justifyContent: "center" }} aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
             </label>
           )}
           {authMode === "register" && (
             <label>Date of birth<input type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} required /></label>
           )}
+          {authMode === "register" && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.82rem", color: "var(--color-text-secondary)", marginTop: 6 }}>
+              <input
+                id="termsCheck"
+                type="checkbox"
+                checked={termsAccepted}
+                onChange={(event) => setTermsAccepted(event.target.checked)}
+                required
+                style={{ accentColor: "var(--color-primary)", flexShrink: 0, margin: 0, width: "auto", cursor: "pointer" }}
+              />
+              <label htmlFor="termsCheck" style={{ margin: 0, cursor: "pointer", display: "inline" }}>
+                I agree to the{" "}
+                <a href="#" onClick={(e) => { e.preventDefault(); setShowLanding(true); setMarketingPage("terms" as MarketingPage); }} style={{ color: "var(--color-primary)" }}>Terms</a>
+                {" & "}
+                <a href="#" onClick={(e) => { e.preventDefault(); setShowLanding(true); setMarketingPage("privacy" as MarketingPage); }} style={{ color: "var(--color-primary)" }}>Privacy Policy</a>
+              </label>
+            </div>
+          )}
           {error && <div className="form-error">{error}</div>}
           {successMessage && (
-            <div className="form-success" style={{ padding: "12px", background: "#18272f", color: "#d8f36b", borderRadius: "8px", fontSize: "0.82rem", border: "1px solid #384b55" }}>
+            <div className="form-success" style={{ padding: "12px", background: "var(--color-primary-light)", color: "var(--color-primary)", borderRadius: "8px", fontSize: "0.82rem", border: "1px solid var(--color-primary)" }}>
               {successMessage}
             </div>
           )}
-          <button className="btn-primary wide" disabled={isLoading}>
+          <button className="btn-primary wide" disabled={isLoading || (authMode === "register" && !termsAccepted)}>
             {isLoading ? "Please wait..." : authMode === "login" ? "Sign in" : authMode === "forgot-password" ? "Request reset link" : authMode === "reset-password" ? "Set password" : "Create account"}
           </button>
           {authMode === "login" && (
-            <button type="button" className="auth-switch" onClick={() => { setAuthMode("forgot-password"); setError(""); setSuccessMessage(""); }} style={{ marginTop: "-8px", marginBottom: "8px" }}>
+            <button type="button" className="auth-switch" onClick={() => { setAuthMode("forgot-password"); setError(""); setSuccessMessage(""); }} style={{ marginTop: "-8px", marginBottom: "4px" }}>
               Forgot your password?
             </button>
+          )}
+          {(authMode === "login" || authMode === "register") && (
+            <SocialSignInButtons
+              onAuthed={() => {
+                void loadWorkspace().then(() => setShowLanding(false));
+              }}
+            />
           )}
           <button type="button" className="auth-switch" onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setError(""); setSuccessMessage(""); }}>
             {authMode === "login" ? "New to Yekis? Create an account" : "Already have an account? Sign in"}
           </button>
-          <p className="auth-footnote">Telegram users can use the Mini App for a faster passwordless entry.</p>
         </form>
       </main>
     );
@@ -324,7 +408,16 @@ export function FullPlatformApp() {
             <span className="eyebrow">{roleLabel(platformRole)} workspace</span>
             <h1>{view === "overview" ? "Good morning" : navItems.find((item) => item.view === view)?.label || "Settings"}</h1>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+            >
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
             <NotificationCenter />
             <button className="user-menu" onClick={logout}>
               <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
@@ -388,7 +481,7 @@ export function FullPlatformApp() {
                 )}
               </div>
             ) : (
-              <FeaturedCarousel />
+              <FeaturedCarousel onProfileClick={(id) => { setViewUserId(id); setView("profile"); }} />
             )}
 
             <div className="platform-metrics">

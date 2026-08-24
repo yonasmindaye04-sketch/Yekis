@@ -7,26 +7,26 @@
   --yekis-bg: #0b1116;
   --yekis-surface: #12181d;
   --yekis-card: #182026;
-  --yekis-border: transparent;
-  --yekis-border-hover: transparent;
-  --yekis-muted: #8a99a8;
-  --yekis-copy: #e2e8f0;
-  --yekis-lime: #d8f36b;
-  --yekis-teal: #77d9c5;
+  --yekis-border: #26343d;
+  --yekis-border-hover: #384b55;
+  --yekis-muted: #94a3b8;
+  --yekis-copy: #f8fafc;
+  --yekis-lime: #22c55e;
+  --yekis-teal: #14b8a6;
   --font-sans: "DM Sans", "Noto Sans Ethiopic", sans-serif;
   --font-heading: "Hanken Grotesk", sans-serif;
 }
 
 :root[data-theme="light"] {
-  --yekis-bg: #f9f6f0;
+  --yekis-bg: #f8fafc;
   --yekis-surface: #ffffff;
   --yekis-card: #ffffff;
-  --yekis-border: transparent;
-  --yekis-border-hover: transparent;
-  --yekis-muted: #5b6b64;
-  --yekis-copy: #2b3631;
-  --yekis-lime: #436a56;
-  --yekis-teal: #16a34a;
+  --yekis-border: #e2e8f0;
+  --yekis-border-hover: #cbd5e1;
+  --yekis-muted: #475569;
+  --yekis-copy: #0f172a;
+  --yekis-lime: #16a34a;
+  --yekis-teal: #0d9488;
 }
 
 /* Base Marketing Page Structure */
@@ -49,16 +49,9 @@
 .marketing-page h5,
 .marketing-page h6 {
   font-family: var(--font-heading);
-  color: #ffffff;
+  color: var(--color-text);
   font-weight: 700;
   letter-spacing: -0.02em;
-}
-
-:root[data-theme="light"] .marketing-page h1,
-:root[data-theme="light"] .marketing-page h2,
-:root[data-theme="light"] .marketing-page h3,
-:root[data-theme="light"] .marketing-page h4 {
-  color: #18181b;
 }
 
 /* AFRO-TECH Space System: Full-Bleed Container with 6% horizontal gutters */
@@ -183,9 +176,9 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: var(--yekis-lime);
-  color: #0b1116;
-  border: none;
+  background-color: var(--color-primary);
+  color: var(--color-primary-text);
+  border: 1px solid transparent;
   border-radius: 9px;
   padding: 12px 24px;
   font-weight: 700;
@@ -199,16 +192,6 @@
 .btn-primary:hover {
   opacity: 0.92;
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(216, 243, 107, 0.25);
-}
-
-:root[data-theme="light"] .btn-primary {
-  background-color: #436a56;
-  color: #ffffff;
-}
-
-:root[data-theme="light"] .btn-primary:hover {
-  box-shadow: 0 6px 20px rgba(67, 106, 86, 0.25);
 }
 
 .btn-secondary {
@@ -216,12 +199,12 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background-color: transparent;
-  color: var(--yekis-lime);
-  border: 1px solid var(--yekis-lime);
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
   border-radius: 9px;
   padding: 12px 24px;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.95rem;
   font-family: inherit;
   cursor: pointer;
@@ -230,17 +213,9 @@
 }
 
 .btn-secondary:hover {
-  background-color: rgba(216, 243, 107, 0.1);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
   transform: translateY(-1px);
-}
-
-:root[data-theme="light"] .btn-secondary {
-  color: #436a56;
-  border-color: #436a56;
-}
-
-:root[data-theme="light"] .btn-secondary:hover {
-  background-color: rgba(67, 106, 86, 0.08);
 }
 
 /* ==========================================================================
@@ -432,8 +407,8 @@
 }
 
 .placeholder-badge {
-  background: rgba(216, 243, 107, 0.1);
-  color: var(--yekis-lime);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 12px;
@@ -471,19 +446,32 @@
    ========================================================================== */
 
 .marketing-footer {
+  /* This element also carries .landing-footer (kept for MobileCTA's
+     visibility observer). Neutralize the old simple-footer flex layout
+     so the marketing grid stacks normally. */
+  display: block;
   margin-top: auto;
-  padding: 64px 0 32px;
+  padding: 36px 0 20px;
   border-top: 1px solid var(--yekis-border);
+}
+
+.marketing-footer > .marketing-container {
+  /* Undo `.landing-footer > div:last-child { display: flex }` which would
+     otherwise place .footer-grid and .footer-bottom side by side. */
+  display: block;
 }
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.5fr repeat(3, 1fr);
+  /* Cap brand stretch; give link columns equal, readable minimums so
+     headings align on a clean rhythm across the row. */
+  grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(150px, 1fr));
   gap: 40px;
+  align-items: start;
 }
 
 .footer-col h4 {
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   font-size: 1rem;
   font-weight: 700;
   color: #ffffff;
@@ -499,18 +487,21 @@
 }
 
 .footer-desc {
-  margin: 0 0 20px;
+  margin: 0 0 14px;
   color: var(--yekis-muted);
   font-size: 14px;
   line-height: 1.6;
 }
 
-.footer-social {
+.marketing-footer .footer-social {
   display: flex;
+  align-items: center;
   gap: 10px;
 }
 
-.footer-social a {
+/* Higher specificity than index.css `.landing-footer a` (border: 0) which
+   otherwise strips the icon boxes depending on bundle order. */
+.marketing-footer .footer-social a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -524,8 +515,9 @@
   transition: all 0.2s ease;
 }
 
-.footer-social a:hover {
-  color: #0b1116 !important;
+.marketing-footer .footer-social a:hover,
+.marketing-footer .footer-social a:focus-visible {
+  color: var(--yekis-bg) !important;
   background-color: var(--yekis-lime);
   border-color: var(--yekis-lime);
   transform: translateY(-2px);
@@ -557,22 +549,37 @@
 }
 
 .footer-bottom {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 48px;
-  padding-top: 24px;
-  border-top: 1px solid var(--yekis-border);
-  color: var(--yekis-muted);
-  font-size: 0.875rem;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 14px !important;
+  width: 100% !important;
+  margin-top: 26px !important;
+  padding-top: 16px !important;
+  border-top: 1px solid var(--yekis-border) !important;
+  color: var(--yekis-muted) !important;
+  font-size: 0.875rem !important;
+}
+
+.footer-bottom-left {
+  display: flex !important;
+  align-items: center !important;
+  gap: 24px !important;
+  flex-wrap: wrap !important;
 }
 
 .footer-escrow-note {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  color: var(--yekis-lime) !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+:root[data-theme="light"] .footer-escrow-note {
+  color: #16a34a !important;
 }
 
 .footer-lang-toggle {

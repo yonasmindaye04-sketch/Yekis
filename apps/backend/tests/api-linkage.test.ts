@@ -65,4 +65,31 @@ describe("frontend journey API linkage", () => {
       "/api/v1/escrow/wallet/withdraw",
     ]);
   });
+
+  it("links proposal negotiations, milestone delivery, and dispute stages to their live routes", async () => {
+    await api.decideProposal("prop-1", "ACCEPTED");
+    await api.withdrawProposal("prop-2");
+    await api.fundMilestoneFromWallet("ms-1");
+    await api.submitMilestone("ms-1");
+    await api.acceptMilestone("ms-1");
+    await api.escalateDispute("disp-1");
+    await api.submitDisputeEvidence("disp-1", "Detailed delivery proof and logs");
+    await api.escalateDisputeToArbitration("disp-1");
+    await api.resolveDispute("disp-1", {
+      outcome: "RELEASE_TO_FREELANCER",
+      recommendation: "Evidence confirmed delivery",
+    });
+
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      "/api/v1/jobs/proposals/prop-1/decision",
+      "/api/v1/jobs/proposals/prop-2/withdraw",
+      "/api/v1/escrow/fund-from-wallet",
+      "/api/v1/escrow/milestones/ms-1/submit",
+      "/api/v1/escrow/milestones/ms-1/accept",
+      "/api/v1/disputes/disp-1/escalate",
+      "/api/v1/disputes/disp-1/evidence",
+      "/api/v1/disputes/disp-1/arbitration",
+      "/api/v1/disputes/disp-1/resolve",
+    ]);
+  });
 });

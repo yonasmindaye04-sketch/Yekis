@@ -106,8 +106,12 @@ export const RegisterInput = z.object({
 export type RegisterInput = z.infer<typeof RegisterInput>;
 
 export const LoginInput = z.object({
-  email: z.string().email(),
-  password: z.string(),
+  email: z.string().optional(),
+  phone: z.string().optional(),
+  identifier: z.string().optional(),
+  password: z.string().min(1, "Password is required"),
+}).refine((data) => Boolean(data.email || data.phone || data.identifier), {
+  message: "Email or phone number is required.",
 });
 export type LoginInput = z.infer<typeof LoginInput>;
 

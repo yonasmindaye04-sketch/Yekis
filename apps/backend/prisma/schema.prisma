@@ -50,6 +50,9 @@ enum ContractStatus {
   ACTIVE
   COMPLETED
   TERMINATED
+  // Client exercised the statutory 7-day cooling-off cancellation right
+  // (Electronic Transactions Proclamation No. 1205/2020) before any work started.
+  CANCELLED
 }
 
 enum EscrowState {
@@ -174,7 +177,9 @@ model User {
   role                  UserRole
   languagePreference    String    @default("en")
   timezone              String    @default("Africa/Addis_Ababa") @db.VarChar(60)
-  dateOfBirth           DateTime
+  // Nullable: Telegram/guest-chat signups have no verified DOB yet; fabricating
+// one corrupted KYC data (AML integrity). Real DOB arrives via Tier-2 Fayda.
+dateOfBirth           DateTime?
   faydaBiometricId      String?   @unique // set once Fayda verification succeeds — used for dedup
   isSuspended           Boolean   @default(false)
   staffRole             StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
@@ -205,6 +210,12 @@ model User {
   ratingBayesianScore   Float?    @default(0) // used for sorting
   lastFeaturedAt        DateTime? // when they were last in carousel
   profileViewCount      Int       @default(0)
+
+  // --- OAUTH PROVIDERS (social sign-in) ---
+  emailVerified         Boolean   @default(false)
+  googleId              String?   @unique
+  appleId               String?   @unique
+  facebookId            String?   @unique
 
   // --- TELEGRAM ---
   telegramUserId        BigInt?   @unique
@@ -242,6 +253,8 @@ model User {
   reviewsGiven          Review[]  @relation("ReviewAuthor")
   featuredLogs          FeaturedLog[]
   profileReports        ProfileReport[] @relation("ReportedUser")
+  passwordResetTokens   PasswordResetToken[]
+  notificationSettings  Json?
 
   @@index([faydaBiometricId])
 }
@@ -338,6 +351,7 @@ model Job {
   directThreads DirectThread[]
 
   @@index([category, status])
+  @@index([clientId])
 }
 
 model Proposal {
@@ -389,6 +403,10 @@ model Contract {
   milestones     Milestone[]
   dispute        Dispute?
   review         Review?
+
+  @@index([clientId])
+  @@index([freelancerId])
+  @@index([status])
 }
 
 model Milestone {
@@ -426,6 +444,8 @@ model PaymentTransaction {
   createdAt          DateTime        @default(now())
 
   @@index([milestoneId])
+  // Reconciliation sweep query: provider + status + createdAt window
+  @@index([provider, status, createdAt])
 }
 
 model Wallet {
@@ -511,6 +531,9 @@ model Dispute {
   updatedAt           DateTime                  @updatedAt
 
   evidence            DisputeEvidence[]
+
+  @@index([milestoneId])
+  @@index([stage])
 }
 
 model DisputeEvidence {
@@ -900,4 +923,16 @@ model WithholdingRemittanceReport {
   updatedAt          DateTime @updatedAt
 
   @@index([periodMonth])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

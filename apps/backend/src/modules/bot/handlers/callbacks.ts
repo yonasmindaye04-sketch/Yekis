@@ -73,7 +73,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
  });
 
  bot.callbackQuery(/^jobs:page:(\d+)$/, async (ctx) => {
- const page = parseInt(ctx.match[1], 10);
+ const page = parseInt(ctx.match[1]!, 10);
  // TODO: Fetch and display jobs for this page
  await ctx.answerCallbackQuery({ text: `Page ${page + 1}` });
  });
@@ -186,8 +186,24 @@ export function registerCallbacks(bot: Bot<BotContext>) {
  });
 
  // Settings callbacks
+ bot.callbackQuery(/^settings:lang:(en|am)$/, async (ctx) => {
+ const lang = ctx.match[1] as "en" | "am";
+ await ctx.i18n.setLocale(lang);
+ ctx.session.language = lang;
+ if (ctx.session.userId) {
+ await prisma.user.update({
+ where: { id: ctx.session.userId },
+ data: { languagePreference: lang },
+ });
+ }
+ await ctx.editMessageText(ctx.t("settings_language_updated"), {
+ reply_markup: settingsKeyboard(ctx),
+ });
+ await ctx.answerCallbackQuery({ text: lang === "am" ? "ቋንቋ ተቀይሯል" : "Language updated" });
+ });
+
  bot.callbackQuery("settings:language", async (ctx) => {
- await ctx.editMessageText(ctx.t("choose_language"), {
+ await ctx.editMessageText(ctx.t("settings_choose_language"), {
  reply_markup: languageKeyboard(),
  });
  await ctx.answerCallbackQuery();
@@ -201,10 +217,11 @@ export function registerCallbacks(bot: Bot<BotContext>) {
  });
 
  bot.callbackQuery(/^settings:notif:(\w+):(on|off)$/, async (ctx) => {
- const key = ctx.match[1];
+ const key = ctx.match[1] as keyof NonNullable<typeof ctx.session.notificationSettings>;
  const value = ctx.match[2] === "on";
+ const current = ctx.session.notificationSettings || { jobs: true, proposals: true, escrow: true, disputes: true, wallet: true, kyc: true };
  ctx.session.notificationSettings = {
- ...ctx.session.notificationSettings,
+ ...current,
  [key]: value,
  };
  await ctx.editMessageText(ctx.t("settings_notifications"), {
@@ -257,7 +274,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
 
  // KYC callbacks
  bot.callbackQuery(/^kyc:upload:(id|selfie|tin|business)$/, async (ctx) => {
- const docType = ctx.match[1];
+ const docType = ctx.match[1]!;
  startScene(ctx, `kyc_upload_${docType}`);
  const prompts: Record<string, string> = {
  id: ctx.t("kyc_upload_id"),
@@ -265,7 +282,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
  tin: ctx.t("kyc_upload_tin"),
  business: ctx.t("kyc_upload_business_reg"),
  };
- await ctx.editMessageText(prompts[docType], {
+ await ctx.editMessageText(prompts[docType]!, {
  reply_markup: confirmKeyboard(ctx, "kyc:confirm_upload", "menu:kyc"),
  });
  await ctx.answerCallbackQuery();

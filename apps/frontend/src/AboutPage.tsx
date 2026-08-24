@@ -17,7 +17,7 @@ export function AboutPage({ onNavigate, onStart: _onStart }: AboutPageProps) {
           
           <div className="glass-panel" style={{ marginTop: '40px' }}>
             <h2>Our Mission</h2>
-            <p style={{ fontSize: '20px', color: 'var(--color-teal)', fontStyle: 'italic', margin: '20px 0' }}>
+            <p style={{ fontSize: '20px', color: 'var(--color-primary)', fontStyle: 'italic', margin: '20px 0' }}>
               "Yekis exists to give Ethiopian freelancers and their clients a workspace where good work can happen without needing informal trust or a lawyer."
             </p>
             

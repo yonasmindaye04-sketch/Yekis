@@ -15,6 +15,15 @@ import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { loginWithTelegram, TelegramAuthError, TelegramNotConfiguredError } from "./telegram.service.js";
+import {
+  verifyGoogleIdToken,
+  verifyAppleIdToken,
+  verifyFacebookAccessToken,
+  loginWithOAuthProfile,
+  OAuthNotConfiguredError,
+  OAuthVerificationError,
+  getOAuthProviderAvailability,
+} from "./oauth.service.js";
 import { z } from "zod";
 
 export const authRouter = Router();
@@ -69,6 +78,93 @@ authRouter.post("/telegram", async (req, res) => {
     if (err instanceof TelegramNotConfiguredError) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED", message: err.message });
     if (err instanceof TelegramAuthError) return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
     logger.error({ err }, "Unexpected error during Telegram login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+// NOTE: A previous "/google" endpoint accepted a bare email and issued full
+// JWTs without verifying any Google credential — an authentication bypass.
+// It was removed. Reintroduce Google sign-in ONLY behind real ID-token
+// verification (e.g. google-auth-library verifying the id_token against
+// Google's JWKS), never on client-supplied profile fields.
+
+// ---------- Social sign-in (real provider verification) ----------
+// Each endpoint takes the provider-issued credential and verifies it
+// server-side before any account access. Unconfigured providers return
+// 503 NOT_CONFIGURED - there is deliberately no unverified fallback.
+
+authRouter.get("/oauth/providers", (_req, res) => {
+  return res.json(getOAuthProviderAvailability());
+});
+
+authRouter.post("/oauth/google", async (req, res) => {
+  const parsed = z.object({ idToken: z.string().min(20) }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  }
+  try {
+    const profile = await verifyGoogleIdToken(parsed.data.idToken);
+    const result = await loginWithOAuthProfile(profile);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof OAuthNotConfiguredError) {
+      return res.status(503).json({ error: "NOT_CONFIGURED", message: err.message });
+    }
+    if (err instanceof OAuthVerificationError) {
+      return res.status(401).json({ error: "OAUTH_VERIFICATION_FAILED", message: err.message });
+    }
+    logger.error({ err }, "Unexpected error during Google OAuth login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/oauth/apple", async (req, res) => {
+  const parsed = z
+    .object({
+      idToken: z.string().min(20),
+      firstName: z.string().optional(),
+      lastName: z.string().optional(),
+    })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  }
+  try {
+    const profile = await verifyAppleIdToken(parsed.data.idToken);
+    if (parsed.data.firstName) {
+      profile.name = [parsed.data.firstName, parsed.data.lastName].filter(Boolean).join(" ");
+    }
+    const result = await loginWithOAuthProfile(profile);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof OAuthNotConfiguredError) {
+      return res.status(503).json({ error: "NOT_CONFIGURED", message: err.message });
+    }
+    if (err instanceof OAuthVerificationError) {
+      return res.status(401).json({ error: "OAUTH_VERIFICATION_FAILED", message: err.message });
+    }
+    logger.error({ err }, "Unexpected error during Apple OAuth login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/oauth/facebook", async (req, res) => {
+  const parsed = z.object({ accessToken: z.string().min(10) }).safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  }
+  try {
+    const profile = await verifyFacebookAccessToken(parsed.data.accessToken);
+    const result = await loginWithOAuthProfile(profile);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof OAuthNotConfiguredError) {
+      return res.status(503).json({ error: "NOT_CONFIGURED", message: err.message });
+    }
+    if (err instanceof OAuthVerificationError) {
+      return res.status(401).json({ error: "OAUTH_VERIFICATION_FAILED", message: err.message });
+    }
+    logger.error({ err }, "Unexpected error during Facebook OAuth login");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });

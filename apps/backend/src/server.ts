@@ -1,4 +1,8 @@
 // === IMPORTS ===
+// MUST be the first import: patches Express 4 so rejected promises from
+// async route handlers forward to the central error handler instead of
+// becoming unhandled rejections (which crash Node >= 15).
+import "express-async-errors";
 import { env } from "./config/env.js";
 import { buildApp } from "./app.js";
 import { logger } from "./lib/logger.js";
@@ -10,8 +14,14 @@ import "./queue/autoRelease.worker.js";
 import "./queue/kycRefresh.worker.js";
 import "./queue/notification.worker.js";
 import "./queue/withholdingRemittance.worker.js";
+import "./queue/paymentReconcile.worker.js";
+import "./queue/reviewReveal.worker.js";
+import "./queue/featuredRefresh.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
 import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
+import { schedulePaymentReconcileJob } from "./queue/paymentReconcile.worker.js";
+import { scheduleReviewRevealJob } from "./queue/reviewReveal.worker.js";
+import { scheduleFeaturedRefreshJob } from "./queue/featuredRefresh.worker.js";
 
 // T2-K: PEP stub safety guard — structurally impossible to run production with the mock.
 // A silent mock PEP check in production is a real AML/CTF regulatory violation, not
@@ -34,8 +44,10 @@ const server = app.listen(env.PORT, async () => {
   
   // Start Telegram bot
   try {
-    await startBot();
-    logger.info("🤖 Telegram bot started");
+    const started = await startBot();
+    if (started) {
+      logger.info("🤖 Telegram bot started");
+    }
   } catch (error) {
     logger.error({ error }, "Failed to start Telegram bot");
   }
@@ -43,6 +55,9 @@ const server = app.listen(env.PORT, async () => {
 
 scheduleRecurringJobs().catch((err) => logger.error({ err }, "Failed to schedule KYC refresh jobs"));
 scheduleWithholdingRemittanceJob().catch((err) => logger.error({ err }, "Failed to schedule withholding remittance job"));
+schedulePaymentReconcileJob().catch((err) => logger.error({ err }, "Failed to schedule payment reconciliation job"));
+scheduleReviewRevealJob().catch((err) => logger.error({ err }, "Failed to schedule review reveal job"));
+scheduleFeaturedRefreshJob().catch((err) => logger.error({ err }, "Failed to schedule featured refresh job"));
 
 
 
@@ -56,3 +71,10 @@ function shutdown(signal: string) {
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+
+// Last-resort safety net: log rather than crash. express-async-errors
+// handles the route-level cases; this catches anything outside a request
+// lifecycle (e.g. a worker's error event).
+process.on("unhandledRejection", (reason) => {
+  logger.error({ err: reason }, "Unhandled promise rejection");
+});

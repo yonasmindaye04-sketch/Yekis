@@ -48,6 +48,7 @@ export interface TelegramWebApp {
     auth_date?: number;
     hash?: string;
   };
+  platform?: string;
   colorScheme: "light" | "dark";
   themeParams: TelegramThemeParams;
   BackButton: TelegramBackButton;

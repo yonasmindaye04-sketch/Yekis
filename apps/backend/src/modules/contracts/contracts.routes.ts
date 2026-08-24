@@ -7,9 +7,12 @@ import { getSignedObjectUrl } from "../../lib/objectStore.js";
 import {
   getContract,
   acceptContract,
+  cancelDuringCoolingOff,
   ContractNotFoundError,
   NotContractPartyError,
   AlreadyAcceptedError,
+  CoolingOffExpiredError,
+  ContractWorkAlreadyStartedError,
 } from "./contracts.service.js";
 import { InsufficientBalanceError } from "../escrow/escrow.service.js";
 
@@ -28,6 +31,14 @@ function handleKnownErrors(err: unknown, res: import("express").Response): boole
   }
   if (err instanceof AlreadyAcceptedError) {
     res.status(409).json({ error: "CONFLICT", message: err.message });
+    return true;
+  }
+  if (err instanceof CoolingOffExpiredError) {
+    res.status(409).json({ error: "COOLING_OFF_EXPIRED", message: err.message });
+    return true;
+  }
+  if (err instanceof ContractWorkAlreadyStartedError) {
+    res.status(409).json({ error: "WORK_ALREADY_STARTED", message: err.message });
     return true;
   }
   if (err instanceof InsufficientBalanceError) {
@@ -84,5 +95,22 @@ contractsRouter.post("/:contractId/accept", requireAuth, async (req: AuthedReque
     if (handleKnownErrors(err, res)) return;
     logger.error({ err }, "Contract acceptance failed");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
+
+// T2-E: Client exercises the statutory 7-day cooling-off cancellation right
+// (ECA Proclamation No. 1205/2020). Only valid before any milestone funding.
+contractsRouter.post("/:contractId/cancel-cooling-off", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const result = await cancelDuringCoolingOff({
+      userId: req.user!.id,
+      contractId: req.params.contractId as string,
+    });
+    return res.json(result);
+  } catch (err) {
+    if (handleKnownErrors(err, res)) return;
+    logger.error({ err }, "Cooling-off cancellation failed");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
   }
 });

@@ -10,7 +10,7 @@ import { recordAuditEvent } from "../../lib/audit.js";
 export const staffProfileRouter = Router();
 
 // === ROUTES ===
-staffProfileRouter.get("/reports", requireAuth, requireStaffRole("ADMIN", "COMPLIANCE_OFFICER", "SUPPORT"), async (req, res) => {
+staffProfileRouter.get("/reports", requireAuth, requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"), async (req, res) => {
   try {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
@@ -39,13 +39,13 @@ staffProfileRouter.get("/reports", requireAuth, requireStaffRole("ADMIN", "COMPL
       }
     });
   } catch (error) {
-    logger.error("GET /staff/reports error", error);
+    logger.error({ err: error }, "GET /staff/reports error");
     res.status(500).json({ error: "Failed to fetch reports" });
   }
 });
 
 const resolveReportSchema = z.object({
-  status: z.enum(["RESOLVED", "DISMISSED"]),
+  status: z.enum(["PENDING", "UNDER_REVIEW", "RESOLVED_NO_ACTION", "RESOLVED_PROFILE_HIDDEN", "RESOLVED_PROFILE_BANNED"]),
   staffNotes: z.string().optional()
 });
 
@@ -74,7 +74,7 @@ staffProfileRouter.patch("/reports/:reportId", requireAuth, requireStaffRole("AD
     
     res.json(report);
   } catch (error) {
-    logger.error("PATCH /staff/reports/:reportId error", error);
+    logger.error({ err: error }, "PATCH /staff/reports/:reportId error");
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: error.errors });
     }

@@ -195,9 +195,8 @@ export function confirmKeyboard(ctx: BotContext, confirmAction: string, cancelAc
 }
 
 export function notificationSettingsKeyboard(ctx: BotContext): InlineKeyboard {
- 
- const settings = ctx.session.notificationSettings || {};
- const kb = new InlineKeyboard();
+  const settings = (ctx.session?.notificationSettings || {}) as Record<string, boolean>;
+  const kb = new InlineKeyboard();
 
  const toggles = [
  { key: "jobs", label: ctx.t("notif_jobs") },

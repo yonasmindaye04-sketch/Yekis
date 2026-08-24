@@ -1,7 +1,8 @@
 # Project Context
 
-Last updated: 2026-08-21
+Last updated: 2026-08-22
 
+> **Update 2026-08-22:** Refactored light and dark mode design systems to eliminate contrast anomalies, ensure WCAG compliance, harmonize brand emerald colors (`#16a34a` in light, `#22c55e` in dark), eliminate low-opacity icon backgrounds, and polish landing copy to remove AI-slop / developer jargon.
 > **Update 2026-08-21:** Aligned the marketing and landing page spacing to match the AFRO-TECH system, using a full-bleed layout with consistent 6% horizontal gutters instead of a constrained 1200px container.
 
 ## Product Vision

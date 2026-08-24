@@ -20,7 +20,7 @@ reviewRouter.post("/contracts/:contractId/review", requireAuth, async (req: Auth
     const authorId = req.user!.id;
     const { rating, comment } = SubmitReviewSchema.parse(req.body);
 
-    const review = await submitReview(authorId, contractId, rating, comment);
+    const review = await submitReview(authorId, contractId!, rating, comment);
     return res.status(201).json(review);
   } catch (err: any) {
     if (err.message?.startsWith("NOT_FOUND")) return res.status(404).json({ error: err.message });
@@ -38,7 +38,7 @@ reviewRouter.get("/users/:userId/reviews", async (req, res) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
 
-    const reviews = await getReviewsForUser(userId, page, limit);
+    const reviews = await getReviewsForUser(userId!, page, limit);
     return res.json(reviews);
   } catch (err) {
     logger.error({ err }, "Failed to get reviews");
@@ -56,7 +56,7 @@ reviewRouter.post("/:reviewId/respond", requireAuth, async (req: AuthedRequest, 
     const targetUserId = req.user!.id;
     const { response } = RespondSchema.parse(req.body);
 
-    const review = await respondToReview(targetUserId, reviewId, response);
+    const review = await respondToReview(targetUserId, reviewId!, response);
     return res.json(review);
   } catch (err: any) {
     if (err.message?.startsWith("NOT_FOUND")) return res.status(404).json({ error: err.message });
@@ -78,7 +78,7 @@ reviewRouter.post("/:reviewId/dispute", requireAuth, async (req: AuthedRequest, 
     const userId = req.user!.id;
     const { reason } = DisputeSchema.parse(req.body);
 
-    const review = await disputeReview(userId, reviewId, reason);
+    const review = await disputeReview(userId, reviewId!, reason);
     return res.json(review);
   } catch (err: any) {
     if (err.message?.startsWith("NOT_FOUND")) return res.status(404).json({ error: err.message });

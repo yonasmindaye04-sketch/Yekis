@@ -14,7 +14,10 @@ import {
   Paperclip,
   Send,
   Users,
+  Sun,
+  Moon,
 } from "lucide-react";
+import { useTheme } from "./theme/ThemeContext";
 import { api, type ChatMessage, type MeResponse, type StaffConversation } from "./api/client";
 import { StaffCompliancePanel } from "./StaffCompliancePanel";
 import { EvidenceViewer, type EvidenceDocument } from "./EvidenceViewer";
@@ -58,6 +61,7 @@ function dateLabel(value?: string) {
 }
 
 export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
+  const { theme, toggleTheme } = useTheme();
   const [conversations, setConversations] = useState<StaffConversation[]>([]);
   const [queueCounts, setQueueCounts] = useState({ kyc: 0, topups: 0, disputes: 0 });
   const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
@@ -224,7 +228,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     return <span className={`sla-indicator ${cls}`}>{label} {txt}</span>;
   };
 
-  const displayedConversations = queueScope === "MINE" ? [] : visibleConversations;
+  const displayedConversations = queueScope === "MINE" ? visibleConversations.filter(c => c.assignedStaff?.id === user.id) : visibleConversations;
 
   return (
     <div className="staff-shell">
@@ -294,9 +298,20 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
             </div>
             <p>Coordinate support, payments, identity checks, and disputes from one desk.</p>
           </div>
-          <button className="btn-secondary" onClick={() => void loadConversations()} disabled={isLoading}>
-            <RefreshCw size={15} /> Refresh
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              type="button"
+              className="theme-toggle"
+              onClick={toggleTheme}
+              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+            >
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+            </button>
+            <button className="btn-secondary" onClick={() => void loadConversations()} disabled={isLoading}>
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </div>
         </header>
 
         {error && <div className="staff-error"><strong>Some queues need attention</strong><span>{error}</span></div>}

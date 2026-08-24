@@ -40,7 +40,7 @@ export function createNonceStr(len = 32): string {
   const bytes = randomBytes(len);
   let result = "";
   for (let i = 0; i < len; i++) {
-    result += chars[bytes[i] % chars.length];
+    result += chars[bytes[i]! % chars.length];
   }
   return result;
 }

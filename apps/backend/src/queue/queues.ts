@@ -8,9 +8,11 @@ import { redis } from "../lib/redis.js";
 // - notifications: SMS/Telegram push for critical events
 // - reviewReveal: reveals blind reviews after 14 days
 // - featuredRefresh: refreshes the featured carousel periodically
+// - paymentReconcile: polls provider status APIs for webhook-missed payments
 
 export const autoReleaseQueue = new Queue("auto-release", { connection: redis });
 export const kycRefreshQueue = new Queue("kyc-refresh", { connection: redis });
 export const notificationQueue = new Queue("notifications", { connection: redis });
 export const reviewRevealQueue = new Queue("review-reveal", { connection: redis });
 export const featuredRefreshQueue = new Queue("featured-refresh", { connection: redis });
+export const paymentReconcileQueue = new Queue("payment-reconcile", { connection: redis });

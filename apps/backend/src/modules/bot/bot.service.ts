@@ -74,8 +74,12 @@ export function getBot(): Bot<BotContext> | null {
  return botInstance;
 }
 
-export async function startBot(): Promise<void> {
- const bot = getBot() || createBot();
+export async function startBot(): Promise<boolean> {
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    logger.warn("TELEGRAM_BOT_TOKEN is not configured. Skipping Telegram bot initialization.");
+    return false;
+  }
+  const bot = getBot() || createBot();
 
  try {
  // 1. Set Chat Menu Button (only works with HTTPS URLs - skip in local dev)
@@ -106,14 +110,14 @@ export async function startBot(): Promise<void> {
  ]);
 
  // 3. Set Bot Description (Seen before pressing Start)
- await bot.api.setMyDescription({
- description: "Welcome to Yekis Jobs! \n\nYour premier Ethiopian freelance marketplace.\n\nWhether you're looking to hire top talent or find your next big gig, we've got you covered with secure escrow payments, KYC verification, and built-in dispute resolution.\n\nHit 'Start' below to begin!"
- });
+ await bot.api.setMyDescription(
+  "Welcome to Yekis Jobs! \n\nYour premier Ethiopian freelance marketplace.\n\nWhether you're looking to hire top talent or find your next big gig, we've got you covered with secure escrow payments, KYC verification, and built-in dispute resolution.\n\nHit 'Start' below to begin!"
+ );
  
  // 4. Set Bot Short Description (Seen on profile)
- await bot.api.setMyShortDescription({
- short_description: "The trusted Ethiopian Freelance Marketplace."
- });
+ await bot.api.setMyShortDescription(
+  "The trusted Ethiopian Freelance Marketplace."
+ );
  } catch (err) {
  logger.error({ err }, "Failed to configure bot API settings");
  }
@@ -141,12 +145,14 @@ export async function startBot(): Promise<void> {
  } catch (e) {
  logger.warn({ err: e }, "Failed to delete webhook, polling might fail");
  }
- bot.start({
- onStart: (botInfo) => {
- logger.info(`Bot @${botInfo.username} started in polling mode`);
- },
- });
- }
+  bot.start({
+    onStart: (botInfo) => {
+      logger.info(`Bot @${botInfo.username} started in polling mode`);
+    },
+  });
+  }
+
+  return true;
 }
 
 export async function stopBot(): Promise<void> {

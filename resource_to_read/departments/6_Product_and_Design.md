@@ -151,3 +151,25 @@ The Product team cannot finalize key screens until these decisions are made:
 *   **Skill Verification & Training** — Paid certification/testing as both a trust signal and revenue line
 *   **Enterprise/Agency Accounts** — Bulk hiring tools and dedicated account management
 *   **Diaspora / Foreign-Client Support** — Expanding cross-border payments once domestic compliance is stable
+
+---
+
+## 8. Implemented Screens — Design QA Baseline (Current Code State)
+
+The following screens/components are now built and styled in the frontend (`apps/frontend/src/`). Design QA should review these implementations against this document's standards (bilingual readiness, trust signals, mobile-first):
+
+| Component | File(s) | Notes |
+|---|---|---|
+| **Public Profile page** | `ProfilePage.tsx` + `ProfilePage.css` | Hero with banner/avatar/KYC badge, stats sidebar, skills chips, portfolio grid, reviews with responses, report-profile modal |
+| **Support chat** | `SupportChat.tsx` + `SupportChat.css` | In-app staff chat: theirs/mine bubbles, online indicator, empty state, composer with attach/emoji |
+| **Cookie consent banner** | `CookieBanner.tsx` + `CookieBanner.css` | Granular consent (essential/analytics/marketing toggles), theme-aware, mobile bottom-sheet layout |
+| **Marketing footer** | `LandingPage.tsx` + `marketing.css` | 4-column grid aligned; social icon hover states fixed; full-width bottom bar |
+
+**Known gap for Content Design:** the Amharic translation strings in `i18n.ts` are still `[TODO: Professional Amharic translation needed]` placeholders — bilingual-by-default is NOT yet met for these screens.
+
+## 9. UX & Marketing Site Updates (Latest Pass)
+*   **Motion layer shipped:** branded first-visit splash, scroll progress bar, header elevation on scroll, reveal-on-scroll sections (varied directions + stagger), hero parallax. All effects respect prefers-reduced-motion (splash skipped entirely for those users).
+*   **Honest metrics policy:** all fabricated numbers (freelancer/job/escrow counters) and invented testimonials removed from the landing page. Do not reintroduce social-proof numbers until they come from real platform data - the empty state is preferable to fake trust signals.
+*   **Footer compacted:** vertical padding reduced ~45 percent; bottom bar spacing tightened.
+*   **Registration:** T&C + Privacy acceptance checkbox (required, links to marketing pages) added before account creation.
+*   **Sign-in:** social buttons (Google/Apple/Facebook) render only when the backend reports them configured; a consistent "or with email" divider separates them from the password form.

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Shield, X } from 'lucide-react';
 import { initAnalytics } from './analytics';
+import './CookieBanner.css';
 
 interface ConsentState {
   necessary: true; // Always true, not toggleable

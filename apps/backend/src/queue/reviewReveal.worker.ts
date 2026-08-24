@@ -59,7 +59,7 @@ export const reviewRevealWorker = new Worker(
 
       logger.info(`reviewRevealWorker: Revealed ${reviewIds.length} reviews and updated ratings for ${targetUserIds.length} users.`);
     } catch (error) {
-      logger.error("reviewRevealWorker: Error revealing reviews", error);
+      logger.error({ err: error }, "reviewRevealWorker: Error revealing reviews");
       throw error;
     }
   },
@@ -67,5 +67,14 @@ export const reviewRevealWorker = new Worker(
 );
 
 reviewRevealWorker.on("failed", (job, err) => {
-  logger.error(`Job ${job?.id} failed in reviewRevealWorker`, err);
+  logger.error({ err }, `Job ${job?.id} failed in reviewRevealWorker`);
 });
+
+/** Call once at startup - BullMQ deduplicates by jobId, safe on every boot. */
+export async function scheduleReviewRevealJob() {
+  await reviewRevealQueue.add(
+    "reveal-sweep",
+    {},
+    { repeat: { pattern: "0 4 * * *" }, jobId: "review-reveal-daily" } // 04:00 daily
+  );
+}

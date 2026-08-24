@@ -22,7 +22,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    } else {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    }
     localStorage.setItem("yekis-theme", theme);
+
+    if (typeof window !== "undefined" && (window as unknown as { Telegram?: { WebApp?: { setHeaderColor?: (c: string) => void; setBackgroundColor?: (c: string) => void } } })?.Telegram?.WebApp) {
+      const wa = (window as unknown as { Telegram: { WebApp: { setHeaderColor?: (c: string) => void; setBackgroundColor?: (c: string) => void } } }).Telegram.WebApp;
+      wa.setHeaderColor?.(theme === "dark" ? "#0b1116" : "#ffffff");
+      wa.setBackgroundColor?.(theme === "dark" ? "#0b1116" : "#fafafa");
+    }
   }, [theme]);
 
   const toggleTheme = () => setThemeState((t) => (t === "light" ? "dark" : "light"));

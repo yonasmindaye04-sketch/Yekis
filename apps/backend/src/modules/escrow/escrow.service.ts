@@ -2,13 +2,16 @@ import type { PaymentProvider } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { autoReleaseQueue, notificationQueue } from "../../queue/queues.js";
-import { calculateFees } from "./fees.js";
+import { calculateFees, type FeeBreakdown } from "./fees.js";
+import type { Prisma } from "@prisma/client";
 import { telebirrClient } from "./providers/telebirr.client.js";
 import { chapaClient } from "./providers/chapa.client.js";
 import { cbeClient } from "./providers/cbe.client.js";
 import type { PaymentProviderClient } from "./providers/paymentProvider.interface.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
+import { sendInvoiceReceiptEmail } from "../../lib/email/email.service.js";
+import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import {
   runPostFundingChecks,
   runVelocityCheck,
@@ -24,6 +27,13 @@ export class InvalidEscrowStateError extends Error {}
 export class ContractNotFullyExecutedError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class ActiveContractWithdrawalBlockedError extends Error {}
+/** Thrown when a concurrent release path (explicit accept / auto-release /
+ * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
+export class MilestoneReleaseClaimLostError extends Error {
+  constructor(public milestoneId: string) {
+    super(`Milestone ${milestoneId} was already settled by another release path`);
+  }
+}
 
 const PROVIDER_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
   TELEBIRR: telebirrClient,
@@ -75,16 +85,6 @@ export async function fundMilestone(params: {
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  const existingPending = await prisma.paymentTransaction.findFirst({
-    where: { milestoneId: milestone.id, status: "PENDING" },
-  });
-  if (existingPending) {
-    await prisma.paymentTransaction.update({
-      where: { id: existingPending.id },
-      data: { status: "FAILED", rawWebhookPayload: { reason: "Superseded by new funding attempt" } },
-    });
-  }
-
   const client = PROVIDER_CLIENTS[params.provider];
   const initiated = await client.initiatePayment({
     amountMinor: fees.clientTotalChargeMinor,
@@ -111,29 +111,11 @@ export async function fundMilestone(params: {
     metadata: { provider: params.provider, amountMinor: fees.clientTotalChargeMinor },
   });
 
-  if (initiated.providerTransactionId.startsWith("mock-")) {
-    setTimeout(() => {
-      handlePaymentWebhook({
-        provider: params.provider,
-        providerTransactionId: initiated.providerTransactionId,
-        status: "SUCCESS",
-        rawPayload: { status: "success", transaction_id: initiated.providerTransactionId },
-      }).catch(err => logger.error({ err }, "Mock webhook failed"));
-    }, 2000);
-  }
-
   return { redirectUrl: initiated.redirectUrl, providerTransactionId: initiated.providerTransactionId };
 }
 
 /**
- * Client funds a milestone directly from their in-platform wallet balance.
- * This is the primary escrow-funding path — the client's wallet must have
- * sufficient balance before this is called. The external-provider path
- * (fundMilestone) is retained for reference but no longer called from the UI.
- *
- * Atomic: wallet debit and milestone state transition happen in a single
- * Prisma transaction so a server crash mid-way cannot leave the milestone
- * stuck in PAYMENT_PENDING with money already gone from the wallet.
+ * T1-E: Direct wallet funding — debits client wallet balance immediately.
  */
 export async function fundMilestoneFromWallet(params: {
   clientId: string;
@@ -147,14 +129,10 @@ export async function fundMilestoneFromWallet(params: {
   if (milestone.contract.clientId !== params.clientId) throw new NotContractPartyError();
 
   if (!milestone.contract.clientAcceptedAt || !milestone.contract.freelancerAcceptedAt) {
-    throw new ContractNotFullyExecutedError(
-      "Both parties must sign the contract before escrow can be funded."
-    );
+    throw new ContractNotFullyExecutedError("Both parties must accept the contract before funding escrow.");
   }
   if (milestone.escrowState !== "PAYMENT_PENDING") {
-    throw new InvalidEscrowStateError(
-      `Cannot fund a milestone in state ${milestone.escrowState}.`
-    );
+    throw new InvalidEscrowStateError(`Cannot fund a milestone in state ${milestone.escrowState}.`);
   }
 
   const freelancerKyc = await prisma.kycRecord.findUnique({
@@ -168,15 +146,10 @@ export async function fundMilestoneFromWallet(params: {
   const wallet = await prisma.wallet.findUnique({ where: { userId: params.clientId } });
   if (!wallet || wallet.balanceMinor < fees.clientTotalChargeMinor) {
     throw new InsufficientBalanceError(
-      `Insufficient wallet balance. Required: ETB ${
-        (fees.clientTotalChargeMinor / 100).toFixed(2)
-      }, available: ETB ${
-        ((wallet?.balanceMinor ?? 0) / 100).toFixed(2)
-      }. Please top up your wallet first.`
+      `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor} minor units, available: ${wallet?.balanceMinor ?? 0}.`
     );
   }
 
-  // Atomic: debit wallet + lock escrow in one transaction.
   await prisma.$transaction([
     prisma.wallet.update({
       where: { userId: params.clientId },
@@ -206,8 +179,25 @@ export async function fundMilestoneFromWallet(params: {
     message: "Escrow has been funded from the client's wallet — you can begin work.",
   });
 
-  // TMS check same as external-provider path — must not break the success
-  // response if it fails, so it runs outside the transaction.
+  // Dispatch formal order invoice receipt email to the client
+  try {
+    const clientUser = await prisma.user.findUnique({ where: { id: params.clientId } });
+    const freelancerUser = await prisma.user.findUnique({ where: { id: milestone.contract.freelancerId } });
+    if (clientUser && clientUser.email && !clientUser.email.endsWith("@yekis.local")) {
+      sendInvoiceReceiptEmail({
+        email: clientUser.email,
+        recipientName: clientUser.displayName || clientUser.firstName || undefined,
+        invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${milestone.id.slice(-4).toUpperCase()}`,
+        milestoneTitle: milestone.title || "Project Milestone",
+        amountEtb: fees.clientTotalChargeMinor / 100,
+        payerName: clientUser.displayName || clientUser.firstName || clientUser.email,
+        payeeName: freelancerUser?.displayName || freelancerUser?.firstName || "Freelancer",
+      }).catch((err) => logger.error({ err }, "Failed to dispatch invoice receipt email"));
+    }
+  } catch (err) {
+    logger.warn({ err }, "Failed to prepare invoice receipt email");
+  }
+
   try {
     await runPostFundingChecks(params.clientId);
   } catch (err) {
@@ -219,9 +209,7 @@ export async function fundMilestoneFromWallet(params: {
 
 /**
  * Webhook entry point. The route layer is responsible for verifying the
- * signature via the matching provider client BEFORE calling this — this
- * function assumes the payload is already trusted, so it must never be
- * reachable except through that verified path.
+ * signature via the matching provider client BEFORE calling this.
  */
 export async function handlePaymentWebhook(params: {
   provider: PaymentProvider;
@@ -242,40 +230,57 @@ export async function handlePaymentWebhook(params: {
     return;
   }
 
-  // Idempotency: a provider may retry the same webhook; don't double-process.
   if (transaction.status !== "PENDING") {
-    logger.info({ transactionId: transaction.id }, "Webhook for already-settled transaction — ignoring.");
+    logger.info({ transactionId: transaction.id }, "Webhook for already-settled transaction - ignoring.");
     return;
   }
 
-  await prisma.paymentTransaction.update({
-    where: { id: transaction.id },
-    data: { status: params.status, rawWebhookPayload: params.rawPayload as never },
-  });
-
-  if (params.status !== "SUCCESS") {
-    await recordAuditEvent({
-      eventType: "ESCROW_FUNDING_FAILED",
-      entityType: "Milestone",
-      entityId: transaction.milestoneId,
-      metadata: { provider: params.provider, status: params.status },
+  // Atomic settlement claim: concurrent webhook + reconciliation sweep both
+  // funnel through here; exactly one wins the PENDING -> settled flip. The
+  // loser gets count=0 and returns before any milestone state changes or
+  // duplicate notifications/increments occur.
+  const outcome = await prisma.$transaction(async (tx) => {
+    const claim = await tx.paymentTransaction.updateMany({
+      where: { id: transaction.id, status: "PENDING" },
+      data: { status: params.status, rawWebhookPayload: params.rawPayload as never },
     });
+
+    if (claim.count === 0) return "ALREADY_SETTLED" as const;
+
+    if (params.status !== "SUCCESS") {
+      await recordAuditEvent({
+        eventType: "ESCROW_FUNDING_FAILED",
+        entityType: "Milestone",
+        entityId: transaction.milestoneId,
+        metadata: { provider: params.provider, status: params.status },
+      });
+      return "FAILED" as const;
+    }
+
+    await tx.milestone.update({
+      where: { id: transaction.milestoneId },
+      data: { escrowState: "ESCROW_HELD" },
+    });
+
+    await tx.user.update({
+      where: { id: transaction.milestone.contract.clientId },
+      data: { totalSpentGrossMinor: { increment: transaction.amountMinor } },
+    });
+
+    return "FUNDED" as const;
+  });
+
+  if (outcome === "ALREADY_SETTLED") {
+    logger.info(
+      { transactionId: transaction.id },
+      "Settlement claim lost - a concurrent webhook/reconciliation already resolved this transaction."
+    );
     return;
   }
 
-  await prisma.milestone.update({
-    where: { id: transaction.milestoneId },
-    data: { escrowState: "ESCROW_HELD" },
-  });
-
-  // Gross figure (matches transaction.amountMinor, which already includes
-  // the client-side fee add-on) — deliberately not net of anything, since
-  // this represents what the client actually paid out, distinct from the
-  // freelancer's net-of-fees earnings figure tracked in releaseMilestoneFunds.
-  await prisma.user.update({
-    where: { id: transaction.milestone.contract.clientId },
-    data: { totalSpentGrossMinor: { increment: transaction.amountMinor } },
-  });
+  if (outcome === "FAILED") {
+    return;
+  }
 
   await recordAuditEvent({
     eventType: "ESCROW_HELD",
@@ -290,10 +295,6 @@ export async function handlePaymentWebhook(params: {
     message: "Escrow has been funded — you can begin work.",
   });
 
-  // TMS check runs after the webhook's own state transition is committed
-  // and must never break the webhook's success response — a failed AML
-  // check is a logged problem to investigate, not a reason to make a
-  // payment provider retry a webhook it already delivered successfully.
   try {
     await runPostFundingChecks(transaction.milestone.contract.clientId);
   } catch (err) {
@@ -302,7 +303,7 @@ export async function handlePaymentWebhook(params: {
 }
 
 /** Freelancer marks work as delivered for a funded milestone. */
-export async function submitMilestone(params: { freelancerId: string; milestoneId: string }) {
+export async function submitMilestone(params: { freelancerId: string; milestoneId: string; deliverableUrl?: string }) {
   const milestone = await prisma.milestone.findUnique({
     where: { id: params.milestoneId },
     include: { contract: true },
@@ -317,12 +318,9 @@ export async function submitMilestone(params: { freelancerId: string; milestoneI
 
   const updated = await prisma.milestone.update({
     where: { id: milestone.id },
-    data: { escrowState: "SUBMITTED_FOR_REVIEW", submittedAt: new Date(), autoReleaseAt: releaseAt },
+    data: { escrowState: "SUBMITTED_FOR_REVIEW", submittedAt: new Date(), autoReleaseAt: releaseAt, deliverableUrl: params.deliverableUrl },
   });
 
-  // Schedule the warn + release jobs the already-built auto-release worker
-  // expects — jobId is deterministic so it can be cancelled by id if the
-  // client acts before either fires (see acceptMilestone/raiseDispute).
   await autoReleaseQueue.add(
     "warn",
     { milestoneId: milestone.id, kind: "warn" },
@@ -365,9 +363,6 @@ export async function acceptMilestone(params: { clientId: string; milestoneId: s
 
   await releaseMilestoneFunds(milestone.id, milestone.contract.freelancerId, milestone.amountMinor);
 
-  // Cancel the now-unnecessary scheduled jobs — best-effort; if they already
-  // fired, the worker's own state check (still SUBMITTED_FOR_REVIEW?) is
-  // the real safety net, this is just to avoid noise.
   await autoReleaseQueue.remove(`warn-${milestone.id}`);
   await autoReleaseQueue.remove(`release-${milestone.id}`);
 
@@ -381,113 +376,180 @@ export async function acceptMilestone(params: { clientId: string; milestoneId: s
   return prisma.milestone.findUniqueOrThrow({ where: { id: milestone.id } });
 }
 
-/** Shared by acceptMilestone (explicit) and the auto-release worker (timeout). */
-export async function releaseMilestoneFunds(milestoneId: string, freelancerId: string, amountMinor: number) {
-  const freelancerKyc = await prisma.kycRecord.findUnique({ where: { userId: freelancerId } });
-  const fees = calculateFees({ milestoneAmountMinor: amountMinor, freelancerHasTin: !!freelancerKyc?.tin });
+/**
+ * T2-D: VAT registration-threshold alert. Fired (once) when cumulative
+ * platform fee revenue crosses VAT_THRESHOLD_MINOR so Finance has lead time
+ * to register for VAT before crossing the statutory 500,000 ETB turnover.
+ */
+async function checkVatThresholdAfterRelease(milestoneId: string) {
+  const account = await prisma.platformOperatingAccount.findUnique({
+    where: { id: "singleton" },
+  });
+  if (!account || account.accumulatedFeeMinor < env.VAT_THRESHOLD_MINOR) return;
 
-  // T1-B / T2-A: Credit PlatformOperatingAccount with the platform fee in the same
-  // atomic transaction as the freelancer wallet credit. Previously fees.platformFeeFromFreelancerMinor
-  // was calculated and then silently discarded — this closes that financial tracking gap.
-  // The client-side fee (platformFeeFromClientMinor) was already collected when the client
-  // funded escrow; we record it here in the PlatformFeeCredit log for reconciliation.
-  const updatedPlatformAccount = await prisma.$transaction(async (tx) => {
-    await tx.milestone.update({
-      where: { id: milestoneId },
-      data: { escrowState: "RELEASED", releasedAt: new Date() },
-    });
-    await tx.wallet.update({
-      where: { userId: freelancerId },
-      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-    });
-    // Lifetime total, distinct from the wallet balance above (which
-    // withdrawal decreases) — this is what a public profile's "earned"
-    // figure should read from, and it's already net of fees/withholding.
-    await tx.user.update({
-      where: { id: freelancerId },
-      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    });
-    // Upsert the singleton platform operating account row, incrementing accumulated revenue.
-    const updated = await tx.platformOperatingAccount.upsert({
+  const alreadyAlerted = await prisma.transactionFlag.findFirst({
+    where: { type: "VAT_THRESHOLD_REACHED" },
+    select: { id: true },
+  });
+  if (alreadyAlerted) return;
+
+  // Attribute to the milestone's client as queue anchor; details make clear
+  // this is a platform-level revenue event, not a user AML concern.
+  const milestone = await prisma.milestone.findUnique({
+    where: { id: milestoneId },
+    select: { contract: { select: { clientId: true } } },
+  });
+
+  await prisma.transactionFlag.create({
+    data: {
+      userId: milestone?.contract.clientId ?? (await requireAnyUserForFlag()),
+      type: "VAT_THRESHOLD_REACHED",
+      status: "PENDING_REVIEW",
+      relatedEntityId: milestoneId,
+      details: {
+        platformLevel: true,
+        accumulatedFeeMinor: account.accumulatedFeeMinor,
+        vatThresholdMinor: env.VAT_THRESHOLD_MINOR,
+        message:
+          "Platform fee revenue crossed the VAT pre-alert threshold. Finance must confirm VAT registration status with the accountant before the statutory 500,000 ETB turnover limit is reached.",
+      },
+    },
+  });
+
+  await recordAuditEvent({
+    eventType: "VAT_THRESHOLD_ALERT_RAISED",
+    entityType: "PlatformOperatingAccount",
+    entityId: "singleton",
+    metadata: { accumulatedFeeMinor: account.accumulatedFeeMinor },
+  });
+
+  await notifyStaffOfEvent({
+    eventType: "vat-threshold-reached",
+    message:
+      "COMPLIANCE: Platform fee revenue crossed the VAT pre-alert threshold. Confirm VAT registration with Finance.",
+    metadata: { accumulatedFeeMinor: account.accumulatedFeeMinor },
+  });
+
+  logger.warn(
+    { accumulatedFeeMinor: account.accumulatedFeeMinor },
+    "VAT threshold alert raised"
+  );
+}
+
+/** Last-resort flag owner if no milestone context exists. */
+async function requireAnyUserForFlag(): Promise<string> {
+  const anyStaff = await prisma.user.findFirst({
+    where: { staffRole: { not: null } },
+    select: { id: true },
+  });
+  if (anyStaff) return anyStaff.id;
+  const anyUser = await prisma.user.findFirst({ select: { id: true } });
+  if (!anyUser) throw new Error("Cannot raise VAT flag: no users exist");
+  return anyUser.id;
+}
+
+/**
+ * Platform-side ledger writes for a milestone release. Without these,
+ * PlatformOperatingAccount stays at zero forever: finance dashboards report
+ * no revenue and the VAT threshold alert can never fire.
+ *
+ * - accumulatedFeeMinor: TOTAL platform revenue (freelancer-side deduction +
+ *   client-side add-on released from the escrow pool). This is the figure
+ *   VAT_THRESHOLD_MINOR monitoring compares against.
+ * - accumulatedWithholdingMinor: running total owed to ERA via the monthly
+ *   remittance report (per-transaction detail lives on PaymentTransaction).
+ * - One PlatformFeeCredit row per release = append-only reconciliation log.
+ */
+function recordPlatformEarnings(
+  tx: Prisma.TransactionClient,
+  fees: FeeBreakdown,
+  milestoneId: string,
+) {
+  const totalFeeMinor =
+    fees.platformFeeFromFreelancerMinor + fees.platformFeeFromClientMinor;
+
+  return Promise.all([
+    tx.platformOperatingAccount.upsert({
       where: { id: "singleton" },
       create: {
         id: "singleton",
-        accumulatedFeeMinor: fees.platformFeeFromFreelancerMinor,
+        accumulatedFeeMinor: totalFeeMinor,
         accumulatedWithholdingMinor: fees.withholdingTaxMinor,
       },
       update: {
-        accumulatedFeeMinor: { increment: fees.platformFeeFromFreelancerMinor },
+        accumulatedFeeMinor: { increment: totalFeeMinor },
         accumulatedWithholdingMinor: { increment: fees.withholdingTaxMinor },
       },
-    });
-    // Append-only credit log for per-milestone reconciliation.
-    await tx.platformFeeCredit.create({
+    }),
+    tx.platformFeeCredit.create({
       data: {
         milestoneId,
         feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
         feeFromClientMinor: fees.platformFeeFromClientMinor,
         withholdingMinor: fees.withholdingTaxMinor,
       },
+    }),
+  ]);
+}
+
+/** Shared by acceptMilestone (explicit) and the auto-release worker (timeout). */
+export async function releaseMilestoneFunds(milestoneId: string, freelancerId: string, amountMinor: number) {
+  const freelancerKyc = await prisma.kycRecord.findUnique({ where: { userId: freelancerId } });
+  const fees = calculateFees({ milestoneAmountMinor: amountMinor, freelancerHasTin: !!freelancerKyc?.tin });
+
+  await prisma.$transaction(async (tx) => {
+    // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
+    // release job firing simultaneously) can flip the milestone into
+    // RELEASED. Two entry states are legal here:
+    //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
+    //   DISPUTED             - staff resolution or arbitration award
+    // The loser gets count=0 and throws BEFORE any wallet credit,
+    // eliminating the historical double-payout race.
+    const claim = await tx.milestone.updateMany({
+      where: { id: milestoneId, escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] } },
+      data: { escrowState: "RELEASED", releasedAt: new Date() },
     });
-    return updated;
+
+    if (claim.count === 0) {
+      throw new MilestoneReleaseClaimLostError(milestoneId);
+    }
+
+    await tx.wallet.update({
+      where: { userId: freelancerId },
+      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    await tx.user.update({
+      where: { id: freelancerId },
+      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    // Platform-side ledger entries — without these, platform revenue and
+    // withholding remittance reports would permanently read zero.
+    await recordPlatformEarnings(tx, fees, milestoneId);
+  }).catch((err) => {
+    if (err instanceof MilestoneReleaseClaimLostError) {
+      logger.info(
+        { milestoneId, freelancerId },
+        "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first."
+      );
+      return;
+    }
+    throw err;
   });
 
-  // T2-D: VAT threshold monitoring — check if cumulative platform fee revenue has
-  // crossed the configurable alert threshold. This does NOT register for VAT —
-  // it creates a staff-visible flag so Finance has lead time before VAT applies.
-  // VAT_THRESHOLD_MINOR defaults to 450,000 ETB (50,000,000 minor = 500,000 ETB threshold,
-  // alert set 50,000 ETB below to give lead time). Configure in .env.
-  if (updatedPlatformAccount.accumulatedFeeMinor >= env.VAT_THRESHOLD_MINOR) {
-    // Check if a flag already exists for this threshold crossing to avoid spamming.
-    const existingFlag = await prisma.transactionFlag.findFirst({
-      where: { type: "VAT_THRESHOLD_REACHED", status: "PENDING_REVIEW" },
-    });
-    if (!existingFlag) {
-      await prisma.transactionFlag.create({
-        data: {
-          userId: freelancerId, // closest user context; this is a platform-level event
-          type: "VAT_THRESHOLD_REACHED",
-          details: {
-            accumulatedFeeMinor: updatedPlatformAccount.accumulatedFeeMinor,
-            thresholdMinor: env.VAT_THRESHOLD_MINOR,
-            triggeredByMilestoneId: milestoneId,
-            message:
-              "Platform fee revenue has crossed the VAT alert threshold. " +
-              "Finance must confirm whether VAT registration is now required before the next milestone release.",
-          },
-        },
-      });
-      logger.warn(
-        { accumulatedFeeMinor: updatedPlatformAccount.accumulatedFeeMinor, thresholdMinor: env.VAT_THRESHOLD_MINOR },
-        "VAT threshold crossed — created compliance flag for Finance review"
-      );
-    }
+  try {
+    await checkVatThresholdAfterRelease(milestoneId);
+  } catch (err) {
+    logger.error({ err, milestoneId }, "VAT threshold check failed");
   }
 
-  await recordAuditEvent({
-    eventType: "PLATFORM_FEE_CREDITED",
-    entityType: "Milestone",
-    entityId: milestoneId,
-    metadata: {
-      feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-      feeFromClientMinor: fees.platformFeeFromClientMinor,
-      withholdingMinor: fees.withholdingTaxMinor,
-    },
-  });
-
-  // A contract is only "complete" once every one of its milestones lands
-  // in a terminal state — this milestone releasing may or may not be the
-  // last one, checkAndUpdateContractCompletion figures that out.
   try {
     await checkAndUpdateContractCompletion(milestoneId);
   } catch (err) {
     logger.error({ err, milestoneId }, "Contract completion check failed");
   }
 
-  // Same non-blocking pattern as runPostFundingChecks — velocity is
-  // naturally evaluated at release time (it counts completed milestones),
-  // not at funding time, so it lives here rather than alongside the
-  // structuring check.
   try {
     await runVelocityCheck(freelancerId);
   } catch (err) {
@@ -496,14 +558,7 @@ export async function releaseMilestoneFunds(milestoneId: string, freelancerId: s
 }
 
 /**
- * Freelancer withdrawal — gated by Tier 2 KYC at the route layer
- * (requireKycVerified("TIER_2")), not here. Also gated here by the
- * wallet-mismatch check: a withdrawal destination that doesn't match the
- * identity on file is held for Compliance Officer review rather than
- * silently processed, per the roadmap's "wallet mismatch" AML rule — this
- * is the one TMS check that actually blocks a flow in real time rather
- * than just flagging after the fact, since letting a mismatched payout
- * through and catching it later defeats the point of the check.
+ * Freelancer withdrawal — gated by Tier 2 KYC at the route layer.
  */
 export async function withdrawFromWallet(params: {
   userId: string;
@@ -511,10 +566,6 @@ export async function withdrawFromWallet(params: {
   provider: PaymentProvider;
   payoutAccountIdentifier: string;
 }) {
-  // Block clients from withdrawing if they have any active contracts
-  // (milestones not yet in a terminal state) or open disputes. The funds
-  // may still be needed for pending escrow obligations or dispute resolution.
-  // Freelancers are not subject to this restriction — they withdraw earned funds.
   const user = await prisma.user.findUnique({ where: { id: params.userId }, select: { role: true } });
   if (user?.role === "CLIENT") {
     const activeContractMilestone = await prisma.milestone.findFirst({
@@ -559,24 +610,24 @@ export async function withdrawFromWallet(params: {
     );
   }
 
-  // Pass-through is flag-only (doesn't block), unlike wallet-mismatch above —
-  // it's a weaker, pattern-based signal that's more prone to false positives
-  // on a legitimate freelancer who simply finished their only active
-  // contract and wants their money, so it goes to the review queue rather
-  // than holding real funds on a heuristic alone.
   try {
     await runPassThroughCheck({ userId: params.userId, withdrawalAmountMinor: params.amountMinor });
   } catch (err) {
     logger.error({ err, userId: params.userId }, "TMS pass-through check failed");
   }
 
-  // Debit immediately (optimistic) — a real payout-failure reconciliation
-  // job belongs here once the provider clients' payout APIs (distinct from
-  // their collection APIs used in fundMilestone) are implemented.
-  await prisma.wallet.update({
-    where: { userId: params.userId },
+  // Atomic conditional decrement: two concurrent withdrawals both pass the
+  // pre-check above, but only decrements that still leave balance >= 0
+  // succeed. A loser gets count=0 -> InsufficientBalanceError, so the wallet
+  // can never go negative under concurrency.
+  const debited = await prisma.wallet.updateMany({
+    where: { userId: params.userId, balanceMinor: { gte: params.amountMinor } },
     data: { balanceMinor: { decrement: params.amountMinor } },
   });
+
+  if (debited.count === 0) {
+    throw new InsufficientBalanceError("Requested amount exceeds wallet balance.");
+  }
 
   await recordAuditEvent({
     userId: params.userId,
@@ -595,13 +646,7 @@ export async function withdrawFromWallet(params: {
 }
 
 /**
- * Refund path for a disputed milestone. Credits the client's wallet rather
- * than calling a provider refund API — no provider currently has a
- * confirmed refund endpoint wired up (same "collection API stubbed,
- * payout API not implemented" situation as withdrawFromWallet). Flag this
- * for Finance/Product: crediting an in-platform wallet balance versus
- * issuing a real bank/Telebirr refund are different UX and accounting
- * decisions, and this defaults to the simpler one for MVP.
+ * Refund path for a disputed milestone.
  */
 export async function refundMilestoneToClient(milestoneId: string, clientId: string, amountMinor: number) {
   await prisma.$transaction([
@@ -615,11 +660,6 @@ export async function refundMilestoneToClient(milestoneId: string, clientId: str
     }),
   ]);
 
-  // A refund is just as much a terminal state as a release — the dispute
-  // module's PARTIAL_SPLIT path (which calls both this and
-  // releaseMilestoneFunds) already gets this check from the release call;
-  // this covers the plain REFUND_TO_CLIENT outcome, which never calls
-  // releaseMilestoneFunds at all.
   try {
     await checkAndUpdateContractCompletion(milestoneId);
   } catch (err) {

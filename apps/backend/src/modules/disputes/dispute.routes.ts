@@ -11,6 +11,9 @@ import {
   getMediationQueue,
   resolveDispute,
   escalateToArbitration,
+  applyArbitrationAward,
+  claimDisputeAsMediator,
+  withdrawDisputeMutually,
   getDispute,
   getDisputesForUser,
   DisputeNotFoundError,
@@ -18,7 +21,9 @@ import {
   InvalidDisputeStageError,
   MilestoneNotFoundError,
   InvalidEscrowStateForDisputeError,
+  DisputeAlreadyClaimedError,
 } from "./dispute.service.js";
+import { z } from "zod";
 
 export const disputesRouter = Router();
 
@@ -35,6 +40,10 @@ function handleKnownErrors(err: unknown, res: import("express").Response): boole
   }
   if (err instanceof InvalidDisputeStageError || err instanceof InvalidEscrowStateForDisputeError) {
     res.status(409).json({ error: "INVALID_STATE", message: err.message });
+    return true;
+  }
+  if (err instanceof DisputeAlreadyClaimedError) {
+    res.status(409).json({ error: "DISPUTE_ALREADY_CLAIMED", message: err.message });
     return true;
   }
   return false;
@@ -154,6 +163,95 @@ disputesRouter.post(
     } catch (err) {
       if (handleKnownErrors(err, res)) return;
       logger.error({ err }, "Failed to resolve dispute");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
+
+
+// ---------- Mediator assignment ----------
+
+// T2-I: a staff member claims a Stage-3 dispute so two mediators never work
+// the same case simultaneously. First claim wins; second gets 409.
+disputesRouter.post(
+  "/:disputeId/claim",
+  requireAuth,
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const result = await claimDisputeAsMediator({
+        staffUserId: req.user!.id,
+        disputeId: req.params.disputeId as string,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to claim dispute as mediator");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
+
+// T2-H: apply an external arbitration award (AACCSA reference required).
+// Staff-only; moves funds per the arbitrator's outcome.
+const ArbitrationAwardInput = z.object({
+  awardReferenceNumber: z.string().min(3),
+  outcome: z.enum(["RELEASE_TO_FREELANCER", "REFUND_TO_CLIENT", "PARTIAL_SPLIT"]),
+  recommendation: z.string().min(5),
+  freelancerShareMinor: z.coerce.number().int().nonnegative().optional(),
+});
+
+disputesRouter.post(
+  "/:disputeId/arbitration-award",
+  requireAuth,
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  async (req: AuthedRequest, res) => {
+    const parsed = ArbitrationAwardInput.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+
+    try {
+      const result = await applyArbitrationAward({
+        staffUserId: req.user!.id,
+        disputeId: req.params.disputeId as string,
+        ...parsed.data,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to apply arbitration award");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  }
+);
+
+// T2-F: party-facing mutual withdrawal. First call proposes; second call
+// (other party) must match outcome + share to confirm.
+disputesRouter.post(
+  "/:disputeId/withdraw",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({
+        proposedOutcome: z.enum(["RELEASE_TO_FREELANCER", "REFUND_TO_CLIENT", "PARTIAL_SPLIT"]),
+        proposedFreelancerShareMinor: z.coerce.number().int().nonnegative().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+
+    try {
+      const result = await withdrawDisputeMutually({
+        userId: req.user!.id,
+        disputeId: req.params.disputeId as string,
+        ...parsed.data,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to mutually withdraw dispute");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   }

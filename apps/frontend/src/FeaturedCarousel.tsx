@@ -1,31 +1,28 @@
 import { useEffect, useState, useRef } from 'react';
 import { Star, Shield, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const mockApi = {
-  getFeaturedTalent: async () => [
-    { id: "1", name: "Sara T.", primarySkill: "UI/UX Designer", avatar: "https://i.pravatar.cc/150?img=5", rating: 4.9, kycTier: 2 },
-    { id: "2", name: "Dawit M.", primarySkill: "Frontend Dev", avatar: "https://i.pravatar.cc/150?img=12", rating: 4.8, kycTier: 1 },
-    { id: "3", name: "Helen B.", primarySkill: "Backend Dev", avatar: "https://i.pravatar.cc/150?img=9", rating: 5.0, kycTier: 2 },
-    { id: "4", name: "Yared K.", primarySkill: "Mobile Dev", avatar: "https://i.pravatar.cc/150?img=11", rating: 4.7, kycTier: 0 },
-    { id: "5", name: "Selam W.", primarySkill: "Data Scientist", avatar: "https://i.pravatar.cc/150?img=20", rating: 4.9, kycTier: 2 },
-  ]
-};
-
+// Shape mirrors backend featured.service.ts buildFeaturedCard()
 interface Talent {
   id: string;
-  name: string;
-  primarySkill: string;
-  avatar: string;
-  rating: number;
-  kycTier: number;
+  displayName: string;
+  avatarUrl: string | null;
+  primarySkill: { id: string; nameEn?: string } | null;
+  ratingAverage: number | null;
+  totalJobsCompleted: number;
+  kycBadge: string | null;
 }
+
+import { api } from './api/client';
 
 export const FeaturedCarousel = ({ onProfileClick }: { onProfileClick?: (id: string) => void }) => {
   const [talents, setTalents] = useState<Talent[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    mockApi.getFeaturedTalent().then(setTalents);
+    api
+      .getFeaturedTalent()
+      .then((res) => setTalents(((res as { items?: Talent[] })?.items ?? res ?? []) as Talent[]))
+      .catch(() => setTalents([])); // carousel is decorative - fail silently
   }, []);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -60,21 +57,17 @@ export const FeaturedCarousel = ({ onProfileClick }: { onProfileClick?: (id: str
             className="carousel-card"
           >
             <div className="carousel-avatar-wrap">
-              <img src={talent.avatar} alt={talent.name} />
-              <div className={`carousel-badge ${talent.kycTier >= 2 ? 'tier-2' : talent.kycTier === 1 ? 'tier-1' : 'tier-0'}`}>
-                {talent.kycTier >= 2 ? (
-                  <Shield size={20} />
-                ) : talent.kycTier === 1 ? (
-                  <CheckCircle size={20} />
-                ) : null}
+              {talent.avatarUrl ? <img src={talent.avatarUrl} alt={talent.displayName} /> : <div className="carousel-avatar-fallback">{(talent.displayName || '?').charAt(0)}</div>}
+              <div className={`carousel-badge ${talent.kycBadge === 'shield' ? 'tier-2' : 'tier-1'}`}>
+                {talent.kycBadge === 'shield' ? <Shield size={20} /> : <CheckCircle size={20} />}
               </div>
             </div>
-            <h3 className="carousel-name">{talent.name}</h3>
-            <p className="carousel-skill">{talent.primarySkill}</p>
-            
+            <h3 className="carousel-name">{talent.displayName}</h3>
+            <p className="carousel-skill">{talent.primarySkill?.nameEn ?? ''}</p>
+
             <div className="carousel-rating">
               <Star size={14} />
-              <span>{talent.rating}</span>
+              <span>{talent.ratingAverage ?? '-'}</span>
             </div>
           </div>
         ))}

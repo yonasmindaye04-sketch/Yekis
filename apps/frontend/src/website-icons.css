@@ -1,22 +1,17 @@
-/* Website icon accent: the original Yekis lime used for action icons. */
+/* Website icon accent: context-aware theme colors for icons */
 .landing-page svg,
 .platform-shell svg,
 .staff-shell svg {
-  color: #d8f36b;
+  color: inherit;
 }
 
 .landing-page .landing-feature-card > svg,
 .landing-page .landing-trust-list svg,
 .landing-page .landing-proof-visual svg,
 .landing-page .landing-support-trigger svg {
-  color: #d8f36b;
+  color: var(--color-primary);
 }
 
-.landing-page .landing-feature-lime > svg {
-  color: #0b1116;
-}
-
-.landing-page .landing-cta svg,
 .landing-page .btn-primary svg,
 .platform-shell .btn-primary svg,
 .staff-shell .btn-primary svg {
@@ -33,16 +28,17 @@
   gap: 7px;
   min-height: 36px;
   padding: 0 10px;
-  border: 1px solid #384b55;
+  border: 1px solid var(--color-border-strong);
   border-radius: 9px;
-  background: transparent;
-  color: #9aacb1;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
   font-size: .78rem;
+  transition: all 0.2s ease;
 }
 
 .auth-back:hover {
-  border-color: #d8f36b;
-  color: #d8f36b;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }
 
 @media (max-width: 760px) {
@@ -221,12 +217,7 @@
   font-weight: 800;
 }
 
-/* The requested borderless visual language across website surfaces. */
-:root[data-theme="dark"] .landing-page *,
-:root[data-theme="dark"] .platform-shell *,
-:root[data-theme="dark"] .staff-shell * {
-  border-color: transparent !important;
-}
+
 
 /* Landing support chat: keep the public chat inside the Yekis dark palette. */
 :root[data-theme="dark"] .landing-support-popover.chat-variant {

@@ -8,7 +8,7 @@ import { prisma } from "../../../lib/prisma.js";
 import { recordAuditEvent } from "../../../lib/audit.js";
 import { logger } from "../../../lib/logger.js";
 
-type MyConversation = Conversation<BotContext>;
+type MyConversation = Conversation<BotContext, BotContext>;
 type MyContext = BotContext;
 
 export function registerScenes(bot: Bot<BotContext>) {
@@ -24,7 +24,7 @@ export function registerScenes(bot: Bot<BotContext>) {
 
 function getLargestPhoto(photos: readonly { file_id: string }[] | undefined): string | undefined {
  if (!photos || photos.length === 0) return undefined;
- return photos[photos.length - 1].file_id;
+ return photos[photos.length - 1]!.file_id;
 }
 
 async function kycUploadScene(conversation: MyConversation, ctx: MyContext) {
@@ -192,18 +192,18 @@ async function withdrawScene(conversation: MyConversation, ctx: MyContext) {
  }
  });
 
- const destMsg = await conversation.waitFor("callback_query:data");
- const destination = destMsg.callbackQuery.data.split(":")[2];
+  const destMsg = await conversation.waitFor("callback_query:data");
+  const destination = destMsg.callbackQuery.data.split(":")[2] || "";
 
- if (destination === "menu") {
- await ctx.reply(ctx.t("propose_cancelled"));
- clearScene(ctx);
- return;
- }
+  if (destination === "menu") {
+  await ctx.reply(ctx.t("propose_cancelled"));
+  clearScene(ctx);
+  return;
+  }
 
- advanceScene(ctx, { destination });
+  advanceScene(ctx, { destination });
 
- await ctx.reply(ctx.t("wallet_withdraw_confirm", { amount, destination }), {
+  await ctx.reply(ctx.t("wallet_withdraw_confirm", { amount: amount || 0, destination }), {
  reply_markup: {
  inline_keyboard: [[
  { text: ctx.t("confirm_yes"), callback_data: "withdraw:confirm:yes" },

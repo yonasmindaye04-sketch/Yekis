@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { useEffect, useMemo, useState } from "react";
-import { getTelegramWebApp } from "./webApp";
-
+import { getTelegramWebApp, isTelegramMiniApp } from "./webApp";
 
 // === MAIN FUNCTIONS ===
 export function useTelegramMiniApp() {
@@ -14,15 +13,21 @@ export function useTelegramMiniApp() {
       return;
     }
 
-    webApp.ready();
-    webApp.expand();
+    try {
+      webApp.ready();
+      webApp.expand();
+    } catch {
+      // ignore
+    }
     setIsReady(true);
   }, [webApp]);
+
+  const isTelegram = isTelegramMiniApp();
 
   return {
     webApp,
     isReady,
-    isTelegram: Boolean(webApp?.initData),
+    isTelegram,
     initData: webApp?.initData ?? "",
     unsafeUser: webApp?.initDataUnsafe?.user ?? null,
     themeParams: webApp?.themeParams ?? {},

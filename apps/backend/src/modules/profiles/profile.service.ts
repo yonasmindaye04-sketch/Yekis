@@ -1,6 +1,6 @@
 // === IMPORTS ===
-import prisma from '../../lib/prisma.js';
-import logger from '../../lib/logger.js';
+import { prisma } from '../../lib/prisma.js';
+import { logger } from '../../lib/logger.js';
 import { sanitizeContactInfo } from '../../middleware/circumvention.middleware.js';
 import { UpdateProfileInput } from './profile.validation.js';
 
@@ -13,11 +13,11 @@ export async function getPublicProfile(targetUserId: string, viewerId?: string) 
       skills: {
         include: { skill: true }
       },
-      portfolio: {
+      portfolioItems: {
         where: { isActive: true }
       },
       kyc: true,
-      receivedReviews: {
+      reviewsReceived: {
         where: {
           isEligible: true,
           revealedAt: { not: null }
@@ -58,31 +58,39 @@ export async function getPublicProfile(targetUserId: string, viewerId?: string) 
           { clientId: targetUserId, freelancerId: viewerId }
         ]
       }
-    }) || await prisma.proposal.findFirst({
-      where: {
-        OR: [
-          { freelancerId: targetUserId, job: { clientId: viewerId } },
-          { freelancerId: viewerId, job: { clientId: targetUserId } }
-        ]
-      }
     });
 
     if (!hasContractOrProposal) {
-      const err = new Error('Not authorized to view this profile');
-      (err as any).statusCode = 403;
-      throw err;
+      // Return limited profile
+      return {
+        id: user.id,
+        displayName: user.displayName || `${user.firstName} ${user.lastName}`.trim(),
+        avatarUrl: user.avatarUrl,
+        primarySkillId: user.primarySkillId,
+        skills: user.skills.map((s: any) => s.skill),
+        isOwnProfile: false,
+        canViewFullProfile: false
+      };
     }
-  } else if (user.profileVisibility === 'PROPOSERS' && !viewerId) {
-    const err = new Error('Not authorized to view this profile');
-    (err as any).statusCode = 403;
-    throw err;
+  }
+
+  if (user.profileVisibility === 'PROPOSERS' && !viewerId) {
+    return {
+      id: user.id,
+      displayName: user.displayName || `${user.firstName} ${user.lastName}`.trim(),
+      avatarUrl: user.avatarUrl,
+      primarySkillId: user.primarySkillId,
+      skills: user.skills.map((s: any) => s.skill),
+      isOwnProfile: false,
+      canViewFullProfile: false
+    };
   }
 
   let ratingCount = 0;
   let totalRating = 0;
   const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
 
-  user.receivedReviews.forEach(review => {
+  user.reviewsReceived.forEach((review: any) => {
     ratingCount++;
     totalRating += review.rating;
     distribution[review.rating] = (distribution[review.rating] || 0) + 1;
@@ -101,8 +109,8 @@ export async function getPublicProfile(targetUserId: string, viewerId?: string) 
     profileCompleteness: user.profileCompleteness,
     isAvailableForWork: user.isAvailableForWork,
     primarySkillId: user.primarySkillId,
-    skills: user.skills.map(s => s.skill),
-    portfolio: user.portfolio,
+    skills: user.skills.map((s: any) => s.skill),
+    portfolio: user.portfolioItems,
     kyc: user.kyc ? {
       tier: user.kyc.tier,
       status: user.kyc.status,
@@ -126,7 +134,7 @@ export async function getPublicProfile(targetUserId: string, viewerId?: string) 
 
 export async function updateProfile(userId: string, data: UpdateProfileInput) {
   if (data.bio) {
-    data.bio = sanitizeContactInfo(data.bio);
+    data.bio = sanitizeContactInfo(data.bio).sanitized;
   }
 
   if (data.skillIds && data.skillIds.length > 0) {
@@ -146,7 +154,7 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     throw err;
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     const userUpdateData: any = {};
     if (data.firstName !== undefined) userUpdateData.firstName = data.firstName;
     if (data.lastName !== undefined) userUpdateData.lastName = data.lastName;
@@ -164,6 +172,7 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
       await tx.userSkill.deleteMany({
         where: { userId }
       });
+
       if (data.skillIds.length > 0) {
         await tx.userSkill.createMany({
           data: data.skillIds.map(skillId => ({
@@ -173,21 +182,25 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
         });
       }
     }
-    
+
     return updatedUser;
   });
 
-  await computeProfileCompleteness(userId);
+  const completeness = await computeProfileCompleteness(userId);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { profileCompleteness: completeness }
+  });
 
-  return result;
+  return getPublicProfile(userId, userId);
 }
 
-export async function computeProfileCompleteness(userId: string) {
+export async function computeProfileCompleteness(userId: string): Promise<number> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
       skills: true,
-      portfolio: { where: { isActive: true } },
+      portfolioItems: { where: { isActive: true } },
       kyc: true
     }
   });
@@ -195,45 +208,33 @@ export async function computeProfileCompleteness(userId: string) {
   if (!user) return 0;
 
   let score = 0;
+
   if (user.avatarUrl) score += 15;
   if (user.firstName && user.lastName) score += 10;
-  if (user.bio && user.bio.length >= 50) score += 15;
-  if (user.skills.length > 0) score += 20;
+  if (user.bio && user.bio.trim().length >= 50) score += 20;
   if (user.primarySkillId) score += 10;
-  if (user.kyc?.status === 'VERIFIED') score += 20;
-  if (user.portfolio.length > 0) score += 10;
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { profileCompleteness: score }
-  });
+  if (user.skills.length >= 3) score += 15;
+  if (user.portfolioItems.length >= 1) score += 15;
+  if (user.kyc && user.kyc.status === 'VERIFIED') score += 15;
 
   return score;
 }
 
-export async function computeEarnedRange(userId: string) {
-  const result = await prisma.paymentTransaction.aggregate({
-    _sum: {
-      amountMinor: true
-    },
-    where: {
-      milestone: {
-        escrowState: 'RELEASED',
-        contract: {
-          freelancerId: userId
-        }
-      }
-    }
+export async function computeEarnedRange(userId: string): Promise<string> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { totalEarnedNetMinor: true }
   });
 
-  const amount = Number(result._sum.amountMinor || 0);
+  const totalEarnedMinor = user?.totalEarnedNetMinor || 0;
+  const totalEarnedETB = totalEarnedMinor / 100;
 
-  if (amount === 0) return null;
-  if (amount <= 1000000) return 'ETB 1K-10K';
-  if (amount <= 5000000) return 'ETB 10K-50K';
-  if (amount <= 10000000) return 'ETB 50K-100K';
-  if (amount <= 50000000) return 'ETB 100K-500K';
-  return 'ETB 500K+';
+  if (totalEarnedETB === 0) return '0 ETB';
+  if (totalEarnedETB < 10000) return '1K+ ETB';
+  if (totalEarnedETB < 50000) return '10K+ ETB';
+  if (totalEarnedETB < 100000) return '50K+ ETB';
+  if (totalEarnedETB < 500000) return '100K+ ETB';
+  return '500K+ ETB';
 }
 
 export async function recordProfileView(targetUserId: string, viewerId?: string, source?: string) {
@@ -257,7 +258,7 @@ export async function reportProfile(reporterId: string, targetUserId: string, re
   const report = await prisma.profileReport.create({
     data: {
       reporterId,
-      targetUserId,
+      reportedUserId: targetUserId,
       reason,
       details
     }
@@ -271,8 +272,8 @@ export async function recalculateUserStats(userId: string) {
     include: { milestones: true }
   });
 
-  const jobsCompletedCount = contracts.filter(c => 
-    c.milestones.length > 0 && c.milestones.every(m => m.escrowState === 'RELEASED')
+  const jobsCompletedCount = contracts.filter((c: any) => 
+    c.milestones.length > 0 && c.milestones.every((m: any) => m.escrowState === 'RELEASED')
   ).length;
 
   const jobsPostedCount = await prisma.job.count({

@@ -13,10 +13,9 @@ import { z } from "zod";
 
 export const financeRouter = Router();
 
-
 // === MAIN FUNCTIONS ===
 /**
- * All finance routes are restricted to staff roles (e.g., ADMIN, FINANCE_OFFICER)
+ * All finance routes are restricted to staff roles (e.g., ADMIN, COMPLIANCE_OFFICER)
  * because they expose platform-wide financial aggregates and revenue data.
  */
 
@@ -24,7 +23,7 @@ export const financeRouter = Router();
 financeRouter.get(
   "/reconciliation",
   requireAuth,
-  requireStaffRole("ADMIN", "FINANCE_OFFICER"),
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
       const periodMonth = req.query.periodMonth as string | undefined;
@@ -41,7 +40,7 @@ financeRouter.get(
 financeRouter.get(
   "/ledger/fees",
   requireAuth,
-  requireStaffRole("ADMIN", "FINANCE_OFFICER"),
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page ? parseInt(req.query.page as string) : undefined;
@@ -59,7 +58,7 @@ financeRouter.get(
 financeRouter.get(
   "/withholding",
   requireAuth,
-  requireStaffRole("ADMIN", "FINANCE_OFFICER"),
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page ? parseInt(req.query.page as string) : undefined;
@@ -81,7 +80,7 @@ const MarkFiledSchema = z.object({
 financeRouter.post(
   "/withholding/:reportId/file",
   requireAuth,
-  requireStaffRole("ADMIN", "FINANCE_OFFICER"),
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     const parsed = MarkFiledSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -90,7 +89,7 @@ financeRouter.post(
 
     try {
       const result = await markWithholdingReportFiled({
-        reportId: req.params.reportId,
+        reportId: req.params.reportId!,
         staffUserId: req.user!.id,
         eraReferenceNumber: parsed.data.eraReferenceNumber,
       });

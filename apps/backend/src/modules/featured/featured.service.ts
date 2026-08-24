@@ -11,7 +11,7 @@ export async function getFeaturedTalent() {
     try {
       return JSON.parse(cached);
     } catch (e) {
-      logger.error("Failed to parse cached featured talent", e);
+      logger.error({ err: e }, "Failed to parse cached featured talent");
     }
   }
   
@@ -21,7 +21,7 @@ export async function getFeaturedTalent() {
 export async function refreshFeaturedCarousel() {
   try {
     const featuredUsers = new Map();
-    const result = [];
+    const result: any[] = [];
     
     // 1. Staff-pinned (up to 3)
     const staffPinnedLogs = await prisma.featuredLog.findMany({
@@ -32,7 +32,7 @@ export async function refreshFeaturedCarousel() {
         user: {
           include: {
             primarySkill: true,
-            kycRecord: true,
+            kyc: true,
           }
         }
       }
@@ -55,7 +55,7 @@ export async function refreshFeaturedCarousel() {
         role: { in: ["FREELANCER", "BOTH"] },
         profileVisibility: "PUBLIC",
         isSuspended: false,
-        kycRecord: {
+        kyc: {
           status: "VERIFIED"
         }
       },
@@ -63,7 +63,7 @@ export async function refreshFeaturedCarousel() {
       take: 10,
       include: {
         primarySkill: true,
-        kycRecord: true,
+        kyc: true,
       }
     });
 
@@ -86,20 +86,20 @@ export async function refreshFeaturedCarousel() {
         role: { in: ["FREELANCER", "BOTH"] },
         profileVisibility: "PUBLIC",
         isSuspended: false,
-        kycRecord: {
+        kyc: {
           status: "VERIFIED",
           lastVerifiedAt: { gte: thirtyDaysAgo }
         }
       },
       orderBy: {
-        kycRecord: {
+        kyc: {
           lastVerifiedAt: "desc"
         }
       },
       take: 10,
       include: {
         primarySkill: true,
-        kycRecord: true,
+        kyc: true,
       }
     });
 
@@ -120,7 +120,7 @@ export async function refreshFeaturedCarousel() {
         role: { in: ["FREELANCER", "BOTH"] },
         profileVisibility: "PUBLIC",
         isSuspended: false,
-        kycRecord: {
+        kyc: {
           status: "VERIFIED"
         },
         primarySkillId: { notIn: existingCategoryIds }
@@ -129,7 +129,7 @@ export async function refreshFeaturedCarousel() {
       take: 5,
       include: {
         primarySkill: true,
-        kycRecord: true,
+        kyc: true,
       }
     });
 
@@ -155,7 +155,8 @@ export async function refreshFeaturedCarousel() {
         prisma.featuredLog.createMany({
           data: result.map(r => ({
             userId: r.id,
-            reason: r.reason,
+            reason: r.reason as any,
+            category: (r.primarySkill?.category || "OTHER") as any,
             featuredAt: new Date()
           }))
         })
@@ -167,7 +168,7 @@ export async function refreshFeaturedCarousel() {
     
     return result;
   } catch (error) {
-    logger.error("Error refreshing featured carousel", error);
+    logger.error({ err: error }, "Error refreshing featured carousel");
     throw new Error("Failed to refresh featured carousel");
   }
 }
@@ -179,7 +180,7 @@ export async function pinUser(staffId: string, userId: string, category: string,
         userId,
         reason: "STAFF_PINNED",
         pinnedByStaffId: staffId,
-        category,
+        category: category as any,
         notes
       }
     });
@@ -187,15 +188,16 @@ export async function pinUser(staffId: string, userId: string, category: string,
     await redis.del("featured:carousel");
     
     await recordAuditEvent({
-      action: "PIN_FEATURED_USER",
-      actorId: staffId,
-      targetId: userId,
-      details: { category, notes }
+      eventType: "PIN_FEATURED_USER",
+      entityType: "User",
+      entityId: userId,
+      userId: staffId,
+      metadata: { category, notes }
     });
     
     return { success: true };
   } catch (error) {
-    logger.error("Error pinning user", error);
+    logger.error({ err: error }, "Error pinning user");
     throw new Error("Failed to pin user");
   }
 }
@@ -216,7 +218,7 @@ function buildFeaturedCard(user: any, reason: string) {
     ratingAverage: user.ratingAverage,
     ratingCount: user.ratingCount,
     totalJobsCompleted: user.totalJobsCompleted,
-    kycBadge: user.kycRecord?.status === "VERIFIED" ? "shield" : null,
+    kycBadge: user.kyc?.status === "VERIFIED" ? "shield" : null,
     isAvailableForWork: user.isAvailableForWork,
     reason
   };

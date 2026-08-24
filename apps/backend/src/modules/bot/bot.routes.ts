@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { getBot, webhookHandler, startBot, stopBot } from "./bot.service.js";
 import { env } from "../../config/env.js";
+import { requireAuth } from "../../middleware/auth.js";
+import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
 
 const router = Router();
@@ -74,7 +76,7 @@ router.get("/telegram/health", async (req: Request, res: Response) => {
 });
 
 // Bot info endpoint
-router.get("/telegram/info", async (req: Request, res: Response) => {
+router.get("/telegram/info", requireAuth, requireStaffRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const bot = getBot();
     if (!bot) {
@@ -97,7 +99,7 @@ router.get("/telegram/info", async (req: Request, res: Response) => {
 });
 
 // Set webhook (admin only)
-router.post("/telegram/set-webhook", async (req: Request, res: Response) => {
+router.post("/telegram/set-webhook", requireAuth, requireStaffRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const bot = getBot();
     if (!bot) {
@@ -135,7 +137,7 @@ router.post("/telegram/set-webhook", async (req: Request, res: Response) => {
 });
 
 // Delete webhook (admin only)
-router.post("/telegram/delete-webhook", async (req: Request, res: Response) => {
+router.post("/telegram/delete-webhook", requireAuth, requireStaffRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     const bot = getBot();
     if (!bot) {
@@ -152,13 +154,16 @@ router.post("/telegram/delete-webhook", async (req: Request, res: Response) => {
 });
 
 // Start bot (for polling mode in development)
-router.post("/telegram/start-polling", async (req: Request, res: Response) => {
+router.post("/telegram/start-polling", requireAuth, requireStaffRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     if (env.NODE_ENV === "production") {
       return res.status(400).json({ error: "Polling not allowed in production" });
     }
 
-    await startBot();
+    const started = await startBot();
+    if (!started) {
+      return res.status(400).json({ error: "TELEGRAM_BOT_TOKEN is not configured" });
+    }
     res.json({ success: true, message: "Bot started in polling mode" });
   } catch (error) {
     logger.error({ error }, "Failed to start bot polling");
@@ -167,7 +172,7 @@ router.post("/telegram/start-polling", async (req: Request, res: Response) => {
 });
 
 // Stop bot
-router.post("/telegram/stop", async (req: Request, res: Response) => {
+router.post("/telegram/stop", requireAuth, requireStaffRole("ADMIN"), async (req: Request, res: Response) => {
   try {
     await stopBot();
     res.json({ success: true, message: "Bot stopped" });

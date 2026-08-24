@@ -17,7 +17,7 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
 
 function getRateLimitKey(ctx: BotContext, type: keyof typeof RATE_LIMITS): string {
   const userId = ctx.session.telegramUserId || ctx.session.telegramChatId;
-  return `${RATE_LIMITS[type].keyPrefix}:${userId}`;
+  return `${RATE_LIMITS[type]!.keyPrefix}:${userId}`;
 }
 
 function getLimitType(ctx: BotContext): keyof typeof RATE_LIMITS {
@@ -27,7 +27,7 @@ function getLimitType(ctx: BotContext): keyof typeof RATE_LIMITS {
   if (update.callback_query?.data?.startsWith("staff:")) return "staff";
   if (update.callback_query?.data?.includes(":")) return "mutation";
   if (update.message?.text?.startsWith("/")) {
-    const command = update.message.text.split(" ")[0].slice(1);
+    const command = update.message.text.split(" ")[0]!.slice(1);
     const mutationCommands = ["propose", "withdraw", "topup", "kyc", "dispute", "accept", "reject", "approve", "sign", "fund", "deliver", "broadcast"];
     if (mutationCommands.some(c => command.startsWith(c))) return "mutation";
   }

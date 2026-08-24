@@ -168,7 +168,7 @@ export const telebirrClient: PaymentProviderClient = {
 
     const rawRequest = Object.keys(rawMap)
       .sort()
-      .map((k) => `${k}=${encodeURIComponent(rawMap[k])}`)
+      .map((k) => `${k}=${encodeURIComponent(rawMap[k]!)}`)
       .join("&")
       + `&sign=${encodeURIComponent(rawSign)}&sign_type=SHA256WithRSA`;
 
@@ -233,5 +233,92 @@ export const telebirrClient: PaymentProviderClient = {
     }
 
     return isValid;
+  },
+
+  /**
+   * Direct transaction-status query (payment.query.order) used by the
+   * payment reconciliation sweep. Signed exactly like preOrder: fabric
+   * token + canonical signing string + merchant private key.
+   *
+   * Returns null when Telebirr has no record of the merch_order_id yet —
+   * that means the user likely never opened/confirmed the checkout page,
+   * which is a normal PENDING, not an error.
+   */
+  async queryPaymentStatus({ providerTransactionId }): Promise<{
+    status: "SUCCESS" | "FAILED" | "PENDING";
+  } | null> {
+    if (!hasCredentials()) {
+      logger.warn("Telebirr credentials not configured — reconciliation query unavailable.");
+      return null;
+    }
+
+    const fabricToken = await getFabricToken();
+
+    const queryRequest: Record<string, unknown> = {
+      timestamp: createTimestamp(),
+      nonce_str: createNonceStr(),
+      method: "payment.query.order",
+      version: "1.0",
+      biz_content: {
+        appid: env.TELEBIRR_MERCHANT_APP_ID,
+        merch_code: env.TELEBIRR_MERCHANT_CODE,
+        merch_order_id: providerTransactionId,
+      },
+      sign: "",
+      sign_type: "SHA256WithRSA",
+    };
+    queryRequest.sign = signRequestObject(queryRequest, env.TELEBIRR_PRIVATE_KEY!);
+
+    let response: Response;
+    try {
+      response = await fetch(`${env.TELEBIRR_BASE_URL}/payment/v1/merchant/queryOrder`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-APP-Key": env.TELEBIRR_FABRIC_APP_ID!,
+          Authorization: `Bearer ${fabricToken}`,
+        },
+        body: JSON.stringify(queryRequest),
+      });
+    } catch (err) {
+      await invalidateFabricToken();
+      throw new Error(
+        `Telebirr queryOrder request failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+
+    if (!response.ok) {
+      if (response.status === 401) await invalidateFabricToken();
+      const body = await response.text().catch(() => "");
+      throw new Error(`Telebirr queryOrder failed: HTTP ${response.status} — ${body}`);
+    }
+
+    const data = (await response.json()) as {
+      code?: number;
+      msg?: string;
+      biz_content?: {
+        trade_status?: string;
+        trade_voucher?: string;
+        total_amount?: string;
+      };
+    };
+
+    // Telebirr returns a non-200 business code when the order is unknown.
+    if (data.code !== 200 || !data.biz_content?.trade_status) {
+      logger.info(
+        { providerTransactionId, code: data.code, msg: data.msg },
+        "Telebirr has no record of this order yet — treating as still PENDING.",
+      );
+      return null;
+    }
+
+    // Same status vocabulary as the webhook handler in webhooks.routes.ts.
+    const s = data.biz_content.trade_status.toLowerCase();
+    let status: "SUCCESS" | "FAILED" | "PENDING";
+    if (["completed", "success"].includes(s)) status = "SUCCESS";
+    else if (["fail", "failed", "closed", "cancelled"].includes(s)) status = "FAILED";
+    else status = "PENDING";
+
+    return { status };
   },
 };

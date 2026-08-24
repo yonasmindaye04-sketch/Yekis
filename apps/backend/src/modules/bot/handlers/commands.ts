@@ -7,35 +7,29 @@ import { walletActionsKeyboard, kycActionsKeyboard, jobFiltersKeyboard, settings
 import { webAppRoutes } from "../utils/deepLink.js";
 
 export function registerCommands(bot: Bot<BotContext>) {
- // /start - Entry point
- bot.command("start", async (ctx) => {
- 
- const isNewUser = !ctx.session.userId;
+  // /start - Entry point
+  bot.command("start", async (ctx) => {
+    const frontendUrl = env.FRONTEND_URL || "";
+    const name = ctx.from?.first_name || "there";
 
- // If user has Telegram Web App data, they're coming from Mini App
- const webAppData = ctx.message?.web_app_data?.data;
- if (webAppData) {
- // Handle Mini App return - user already authenticated
- await ctx.reply(ctx.t("welcome_returning"), {
- reply_markup: mainMenuKeyboard(ctx),
- });
- return;
- }
+    const kb = new InlineKeyboard();
+    if (frontendUrl && frontendUrl.startsWith("https://")) {
+      kb.webApp("Open Yekis Jobs", frontendUrl).row();
+    }
+    kb.text("Browse Jobs", "menu:jobs")
+      .text("My Contracts", "menu:contracts").row()
+      .text("Wallet", "menu:wallet")
+      .text("KYC Verification", "menu:kyc").row()
+      .text("Settings", "menu:settings")
+      .text("Help", "menu:help");
 
- const welcomeText = isNewUser ? ctx.t("welcome") : ctx.t("welcome_returning");
+    const welcomeMsg = `**Welcome to Yekis Jobs, ${name}!**\n\nEthiopia's premier escrow-protected freelance marketplace.\n\n**What you can do:**\n• **Clients:** Post jobs, review proposals, and fund secure escrow.\n• **Freelancers:** Browse jobs, submit proposals, and get guaranteed payouts.\n\nTap **"Open Yekis Jobs"** below to launch the workspace, or choose an option below:`;
 
- await ctx.reply(welcomeText, {
- reply_markup: isNewUser ? languageKeyboard() : mainMenuKeyboard(ctx),
- parse_mode: "Markdown",
- });
-
- // If new user, prompt for language selection
- if (isNewUser) {
- await ctx.reply(ctx.t("choose_language"), {
- reply_markup: languageKeyboard(),
- });
- }
- });
+    await ctx.reply(welcomeMsg, {
+      reply_markup: kb,
+      parse_mode: "Markdown",
+    });
+  });
 
  // /menu - Show main menu
  bot.command("menu", async (ctx) => {

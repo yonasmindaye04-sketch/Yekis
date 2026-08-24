@@ -7,8 +7,9 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "pnpm -r --parallel dev",
     "dev:backend": "pnpm --filter backend dev",
-    "dev:web": "pnpm --filter web dev",
+    "dev:frontend": "pnpm --filter frontend dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"

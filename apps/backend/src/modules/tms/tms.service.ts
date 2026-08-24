@@ -2,6 +2,7 @@
 import type { TransactionFlagType } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 
@@ -35,6 +36,13 @@ async function createFlag(params: {
   });
 
   logger.warn({ flagId: flag.id, type: params.type, userId: params.userId }, "AML rule triggered — flag created");
+
+  // Staff alert: flags previously landed in a dashboard nobody watched.
+  await notifyStaffOfEvent({
+    eventType: "tms-flag-raised",
+    message: `AML flag raised for user ${params.userId}. Review the compliance queue.`,
+    metadata: { flagId: flag.id, flagType: params.type, targetUserId: params.userId },
+  });
 
   return flag;
 }

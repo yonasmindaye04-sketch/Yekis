@@ -10,7 +10,7 @@ export const portfolioRouter = Router();
 portfolioRouter.get("/users/:userId/portfolio", async (req, res) => {
   try {
     const { userId } = req.params;
-    const items = await listPortfolioItems(userId);
+    const items = await listPortfolioItems(userId!);
     return res.json(items);
   } catch (err) {
     logger.error({ err }, "Failed to list portfolio items");
@@ -34,7 +34,7 @@ portfolioRouter.patch("/me/:itemId", requireAuth, async (req: AuthedRequest, res
   try {
     const userId = req.user!.id;
     const { itemId } = req.params;
-    const item = await updatePortfolioItem(userId, itemId, req.body);
+    const item = await updatePortfolioItem(userId, itemId!, req.body);
     return res.json(item);
   } catch (err: any) {
     if (err.message?.startsWith("NOT_FOUND")) return res.status(404).json({ error: err.message });
@@ -48,7 +48,7 @@ portfolioRouter.delete("/me/:itemId", requireAuth, async (req: AuthedRequest, re
   try {
     const userId = req.user!.id;
     const { itemId } = req.params;
-    await deletePortfolioItem(userId, itemId);
+    await deletePortfolioItem(userId, itemId!);
     return res.json({ success: true });
   } catch (err: any) {
     if (err.message?.startsWith("NOT_FOUND")) return res.status(404).json({ error: err.message });

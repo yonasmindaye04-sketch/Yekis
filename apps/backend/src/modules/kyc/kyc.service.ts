@@ -1,6 +1,7 @@
 import type { KycDocumentType } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { uploadKycDocument, getKycDocumentUrl } from "../../lib/objectStore.js";
 import { verifyWithFayda } from "./fayda.client.js";
 import { screenForPep } from "./pep.client.js";
@@ -207,6 +208,16 @@ export async function upgradeToTier2(params: {
     metadata: { requestedTier: updated.tier },
   });
 
+  await notifyStaffOfEvent({
+    eventType: "kyc-upgrade-pending-review",
+    message: `KYC Tier upgrade requested by user ${params.userId}${pepResult.isMatch ? " - PEP MATCH, enhanced review required" : ""}.`,
+    metadata: {
+      kycRecordId: kyc.id,
+      targetUserId: params.userId,
+      isPepMatch: pepResult.isMatch,
+    },
+  });
+
   return updated;
 }
 
@@ -305,50 +316,41 @@ export async function getKycStatus(userId: string) {
   };
 }
 
-export async function getReviewQueue(params?: { page?: number; limit?: number; search?: string; status?: string }) {
-  const page = Math.max(1, params?.page || 1);
-  const limit = Math.max(1, Math.min(100, params?.limit || 20));
-  
+export async function getReviewQueue(filters?: { page?: number; limit?: number; search?: string; status?: string }) {
   const where: any = {};
-
-  // T2-J: "PERIODIC_REVIEW" is a virtual status — it queries for records where
-  // periodicReviewPending is true, regardless of their KycStatus. This allows
-  // staff to see re-review cases (existing verified users due for refresh) in a
-  // separate queue from first-time UNDER_REVIEW submissions.
-  if (params?.status === "PERIODIC_REVIEW") {
-    where.periodicReviewPending = true;
-  } else if (params?.status) {
-    where.status = params.status;
+  if (filters?.status) {
+    where.status = filters.status;
   } else {
-    // Default to UNDER_REVIEW if no specific status requested
     where.status = "UNDER_REVIEW";
   }
+  const page = Math.max(1, filters?.page ?? 1);
+  const limit = Math.min(100, Math.max(1, filters?.limit ?? 25));
 
-  if (params?.search) {
+  if (filters?.search) {
+    const q = filters.search.trim();
     where.user = {
       OR: [
-        { email: { contains: params.search, mode: 'insensitive' } },
-        { phone: { contains: params.search } }
-      ]
+        { email: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q } },
+        { ucid: { contains: q, mode: "insensitive" } },
+      ],
     };
   }
 
+  // Audit finding fix: previously ignored page/limit/search entirely and
+  // returned an unbounded result set.
   const [total, items] = await Promise.all([
     prisma.kycRecord.count({ where }),
     prisma.kycRecord.findMany({
       where,
-      include: { 
-        user: { select: { id: true, email: true, phone: true, ucid: true, dateOfBirth: true } }, 
-        documents: true,
-        reviewEvents: { orderBy: { createdAt: "desc" } }
-      },
-      orderBy: { updatedAt: "asc" },
-      skip: (page - 1) * limit,
+      include: { user: { select: { id: true, email: true, phone: true, ucid: true } }, documents: true },
+      orderBy: { updatedAt: "asc" }, // oldest-waiting-first
       take: limit,
-    })
+      skip: (page - 1) * limit,
+    }),
   ]);
 
-  return { items, total, page, pageSize: limit };
+  return { items, total, page, limit };
 }
 
 /**

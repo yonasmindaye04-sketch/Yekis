@@ -90,11 +90,8 @@ export async function sendNotification(
   }
 }
 
-/**
- * Map event type to notification category for user preferences
- */
-function getEventCategory(event: string): keyof NonNullable<BotContext["session"]["notificationSettings"]> {
-  const categoryMap: Record<string, keyof NonNullable<BotContext["session"]["notificationSettings"]>> = {
+function getEventCategory(event: string): string {
+  const categoryMap: Record<string, string> = {
     "job.new_match": "jobs",
     "job.applied": "jobs",
     "proposal.received": "proposals",

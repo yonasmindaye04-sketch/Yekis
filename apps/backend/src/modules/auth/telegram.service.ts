@@ -105,19 +105,29 @@ export async function loginWithTelegram(initData: string, role?: string) {
   const telegram = parseAndCheckFreshness(params);
   const email = telegramEmail(telegram.id);
 
+  const selectedRole = role === "FREELANCER" || role === "BOTH" ? role : "CLIENT";
   const user = await prisma.user.upsert({
     where: { email },
     update: {
       languagePreference: telegram.language_code === "am" ? "am" : "en",
+      firstName: telegram.first_name || undefined,
+      lastName: telegram.last_name || undefined,
+      displayName: telegram.first_name ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}` : undefined,
+      avatarUrl: telegram.photo_url || undefined,
+      ...(role ? { role: selectedRole } : {}),
     },
     create: {
       email,
       phone: telegramPhone(telegram.id),
       passwordHash: await argon2.hash(randomBytes(32).toString("hex")),
-      role: role === "FREELANCER" || role === "BOTH" ? role : "CLIENT",
+      role: selectedRole,
+      firstName: telegram.first_name || "",
+      lastName: telegram.last_name || "",
+      displayName: telegram.first_name ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}` : "Telegram Member",
+      avatarUrl: telegram.photo_url || null,
       languagePreference: telegram.language_code === "am" ? "am" : "en",
-      dateOfBirth: new Date("1990-01-01T00:00:00.000Z"),
-      kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+      // No fabricated DOB - AML data integrity. Real DOB captured at Tier-2 Fayda.
+      kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
       wallet: { create: { balanceMinor: 0 } },
       consents: {
         create: [

@@ -1,6 +1,20 @@
 // === IMPORTS ===
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
 import { z } from "zod";
+
+// Load .env from apps/backend/.env, repo root, and current working directory.
+// (Derived from process.cwd() rather than import.meta.url — the project builds
+// as CommonJS under NodeNext, where import.meta is not permitted.)
+const envPaths = [
+  path.resolve(process.cwd(), ".env"), // run from apps/backend
+  path.resolve(process.cwd(), "apps/backend/.env"), // run from repo root
+  path.resolve(process.cwd(), "../../.env"), // monorepo parent fallback
+];
+
+for (const envPath of envPaths) {
+  dotenv.config({ path: envPath, override: false });
+}
 
 // Fail fast on startup if required config is missing — better than a
 // confusing runtime error three requests into production.
@@ -47,13 +61,35 @@ const EnvSchema = z.object({
 
   SMS_ETHIOPIA_API_KEY: z.string().optional(),
 
-  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_TOKEN: z
+    .string()
+    .transform((val) => val.trim().replace(/^["']|["']$/g, "").trim())
+    .pipe(z.string().min(1))
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   TELEGRAM_WEBHOOK_URL: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  // Social sign-in (oauth.service.ts). Each provider independently gated:
+  // unset = button hidden client-side + endpoint returns 503.
+  APPLE_CLIENT_ID: z.string().optional(),
+  FACEBOOK_APP_ID: z.string().optional(),
+  FACEBOOK_APP_SECRET: z.string().optional(),
   FRONTEND_URL: z.string().default("http://localhost:5173"),
   TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: z.coerce.number().default(86400),
 
   CHAPA_SECRET_KEY: z.string().optional(),
+
+  // Google OAuth & Social Auth
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+  // Transactional Email Service
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_SECURE: z.coerce.boolean().default(false),
+  EMAIL_FROM: z.string().default("Yekis Notifications <notifications@yekis.com>"),
 
   SENTRY_DSN: z.string().optional(),
 
@@ -66,6 +102,15 @@ const EnvSchema = z.object({
   WITHHOLDING_RATE_WITHOUT_TIN: z.coerce.number().default(0.3),
 
   AUTO_RELEASE_WINDOW_DAYS: z.coerce.number().default(5),
+
+  // Payment reconciliation sweep (paymentReconcile.worker.ts) — the webhook
+  // safety net. Polls Telebirr's queryOrder API for escrow transactions still
+  // PENDING past STALE minutes; gives up (leaves PENDING for manual review)
+  // after GIVE_UP_HOURS, matching the checkout expiry window plus slack.
+  PAYMENT_RECONCILE_CRON: z.string().default("*/10 * * * *"), // every 10 min
+  PAYMENT_RECONCILE_STALE_MINUTES: z.coerce.number().default(5),
+  PAYMENT_RECONCILE_GIVE_UP_HOURS: z.coerce.number().default(3),
+  PAYMENT_RECONCILE_BATCH_SIZE: z.coerce.number().default(50),
 
   // Take-rate — proposed 10% total, split evenly. Confirm final % with the
   // Phase 0 decision log before this stops being a placeholder default.
@@ -100,6 +145,11 @@ const EnvSchema = z.object({
   // Blocked on: Compliance Officer selecting a real screening vendor (UN/OFAC/FIC).
   // See COMPLIANCE_BLOCKERS.md §PEP Screening for details.
   PEP_PROVIDER: z.enum(["mock", "real"]).default("mock"),
+
+  // Number of trusted proxy hops in front of the API (ngrok, nginx, ALB...).
+  // Required for correct client IPs (rate limiting, audit logs) whenever the
+  // API is not reached directly. Leave unset when running bare on localhost.
+  TRUST_PROXY: z.coerce.number().int().min(0).optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

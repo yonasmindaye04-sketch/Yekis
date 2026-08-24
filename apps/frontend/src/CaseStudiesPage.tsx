@@ -19,7 +19,7 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
             {[1, 2, 3].map((i) => (
               <div key={i} className="card">
                 <span className="placeholder-badge">Coming Soon</span>
-                <div style={{ color: 'var(--color-teal)', fontSize: '14px', marginBottom: '10px' }}>Category Placeholder</div>
+                <div style={{ color: 'var(--color-primary)', fontSize: '14px', marginBottom: '10px', fontWeight: 600 }}>Category Placeholder</div>
                 <h3>Project Title Placeholder</h3>
                 <p style={{ margin: '15px 0', color: 'var(--color-text-secondary)' }}>Outcome summary placeholder. This is where the story of successful escrow-protected work will go.</p>
                 <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '15px', marginTop: '15px' }}>

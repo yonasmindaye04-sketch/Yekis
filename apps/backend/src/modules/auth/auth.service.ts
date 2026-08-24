@@ -6,6 +6,7 @@ import type { RegisterInput, LoginInput } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { env } from "../../config/env.js";
+import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
@@ -72,7 +73,7 @@ export async function registerUser(input: RegisterInput) {
   return user;
 }
 
-export async function createAuthTokens(user: { id: string; role: string; ucid: string | null }) {
+export async function createAuthTokens(user: { id: string; role: string; ucid: string | null; staffRole?: string | null }) {
   const accessToken = await new SignJWT({ role: user.role, staffRole: user.staffRole ?? null })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
@@ -88,8 +89,43 @@ export async function createAuthTokens(user: { id: string; role: string; ucid: s
   return { accessToken, refreshToken, user: { id: user.id, ucid: user.ucid, role: user.role } };
 }
 
+export function normalizeLoginIdentifier(rawIdentifier: string): { email?: string; phone?: string } {
+  const trimmed = rawIdentifier.trim();
+  if (trimmed.includes("@")) {
+    return { email: trimmed.toLowerCase() };
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  if (digits.startsWith("251") && digits.length === 12) {
+    return { phone: `+${digits}` };
+  }
+  if (digits.startsWith("0") && digits.length === 10) {
+    return { phone: `+251${digits.slice(1)}` };
+  }
+  if (digits.startsWith("9") && digits.length === 9) {
+    return { phone: `+251${digits}` };
+  }
+  if (trimmed.startsWith("+")) {
+    return { phone: trimmed };
+  }
+  return { phone: digits ? `+251${digits}` : undefined, email: trimmed.toLowerCase() };
+}
+
 export async function loginUser(input: LoginInput) {
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  const rawId = input.identifier || input.email || input.phone || "";
+  const normalized = normalizeLoginIdentifier(rawId);
+
+  const orConditions: Array<{ email?: string; phone?: string }> = [];
+  if (input.email) orConditions.push({ email: input.email.toLowerCase() });
+  if (input.phone) orConditions.push({ phone: input.phone });
+  if (normalized.email) orConditions.push({ email: normalized.email });
+  if (normalized.phone) orConditions.push({ phone: normalized.phone });
+
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: orConditions,
+    },
+  });
+
   if (!user) throw new InvalidCredentialsError();
 
   const valid = await argon2.verify(user.passwordHash, input.password);
@@ -140,11 +176,16 @@ export async function requestPasswordReset(email: string) {
     entityId: user.id,
   });
 
-  // Since we have no email provider in this dev environment, log it to the console
-  console.log(`\n=============================================================`);
-  console.log(`PASSWORD RESET REQUESTED FOR: ${email}`);
-  console.log(`RESET TOKEN: ${token}`);
-  console.log(`=============================================================\n`);
+  // Dispatch branded transactional email with password reset link and token
+  try {
+    await sendPasswordResetEmail({
+      email,
+      name: user.displayName || user.firstName || undefined,
+      token,
+    });
+  } catch (err) {
+    console.error("Failed to transmit password reset email:", err);
+  }
 }
 
 export async function resetPassword(token: string, newPassword: string) {

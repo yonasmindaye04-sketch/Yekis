@@ -1,28 +1,33 @@
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
+import { env } from "../../../config/env.js";
 
 export function mainMenuKeyboard(ctx: BotContext): InlineKeyboard {
- 
- const kb = new InlineKeyboard();
+  const kb = new InlineKeyboard();
+  const frontendUrl = env.FRONTEND_URL || "";
 
- // Common for all authenticated users
- kb.text(ctx.t("menu_jobs"), "menu:jobs")
- .text(ctx.t("menu_my_jobs"), "menu:my_jobs").row()
- .text(ctx.t("menu_proposals"), "menu:proposals")
- .text(ctx.t("menu_contracts"), "menu:contracts").row()
- .text(ctx.t("menu_wallet"), "menu:wallet")
- .text(ctx.t("menu_kyc"), "menu:kyc").row()
- .text(ctx.t("menu_disputes"), "menu:disputes")
- .text(ctx.t("menu_notifications"), "menu:notifications").row()
- .text(ctx.t("menu_settings"), "menu:settings")
- .text(ctx.t("menu_help"), "menu:help");
+  if (frontendUrl && frontendUrl.startsWith("https://")) {
+    kb.webApp("Open Yekis Jobs", frontendUrl).row();
+  }
 
- // Staff-only
- if (ctx.session.role === "STAFF") {
- kb.row().text(ctx.t("menu_staff_dashboard"), "menu:staff");
- }
+  // Common for all authenticated users
+  kb.text(ctx.t("menu_jobs") || "Browse Jobs", "menu:jobs")
+    .text(ctx.t("menu_my_jobs") || "My Jobs", "menu:my_jobs").row()
+    .text(ctx.t("menu_proposals") || "Proposals", "menu:proposals")
+    .text(ctx.t("menu_contracts") || "Contracts", "menu:contracts").row()
+    .text(ctx.t("menu_wallet") || "Wallet", "menu:wallet")
+    .text(ctx.t("menu_kyc") || "KYC Verification", "menu:kyc").row()
+    .text(ctx.t("menu_disputes") || "Disputes", "menu:disputes")
+    .text(ctx.t("menu_notifications") || "Notifications", "menu:notifications").row()
+    .text(ctx.t("menu_settings") || "Settings", "menu:settings")
+    .text(ctx.t("menu_help") || "Help", "menu:help");
 
- return kb;
+  // Staff-only
+  if (ctx.session.role === "STAFF") {
+    kb.row().text(ctx.t("menu_staff_dashboard") || "Staff Dashboard", "menu:staff");
+  }
+
+  return kb;
 }
 
 export function languageKeyboard(): InlineKeyboard {

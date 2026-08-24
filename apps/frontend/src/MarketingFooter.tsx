@@ -1,0 +1,57 @@
+import { Send, MessageCircle, Bot, Mail, ShieldCheck } from "lucide-react";
+
+type MarketingFooterProps = {
+  onNavigate: (page: string) => void;
+};
+
+export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
+  return (
+    <footer className="landing-footer marketing-footer">
+      <div className="marketing-container">
+        <div className="footer-grid">
+          <div className="footer-col footer-brand">
+            <div className="landing-brand" style={{ marginBottom: 16 }}>
+              <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
+              <strong>Yekis</strong>
+            </div>
+            <p className="footer-desc">
+              Ethiopia's escrow-protected freelance marketplace. Post work, pay into
+              escrow, and get your result — or your money back.
+            </p>
+            <div className="footer-social">
+              <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram channel"><Send size={16} /></a>
+              <a href="https://t.me/yekis_group" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram community"><MessageCircle size={16} /></a>
+              <a href="https://t.me/yekis_bot" target="_blank" rel="noopener noreferrer" aria-label="Yekis Telegram bot"><Bot size={16} /></a>
+              <a href="mailto:support@yekis.com" aria-label="Email Yekis support"><Mail size={16} /></a>
+            </div>
+          </div>
+          <nav className="footer-col" aria-label="Platform">
+            <h4>Platform</h4>
+            <button onClick={() => onNavigate("faq")}>FAQ</button>
+            <button onClick={() => onNavigate("fees")}>Fees</button>
+            <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
+          </nav>
+          <nav className="footer-col" aria-label="Company">
+            <h4>Company</h4>
+            <button onClick={() => onNavigate("about")}>About Us</button>
+            <a href="mailto:support@yekis.com">Contact Support</a>
+          </nav>
+          <nav className="footer-col" aria-label="Legal">
+            <h4>Legal</h4>
+            <button onClick={() => onNavigate("privacy")}>Privacy Policy</button>
+            <button onClick={() => onNavigate("terms")}>Terms of Service</button>
+          </nav>
+        </div>
+        <div className="footer-bottom">
+          <div className="footer-bottom-left">
+            <span>© {new Date().getFullYear()} Yekis. All rights reserved.</span>
+            <span className="footer-escrow-note">
+              <ShieldCheck size={15} /> Payments secured by Yekis Escrow
+            </span>
+          </div>
+          <button className="footer-lang-toggle">EN / አማ</button>
+        </div>
+      </div>
+    </footer>
+  );
+}

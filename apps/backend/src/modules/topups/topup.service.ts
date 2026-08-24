@@ -2,6 +2,7 @@
 import type { PaymentProvider } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { uploadTopUpReceipt, getSignedObjectUrl } from "../../lib/objectStore.js";
 import { notificationQueue } from "../../queue/queues.js";
 import { logger } from "../../lib/logger.js";
@@ -44,6 +45,12 @@ export async function submitTopUp(params: {
     entityType: "WalletTopUp",
     entityId: topUp.id,
     metadata: { provider: params.provider, amountMinor: params.amountMinor },
+  });
+
+  await notifyStaffOfEvent({
+    eventType: "topup-pending-review",
+    message: `New wallet top-up request awaiting receipt verification (${params.provider}).`,
+    metadata: { topUpId: topUp.id, targetUserId: params.userId },
   });
 
   return topUp;

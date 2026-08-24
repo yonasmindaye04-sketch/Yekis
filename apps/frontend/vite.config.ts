@@ -11,11 +11,17 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] })
   ],
   server: {
-    host: true, // binds to all interfaces including IPv6, fixing ngrok 502 errors
+    host: true, // binds to 0.0.0.0 for external and tunnel traffic
     port: 5173,
-    // Telegram opens the Mini App through the public ngrok hostname. Vite
-    // blocks unknown Host headers unless the tunnel domains are allowlisted.
-    allowedHosts: ['.ngrok-free.dev', '.ngrok.io'],
+    allowedHosts: true, // Allow all ngrok and tunnel hostnames
+    hmr: {
+      clientPort: 443, // Connects WSS via ngrok HTTPS port 443 instead of failing on localhost
+    },
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'ngrok-skip-browser-warning': 'true',
+      'X-Frame-Options': 'ALLOWALL',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:4000',

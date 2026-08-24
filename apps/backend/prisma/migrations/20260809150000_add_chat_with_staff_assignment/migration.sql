@@ -1,52 +1,34 @@
--- CreateTable: Support Chat models with staff assignment
+-- AlterTable: Conversation
+ALTER TABLE "Conversation" ADD COLUMN "assignedStaffId" TEXT;
+ALTER TABLE "Conversation" ALTER COLUMN "status" DROP DEFAULT;
+ALTER TABLE "Conversation" ALTER COLUMN "status" TYPE TEXT USING "status"::TEXT;
+ALTER TABLE "Conversation" ALTER COLUMN "status" SET DEFAULT 'OPEN';
+DROP TYPE IF EXISTS "ConversationStatus";
 
-CREATE TABLE "Conversation" (
-    "id" TEXT NOT NULL,
-    "creatorId" TEXT NOT NULL,
-    "assignedStaffId" TEXT,
-    "subject" TEXT NOT NULL,
-    "status" TEXT NOT NULL DEFAULT 'OPEN',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL,
-    CONSTRAINT "Conversation_pkey" PRIMARY KEY ("id")
-);
-
-CREATE TABLE "ConversationParticipant" (
-    "id" TEXT NOT NULL,
-    "conversationId" TEXT NOT NULL,
-    "userId" TEXT NOT NULL,
-    "lastReadAt" TIMESTAMP(3),
-    CONSTRAINT "ConversationParticipant_pkey" PRIMARY KEY ("id")
-);
-
-CREATE TABLE "ChatMessage" (
-    "id" TEXT NOT NULL,
-    "conversationId" TEXT NOT NULL,
-    "senderId" TEXT NOT NULL,
-    "body" TEXT NOT NULL,
-    "attachmentUrl" TEXT,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "ChatMessage_pkey" PRIMARY KEY ("id")
-);
-
--- CreateIndex
+-- Drop old Conversation indexes and create new ones
+DROP INDEX IF EXISTS "Conversation_creatorId_updatedAt_idx";
+DROP INDEX IF EXISTS "Conversation_status_updatedAt_idx";
 CREATE INDEX "Conversation_status_idx" ON "Conversation"("status");
 CREATE INDEX "Conversation_creatorId_idx" ON "Conversation"("creatorId");
 CREATE INDEX "Conversation_assignedStaffId_idx" ON "Conversation"("assignedStaffId");
 
-CREATE UNIQUE INDEX "ConversationParticipant_conversationId_userId_key" ON "ConversationParticipant"("conversationId", "userId");
+-- Add ForeignKey for assignedStaffId
+ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_assignedStaffId_fkey" FOREIGN KEY ("assignedStaffId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AlterTable: ConversationParticipant
+ALTER TABLE "ConversationParticipant" DROP COLUMN IF EXISTS "joinedAt";
+DROP INDEX IF EXISTS "ConversationParticipant_userId_lastReadAt_idx";
 CREATE INDEX "ConversationParticipant_conversationId_idx" ON "ConversationParticipant"("conversationId");
 CREATE INDEX "ConversationParticipant_userId_idx" ON "ConversationParticipant"("userId");
 
+ALTER TABLE "ConversationParticipant" DROP CONSTRAINT IF EXISTS "ConversationParticipant_conversationId_fkey";
+ALTER TABLE "ConversationParticipant" ADD CONSTRAINT "ConversationParticipant_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AlterTable: ChatMessage
+ALTER TABLE "ChatMessage" ADD COLUMN "attachmentUrl" TEXT;
+DROP INDEX IF EXISTS "ChatMessage_conversationId_createdAt_idx";
 CREATE INDEX "ChatMessage_conversationId_idx" ON "ChatMessage"("conversationId");
 CREATE INDEX "ChatMessage_senderId_idx" ON "ChatMessage"("senderId");
 
--- AddForeignKey
-ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_creatorId_fkey" FOREIGN KEY ("creatorId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "Conversation" ADD CONSTRAINT "Conversation_assignedStaffId_fkey" FOREIGN KEY ("assignedStaffId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
-ALTER TABLE "ConversationParticipant" ADD CONSTRAINT "ConversationParticipant_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "ConversationParticipant" ADD CONSTRAINT "ConversationParticipant_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
+ALTER TABLE "ChatMessage" DROP CONSTRAINT IF EXISTS "ChatMessage_conversationId_fkey";
 ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_conversationId_fkey" FOREIGN KEY ("conversationId") REFERENCES "Conversation"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "ChatMessage" ADD CONSTRAINT "ChatMessage_senderId_fkey" FOREIGN KEY ("senderId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

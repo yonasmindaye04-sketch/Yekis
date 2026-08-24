@@ -1,0 +1,167 @@
+/* ── Scroll & motion layer (marketing site) ────────────────
+   All animations no-op under prefers-reduced-motion. */
+
+/* Splash */
+.yekis-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  transition: opacity 480ms ease, visibility 480ms ease;
+}
+
+.yekis-splash-fade {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.yekis-splash-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: splash-pop 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.yekis-splash-logo {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 6px 18px rgba(22, 163, 74, 0.35));
+}
+
+.yekis-splash-word {
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--color-text);
+}
+
+.yekis-splash-bar {
+  width: 148px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--color-border);
+  overflow: hidden;
+}
+
+.yekis-splash-bar-fill {
+  height: 100%;
+  width: 40%;
+  border-radius: 999px;
+  background: var(--color-primary);
+  animation: splash-load 900ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes splash-pop {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes splash-load {
+  from {
+    width: 8%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Scroll progress bar */
+.yekis-scroll-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 1500;
+  pointer-events: none;
+  background: transparent;
+}
+
+.yekis-scroll-progress-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-teal));
+  border-radius: 0 999px 999px 0;
+  box-shadow: 0 0 8px rgba(22, 163, 74, 0.45);
+}
+
+/* Header elevation on scroll */
+.marketing-header {
+  transition: box-shadow 240ms ease, background 240ms ease;
+}
+
+.marketing-header.is-scrolled {
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(10px);
+}
+
+/* Reveal-on-scroll */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 640ms cubic-bezier(0.2, 0.7, 0.3, 1),
+    transform 640ms cubic-bezier(0.2, 0.7, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+[data-reveal="left"] {
+  transform: translateX(-32px);
+}
+
+[data-reveal="right"] {
+  transform: translateX(32px);
+}
+
+[data-reveal="zoom"] {
+  transform: scale(0.94);
+}
+
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Hero parallax hook (value set from JS) */
+[data-parallax] {
+  transform: translateY(calc(var(--parallax-y, 0px) * -1));
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yekis-splash,
+  .yekis-splash-inner,
+  .yekis-splash-bar-fill {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .yekis-splash {
+    display: none; /* skip the splash entirely for reduced-motion users */
+  }
+
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  [data-parallax] {
+    transform: none !important;
+  }
+
+  .yekis-scroll-progress {
+    display: none;
+  }
+}

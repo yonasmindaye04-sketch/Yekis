@@ -24,9 +24,9 @@ profileRouter.get("/:userId/profile", optionalAuth, async (req: AuthedRequest, r
     const viewerId = req.user?.id;
     const { userId } = req.params;
 
-    const profile = await profileService.getPublicProfile(userId, viewerId);
+    const profile = await profileService.getPublicProfile(userId!, viewerId);
     
-    profileService.recordProfileView(userId, viewerId, req.query.source as string).catch(e => {
+    profileService.recordProfileView(userId!, viewerId, req.query.source as string).catch(e => {
       logger.error({ err: e }, "Failed to record profile view");
     });
 
@@ -75,7 +75,7 @@ profileRouter.post("/:userId/report", requireAuth, async (req: AuthedRequest, re
     const { userId } = req.params;
     const validatedData = reportProfileSchema.parse(req.body);
     
-    const report = await profileService.reportProfile(reporterId, userId, validatedData.reason, validatedData.details);
+    const report = await profileService.reportProfile(reporterId, userId!, validatedData.reason, validatedData.details);
     res.status(201).json(report);
   } catch (error: any) {
     if (error.name === "ZodError") {
@@ -116,5 +116,3 @@ profileRouter.get("/me/profile/views", requireAuth, async (req: AuthedRequest, r
     res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
-
-

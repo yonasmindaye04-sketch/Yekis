@@ -65,5 +65,5 @@ export function createReferralLink(userId: string): string {
 export function parseDeepLink(startParam: string): { type: string; id: string } | null {
   const match = startParam.match(/^(job|ref|proposal|contract|dispute)_(\w+)$/);
   if (!match) return null;
-  return { type: match[1], id: match[2] };
+  return { type: match[1]!, id: match[2]! };
 }

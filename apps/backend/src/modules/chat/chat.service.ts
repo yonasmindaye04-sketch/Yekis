@@ -25,7 +25,6 @@ export async function createGuestConversation(params: { email: string; body: str
       phone: `+2519${String(randomInt(10000000, 99999999))}`,
       passwordHash: "guest-support-contact",
       role: "CLIENT",
-      dateOfBirth: new Date("1990-01-01T00:00:00.000Z"),
       kyc: { create: { tier: "TIER_1", status: "PENDING" } },
       wallet: { create: { balanceMinor: 0 } },
       consents: { create: [{ purpose: "support_contact", granted: true }] },

@@ -67,7 +67,7 @@ export function FAQPage({ onNavigate, onStart: _onStart }: FAQPageProps) {
           <div className="faq-accordion">
             {faqs.map((cat, catIdx) => (
               <div key={catIdx} style={{ marginBottom: '40px' }}>
-                <h2 style={{ marginBottom: '20px', color: 'var(--color-teal)' }}>{cat.category}</h2>
+                <h2 style={{ marginBottom: '20px', color: 'var(--color-primary)' }}>{cat.category}</h2>
                 {cat.questions.map((q) => {
                   const currentIndex = qIndex++;
                   return (

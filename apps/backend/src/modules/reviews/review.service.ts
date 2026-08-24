@@ -10,7 +10,7 @@ export async function submitReview(authorId: string, contractId: string, rating:
     where: { id: contractId },
     include: {
       milestones: true,
-      reviews: true
+      review: true
     }
   });
 
@@ -23,20 +23,19 @@ export async function submitReview(authorId: string, contractId: string, rating:
   }
 
   const hasReleasedOrAcceptedMilestone = contract.milestones.some(
-    (m: any) => m.escrowState === "RELEASED" || m.escrowState === "ACCEPTED"
+    (m: any) => m.escrowState === "RELEASED"
   );
 
   if (!hasReleasedOrAcceptedMilestone) {
     throw new Error("BAD_REQUEST: Contract has no eligible milestones");
   }
 
-  const existingReview = contract.reviews.find((r: any) => r.authorId === authorId);
-  if (existingReview) {
+  if (contract.review && contract.review.authorId === authorId) {
     throw new Error("BAD_REQUEST: Review already submitted");
   }
 
   const targetUserId = authorId === contract.clientId ? contract.freelancerId : contract.clientId;
-  const sanitizedComment = comment ? sanitizeContactInfo(comment) : undefined;
+  const sanitizedComment = comment ? sanitizeContactInfo(comment).sanitized : undefined;
 
   const review = await prisma.review.create({
     data: {
@@ -51,7 +50,9 @@ export async function submitReview(authorId: string, contractId: string, rating:
   });
 
   await recordAuditEvent({
-    action: "REVIEW_SUBMITTED",
+    eventType: "REVIEW_SUBMITTED",
+    entityType: "Review",
+    entityId: review.id,
     userId: authorId,
     metadata: { contractId, reviewId: review.id }
   });
@@ -132,7 +133,7 @@ export async function respondToReview(targetUserId: string, reviewId: string, re
   if (review.targetUserId !== targetUserId) throw new Error("FORBIDDEN: Not your review");
   if (review.response) throw new Error("BAD_REQUEST: Already responded");
 
-  const sanitizedResponse = sanitizeContactInfo(response);
+  const sanitizedResponse = sanitizeContactInfo(response).sanitized;
 
   return prisma.review.update({
     where: { id: reviewId },

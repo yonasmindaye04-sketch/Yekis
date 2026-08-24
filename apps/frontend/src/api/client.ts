@@ -222,6 +222,7 @@ export interface StaffConversation {
   createdAt: string;
   updatedAt: string;
   creator: { id: string; email: string; role: string };
+  assignedStaff: { id: string; name: string } | null;
   messages: { body: string; createdAt: string }[];
 }
 
@@ -239,15 +240,21 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
 class ApiClient {
-  private accessToken: string | null = window.localStorage.getItem("yekis-api-token");
+  private accessToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
 
   setToken(token: string | null) {
     this.accessToken = token;
-    if (token) {
-      window.localStorage.setItem("yekis-api-token", token);
-    } else {
-      window.localStorage.removeItem("yekis-api-token");
+    if (typeof window !== "undefined") {
+      if (token) {
+        window.localStorage.setItem("yekis-api-token", token);
+      } else {
+        window.localStorage.removeItem("yekis-api-token");
+      }
     }
+  }
+
+  clearToken() {
+    this.setToken(null);
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -285,6 +292,38 @@ class ApiClient {
     });
   }
 
+  // ---------- Social sign-in (server verifies provider credentials) ----------
+
+  async getOAuthProviders(): Promise<{
+    google: boolean;
+    apple: boolean;
+    facebook: boolean;
+    telegram: boolean;
+  }> {
+    return this.request("/api/v1/auth/oauth/providers", { method: "GET" });
+  }
+
+  async loginWithGoogleOAuth(idToken: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    return this.request("/api/v1/auth/oauth/google", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
+    });
+  }
+
+  async loginWithAppleOAuth(idToken: string, firstName?: string, lastName?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    return this.request("/api/v1/auth/oauth/apple", {
+      method: "POST",
+      body: JSON.stringify({ idToken, firstName, lastName }),
+    });
+  }
+
+  async loginWithFacebookOAuth(accessToken: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    return this.request("/api/v1/auth/oauth/facebook", {
+      method: "POST",
+      body: JSON.stringify({ accessToken }),
+    });
+  }
+
   async requestPasswordReset(email: string): Promise<{ success: boolean }> {
     return this.request("/api/v1/auth/reset-password-request", {
       method: "POST",
@@ -299,7 +338,7 @@ class ApiClient {
     });
   }
 
-  async loginWithMobile(input: { phone?: string; email?: string; password: string }): Promise<{ accessToken: string }> {
+  async loginWithMobile(input: { phone?: string; email?: string; identifier?: string; password: string }): Promise<{ accessToken: string; refreshToken?: string; user?: AuthUser }> {
     return this.request("/api/v1/auth/login", {
       method: "POST",
       body: JSON.stringify(input),
@@ -641,19 +680,19 @@ class ApiClient {
 
   // --- Profiles ---
   async getPublicProfile(userId: string): Promise<unknown> {
-    return this.request(`/api/v1/profiles/${userId}`);
+    return this.request(`/api/v1/users/${userId}/profile`);
   }
   async updateProfile(data: unknown): Promise<unknown> {
-    return this.request(`/api/v1/profiles/me`, { method: "PATCH", body: JSON.stringify(data) });
+    return this.request(`/api/v1/users/me/profile`, { method: "PATCH", body: JSON.stringify(data) });
   }
   async getProfileCompleteness(): Promise<unknown> {
-    return this.request(`/api/v1/profiles/me/completeness`);
+    return this.request(`/api/v1/users/me/profile/completeness`);
   }
   async reportProfile(userId: string, reason: string, details: string): Promise<unknown> {
-    return this.request(`/api/v1/profiles/${userId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });
+    return this.request(`/api/v1/users/${userId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });
   }
   async getProfileViews(): Promise<unknown> {
-    return this.request(`/api/v1/profiles/me/views`);
+    return this.request(`/api/v1/users/me/profile/views`);
   }
   async getSkills(category?: string): Promise<unknown> {
     const params = new URLSearchParams();
@@ -661,10 +700,10 @@ class ApiClient {
     return this.request(`/api/v1/skills?${params.toString()}`);
   }
   async getFeaturedTalent(): Promise<unknown> {
-    return this.request(`/api/v1/profiles/featured`);
+    return this.request(`/api/v1/featured`);
   }
   async pinFeaturedTalent(userId: string, category: string, notes: string): Promise<unknown> {
-    return this.request(`/api/v1/profiles/featured`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
+    return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
   }
   async refreshFeaturedCarousel(): Promise<unknown> {
     return this.request(`/api/v1/profiles/featured/refresh`, { method: "POST" });
@@ -672,10 +711,10 @@ class ApiClient {
   
   // --- Reviews ---
   async submitReview(contractId: string, rating: number, comment: string): Promise<unknown> {
-    return this.request(`/api/v1/reviews`, { method: "POST", body: JSON.stringify({ contractId, rating, comment }) });
+    return this.request(`/api/v1/reviews/contracts/${contractId}/review`, { method: "POST", body: JSON.stringify({ rating, comment }) });
   }
   async getReviews(userId: string): Promise<unknown> {
-    return this.request(`/api/v1/reviews/user/${userId}`);
+    return this.request(`/api/v1/reviews/users/${userId}/reviews`);
   }
   async respondToReview(reviewId: string, response: string): Promise<unknown> {
     return this.request(`/api/v1/reviews/${reviewId}/respond`, { method: "POST", body: JSON.stringify({ response }) });

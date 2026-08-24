@@ -7,7 +7,9 @@ Last reviewed: 2026-08-15
 ## Product Journey
 
 - [x] Registration, login, age gate, consent capture, and JWT sessions
-- [x] Telegram Mini App authentication backend and frontend entry path
+- [x] Google (Gmail) & Social authentication with automatic workspace provisioning and session persistence
+- [x] Transactional email system (branded HTML templates for password resets, escrow order invoices/receipts with ETB amounts, platform movement alerts)
+- [x] Telegram Mini App dual authentication (1-tap Telegram WebApp HMAC verification + secure Mobile Phone & PIN login)
 - [x] Public user profiles with skills taxonomy, bio, and dynamic completeness score
 - [x] Privacy-gated profile visibility (PUBLIC, PROPOSERS, PRIVATE)
 - [x] Featured talent carousel with staff-pinned, top-rated, and recently verified algorithm
@@ -83,6 +85,7 @@ Last reviewed: 2026-08-15
 - [x] Staff live chat inbox: auto-poll (8 s), unread badges, OPEN/ALL filter, close/reopen conversation, auto-scroll, relative timestamps
 - [x] Guest chat widget: displays assigned staff member and supports file attachments
 - [x] Loading, empty, action-busy, and user-visible error/confirmation states in primary workflows
+- [x] Complete Light/Dark mode design token system with WCAG AAA contrast, consistent brand colors, clean SVG icons without background box artifacts, and human-first copy
 - [x] Frontend production build passes
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
