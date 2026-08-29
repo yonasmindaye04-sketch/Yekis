@@ -2,7 +2,10 @@
 import { createHmac, timingSafeEqual, randomUUID } from "node:crypto";
 import { env } from "../../../config/env.js";
 import { logger } from "../../../lib/logger.js";
-import type { InitiatePaymentResult, PaymentProviderClient } from "./paymentProvider.interface.js";
+import type {
+  InitiatePaymentResult,
+  PaymentProviderClient,
+} from "./paymentProvider.interface.js";
 
 /**
  * CBE Birr — tertiary option. Per the legal/design document, CBE currently
@@ -14,7 +17,9 @@ import type { InitiatePaymentResult, PaymentProviderClient } from "./paymentProv
  */
 export const cbeClient: PaymentProviderClient = {
   async initiatePayment(): Promise<InitiatePaymentResult> {
-    logger.warn("CBE Birr integration not yet confirmed — using mock payment initiation.");
+    logger.warn(
+      "CBE Birr integration not yet confirmed — using mock payment initiation.",
+    );
     return {
       providerTransactionId: `mock-cbe-${randomUUID()}`,
       redirectUrl: null,
@@ -27,7 +32,7 @@ export const cbeClient: PaymentProviderClient = {
     // this to production without replacing this with CBE's real scheme —
     // or removing CBE as a webhook-driven provider entirely if it turns
     // out to be manual-reconciliation-only.
-    const secret = env.CHAPA_SECRET_KEY; // placeholder — CBE has no dedicated secret configured yet
+    const secret = env.CBE_WEBHOOK_SECRET;
     if (!secret || !signatureHeader) return false;
     const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
     const a = Buffer.from(expected, "utf8");

@@ -50,7 +50,9 @@ export const DisputeCategory = z.enum([
 ]);
 export type DisputeCategory = z.infer<typeof DisputeCategory>;
 
-export const PaymentProvider = z.enum(["TELEBIRR", "CHAPA", "CBE_BIRR"]);
+// PAY-002: Chapa is REMOVED from the approved payment architecture
+// (Telebirr + CBE only). The enum value was dropped via migration.
+export const PaymentProvider = z.enum(["TELEBIRR", "CBE_BIRR"]);
 export type PaymentProvider = z.infer<typeof PaymentProvider>;
 
 // Launch categories — locked in Phase 0. Keep this list here so the whole
@@ -98,7 +100,10 @@ export const RegisterInput = z.object({
   role: UserRole,
   dateOfBirth: z.string().date(), // ISO date — checked server-side against capacity gate
   consents: z.object({
-    kycDataProcessing: z.literal(true), // required, no opt-out
+    // Required, no opt-out (PDPP Arts. 8 & 11 — freely given, specific, unbundled)
+    kycDataProcessing: z.literal(true),
+    financialDataProcessing: z.literal(true),
+    platformNotifications: z.boolean().default(false),
     marketingCommunications: z.boolean().default(false),
     analytics: z.boolean().default(false),
   }),
@@ -164,6 +169,7 @@ export const CreateProposalInput = z.object({
   quotedAmount: Money,
   estimatedDays: z.number().int().positive(),
   milestoneBreakdown: z.array(MilestonePlanItem).min(1),
+  attachmentPaths: z.array(z.string()).optional(),
 });
 export type CreateProposalInput = z.infer<typeof CreateProposalInput>;
 
@@ -223,7 +229,7 @@ export type FlagTopUpInput = z.infer<typeof FlagTopUpInput>;
 
 // ---------- TMS (Transaction Monitoring / AML) ----------
 
-export const TransactionFlagType = z.enum(["STRUCTURING", "VELOCITY", "PASS_THROUGH", "WALLET_MISMATCH", "STAFF_FLAGGED"]);
+export const TransactionFlagType = z.enum(["STRUCTURING", "VELOCITY", "ROUND_AMOUNTS", "PASS_THROUGH", "WALLET_MISMATCH", "STAFF_FLAGGED"]);
 export type TransactionFlagType = z.infer<typeof TransactionFlagType>;
 
 export const TransactionFlagStatus = z.enum(["PENDING_REVIEW", "STR_FILED", "DISMISSED"]);
@@ -232,6 +238,10 @@ export type TransactionFlagStatus = z.infer<typeof TransactionFlagStatus>;
 export const FileStrInput = z.object({
   reviewNotes: z.string().min(10).max(2000),
   strReferenceNumber: z.string().min(1).max(200),
+  // Master Design §11.4: a filed STR means suspicion is confirmed —
+  // "freeze funds, suspend the account, preserve records." The Compliance
+  // Officer opts in explicitly; the suspension is audited separately.
+  suspendAccount: z.boolean().default(false),
 });
 export type FileStrInput = z.infer<typeof FileStrInput>;
 

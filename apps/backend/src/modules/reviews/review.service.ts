@@ -5,13 +5,18 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { sanitizeContactInfo } from "../../middleware/circumvention.middleware.js";
 
 // === MAIN FUNCTIONS ===
-export async function submitReview(authorId: string, contractId: string, rating: number, comment?: string) {
+export async function submitReview(
+  authorId: string,
+  contractId: string,
+  rating: number,
+  comment?: string,
+) {
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
     include: {
       milestones: true,
-      review: true
-    }
+      review: true,
+    },
   });
 
   if (!contract) {
@@ -23,7 +28,7 @@ export async function submitReview(authorId: string, contractId: string, rating:
   }
 
   const hasReleasedOrAcceptedMilestone = contract.milestones.some(
-    (m: any) => m.escrowState === "RELEASED"
+    (m: any) => m.escrowState === "RELEASED",
   );
 
   if (!hasReleasedOrAcceptedMilestone) {
@@ -34,8 +39,11 @@ export async function submitReview(authorId: string, contractId: string, rating:
     throw new Error("BAD_REQUEST: Review already submitted");
   }
 
-  const targetUserId = authorId === contract.clientId ? contract.freelancerId : contract.clientId;
-  const sanitizedComment = comment ? sanitizeContactInfo(comment).sanitized : undefined;
+  const targetUserId =
+    authorId === contract.clientId ? contract.freelancerId : contract.clientId;
+  const sanitizedComment = comment
+    ? sanitizeContactInfo(comment).sanitized
+    : undefined;
 
   const review = await prisma.review.create({
     data: {
@@ -45,8 +53,8 @@ export async function submitReview(authorId: string, contractId: string, rating:
       rating,
       comment: sanitizedComment,
       isEligible: true,
-      isBlind: true
-    }
+      isBlind: true,
+    },
   });
 
   await recordAuditEvent({
@@ -54,20 +62,20 @@ export async function submitReview(authorId: string, contractId: string, rating:
     entityType: "Review",
     entityId: review.id,
     userId: authorId,
-    metadata: { contractId, reviewId: review.id }
+    metadata: { contractId, reviewId: review.id },
   });
 
   // Check if both parties submitted
   const allReviews = await prisma.review.findMany({
-    where: { contractId }
+    where: { contractId },
   });
 
   if (allReviews.length >= 2) {
     await prisma.review.updateMany({
       where: { contractId },
-      data: { isBlind: false, revealedAt: new Date() }
+      data: { isBlind: false, revealedAt: new Date() },
     });
-    
+
     // Both revealed, calculate ratings for both parties
     await recalculateUserRating(contract.clientId);
     await recalculateUserRating(contract.freelancerId);
@@ -78,13 +86,16 @@ export async function submitReview(authorId: string, contractId: string, rating:
 
 export async function recalculateUserRating(userId: string) {
   const userReviews = await prisma.review.findMany({
-    where: { targetUserId: userId, isEligible: true, isBlind: false }
+    where: { targetUserId: userId, isEligible: true, isBlind: false },
   });
 
   const v = userReviews.length;
   if (v === 0) return;
 
-  const totalScore = userReviews.reduce((sum: number, r: any) => sum + r.rating, 0);
+  const totalScore = userReviews.reduce(
+    (sum: number, r: any) => sum + r.rating,
+    0,
+  );
   const R = totalScore / v;
 
   // Global metrics approximation
@@ -98,14 +109,18 @@ export async function recalculateUserRating(userId: string) {
     data: {
       ratingAverage: R,
       ratingCount: v,
-      ratingBayesianScore: bayesianScore
-    }
+      ratingBayesianScore: bayesianScore,
+    },
   });
 }
 
-export async function getReviewsForUser(targetUserId: string, page = 1, limit = 10) {
+export async function getReviewsForUser(
+  targetUserId: string,
+  page = 1,
+  limit = 10,
+) {
   const skip = (page - 1) * limit;
-  
+
   const reviews = await prisma.review.findMany({
     where: { targetUserId, isEligible: true, isBlind: false },
     orderBy: { createdAt: "desc" },
@@ -114,23 +129,28 @@ export async function getReviewsForUser(targetUserId: string, page = 1, limit = 
     include: {
       author: {
         select: {
-          displayName: true
-        }
-      }
-    }
+          displayName: true,
+        },
+      },
+    },
   });
 
   return reviews.map((r: any) => ({
     ...r,
-    authorName: r.author?.displayName || "Anonymous"
+    authorName: r.author?.displayName || "Anonymous",
   }));
 }
 
-export async function respondToReview(targetUserId: string, reviewId: string, response: string) {
+export async function respondToReview(
+  targetUserId: string,
+  reviewId: string,
+  response: string,
+) {
   const review = await prisma.review.findUnique({ where: { id: reviewId } });
-  
+
   if (!review) throw new Error("NOT_FOUND: Review not found");
-  if (review.targetUserId !== targetUserId) throw new Error("FORBIDDEN: Not your review");
+  if (review.targetUserId !== targetUserId)
+    throw new Error("FORBIDDEN: Not your review");
   if (review.response) throw new Error("BAD_REQUEST: Already responded");
 
   const sanitizedResponse = sanitizeContactInfo(response).sanitized;
@@ -139,22 +159,27 @@ export async function respondToReview(targetUserId: string, reviewId: string, re
     where: { id: reviewId },
     data: {
       response: sanitizedResponse,
-      respondedAt: new Date()
-    }
+      respondedAt: new Date(),
+    },
   });
 }
 
-export async function disputeReview(userId: string, reviewId: string, reason: string) {
+export async function disputeReview(
+  userId: string,
+  reviewId: string,
+  reason: string,
+) {
   const review = await prisma.review.findUnique({ where: { id: reviewId } });
-  
+
   if (!review) throw new Error("NOT_FOUND: Review not found");
-  if (review.targetUserId !== userId) throw new Error("FORBIDDEN: Not your review");
+  if (review.targetUserId !== userId)
+    throw new Error("FORBIDDEN: Not your review");
 
   return prisma.review.update({
     where: { id: reviewId },
     data: {
       isDisputed: true,
-      disputeReason: reason
-    }
+      disputeReason: reason,
+    },
   });
 }

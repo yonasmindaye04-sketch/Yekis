@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { Save, Check } from 'lucide-react';
-import { api } from './api/client';
+import { useEffect, useState } from "react";
+import { Save, Check } from "lucide-react";
+import { api } from "./api/client";
 
 interface SkillTaxonomy {
   id: string;
@@ -38,11 +38,12 @@ export const ProfileEditPage = () => {
     api
       .getMe()
       .then((me) =>
-        Promise.all([api.getPublicProfile(me.id), api.getSkills().catch(() => [])]).then(
-          ([profileRes, skillsRes]) => ({ me, profileRes, skillsRes })
-        )
+        Promise.all([
+          api.getPublicProfile(me.id),
+          api.getSkills().catch(() => []),
+        ]).then(([profileRes, skillsRes]) => ({ me, profileRes, skillsRes })),
       )
-      .then(({ me, profileRes, skillsRes }) => {
+      .then(({ profileRes, skillsRes }) => {
         if (cancelled) return;
         const p = profileRes as {
           firstName?: string;
@@ -67,12 +68,15 @@ export const ProfileEditPage = () => {
           profileCompleteness: p.profileCompleteness,
         });
 
-        const s = skillsRes as { items?: SkillTaxonomy[] } | SkillTaxonomy[] | null;
-        setSkillTaxonomy(Array.isArray(s) ? s : s?.items ?? []);
+        const s = skillsRes as
+          { items?: SkillTaxonomy[] } | SkillTaxonomy[] | null;
+        setSkillTaxonomy(Array.isArray(s) ? s : (s?.items ?? []));
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setLoadError(err instanceof Error ? err.message : "Failed to load your profile.");
+          setLoadError(
+            err instanceof Error ? err.message : "Failed to load your profile.",
+          );
         }
       })
       .finally(() => !cancelled && setLoading(false));
@@ -83,11 +87,16 @@ export const ProfileEditPage = () => {
   }, []);
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    >,
   ) => {
     const { name, value, type } = e.target;
     if (type === "checkbox") {
-      setFormData({ ...formData, [name]: (e.target as HTMLInputElement).checked });
+      setFormData({
+        ...formData,
+        [name]: (e.target as HTMLInputElement).checked,
+      });
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -124,7 +133,9 @@ export const ProfileEditPage = () => {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save changes");
+      setSaveError(
+        err instanceof Error ? err.message : "Failed to save changes",
+      );
     } finally {
       setSaving(false);
     }
@@ -136,7 +147,6 @@ export const ProfileEditPage = () => {
   return (
     <div className="profile-edit-page">
       <div className="profile-edit-container">
-
         <div className="profile-edit-header">
           <h1>Edit Profile</h1>
           <div className="completeness-indicator">
@@ -153,7 +163,6 @@ export const ProfileEditPage = () => {
 
         <form onSubmit={handleSubmit} className="profile-edit-form panel">
           <div className="form-content">
-
             <div className="form-grid">
               <div className="form-group">
                 <label>First Name</label>
@@ -197,7 +206,7 @@ export const ProfileEditPage = () => {
                 <label>Primary Skill</label>
                 <select
                   name="primarySkillId"
-                  value={formData.primarySkillId}
+                  value={formData.primarySkillId ?? ""}
                   onChange={handleChange}
                 >
                   <option value="">Select your main expertise</option>
@@ -211,7 +220,9 @@ export const ProfileEditPage = () => {
 
               <div className="form-group">
                 <label>Additional Skills</label>
-                <p className="field-hint">Tap to toggle - selected skills are highlighted.</p>
+                <p className="field-hint">
+                  Tap to toggle - selected skills are highlighted.
+                </p>
                 <div className="tags-list">
                   {skillTaxonomy.map((skill) => {
                     const selected = formData.skillIds.includes(skill.id);
@@ -270,7 +281,6 @@ export const ProfileEditPage = () => {
                 </div>
               </div>
             </div>
-
           </div>
 
           <div className="form-actions">
@@ -282,7 +292,7 @@ export const ProfileEditPage = () => {
             {saveError && <span className="report-error">{saveError}</span>}
             <button type="submit" disabled={saving} className="btn-primary">
               <Save size={16} />
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? "Saving..." : "Save Changes"}
             </button>
           </div>
         </form>

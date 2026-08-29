@@ -1,0 +1,75 @@
+diff --git a/examples/fapi2.ts b/examples/fapi2-message-signing.ts
+index bba1f24..e08d049 100644
+--- a/examples/fapi2.ts
++++ b/examples/fapi2-message-signing.ts
+@@ -25,6 +25,11 @@ let DPoPKeys!: oauth.CryptoKeyPair
+  * client authentication method.
+  */
+ let clientPrivateKey!: oauth.CryptoKey
++/**
++ * A key that is pre-registered at the Authorization Server that the client is supposed to sign its
++ * Request Objects with.
++ */
++let jarPrivateKey!: oauth.CryptoKey
+ 
+ // End of prerequisites
+ 
+@@ -45,8 +50,8 @@ const code_challenge_method = 'S256'
+ const code_verifier = oauth.generateRandomCodeVerifier()
+ const code_challenge = await oauth.calculatePKCECodeChallenge(code_verifier)
+ 
+-// Pushed Authorization Request & Response (PAR)
+-let request_uri: string
++// Signed Request Object (JAR)
++let request: string
+ {
+   const params = new URLSearchParams()
+   params.set('client_id', client.client_id)
+@@ -54,7 +59,18 @@ let request_uri: string
+   params.set('code_challenge_method', code_challenge_method)
+   params.set('redirect_uri', redirect_uri)
+   params.set('response_type', 'code')
+-  params.set('scope', 'api:read')
++  params.set('scope', 'openid api:read')
++  params.set('response_mode', 'jwt')
++
++  request = await oauth.issueRequestObject(as, client, params, jarPrivateKey)
++}
++
++// Pushed Authorization Request & Response (PAR)
++let request_uri: string
++{
++  const params = new URLSearchParams()
++  params.set('client_id', client.client_id)
++  params.set('request', request)
+ 
+   const pushedAuthorizationRequest = () =>
+     oauth.pushedAuthorizationRequest(as, client, clientAuth, params, {
+@@ -90,7 +106,7 @@ let request_uri: string
+ let access_token: string
+ {
+   const currentUrl: URL = getCurrentUrl()
+-  const params = oauth.validateAuthResponse(as, client, currentUrl)
++  const params = await oauth.validateJwtAuthResponse(as, client, currentUrl)
+ 
+   const authorizationCodeGrantRequest = () =>
+     oauth.authorizationCodeGrantRequest(
+@@ -106,7 +122,7 @@ let access_token: string
+   let response = await authorizationCodeGrantRequest()
+ 
+   const processAuthorizationCodeResponse = () =>
+-    oauth.processAuthorizationCodeResponse(as, client, response)
++    oauth.processAuthorizationCodeResponse(as, client, response, { requireIdToken: true })
+ 
+   let result = await processAuthorizationCodeResponse().catch(async (err) => {
+     if (oauth.isDPoPNonceError(err)) {
+@@ -117,6 +133,9 @@ let access_token: string
+     throw err
+   })
+ 
++  // Check ID Token signature for non-repudiation purposes
++  await oauth.validateApplicationLevelSignature(as, response)
++
+   console.log('Access Token Response', result)
+   ;({ access_token } = result)
+ }

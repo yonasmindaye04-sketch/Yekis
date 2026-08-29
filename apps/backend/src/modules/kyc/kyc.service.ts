@@ -6,6 +6,10 @@ import { uploadKycDocument, getKycDocumentUrl } from "../../lib/objectStore.js";
 import { verifyWithFayda } from "./fayda.client.js";
 import { screenForPep } from "./pep.client.js";
 import { logger } from "../../lib/logger.js";
+import { randomBytes } from "node:crypto";
+import { redis } from "../../lib/redis.js";
+import * as esignet from "./esignet.client.js";
+import { env } from "../../config/env.js";
 
 export class DuplicateIdentityError extends Error {}
 export class KycNotFoundError extends Error {}
@@ -36,7 +40,9 @@ export async function submitKycDocument(params: {
   dateOfBirth: string;
   documentNumber: string;
 }) {
-  const kyc = await prisma.kycRecord.findUnique({ where: { userId: params.userId } });
+  const kyc = await prisma.kycRecord.findUnique({
+    where: { userId: params.userId },
+  });
   if (!kyc) throw new KycNotFoundError();
 
   const storageKey = await uploadKycDocument({
@@ -47,7 +53,11 @@ export async function submitKycDocument(params: {
   });
 
   await prisma.kycDocument.create({
-    data: { kycRecordId: kyc.id, documentType: params.documentType, storagePath: storageKey },
+    data: {
+      kycRecordId: kyc.id,
+      documentType: params.documentType,
+      storagePath: storageKey,
+    },
   });
 
   await recordAuditEvent({
@@ -75,13 +85,19 @@ export async function submitKycDocument(params: {
     eventType: "FAYDA_VERIFICATION_ATTEMPTED",
     entityType: "KycRecord",
     entityId: kyc.id,
-    metadata: { success: faydaResult.success, failureReason: faydaResult.failureReason },
+    metadata: {
+      success: faydaResult.success,
+      failureReason: faydaResult.failureReason,
+    },
   });
 
   if (!faydaResult.success) {
     // Manual review fallback — do not block the user's application, just
     // route a human into the loop.
-    await prisma.user.update({ where: { id: params.userId }, data: { cachedKycStatus: "UNDER_REVIEW" } });
+    await prisma.user.update({
+      where: { id: params.userId },
+      data: { cachedKycStatus: "UNDER_REVIEW" },
+    });
     return prisma.kycRecord.update({
       where: { id: kyc.id },
       data: { status: "UNDER_REVIEW", faydaVerificationAttempted: true },
@@ -90,7 +106,10 @@ export async function submitKycDocument(params: {
 
   // Fayda succeeded — check for duplicate accounts BEFORE auto-verifying.
   const existingWithSameBiometric = await prisma.user.findFirst({
-    where: { faydaBiometricId: faydaResult.biometricId, id: { not: params.userId } },
+    where: {
+      faydaPsut: faydaResult.biometricId,
+      id: { not: params.userId },
+    },
   });
 
   if (existingWithSameBiometric) {
@@ -105,7 +124,10 @@ export async function submitKycDocument(params: {
     // Route to manual review rather than auto-rejecting — a false positive
     // here (e.g. Fayda API returning a stale/reused ID) shouldn't silently
     // lock out a legitimate user.
-    await prisma.user.update({ where: { id: params.userId }, data: { cachedKycStatus: "UNDER_REVIEW" } });
+    await prisma.user.update({
+      where: { id: params.userId },
+      data: { cachedKycStatus: "UNDER_REVIEW" },
+    });
     return prisma.kycRecord.update({
       where: { id: kyc.id },
       data: {
@@ -133,7 +155,7 @@ export async function submitKycDocument(params: {
     prisma.user.update({
       where: { id: params.userId },
       data: {
-        faydaBiometricId: faydaResult.biometricId,
+        faydaPsut: faydaResult.biometricId,
         cachedKycTier: "TIER_1",
         cachedKycStatus: "VERIFIED",
       },
@@ -162,11 +184,15 @@ export async function upgradeToTier2(params: {
   tin?: string;
   businessRegNumber?: string;
 }) {
-  const kyc = await prisma.kycRecord.findUnique({ where: { userId: params.userId } });
+  const kyc = await prisma.kycRecord.findUnique({
+    where: { userId: params.userId },
+  });
   if (!kyc) throw new KycNotFoundError();
 
   if (kyc.status !== "VERIFIED" || kyc.tier !== "TIER_1") {
-    throw new InvalidTierTransitionError("Tier 1 must be VERIFIED before requesting Tier 2.");
+    throw new InvalidTierTransitionError(
+      "Tier 1 must be VERIFIED before requesting Tier 2.",
+    );
   }
 
   const pepResult = await screenForPep(params.fullName);
@@ -232,7 +258,9 @@ export async function reviewKycRecord(params: {
   decision: "VERIFIED" | "REJECTED";
   rejectionReason?: string;
 }) {
-  const kyc = await prisma.kycRecord.findUnique({ where: { userId: params.targetUserId } });
+  const kyc = await prisma.kycRecord.findUnique({
+    where: { userId: params.targetUserId },
+  });
   if (!kyc) throw new KycNotFoundError();
 
   // On rejection, `tier` reverts to the last tier that actually passed —
@@ -247,12 +275,17 @@ export async function reviewKycRecord(params: {
     data: {
       status: params.decision,
       tier: params.decision === "REJECTED" ? revertedTier : kyc.tier,
-      highestVerifiedTier: params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
+      highestVerifiedTier:
+        params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
       reviewedByStaffId: params.staffUserId,
-      rejectionReason: params.decision === "REJECTED" ? params.rejectionReason : null,
-      lastVerifiedAt: params.decision === "VERIFIED" ? new Date() : kyc.lastVerifiedAt,
+      rejectionReason:
+        params.decision === "REJECTED" ? params.rejectionReason : null,
+      lastVerifiedAt:
+        params.decision === "VERIFIED" ? new Date() : kyc.lastVerifiedAt,
       nextReviewDueAt:
-        params.decision === "VERIFIED" ? monthsFromNow(REVIEW_CYCLE_MONTHS) : kyc.nextReviewDueAt,
+        params.decision === "VERIFIED"
+          ? monthsFromNow(REVIEW_CYCLE_MONTHS)
+          : kyc.nextReviewDueAt,
     },
   });
 
@@ -269,8 +302,12 @@ export async function reviewKycRecord(params: {
   await prisma.user.update({
     where: { id: params.targetUserId },
     data: {
-      cachedKycStatus: params.decision === "VERIFIED" || hadPriorStanding ? "VERIFIED" : "REJECTED",
-      cachedKycTier: params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
+      cachedKycStatus:
+        params.decision === "VERIFIED" || hadPriorStanding
+          ? "VERIFIED"
+          : "REJECTED",
+      cachedKycTier:
+        params.decision === "VERIFIED" ? kyc.tier : kyc.highestVerifiedTier,
     },
   });
 
@@ -289,13 +326,21 @@ export async function reviewKycRecord(params: {
 
   await recordAuditEvent({
     userId: params.targetUserId,
-    eventType: params.decision === "VERIFIED" ? "KYC_MANUALLY_VERIFIED" : "KYC_REJECTED",
+    eventType:
+      params.decision === "VERIFIED" ? "KYC_MANUALLY_VERIFIED" : "KYC_REJECTED",
     entityType: "KycRecord",
     entityId: kyc.id,
-    metadata: { reviewedBy: params.staffUserId, reason: params.rejectionReason, revertedTier: params.decision === "REJECTED" ? revertedTier : undefined },
+    metadata: {
+      reviewedBy: params.staffUserId,
+      reason: params.rejectionReason,
+      revertedTier: params.decision === "REJECTED" ? revertedTier : undefined,
+    },
   });
 
-  logger.info({ kycId: kyc.id, decision: params.decision }, "KYC manual review decision recorded");
+  logger.info(
+    { kycId: kyc.id, decision: params.decision },
+    "KYC manual review decision recorded",
+  );
 
   return updated;
 }
@@ -316,7 +361,12 @@ export async function getKycStatus(userId: string) {
   };
 }
 
-export async function getReviewQueue(filters?: { page?: number; limit?: number; search?: string; status?: string }) {
+export async function getReviewQueue(filters?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+}) {
   const where: any = {};
   if (filters?.status) {
     where.status = filters.status;
@@ -343,7 +393,10 @@ export async function getReviewQueue(filters?: { page?: number; limit?: number; 
     prisma.kycRecord.count({ where }),
     prisma.kycRecord.findMany({
       where,
-      include: { user: { select: { id: true, email: true, phone: true, ucid: true } }, documents: true },
+      include: {
+        user: { select: { id: true, email: true, phone: true, ucid: true } },
+        documents: true,
+      },
       orderBy: { updatedAt: "asc" }, // oldest-waiting-first
       take: limit,
       skip: (page - 1) * limit,
@@ -360,7 +413,9 @@ export async function getReviewQueue(filters?: { page?: number; limit?: number; 
  * load directly.
  */
 export async function getDocumentViewUrl(documentId: string) {
-  const document = await prisma.kycDocument.findUnique({ where: { id: documentId } });
+  const document = await prisma.kycDocument.findUnique({
+    where: { id: documentId },
+  });
   if (!document) throw new KycNotFoundError();
 
   const url = await getKycDocumentUrl(document.storagePath);
@@ -373,11 +428,163 @@ export async function getDocumentViewUrl(documentId: string) {
  * of a reviewer starting blind on a resubmission.
  */
 export async function getReviewHistory(targetUserId: string) {
-  const kyc = await prisma.kycRecord.findUnique({ where: { userId: targetUserId } });
+  const kyc = await prisma.kycRecord.findUnique({
+    where: { userId: targetUserId },
+  });
   if (!kyc) throw new KycNotFoundError();
 
   return prisma.kycReviewEvent.findMany({
     where: { kycRecordId: kyc.id },
     orderBy: { createdAt: "desc" },
   });
+}
+
+// === eSignet OIDC Flow (Tier 1 KYC) ===
+
+export async function initiateFaydaVerification(userId: string) {
+  let kyc = await prisma.kycRecord.findUnique({ where: { userId } });
+
+  if (!kyc) {
+    kyc = await prisma.kycRecord.create({
+      data: { userId, status: "PENDING", tier: "TIER_1" },
+    });
+  }
+
+  if (kyc.status === "VERIFIED" && kyc.faydaVerificationSucceeded) {
+    throw new InvalidTierTransitionError("User is already Fayda verified");
+  }
+
+  const state = randomBytes(16).toString("hex");
+  const nonce = randomBytes(16).toString("hex");
+
+  // Store state and nonce in Redis linked to the user's session (10 min TTL)
+  await redis.setex(
+    `kyc:oidc:${userId}`,
+    600,
+    JSON.stringify({ state, nonce }),
+  );
+
+  if (env.ESIGNET_CLIENT_ID) {
+    // Real eSignet flow
+    const { authorizeUrl, requestUri } = await esignet.initiatePar({
+      state,
+      nonce,
+    });
+    return { authorizeUrl, requestUri, state };
+  } else {
+    // Mock fallback for local dev when eSignet is not configured
+    return {
+      authorizeUrl: "http://localhost:3000/mock-fayda-consent",
+      requestUri: "mock_request_uri",
+      state,
+    };
+  }
+}
+
+export async function completeFaydaCallback(params: {
+  userId: string;
+  code: string;
+  state: string;
+}) {
+  const { userId, code, state } = params;
+
+  // 1. Validate State against Redis
+  const redisKey = `kyc:oidc:${userId}`;
+  const cachedDataStr = await redis.get(redisKey);
+  if (!cachedDataStr) {
+    throw new Error("KYC session expired or invalid");
+  }
+
+  const cachedData = JSON.parse(cachedDataStr);
+  if (cachedData.state !== state) {
+    throw new Error("Invalid state parameter (CSRF protection)");
+  }
+
+  // Consume the state (single-use)
+  await redis.del(redisKey);
+
+  let esignetSub = "";
+  let verifiedName = "";
+  let verifiedDob = "";
+
+  if (env.ESIGNET_CLIENT_ID) {
+    // 2. Exchange code for tokens
+    const { accessToken } = await esignet.exchangeCodeForTokens(code);
+
+    // 3. Fetch and decrypt nested claims
+    const claims = await esignet.fetchAndDecryptUserInfo(accessToken);
+
+    esignetSub = claims.sub;
+    verifiedName = claims.name || "";
+    verifiedDob = claims.birthdate || "";
+  } else {
+    // Mock fallback
+    esignetSub = `mock-psut-${userId}`;
+    verifiedName = "Mock User";
+    verifiedDob = "1990-01-01";
+  }
+
+  // 4. Dedup check (using PSUT)
+  const duplicate = await prisma.user.findFirst({
+    where: { faydaPsut: esignetSub, id: { not: userId } },
+  });
+
+  if (duplicate) {
+    await prisma.kycRecord.update({
+      where: { userId },
+      data: {
+        faydaVerificationAttempted: true,
+        faydaVerificationSucceeded: false,
+        status: "UNDER_REVIEW",
+      },
+    });
+
+    await recordAuditEvent({
+      userId,
+      eventType: "KYC_DUPLICATE_IDENTITY_FLAGGED",
+      entityType: "KycRecord",
+      entityId: userId,
+      metadata: { duplicateOfUserId: duplicate.id },
+    });
+
+    await notifyStaffOfEvent({
+      eventType: "kyc-duplicate-detected",
+      message: `User ${userId} submitted a Fayda identity that is already linked to user ${duplicate.id}.`,
+    });
+
+    return { tier: "TIER_1", status: "UNDER_REVIEW" };
+  }
+
+  // 5. Clean pass -> Auto-verify Tier 1
+  const kyc = await prisma.kycRecord.update({
+    where: { userId },
+    data: {
+      faydaVerificationAttempted: true,
+      faydaVerificationSucceeded: true,
+      status: "VERIFIED",
+      fullName: verifiedName,
+      esignetSub: esignetSub,
+      esignetVerifiedName: verifiedName,
+      esignetVerifiedDob: verifiedDob,
+      esignetVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      faydaPsut: esignetSub,
+      dateOfBirth: verifiedDob ? new Date(verifiedDob) : undefined,
+    },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "KYC_ESIGNET_VERIFIED",
+    entityType: "KycRecord",
+    entityId: kyc.id,
+    metadata: { esignetSub, verifiedName },
+  });
+
+  return { tier: kyc.tier, status: kyc.status };
 }

@@ -1,7 +1,14 @@
 // === IMPORTS ===
 import React, { useState, useEffect } from "react";
-import { X, ZoomIn, ZoomOut, RotateCw, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
-
+import {
+  X,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  AlertTriangle,
+} from "lucide-react";
 
 // === INTERFACES & TYPES ===
 export type EvidenceDocument = {
@@ -14,7 +21,6 @@ interface EvidenceViewerProps {
   documents: EvidenceDocument[];
   onClose: () => void;
 }
-
 
 // === MAIN COMPONENT ===
 export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
@@ -43,7 +49,8 @@ export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
     setRotation(0);
     setTranslate({ x: 0, y: 0 });
 
-    activeDoc.urlFetcher()
+    activeDoc
+      .urlFetcher()
       .then((url) => {
         if (isMounted) {
           setImageUrl(url);
@@ -98,28 +105,41 @@ export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
       <div className="evidence-viewer-header">
         <div>
           <h3>{activeDoc?.title || "Document"}</h3>
-          <span className="evidence-count">{activeIndex + 1} of {documents.length}</span>
+          <span className="evidence-count">
+            {activeIndex + 1} of {documents.length}
+          </span>
         </div>
         <div className="evidence-viewer-controls">
-          <button onClick={handleZoomOut} aria-label="Zoom out"><ZoomOut size={20} /></button>
-          <button onClick={handleZoomIn} aria-label="Zoom in"><ZoomIn size={20} /></button>
-          <button onClick={handleRotate} aria-label="Rotate"><RotateCw size={20} /></button>
+          <button onClick={handleZoomOut} aria-label="Zoom out">
+            <ZoomOut size={20} />
+          </button>
+          <button onClick={handleZoomIn} aria-label="Zoom in">
+            <ZoomIn size={20} />
+          </button>
+          <button onClick={handleRotate} aria-label="Rotate">
+            <RotateCw size={20} />
+          </button>
           <div className="divider"></div>
-          <button onClick={onClose} aria-label="Close" className="close-btn"><X size={20} /></button>
+          <button onClick={onClose} aria-label="Close" className="close-btn">
+            <X size={20} />
+          </button>
         </div>
       </div>
 
-      <div 
-        className="evidence-viewer-stage" 
-        onMouseMove={handleMouseMove} 
-        onMouseUp={handleMouseUp} 
+      <div
+        className="evidence-viewer-stage"
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
         {documents.length > 1 && (
-          <button 
-            className="nav-btn prev" 
-            disabled={activeIndex === 0} 
-            onClick={(e) => { e.stopPropagation(); setActiveIndex(a => a - 1); }}
+          <button
+            className="nav-btn prev"
+            disabled={activeIndex === 0}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveIndex((a) => a - 1);
+            }}
           >
             <ChevronLeft size={32} />
           </button>
@@ -139,17 +159,17 @@ export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
             </div>
           )}
           {!isLoading && !hasError && imageUrl && (
-            <div 
+            <div
               className="evidence-image-container"
               style={{
                 transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale}) rotate(${rotation}deg)`,
-                cursor: isDragging ? "grabbing" : "grab"
+                cursor: isDragging ? "grabbing" : "grab",
               }}
               onMouseDown={handleMouseDown}
             >
-              <img 
-                src={imageUrl} 
-                alt={activeDoc?.title} 
+              <img
+                src={imageUrl}
+                alt={activeDoc?.title}
                 draggable={false}
                 onError={() => setHasError(true)}
               />
@@ -158,10 +178,13 @@ export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
         </div>
 
         {documents.length > 1 && (
-          <button 
-            className="nav-btn next" 
-            disabled={activeIndex === documents.length - 1} 
-            onClick={(e) => { e.stopPropagation(); setActiveIndex(a => a + 1); }}
+          <button
+            className="nav-btn next"
+            disabled={activeIndex === documents.length - 1}
+            onClick={(e) => {
+              e.stopPropagation();
+              setActiveIndex((a) => a + 1);
+            }}
           >
             <ChevronRight size={32} />
           </button>
@@ -171,8 +194,8 @@ export function EvidenceViewer({ documents, onClose }: EvidenceViewerProps) {
       {documents.length > 1 && (
         <div className="evidence-viewer-thumbnails">
           {documents.map((doc, idx) => (
-            <button 
-              key={doc.id} 
+            <button
+              key={doc.id}
               className={`thumbnail-btn ${idx === activeIndex ? "active" : ""}`}
               onClick={() => setActiveIndex(idx)}
             >

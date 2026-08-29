@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 type Theme = "light" | "dark";
 
@@ -15,7 +21,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("yekis-theme") as Theme | null;
       if (saved) return saved;
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+      return window.matchMedia("(prefers-color-scheme: dark)").matches
+        ? "dark"
+        : "light";
     }
     return "light";
   });
@@ -31,14 +39,36 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
     localStorage.setItem("yekis-theme", theme);
 
-    if (typeof window !== "undefined" && (window as unknown as { Telegram?: { WebApp?: { setHeaderColor?: (c: string) => void; setBackgroundColor?: (c: string) => void } } })?.Telegram?.WebApp) {
-      const wa = (window as unknown as { Telegram: { WebApp: { setHeaderColor?: (c: string) => void; setBackgroundColor?: (c: string) => void } } }).Telegram.WebApp;
+    if (
+      typeof window !== "undefined" &&
+      (
+        window as unknown as {
+          Telegram?: {
+            WebApp?: {
+              setHeaderColor?: (c: string) => void;
+              setBackgroundColor?: (c: string) => void;
+            };
+          };
+        }
+      )?.Telegram?.WebApp
+    ) {
+      const wa = (
+        window as unknown as {
+          Telegram: {
+            WebApp: {
+              setHeaderColor?: (c: string) => void;
+              setBackgroundColor?: (c: string) => void;
+            };
+          };
+        }
+      ).Telegram.WebApp;
       wa.setHeaderColor?.(theme === "dark" ? "#0b1116" : "#ffffff");
       wa.setBackgroundColor?.(theme === "dark" ? "#0b1116" : "#fafafa");
     }
   }, [theme]);
 
-  const toggleTheme = () => setThemeState((t) => (t === "light" ? "dark" : "light"));
+  const toggleTheme = () =>
+    setThemeState((t) => (t === "light" ? "dark" : "light"));
   const setTheme = (t: Theme) => setThemeState(t);
 
   return (

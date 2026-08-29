@@ -18,15 +18,18 @@ import {
   Moon,
 } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
-import { api, type ChatMessage, type MeResponse, type StaffConversation } from "./api/client";
+import {
+  api,
+  type ChatMessage,
+  type MeResponse,
+  type StaffConversation,
+} from "./api/client";
 import { StaffCompliancePanel } from "./StaffCompliancePanel";
 import { EvidenceViewer, type EvidenceDocument } from "./EvidenceViewer";
 import { KycQueue } from "./KycQueue";
 import { TopUpQueue } from "./TopUpQueue";
 import { DisputeQueue } from "./DisputeQueue";
 import { ProfileReportsQueue } from "./ProfileReportsQueue";
-
-
 
 // === INTERFACES & TYPES ===
 type StaffDashboardProps = { user: MeResponse; onLogout: () => void };
@@ -43,7 +46,6 @@ function getOldestWaitHours<T, K extends keyof T>(items: T[], dateField: K) {
   return (now - oldest) / (1000 * 60 * 60);
 }
 
-
 // === MAIN COMPONENT ===
 function relativeTime(value?: string): string {
   if (!value) return "";
@@ -53,24 +55,42 @@ function relativeTime(value?: string): string {
   if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `${hrs}h ago`;
-  return new Date(value).toLocaleDateString([], { month: "short", day: "numeric" });
+  return new Date(value).toLocaleDateString([], {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function dateLabel(value?: string) {
-  return value ? new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) : "";
+  return value
+    ? new Date(value).toLocaleString([], {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "";
 }
 
 export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   const { theme, toggleTheme } = useTheme();
   const [conversations, setConversations] = useState<StaffConversation[]>([]);
-  const [queueCounts, setQueueCounts] = useState({ kyc: 0, topups: 0, disputes: 0 });
+  const [queueCounts, setQueueCounts] = useState({
+    kyc: 0,
+    topups: 0,
+    disputes: 0,
+  });
   const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
-  const [activeTab, setActiveTab] = useState<"OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES">("OVERVIEW");
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES"
+  >("OVERVIEW");
+  const [selectedConversation, setSelectedConversation] = useState<
+    string | null
+  >(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reply, setReply] = useState("");
   const [queueScope, setQueueScope] = useState<"ALL" | "MINE">("ALL");
-  const [viewingEvidence, setViewingEvidence] = useState<EvidenceDocument[] | null>(null);
+  const [viewingEvidence, setViewingEvidence] = useState<
+    EvidenceDocument[] | null
+  >(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -86,13 +106,17 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   );
 
   const visibleConversations = useMemo(
-    () => filter === "OPEN" ? conversations.filter((c) => c.status === "OPEN") : conversations,
+    () =>
+      filter === "OPEN"
+        ? conversations.filter((c) => c.status === "OPEN")
+        : conversations,
     [conversations, filter],
   );
 
-  const openCount = useMemo(() => conversations.filter((c) => c.status === "OPEN").length, [conversations]);
-
-
+  const openCount = useMemo(
+    () => conversations.filter((c) => c.status === "OPEN").length,
+    [conversations],
+  );
 
   // Helper used in the conversation list — kept as a plain function since it is
   // called in JSX and does not need to be stable across renders.
@@ -106,13 +130,16 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   // Wrap in useCallback so the function identity is stable and can be referenced
   // safely by the effect below without triggering set-state-in-effect warnings.
   const loadConversations = useCallback(async (silent = false) => {
-    if (!silent) { setIsLoading(true); setError(""); }
+    if (!silent) {
+      setIsLoading(true);
+      setError("");
+    }
     try {
       const [chat, kyc, topups, disputes] = await Promise.all([
         api.getStaffConversations(),
         api.getKycReviewQueue({ pageSize: 1 }),
         api.getTopUpReviewQueue({ pageSize: 1 }),
-        api.getDisputeQueue({ pageSize: 1 })
+        api.getDisputeQueue({ pageSize: 1 }),
       ]);
       setConversations(Array.isArray(chat) ? chat : chat.items);
       setQueueCounts({
@@ -121,7 +148,12 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         disputes: disputes.total || 0,
       });
     } catch (err) {
-      if (!silent) setError(err instanceof Error ? err.message : "Unable to load conversation data");
+      if (!silent)
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load conversation data",
+        );
     } finally {
       if (!silent) setIsLoading(false);
     }
@@ -130,13 +162,20 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   // Store a stable ref to loadConversations so the effect can schedule it via the ref
   // rather than calling it directly — this satisfies the set-state-in-effect rule.
   const loadConversationsRef = useRef(loadConversations);
-  useEffect(() => { loadConversationsRef.current = loadConversations; }, [loadConversations]);
+  useEffect(() => {
+    loadConversationsRef.current = loadConversations;
+  }, [loadConversations]);
 
   // Initial load + auto-poll every 15 s just for chat/activity
   useEffect(() => {
     void loadConversationsRef.current();
-    pollingRef.current = setInterval(() => void loadConversationsRef.current(true), 15000);
-    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+    pollingRef.current = setInterval(
+      () => void loadConversationsRef.current(true),
+      15000,
+    );
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
   }, []);
 
   // Auto-scroll message thread when messages update
@@ -151,7 +190,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
       await api.markChatRead(conversation.id);
       setReadAt((prev) => ({ ...prev, [conversation.id]: new Date() }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load conversation");
+      setError(
+        err instanceof Error ? err.message : "Unable to load conversation",
+      );
     }
   };
 
@@ -176,7 +217,10 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     if (!selectedConversation || !reply.trim() || isSending) return;
     setIsSending(true);
     try {
-      const message = await api.sendChatMessage(selectedConversation, reply.trim());
+      const message = await api.sendChatMessage(
+        selectedConversation,
+        reply.trim(),
+      );
       setMessages((current) => [...current, message]);
       setReply("");
       await loadConversations(true);
@@ -196,7 +240,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
       setMessages([]);
       await loadConversations(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to close conversation");
+      setError(
+        err instanceof Error ? err.message : "Unable to close conversation",
+      );
     } finally {
       setIsClosing(false);
     }
@@ -209,15 +255,18 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
       await api.setConversationStatus(selectedConversation, "OPEN");
       await loadConversations(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to reopen conversation");
+      setError(
+        err instanceof Error ? err.message : "Unable to reopen conversation",
+      );
     } finally {
       setIsClosing(false);
     }
   };
 
-  const supportHours = getOldestWaitHours(conversations.filter(c => c.status === "OPEN"), "updatedAt");
-
-
+  const supportHours = getOldestWaitHours(
+    conversations.filter((c) => c.status === "OPEN"),
+    "updatedAt",
+  );
 
   const renderSla = (hours: number | null, label = "waiting") => {
     if (hours === null) return null;
@@ -225,56 +274,109 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     if (hours > 24) cls = "sla-breached";
     else if (hours > 2) cls = "sla-warning";
     const txt = hours < 1 ? "< 1h" : `${Math.floor(hours)}h`;
-    return <span className={`sla-indicator ${cls}`}>{label} {txt}</span>;
+    return (
+      <span className={`sla-indicator ${cls}`}>
+        {label} {txt}
+      </span>
+    );
   };
 
-  const displayedConversations = queueScope === "MINE" ? visibleConversations.filter(c => c.assignedStaff?.id === user.id) : visibleConversations;
+  const displayedConversations =
+    queueScope === "MINE"
+      ? visibleConversations.filter((c) => c.assignedStaff?.id === user.id)
+      : visibleConversations;
 
   return (
     <div className="staff-shell">
       {/* ── Sidebar ─────────────────────────────────────── */}
       <aside className="staff-sidebar">
-        <div className="sidebar-brand"><img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" /><strong>Yekis</strong></div>
+        <div className="sidebar-brand">
+          <img
+            src="/svgviewer-output.svg"
+            alt="Yekis Logo"
+            className="platform-logo small"
+          />
+          <strong>Yekis</strong>
+        </div>
         <div className="staff-identity">
           <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
           <div>
-            <strong>{user.staffRole === "ADMIN" ? "Administrator" : "Staff desk"}</strong>
+            <strong>
+              {user.staffRole === "ADMIN" ? "Administrator" : "Staff desk"}
+            </strong>
             <small>{user.email}</small>
           </div>
         </div>
-        
+
         <nav className="sidebar-nav">
-          <button className={activeTab === "OVERVIEW" ? "active" : ""} onClick={() => setActiveTab("OVERVIEW")}>
-            <span className="nav-icon"><LayoutDashboard size={18} /></span>
+          <button
+            className={activeTab === "OVERVIEW" ? "active" : ""}
+            onClick={() => setActiveTab("OVERVIEW")}
+          >
+            <span className="nav-icon">
+              <LayoutDashboard size={18} />
+            </span>
             <span className="nav-label">Overview</span>
           </button>
-          <button className={activeTab === "SUPPORT" ? "active" : ""} onClick={() => setActiveTab("SUPPORT")}>
-            <span className="nav-icon"><MessageSquare size={18} /></span>
+          <button
+            className={activeTab === "SUPPORT" ? "active" : ""}
+            onClick={() => setActiveTab("SUPPORT")}
+          >
+            <span className="nav-icon">
+              <MessageSquare size={18} />
+            </span>
             <span className="nav-label">Support</span>
           </button>
-          <button className={activeTab === "TOPUPS" ? "active" : ""} onClick={() => setActiveTab("TOPUPS")}>
-            <span className="nav-icon"><WalletCards size={18} /></span>
+          <button
+            className={activeTab === "TOPUPS" ? "active" : ""}
+            onClick={() => setActiveTab("TOPUPS")}
+          >
+            <span className="nav-icon">
+              <WalletCards size={18} />
+            </span>
             <span className="nav-label">Receipts</span>
           </button>
-          <button className={activeTab === "KYC" ? "active" : ""} onClick={() => setActiveTab("KYC")}>
-            <span className="nav-icon"><ShieldCheck size={18} /></span>
+          <button
+            className={activeTab === "KYC" ? "active" : ""}
+            onClick={() => setActiveTab("KYC")}
+          >
+            <span className="nav-icon">
+              <ShieldCheck size={18} />
+            </span>
             <span className="nav-label">Identity</span>
           </button>
           {user.staffRole === "ADMIN" && (
-            <button className={activeTab === "DISPUTES" ? "active" : ""} onClick={() => setActiveTab("DISPUTES")}>
-              <span className="nav-icon"><span className="metric-symbol" style={{ fontSize: 16, fontWeight: "bold" }}>!</span></span>
+            <button
+              className={activeTab === "DISPUTES" ? "active" : ""}
+              onClick={() => setActiveTab("DISPUTES")}
+            >
+              <span className="nav-icon">
+                <span
+                  className="metric-symbol"
+                  style={{ fontSize: 16, fontWeight: "bold" }}
+                >
+                  !
+                </span>
+              </span>
               <span className="nav-label">Disputes</span>
             </button>
           )}
           {user.staffRole === "ADMIN" && (
-            <button className={activeTab === "PROFILES" ? "active" : ""} onClick={() => setActiveTab("PROFILES")}>
-              <span className="nav-icon"><Users size={18} /></span>
+            <button
+              className={activeTab === "PROFILES" ? "active" : ""}
+              onClick={() => setActiveTab("PROFILES")}
+            >
+              <span className="nav-icon">
+                <Users size={18} />
+              </span>
               <span className="nav-label">Profiles</span>
             </button>
           )}
         </nav>
 
-        <button className="sidebar-settings" onClick={onLogout}>Sign out</button>
+        <button className="sidebar-settings" onClick={onLogout}>
+          Sign out
+        </button>
       </aside>
 
       {/* ── Main ────────────────────────────────────────── */}
@@ -292,34 +394,74 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 {activeTab === "PROFILES" && "Profile Moderation"}
               </h1>
               <div className="staff-filter-toggle">
-                <button className={queueScope === "ALL" ? "active" : ""} onClick={() => setQueueScope("ALL")}>All Queues</button>
-                <button className={queueScope === "MINE" ? "active" : ""} onClick={() => setQueueScope("MINE")}>My Queue</button>
+                <button
+                  className={queueScope === "ALL" ? "active" : ""}
+                  onClick={() => setQueueScope("ALL")}
+                >
+                  All Queues
+                </button>
+                <button
+                  className={queueScope === "MINE" ? "active" : ""}
+                  onClick={() => setQueueScope("MINE")}
+                >
+                  My Queue
+                </button>
               </div>
             </div>
-            <p>Coordinate support, payments, identity checks, and disputes from one desk.</p>
+            <p>
+              Coordinate support, payments, identity checks, and disputes from
+              one desk.
+            </p>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <button
               type="button"
               className="theme-toggle"
               onClick={toggleTheme}
-              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+              aria-label={
+                theme === "light"
+                  ? "Switch to dark mode"
+                  : "Switch to light mode"
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                background: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                cursor: "pointer",
+              }}
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <button className="btn-secondary" onClick={() => void loadConversations()} disabled={isLoading}>
+            <button
+              className="btn-secondary"
+              onClick={() => void loadConversations()}
+              disabled={isLoading}
+            >
               <RefreshCw size={15} /> Refresh
             </button>
           </div>
         </header>
 
-        {error && <div className="staff-error"><strong>Some queues need attention</strong><span>{error}</span></div>}
+        {error && (
+          <div className="staff-error">
+            <strong>Some queues need attention</strong>
+            <span>{error}</span>
+          </div>
+        )}
 
         {activeTab === "OVERVIEW" && (
           <div className="staff-dashboard-top-section">
             <section className="staff-metrics">
-              <article className="clickable" onClick={() => setActiveTab("SUPPORT")}>
+              <article
+                className="clickable"
+                onClick={() => setActiveTab("SUPPORT")}
+              >
                 <MessageSquare size={19} />
                 <span>Open support</span>
                 <div className="metric-details">
@@ -327,21 +469,30 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   {renderSla(supportHours)}
                 </div>
               </article>
-              <article className="clickable" onClick={() => setActiveTab("TOPUPS")}>
+              <article
+                className="clickable"
+                onClick={() => setActiveTab("TOPUPS")}
+              >
                 <WalletCards size={19} />
                 <span>Receipt reviews</span>
                 <div className="metric-details">
                   <strong>{queueCounts.topups}</strong>
                 </div>
               </article>
-              <article className="clickable" onClick={() => setActiveTab("KYC")}>
+              <article
+                className="clickable"
+                onClick={() => setActiveTab("KYC")}
+              >
                 <ShieldCheck size={19} />
                 <span>Identity reviews</span>
                 <div className="metric-details">
                   <strong>{queueCounts.kyc}</strong>
                 </div>
               </article>
-              <article className="clickable" onClick={() => setActiveTab("DISPUTES")}>
+              <article
+                className="clickable"
+                onClick={() => setActiveTab("DISPUTES")}
+              >
                 <span className="metric-symbol">!</span>
                 <span>Disputes</span>
                 <div className="metric-details">
@@ -351,9 +502,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
             </section>
           </div>
         )}
-        
+
         {/* ── Tab Content ───────────────────────────────── */}
-        
+
         {/* Support Chat Tab */}
         {activeTab === "SUPPORT" && (
           <section id="panel-support" className="staff-panel staff-chat-panel">
@@ -368,11 +519,15 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   <button
                     className={filter === "OPEN" ? "active" : ""}
                     onClick={() => setFilter("OPEN")}
-                  >Open</button>
+                  >
+                    Open
+                  </button>
                   <button
                     className={filter === "ALL" ? "active" : ""}
                     onClick={() => setFilter("ALL")}
-                  >All</button>
+                  >
+                    All
+                  </button>
                 </div>
                 <span className="status-pill">Live queue</span>
               </div>
@@ -384,7 +539,11 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 {displayedConversations.length === 0 ? (
                   <div className="staff-inbox-empty">
                     <MessageCircle size={32} />
-                    <p>{filter === "OPEN" ? "No open conversations." : "No support conversations yet."}</p>
+                    <p>
+                      {filter === "OPEN"
+                        ? "No open conversations."
+                        : "No support conversations yet."}
+                    </p>
                   </div>
                 ) : (
                   displayedConversations.map((conversation) => {
@@ -396,20 +555,32 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                         onClick={() => void openConversation(conversation)}
                       >
                         <span className="staff-conv-dot-wrap">
-                          {hasUnread && <CircleDot size={10} className="staff-conv-unread-dot" />}
+                          {hasUnread && (
+                            <CircleDot
+                              size={10}
+                              className="staff-conv-unread-dot"
+                            />
+                          )}
                         </span>
                         <span className="staff-conv-body">
                           <strong>{conversation.subject}</strong>
                           <small>{conversation.creator.email}</small>
                           {conversation.messages[0] && (
-                            <span className="staff-conv-preview">{conversation.messages[0].body}</span>
+                            <span className="staff-conv-preview">
+                              {conversation.messages[0].body}
+                            </span>
                           )}
                         </span>
                         <span className="staff-conv-meta">
-                          <b className={`status-pill ${conversation.status === "CLOSED" ? "closed" : ""}`}>
+                          <b
+                            className={`status-pill ${conversation.status === "CLOSED" ? "closed" : ""}`}
+                          >
                             {conversation.status}
                           </b>
-                          <small><Clock size={10} /> {relativeTime(conversation.updatedAt)}</small>
+                          <small>
+                            <Clock size={10} />{" "}
+                            {relativeTime(conversation.updatedAt)}
+                          </small>
                         </span>
                       </button>
                     );
@@ -426,14 +597,28 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                         <strong>{selected.subject}</strong>
                         <span>{selected.creator.email}</span>
                       </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        <span className={`status-pill ${selected.status === "CLOSED" ? "closed" : ""}`}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          alignItems: "center",
+                        }}
+                      >
+                        <span
+                          className={`status-pill ${selected.status === "CLOSED" ? "closed" : ""}`}
+                        >
                           {selected.status}
                         </span>
                         {selected.status === "OPEN" ? (
                           <button
                             className="btn-secondary"
-                            style={{ fontSize: "0.78rem", padding: "4px 10px", display: "flex", alignItems: "center", gap: 5 }}
+                            style={{
+                              fontSize: "0.78rem",
+                              padding: "4px 10px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
                             onClick={closeConversation}
                             disabled={isClosing}
                             title="Mark this conversation as resolved"
@@ -443,7 +628,13 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                         ) : (
                           <button
                             className="btn-secondary"
-                            style={{ fontSize: "0.78rem", padding: "4px 10px", display: "flex", alignItems: "center", gap: 5 }}
+                            style={{
+                              fontSize: "0.78rem",
+                              padding: "4px 10px",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 5,
+                            }}
                             onClick={reopenConversation}
                             disabled={isClosing}
                             title="Reopen this conversation"
@@ -457,17 +648,28 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     {/* Messages */}
                     <div className="staff-messages">
                       {messages.length === 0 ? (
-                        <p className="empty-state">No messages in this conversation yet.</p>
+                        <p className="empty-state">
+                          No messages in this conversation yet.
+                        </p>
                       ) : (
                         messages.map((message) => (
                           <div
                             key={message.id}
-                            className={message.senderId === user.id ? "staff-message own" : "staff-message"}
+                            className={
+                              message.senderId === user.id
+                                ? "staff-message own"
+                                : "staff-message"
+                            }
                           >
                             <p>{message.body}</p>
                             <small>
-                              {message.senderId === user.id ? "You" : message.sender.staffRole ? "Yekis team" : message.sender.role}
-                              {" · "}{dateLabel(message.createdAt)}
+                              {message.senderId === user.id
+                                ? "You"
+                                : message.sender.staffRole
+                                  ? "Yekis team"
+                                  : message.sender.role}
+                              {" · "}
+                              {dateLabel(message.createdAt)}
                             </small>
                           </div>
                         ))
@@ -478,15 +680,19 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     {/* Reply box — only for open conversations */}
                     {selected.status === "OPEN" ? (
                       <div className="staff-reply">
-                        <button 
-                          className="chat-compose-icon" 
+                        <button
+                          className="chat-compose-icon"
                           aria-label="Attach a file"
                           onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
+                            const input = document.createElement("input");
+                            input.type = "file";
                             input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement).files?.[0];
-                              if (file) setReply((r) => r + (r ? " " : "") + `📎 ${file.name}`);
+                              const file = (e.target as HTMLInputElement)
+                                .files?.[0];
+                              if (file)
+                                setReply(
+                                  (r) => r + (r ? " " : "") + `📎 ${file.name}`,
+                                );
                             };
                             input.click();
                           }}
@@ -496,7 +702,12 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                         <input
                           value={reply}
                           onChange={(e) => setReply(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendReply(); } }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void sendReply();
+                            }
+                          }}
                           placeholder="Reply to this conversation…"
                           disabled={isSending}
                           style={{ flex: 1, minWidth: 0 }}
@@ -512,7 +723,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                       </div>
                     ) : (
                       <div className="staff-reply staff-reply-closed">
-                        <span>This conversation is closed. Reopen it to reply.</span>
+                        <span>
+                          This conversation is closed. Reopen it to reply.
+                        </span>
                       </div>
                     )}
                   </>
@@ -530,55 +743,104 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         {/* Top-up Receipts Tab */}
         {activeTab === "TOPUPS" && (
           <section id="panel-receipts">
-            <TopUpQueue onReview={async (id, d, r) => { await api.reviewTopUp(id, d, r); await loadConversations(); }} onFlag={async (id, r) => { await api.flagTopUpSuspicious(id, r); await loadConversations(); }} />
+            <TopUpQueue
+              onReview={async (id, d, r) => {
+                await api.reviewTopUp(id, d, r);
+                await loadConversations();
+              }}
+              onFlag={async (id, r) => {
+                await api.flagTopUpSuspicious(id, r);
+                await loadConversations();
+              }}
+            />
           </section>
         )}
 
         {/* Identity Reviews Tab */}
         {activeTab === "KYC" && (
           <section id="panel-identity">
-            <KycQueue onReview={async (id, d, r) => { await api.reviewKyc(id, d, r); await loadConversations(); }} />
+            <KycQueue
+              onReview={async (id, d, r) => {
+                await api.reviewKyc(id, d, r);
+                await loadConversations();
+              }}
+            />
           </section>
         )}
 
         {/* Disputes Tab */}
         {activeTab === "DISPUTES" && (
           <section id="panel-disputes">
-            <DisputeQueue onResolve={async (id, o, r, s) => { await api.resolveDispute(id, { outcome: o, recommendation: r, freelancerShareMinor: s }); await loadConversations(); }} />
+            <DisputeQueue
+              onResolve={async (id, o, r, s) => {
+                await api.resolveDispute(id, {
+                  outcome: o,
+                  recommendation: r,
+                  freelancerShareMinor: s,
+                });
+                await loadConversations();
+              }}
+            />
           </section>
         )}
 
         {/* Profiles Tab */}
         {activeTab === "PROFILES" && (
-          <section id="panel-profiles" className="staff-panel" style={{ padding: "1.5rem" }}>
-             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-                <div>
-                   <h2 style={{ margin: 0, fontSize: "1.2rem" }}>Featured Profiles</h2>
-                   <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>Manage featured talent on the landing page</p>
-                </div>
-                <button 
-                  onClick={async () => {
-                     if (!window.confirm("Are you sure you want to refresh the featured carousel? This will update the featured talent shown on the landing page.")) {
-                       return;
-                     }
-                     try {
-                        await api.refreshFeaturedCarousel();
-                        alert("Featured carousel refreshed successfully.");
-                     } catch(err) {
-                        alert(err instanceof Error ? err.message : "Failed to refresh carousel");
-                     }
-                  }}
-                  className="btn-secondary"
-                  style={{ display: "flex", alignItems: "center", gap: 5 }}
-                >
-                  <RefreshCw size={15} /> Refresh Carousel
-                </button>
-             </div>
-             <ProfileReportsQueue />
+          <section
+            id="panel-profiles"
+            className="staff-panel"
+            style={{ padding: "1.5rem" }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "1.5rem",
+              }}
+            >
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.2rem" }}>
+                  Featured Profiles
+                </h2>
+                <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>
+                  Manage featured talent on the landing page
+                </p>
+              </div>
+              <button
+                onClick={async () => {
+                  if (
+                    !window.confirm(
+                      "Are you sure you want to refresh the featured carousel? This will update the featured talent shown on the landing page.",
+                    )
+                  ) {
+                    return;
+                  }
+                  try {
+                    await api.refreshFeaturedCarousel();
+                    alert("Featured carousel refreshed successfully.");
+                  } catch (err) {
+                    alert(
+                      err instanceof Error
+                        ? err.message
+                        : "Failed to refresh carousel",
+                    );
+                  }
+                }}
+                className="btn-secondary"
+                style={{ display: "flex", alignItems: "center", gap: 5 }}
+              >
+                <RefreshCw size={15} /> Refresh Carousel
+              </button>
+            </div>
+            <ProfileReportsQueue />
           </section>
         )}
 
-        <StaffCompliancePanel onChanged={loadConversations} onError={setError} />
+        <StaffCompliancePanel
+          onChanged={loadConversations}
+          onError={setError}
+        />
       </main>
 
       {viewingEvidence && (

@@ -1,0 +1,31 @@
+diff --git a/examples/oauth.ts b/examples/private_key_jwt.ts
+index d55e62d..8bf4f3a 100644
+--- a/examples/oauth.ts
++++ b/examples/private_key_jwt.ts
+@@ -9,12 +9,16 @@ let algorithm!:
+   | 'oidc' /* For .well-known/openid-configuration discovery */
+   | undefined /* Defaults to 'oidc' */
+ let client_id!: string
+-let client_secret!: string
+ /**
+  * Value used in the authorization request as redirect_uri pre-registered at the Authorization
+  * Server.
+  */
+ let redirect_uri!: string
++/**
++ * A key that the client has pre-registered at the Authorization Server for use with Private Key JWT
++ * client authentication method.
++ */
++let clientPrivateKey!: oauth.CryptoKey
+ 
+ // End of prerequisites
+ 
+@@ -23,7 +27,7 @@ const as = await oauth
+   .then((response) => oauth.processDiscoveryResponse(issuer, response))
+ 
+ const client: oauth.Client = { client_id }
+-const clientAuth = oauth.ClientSecretPost(client_secret)
++const clientAuth = oauth.PrivateKeyJwt(clientPrivateKey)
+ 
+ const code_challenge_method = 'S256'
+ /**

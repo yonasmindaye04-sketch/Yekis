@@ -3,14 +3,17 @@ import type { CreateJobInput, JobSearchQuery } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 
-
 // === MAIN FUNCTIONS ===
 export class ForbiddenRoleError extends Error {}
 export class JobNotFoundError extends Error {}
 export class InvalidJobStateError extends Error {}
 
 /** Clients (CLIENT or BOTH) post jobs. Freelancer-only accounts cannot. */
-export async function createJob(params: { clientId: string; clientRole: string; input: CreateJobInput }) {
+export async function createJob(params: {
+  clientId: string;
+  clientRole: string;
+  input: CreateJobInput;
+}) {
   if (params.clientRole !== "CLIENT" && params.clientRole !== "BOTH") {
     throw new ForbiddenRoleError("Only client accounts can post jobs.");
   }
@@ -66,15 +69,24 @@ export async function getJobById(jobId: string) {
 }
 
 /** Only the posting client can cancel, and only while still OPEN (no accepted proposal yet). */
-export async function cancelJob(params: { jobId: string; requestingUserId: string }) {
+export async function cancelJob(params: {
+  jobId: string;
+  requestingUserId: string;
+}) {
   const job = await prisma.job.findUnique({ where: { id: params.jobId } });
   if (!job) throw new JobNotFoundError();
-  if (job.clientId !== params.requestingUserId) throw new ForbiddenRoleError("Not your job posting.");
+  if (job.clientId !== params.requestingUserId)
+    throw new ForbiddenRoleError("Not your job posting.");
   if (job.status !== "OPEN") {
-    throw new InvalidJobStateError(`Cannot cancel a job in status ${job.status}.`);
+    throw new InvalidJobStateError(
+      `Cannot cancel a job in status ${job.status}.`,
+    );
   }
 
-  const updated = await prisma.job.update({ where: { id: job.id }, data: { status: "CANCELLED" } });
+  const updated = await prisma.job.update({
+    where: { id: job.id },
+    data: { status: "CANCELLED" },
+  });
 
   await recordAuditEvent({
     userId: params.requestingUserId,

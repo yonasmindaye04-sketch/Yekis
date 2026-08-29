@@ -1,0 +1,21 @@
+diff --git a/examples/oauth.ts b/examples/public.ts
+index d55e62d..437cd06 100644
+--- a/examples/oauth.ts
++++ b/examples/public.ts
+@@ -9,7 +9,6 @@ let algorithm!:
+   | 'oidc' /* For .well-known/openid-configuration discovery */
+   | undefined /* Defaults to 'oidc' */
+ let client_id!: string
+-let client_secret!: string
+ /**
+  * Value used in the authorization request as redirect_uri pre-registered at the Authorization
+  * Server.
+@@ -23,7 +22,7 @@ const as = await oauth
+   .then((response) => oauth.processDiscoveryResponse(issuer, response))
+ 
+ const client: oauth.Client = { client_id }
+-const clientAuth = oauth.ClientSecretPost(client_secret)
++const clientAuth = oauth.None()
+ 
+ const code_challenge_method = 'S256'
+ /**

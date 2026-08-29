@@ -34,13 +34,20 @@ export async function createContractFromProposal(proposalId: string) {
   });
   if (!proposal) throw new ContractNotFoundError("Proposal not found.");
   if (proposal.status !== "ACCEPTED") {
-    throw new ProposalNotAcceptedError("Contract can only be created from an ACCEPTED proposal.");
+    throw new ProposalNotAcceptedError(
+      "Contract can only be created from an ACCEPTED proposal.",
+    );
   }
 
-  const client = await prisma.user.findUniqueOrThrow({ where: { id: proposal.job.clientId } });
+  const client = await prisma.user.findUniqueOrThrow({
+    where: { id: proposal.job.clientId },
+  });
 
   const milestonePlan = MilestoneBreakdown.parse(proposal.milestoneBreakdown);
-  const totalAmountMinor = milestonePlan.reduce((sum, m) => sum + m.amount.amountMinor, 0);
+  const totalAmountMinor = milestonePlan.reduce(
+    (sum, m) => sum + m.amount.amountMinor,
+    0,
+  );
 
   const pdfBytes = await generateServiceAgreementPdf({
     contractId: proposal.jobId, // placeholder id in the PDF body itself; real Contract.id assigned below
@@ -87,7 +94,11 @@ export async function createContractFromProposal(proposalId: string) {
     eventType: "CONTRACT_GENERATED",
     entityType: "Contract",
     entityId: contract.id,
-    metadata: { jobId: proposal.jobId, proposalId, templateVersion: SERVICE_AGREEMENT_TEMPLATE_VERSION },
+    metadata: {
+      jobId: proposal.jobId,
+      proposalId,
+      templateVersion: SERVICE_AGREEMENT_TEMPLATE_VERSION,
+    },
   });
 
   return contract;
@@ -113,21 +124,27 @@ export async function getContract(userId: string, contractId: string) {
  * recognition of e-signatures.
  */
 export async function acceptContract(userId: string, contractId: string) {
-  const contract = await prisma.contract.findUnique({ where: { id: contractId } });
+  const contract = await prisma.contract.findUnique({
+    where: { id: contractId },
+  });
   if (!contract) throw new ContractNotFoundError();
 
   const isClient = contract.clientId === userId;
   const isFreelancer = contract.freelancerId === userId;
-  if (!isClient && !isFreelancer) throw new NotContractPartyError("Not a party to this contract.");
+  if (!isClient && !isFreelancer)
+    throw new NotContractPartyError("Not a party to this contract.");
 
-  if (isClient && contract.clientAcceptedAt) throw new AlreadyAcceptedError("Client already accepted.");
+  if (isClient && contract.clientAcceptedAt)
+    throw new AlreadyAcceptedError("Client already accepted.");
   if (isFreelancer && contract.freelancerAcceptedAt) {
     throw new AlreadyAcceptedError("Freelancer already accepted.");
   }
 
   const updated = await prisma.contract.update({
     where: { id: contractId },
-    data: isClient ? { clientAcceptedAt: new Date() } : { freelancerAcceptedAt: new Date() },
+    data: isClient
+      ? { clientAcceptedAt: new Date() }
+      : { freelancerAcceptedAt: new Date() },
   });
 
   await recordAuditEvent({
@@ -138,7 +155,8 @@ export async function acceptContract(userId: string, contractId: string) {
     metadata: { role: isClient ? "CLIENT" : "FREELANCER" },
   });
 
-  const fullyExecuted = !!updated.clientAcceptedAt && !!updated.freelancerAcceptedAt;
+  const fullyExecuted =
+    !!updated.clientAcceptedAt && !!updated.freelancerAcceptedAt;
   if (fullyExecuted) {
     await recordAuditEvent({
       eventType: "CONTRACT_FULLY_EXECUTED",
@@ -178,7 +196,10 @@ const TERMINAL_ESCROW_STATES = ["RELEASED", "REFUNDED", "PARTIAL_REFUND"];
  *      the statutory right no longer applies.
  * No money moves: by rule 3 there is nothing in escrow to refund.
  */
-export async function cancelDuringCoolingOff(params: { userId: string; contractId: string }) {
+export async function cancelDuringCoolingOff(params: {
+  userId: string;
+  contractId: string;
+}) {
   const contract = await prisma.contract.findUnique({
     where: { id: params.contractId },
     select: {
@@ -195,14 +216,16 @@ export async function cancelDuringCoolingOff(params: { userId: string; contractI
 
   if (!contract.cancellableUntil || contract.cancellableUntil <= new Date()) {
     throw new CoolingOffExpiredError(
-      "The 7-day cooling-off window for this contract has expired."
+      "The 7-day cooling-off window for this contract has expired.",
     );
   }
 
-  const progressedMilestone = contract.milestones.find((m) => m.escrowState !== "PAYMENT_PENDING");
+  const progressedMilestone = contract.milestones.find(
+    (m) => m.escrowState !== "PAYMENT_PENDING",
+  );
   if (progressedMilestone) {
     throw new ContractWorkAlreadyStartedError(
-      "Cooling-off cancellation is only available before work begins (no milestone funded)."
+      "Cooling-off cancellation is only available before work begins (no milestone funded).",
     );
   }
 
@@ -223,7 +246,8 @@ export async function cancelDuringCoolingOff(params: { userId: string; contractI
     entityId: contract.id,
     metadata: {
       cancellableUntil: contract.cancellableUntil,
-      legalBasis: "Electronic Transactions Proclamation No. 1205/2020 - Art. cooling-off right",
+      legalBasis:
+        "Electronic Transactions Proclamation No. 1205/2020 - Art. cooling-off right",
     },
   });
 
@@ -241,7 +265,9 @@ export async function checkAndUpdateContractCompletion(milestoneId: string) {
     select: { escrowState: true },
   });
 
-  const allTerminal = siblingMilestones.every((m) => TERMINAL_ESCROW_STATES.includes(m.escrowState));
+  const allTerminal = siblingMilestones.every((m) =>
+    TERMINAL_ESCROW_STATES.includes(m.escrowState),
+  );
   if (!allTerminal) return;
 
   await prisma.contract.update({

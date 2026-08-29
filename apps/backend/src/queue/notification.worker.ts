@@ -18,13 +18,20 @@ import { processNotification } from "../modules/notifications/notification.servi
 export const notificationWorker = new Worker(
   "notifications",
   async (job) => {
-    const { userId, message, ...metadata } = job.data as { userId: string; message: string; [k: string]: unknown };
+    const { userId, message, ...metadata } = job.data as {
+      userId: string;
+      message: string;
+      [k: string]: unknown;
+    };
 
     await processNotification({ userId, type: job.name, message, metadata });
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 notificationWorker.on("failed", (job, err) => {
-  logger.error({ jobId: job?.id, jobName: job?.name, err }, "Notification job failed");
+  logger.error(
+    { jobId: job?.id, jobName: job?.name, err },
+    "Notification job failed",
+  );
 });

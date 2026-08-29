@@ -21,7 +21,10 @@ export const adminRouter = Router();
 
 function parsePagination(query: Record<string, unknown>) {
   const page = Math.max(1, parseInt(String(query.page ?? "1")) || 1);
-  const limit = Math.min(100, Math.max(1, parseInt(String(query.limit ?? "25")) || 25));
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(String(query.limit ?? "25")) || 25),
+  );
   return { page, limit, skip: (page - 1) * limit };
 }
 
@@ -32,7 +35,9 @@ adminRouter.get(
   requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
-      const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
+      const { page, limit, skip } = parsePagination(
+        req.query as Record<string, unknown>,
+      );
       const where: {
         eventType?: string;
         entityType?: string;
@@ -60,57 +65,66 @@ adminRouter.get(
       logger.error({ err }, "Failed to list audit logs");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 // ---------- User management: search ----------
 
-adminRouter.get("/users/search", requireStaffRole("ADMIN"), async (req: AuthedRequest, res) => {
-  try {
-    const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
-    const q = String(req.query.q ?? "").trim();
+adminRouter.get(
+  "/users/search",
+  requireStaffRole("ADMIN"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const { page, limit, skip } = parsePagination(
+        req.query as Record<string, unknown>,
+      );
+      const q = String(req.query.q ?? "").trim();
 
-    if (q.length < 2) {
-      return res.status(400).json({ error: "QUERY_TOO_SHORT", message: "Search at least 2 characters." });
+      if (q.length < 2) {
+        return res.status(400).json({
+          error: "QUERY_TOO_SHORT",
+          message: "Search at least 2 characters.",
+        });
+      }
+
+      const where = {
+        OR: [
+          { email: { contains: q, mode: "insensitive" as const } },
+          { phone: { contains: q } },
+          { ucid: { contains: q, mode: "insensitive" as const } },
+          { displayName: { contains: q, mode: "insensitive" as const } },
+        ],
+      };
+
+      const [total, items] = await Promise.all([
+        prisma.user.count({ where }),
+        prisma.user.findMany({
+          where,
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            displayName: true,
+            role: true,
+            staffRole: true,
+            isSuspended: true,
+            cachedKycTier: true,
+            cachedKycStatus: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip,
+        }),
+      ]);
+
+      return res.json({ items, total, page, limit });
+    } catch (err) {
+      logger.error({ err }, "Failed to search users");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-
-    const where = {
-      OR: [
-        { email: { contains: q, mode: "insensitive" as const } },
-        { phone: { contains: q } },
-        { ucid: { contains: q, mode: "insensitive" as const } },
-        { displayName: { contains: q, mode: "insensitive" as const } },
-      ],
-    };
-
-    const [total, items] = await Promise.all([
-      prisma.user.count({ where }),
-      prisma.user.findMany({
-        where,
-        select: {
-          id: true,
-          email: true,
-          phone: true,
-          displayName: true,
-          role: true,
-          staffRole: true,
-          isSuspended: true,
-          cachedKycTier: true,
-          cachedKycStatus: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
-        take: limit,
-        skip,
-      }),
-    ]);
-
-    return res.json({ items, total, page, limit });
-  } catch (err) {
-    logger.error({ err }, "Failed to search users");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+  },
+);
 
 // ---------- User management: suspend / unsuspend ----------
 
@@ -122,7 +136,9 @@ adminRouter.post(
   async (req: AuthedRequest, res) => {
     const parsed = SuspendInput.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
     }
 
     try {
@@ -156,7 +172,7 @@ adminRouter.post(
       logger.error({ err }, "Failed to suspend user");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 adminRouter.post(
@@ -187,7 +203,7 @@ adminRouter.post(
       logger.error({ err }, "Failed to unsuspend user");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 // ---------- User management: force KYC re-review ----------
@@ -233,5 +249,5 @@ adminRouter.post(
       logger.error({ err }, "Failed to force KYC re-review");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );

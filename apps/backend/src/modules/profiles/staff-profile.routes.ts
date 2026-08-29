@@ -10,74 +10,92 @@ import { recordAuditEvent } from "../../lib/audit.js";
 export const staffProfileRouter = Router();
 
 // === ROUTES ===
-staffProfileRouter.get("/reports", requireAuth, requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"), async (req, res) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const skip = (page - 1) * limit;
-    
-    const [reports, total] = await Promise.all([
-      prisma.profileReport.findMany({
-        where: { status: "PENDING" },
-        skip,
-        take: limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          reportedUser: { select: { id: true, ucid: true, displayName: true } }
-        }
-      }),
-      prisma.profileReport.count({ where: { status: "PENDING" } })
-    ]);
-    
-    res.json({
-      data: reports,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    logger.error({ err: error }, "GET /staff/reports error");
-    res.status(500).json({ error: "Failed to fetch reports" });
-  }
-});
+staffProfileRouter.get(
+  "/reports",
+  requireAuth,
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  async (req, res) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const skip = (page - 1) * limit;
+
+      const [reports, total] = await Promise.all([
+        prisma.profileReport.findMany({
+          where: { status: "PENDING" },
+          skip,
+          take: limit,
+          orderBy: { createdAt: "desc" },
+          include: {
+            reportedUser: {
+              select: { id: true, ucid: true, displayName: true },
+            },
+          },
+        }),
+        prisma.profileReport.count({ where: { status: "PENDING" } }),
+      ]);
+
+      res.json({
+        data: reports,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      logger.error({ err: error }, "GET /staff/reports error");
+      res.status(500).json({ error: "Failed to fetch reports" });
+    }
+  },
+);
 
 const resolveReportSchema = z.object({
-  status: z.enum(["PENDING", "UNDER_REVIEW", "RESOLVED_NO_ACTION", "RESOLVED_PROFILE_HIDDEN", "RESOLVED_PROFILE_BANNED"]),
-  staffNotes: z.string().optional()
+  status: z.enum([
+    "PENDING",
+    "UNDER_REVIEW",
+    "RESOLVED_NO_ACTION",
+    "RESOLVED_PROFILE_HIDDEN",
+    "RESOLVED_PROFILE_BANNED",
+  ]),
+  staffNotes: z.string().optional(),
 });
 
-staffProfileRouter.patch("/reports/:reportId", requireAuth, requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"), async (req: any, res) => {
-  try {
-    const { reportId } = req.params;
-    const data = resolveReportSchema.parse(req.body);
-    
-    const report = await prisma.profileReport.update({
-      where: { id: reportId },
-      data: {
-        status: data.status,
-        staffNotes: data.staffNotes,
-        resolvedAt: new Date(),
-        reviewedByStaffId: req.user.id
+staffProfileRouter.patch(
+  "/reports/:reportId",
+  requireAuth,
+  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  async (req: any, res) => {
+    try {
+      const { reportId } = req.params;
+      const data = resolveReportSchema.parse(req.body);
+
+      const report = await prisma.profileReport.update({
+        where: { id: reportId },
+        data: {
+          status: data.status,
+          staffNotes: data.staffNotes,
+          resolvedAt: new Date(),
+          reviewedByStaffId: req.user.id,
+        },
+      });
+
+      await recordAuditEvent({
+        eventType: "RESOLVE_REPORT",
+        userId: req.user.id,
+        entityType: "ProfileReport",
+        entityId: reportId,
+        metadata: { status: data.status, notes: data.staffNotes },
+      });
+
+      res.json(report);
+    } catch (error) {
+      logger.error({ err: error }, "PATCH /staff/reports/:reportId error");
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors });
       }
-    });
-    
-    await recordAuditEvent({
-      eventType: "RESOLVE_REPORT",
-      userId: req.user.id,
-      entityType: "ProfileReport",
-      entityId: reportId,
-      metadata: { status: data.status, notes: data.staffNotes }
-    });
-    
-    res.json(report);
-  } catch (error) {
-    logger.error({ err: error }, "PATCH /staff/reports/:reportId error");
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ error: error.errors });
+      res.status(500).json({ error: "Failed to resolve report" });
     }
-    res.status(500).json({ error: "Failed to resolve report" });
-  }
-});
+  },
+);

@@ -3,7 +3,6 @@ import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { DisputeCategory, DisputeStage, EscrowState } from "@prisma/client";
 
-
 // === MAIN FUNCTIONS ===
 export class DisputesService {
   static async raiseDispute(params: {
@@ -19,13 +18,21 @@ export class DisputesService {
     });
 
     if (!contract) throw new Error("CONTRACT_NOT_FOUND");
-    if (contract.clientId !== params.raisedByUserId && contract.freelancerId !== params.raisedByUserId) {
+    if (
+      contract.clientId !== params.raisedByUserId &&
+      contract.freelancerId !== params.raisedByUserId
+    ) {
       throw new Error("UNAUTHORIZED_PARTY_FOR_DISPUTE");
     }
 
     // Freeze contract milestones to DISPUTED state
     await prisma.milestone.updateMany({
-      where: { contractId: params.contractId, escrowState: { in: [EscrowState.ESCROW_HELD, EscrowState.SUBMITTED_FOR_REVIEW] } },
+      where: {
+        contractId: params.contractId,
+        escrowState: {
+          in: [EscrowState.ESCROW_HELD, EscrowState.SUBMITTED_FOR_REVIEW],
+        },
+      },
       data: { escrowState: EscrowState.DISPUTED },
     });
 
@@ -45,7 +52,10 @@ export class DisputesService {
       eventType: "DISPUTE_RAISED",
       entityType: "Dispute",
       entityId: dispute.id,
-      metadata: { category: params.category, stage: DisputeStage.STAGE_1_NEGOTIATION },
+      metadata: {
+        category: params.category,
+        stage: DisputeStage.STAGE_1_NEGOTIATION,
+      },
     });
 
     return dispute;
@@ -58,16 +68,23 @@ export class DisputesService {
     evidenceBundlePath?: string;
     mediatorRecommendation?: string;
   }) {
-    const dispute = await prisma.dispute.findUnique({ where: { id: params.disputeId } });
+    const dispute = await prisma.dispute.findUnique({
+      where: { id: params.disputeId },
+    });
     if (!dispute) throw new Error("DISPUTE_NOT_FOUND");
 
     const updateData: Record<string, unknown> = { stage: params.nextStage };
 
     if (params.nextStage === DisputeStage.STAGE_2_EVIDENCE) {
-      updateData.evidenceBundlePath = params.evidenceBundlePath || `evidence/${dispute.contractId}/bundle-v1.json`;
+      updateData.evidenceBundlePath =
+        params.evidenceBundlePath ||
+        `evidence/${dispute.contractId}/bundle-v1.json`;
     }
 
-    if (params.nextStage === DisputeStage.STAGE_3_MEDIATION && params.mediatorRecommendation) {
+    if (
+      params.nextStage === DisputeStage.STAGE_3_MEDIATION &&
+      params.mediatorRecommendation
+    ) {
       updateData.mediatorRecommendation = params.mediatorRecommendation;
     }
 
@@ -111,7 +128,11 @@ export class DisputesService {
 
   static async listMediatorQueue() {
     return prisma.dispute.findMany({
-      where: { stage: { in: [DisputeStage.STAGE_2_EVIDENCE, DisputeStage.STAGE_3_MEDIATION] } },
+      where: {
+        stage: {
+          in: [DisputeStage.STAGE_2_EVIDENCE, DisputeStage.STAGE_3_MEDIATION],
+        },
+      },
       include: {
         contract: {
           include: {

@@ -12,8 +12,19 @@ export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
   return (
     <header className="marketing-header">
       <div className="marketing-header-left">
-        <a className="marketing-brand" href="#top" onClick={(e) => { e.preventDefault(); onNavigate("home"); }}>
-          <img src="/svgviewer-output.svg" alt="Yekis — Ethiopian freelance marketplace logo" className="platform-logo" />
+        <a
+          className="marketing-brand"
+          href="#top"
+          onClick={(e) => {
+            e.preventDefault();
+            onNavigate("home");
+          }}
+        >
+          <img
+            src="/svgviewer-output.svg"
+            alt="Yekis — Ethiopian freelance marketplace logo"
+            className="platform-logo"
+          />
           <strong>YEKIS</strong>
         </a>
       </div>
@@ -24,14 +35,30 @@ export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
         <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
       </nav>
       <div className="marketing-nav-right">
-        <a href="https://t.me/yekis_channel" target="_blank" rel="noopener noreferrer" className="telegram-link" aria-label="Yekis Telegram Channel">
+        <a
+          href="https://t.me/yekis_channel"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="telegram-link"
+          aria-label="Yekis Telegram Channel"
+        >
           <MessageCircle size={18} />
         </a>
-        <button className="theme-toggle" onClick={toggleTheme} aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}>
+        <button
+          className="theme-toggle"
+          onClick={toggleTheme}
+          aria-label={
+            theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+          }
+        >
           {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-        <button className="btn-ghost" onClick={() => onStart("login")}>Sign in</button>
-        <button className="btn-primary" onClick={() => onStart("register")}>Get started</button>
+        <button className="btn-ghost" onClick={() => onStart("login")}>
+          Sign in
+        </button>
+        <button className="btn-primary" onClick={() => onStart("register")}>
+          Get started
+        </button>
       </div>
     </header>
   );

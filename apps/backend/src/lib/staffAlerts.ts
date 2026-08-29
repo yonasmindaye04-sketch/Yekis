@@ -28,7 +28,7 @@ export async function notifyStaffOfEvent(params: {
   if (staff.length === 0) {
     logger.warn(
       { eventType: params.eventType },
-      "notifyStaffOfEvent: no staff users exist to notify — seed staff accounts."
+      "notifyStaffOfEvent: no staff users exist to notify — seed staff accounts.",
     );
     return 0;
   }

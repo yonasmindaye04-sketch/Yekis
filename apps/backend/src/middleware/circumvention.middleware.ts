@@ -14,16 +14,21 @@ const CONTACT_PATTERNS = [
   /\b(?:whatsapp|viber|imo|signal|phone|call me|email me|contact me at)\b/gi, // Common contact keywords
 ];
 
-
 // === MAIN FUNCTIONS ===
-export function sanitizeContactInfo(text: string): { sanitized: string; flagged: boolean } {
+export function sanitizeContactInfo(text: string): {
+  sanitized: string;
+  flagged: boolean;
+} {
   let flagged = false;
   let sanitized = text;
 
   for (const pattern of CONTACT_PATTERNS) {
     if (pattern.test(sanitized)) {
       flagged = true;
-      sanitized = sanitized.replace(pattern, "[REDACTED - Contact Info Sharing Prohibited]");
+      sanitized = sanitized.replace(
+        pattern,
+        "[REDACTED - Contact Info Sharing Prohibited]",
+      );
     }
   }
 

@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Check, Upload, WalletCards } from "lucide-react";
 import { api, type TopUpRequest, type WalletResponse } from "./api/client";
 
-
 // === MAIN COMPONENT ===
 export function BrowserWallet({
   wallet,
@@ -16,8 +15,12 @@ export function BrowserWallet({
   onChanged: () => Promise<void>;
   role: "CLIENT" | "FREELANCER";
 }) {
-  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR">("TELEBIRR");
-  const [withdrawRail, setWithdrawRail] = useState<"TELEBIRR" | "CBE_BIRR">("TELEBIRR");
+  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR">(
+    "TELEBIRR",
+  );
+  const [withdrawRail, setWithdrawRail] = useState<"TELEBIRR" | "CBE_BIRR">(
+    "TELEBIRR",
+  );
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
@@ -28,15 +31,24 @@ export function BrowserWallet({
   const [payoutIdentifier, setPayoutIdentifier] = useState("");
   const [showTopUp, setShowTopUp] = useState(false);
 
-  const setSuccess = (msg: string) => { setMessage(msg); setMessageIsError(false); };
-  const setError = (msg: string) => { setMessage(msg); setMessageIsError(true); };
+  const setSuccess = (msg: string) => {
+    setMessage(msg);
+    setMessageIsError(false);
+  };
+  const setError = (msg: string) => {
+    setMessage(msg);
+    setMessageIsError(true);
+  };
 
   const submitTopUp = async () => {
     if (!amount || !reference || !receipt) {
-      setError("Please fill in the amount, reference number, and attach a receipt.");
+      setError(
+        "Please fill in the amount, reference number, and attach a receipt.",
+      );
       return;
     }
-    setIsSubmitting(true); setMessage("");
+    setIsSubmitting(true);
+    setMessage("");
     try {
       const data = new FormData();
       data.append("amountMinor", (Number(amount) * 100).toString());
@@ -44,8 +56,12 @@ export function BrowserWallet({
       data.append("referenceNumber", reference);
       data.append("receipt", receipt);
       await api.createTopUpRequest(data);
-      setAmount(""); setReference(""); setReceipt(null);
-      setSuccess("Top-up submitted for staff approval. Your balance will update once approved.");
+      setAmount("");
+      setReference("");
+      setReceipt(null);
+      setSuccess(
+        "Top-up submitted for staff approval. Your balance will update once approved.",
+      );
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to submit top-up");
@@ -56,11 +72,18 @@ export function BrowserWallet({
 
   const withdraw = async () => {
     const amountMinor = Math.round(Number(withdrawAmount) * 100);
-    if (!Number.isFinite(amountMinor) || amountMinor <= 0 || !payoutIdentifier.trim()) {
-      setError("Enter a withdrawal amount and your payout phone or account number.");
+    if (
+      !Number.isFinite(amountMinor) ||
+      amountMinor <= 0 ||
+      !payoutIdentifier.trim()
+    ) {
+      setError(
+        "Enter a withdrawal amount and your payout phone or account number.",
+      );
       return;
     }
-    setIsSubmitting(true); setMessage("");
+    setIsSubmitting(true);
+    setMessage("");
     try {
       const result = await api.withdrawWallet({
         amountMinor,
@@ -68,16 +91,25 @@ export function BrowserWallet({
         payoutAccountIdentifier: payoutIdentifier.trim(),
       });
       if (result.error === "HELD_FOR_REVIEW") {
-        setError("Withdrawal held for compliance review. Your balance was not debited.");
+        setError(
+          "Withdrawal held for compliance review. Your balance was not debited.",
+        );
       } else if (result.error === "ACTIVE_CONTRACT_BLOCKS_WITHDRAWAL") {
-        setError(result.message ?? "You cannot withdraw while you have active contracts or open disputes. Wait for them to complete first.");
+        setError(
+          result.message ??
+            "You cannot withdraw while you have active contracts or open disputes. Wait for them to complete first.",
+        );
       } else {
-        setWithdrawAmount(""); setPayoutIdentifier("");
-        setSuccess("Withdrawal request recorded. Funds will be sent to your account.");
+        setWithdrawAmount("");
+        setPayoutIdentifier("");
+        setSuccess(
+          "Withdrawal request recorded. Funds will be sent to your account.",
+        );
       }
       await onChanged();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unable to request withdrawal";
+      const msg =
+        err instanceof Error ? err.message : "Unable to request withdrawal";
       // Handle the contract-blocks-withdrawal error from the API
       if (msg.includes("active contracts") || msg.includes("open dispute")) {
         setError(msg);
@@ -120,20 +152,48 @@ export function BrowserWallet({
           <p className="wallet-help">Choose where to receive your payout:</p>
           <div className="payment-grid">
             <button
-              className={withdrawRail === "TELEBIRR" ? "payment-account selected" : "payment-account"}
+              className={
+                withdrawRail === "TELEBIRR"
+                  ? "payment-account selected"
+                  : "payment-account"
+              }
               onClick={() => setWithdrawRail("TELEBIRR")}
             >
-              <img src="/payment/Telebirr.png" alt="Telebirr" style={{ width: '70px', height: '70px', objectFit: 'contain', borderRadius: '8px', flexShrink: 0 }} />
+              <img
+                src="/payment/Telebirr.png"
+                alt="Telebirr"
+                style={{
+                  width: "70px",
+                  height: "70px",
+                  objectFit: "contain",
+                  borderRadius: "8px",
+                  flexShrink: 0,
+                }}
+              />
               <div className="payment-account-text">
                 <strong>Telebirr</strong>
                 <span>Send to phone number</span>
               </div>
             </button>
             <button
-              className={withdrawRail === "CBE_BIRR" ? "payment-account selected" : "payment-account"}
+              className={
+                withdrawRail === "CBE_BIRR"
+                  ? "payment-account selected"
+                  : "payment-account"
+              }
               onClick={() => setWithdrawRail("CBE_BIRR")}
             >
-              <img src="/payment/cbe payment.jpg" alt="CBE Bank" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+              <img
+                src="/payment/cbe payment.jpg"
+                alt="CBE Bank"
+                style={{
+                  width: "70px",
+                  height: "70px",
+                  objectFit: "cover",
+                  borderRadius: "8px",
+                  flexShrink: 0,
+                }}
+              />
               <div className="payment-account-text">
                 <strong>CBE Bank</strong>
                 <span>Send to account number</span>
@@ -154,7 +214,9 @@ export function BrowserWallet({
               />
             </label>
             <label>
-              {withdrawRail === "TELEBIRR" ? "Telebirr phone number" : "CBE account number"}
+              {withdrawRail === "TELEBIRR"
+                ? "Telebirr phone number"
+                : "CBE account number"}
               <input
                 value={payoutIdentifier}
                 onChange={(e) => setPayoutIdentifier(e.target.value)}
@@ -164,7 +226,11 @@ export function BrowserWallet({
           </div>
 
           {message && (
-            <p className={messageIsError ? "wallet-message error" : "wallet-message"}>
+            <p
+              className={
+                messageIsError ? "wallet-message error" : "wallet-message"
+              }
+            >
               {!messageIsError && <Check size={16} />}
               {message}
             </p>
@@ -199,25 +265,54 @@ export function BrowserWallet({
         {showTopUp && (
           <>
             <p className="wallet-help">
-              Send money to your selected account, then upload the receipt for staff approval.
+              Send money to your selected account, then upload the receipt for
+              staff approval.
             </p>
             <div className="payment-grid">
               <button
-                className={topUpRail === "TELEBIRR" ? "payment-account selected" : "payment-account"}
+                className={
+                  topUpRail === "TELEBIRR"
+                    ? "payment-account selected"
+                    : "payment-account"
+                }
                 onClick={() => setTopUpRail("TELEBIRR")}
               >
-                <img src="/payment/Telebirr.png" alt="Telebirr" style={{ width: '70px', height: '70px', objectFit: 'contain', borderRadius: '8px', flexShrink: 0 }} />
+                <img
+                  src="/payment/Telebirr.png"
+                  alt="Telebirr"
+                  style={{
+                    width: "70px",
+                    height: "70px",
+                    objectFit: "contain",
+                    borderRadius: "8px",
+                    flexShrink: 0,
+                  }}
+                />
                 <div className="payment-account-text">
                   <strong>Telebirr</strong>
                   <span>Yekis top-up account</span>
-                  <code>0911 223 344</code>
+                  <code>0910 011 818</code>
                 </div>
               </button>
               <button
-                className={topUpRail === "CBE_BIRR" ? "payment-account selected" : "payment-account"}
+                className={
+                  topUpRail === "CBE_BIRR"
+                    ? "payment-account selected"
+                    : "payment-account"
+                }
                 onClick={() => setTopUpRail("CBE_BIRR")}
               >
-                <img src="/payment/cbe payment.jpg" alt="CBE Bank" style={{ width: '70px', height: '70px', objectFit: 'cover', borderRadius: '8px', flexShrink: 0 }} />
+                <img
+                  src="/payment/cbe payment.jpg"
+                  alt="CBE Bank"
+                  style={{
+                    width: "70px",
+                    height: "70px",
+                    objectFit: "cover",
+                    borderRadius: "8px",
+                    flexShrink: 0,
+                  }}
+                />
                 <div className="payment-account-text">
                   <strong>CBE Bank</strong>
                   <span>Yekis top-up account</span>
@@ -229,16 +324,27 @@ export function BrowserWallet({
             <div className="browser-topup-fields">
               <label>
                 Amount sent
-                <input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="1" placeholder="ETB" />
+                <input
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  type="number"
+                  min="1"
+                  placeholder="ETB"
+                />
               </label>
               <label>
                 Reference number
-                <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. TB-12345" />
+                <input
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                  placeholder="e.g. TB-12345"
+                />
               </label>
               <label className="browser-upload">
                 Receipt
                 <small>
-                  <Upload size={15} /> {receipt?.name ?? "Choose an image or PDF"}
+                  <Upload size={15} />{" "}
+                  {receipt?.name ?? "Choose an image or PDF"}
                 </small>
                 <input
                   type="file"
@@ -249,13 +355,21 @@ export function BrowserWallet({
             </div>
 
             {message && (
-              <p className={messageIsError ? "wallet-message error" : "wallet-message"}>
+              <p
+                className={
+                  messageIsError ? "wallet-message error" : "wallet-message"
+                }
+              >
                 {!messageIsError && <Check size={16} />}
                 {message}
               </p>
             )}
 
-            <button className="btn-primary" onClick={() => void submitTopUp()} disabled={isSubmitting}>
+            <button
+              className="btn-primary"
+              onClick={() => void submitTopUp()}
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Submitting..." : "Submit for approval"}
             </button>
           </>
@@ -274,9 +388,13 @@ export function BrowserWallet({
             <div className="list-row" key={item.id}>
               <div>
                 <strong>ETB {(item.amountMinor / 100).toLocaleString()}</strong>
-                <span>{item.provider} · {item.referenceNumber}</span>
+                <span>
+                  {item.provider} · {item.referenceNumber}
+                </span>
               </div>
-              <span className="status-pill">{item.status.replace("_", " ")}</span>
+              <span className="status-pill">
+                {item.status.replace("_", " ")}
+              </span>
             </div>
           ))
         )}

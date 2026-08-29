@@ -1,0 +1,38 @@
+# Interface: WWWAuthenticateChallenge
+
+[💗 Help the project](https://github.com/sponsors/panva)
+
+Support from the community to continue maintaining and improving this module is welcome. If you find the module useful, please consider supporting the project by [becoming a sponsor](https://github.com/sponsors/panva).
+
+***
+
+A parsed `WWW-Authenticate` challenge.
+
+## Properties
+
+### parameters
+
+• `readonly` **parameters**: [`WWWAuthenticateChallengeParameters`](WWWAuthenticateChallengeParameters.md)
+
+Parsed WWW-Authenticate challenge auth-param dictionary (always present but may be empty, e.g.
+when [token68](#token68) is present, or when no auth-param pairs
+were provided)
+
+***
+
+### scheme
+
+• `readonly` **scheme**: [`Lowercase`](https://www.typescriptlang.org/docs/handbook/2/template-literal-types.html#lowercasestringtype)\<`string`\>
+
+Parsed WWW-Authenticate challenge auth-scheme
+
+> [!NOTE]\
+> Because the value is case insensitive it is always returned lowercased
+
+***
+
+### token68?
+
+• `readonly` `optional` **token68?**: `string`
+
+Parsed WWW-Authenticate challenge token68

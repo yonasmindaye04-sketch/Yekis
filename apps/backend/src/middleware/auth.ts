@@ -6,18 +6,22 @@ import { prisma } from "../lib/prisma.js";
 
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 
-
 // === INTERFACES & TYPES ===
 export interface AuthedRequest extends Request {
   user?: { id: string; role: string; staffRole?: string | null };
 }
 
-
 // === MAIN FUNCTIONS ===
-export async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing or malformed Authorization header" });
+    return res
+      .status(401)
+      .json({ error: "Missing or malformed Authorization header" });
   }
 
   try {
@@ -38,7 +42,11 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
       return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
     }
 
-    req.user = { id, role: payload.role as string, staffRole: (payload.staffRole as string | null) ?? null };
+    req.user = {
+      id,
+      role: payload.role as string,
+      staffRole: (payload.staffRole as string | null) ?? null,
+    };
     next();
   } catch {
     return res.status(401).json({ error: "Invalid or expired token" });
@@ -51,7 +59,11 @@ export async function requireAuth(req: AuthedRequest, res: Response, next: NextF
  * populated; otherwise req.user stays undefined and the request proceeds.
  * Used for public endpoints where auth provides extra context (e.g. profile views).
  */
-export async function optionalAuth(req: AuthedRequest, _res: Response, next: NextFunction) {
+export async function optionalAuth(
+  req: AuthedRequest,
+  _res: Response,
+  next: NextFunction,
+) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) {
     req.user = undefined;
@@ -61,7 +73,11 @@ export async function optionalAuth(req: AuthedRequest, _res: Response, next: Nex
   try {
     const token = header.slice("Bearer ".length);
     const { payload } = await jwtVerify(token, accessSecret);
-    req.user = { id: payload.sub as string, role: payload.role as string, staffRole: (payload.staffRole as string | null) ?? null };
+    req.user = {
+      id: payload.sub as string,
+      role: payload.role as string,
+      staffRole: (payload.staffRole as string | null) ?? null,
+    };
   } catch {
     req.user = undefined;
   }

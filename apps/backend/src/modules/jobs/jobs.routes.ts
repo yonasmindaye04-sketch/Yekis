@@ -10,6 +10,8 @@ import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
+import { uploadProposalAttachment } from "../../lib/objectStore.js";
+import multer from "multer";
 import {
   createJob,
   searchJobs,
@@ -38,11 +40,17 @@ export const jobsRouter = Router();
 
 // === MAIN FUNCTIONS ===
 async function currentUserRole(userId: string): Promise<string> {
-  const user = await prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { role: true } });
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { role: true },
+  });
   return user.role;
 }
 
-function handleKnownErrors(err: unknown, res: import("express").Response): boolean {
+function handleKnownErrors(
+  err: unknown,
+  res: import("express").Response,
+): boolean {
   if (err instanceof ForbiddenRoleError || err instanceof SelfBidError) {
     res.status(403).json({ error: "FORBIDDEN", message: err.message });
     return true;
@@ -51,7 +59,10 @@ function handleKnownErrors(err: unknown, res: import("express").Response): boole
     res.status(404).json({ error: "NOT_FOUND" });
     return true;
   }
-  if (err instanceof InvalidJobStateError || err instanceof DuplicateProposalError) {
+  if (
+    err instanceof InvalidJobStateError ||
+    err instanceof DuplicateProposalError
+  ) {
     res.status(409).json({ error: "CONFLICT", message: err.message });
     return true;
   }
@@ -60,24 +71,39 @@ function handleKnownErrors(err: unknown, res: import("express").Response): boole
 
 // ---------- Jobs ----------
 
-jobsRouter.post("/", requireAuth, requireKycVerified("TIER_1"), async (req: AuthedRequest, res) => {
-  const parsed = CreateJobInput.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+jobsRouter.post(
+  "/",
+  requireAuth,
+  requireKycVerified("TIER_1"),
+  async (req: AuthedRequest, res) => {
+    const parsed = CreateJobInput.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
-  try {
-    const role = await currentUserRole(req.user!.id);
-    const job = await createJob({ clientId: req.user!.id, clientRole: role, input: parsed.data });
-    return res.status(201).json(job);
-  } catch (err) {
-    if (handleKnownErrors(err, res)) return;
-    logger.error({ err }, "Job creation failed");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+    try {
+      const role = await currentUserRole(req.user!.id);
+      const job = await createJob({
+        clientId: req.user!.id,
+        clientRole: role,
+        input: parsed.data,
+      });
+      return res.status(201).json(job);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Job creation failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 jobsRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
   const parsed = JobSearchQuery.safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
   const result = await searchJobs(parsed.data);
   return res.json(result);
@@ -86,7 +112,10 @@ jobsRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
 jobsRouter.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
   const jobs = await prisma.job.findMany({
     where: { clientId: req.user!.id },
-    include: { _count: { select: { proposals: true } }, contract: { select: { id: true } } },
+    include: {
+      _count: { select: { proposals: true } },
+      contract: { select: { id: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
   return res.json(jobs);
@@ -102,39 +131,93 @@ jobsRouter.get("/:jobId", requireAuth, async (req, res) => {
   }
 });
 
-jobsRouter.post("/:jobId/cancel", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const job = await cancelJob({ jobId: req.params.jobId as string, requestingUserId: req.user!.id });
-    return res.json(job);
-  } catch (err) {
-    if (handleKnownErrors(err, res)) return;
-    logger.error({ err }, "Job cancellation failed");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+jobsRouter.post(
+  "/:jobId/cancel",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const job = await cancelJob({
+        jobId: req.params.jobId as string,
+        requestingUserId: req.user!.id,
+      });
+      return res.json(job);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Job cancellation failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // ---------- Proposals ----------
 
-jobsRouter.get("/proposals/mine", requireAuth, async (req: AuthedRequest, res) => {
-  const proposals = await prisma.proposal.findMany({
-    where: { freelancerId: req.user!.id },
-    include: {
-      job: {
-        select: { id: true, title: true, status: true, clientId: true, contract: { select: { id: true } } },
+jobsRouter.get(
+  "/proposals/mine",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const proposals = await prisma.proposal.findMany({
+      where: { freelancerId: req.user!.id },
+      include: {
+        job: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            clientId: true,
+            contract: { select: { id: true } },
+          },
+        },
       },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  return res.json(proposals);
+      orderBy: { createdAt: "desc" },
+    });
+    return res.json(proposals);
+  },
+);
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 }, // 8MB limit
 });
+
+jobsRouter.post(
+  "/:jobId/proposals/upload",
+  requireAuth,
+  upload.single("file"),
+  async (req: AuthedRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Missing file" });
+      }
+
+      const jobId = req.params.jobId as string;
+      const path = await uploadProposalAttachment({
+        jobId,
+        userId: req.user!.id,
+        fileBuffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+
+      return res.json({ path });
+    } catch (err) {
+      logger.error({ err }, "Failed to upload proposal attachment");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 jobsRouter.post(
   "/:jobId/proposals",
   requireAuth,
   requireKycVerified("TIER_1"),
   async (req: AuthedRequest, res) => {
-    const parsed = CreateProposalInput.safeParse({ ...req.body, jobId: req.params.jobId });
-    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    const parsed = CreateProposalInput.safeParse({
+      ...req.body,
+      jobId: req.params.jobId,
+    });
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
     try {
       const role = await currentUserRole(req.user!.id);
@@ -149,51 +232,66 @@ jobsRouter.post(
       logger.error({ err }, "Proposal submission failed");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
-jobsRouter.get("/:jobId/proposals", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const proposals = await listProposalsForJob({
-      jobId: req.params.jobId as string,
-      requestingUserId: req.user!.id,
-    });
-    return res.json(proposals);
-  } catch (err) {
-    if (handleKnownErrors(err, res)) return;
-    logger.error({ err }, "Failed to list proposals");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+jobsRouter.get(
+  "/:jobId/proposals",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const proposals = await listProposalsForJob({
+        jobId: req.params.jobId as string,
+        requestingUserId: req.user!.id,
+      });
+      return res.json(proposals);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to list proposals");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
-jobsRouter.post("/proposals/:proposalId/decision", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = ProposalDecisionInput.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+jobsRouter.post(
+  "/proposals/:proposalId/decision",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = ProposalDecisionInput.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
-  try {
-    const result = await decideProposal({
-      proposalId: req.params.proposalId as string,
-      requestingUserId: req.user!.id,
-      decision: parsed.data.decision,
-    });
-    return res.json(result);
-  } catch (err) {
-    if (handleKnownErrors(err, res)) return;
-    logger.error({ err }, "Proposal decision failed");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+    try {
+      const result = await decideProposal({
+        proposalId: req.params.proposalId as string,
+        requestingUserId: req.user!.id,
+        decision: parsed.data.decision,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Proposal decision failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
-jobsRouter.post("/proposals/:proposalId/withdraw", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const result = await withdrawProposal({
-      proposalId: req.params.proposalId as string,
-      requestingUserId: req.user!.id,
-    });
-    return res.json(result);
-  } catch (err) {
-    if (handleKnownErrors(err, res)) return;
-    logger.error({ err }, "Proposal withdrawal failed");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+jobsRouter.post(
+  "/proposals/:proposalId/withdraw",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const result = await withdrawProposal({
+        proposalId: req.params.proposalId as string,
+        requestingUserId: req.user!.id,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Proposal withdrawal failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);

@@ -22,18 +22,24 @@ export async function sendTelegramPush(params: {
   try {
     const user = await prisma.user.findUnique({
       where: { id: params.userId },
-      select: { telegramChatId: true }
+      select: { telegramChatId: true },
     });
 
     if (!user?.telegramChatId) {
-      logger.info({ userId: params.userId }, "User has no Telegram chat ID linked. Skipping push.");
+      logger.info(
+        { userId: params.userId },
+        "User has no Telegram chat ID linked. Skipping push.",
+      );
       return { sent: false };
     }
 
     await bot.api.sendMessage(user.telegramChatId, params.message);
     return { sent: true };
   } catch (error) {
-    logger.error({ error, userId: params.userId }, "Failed to send Telegram push notification");
+    logger.error(
+      { error, userId: params.userId },
+      "Failed to send Telegram push notification",
+    );
     return { sent: false };
   }
 }

@@ -59,7 +59,7 @@ export interface TopUpRequest {
 export interface TopUpQueueItem {
   id: string;
   userId: string;
-  provider: "TELEBIRR" | "CBE_BIRR" | "CHAPA";
+  provider: "TELEBIRR" | "CBE_BIRR";
   amountMinor: number;
   referenceNumber: string;
   status: string;
@@ -107,12 +107,14 @@ export interface ProposalInput {
   quotedAmountMinor: number;
   estimatedDays: number;
   milestoneBreakdown: { title: string; amountMinor: number; dueDate: string }[];
+  attachmentPaths?: string[];
 }
 
 export interface Proposal {
   id: string;
   jobId: string;
   freelancerId: string;
+  attachmentPaths?: string[];
   coverLetter: string;
   quotedAmountMinor: number;
   estimatedDays: number;
@@ -465,7 +467,7 @@ class ApiClient {
     languagePreference: "am" | "en";
     role: "CLIENT" | "FREELANCER";
     dateOfBirth: string;
-    consents: { kycDataProcessing: true; marketingCommunications: boolean; analytics: boolean };
+    consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
   }): Promise<{ id: string; ucid: string }> {
     return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
   }
@@ -584,6 +586,28 @@ class ApiClient {
     return this.request(`/api/v1/jobs/${jobId}/proposals`);
   }
 
+  async uploadProposalAttachment(jobId: string, file: File): Promise<{ path: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    // We use native fetch here because this.request expects JSON body by default
+    const token = this.tokenProvider();
+    const headers: Record<string, string> = {};
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+    
+    const res = await fetch(`${this.baseUrl}/api/v1/jobs/${jobId}/proposals/upload`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+    
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      throw new Error(data?.error || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  }
+
   async submitProposal(input: ProposalInput): Promise<{ id: string }> {
     return this.request(`/api/v1/jobs/${input.jobId}/proposals`, {
       method: "POST",
@@ -596,6 +620,7 @@ class ApiClient {
           amount: { amountMinor: milestone.amountMinor, currency: "ETB" },
           dueDate: milestone.dueDate,
         })),
+        attachmentPaths: input.attachmentPaths,
       }),
     });
   }
@@ -633,7 +658,7 @@ class ApiClient {
     return this.request("/api/v1/escrow/milestones");
   }
 
-  async fundMilestone(contractId: string, milestoneId: string, provider: "TELEBIRR" | "CHAPA" | "CBE_BIRR"): Promise<{ redirectUrl: string | null; providerTransactionId: string }> {
+  async fundMilestone(contractId: string, milestoneId: string, provider: "TELEBIRR" | "CBE_BIRR"): Promise<{ redirectUrl: string | null; providerTransactionId: string }> {
     return this.request("/api/v1/escrow/fund", {
       method: "POST",
       body: JSON.stringify({ contractId, milestoneId, provider }),
@@ -660,7 +685,7 @@ class ApiClient {
   }
 
 
-  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CHAPA" | "CBE_BIRR"; payoutAccountIdentifier: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
+  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CBE_BIRR"; payoutAccountIdentifier: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
     return this.request("/api/v1/escrow/wallet/withdraw", { method: "POST", body: JSON.stringify(input) });
   }
 

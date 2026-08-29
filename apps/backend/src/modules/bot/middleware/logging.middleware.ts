@@ -1,7 +1,10 @@
 import { BotContext } from "../types.js";
 import { logger } from "../../../lib/logger.js";
 
-export async function loggingMiddleware(ctx: BotContext, next: () => Promise<void>) {
+export async function loggingMiddleware(
+  ctx: BotContext,
+  next: () => Promise<void>,
+) {
   const start = Date.now();
   const userId = ctx.session.telegramUserId;
   const chatId = ctx.session.telegramChatId;
@@ -22,7 +25,7 @@ export async function loggingMiddleware(ctx: BotContext, next: () => Promise<voi
       callbackData: ctx.callbackQuery?.data,
       scene: ctx.session.scene,
     },
-    "Incoming update"
+    "Incoming update",
   );
 
   try {
@@ -38,7 +41,7 @@ export async function loggingMiddleware(ctx: BotContext, next: () => Promise<voi
         durationMs: duration,
         scene: ctx.session.scene,
       },
-      "Update processed"
+      "Update processed",
     );
   }
 }

@@ -19,7 +19,6 @@ import { prisma } from "../../lib/prisma.js";
  * bank/Telebirr account once physical escrow separation is completed (TIER 3 blocker).
  */
 
-
 // === MAIN FUNCTIONS ===
 export async function getFinanceReconciliation(params?: {
   periodMonth?: string; // ISO format "2026-08" — if provided, also returns that month's withholding report
@@ -32,7 +31,11 @@ export async function getFinanceReconciliation(params?: {
   ] = await Promise.all([
     // Pool 1: Current escrow — sum of all milestones in flight
     prisma.milestone.aggregate({
-      where: { escrowState: { in: ["ESCROW_HELD", "SUBMITTED_FOR_REVIEW", "DISPUTED"] } },
+      where: {
+        escrowState: {
+          in: ["ESCROW_HELD", "SUBMITTED_FOR_REVIEW", "DISPUTED"],
+        },
+      },
       _sum: { amountMinor: true },
       _count: { id: true },
     }),
@@ -46,7 +49,9 @@ export async function getFinanceReconciliation(params?: {
     prisma.platformOperatingAccount.findUnique({ where: { id: "singleton" } }),
     // Optional: specific month's withholding report
     params?.periodMonth
-      ? prisma.withholdingRemittanceReport.findUnique({ where: { periodMonth: params.periodMonth } })
+      ? prisma.withholdingRemittanceReport.findUnique({
+          where: { periodMonth: params.periodMonth },
+        })
       : Promise.resolve(null),
   ]);
 
@@ -56,7 +61,8 @@ export async function getFinanceReconciliation(params?: {
     totalReleasedMinor: totalReleasedResult._sum.amountMinor ?? 0,
     totalReleasedMilestoneCount: totalReleasedResult._count.id,
     platformFeeAccumulatedMinor: platformAccount?.accumulatedFeeMinor ?? 0,
-    withholdingAccumulatedMinor: platformAccount?.accumulatedWithholdingMinor ?? 0,
+    withholdingAccumulatedMinor:
+      platformAccount?.accumulatedWithholdingMinor ?? 0,
     platformAccountUpdatedAt: platformAccount?.updatedAt ?? null,
     // Monthly withholding detail if requested
     periodWithholdingReport: withholdingReport ?? null,
@@ -68,7 +74,10 @@ export async function getFinanceReconciliation(params?: {
  * fee reconciliation — Finance can cross-check each credit against the
  * corresponding PaymentTransaction and PaymentProvider receipt.
  */
-export async function getFeeCreditLedger(params?: { page?: number; limit?: number }) {
+export async function getFeeCreditLedger(params?: {
+  page?: number;
+  limit?: number;
+}) {
   const page = Math.max(1, params?.page ?? 1);
   const limit = Math.max(1, Math.min(200, params?.limit ?? 50));
 
@@ -87,7 +96,10 @@ export async function getFeeCreditLedger(params?: { page?: number; limit?: numbe
 /**
  * Returns all WithholdingRemittanceReport rows for Finance's ERA filing reference.
  */
-export async function getWithholdingReports(params?: { page?: number; limit?: number }) {
+export async function getWithholdingReports(params?: {
+  page?: number;
+  limit?: number;
+}) {
   const page = Math.max(1, params?.page ?? 1);
   const limit = Math.max(1, Math.min(50, params?.limit ?? 12));
 

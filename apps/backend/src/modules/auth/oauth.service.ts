@@ -42,9 +42,13 @@ const googleJwks = env.GOOGLE_CLIENT_ID
   ? createRemoteJWKSet(new URL("https://www.googleapis.com/oauth2/v3/certs"))
   : null;
 
-export async function verifyGoogleIdToken(idToken: string): Promise<OAuthProfile> {
+export async function verifyGoogleIdToken(
+  idToken: string,
+): Promise<OAuthProfile> {
   if (!googleJwks || !env.GOOGLE_CLIENT_ID) {
-    throw new OAuthNotConfiguredError("Google sign-in is not configured on this server.");
+    throw new OAuthNotConfiguredError(
+      "Google sign-in is not configured on this server.",
+    );
   }
 
   let payload: Record<string, unknown>;
@@ -56,10 +60,13 @@ export async function verifyGoogleIdToken(idToken: string): Promise<OAuthProfile
     payload = result.payload as Record<string, unknown>;
   } catch (err) {
     logger.warn({ err }, "Google id_token verification failed");
-    throw new OAuthVerificationError("Google credential could not be verified.");
+    throw new OAuthVerificationError(
+      "Google credential could not be verified.",
+    );
   }
 
-  const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
+  const email =
+    typeof payload.email === "string" ? payload.email.toLowerCase() : "";
   // Refuse unverified mailboxes: a self-asserted email could hijack an
   // existing password account otherwise.
   if (!email || payload.email_verified !== true) {
@@ -71,7 +78,8 @@ export async function verifyGoogleIdToken(idToken: string): Promise<OAuthProfile
     providerId: String(payload.sub ?? ""),
     email,
     name: typeof payload.name === "string" ? payload.name : undefined,
-    avatarUrl: typeof payload.picture === "string" ? payload.picture : undefined,
+    avatarUrl:
+      typeof payload.picture === "string" ? payload.picture : undefined,
   };
 }
 
@@ -81,9 +89,13 @@ const appleJwks = env.APPLE_CLIENT_ID
   ? createRemoteJWKSet(new URL("https://appleid.apple.com/auth/keys"))
   : null;
 
-export async function verifyAppleIdToken(idToken: string): Promise<OAuthProfile> {
+export async function verifyAppleIdToken(
+  idToken: string,
+): Promise<OAuthProfile> {
   if (!appleJwks || !env.APPLE_CLIENT_ID) {
-    throw new OAuthNotConfiguredError("Apple sign-in is not configured on this server.");
+    throw new OAuthNotConfiguredError(
+      "Apple sign-in is not configured on this server.",
+    );
   }
 
   let payload: Record<string, unknown>;
@@ -98,9 +110,12 @@ export async function verifyAppleIdToken(idToken: string): Promise<OAuthProfile>
     throw new OAuthVerificationError("Apple credential could not be verified.");
   }
 
-  const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
+  const email =
+    typeof payload.email === "string" ? payload.email.toLowerCase() : "";
   if (!email) {
-    throw new OAuthVerificationError("Apple credential did not include an email.");
+    throw new OAuthVerificationError(
+      "Apple credential did not include an email.",
+    );
   }
 
   // Apple hides the real name behind a private relay email; use the email
@@ -115,16 +130,20 @@ export async function verifyAppleIdToken(idToken: string): Promise<OAuthProfile>
 
 // ---- Facebook ----
 
-export async function verifyFacebookAccessToken(accessToken: string): Promise<OAuthProfile> {
+export async function verifyFacebookAccessToken(
+  accessToken: string,
+): Promise<OAuthProfile> {
   if (!(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET)) {
-    throw new OAuthNotConfiguredError("Facebook sign-in is not configured on this server.");
+    throw new OAuthNotConfiguredError(
+      "Facebook sign-in is not configured on this server.",
+    );
   }
 
   const appToken = `${env.FACEBOOK_APP_ID}|${env.FACEBOOK_APP_SECRET}`;
 
   // 1. Verify the token is issued BY our app and is still valid.
   const debugRes = await fetch(
-    `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appToken)}`
+    `https://graph.facebook.com/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appToken)}`,
   );
   if (!debugRes.ok) {
     throw new OAuthVerificationError("Facebook token check failed.");
@@ -138,12 +157,14 @@ export async function verifyFacebookAccessToken(accessToken: string): Promise<OA
     debug.data.app_id !== env.FACEBOOK_APP_ID ||
     !debug.data.user_id
   ) {
-    throw new OAuthVerificationError("Facebook credential is invalid or was issued by another app.");
+    throw new OAuthVerificationError(
+      "Facebook credential is invalid or was issued by another app.",
+    );
   }
 
   // 2. Fetch profile fields with the verified token (app-scoped id matches).
   const meRes = await fetch(
-    `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`
+    `https://graph.facebook.com/me?fields=id,name,email,picture.type(large)&access_token=${encodeURIComponent(accessToken)}`,
   );
   if (!meRes.ok) {
     throw new OAuthVerificationError("Could not read Facebook profile.");
@@ -158,7 +179,7 @@ export async function verifyFacebookAccessToken(accessToken: string): Promise<OA
   const email = typeof me.email === "string" ? me.email.toLowerCase() : "";
   if (!email) {
     throw new OAuthVerificationError(
-      "Facebook account did not grant email permission - required to sign in."
+      "Facebook account did not grant email permission - required to sign in.",
     );
   }
 
@@ -183,7 +204,10 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
 
   if (user && !user.emailVerified) {
     // OAuth providers verify email ownership - mark verified on first OAuth login.
-    await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true },
+    });
   }
 
   if (!user) {
@@ -215,7 +239,10 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
           consents: {
             create: [
               { purpose: "kyc_data_processing", granted: true },
-              { purpose: `${profile.provider.toLowerCase()}_account_linking`, granted: true },
+              {
+                purpose: `${profile.provider.toLowerCase()}_account_linking`,
+                granted: true,
+              },
               { purpose: "marketing_communications", granted: false },
               { purpose: "analytics", granted: false },
             ],
@@ -236,7 +263,8 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
 
   // 2. Ensure the provider id is linked for future direct lookup.
   const linkData = { [providerField]: profile.providerId };
-  const needsLink = (user as Record<string, unknown>)[providerField] !== profile.providerId;
+  const needsLink =
+    (user as Record<string, unknown>)[providerField] !== profile.providerId;
   if (needsLink) {
     try {
       await prisma.user.update({ where: { id: user.id }, data: linkData });
@@ -245,7 +273,7 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
       // than silently merging identities.
       logger.warn({ err, provider: profile.provider }, "OAuth link conflict");
       throw new OAuthVerificationError(
-        "This social account is already linked to a different Yekis account."
+        "This social account is already linked to a different Yekis account.",
       );
     }
   }

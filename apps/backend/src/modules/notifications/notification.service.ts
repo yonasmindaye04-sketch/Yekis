@@ -4,7 +4,6 @@ import { sendSms } from "./sms.client.js";
 import { sendTelegramPush } from "./telegram.client.js";
 import { logger } from "../../lib/logger.js";
 
-
 // === MAIN FUNCTIONS ===
 export class NotificationNotFoundError extends Error {}
 export class NotNotificationOwnerError extends Error {}
@@ -62,7 +61,10 @@ export async function processNotification(params: {
 }) {
   const user = await prisma.user.findUnique({ where: { id: params.userId } });
   if (!user) {
-    logger.warn({ userId: params.userId }, "Notification for unknown user — dropping.");
+    logger.warn(
+      { userId: params.userId },
+      "Notification for unknown user — dropping.",
+    );
     return;
   }
 
@@ -78,7 +80,9 @@ export async function processNotification(params: {
   const isCritical = CRITICAL_NOTIFICATION_TYPES.has(params.type);
 
   const results = await Promise.allSettled([
-    isCritical ? sendSms({ phone: user.phone, message: params.message }) : Promise.resolve({ sent: false }),
+    isCritical
+      ? sendSms({ phone: user.phone, message: params.message })
+      : Promise.resolve({ sent: false }),
     sendTelegramPush({ userId: params.userId, message: params.message }),
     user.email && !user.email.endsWith("@yekis.local")
       ? sendPlatformMovementEmail({
@@ -91,20 +95,33 @@ export async function processNotification(params: {
       : Promise.resolve({ success: true }),
   ]);
 
-  if (isCritical && results[0].status === "fulfilled" && (results[0].value as { sent?: boolean })?.sent) {
-    await prisma.notification.update({ where: { id: notification.id }, data: { smsSentAt: new Date() } });
+  if (
+    isCritical &&
+    results[0].status === "fulfilled" &&
+    (results[0].value as { sent?: boolean })?.sent
+  ) {
+    await prisma.notification.update({
+      where: { id: notification.id },
+      data: { smsSentAt: new Date() },
+    });
   }
 
   for (const result of results) {
     if (result.status === "rejected") {
-      logger.error({ reason: result.reason, notificationId: notification.id }, "Notification delivery channel failed");
+      logger.error(
+        { reason: result.reason, notificationId: notification.id },
+        "Notification delivery channel failed",
+      );
     }
   }
 
   return notification;
 }
 
-export async function listNotifications(userId: string, opts: { unreadOnly?: boolean } = {}) {
+export async function listNotifications(
+  userId: string,
+  opts: { unreadOnly?: boolean } = {},
+) {
   return prisma.notification.findMany({
     where: { userId, ...(opts.unreadOnly ? { isRead: false } : {}) },
     orderBy: { createdAt: "desc" },
@@ -113,13 +130,21 @@ export async function listNotifications(userId: string, opts: { unreadOnly?: boo
 }
 
 export async function markAsRead(userId: string, notificationId: string) {
-  const notification = await prisma.notification.findUnique({ where: { id: notificationId } });
+  const notification = await prisma.notification.findUnique({
+    where: { id: notificationId },
+  });
   if (!notification) throw new NotificationNotFoundError();
   if (notification.userId !== userId) throw new NotNotificationOwnerError();
 
-  return prisma.notification.update({ where: { id: notificationId }, data: { isRead: true } });
+  return prisma.notification.update({
+    where: { id: notificationId },
+    data: { isRead: true },
+  });
 }
 
 export async function markAllAsRead(userId: string) {
-  return prisma.notification.updateMany({ where: { userId, isRead: false }, data: { isRead: true } });
+  return prisma.notification.updateMany({
+    where: { userId, isRead: false },
+    data: { isRead: true },
+  });
 }

@@ -14,10 +14,15 @@ export interface PaginationOptions {
  */
 export function createPaginationKeyboard(
   ctx: BotContext,
-  options: PaginationOptions
+  options: PaginationOptions,
 ): InlineKeyboard {
-  
-  const { baseAction, page, totalPages, showBack = true, backAction = "menu:main" } = options;
+  const {
+    baseAction,
+    page,
+    totalPages,
+    showBack = true,
+    backAction = "menu:main",
+  } = options;
   const kb = new InlineKeyboard();
 
   // Previous page
@@ -49,7 +54,7 @@ export function createPaginationKeyboard(
 export function getPaginationMeta(
   totalItems: number,
   page: number,
-  pageSize: number
+  pageSize: number,
 ): { totalPages: number; hasNext: boolean; hasPrev: boolean; offset: number } {
   const totalPages = Math.ceil(totalItems / pageSize);
   const hasNext = page < totalPages - 1;
@@ -66,9 +71,8 @@ export function createSimplePagination(
   baseAction: string,
   page: number,
   hasNext: boolean,
-  backAction = "menu:main"
+  backAction = "menu:main",
 ): InlineKeyboard {
-  
   const kb = new InlineKeyboard();
 
   if (page > 0) {

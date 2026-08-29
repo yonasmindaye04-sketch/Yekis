@@ -43,7 +43,7 @@ export function buildApp() {
       crossOriginEmbedderPolicy: false,
       crossOriginResourcePolicy: false,
       frameguard: false,
-    })
+    }),
   );
   app.use(cors()); // tighten to your actual frontend origin(s) before production
   app.use(pinoHttp({ logger })); // doesn't touch the body, safe to run before the raw-body webhook routes
@@ -55,7 +55,7 @@ export function buildApp() {
   // re-serialized JSON, which can differ byte-for-byte from the original
   // and silently break verification.
   app.use("/api/v1/webhooks", webhooksRouter);
-  
+
   // Telegram bot webhook also needs raw body for secret token verification
   app.use("/api/v1/telegram", botRouter);
 
@@ -65,7 +65,12 @@ export function buildApp() {
   // limit defined alongside the webhook handlers themselves.
   app.use(
     "/api",
-    rateLimit({ windowMs: 15 * 60 * 1000, max: 300, standardHeaders: true, legacyHeaders: false })
+    rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 300,
+      standardHeaders: true,
+      legacyHeaders: false,
+    }),
   );
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
@@ -97,10 +102,17 @@ export function buildApp() {
   // Central error handler — catches anything that slips past route-level
   // try/catch. Never leak err.stack in production responses.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    logger.error({ err, path: req.path }, "Unhandled error");
-    res.status(500).json({ error: "INTERNAL_ERROR" });
-  });
+  app.use(
+    (
+      err: Error,
+      req: express.Request,
+      res: express.Response,
+      _next: express.NextFunction,
+    ) => {
+      logger.error({ err, path: req.path }, "Unhandled error");
+      res.status(500).json({ error: "INTERNAL_ERROR" });
+    },
+  );
 
   return app;
 }

@@ -1,7 +1,10 @@
 import { BotContext } from "../types.js";
 import { prisma } from "../../../lib/prisma.js";
 
-export async function authMiddleware(ctx: BotContext, next: () => Promise<void>) {
+export async function authMiddleware(
+  ctx: BotContext,
+  next: () => Promise<void>,
+) {
   const from = ctx.from;
   const chat = ctx.chat;
 
@@ -13,7 +16,7 @@ export async function authMiddleware(ctx: BotContext, next: () => Promise<void>)
   // Since the schema doesn't have telegramUserId/telegramChatId yet, we'll use email pattern
   // TODO: Add telegramUserId and telegramChatId to User model in Prisma schema
   const telegramEmail = `telegram+${from.id}@yekis.local`;
-  
+
   const user = await prisma.user.findUnique({
     where: { email: telegramEmail },
     select: {

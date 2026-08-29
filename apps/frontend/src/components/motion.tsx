@@ -44,7 +44,10 @@ export function PageLoadSplash() {
   if (!show) return null;
 
   return (
-    <div className={`yekis-splash ${fading ? "yekis-splash-fade" : ""}`} aria-hidden="true">
+    <div
+      className={`yekis-splash ${fading ? "yekis-splash-fade" : ""}`}
+      aria-hidden="true"
+    >
       <div className="yekis-splash-inner">
         <img src="/svgviewer-output.svg" alt="" className="yekis-splash-logo" />
         <span className="yekis-splash-word">Yekis</span>
@@ -80,13 +83,18 @@ export function ScrollEffects() {
         const header = document.querySelector(".marketing-header");
         if (header) header.classList.toggle("is-scrolled", doc.scrollTop > 8);
 
-        document.querySelectorAll<HTMLElement>("[data-parallax]").forEach((el) => {
-          const speed = Number(el.dataset.parallax) || 0.15;
-          const rect = el.getBoundingClientRect();
-          // Only parallax while the element is near the viewport
-          if (rect.bottom < 0 || rect.top > window.innerHeight) return;
-          el.style.setProperty("--parallax-y", `${Math.round(doc.scrollTop * speed * 10) / 10}px`);
-        });
+        document
+          .querySelectorAll<HTMLElement>("[data-parallax]")
+          .forEach((el) => {
+            const speed = Number(el.dataset.parallax) || 0.15;
+            const rect = el.getBoundingClientRect();
+            // Only parallax while the element is near the viewport
+            if (rect.bottom < 0 || rect.top > window.innerHeight) return;
+            el.style.setProperty(
+              "--parallax-y",
+              `${Math.round(doc.scrollTop * speed * 10) / 10}px`,
+            );
+          });
       });
     };
 
@@ -107,7 +115,9 @@ export function ScrollEffects() {
 
 export function useScrollReveal() {
   useEffect(() => {
-    const els = Array.from(document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-visible)"));
+    const els = Array.from(
+      document.querySelectorAll<HTMLElement>("[data-reveal]:not(.is-visible)"),
+    );
     if (els.length === 0) return;
 
     // Elements already in view on mount reveal immediately (no pop-in flash)
@@ -123,7 +133,7 @@ export function useScrollReveal() {
           }
         }
       },
-      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" }
+      { threshold: 0.12, rootMargin: "0px 0px -40px 0px" },
     );
 
     els.forEach((el) => io.observe(el));

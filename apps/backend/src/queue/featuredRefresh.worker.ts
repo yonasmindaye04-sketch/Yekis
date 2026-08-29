@@ -14,11 +14,14 @@ export const featuredRefreshWorker = new Worker(
       await refreshFeaturedCarousel();
       logger.info("featuredRefreshWorker: Completed refresh");
     } catch (error) {
-      logger.error({ err: error }, "featuredRefreshWorker: Error refreshing carousel");
+      logger.error(
+        { err: error },
+        "featuredRefreshWorker: Error refreshing carousel",
+      );
       throw error;
     }
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 featuredRefreshWorker.on("failed", (job, err) => {
@@ -32,6 +35,6 @@ export async function scheduleFeaturedRefreshJob() {
   await featuredRefreshQueue.add(
     "carousel-refresh",
     {},
-    { repeat: { pattern: "0 */6 * * *" }, jobId: "featured-refresh-periodic" } // every 6h
+    { repeat: { pattern: "0 */6 * * *" }, jobId: "featured-refresh-periodic" }, // every 6h
   );
 }

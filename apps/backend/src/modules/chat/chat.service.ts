@@ -3,7 +3,6 @@ import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { randomInt } from "node:crypto";
 
-
 // === MAIN FUNCTIONS ===
 export class ConversationNotFoundError extends Error {}
 export class ConversationAccessError extends Error {}
@@ -11,11 +10,18 @@ export class InvalidMessageError extends Error {}
 
 const STAFF_SELECT = { id: true, email: true, staffRole: true, role: true };
 
-export async function createGuestConversation(params: { email: string; body: string }) {
+export async function createGuestConversation(params: {
+  email: string;
+  body: string;
+}) {
   const email = params.email.trim().toLowerCase();
   const body = params.body.trim();
-  if (!email.includes("@")) throw new InvalidMessageError("Enter a valid email address.");
-  if (body.length < 1 || body.length > 5000) throw new InvalidMessageError("Message must be between 1 and 5,000 characters.");
+  if (!email.includes("@"))
+    throw new InvalidMessageError("Enter a valid email address.");
+  if (body.length < 1 || body.length > 5000)
+    throw new InvalidMessageError(
+      "Message must be between 1 and 5,000 characters.",
+    );
 
   const user = await prisma.user.upsert({
     where: { email },
@@ -50,7 +56,10 @@ export async function createGuestConversation(params: { email: string; body: str
     subject: conversation.subject,
     status: conversation.status,
     assignedStaff: conversation.assignedStaff
-      ? { id: conversation.assignedStaff.id, name: staffDisplayName(conversation.assignedStaff.email) }
+      ? {
+          id: conversation.assignedStaff.id,
+          name: staffDisplayName(conversation.assignedStaff.email),
+        }
       : null,
   };
 }
@@ -59,7 +68,14 @@ export async function createGuestConversation(params: { email: string; body: str
 async function pickAvailableStaff() {
   const staffUsers = await prisma.user.findMany({
     where: { staffRole: { in: ["ADMIN", "COMPLIANCE_OFFICER"] } },
-    select: { id: true, email: true, staffRole: true, _count: { select: { conversationsAssigned: { where: { status: "OPEN" } } } } },
+    select: {
+      id: true,
+      email: true,
+      staffRole: true,
+      _count: {
+        select: { conversationsAssigned: { where: { status: "OPEN" } } },
+      },
+    },
     orderBy: { conversationsAssigned: { _count: "asc" } },
     take: 1,
   });
@@ -76,14 +92,21 @@ async function getConversationAccess(conversationId: string, userId: string) {
   const conversation = await prisma.conversation.findUnique({
     where: { id: conversationId },
     include: {
-      participants: { where: { userId }, select: { id: true, lastReadAt: true } },
+      participants: {
+        where: { userId },
+        select: { id: true, lastReadAt: true },
+      },
       assignedStaff: { select: STAFF_SELECT },
     },
   });
   if (!conversation) throw new ConversationNotFoundError();
 
-  const user = await prisma.user.findUnique({ where: { id: userId }, select: { staffRole: true } });
-  const isStaff = user?.staffRole === "ADMIN" || user?.staffRole === "COMPLIANCE_OFFICER";
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { staffRole: true },
+  });
+  const isStaff =
+    user?.staffRole === "ADMIN" || user?.staffRole === "COMPLIANCE_OFFICER";
 
   // Staff can only access conversations assigned to them (unless ADMIN can see all)
   if (isStaff) {
@@ -97,9 +120,15 @@ async function getConversationAccess(conversationId: string, userId: string) {
   return { conversation, isStaff };
 }
 
-export async function createConversation(params: { userId: string; subject: string }) {
+export async function createConversation(params: {
+  userId: string;
+  subject: string;
+}) {
   const subject = params.subject.trim();
-  if (subject.length < 3 || subject.length > 160) throw new InvalidMessageError("Subject must be between 3 and 160 characters.");
+  if (subject.length < 3 || subject.length > 160)
+    throw new InvalidMessageError(
+      "Subject must be between 3 and 160 characters.",
+    );
 
   const assignedStaff = await pickAvailableStaff();
 
@@ -113,11 +142,19 @@ export async function createConversation(params: { userId: string; subject: stri
     include: { assignedStaff: { select: STAFF_SELECT } },
   });
 
-  await recordAuditEvent({ userId: params.userId, eventType: "SUPPORT_CONVERSATION_CREATED", entityType: "Conversation", entityId: conversation.id });
+  await recordAuditEvent({
+    userId: params.userId,
+    eventType: "SUPPORT_CONVERSATION_CREATED",
+    entityType: "Conversation",
+    entityId: conversation.id,
+  });
   return {
     ...conversation,
     assignedStaff: conversation.assignedStaff
-      ? { id: conversation.assignedStaff.id, name: staffDisplayName(conversation.assignedStaff.email) }
+      ? {
+          id: conversation.assignedStaff.id,
+          name: staffDisplayName(conversation.assignedStaff.email),
+        }
       : null,
   };
 }
@@ -127,7 +164,11 @@ export async function listConversations(userId: string) {
     where: { participants: { some: { userId } } },
     include: {
       participants: { where: { userId }, select: { lastReadAt: true } },
-      messages: { orderBy: { createdAt: "desc" }, take: 1, select: { body: true, createdAt: true, senderId: true } },
+      messages: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { body: true, createdAt: true, senderId: true },
+      },
       assignedStaff: { select: STAFF_SELECT },
     },
     orderBy: { updatedAt: "desc" },
@@ -143,15 +184,25 @@ export async function listConversations(userId: string) {
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt,
       latestMessage,
-      unread: Boolean(latestMessage && latestMessage.senderId !== userId && (!lastReadAt || latestMessage.createdAt > lastReadAt)),
+      unread: Boolean(
+        latestMessage &&
+        latestMessage.senderId !== userId &&
+        (!lastReadAt || latestMessage.createdAt > lastReadAt),
+      ),
       assignedStaff: conversation.assignedStaff
-        ? { id: conversation.assignedStaff.id, name: staffDisplayName(conversation.assignedStaff.email) }
+        ? {
+            id: conversation.assignedStaff.id,
+            name: staffDisplayName(conversation.assignedStaff.email),
+          }
         : null,
     };
   });
 }
 
-export async function listMessages(params: { conversationId: string; userId: string }) {
+export async function listMessages(params: {
+  conversationId: string;
+  userId: string;
+}) {
   await getConversationAccess(params.conversationId, params.userId);
   return prisma.chatMessage.findMany({
     where: { conversationId: params.conversationId },
@@ -160,15 +211,34 @@ export async function listMessages(params: { conversationId: string; userId: str
   });
 }
 
-export async function sendMessage(params: { conversationId: string; userId: string; body: string; attachmentUrl?: string }) {
+export async function sendMessage(params: {
+  conversationId: string;
+  userId: string;
+  body: string;
+  attachmentUrl?: string;
+}) {
   const body = params.body.trim();
-  if (body.length < 1 || body.length > 5000) throw new InvalidMessageError("Message must be between 1 and 5,000 characters.");
-  const { conversation, isStaff } = await getConversationAccess(params.conversationId, params.userId);
+  if (body.length < 1 || body.length > 5000)
+    throw new InvalidMessageError(
+      "Message must be between 1 and 5,000 characters.",
+    );
+  const { conversation, isStaff } = await getConversationAccess(
+    params.conversationId,
+    params.userId,
+  );
 
   await prisma.$transaction(async (tx) => {
-    if (isStaff && !conversation.participants.find((p: { id: string }) => p.id)) {
+    if (
+      isStaff &&
+      !conversation.participants.find((p: { id: string }) => p.id)
+    ) {
       await tx.conversationParticipant.upsert({
-        where: { conversationId_userId: { conversationId: conversation.id, userId: params.userId } },
+        where: {
+          conversationId_userId: {
+            conversationId: conversation.id,
+            userId: params.userId,
+          },
+        },
         create: { conversationId: conversation.id, userId: params.userId },
         update: {},
       });
@@ -178,10 +248,15 @@ export async function sendMessage(params: { conversationId: string; userId: stri
         conversationId: conversation.id,
         senderId: params.userId,
         body,
-        ...(params.attachmentUrl ? { attachmentUrl: params.attachmentUrl } : {}),
+        ...(params.attachmentUrl
+          ? { attachmentUrl: params.attachmentUrl }
+          : {}),
       },
     });
-    await tx.conversation.update({ where: { id: conversation.id }, data: { updatedAt: new Date() } });
+    await tx.conversation.update({
+      where: { id: conversation.id },
+      data: { updatedAt: new Date() },
+    });
   });
 
   return prisma.chatMessage.findFirstOrThrow({
@@ -191,17 +266,38 @@ export async function sendMessage(params: { conversationId: string; userId: stri
   });
 }
 
-export async function markConversationRead(params: { conversationId: string; userId: string }) {
-  const { conversation } = await getConversationAccess(params.conversationId, params.userId);
+export async function markConversationRead(params: {
+  conversationId: string;
+  userId: string;
+}) {
+  const { conversation } = await getConversationAccess(
+    params.conversationId,
+    params.userId,
+  );
   await prisma.conversationParticipant.upsert({
-    where: { conversationId_userId: { conversationId: conversation.id, userId: params.userId } },
-    create: { conversationId: conversation.id, userId: params.userId, lastReadAt: new Date() },
+    where: {
+      conversationId_userId: {
+        conversationId: conversation.id,
+        userId: params.userId,
+      },
+    },
+    create: {
+      conversationId: conversation.id,
+      userId: params.userId,
+      lastReadAt: new Date(),
+    },
     update: { lastReadAt: new Date() },
   });
   return { ok: true };
 }
 
-export async function listStaffConversations(params?: { page?: number; limit?: number; search?: string; status?: string; staffId?: string }) {
+export async function listStaffConversations(params?: {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  staffId?: string;
+}) {
   const page = Math.max(1, params?.page || 1);
   const limit = Math.max(1, Math.min(100, params?.limit || 20));
 
@@ -232,7 +328,11 @@ export async function listStaffConversations(params?: { page?: number; limit?: n
       include: {
         creator: { select: { id: true, email: true, role: true } },
         assignedStaff: { select: STAFF_SELECT },
-        messages: { orderBy: { createdAt: "desc" }, take: 1, select: { body: true, createdAt: true } },
+        messages: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { body: true, createdAt: true },
+        },
       },
       orderBy: { updatedAt: "asc" },
       skip: (page - 1) * limit,
@@ -244,7 +344,10 @@ export async function listStaffConversations(params?: { page?: number; limit?: n
     items: items.map((c) => ({
       ...c,
       assignedStaff: c.assignedStaff
-        ? { id: c.assignedStaff.id, name: staffDisplayName(c.assignedStaff.email) }
+        ? {
+            id: c.assignedStaff.id,
+            name: staffDisplayName(c.assignedStaff.email),
+          }
         : null,
     })),
     total,
@@ -253,26 +356,45 @@ export async function listStaffConversations(params?: { page?: number; limit?: n
   };
 }
 
-export async function setConversationStatus(params: { conversationId: string; status: "OPEN" | "CLOSED" }) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: params.conversationId } });
+export async function setConversationStatus(params: {
+  conversationId: string;
+  status: "OPEN" | "CLOSED";
+}) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: params.conversationId },
+  });
   if (!conversation) throw new ConversationNotFoundError();
   return prisma.conversation.update({
     where: { id: params.conversationId },
     data: { status: params.status },
-    include: { creator: { select: { id: true, email: true, role: true } }, assignedStaff: { select: STAFF_SELECT } },
+    include: {
+      creator: { select: { id: true, email: true, role: true } },
+      assignedStaff: { select: STAFF_SELECT },
+    },
   });
 }
 
-export async function assignConversationToStaff(params: { conversationId: string; staffId: string }) {
-  const conversation = await prisma.conversation.findUnique({ where: { id: params.conversationId } });
+export async function assignConversationToStaff(params: {
+  conversationId: string;
+  staffId: string;
+}) {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: params.conversationId },
+  });
   if (!conversation) throw new ConversationNotFoundError();
 
-  const staff = await prisma.user.findUnique({ where: { id: params.staffId }, select: { id: true, staffRole: true } });
+  const staff = await prisma.user.findUnique({
+    where: { id: params.staffId },
+    select: { id: true, staffRole: true },
+  });
   if (!staff?.staffRole) throw new ConversationAccessError();
 
   return prisma.conversation.update({
     where: { id: params.conversationId },
     data: { assignedStaffId: params.staffId },
-    include: { creator: { select: { id: true, email: true, role: true } }, assignedStaff: { select: STAFF_SELECT } },
+    include: {
+      creator: { select: { id: true, email: true, role: true } },
+      assignedStaff: { select: STAFF_SELECT },
+    },
   });
 }

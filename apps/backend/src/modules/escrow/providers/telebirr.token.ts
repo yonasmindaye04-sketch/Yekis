@@ -15,7 +15,6 @@ import { logger } from "../../../lib/logger.js";
 const REDIS_KEY = "telebirr:fabric_token";
 const CACHE_TTL_SECONDS = 3000; // 50 minutes — well within the 1-hour validity
 
-
 // === MAIN FUNCTIONS ===
 
 /**
@@ -34,7 +33,10 @@ export async function getFabricToken(): Promise<string> {
     }
   } catch (err) {
     // Redis unavailable — fall through to direct API call
-    logger.warn({ err }, "Redis unavailable for Telebirr token cache — fetching directly.");
+    logger.warn(
+      { err },
+      "Redis unavailable for Telebirr token cache — fetching directly.",
+    );
   }
 
   // 2. Request a new token from Telebirr
@@ -82,7 +84,10 @@ export async function getFabricToken(): Promise<string> {
     await redis.set(REDIS_KEY, token, "EX", CACHE_TTL_SECONDS);
     logger.debug("Cached new Telebirr fabric token in Redis (TTL 50m).");
   } catch (err) {
-    logger.warn({ err }, "Failed to cache Telebirr token in Redis — will re-fetch next time.");
+    logger.warn(
+      { err },
+      "Failed to cache Telebirr token in Redis — will re-fetch next time.",
+    );
   }
 
   return token;

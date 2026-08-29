@@ -1,19 +1,45 @@
 // === IMPORTS ===
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { api, type Job, type MeResponse, type Milestone, type TopUpRequest, type WalletResponse } from "./api/client";
+import {
+  api,
+  type Job,
+  type MeResponse,
+  type Milestone,
+  type TopUpRequest,
+  type WalletResponse,
+} from "./api/client";
 import { LandingPage } from "./LandingPage";
 import { SupportChat } from "./SupportChat";
 import { StaffDashboard } from "./StaffDashboard";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
-import { ContractsWorkspace, DisputesWorkspace, JobsWorkspace } from "./WorkflowWorkspace";
 import {
-  LayoutDashboard, Briefcase, Search, FileText, Wallet, MessageCircle,
-  ShieldCheck, Scale, Settings, ChevronDown, Plus,
-  LogOut, ArrowLeft, User as UserIcon, Edit, Sun, Moon,
-  Eye, EyeOff
+  ContractsWorkspace,
+  DisputesWorkspace,
+  JobsWorkspace,
+} from "./WorkflowWorkspace";
+import {
+  LayoutDashboard,
+  Briefcase,
+  Search,
+  FileText,
+  Wallet,
+  MessageCircle,
+  ShieldCheck,
+  Scale,
+  Settings,
+  ChevronDown,
+  Plus,
+  LogOut,
+  ArrowLeft,
+  User as UserIcon,
+  Edit,
+  Sun,
+  Moon,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -37,12 +63,32 @@ import { initAnalytics, events } from "./analytics";
 import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import "./components/scroll.css";
 
-
 // === INTERFACES & TYPES ===
 type PlatformRole = "CLIENT" | "FREELANCER" | "ADMIN" | "MEDIATOR";
-type View = "overview" | "jobs" | "contracts" | "wallet" | "chat" | "verification" | "cases" | "settings" | "profile" | "profile-edit";
+type View =
+  | "overview"
+  | "jobs"
+  | "contracts"
+  | "wallet"
+  | "chat"
+  | "verification"
+  | "cases"
+  | "settings"
+  | "profile"
+  | "profile-edit";
 type AuthMode = "login" | "register" | "forgot-password" | "reset-password";
-type MarketingPage = "home" | "faq" | "fees" | "privacy" | "terms" | "about" | "case-studies" | "404" | "thank-you-signup" | "thank-you-job-posted" | "thank-you-contact";
+type MarketingPage =
+  | "home"
+  | "faq"
+  | "fees"
+  | "privacy"
+  | "terms"
+  | "about"
+  | "case-studies"
+  | "404"
+  | "thank-you-signup"
+  | "thank-you-job-posted"
+  | "thank-you-contact";
 
 const categoryLabels: Record<string, string> = {
   WEB_APP_DEVELOPMENT: "Web app development",
@@ -55,10 +101,15 @@ const categoryLabels: Record<string, string> = {
 
 const categories = Object.keys(categoryLabels);
 
-
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
-  return role === "FREELANCER" ? "Freelancer" : role === "ADMIN" ? "Operations" : role === "MEDIATOR" ? "Mediator" : "Client";
+  return role === "FREELANCER"
+    ? "Freelancer"
+    : role === "ADMIN"
+      ? "Operations"
+      : role === "MEDIATOR"
+        ? "Mediator"
+        : "Client";
 }
 
 const navIconMap: Record<string, React.ReactNode> = {
@@ -86,6 +137,12 @@ export function FullPlatformApp() {
   const [dateOfBirth, setDateOfBirth] = useState("2000-01-01");
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  // Granular PDPP consents (Master Design §12.2) — optional purposes default
+  // unticked (no pre-ticked boxes); required purposes are implied by the
+  // terms checkbox + mandatory kyc/financial literals sent on register.
+  const [consentNotifications, setConsentNotifications] = useState(false);
+  const [consentMarketing, setConsentMarketing] = useState(false);
+  const [consentAnalytics, setConsentAnalytics] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -103,10 +160,12 @@ export function FullPlatformApp() {
   const [jobBudgetMax, setJobBudgetMax] = useState("");
   const [jobDeadline, setJobDeadline] = useState("");
 
-
   useEffect(() => {
     // Auto-resume active session on visit without prompting to re-register
-    const token = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
+    const token =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("yekis-api-token")
+        : null;
     if (token) {
       loadWorkspace()
         .then(() => {
@@ -130,23 +189,34 @@ export function FullPlatformApp() {
   }, []);
 
   const loadWorkspace = async () => {
-    const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] = await Promise.allSettled([
-      api.getMe(), api.getWallet(), api.getJobs({ status: "OPEN" }), api.getMilestones(), api.getTopUpRequests(),
-    ]);
+    const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] =
+      await Promise.allSettled([
+        api.getMe(),
+        api.getWallet(),
+        api.getJobs({ status: "OPEN" }),
+        api.getMilestones(),
+        api.getTopUpRequests(),
+      ]);
     if (meResult.status === "rejected") throw meResult.reason;
     setUser(meResult.value);
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
-    if (milestonesResult.status === "fulfilled") setMilestones(milestonesResult.value);
+    if (milestonesResult.status === "fulfilled")
+      setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
   };
 
-const submitAuth = async (event: FormEvent) => {
-    event.preventDefault(); setError(""); setSuccessMessage(""); setIsLoading(true);
+  const submitAuth = async (event: FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setSuccessMessage("");
+    setIsLoading(true);
     try {
       if (authMode === "forgot-password") {
         await api.requestPasswordReset(email);
-        setSuccessMessage("If an account exists, a reset token has been sent to your email.");
+        setSuccessMessage(
+          "If an account exists, a reset token has been sent to your email.",
+        );
         setAuthMode("reset-password");
         return;
       }
@@ -158,32 +228,94 @@ const submitAuth = async (event: FormEvent) => {
         return;
       }
       if (authMode === "register") {
-        await api.register({ email, phone, password, role, dateOfBirth, languagePreference: "en", consents: { kycDataProcessing: true, marketingCommunications: false, analytics: false } });
+        await api.register({
+          email,
+          phone,
+          password,
+          role,
+          dateOfBirth,
+          languagePreference: "en",
+          consents: {
+            kycDataProcessing: true,
+            financialDataProcessing: true,
+            platformNotifications: consentNotifications,
+            marketingCommunications: consentMarketing,
+            analytics: consentAnalytics,
+          },
+        });
       }
       const session = await api.login(email, password);
       api.setToken(session.accessToken);
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
-      setError(message === "DUPLICATE_USER" ? "This email or phone already has an account. Switch to Sign in." : message);
+      setError(
+        message === "DUPLICATE_USER"
+          ? "This email or phone already has an account. Switch to Sign in."
+          : message,
+      );
+    } finally {
+      setIsLoading(false);
     }
-    finally { setIsLoading(false); }
   };
 
-  const logout = () => { api.setToken(null); setUser(null); setPassword(""); setResetToken(""); setView("overview"); setShowLanding(true); };
+  const logout = () => {
+    api.setToken(null);
+    setUser(null);
+    setPassword("");
+    setResetToken("");
+    setView("overview");
+    setShowLanding(true);
+  };
 
   const submitJob = async (event: FormEvent) => {
-    event.preventDefault(); setError(""); setIsLoading(true);
+    event.preventDefault();
+    setError("");
+    setIsLoading(true);
     try {
-      const min = Math.round(Number(jobBudgetMin) * 100); const max = Math.round(Number(jobBudgetMax) * 100);
-      if (jobTitle.trim().length < 5) throw new Error("Job title must be at least 5 characters.");
-      if (jobDescription.trim().length < 20) throw new Error("Description must be at least 20 characters.");
-      if (!Number.isFinite(min) || !Number.isFinite(max) || min <= 0 || max < min) throw new Error("Enter valid budgets; maximum must be greater than or equal to minimum.");
+      const min = Math.round(Number(jobBudgetMin) * 100);
+      const max = Math.round(Number(jobBudgetMax) * 100);
+      if (jobTitle.trim().length < 5)
+        throw new Error("Job title must be at least 5 characters.");
+      if (jobDescription.trim().length < 20)
+        throw new Error("Description must be at least 20 characters.");
+      if (
+        !Number.isFinite(min) ||
+        !Number.isFinite(max) ||
+        min <= 0 ||
+        max < min
+      )
+        throw new Error(
+          "Enter valid budgets; maximum must be greater than or equal to minimum.",
+        );
       if (!jobDeadline) throw new Error("Choose a deadline.");
-      await api.createJob({ title: jobTitle, category: jobCategory, description: jobDescription, budgetMin: { amountMinor: min, currency: "ETB" }, budgetMax: { amountMinor: max, currency: "ETB" }, proposedMilestones: [{ title: "Initial delivery", amount: { amountMinor: max, currency: "ETB" }, dueDate: jobDeadline }], deadline: jobDeadline });
-      setJobTitle(""); setJobDescription(""); setJobBudgetMin(""); setJobBudgetMax(""); setJobDeadline(""); await loadWorkspace(); setView("jobs");
-    } catch (err) { setError(err instanceof Error ? err.message : "Unable to publish job"); }
-    finally { setIsLoading(false); }
+      await api.createJob({
+        title: jobTitle,
+        category: jobCategory,
+        description: jobDescription,
+        budgetMin: { amountMinor: min, currency: "ETB" },
+        budgetMax: { amountMinor: max, currency: "ETB" },
+        proposedMilestones: [
+          {
+            title: "Initial delivery",
+            amount: { amountMinor: max, currency: "ETB" },
+            dueDate: jobDeadline,
+          },
+        ],
+        deadline: jobDeadline,
+      });
+      setJobTitle("");
+      setJobDescription("");
+      setJobBudgetMin("");
+      setJobBudgetMax("");
+      setJobDeadline("");
+      await loadWorkspace();
+      setView("jobs");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to publish job");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const platformRole = (user?.role as PlatformRole) || "CLIENT";
@@ -202,7 +334,15 @@ const submitAuth = async (event: FormEvent) => {
     ];
     return platformRole === "ADMIN" || platformRole === "MEDIATOR"
       ? [...common, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
-      : [...common, { view: "cases" as View, iconKey: "cases", label: "Disputes" }, { view: "verification" as View, iconKey: "verification", label: "Verification" }];
+      : [
+          ...common,
+          { view: "cases" as View, iconKey: "cases", label: "Disputes" },
+          {
+            view: "verification" as View,
+            iconKey: "verification",
+            label: "Verification",
+          },
+        ];
   }, [platformRole]);
 
   if (user?.staffRole) return <StaffDashboard user={user} onLogout={logout} />;
@@ -210,7 +350,7 @@ const submitAuth = async (event: FormEvent) => {
   if (!user && showLanding) {
     const handleNavigate = (page: string) => {
       setMarketingPage(page as MarketingPage);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     };
     const handleStart = (mode: "login" | "register") => {
       setAuthMode(mode);
@@ -245,17 +385,49 @@ const submitAuth = async (event: FormEvent) => {
             <LandingPage onStart={handleStart} onNavigate={handleNavigate} />
           </>
         )}
-        {marketingPage === "faq" && <FAQPage onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "fees" && <FeesPage onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "privacy" && <PrivacyPage onNavigate={handleNavigate} />}
+        {marketingPage === "faq" && (
+          <FAQPage onNavigate={handleNavigate} onStart={handleStart} />
+        )}
+        {marketingPage === "fees" && (
+          <FeesPage onNavigate={handleNavigate} onStart={handleStart} />
+        )}
+        {marketingPage === "privacy" && (
+          <PrivacyPage onNavigate={handleNavigate} />
+        )}
         {marketingPage === "terms" && <TermsPage onNavigate={handleNavigate} />}
-        {marketingPage === "about" && <AboutPage onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "case-studies" && <CaseStudiesPage onNavigate={handleNavigate} />}
-        {marketingPage === "404" && <NotFoundPage onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "thank-you-signup" && <ThankYouPage action="signup" onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "thank-you-job-posted" && <ThankYouPage action="job-posted" onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage === "thank-you-contact" && <ThankYouPage action="contact" onNavigate={handleNavigate} onStart={handleStart} />}
-        {marketingPage !== "home" && <MarketingFooter onNavigate={handleNavigate} />}
+        {marketingPage === "about" && (
+          <AboutPage onNavigate={handleNavigate} onStart={handleStart} />
+        )}
+        {marketingPage === "case-studies" && (
+          <CaseStudiesPage onNavigate={handleNavigate} />
+        )}
+        {marketingPage === "404" && (
+          <NotFoundPage onNavigate={handleNavigate} onStart={handleStart} />
+        )}
+        {marketingPage === "thank-you-signup" && (
+          <ThankYouPage
+            action="signup"
+            onNavigate={handleNavigate}
+            onStart={handleStart}
+          />
+        )}
+        {marketingPage === "thank-you-job-posted" && (
+          <ThankYouPage
+            action="job-posted"
+            onNavigate={handleNavigate}
+            onStart={handleStart}
+          />
+        )}
+        {marketingPage === "thank-you-contact" && (
+          <ThankYouPage
+            action="contact"
+            onNavigate={handleNavigate}
+            onStart={handleStart}
+          />
+        )}
+        {marketingPage !== "home" && (
+          <MarketingFooter onNavigate={handleNavigate} />
+        )}
         <CookieBanner />
         <MobileCTA onStart={handleStart} />
       </>
@@ -265,98 +437,391 @@ const submitAuth = async (event: FormEvent) => {
   if (!user) {
     return (
       <main className="platform-auth">
-        <div style={{ position: "absolute", top: 20, left: 24, right: 24, display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 10 }}>
-          <button type="button" className="auth-back" style={{ position: "static" }} onClick={() => { setShowLanding(true); setError(""); setSuccessMessage(""); }}>
+        <div
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 24,
+            right: 24,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            zIndex: 10,
+          }}
+        >
+          <button
+            type="button"
+            className="auth-back"
+            style={{ position: "static" }}
+            onClick={() => {
+              setShowLanding(true);
+              setError("");
+              setSuccessMessage("");
+            }}
+          >
             <ArrowLeft size={17} /> Back to Yekis
           </button>
           <button
             type="button"
             className="theme-toggle"
             onClick={toggleTheme}
-            aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-            style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 40, height: 40, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+            aria-label={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: "var(--color-bg-elevated)",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-text)",
+              cursor: "pointer",
+            }}
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
         </div>
         <div className="platform-auth-art">
-          <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo" />
+          <img
+            src="/svgviewer-output.svg"
+            alt="Yekis Logo"
+            className="platform-logo"
+          />
           <p className="eyebrow">Yekis jobs</p>
           <h1>Work with clarity.</h1>
-          <p>Find trusted talent, manage milestone work, and keep payments visible from brief to delivery.</p>
-          <div className="auth-proof"><span>01</span><strong>Jobs, contracts, and escrow in one workspace.</strong></div>
-          <div className="auth-proof"><span>02</span><strong>Built for Ethiopian clients and freelancers.</strong></div>
+          <p>
+            Find trusted talent, manage milestone work, and keep payments
+            visible from brief to delivery.
+          </p>
+          <div className="auth-proof">
+            <span>01</span>
+            <strong>Jobs, contracts, and escrow in one workspace.</strong>
+          </div>
+          <div className="auth-proof">
+            <span>02</span>
+            <strong>Built for Ethiopian clients and freelancers.</strong>
+          </div>
         </div>
         <form className="auth-panel" onSubmit={submitAuth}>
           <div className="auth-panel-header">
             <div>
               <p className="eyebrow">
-                {authMode === "login" ? "Welcome back" : authMode === "forgot-password" ? "Recover account" : authMode === "reset-password" ? "Set new password" : "Get started"}
+                {authMode === "login"
+                  ? "Welcome back"
+                  : authMode === "forgot-password"
+                    ? "Recover account"
+                    : authMode === "reset-password"
+                      ? "Set new password"
+                      : "Get started"}
               </p>
               <h2>
-                {authMode === "login" ? "Sign in to Yekis" : authMode === "forgot-password" ? "Forgot password" : authMode === "reset-password" ? "Reset password" : "Create an account"}
+                {authMode === "login"
+                  ? "Sign in to Yekis"
+                  : authMode === "forgot-password"
+                    ? "Forgot password"
+                    : authMode === "reset-password"
+                      ? "Reset password"
+                      : "Create an account"}
               </h2>
             </div>
-            <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
+            <img
+              src="/svgviewer-output.svg"
+              alt="Yekis Logo"
+              className="platform-logo small"
+            />
           </div>
           {authMode === "register" && (
             <div className="segmented-control">
-              <button type="button" className={role === "CLIENT" ? "selected" : ""} onClick={() => setRole("CLIENT")}>Client</button>
-              <button type="button" className={role === "FREELANCER" ? "selected" : ""} onClick={() => setRole("FREELANCER")}>Freelancer</button>
+              <button
+                type="button"
+                className={role === "CLIENT" ? "selected" : ""}
+                onClick={() => setRole("CLIENT")}
+              >
+                Client
+              </button>
+              <button
+                type="button"
+                className={role === "FREELANCER" ? "selected" : ""}
+                onClick={() => setRole("FREELANCER")}
+              >
+                Freelancer
+              </button>
             </div>
           )}
-          {(authMode === "login" || authMode === "register" || authMode === "forgot-password") && (
-            <label>Email<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" required /></label>
+          {(authMode === "login" ||
+            authMode === "register" ||
+            authMode === "forgot-password") && (
+            <label>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+                required
+              />
+            </label>
           )}
           {authMode === "register" && (
-            <label>Phone<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+251911223344" required /></label>
+            <label>
+              Phone
+              <input
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder="+251911223344"
+                required
+              />
+            </label>
           )}
           {authMode === "reset-password" && (
-            <label>Reset token<input type="text" value={resetToken} onChange={(event) => setResetToken(event.target.value)} placeholder="Enter reset token" required /></label>
+            <label>
+              Reset token
+              <input
+                type="text"
+                value={resetToken}
+                onChange={(event) => setResetToken(event.target.value)}
+                placeholder="Enter reset token"
+                required
+              />
+            </label>
           )}
-          {(authMode === "login" || authMode === "register" || authMode === "reset-password") && (
+          {(authMode === "login" ||
+            authMode === "register" ||
+            authMode === "reset-password") && (
             <label>
               {authMode === "reset-password" ? "New Password" : "Password"}
               <div style={{ position: "relative", marginTop: "6px" }}>
-                <input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Your password" minLength={authMode === "register" || authMode === "reset-password" ? 10 : undefined} required style={{ paddingRight: "40px", margin: 0 }} />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "var(--color-text-secondary)", display: "flex", alignItems: "center", justifyContent: "center" }} aria-label={showPassword ? "Hide password" : "Show password"}>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Your password"
+                  minLength={
+                    authMode === "register" || authMode === "reset-password"
+                      ? 10
+                      : undefined
+                  }
+                  required
+                  style={{ paddingRight: "40px", margin: 0 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--color-text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
             </label>
           )}
           {authMode === "register" && (
-            <label>Date of birth<input type="date" value={dateOfBirth} onChange={(event) => setDateOfBirth(event.target.value)} required /></label>
+            <label>
+              Date of birth
+              <input
+                type="date"
+                value={dateOfBirth}
+                onChange={(event) => setDateOfBirth(event.target.value)}
+                required
+              />
+            </label>
           )}
           {authMode === "register" && (
-            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.82rem", color: "var(--color-text-secondary)", marginTop: 6 }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                fontSize: "0.82rem",
+                color: "var(--color-text-secondary)",
+                marginTop: 6,
+              }}
+            >
               <input
                 id="termsCheck"
                 type="checkbox"
                 checked={termsAccepted}
                 onChange={(event) => setTermsAccepted(event.target.checked)}
                 required
-                style={{ accentColor: "var(--color-primary)", flexShrink: 0, margin: 0, width: "auto", cursor: "pointer" }}
+                style={{
+                  accentColor: "var(--color-primary)",
+                  flexShrink: 0,
+                  margin: 0,
+                  width: "auto",
+                  cursor: "pointer",
+                }}
               />
-              <label htmlFor="termsCheck" style={{ margin: 0, cursor: "pointer", display: "inline" }}>
+              <label
+                htmlFor="termsCheck"
+                style={{ margin: 0, cursor: "pointer", display: "inline" }}
+              >
                 I agree to the{" "}
-                <a href="#" onClick={(e) => { e.preventDefault(); setShowLanding(true); setMarketingPage("terms" as MarketingPage); }} style={{ color: "var(--color-primary)" }}>Terms</a>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowLanding(true);
+                    setMarketingPage("terms" as MarketingPage);
+                  }}
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  Terms
+                </a>
                 {" & "}
-                <a href="#" onClick={(e) => { e.preventDefault(); setShowLanding(true); setMarketingPage("privacy" as MarketingPage); }} style={{ color: "var(--color-primary)" }}>Privacy Policy</a>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setShowLanding(true);
+                    setMarketingPage("privacy" as MarketingPage);
+                  }}
+                  style={{ color: "var(--color-primary)" }}
+                >
+                  Privacy Policy
+                </a>
+                , including required identity (KYC) and financial data
+                processing.
+              </label>
+            </div>
+          )}
+          {authMode === "register" && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 4,
+                fontSize: "0.78rem",
+                color: "var(--color-text-secondary)",
+                marginTop: 4,
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>
+                Optional — choose what we may use:
+              </span>
+              <label
+                htmlFor="notifConsent"
+                style={{
+                  margin: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  id="notifConsent"
+                  type="checkbox"
+                  checked={consentNotifications}
+                  onChange={(e) => setConsentNotifications(e.target.checked)}
+                  style={{
+                    accentColor: "var(--color-primary)",
+                    width: "auto",
+                    margin: 0,
+                  }}
+                />
+                Platform notifications (escrow updates, dispute alerts)
+              </label>
+              <label
+                htmlFor="mktConsent"
+                style={{
+                  margin: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  id="mktConsent"
+                  type="checkbox"
+                  checked={consentMarketing}
+                  onChange={(e) => setConsentMarketing(e.target.checked)}
+                  style={{
+                    accentColor: "var(--color-primary)",
+                    width: "auto",
+                    margin: 0,
+                  }}
+                />
+                Marketing communications
+              </label>
+              <label
+                htmlFor="anaConsent"
+                style={{
+                  margin: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  id="anaConsent"
+                  type="checkbox"
+                  checked={consentAnalytics}
+                  onChange={(e) => setConsentAnalytics(e.target.checked)}
+                  style={{
+                    accentColor: "var(--color-primary)",
+                    width: "auto",
+                    margin: 0,
+                  }}
+                />
+                Anonymized analytics sharing
               </label>
             </div>
           )}
           {error && <div className="form-error">{error}</div>}
           {successMessage && (
-            <div className="form-success" style={{ padding: "12px", background: "var(--color-primary-light)", color: "var(--color-primary)", borderRadius: "8px", fontSize: "0.82rem", border: "1px solid var(--color-primary)" }}>
+            <div
+              className="form-success"
+              style={{
+                padding: "12px",
+                background: "var(--color-primary-light)",
+                color: "var(--color-primary)",
+                borderRadius: "8px",
+                fontSize: "0.82rem",
+                border: "1px solid var(--color-primary)",
+              }}
+            >
               {successMessage}
             </div>
           )}
-          <button className="btn-primary wide" disabled={isLoading || (authMode === "register" && !termsAccepted)}>
-            {isLoading ? "Please wait..." : authMode === "login" ? "Sign in" : authMode === "forgot-password" ? "Request reset link" : authMode === "reset-password" ? "Set password" : "Create account"}
+          <button
+            className="btn-primary wide"
+            disabled={isLoading || (authMode === "register" && !termsAccepted)}
+          >
+            {isLoading
+              ? "Please wait..."
+              : authMode === "login"
+                ? "Sign in"
+                : authMode === "forgot-password"
+                  ? "Request reset link"
+                  : authMode === "reset-password"
+                    ? "Set password"
+                    : "Create account"}
           </button>
           {authMode === "login" && (
-            <button type="button" className="auth-switch" onClick={() => { setAuthMode("forgot-password"); setError(""); setSuccessMessage(""); }} style={{ marginTop: "-8px", marginBottom: "4px" }}>
+            <button
+              type="button"
+              className="auth-switch"
+              onClick={() => {
+                setAuthMode("forgot-password");
+                setError("");
+                setSuccessMessage("");
+              }}
+              style={{ marginTop: "-8px", marginBottom: "4px" }}
+            >
               Forgot your password?
             </button>
           )}
@@ -367,8 +832,18 @@ const submitAuth = async (event: FormEvent) => {
               }}
             />
           )}
-          <button type="button" className="auth-switch" onClick={() => { setAuthMode(authMode === "login" ? "register" : "login"); setError(""); setSuccessMessage(""); }}>
-            {authMode === "login" ? "New to Yekis? Create an account" : "Already have an account? Sign in"}
+          <button
+            type="button"
+            className="auth-switch"
+            onClick={() => {
+              setAuthMode(authMode === "login" ? "register" : "login");
+              setError("");
+              setSuccessMessage("");
+            }}
+          >
+            {authMode === "login"
+              ? "New to Yekis? Create an account"
+              : "Already have an account? Sign in"}
           </button>
         </form>
       </main>
@@ -379,7 +854,11 @@ const submitAuth = async (event: FormEvent) => {
     <div className="platform-shell">
       <aside className="platform-sidebar">
         <div className="sidebar-brand">
-          <img src="/svgviewer-output.svg" alt="Yekis Logo" className="platform-logo small" />
+          <img
+            src="/svgviewer-output.svg"
+            alt="Yekis Logo"
+            className="platform-logo small"
+          />
           <strong>Yekis</strong>
         </div>
         <div className="sidebar-role">
@@ -391,13 +870,20 @@ const submitAuth = async (event: FormEvent) => {
         </div>
         <nav className="sidebar-nav">
           {navItems.map((item) => (
-            <button key={item.view} className={view === item.view ? "active" : ""} onClick={() => setView(item.view)}>
+            <button
+              key={item.view}
+              className={view === item.view ? "active" : ""}
+              onClick={() => setView(item.view)}
+            >
               <span className="nav-icon">{navIconMap[item.iconKey]}</span>
               <span className="nav-label">{item.label}</span>
             </button>
           ))}
         </nav>
-        <button className="sidebar-settings" onClick={() => setView("settings")}>
+        <button
+          className="sidebar-settings"
+          onClick={() => setView("settings")}
+        >
           <Settings size={16} /> <span className="nav-label">Settings</span>
         </button>
       </aside>
@@ -406,21 +892,46 @@ const submitAuth = async (event: FormEvent) => {
         <header className="platform-topbar">
           <div>
             <span className="eyebrow">{roleLabel(platformRole)} workspace</span>
-            <h1>{view === "overview" ? "Good morning" : navItems.find((item) => item.view === view)?.label || "Settings"}</h1>
+            <h1>
+              {view === "overview"
+                ? "Good morning"
+                : navItems.find((item) => item.view === view)?.label ||
+                  "Settings"}
+            </h1>
           </div>
-          <div className="topbar-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            className="topbar-actions"
+            style={{ display: "flex", alignItems: "center", gap: 10 }}
+          >
             <button
               type="button"
               className="theme-toggle"
               onClick={toggleTheme}
-              aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
-              style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 38, height: 38, borderRadius: "50%", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", color: "var(--color-text)", cursor: "pointer" }}
+              aria-label={
+                theme === "light"
+                  ? "Switch to dark mode"
+                  : "Switch to light mode"
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 38,
+                height: 38,
+                borderRadius: "50%",
+                background: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                cursor: "pointer",
+              }}
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
             <NotificationCenter />
             <button className="user-menu" onClick={logout}>
-              <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
+              <span className="avatar">
+                {user.email.slice(0, 1).toUpperCase()}
+              </span>
               <ChevronDown size={14} />
             </button>
           </div>
@@ -435,15 +946,15 @@ const submitAuth = async (event: FormEvent) => {
                   {platformRole === "FREELANCER"
                     ? "Make your next move count."
                     : platformRole === "CLIENT"
-                    ? "Turn your brief into progress."
-                    : "Keep every review moving."}
+                      ? "Turn your brief into progress."
+                      : "Keep every review moving."}
                 </h2>
                 <p>
                   {platformRole === "FREELANCER"
                     ? "Find relevant work and keep delivery, verification, and payout status close at hand."
                     : platformRole === "CLIENT"
-                    ? "Post a clear job, compare proposals, and fund milestones with confidence."
-                    : "Monitor receipts, identity checks, escrow, and open cases from one desk."}
+                      ? "Post a clear job, compare proposals, and fund milestones with confidence."
+                      : "Monitor receipts, identity checks, escrow, and open cases from one desk."}
                 </p>
               </div>
               {platformRole === "CLIENT" && (
@@ -462,7 +973,11 @@ const submitAuth = async (event: FormEvent) => {
             {isFreelancer ? (
               <div className="featured-jobs-section">
                 <h2>Featured Jobs for You</h2>
-                <p>{jobs.length === 0 ? "No open jobs at the moment. Check back soon." : ""}</p>
+                <p>
+                  {jobs.length === 0
+                    ? "No open jobs at the moment. Check back soon."
+                    : ""}
+                </p>
                 {jobs.length > 0 && (
                   <div className="job-grid">
                     {jobs
@@ -473,7 +988,10 @@ const submitAuth = async (event: FormEvent) => {
                             <span className="status-pill">Open</span>
                             <h3>{job.title}</h3>
                             <p>{job.description.substring(0, 100)}...</p>
-                            <small>ETB {(job.budgetMinMinor / 100).toLocaleString()} – {(job.budgetMaxMinor / 100).toLocaleString()}</small>
+                            <small>
+                              ETB {(job.budgetMinMinor / 100).toLocaleString()}{" "}
+                              – {(job.budgetMaxMinor / 100).toLocaleString()}
+                            </small>
                           </div>
                         </article>
                       ))}
@@ -481,13 +999,20 @@ const submitAuth = async (event: FormEvent) => {
                 )}
               </div>
             ) : (
-              <FeaturedCarousel onProfileClick={(id) => { setViewUserId(id); setView("profile"); }} />
+              <FeaturedCarousel
+                onProfileClick={(id) => {
+                  setViewUserId(id);
+                  setView("profile");
+                }}
+              />
             )}
 
             <div className="platform-metrics">
               <article>
                 <small>Wallet balance</small>
-                <strong>ETB {(wallet.balanceMinor / 100).toLocaleString()}</strong>
+                <strong>
+                  ETB {(wallet.balanceMinor / 100).toLocaleString()}
+                </strong>
                 <span>Available balance</span>
               </article>
               <article>
@@ -498,7 +1023,11 @@ const submitAuth = async (event: FormEvent) => {
               <article>
                 <small>Active milestones</small>
                 <strong>
-                  {milestones.filter((milestone) => milestone.escrowState !== "RELEASED").length}
+                  {
+                    milestones.filter(
+                      (milestone) => milestone.escrowState !== "RELEASED",
+                    ).length
+                  }
                 </strong>
                 <span>Across your contracts</span>
               </article>
@@ -508,19 +1037,27 @@ const submitAuth = async (event: FormEvent) => {
               <section className="panel">
                 <div className="panel-heading">
                   <h2>Recent activity</h2>
-                  <button onClick={() => setView("contracts")}>View contracts</button>
+                  <button onClick={() => setView("contracts")}>
+                    View contracts
+                  </button>
                 </div>
                 {milestones.length === 0 ? (
-                  <p className="empty-state">Your active contracts will appear here.</p>
+                  <p className="empty-state">
+                    Your active contracts will appear here.
+                  </p>
                 ) : (
                   milestones.slice(0, 4).map((milestone) => (
                     <div className="activity-row" key={milestone.id}>
                       <span className="activity-dot" />
                       <span>
                         <strong>{milestone.title}</strong>
-                        <small>{milestone.escrowState.replaceAll("_", " ")}</small>
+                        <small>
+                          {milestone.escrowState.replaceAll("_", " ")}
+                        </small>
                       </span>
-                      <b>ETB {(milestone.amountMinor / 100).toLocaleString()}</b>
+                      <b>
+                        ETB {(milestone.amountMinor / 100).toLocaleString()}
+                      </b>
                     </div>
                   ))
                 )}
@@ -543,7 +1080,15 @@ const submitAuth = async (event: FormEvent) => {
                         : "Upload a Telebirr or CBE receipt for approval."}
                     </p>
                   </div>
-                  <button onClick={() => setView(platformRole === "FREELANCER" ? "verification" : "wallet")}>
+                  <button
+                    onClick={() =>
+                      setView(
+                        platformRole === "FREELANCER"
+                          ? "verification"
+                          : "wallet",
+                      )
+                    }
+                  >
                     Open
                   </button>
                 </div>
@@ -556,25 +1101,94 @@ const submitAuth = async (event: FormEvent) => {
           <section className="platform-content">
             <div className="content-toolbar">
               <div>
-                <h2>{platformRole === "CLIENT" ? "Job postings" : "Find work"}</h2>
-                <p>{platformRole === "CLIENT" ? "Create a clear brief and manage the talent pipeline." : "Browse open opportunities across the marketplace."}</p>
+                <h2>
+                  {platformRole === "CLIENT" ? "Job postings" : "Find work"}
+                </h2>
+                <p>
+                  {platformRole === "CLIENT"
+                    ? "Create a clear brief and manage the talent pipeline."
+                    : "Browse open opportunities across the marketplace."}
+                </p>
               </div>
             </div>
             {platformRole === "CLIENT" && (
               <form className="panel job-form" onSubmit={submitJob}>
                 <h3>New job brief</h3>
                 <div className="form-grid">
-                  <label>Title<input value={jobTitle} onChange={(event) => setJobTitle(event.target.value)} placeholder="What do you need done?" required /></label>
-                  <label>Category<select value={jobCategory} onChange={(event) => setJobCategory(event.target.value)}>{categories.map((category) => <option key={category} value={category}>{categoryLabels[category]}</option>)}</select></label>
-                  <label className="form-wide">Description<textarea value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Describe the outcome, scope, and expectations." minLength={20} required /></label>
-                  <label>Minimum budget<input type="number" value={jobBudgetMin} onChange={(event) => setJobBudgetMin(event.target.value)} placeholder="ETB" required /></label>
-                  <label>Maximum budget<input type="number" value={jobBudgetMax} onChange={(event) => setJobBudgetMax(event.target.value)} placeholder="ETB" required /></label>
-                  <label>Deadline<input type="date" value={jobDeadline} onChange={(event) => setJobDeadline(event.target.value)} required /></label>
+                  <label>
+                    Title
+                    <input
+                      value={jobTitle}
+                      onChange={(event) => setJobTitle(event.target.value)}
+                      placeholder="What do you need done?"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Category
+                    <select
+                      value={jobCategory}
+                      onChange={(event) => setJobCategory(event.target.value)}
+                    >
+                      {categories.map((category) => (
+                        <option key={category} value={category}>
+                          {categoryLabels[category]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="form-wide">
+                    Description
+                    <textarea
+                      value={jobDescription}
+                      onChange={(event) =>
+                        setJobDescription(event.target.value)
+                      }
+                      placeholder="Describe the outcome, scope, and expectations."
+                      minLength={20}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Minimum budget
+                    <input
+                      type="number"
+                      value={jobBudgetMin}
+                      onChange={(event) => setJobBudgetMin(event.target.value)}
+                      placeholder="ETB"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Maximum budget
+                    <input
+                      type="number"
+                      value={jobBudgetMax}
+                      onChange={(event) => setJobBudgetMax(event.target.value)}
+                      placeholder="ETB"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Deadline
+                    <input
+                      type="date"
+                      value={jobDeadline}
+                      onChange={(event) => setJobDeadline(event.target.value)}
+                      required
+                    />
+                  </label>
                 </div>
-                <button className="btn-primary" disabled={isLoading}>Publish job</button>
+                <button className="btn-primary" disabled={isLoading}>
+                  Publish job
+                </button>
               </form>
             )}
-            <JobsWorkspace role={platformRole as "CLIENT" | "FREELANCER"} openJobs={jobs} onChanged={loadWorkspace} />
+            <JobsWorkspace
+              role={platformRole as "CLIENT" | "FREELANCER"}
+              openJobs={jobs}
+              onChanged={loadWorkspace}
+            />
           </section>
         )}
 
@@ -583,16 +1197,27 @@ const submitAuth = async (event: FormEvent) => {
             <div className="content-toolbar">
               <div>
                 <h2>Contracts and milestones</h2>
-                <p>Sign agreements, fund escrow, submit work, and release completed milestones.</p>
+                <p>
+                  Sign agreements, fund escrow, submit work, and release
+                  completed milestones.
+                </p>
               </div>
             </div>
-            <ContractsWorkspace role={platformRole as "CLIENT" | "FREELANCER"} onChanged={loadWorkspace} />
+            <ContractsWorkspace
+              role={platformRole as "CLIENT" | "FREELANCER"}
+              onChanged={loadWorkspace}
+            />
           </section>
         )}
 
         {view === "wallet" && (
           <section className="platform-content">
-            <BrowserWallet wallet={wallet} topUps={topUps} onChanged={loadWorkspace} role={platformRole as "CLIENT" | "FREELANCER"} />
+            <BrowserWallet
+              wallet={wallet}
+              topUps={topUps}
+              onChanged={loadWorkspace}
+              role={platformRole as "CLIENT" | "FREELANCER"}
+            />
           </section>
         )}
 
@@ -601,7 +1226,10 @@ const submitAuth = async (event: FormEvent) => {
             <div className="content-toolbar">
               <div>
                 <h2>Support chat</h2>
-                <p>Get help with jobs, contracts, payments, verification, or disputes.</p>
+                <p>
+                  Get help with jobs, contracts, payments, verification, or
+                  disputes.
+                </p>
               </div>
             </div>
             <SupportChat userId={user.id} />
@@ -625,7 +1253,10 @@ const submitAuth = async (event: FormEvent) => {
             <div className="content-toolbar">
               <div>
                 <h2>Disputes</h2>
-                <p>Negotiate, submit evidence, and track mediation or arbitration.</p>
+                <p>
+                  Negotiate, submit evidence, and track mediation or
+                  arbitration.
+                </p>
               </div>
             </div>
             <DisputesWorkspace />
@@ -639,7 +1270,10 @@ const submitAuth = async (event: FormEvent) => {
                 <h2>Profile</h2>
                 <p>View user profile details.</p>
               </div>
-              <button className="btn-secondary" onClick={() => setView("profile-edit")}>
+              <button
+                className="btn-secondary"
+                onClick={() => setView("profile-edit")}
+              >
                 <Edit size={16} /> Edit Profile
               </button>
             </div>
@@ -654,7 +1288,10 @@ const submitAuth = async (event: FormEvent) => {
                 <h2>Edit Profile</h2>
                 <p>Update your public profile details.</p>
               </div>
-              <button className="btn-secondary" onClick={() => setView("profile")}>
+              <button
+                className="btn-secondary"
+                onClick={() => setView("profile")}
+              >
                 <ArrowLeft size={16} /> Back to Profile
               </button>
             </div>
@@ -671,9 +1308,17 @@ const submitAuth = async (event: FormEvent) => {
               </div>
             </div>
             <div className="panel settings-list">
-              <div><strong>Account email</strong><span>{user.email}</span></div>
-              <div><strong>Workspace role</strong><span>{roleLabel(platformRole)}</span></div>
-              <button className="btn-secondary" onClick={logout}><LogOut size={16} /> Sign out</button>
+              <div>
+                <strong>Account email</strong>
+                <span>{user.email}</span>
+              </div>
+              <div>
+                <strong>Workspace role</strong>
+                <span>{roleLabel(platformRole)}</span>
+              </div>
+              <button className="btn-secondary" onClick={logout}>
+                <LogOut size={16} /> Sign out
+              </button>
             </div>
           </section>
         )}
@@ -681,7 +1326,11 @@ const submitAuth = async (event: FormEvent) => {
 
       <nav className="platform-mobile-nav">
         {navItems.map((item) => (
-          <button key={item.view} className={view === item.view ? "active" : ""} onClick={() => setView(item.view)}>
+          <button
+            key={item.view}
+            className={view === item.view ? "active" : ""}
+            onClick={() => setView(item.view)}
+          >
             <span>{navIconMap[item.iconKey]}</span>
             <small>{item.label}</small>
           </button>

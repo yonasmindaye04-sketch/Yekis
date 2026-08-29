@@ -16,7 +16,6 @@ import { logger } from "./logger.js";
  * ECA filing within the 72-hour window.
  */
 
-
 // === MAIN FUNCTIONS ===
 export async function triggerBreachAlert(params: {
   severity: "HIGH" | "CRITICAL";
@@ -31,12 +30,12 @@ export async function triggerBreachAlert(params: {
       affectedSystems: params.affectedSystems,
       estimatedUsersImpacted: params.estimatedUsersImpacted,
     },
-    `🚨 DATA BREACH ALERT: ${params.description}`
+    `🚨 DATA BREACH ALERT: ${params.description}`,
   );
 
   // TODO: Send critical SMS/Telegram/Email to the Security Incident Response Team (SIRT)
   // await notificationQueue.add("security-alert", { ...params });
-  
+
   // NOTE: A human must manually file the breach report with the ECA if required by law.
   // See COMPLIANCE_BLOCKERS.md §Real-Time Data Breach Reporting.
 }

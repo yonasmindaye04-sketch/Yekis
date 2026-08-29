@@ -40,7 +40,9 @@ export interface BotSessionContext extends SessionFlavor<BotSession> {
   };
 }
 
-export type BotContext = ConversationFlavor<Context & SessionFlavor<BotSession> & I18nFlavor>;
+export type BotContext = ConversationFlavor<
+  Context & SessionFlavor<BotSession> & I18nFlavor
+>;
 
 import { Context } from "grammy";
 

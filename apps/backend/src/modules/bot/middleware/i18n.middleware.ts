@@ -7,8 +7,12 @@ const localesDir = resolve(process.cwd(), "src/modules/bot/locales");
 // Load JSON locales synchronously
 const locales: Record<string, Record<string, string>> = {};
 try {
-  locales["en"] = JSON.parse(fs.readFileSync(resolve(localesDir, "en.json"), "utf8"));
-  locales["am"] = JSON.parse(fs.readFileSync(resolve(localesDir, "am.json"), "utf8"));
+  locales["en"] = JSON.parse(
+    fs.readFileSync(resolve(localesDir, "en.json"), "utf8"),
+  );
+  locales["am"] = JSON.parse(
+    fs.readFileSync(resolve(localesDir, "am.json"), "utf8"),
+  );
 } catch (e) {
   console.error("Failed to load JSON locales", e);
 }
@@ -33,7 +37,7 @@ export function i18nMiddleware() {
       setLocale: async (lang: "en" | "am") => {
         if (ctx.session) ctx.session.language = lang;
       },
-      locale: () => ctx.session?.language || "en"
+      locale: () => ctx.session?.language || "en",
     } as any;
 
     await next();

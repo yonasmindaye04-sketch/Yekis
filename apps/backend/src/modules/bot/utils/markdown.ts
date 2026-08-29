@@ -76,18 +76,25 @@ export function formatETB(minor: number, locale: "en" | "am" = "en"): string {
 /**
  * Format date with locale
  */
-export function formatDate(date: Date | string, locale: "en" | "am" = "en", options?: Intl.DateTimeFormatOptions): string {
+export function formatDate(
+  date: Date | string,
+  locale: "en" | "am" = "en",
+  options?: Intl.DateTimeFormatOptions,
+): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString(
     locale === "am" ? "am-ET" : "en-US",
-    options || { year: "numeric", month: "short", day: "numeric" }
+    options || { year: "numeric", month: "short", day: "numeric" },
   );
 }
 
 /**
  * Format relative time (e.g., "2 hours ago")
  */
-export function formatRelativeTime(date: Date | string, locale: "en" | "am" = "en"): string {
+export function formatRelativeTime(
+  date: Date | string,
+  locale: "en" | "am" = "en",
+): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();

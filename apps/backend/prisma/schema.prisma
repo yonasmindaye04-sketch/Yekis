@@ -117,9 +117,9 @@ enum LaunchCategory {
 }
 
 enum Visibility {
-  PUBLIC      // anyone can view
-  PROPOSERS   // only users who proposed to their jobs (clients) or received proposals (freelancers)
-  PRIVATE     // only visible to self + staff
+  PUBLIC // anyone can view
+  PROPOSERS // only users who proposed to their jobs (clients) or received proposals (freelancers)
+  PRIVATE // only visible to self + staff
 }
 
 enum SkillCategory {
@@ -169,103 +169,107 @@ enum ReportStatus {
 // ---------- Core identity ----------
 
 model User {
-  id                    String    @id @default(cuid())
-  ucid                  String    @unique @default(cuid()) // platform-wide Unique Customer ID
-  email                 String    @unique
-  phone                 String    @unique
-  passwordHash          String
-  role                  UserRole
-  languagePreference    String    @default("en")
-  timezone              String    @default("Africa/Addis_Ababa") @db.VarChar(60)
+  id                      String     @id @default(cuid())
+  ucid                    String     @unique @default(cuid()) // platform-wide Unique Customer ID
+  email                   String     @unique
+  phone                   String     @unique
+  passwordHash            String
+  role                    UserRole
+  languagePreference      String     @default("en")
+  timezone                String     @default("Africa/Addis_Ababa") @db.VarChar(60)
   // Nullable: Telegram/guest-chat signups have no verified DOB yet; fabricating
-// one corrupted KYC data (AML integrity). Real DOB arrives via Tier-2 Fayda.
-dateOfBirth           DateTime?
-  faydaBiometricId      String?   @unique // set once Fayda verification succeeds — used for dedup
-  isSuspended           Boolean   @default(false)
-  staffRole             StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
+  // one corrupted KYC data (AML integrity). Real DOB arrives via Tier-2 Fayda.
+  dateOfBirth             DateTime?
+  faydaPsut               String?    @unique @map("fayda_biometric_id") // set once Fayda verification succeeds — used for dedup
+  isComplianceHeld        Boolean    @default(false)
+  complianceHeldAt        DateTime?
+  complianceHeldReason    String?
+  circumventionAlertCount Int        @default(0)
+  isSuspended             Boolean    @default(false)
+  staffRole               StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
 
-  cachedKycTier         KycTier?
-  cachedKycStatus       KycStatus? @default(PENDING)
-  totalEarnedNetMinor   Int @default(0)
-  totalSpentGrossMinor  Int @default(0)
+  cachedKycTier        KycTier?
+  cachedKycStatus      KycStatus? @default(PENDING)
+  totalEarnedNetMinor  Int        @default(0)
+  totalSpentGrossMinor Int        @default(0)
 
   // --- PROFILE FIELDS ---
-  firstName             String    @default("") @db.VarChar(50)
-  lastName              String    @default("") @db.VarChar(50)
-  displayName           String?   @db.VarChar(100) // computed fallback: "{firstName} {lastName}"
-  bio                   String?   @db.VarChar(2000)
-  avatarUrl             String?   @db.VarChar(500)
-  avatarCdnUrls         Json?     // { "64": "...", "256": "...", "512": "..." }
-  primarySkillId        String?   @db.VarChar(50)
-  primarySkill          Skill?    @relation(fields: [primarySkillId], references: [id])
-  isAvailableForWork    Boolean   @default(true)
-  profileVisibility     Visibility @default(PUBLIC)
-  profileCompleteness   Int       @default(0) // 0-100, computed
+  firstName           String     @default("") @db.VarChar(50)
+  lastName            String     @default("") @db.VarChar(50)
+  displayName         String?    @db.VarChar(100) // computed fallback: "{firstName} {lastName}"
+  bio                 String?    @db.VarChar(2000)
+  avatarUrl           String?    @db.VarChar(500)
+  avatarCdnUrls       Json? // { "64": "...", "256": "...", "512": "..." }
+  primarySkillId      String?    @db.VarChar(50)
+  primarySkill        Skill?     @relation(fields: [primarySkillId], references: [id])
+  isAvailableForWork  Boolean    @default(true)
+  profileVisibility   Visibility @default(PUBLIC)
+  profileCompleteness Int        @default(0) // 0-100, computed
 
   // --- STATS (COMPUTED, CACHED) ---
-  totalJobsCompleted    Int       @default(0)
-  totalJobsPosted       Int       @default(0)
-  ratingAverage         Float?    @default(0) // Bayesian average, not raw mean
-  ratingCount           Int       @default(0)
-  ratingBayesianScore   Float?    @default(0) // used for sorting
-  lastFeaturedAt        DateTime? // when they were last in carousel
-  profileViewCount      Int       @default(0)
+  totalJobsCompleted  Int       @default(0)
+  totalJobsPosted     Int       @default(0)
+  ratingAverage       Float?    @default(0) // Bayesian average, not raw mean
+  ratingCount         Int       @default(0)
+  ratingBayesianScore Float?    @default(0) // used for sorting
+  lastFeaturedAt      DateTime? // when they were last in carousel
+  profileViewCount    Int       @default(0)
 
   // --- OAUTH PROVIDERS (social sign-in) ---
-  emailVerified         Boolean   @default(false)
-  googleId              String?   @unique
-  appleId               String?   @unique
-  facebookId            String?   @unique
+  emailVerified Boolean @default(false)
+  googleId      String? @unique
+  appleId       String? @unique
+  facebookId    String? @unique
 
   // --- TELEGRAM ---
-  telegramUserId        BigInt?   @unique
-  telegramChatId        String?
+  telegramUserId BigInt? @unique
+  telegramChatId String?
 
   // --- TIMESTAMPS ---
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // --- EXISTING RELATIONS ---
-  kyc               KycRecord?
-  wallet            Wallet?
-  jobsPosted        Job[]            @relation("ClientJobs")
-  proposals         Proposal[]
-  contractsAsClient Contract[]       @relation("ClientContracts")
-  contractsAsFreelancer Contract[]   @relation("FreelancerContracts")
-  consents          ConsentRecord[]
-  auditLogs         AuditLog[]
-  notifications     Notification[]
-  transactionFlags  TransactionFlag[]
-  walletTopUps      WalletTopUp[]
-  conversationsCreated Conversation[]         @relation("ConversationCreator")
-  conversationsAssigned Conversation[]        @relation("ConversationAssignedStaff")
+  kyc                      KycRecord?
+  wallet                   Wallet?
+  jobsPosted               Job[]                     @relation("ClientJobs")
+  proposals                Proposal[]
+  contractsAsClient        Contract[]                @relation("ClientContracts")
+  contractsAsFreelancer    Contract[]                @relation("FreelancerContracts")
+  consents                 ConsentRecord[]
+  auditLogs                AuditLog[]
+  notifications            Notification[]
+  transactionFlags         TransactionFlag[]
+  walletTopUps             WalletTopUp[]
+  conversationsCreated     Conversation[]            @relation("ConversationCreator")
+  conversationsAssigned    Conversation[]            @relation("ConversationAssignedStaff")
   conversationParticipants ConversationParticipant[]
-  chatMessages      ChatMessage[]
+  chatMessages             ChatMessage[]
 
-  sentDirectMessages DirectMessage[]
-  directThreadsAsClient DirectThread[] @relation("ClientThreads")
-  directThreadsAsFreelancer DirectThread[] @relation("FreelancerThreads")
+  sentDirectMessages        DirectMessage[]
+  directThreadsAsClient     DirectThread[]  @relation("ClientThreads")
+  directThreadsAsFreelancer DirectThread[]  @relation("FreelancerThreads")
 
   // --- PROFILE RELATIONS ---
-  skills                UserSkill[]
-  portfolioItems        PortfolioItem[]
-  reviewsReceived       Review[]  @relation("ReviewTarget")
-  reviewsGiven          Review[]  @relation("ReviewAuthor")
-  featuredLogs          FeaturedLog[]
-  profileReports        ProfileReport[] @relation("ReportedUser")
-  passwordResetTokens   PasswordResetToken[]
-  notificationSettings  Json?
+  skills               UserSkill[]
+  portfolioItems       PortfolioItem[]
+  reviewsReceived      Review[]             @relation("ReviewTarget")
+  reviewsGiven         Review[]             @relation("ReviewAuthor")
+  featuredLogs         FeaturedLog[]
+  profileReports       ProfileReport[]      @relation("ReportedUser")
+  passwordResetTokens  PasswordResetToken[]
+  notificationSettings Json?
 
-  @@index([faydaBiometricId])
+  @@index([faydaPsut])
 }
 
 model ConsentRecord {
-  id          String   @id @default(cuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  purpose     String   // e.g. "kyc_data_processing", "marketing", "analytics"
-  granted     Boolean
-  grantedAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  purpose   String // e.g. "kyc_data_processing", "marketing", "analytics"
+  granted   Boolean
+  grantedAt DateTime @default(now())
 
   @@index([userId])
 }
@@ -273,43 +277,47 @@ model ConsentRecord {
 // ---------- KYC (tiered) ----------
 
 model KycRecord {
-  id                String     @id @default(cuid())
-  userId            String     @unique
-  user              User       @relation(fields: [userId], references: [id])
-  tier              KycTier    @default(TIER_1)
-  status            KycStatus  @default(PENDING)
-  highestVerifiedTier KycTier?
-  fullName          String?
-  documentNumber    String?
-  tin               String?    // required for Tier 2 (withdrawal eligibility)
-  businessRegNumber String?
-  isPepMatch        Boolean    @default(false)
-  pepScreenedAt     DateTime?
-  faydaVerificationAttempted Boolean  @default(false)
-  faydaVerificationSucceeded Boolean  @default(false)
-  reviewedByStaffId String?    // staff user who made the manual VERIFIED/REJECTED call
-  rejectionReason   String?
-  lastVerifiedAt    DateTime?
-  nextReviewDueAt   DateTime?  // periodic KYC refresh job reads this
+  id                         String    @id @default(cuid())
+  userId                     String    @unique
+  user                       User      @relation(fields: [userId], references: [id])
+  tier                       KycTier   @default(TIER_1)
+  status                     KycStatus @default(PENDING)
+  highestVerifiedTier        KycTier?
+  fullName                   String?
+  documentNumber             String?
+  tin                        String? // required for Tier 2 (withdrawal eligibility)
+  businessRegNumber          String?
+  isPepMatch                 Boolean   @default(false)
+  pepScreenedAt              DateTime?
+  faydaVerificationAttempted Boolean   @default(false)
+  faydaVerificationSucceeded Boolean   @default(false)
+  esignetSub                 String?
+  esignetVerifiedName        String?
+  esignetVerifiedDob         String?
+  esignetVerifiedAt          DateTime?
+  reviewedByStaffId          String? // staff user who made the manual VERIFIED/REJECTED call
+  rejectionReason            String?
+  lastVerifiedAt             DateTime?
+  nextReviewDueAt            DateTime? // periodic KYC refresh job reads this
   // T2-J: set by kycRefresh.worker; surfaces in getReviewQueue as a distinct filter
   // so staff can see re-review cases separately from first-time submissions.
-  periodicReviewPending Boolean @default(false)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  periodicReviewPending      Boolean   @default(false)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
-  documents         KycDocument[]
-  reviewEvents      KycReviewEvent[]
+  documents    KycDocument[]
+  reviewEvents KycReviewEvent[]
 }
 
 model KycReviewEvent {
-  id            String    @id @default(cuid())
-  kycRecordId   String
-  kycRecord     KycRecord @relation(fields: [kycRecordId], references: [id])
-  staffUserId   String
-  decision      KycStatus // VERIFIED or REJECTED (PENDING/UNDER_REVIEW never logged here)
+  id             String    @id @default(cuid())
+  kycRecordId    String
+  kycRecord      KycRecord @relation(fields: [kycRecordId], references: [id])
+  staffUserId    String
+  decision       KycStatus // VERIFIED or REJECTED (PENDING/UNDER_REVIEW never logged here)
   tierAtDecision KycTier
-  reason        String?
-  createdAt     DateTime  @default(now())
+  reason         String?
+  createdAt      DateTime  @default(now())
 
   @@index([kycRecordId])
 }
@@ -319,7 +327,7 @@ model KycDocument {
   kycRecordId  String
   kycRecord    KycRecord       @relation(fields: [kycRecordId], references: [id])
   documentType KycDocumentType
-  storagePath  String          // pointer into WORM object store — never the raw file in the DB
+  storagePath  String // pointer into WORM object store — never the raw file in the DB
   uploadedAt   DateTime        @default(now())
 
   @@index([kycRecordId])
@@ -328,26 +336,26 @@ model KycDocument {
 // ---------- Jobs & Proposals ----------
 
 model Job {
-  id          String         @id @default(cuid())
-  clientId    String
-  client      User           @relation("ClientJobs", fields: [clientId], references: [id])
-  title       String
-  category    LaunchCategory
-  description String
-  budgetMinMinor Int
-  budgetMaxMinor Int
-  deadline    DateTime
-  status      JobStatus      @default(OPEN)
+  id                 String         @id @default(cuid())
+  clientId           String
+  client             User           @relation("ClientJobs", fields: [clientId], references: [id])
+  title              String
+  category           LaunchCategory
+  description        String
+  budgetMinMinor     Int
+  budgetMaxMinor     Int
+  deadline           DateTime
+  status             JobStatus      @default(OPEN)
   // Client's proposed milestone plan at posting time — informational until
   // a proposal is accepted, at which point Contracts.milestones are seeded
   // from whichever plan (this one, possibly renegotiated via the accepted
   // Proposal) the two parties actually agreed to.
   proposedMilestones Json
   screeningQuestions Json?
-  createdAt   DateTime       @default(now())
+  createdAt          DateTime       @default(now())
 
-  proposals   Proposal[]
-  contract    Contract?
+  proposals     Proposal[]
+  contract      Contract?
   directThreads DirectThread[]
 
   @@index([category, status])
@@ -355,40 +363,40 @@ model Job {
 }
 
 model Proposal {
-  id             String         @id @default(cuid())
-  jobId          String
-  job            Job            @relation(fields: [jobId], references: [id])
-  freelancerId   String
-  freelancer     User           @relation(fields: [freelancerId], references: [id])
-  coverLetter    String
-  quotedAmountMinor Int
-  estimatedDays  Int
-  milestoneBreakdown Json       // freelancer's proposed milestone/payment split
+  id                 String         @id @default(cuid())
+  jobId              String
+  job                Job            @relation(fields: [jobId], references: [id])
+  freelancerId       String
+  freelancer         User           @relation(fields: [freelancerId], references: [id])
+  coverLetter        String
+  quotedAmountMinor  Int
+  estimatedDays      Int
+  milestoneBreakdown Json // freelancer's proposed milestone/payment split
   screeningAnswers   Json?
   attachmentPaths    String[]
-  status         ProposalStatus @default(SUBMITTED)
-  createdAt      DateTime       @default(now())
+  status             ProposalStatus @default(SUBMITTED)
+  createdAt          DateTime       @default(now())
 
-  counterOffer   CounterOffer?
+  counterOffer CounterOffer?
 
+  @@unique([jobId, freelancerId]) // one active proposal per freelancer per job
   @@index([jobId])
   @@index([freelancerId])
-  @@unique([jobId, freelancerId]) // one active proposal per freelancer per job
 }
 
 // ---------- Contracts ----------
 
 model Contract {
-  id             String     @id @default(cuid())
-  jobId          String     @unique
-  job            Job        @relation(fields: [jobId], references: [id])
-  clientId       String
-  client         User       @relation("ClientContracts", fields: [clientId], references: [id])
-  freelancerId   String
-  freelancer     User       @relation("FreelancerContracts", fields: [freelancerId], references: [id])
-  templateVersion String    // which Service Agreement template version was used
-  documentStoragePath String // the generated, immutable PDF
-  status         ContractStatus @default(ACTIVE)
+  id                   String         @id @default(cuid())
+  jobId                String         @unique
+  job                  Job            @relation(fields: [jobId], references: [id])
+  clientId             String
+  client               User           @relation("ClientContracts", fields: [clientId], references: [id])
+  freelancerId         String
+  freelancer           User           @relation("FreelancerContracts", fields: [freelancerId], references: [id])
+  templateVersion      String // which Service Agreement template version was used
+  documentStoragePath  String // the generated, immutable PDF
+  status               ContractStatus @default(ACTIVE)
   clientAcceptedAt     DateTime?
   freelancerAcceptedAt DateTime?
   // T2-E: 7-day cooling-off right — Electronic Transactions Proclamation No. 1205/2020.
@@ -397,12 +405,12 @@ model Contract {
   // ⚠️ Conflict note: AUTO_RELEASE_WINDOW_DAYS default is 5 days. If a milestone were somehow
   // submitted AND the auto-release timer fires before cancellableUntil, auto-release must be
   // skipped — see autoRelease.worker.ts for the guard added to enforce this.
-  cancellableUntil DateTime? // set to createdAt + 7 days by createContractFromProposal()
-  createdAt      DateTime   @default(now())
+  cancellableUntil     DateTime? // set to createdAt + 7 days by createContractFromProposal()
+  createdAt            DateTime       @default(now())
 
-  milestones     Milestone[]
-  dispute        Dispute?
-  review         Review?
+  milestones Milestone[]
+  dispute    Dispute?
+  review     Review?
 
   @@index([clientId])
   @@index([freelancerId])
@@ -410,18 +418,19 @@ model Contract {
 }
 
 model Milestone {
-  id           String      @id @default(cuid())
-  contractId   String
-  contract     Contract    @relation(fields: [contractId], references: [id])
-  title        String
-  amountMinor  Int
-  dueDate      DateTime
-  escrowState  EscrowState @default(PAYMENT_PENDING)
-  submittedAt  DateTime?
-  deliverableUrl String?   // added to track the submitted file/link for review & disputes
-  autoReleaseAt DateTime?  // set when freelancer submits; cron releases at this time if untouched
-  releasedAt   DateTime?
-  createdAt    DateTime    @default(now())
+  id              String      @id @default(cuid())
+  contractId      String
+  contract        Contract    @relation(fields: [contractId], references: [id])
+  title           String
+  amountMinor     Int
+  dueDate         DateTime
+  escrowState     EscrowState @default(PAYMENT_PENDING)
+  submittedAt     DateTime?
+  deliverableUrl  String? // added to track the submitted file/link for review & disputes
+  deliverableHash String?
+  autoReleaseAt   DateTime? // set when freelancer submits; cron releases at this time if untouched
+  releasedAt      DateTime?
+  createdAt       DateTime    @default(now())
 
   paymentTransactions PaymentTransaction[]
 
@@ -432,16 +441,16 @@ model Milestone {
 // ---------- Payments ----------
 
 model PaymentTransaction {
-  id                 String          @id @default(cuid())
-  milestoneId        String
-  milestone          Milestone       @relation(fields: [milestoneId], references: [id])
-  provider           PaymentProvider
-  providerTransactionId String        @unique
-  amountMinor        Int
-  status             String          // PENDING | SUCCESS | FAILED
-  withholdingTaxMinor Int            @default(0)
-  rawWebhookPayload  Json?
-  createdAt          DateTime        @default(now())
+  id                    String          @id @default(cuid())
+  milestoneId           String
+  milestone             Milestone       @relation(fields: [milestoneId], references: [id])
+  provider              PaymentProvider
+  providerTransactionId String          @unique
+  amountMinor           Int
+  status                String // PENDING | SUCCESS | FAILED
+  withholdingTaxMinor   Int             @default(0)
+  rawWebhookPayload     Json?
+  createdAt             DateTime        @default(now())
 
   @@index([milestoneId])
   // Reconciliation sweep query: provider + status + createdAt window
@@ -455,7 +464,7 @@ model Wallet {
   balanceMinor Int      @default(0)
   updatedAt    DateTime @updatedAt
 
-  topUps       WalletTopUp[]
+  topUps WalletTopUp[]
 }
 
 enum TopUpStatus {
@@ -481,7 +490,7 @@ model WalletTopUp {
   provider          PaymentProvider
   amountMinor       Int
   referenceNumber   String
-  receiptImagePath  String          // object store pointer — never a public URL
+  receiptImagePath  String // object store pointer — never a public URL
   status            TopUpStatus     @default(PENDING)
   reviewedByStaffId String?
   rejectionReason   String?
@@ -501,48 +510,49 @@ enum DisputeResolutionOutcome {
 }
 
 model Dispute {
-  id                  String                    @id @default(cuid())
-  contractId          String                    @unique
-  contract            Contract                  @relation(fields: [contractId], references: [id])
-  milestoneId         String
-  category            DisputeCategory
-  stage               DisputeStage              @default(STAGE_1_NEGOTIATION)
-  raisedByUserId      String
-  description         String
-  negotiationDeadlineAt DateTime?                // Stage 1 — 7 days from raise
-  mediationDeadlineAt   DateTime?                // Stage 3 — 3-5 business days from escalation
-  evidenceBundlePath  String?                    // compiled Stage 2 package (object store pointer)
-  mediatorRecommendation String?
-  resolvedByStaffId   String?
-  resolutionOutcome   DisputeResolutionOutcome?
-  freelancerShareMinor Int?                      // set only when resolutionOutcome is PARTIAL_SPLIT
-  resolvedAt          DateTime?
+  id                                     String                    @id @default(cuid())
+  contractId                             String                    @unique
+  contract                               Contract                  @relation(fields: [contractId], references: [id])
+  milestoneId                            String
+  category                               DisputeCategory
+  stage                                  DisputeStage              @default(STAGE_1_NEGOTIATION)
+  raisedByUserId                         String
+  description                            String
+  negotiationDeadlineAt                  DateTime? // Stage 1 — 7 days from raise
+  mediationDeadlineAt                    DateTime? // Stage 3 — 3-5 business days from escalation
+  evidenceBundlePath                     String? // compiled Stage 2 package (object store pointer)
+  evidenceBundleHash                     String?
+  mediatorRecommendation                 String?
+  resolvedByStaffId                      String?
+  resolutionOutcome                      DisputeResolutionOutcome?
+  freelancerShareMinor                   Int? // set only when resolutionOutcome is PARTIAL_SPLIT
+  resolvedAt                             DateTime?
   // T2-I: mediator assignment — ensures two staff don't work the same case simultaneously
-  assignedMediatorStaffId String?
-  assignedAt          DateTime?
+  assignedMediatorStaffId                String?
+  assignedAt                             DateTime?
   // T2-F: mutual withdrawal — both parties must call /withdraw for this to close
-  withdrawalRequestedByUserId String?            // first party to request mutual close
-  withdrawalProposedOutcome DisputeResolutionOutcome? // outcome they proposed
+  withdrawalRequestedByUserId            String? // first party to request mutual close
+  withdrawalProposedOutcome              DisputeResolutionOutcome? // outcome they proposed
   withdrawalProposedFreelancerShareMinor Int?
-  withdrawalConfirmedAt DateTime?               // set when second party confirms matching outcome
+  withdrawalConfirmedAt                  DateTime? // set when second party confirms matching outcome
   // T2-H: arbitration award tracking
-  awardReferenceNumber String?                  // AACCSA or other arbitration body reference
-  createdAt           DateTime                  @default(now())
-  updatedAt           DateTime                  @updatedAt
+  awardReferenceNumber                   String? // AACCSA or other arbitration body reference
+  createdAt                              DateTime                  @default(now())
+  updatedAt                              DateTime                  @updatedAt
 
-  evidence            DisputeEvidence[]
+  evidence DisputeEvidence[]
 
   @@index([milestoneId])
   @@index([stage])
 }
 
 model DisputeEvidence {
-  id          String   @id @default(cuid())
-  disputeId   String
-  dispute     Dispute  @relation(fields: [disputeId], references: [id])
+  id                String   @id @default(cuid())
+  disputeId         String
+  dispute           Dispute  @relation(fields: [disputeId], references: [id])
   submittedByUserId String
-  statement   String
-  createdAt   DateTime @default(now())
+  statement         String
+  createdAt         DateTime @default(now())
 
   @@index([disputeId])
 }
@@ -557,6 +567,7 @@ model DisputeEvidence {
 enum TransactionFlagType {
   STRUCTURING
   VELOCITY
+  ROUND_AMOUNTS
   PASS_THROUGH
   WALLET_MISMATCH
   STAFF_FLAGGED
@@ -570,19 +581,20 @@ enum TransactionFlagStatus {
 }
 
 model TransactionFlag {
-  id                 String                 @id @default(cuid())
+  id                 String                @id @default(cuid())
   userId             String
-  user               User                   @relation(fields: [userId], references: [id])
+  user               User                  @relation(fields: [userId], references: [id])
   type               TransactionFlagType
-  status             TransactionFlagStatus  @default(PENDING_REVIEW)
-  details            Json                   // rule-specific context (e.g. matched transaction IDs, amounts)
-  relatedEntityId    String?                // milestoneId, PaymentTransaction id, or withdrawal reference
+  status             TransactionFlagStatus @default(PENDING_REVIEW)
+  details            Json // rule-specific context (e.g. matched transaction IDs, amounts)
+  relatedEntityId    String? // milestoneId, PaymentTransaction id, or withdrawal reference
   reviewedByStaffId  String?
   reviewNotes        String?
   strFiledAt         DateTime?
-  strReferenceNumber String?                // the FIC filing reference the Compliance Officer received — filed manually, not via any API
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  strReferenceNumber String? // the FIC filing reference the Compliance Officer received — filed manually, not via any API
+  strDeadlineAt      DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([status])
   @@index([userId])
@@ -591,15 +603,15 @@ model TransactionFlag {
 // ---------- Notifications ----------
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  type      String   // matches the BullMQ job name, e.g. "dispute-raised", "escrow-funded"
+  user      User      @relation(fields: [userId], references: [id])
+  type      String // matches the BullMQ job name, e.g. "dispute-raised", "escrow-funded"
   message   String
   metadata  Json?
-  isRead    Boolean  @default(false)
+  isRead    Boolean   @default(false)
   smsSentAt DateTime? // null if this type isn't SMS-critical, or SMS send failed/is stubbed
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId, isRead])
 }
@@ -608,8 +620,8 @@ model AuditLog {
   id         String   @id @default(cuid())
   userId     String?
   user       User?    @relation(fields: [userId], references: [id])
-  eventType  String   // e.g. "ESCROW_RELEASED", "DISPUTE_RAISED", "KYC_STATUS_CHANGE"
-  entityType String   // e.g. "Milestone", "Dispute"
+  eventType  String // e.g. "ESCROW_RELEASED", "DISPUTE_RAISED", "KYC_STATUS_CHANGE"
+  entityType String // e.g. "Milestone", "Dispute"
   entityId   String
   metadata   Json?
   createdAt  DateTime @default(now())
@@ -621,18 +633,18 @@ model AuditLog {
 // ---------- Support Chat ----------
 
 model Conversation {
-  id               String    @id @default(cuid())
-  creatorId        String
-  creator          User      @relation("ConversationCreator", fields: [creatorId], references: [id])
-  assignedStaffId  String?   // staff member who claimed/was assigned to this conversation
-  assignedStaff    User?     @relation("ConversationAssignedStaff", fields: [assignedStaffId], references: [id])
-  subject          String
-  status           String    @default("OPEN") // OPEN | CLOSED
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String   @id @default(cuid())
+  creatorId       String
+  creator         User     @relation("ConversationCreator", fields: [creatorId], references: [id])
+  assignedStaffId String? // staff member who claimed/was assigned to this conversation
+  assignedStaff   User?    @relation("ConversationAssignedStaff", fields: [assignedStaffId], references: [id])
+  subject         String
+  status          String   @default("OPEN") // OPEN | CLOSED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  participants     ConversationParticipant[]
-  messages         ChatMessage[]
+  participants ConversationParticipant[]
+  messages     ChatMessage[]
 
   @@index([status])
   @@index([creatorId])
@@ -640,11 +652,11 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   userId         String
-  user           User      @relation(fields: [userId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
   lastReadAt     DateTime?
 
   @@unique([conversationId, userId])
@@ -653,14 +665,14 @@ model ConversationParticipant {
 }
 
 model ChatMessage {
-  id             String    @id @default(cuid())
+  id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
   senderId       String
-  sender         User      @relation(fields: [senderId], references: [id])
+  sender         User         @relation(fields: [senderId], references: [id])
   body           String
-  attachmentUrl  String?   // optional file attachment stored in object store
-  createdAt      DateTime  @default(now())
+  attachmentUrl  String? // optional file attachment stored in object store
+  createdAt      DateTime     @default(now())
 
   @@index([conversationId])
   @@index([senderId])
@@ -669,15 +681,15 @@ model ChatMessage {
 // ---------- Skills Taxonomy ----------
 
 model Skill {
-  id            String        @id @db.VarChar(50) // slug: "ui-ux-design"
-  nameEn        String        @db.VarChar(100)
-  nameAm        String        @db.VarChar(100)
-  category      SkillCategory
-  isActive      Boolean       @default(true)
-  displayOrder  Int           @default(0)
+  id           String        @id @db.VarChar(50) // slug: "ui-ux-design"
+  nameEn       String        @db.VarChar(100)
+  nameAm       String        @db.VarChar(100)
+  category     SkillCategory
+  isActive     Boolean       @default(true)
+  displayOrder Int           @default(0)
 
-  users         UserSkill[]
-  primaryUsers  User[]
+  users        UserSkill[]
+  primaryUsers User[]
 }
 
 model UserSkill {
@@ -686,8 +698,8 @@ model UserSkill {
   skillId   String
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  skill     Skill    @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
 
   @@unique([userId, skillId])
   @@index([userId])
@@ -697,40 +709,40 @@ model UserSkill {
 // ---------- Reviews ----------
 
 model Review {
-  id                String        @id @default(cuid())
+  id String @id @default(cuid())
 
-  contractId        String        @unique // one review per contract direction
-  contract          Contract      @relation(fields: [contractId], references: [id])
+  contractId String   @unique // one review per contract direction
+  contract   Contract @relation(fields: [contractId], references: [id])
 
-  authorId          String
-  author            User          @relation("ReviewAuthor", fields: [authorId], references: [id])
+  authorId String
+  author   User   @relation("ReviewAuthor", fields: [authorId], references: [id])
 
-  targetUserId      String
-  targetUser        User          @relation("ReviewTarget", fields: [targetUserId], references: [id])
+  targetUserId String
+  targetUser   User   @relation("ReviewTarget", fields: [targetUserId], references: [id])
 
-  rating            Int           // 1-5
-  comment           String?       @db.VarChar(2000)
+  rating  Int // 1-5
+  comment String? @db.VarChar(2000)
 
   // Double-blind
-  isBlind           Boolean       @default(true)
-  revealedAt        DateTime?
+  isBlind    Boolean   @default(true)
+  revealedAt DateTime?
 
   // Response from target
-  response          String?       @db.VarChar(1000)
-  respondedAt       DateTime?
+  response    String?   @db.VarChar(1000)
+  respondedAt DateTime?
 
   // Dispute
-  isDisputed        Boolean       @default(false)
-  disputeReason     String?       @db.VarChar(500)
+  isDisputed        Boolean                  @default(false)
+  disputeReason     String?                  @db.VarChar(500)
   disputeResolvedAt DateTime?
   disputeResolution ReviewDisputeResolution?
   disputedByStaffId String?
 
   // Eligibility — only true after escrow-funded contract completion
-  isEligible        Boolean       @default(false)
+  isEligible Boolean @default(false)
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([targetUserId, isEligible, revealedAt])
   @@index([authorId])
@@ -740,19 +752,19 @@ model Review {
 // ---------- Portfolio ----------
 
 model PortfolioItem {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title         String   @db.VarChar(200)
-  description   String?  @db.VarChar(2000)
-  thumbnailUrl  String?  @db.VarChar(500)
-  projectUrl    String?  @db.VarChar(500)
-  isActive      Boolean  @default(true)
-  displayOrder  Int      @default(0)
+  title        String  @db.VarChar(200)
+  description  String? @db.VarChar(2000)
+  thumbnailUrl String? @db.VarChar(500)
+  projectUrl   String? @db.VarChar(500)
+  isActive     Boolean @default(true)
+  displayOrder Int     @default(0)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId, isActive])
 }
@@ -760,16 +772,16 @@ model PortfolioItem {
 // ---------- Featured Selection Log ----------
 
 model FeaturedLog {
-  id            String        @id @default(cuid())
-  userId        String
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  featuredAt    DateTime      @default(now())
-  reason        FeaturedReason
-  category      SkillCategory
+  featuredAt DateTime       @default(now())
+  reason     FeaturedReason
+  category   SkillCategory
 
   pinnedByStaffId String?
-  notes         String?       @db.VarChar(500)
+  notes           String? @db.VarChar(500)
 
   @@index([userId, featuredAt])
   @@index([featuredAt])
@@ -778,21 +790,21 @@ model FeaturedLog {
 // ---------- Profile Reports ----------
 
 model ProfileReport {
-  id              String       @id @default(cuid())
-  reporterId      String
-  reportedUserId  String
-  reportedUser    User         @relation("ReportedUser", fields: [reportedUserId], references: [id])
+  id             String @id @default(cuid())
+  reporterId     String
+  reportedUserId String
+  reportedUser   User   @relation("ReportedUser", fields: [reportedUserId], references: [id])
 
-  reason          ReportReason
-  details         String?      @db.VarChar(1000)
-  status          ReportStatus @default(PENDING)
+  reason  ReportReason
+  details String?      @db.VarChar(1000)
+  status  ReportStatus @default(PENDING)
 
   reviewedByStaffId String?
-  staffNotes      String?      @db.VarChar(1000)
-  resolvedAt      DateTime?
+  staffNotes        String?   @db.VarChar(1000)
+  resolvedAt        DateTime?
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([reportedUserId])
   @@index([status])
@@ -801,11 +813,11 @@ model ProfileReport {
 // ---------- Profile Views (Analytics) ----------
 
 model ProfileView {
-  id            String   @id @default(cuid())
-  viewerId      String?  // null for anonymous
-  targetUserId  String
-  viewedAt      DateTime @default(now())
-  source        String?  @db.VarChar(50) // "carousel", "search", "bot", "direct"
+  id           String   @id @default(cuid())
+  viewerId     String? // null for anonymous
+  targetUserId String
+  viewedAt     DateTime @default(now())
+  source       String?  @db.VarChar(50) // "carousel", "search", "bot", "direct"
 
   @@index([targetUserId, viewedAt])
   @@index([viewedAt])
@@ -814,16 +826,16 @@ model ProfileView {
 // ---------- Counter Offers ----------
 
 model CounterOffer {
-  id                  String         @id @default(cuid())
-  proposalId          String         @unique   // one counter per proposal
-  proposal            Proposal       @relation(fields: [proposalId], references: [id])
-  proposedByClientId  String
-  revisedAmountMinor  Int
+  id                   String   @id @default(cuid())
+  proposalId           String   @unique // one counter per proposal
+  proposal             Proposal @relation(fields: [proposalId], references: [id])
+  proposedByClientId   String
+  revisedAmountMinor   Int
   revisedEstimatedDays Int
-  revisedMilestones   Json           // same shape as Proposal.milestoneBreakdown
-  message             String         @db.VarChar(1000)
-  status              String         @default("PENDING") // PENDING | ACCEPTED | DECLINED
-  createdAt           DateTime       @default(now())
+  revisedMilestones    Json // same shape as Proposal.milestoneBreakdown
+  message              String   @db.VarChar(1000)
+  status               String   @default("PENDING") // PENDING | ACCEPTED | DECLINED
+  createdAt            DateTime @default(now())
 
   @@index([proposalId])
 }
@@ -833,17 +845,17 @@ model CounterOffer {
 // A thread is tied to a specific (job, client, freelancer) triple.
 // It is created automatically when either party sends the first message.
 model DirectThread {
-  id           String    @id @default(cuid())
+  id           String   @id @default(cuid())
   jobId        String
-  job          Job       @relation(fields: [jobId], references: [id])
+  job          Job      @relation(fields: [jobId], references: [id])
   clientId     String
-  client       User      @relation("ClientThreads", fields: [clientId], references: [id])
+  client       User     @relation("ClientThreads", fields: [clientId], references: [id])
   freelancerId String
-  freelancer   User      @relation("FreelancerThreads", fields: [freelancerId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  freelancer   User     @relation("FreelancerThreads", fields: [freelancerId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  messages     DirectMessage[]
+  messages DirectMessage[]
 
   @@unique([jobId, clientId, freelancerId])
   @@index([clientId])
@@ -879,28 +891,29 @@ model DirectMessage {
 model PlatformOperatingAccount {
   // Singleton row — always upserted with id = "singleton" so there is
   // exactly one platform account regardless of how many fee credits occur.
-  id                      String   @id @default("singleton")
+  id                          String   @id @default("singleton")
   // Accumulated platform fee collected from freelancers (net of milestone amounts).
   // Does NOT include the client-side add-on (platformFeeFromClientMinor) which
   // stays in the escrow pool until milestone release. See fees.ts for the split.
-  accumulatedFeeMinor     Int      @default(0)
+  accumulatedFeeMinor         Int      @default(0)
   // Running total of withholding tax deducted — used for ERA remittance reconciliation.
   // This is an aggregate; per-transaction detail lives on PaymentTransaction.withholdingTaxMinor.
-  accumulatedWithholdingMinor Int  @default(0)
-  updatedAt               DateTime @updatedAt
+  accumulatedWithholdingMinor Int      @default(0)
+  accumulatedVatMinor         Int      @default(0)
+  updatedAt                   DateTime @updatedAt
 }
 
 // Append-only fee credit log — immutable record of each credit to the
 // PlatformOperatingAccount, enabling per-milestone fee reconciliation.
 model PlatformFeeCredit {
-  id                  String   @id @default(cuid())
-  milestoneId         String
+  id                     String   @id @default(cuid())
+  milestoneId            String
   // Freelancer-side fee (deducted from gross before freelancer gets paid)
   feeFromFreelancerMinor Int
   // Client-side add-on (collected when client funds; already in wallet debit)
-  feeFromClientMinor  Int
-  withholdingMinor    Int
-  createdAt           DateTime @default(now())
+  feeFromClientMinor     Int
+  withholdingMinor       Int
+  createdAt              DateTime @default(now())
 
   @@index([milestoneId])
   @@index([createdAt])
@@ -910,17 +923,17 @@ model PlatformFeeCredit {
 // A human uses this to file with ERA — this platform does NOT file automatically.
 // See COMPLIANCE_BLOCKERS.md §ERA Remittance for the TIER 3 blocker.
 model WithholdingRemittanceReport {
-  id                 String   @id @default(cuid())
+  id                    String    @id @default(cuid())
   // ISO month: "2026-08" — one report per calendar month
-  periodMonth        String   @unique @db.VarChar(7)
-  totalWithholdingMinor Int   // sum of withholdingTaxMinor across SUCCESS transactions in period
-  transactionCount   Int      // number of qualifying transactions
+  periodMonth           String    @unique @db.VarChar(7)
+  totalWithholdingMinor Int // sum of withholdingTaxMinor across SUCCESS transactions in period
+  transactionCount      Int // number of qualifying transactions
   // Set by staff once they have actually filed with ERA — not automated
-  filedAt            DateTime?
-  filedByStaffId     String?
-  eraReferenceNumber String?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  filedAt               DateTime?
+  filedByStaffId        String?
+  eraReferenceNumber    String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([periodMonth])
 }

@@ -5,7 +5,10 @@ import { prisma } from "../lib/prisma.js";
 import { recordAuditEvent } from "../lib/audit.js";
 import { logger } from "../lib/logger.js";
 import { paymentReconcileQueue } from "./queues.js";
-import { getProviderClient, handlePaymentWebhook } from "../modules/escrow/escrow.service.js";
+import {
+  getProviderClient,
+  handlePaymentWebhook,
+} from "../modules/escrow/escrow.service.js";
 import { env } from "../config/env.js";
 
 /**
@@ -19,8 +22,8 @@ import { env } from "../config/env.js";
  * through the same handlePaymentWebhook path as a real webhook (which is
  * idempotent), so whichever arrives second is a no-op.
  *
- * Currently only Telebirr implements queryPaymentStatus. Chapa/CBE are
- * skipped until their clients add the method (interface marks it optional).
+ * Currently only Telebirr implements queryPaymentStatus. CBE is
+ * skipped until its client adds the method (interface marks it optional).
  *
  * ⚠️ Blocked on sandbox access: the queryOrder endpoint's exact response
  * shape must be confirmed against real Telebirr docs/sandbox before
@@ -30,11 +33,15 @@ import { env } from "../config/env.js";
 export const paymentReconcileWorker = new Worker(
   "payment-reconcile",
   async () => {
-    const staleBefore = new Date(Date.now() - env.PAYMENT_RECONCILE_STALE_MINUTES * 60_000);
+    const staleBefore = new Date(
+      Date.now() - env.PAYMENT_RECONCILE_STALE_MINUTES * 60_000,
+    );
     // Don't chase transactions older than the checkout expiry window + slack —
     // TELEBIRR_TIMEOUT_EXPRESS defaults to "120m"; beyond that Telebirr itself
     // closes the order and we treat silence as FAILED rather than querying forever.
-    const giveUpBefore = new Date(Date.now() - env.PAYMENT_RECONCILE_GIVE_UP_HOURS * 3_600_000);
+    const giveUpBefore = new Date(
+      Date.now() - env.PAYMENT_RECONCILE_GIVE_UP_HOURS * 3_600_000,
+    );
 
     const stale = await prisma.paymentTransaction.findMany({
       where: {
@@ -54,7 +61,9 @@ export const paymentReconcileWorker = new Worker(
 
       if (!client.queryPaymentStatus) {
         // Defensive: interface change removed the method — bail loudly.
-        throw new Error("Telebirr client no longer implements queryPaymentStatus");
+        throw new Error(
+          "Telebirr client no longer implements queryPaymentStatus",
+        );
       }
 
       try {
@@ -99,7 +108,11 @@ export const paymentReconcileWorker = new Worker(
         // Per-transaction errors shouldn't kill the whole sweep; log and
         // move on — next run retries naturally since status stays PENDING.
         logger.error(
-          { err, transactionId: txn.id, providerTransactionId: txn.providerTransactionId },
+          {
+            err,
+            transactionId: txn.id,
+            providerTransactionId: txn.providerTransactionId,
+          },
           "Reconciliation query failed for transaction",
         );
       }
@@ -112,7 +125,7 @@ export const paymentReconcileWorker = new Worker(
       );
     }
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 /** Call once at startup — BullMQ deduplicates by jobId, safe on every boot. */
@@ -120,6 +133,9 @@ export async function schedulePaymentReconcileJob() {
   await paymentReconcileQueue.add(
     "reconcile-sweep",
     {},
-    { repeat: { pattern: env.PAYMENT_RECONCILE_CRON }, jobId: "payment-reconcile-sweep" }
+    {
+      repeat: { pattern: env.PAYMENT_RECONCILE_CRON },
+      jobId: "payment-reconcile-sweep",
+    },
   );
 }

@@ -3,10 +3,12 @@ import type { PaymentProvider } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
-import { uploadTopUpReceipt, getSignedObjectUrl } from "../../lib/objectStore.js";
+import {
+  uploadTopUpReceipt,
+  getSignedObjectUrl,
+} from "../../lib/objectStore.js";
 import { notificationQueue } from "../../queue/queues.js";
 import { logger } from "../../lib/logger.js";
-
 
 // === MAIN FUNCTIONS ===
 export class TopUpNotFoundError extends Error {}
@@ -20,7 +22,9 @@ export async function submitTopUp(params: {
   fileBuffer: Buffer;
   contentType: string;
 }) {
-  const wallet = await prisma.wallet.findUniqueOrThrow({ where: { userId: params.userId } });
+  const wallet = await prisma.wallet.findUniqueOrThrow({
+    where: { userId: params.userId },
+  });
 
   const receiptPath = await uploadTopUpReceipt({
     userId: params.userId,
@@ -62,7 +66,12 @@ export async function submitTopUp(params: {
  * at a glance whether this is a first-time submission or an established
  * pattern, without a separate lookup per item.
  */
-export async function getTopUpQueue(params?: { page?: number; pageSize?: number; search?: string; status?: string }) {
+export async function getTopUpQueue(params?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  status?: string;
+}) {
   const page = Math.max(1, params?.page || 1);
   const limit = Math.max(1, Math.min(100, params?.pageSize || 20));
 
@@ -80,9 +89,9 @@ export async function getTopUpQueue(params?: { page?: number; pageSize?: number;
   if (params?.search) {
     where.user = {
       OR: [
-        { email: { contains: params.search, mode: 'insensitive' } },
-        { phone: { contains: params.search } }
-      ]
+        { email: { contains: params.search, mode: "insensitive" } },
+        { phone: { contains: params.search } },
+      ],
     };
   }
 
@@ -90,22 +99,28 @@ export async function getTopUpQueue(params?: { page?: number; pageSize?: number;
     prisma.walletTopUp.count({ where }),
     prisma.walletTopUp.findMany({
       where,
-      include: { user: { select: { id: true, email: true, phone: true, ucid: true } } },
+      include: {
+        user: { select: { id: true, email: true, phone: true, ucid: true } },
+      },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
-    })
+    }),
   ]);
 
   const withHistory = await Promise.all(
     pending.map(async (topUp) => {
       const [approvedCount, approvedTotal, rejectedCount] = await Promise.all([
-        prisma.walletTopUp.count({ where: { userId: topUp.userId, status: "APPROVED" } }),
+        prisma.walletTopUp.count({
+          where: { userId: topUp.userId, status: "APPROVED" },
+        }),
         prisma.walletTopUp.aggregate({
           where: { userId: topUp.userId, status: "APPROVED" },
           _sum: { amountMinor: true },
         }),
-        prisma.walletTopUp.count({ where: { userId: topUp.userId, status: "REJECTED" } }),
+        prisma.walletTopUp.count({
+          where: { userId: topUp.userId, status: "REJECTED" },
+        }),
       ]);
       return {
         ...topUp,
@@ -115,7 +130,7 @@ export async function getTopUpQueue(params?: { page?: number; pageSize?: number;
           rejectedCount,
         },
       };
-    })
+    }),
   );
 
   return { items: withHistory, total, page, pageSize: limit };
@@ -130,15 +145,24 @@ export async function getReceiptViewUrl(topUpId: string) {
   return { url, expiresInSeconds: 300 };
 }
 
-export async function approveTopUp(params: { staffUserId: string; topUpId: string }) {
-  const topUp = await prisma.walletTopUp.findUnique({ where: { id: params.topUpId } });
+export async function approveTopUp(params: {
+  staffUserId: string;
+  topUpId: string;
+}) {
+  const topUp = await prisma.walletTopUp.findUnique({
+    where: { id: params.topUpId },
+  });
   if (!topUp) throw new TopUpNotFoundError();
   if (topUp.status !== "PENDING") throw new TopUpAlreadyResolvedError();
 
   await prisma.$transaction([
     prisma.walletTopUp.update({
       where: { id: topUp.id },
-      data: { status: "APPROVED", reviewedByStaffId: params.staffUserId, reviewedAt: new Date() },
+      data: {
+        status: "APPROVED",
+        reviewedByStaffId: params.staffUserId,
+        reviewedAt: new Date(),
+      },
     }),
     prisma.wallet.update({
       where: { id: topUp.walletId },
@@ -165,8 +189,14 @@ export async function approveTopUp(params: { staffUserId: string; topUpId: strin
   return prisma.walletTopUp.findUniqueOrThrow({ where: { id: topUp.id } });
 }
 
-export async function rejectTopUp(params: { staffUserId: string; topUpId: string; rejectionReason: string }) {
-  const topUp = await prisma.walletTopUp.findUnique({ where: { id: params.topUpId } });
+export async function rejectTopUp(params: {
+  staffUserId: string;
+  topUpId: string;
+  rejectionReason: string;
+}) {
+  const topUp = await prisma.walletTopUp.findUnique({
+    where: { id: params.topUpId },
+  });
   if (!topUp) throw new TopUpNotFoundError();
   if (topUp.status !== "PENDING") throw new TopUpAlreadyResolvedError();
 
@@ -204,21 +234,35 @@ export async function rejectTopUp(params: { staffUserId: string; topUpId: string
  * disappear from view as merely "handled") and creates a TransactionFlag
  * so it enters the same TMS compliance queue as automated AML rules.
  */
-export async function flagTopUpSuspicious(params: { staffUserId: string; topUpId: string; reason: string }) {
-  const topUp = await prisma.walletTopUp.findUnique({ where: { id: params.topUpId } });
+export async function flagTopUpSuspicious(params: {
+  staffUserId: string;
+  topUpId: string;
+  reason: string;
+}) {
+  const topUp = await prisma.walletTopUp.findUnique({
+    where: { id: params.topUpId },
+  });
   if (!topUp) throw new TopUpNotFoundError();
   if (topUp.status !== "PENDING") throw new TopUpAlreadyResolvedError();
 
   const [updated] = await prisma.$transaction([
     prisma.walletTopUp.update({
       where: { id: topUp.id },
-      data: { status: "FLAGGED", reviewedByStaffId: params.staffUserId, reviewedAt: new Date() },
+      data: {
+        status: "FLAGGED",
+        reviewedByStaffId: params.staffUserId,
+        reviewedAt: new Date(),
+      },
     }),
     prisma.transactionFlag.create({
       data: {
         userId: topUp.userId,
         type: "STAFF_FLAGGED",
-        details: { source: "wallet_topup", topUpId: topUp.id, reason: params.reason },
+        details: {
+          source: "wallet_topup",
+          topUpId: topUp.id,
+          reason: params.reason,
+        },
         relatedEntityId: topUp.id,
       },
     }),
@@ -232,10 +276,17 @@ export async function flagTopUpSuspicious(params: { staffUserId: string; topUpId
     metadata: { reason: params.reason },
   });
 
-  logger.warn({ topUpId: topUp.id }, "Top-up flagged as suspicious — routed to compliance queue");
+  logger.warn(
+    { topUpId: topUp.id },
+    "Top-up flagged as suspicious — routed to compliance queue",
+  );
 
   return updated;
 }
 
-
-export async function getUserTopUps(userId: string) { return await prisma.walletTopUp.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }); }
+export async function getUserTopUps(userId: string) {
+  return await prisma.walletTopUp.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+  });
+}

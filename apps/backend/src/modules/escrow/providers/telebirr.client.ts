@@ -2,7 +2,10 @@
 import { randomUUID } from "node:crypto";
 import { env } from "../../../config/env.js";
 import { logger } from "../../../lib/logger.js";
-import type { InitiatePaymentResult, PaymentProviderClient } from "./paymentProvider.interface.js";
+import type {
+  InitiatePaymentResult,
+  PaymentProviderClient,
+} from "./paymentProvider.interface.js";
 import { getFabricToken, invalidateFabricToken } from "./telebirr.token.js";
 import {
   createTimestamp,
@@ -51,13 +54,14 @@ function generateMerchOrderId(): string {
   return `YKS-${ts}-${rand}`;
 }
 
-
 // === MAIN EXPORT ===
 
 export const telebirrClient: PaymentProviderClient = {
   async initiatePayment(params): Promise<InitiatePaymentResult> {
     if (!hasCredentials()) {
-      logger.warn("Telebirr credentials not configured — using mock payment initiation.");
+      logger.warn(
+        "Telebirr credentials not configured — using mock payment initiation.",
+      );
       return {
         providerTransactionId: `mock-telebirr-${randomUUID()}`,
         redirectUrl: null,
@@ -84,7 +88,9 @@ export const telebirrClient: PaymentProviderClient = {
       method: "payment.preorder",
       version: "1.0",
       biz_content: {
-        notify_url: env.TELEBIRR_NOTIFY_URL || `${env.FRONTEND_URL}/api/v1/webhooks/telebirr`,
+        notify_url:
+          env.TELEBIRR_NOTIFY_URL ||
+          `${env.FRONTEND_URL}/api/v1/webhooks/telebirr`,
         appid: env.TELEBIRR_MERCHANT_APP_ID,
         merch_code: env.TELEBIRR_MERCHANT_CODE,
         merch_order_id: merchOrderId,
@@ -119,14 +125,16 @@ export const telebirrClient: PaymentProviderClient = {
         headers: {
           "Content-Type": "application/json",
           "X-APP-Key": env.TELEBIRR_FABRIC_APP_ID!,
-          "Authorization": `Bearer ${fabricToken}`,
+          Authorization: `Bearer ${fabricToken}`,
         },
         body: JSON.stringify(preOrderRequest),
       });
     } catch (err) {
       // If the token might have expired, invalidate and let the next attempt re-fetch
       await invalidateFabricToken();
-      throw new Error(`Telebirr preOrder request failed: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `Telebirr preOrder request failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
 
     if (!preOrderResponse.ok) {
@@ -166,14 +174,14 @@ export const telebirrClient: PaymentProviderClient = {
 
     const rawSign = signRequestObject(rawMap, env.TELEBIRR_PRIVATE_KEY!);
 
-    const rawRequest = Object.keys(rawMap)
-      .sort()
-      .map((k) => `${k}=${encodeURIComponent(rawMap[k]!)}`)
-      .join("&")
-      + `&sign=${encodeURIComponent(rawSign)}&sign_type=SHA256WithRSA`;
+    const rawRequest =
+      Object.keys(rawMap)
+        .sort()
+        .map((k) => `${k}=${encodeURIComponent(rawMap[k]!)}`)
+        .join("&") +
+      `&sign=${encodeURIComponent(rawSign)}&sign_type=SHA256WithRSA`;
 
-    const checkoutUrl =
-      `${env.TELEBIRR_WEB_BASE_URL}${rawRequest}&version=1.0&trade_type=Checkout`;
+    const checkoutUrl = `${env.TELEBIRR_WEB_BASE_URL}${rawRequest}&version=1.0&trade_type=Checkout`;
 
     logger.info(
       { merchOrderId, prepayId },
@@ -248,7 +256,9 @@ export const telebirrClient: PaymentProviderClient = {
     status: "SUCCESS" | "FAILED" | "PENDING";
   } | null> {
     if (!hasCredentials()) {
-      logger.warn("Telebirr credentials not configured — reconciliation query unavailable.");
+      logger.warn(
+        "Telebirr credentials not configured — reconciliation query unavailable.",
+      );
       return null;
     }
 
@@ -267,19 +277,25 @@ export const telebirrClient: PaymentProviderClient = {
       sign: "",
       sign_type: "SHA256WithRSA",
     };
-    queryRequest.sign = signRequestObject(queryRequest, env.TELEBIRR_PRIVATE_KEY!);
+    queryRequest.sign = signRequestObject(
+      queryRequest,
+      env.TELEBIRR_PRIVATE_KEY!,
+    );
 
     let response: Response;
     try {
-      response = await fetch(`${env.TELEBIRR_BASE_URL}/payment/v1/merchant/queryOrder`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-APP-Key": env.TELEBIRR_FABRIC_APP_ID!,
-          Authorization: `Bearer ${fabricToken}`,
+      response = await fetch(
+        `${env.TELEBIRR_BASE_URL}/payment/v1/merchant/queryOrder`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-APP-Key": env.TELEBIRR_FABRIC_APP_ID!,
+            Authorization: `Bearer ${fabricToken}`,
+          },
+          body: JSON.stringify(queryRequest),
         },
-        body: JSON.stringify(queryRequest),
-      });
+      );
     } catch (err) {
       await invalidateFabricToken();
       throw new Error(
@@ -290,7 +306,9 @@ export const telebirrClient: PaymentProviderClient = {
     if (!response.ok) {
       if (response.status === 401) await invalidateFabricToken();
       const body = await response.text().catch(() => "");
-      throw new Error(`Telebirr queryOrder failed: HTTP ${response.status} — ${body}`);
+      throw new Error(
+        `Telebirr queryOrder failed: HTTP ${response.status} — ${body}`,
+      );
     }
 
     const data = (await response.json()) as {
@@ -316,7 +334,8 @@ export const telebirrClient: PaymentProviderClient = {
     const s = data.biz_content.trade_status.toLowerCase();
     let status: "SUCCESS" | "FAILED" | "PENDING";
     if (["completed", "success"].includes(s)) status = "SUCCESS";
-    else if (["fail", "failed", "closed", "cancelled"].includes(s)) status = "FAILED";
+    else if (["fail", "failed", "closed", "cancelled"].includes(s))
+      status = "FAILED";
     else status = "PENDING";
 
     return { status };

@@ -52,9 +52,12 @@ export const kycRefreshWorker = new Worker(
       });
     }
 
-    logger.info({ count: dueRecords.length }, "KYC periodic refresh sweep complete");
+    logger.info(
+      { count: dueRecords.length },
+      "KYC periodic refresh sweep complete",
+    );
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 /** Call once at startup — BullMQ deduplicates by jobId, so this is safe to call on every boot. */
@@ -64,6 +67,6 @@ export async function scheduleRecurringJobs() {
   await kycRefreshQueue.add(
     "daily-refresh-sweep",
     {},
-    { repeat: { pattern: "0 3 * * *" }, jobId: "kyc-refresh-daily" } // 03:00 daily
+    { repeat: { pattern: "0 3 * * *" }, jobId: "kyc-refresh-daily" }, // 03:00 daily
   );
 }

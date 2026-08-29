@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react';
-import { Shield, CheckCircle, Star, Briefcase, Flag, Calendar, X } from 'lucide-react';
-import { api } from './api/client';
-import './ProfilePage.css';
+import { useEffect, useState } from "react";
+import {
+  Shield,
+  CheckCircle,
+  Star,
+  Briefcase,
+  Flag,
+  Calendar,
+  X,
+} from "lucide-react";
+import { api } from "./api/client";
+import "./ProfilePage.css";
 
 // Shape mirrors backend profile.service.ts getPublicProfile()
 interface SkillRef {
@@ -68,12 +76,17 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
         if (cancelled) return;
         setProfile(profileRes as unknown as PublicProfileData);
         const r = reviewsRes as { items?: ReviewItem[] } | ReviewItem[] | null;
-        setReviews(Array.isArray(r) ? r : r?.items ?? []);
+        setReviews(Array.isArray(r) ? r : (r?.items ?? []));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        const message = err instanceof Error ? err.message : "Could not load this profile.";
-        setLoadError(message.toLowerCase().includes("private") ? "This profile is private." : message);
+        const message =
+          err instanceof Error ? err.message : "Could not load this profile.";
+        setLoadError(
+          message.toLowerCase().includes("private")
+            ? "This profile is private."
+            : message,
+        );
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -86,7 +99,9 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
   if (!profile) return null;
 
   const skillName = (s: SkillRef) => s.nameEn ?? s.name ?? s.id;
-  const primarySkill = profile.skills.find((s) => s.id === profile.primarySkillId);
+  const primarySkill = profile.skills.find(
+    (s) => s.id === profile.primarySkillId,
+  );
   const memberSinceYear = profile.stats?.memberSince
     ? new Date(profile.stats.memberSince).getFullYear()
     : null;
@@ -95,10 +110,16 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
     setReportError(null);
     setReportSending(true);
     try {
-      await api.reportProfile(profile.id, reportReason || "Other", reportDetails);
+      await api.reportProfile(
+        profile.id,
+        reportReason || "Other",
+        reportDetails,
+      );
       setReportDone(true);
     } catch (err) {
-      setReportError(err instanceof Error ? err.message : "Failed to submit report");
+      setReportError(
+        err instanceof Error ? err.message : "Failed to submit report",
+      );
     } finally {
       setReportSending(false);
     }
@@ -107,7 +128,6 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
   return (
     <div className="profile-view-page">
       <div className="profile-view-container">
-
         {/* Hero */}
         <div className="profile-hero panel">
           <div className="hero-banner"></div>
@@ -115,7 +135,11 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
             <div className="hero-top-row">
               <div className="hero-user-info">
                 {profile.avatarUrl ? (
-                  <img src={profile.avatarUrl} alt={profile.displayName} className="hero-avatar" />
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.displayName}
+                    className="hero-avatar"
+                  />
                 ) : (
                   <div className="hero-avatar hero-avatar-fallback">
                     {(profile.displayName || "?").charAt(0).toUpperCase()}
@@ -124,15 +148,18 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                 <div className="hero-text">
                   <h1>
                     {profile.displayName}
-                    {profile.kyc?.status === "VERIFIED" && profile.kyc.tier === "TIER_3" && (
-                      <Shield className="tier-badge gold" size={24} />
-                    )}
-                    {profile.kyc?.status === "VERIFIED" && profile.kyc.tier === "TIER_2" && (
-                      <Shield className="tier-badge gold" size={24} />
-                    )}
-                    {profile.kyc?.status === "VERIFIED" && profile.kyc.tier === "TIER_1" && (
-                      <CheckCircle className="tier-badge silver" size={24} />
-                    )}
+                    {profile.kyc?.status === "VERIFIED" &&
+                      profile.kyc.tier === "TIER_3" && (
+                        <Shield className="tier-badge gold" size={24} />
+                      )}
+                    {profile.kyc?.status === "VERIFIED" &&
+                      profile.kyc.tier === "TIER_2" && (
+                        <Shield className="tier-badge gold" size={24} />
+                      )}
+                    {profile.kyc?.status === "VERIFIED" &&
+                      profile.kyc.tier === "TIER_1" && (
+                        <CheckCircle className="tier-badge silver" size={24} />
+                      )}
                   </h1>
                   {primarySkill && (
                     <p className="hero-location">
@@ -143,7 +170,13 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
               </div>
               {!profile.isOwnProfile && (
                 <div className="hero-actions">
-                  <button onClick={() => { setReportModalOpen(true); setReportDone(false); }} className="report-btn">
+                  <button
+                    onClick={() => {
+                      setReportModalOpen(true);
+                      setReportDone(false);
+                    }}
+                    className="report-btn"
+                  >
                     <Flag size={16} /> Report Profile
                   </button>
                 </div>
@@ -167,20 +200,34 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
               <h3>Overview</h3>
               <div className="stats-list">
                 <div className="stat-item">
-                  <span className="stat-label"><Star size={16} className="icon-star" /> Rating</span>
-                  <span className="stat-value">{profile.stats?.rating?.average ?? "-"}</span>
+                  <span className="stat-label">
+                    <Star size={16} className="icon-star" /> Rating
+                  </span>
+                  <span className="stat-value">
+                    {profile.stats?.rating?.average ?? "-"}
+                  </span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label"><Briefcase size={16} /> Jobs</span>
-                  <span className="stat-value">{profile.stats?.jobsCompleted ?? 0}</span>
+                  <span className="stat-label">
+                    <Briefcase size={16} /> Jobs
+                  </span>
+                  <span className="stat-value">
+                    {profile.stats?.jobsCompleted ?? 0}
+                  </span>
                 </div>
                 <div className="stat-item">
-                  <span className="stat-label"><strong>$</strong> Earned</span>
-                  <span className="stat-value">{profile.stats?.earnedRange ?? "-"}</span>
+                  <span className="stat-label">
+                    <strong>$</strong> Earned
+                  </span>
+                  <span className="stat-value">
+                    {profile.stats?.earnedRange ?? "-"}
+                  </span>
                 </div>
                 {memberSinceYear && (
                   <div className="stat-item">
-                    <span className="stat-label"><Calendar size={16} /> Member Since</span>
+                    <span className="stat-label">
+                      <Calendar size={16} /> Member Since
+                    </span>
                     <span className="stat-value">{memberSinceYear}</span>
                   </div>
                 )}
@@ -191,9 +238,13 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
               <h3>Skills</h3>
               <div className="tags-list">
                 {profile.skills.map((s) => (
-                  <span key={s.id} className="tag">{skillName(s)}</span>
+                  <span key={s.id} className="tag">
+                    {skillName(s)}
+                  </span>
                 ))}
-                {profile.skills.length === 0 && <span className="tag">No skills listed yet</span>}
+                {profile.skills.length === 0 && (
+                  <span className="tag">No skills listed yet</span>
+                )}
               </div>
             </div>
           </div>
@@ -215,7 +266,9 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                         {item.thumbnailUrl ? (
                           <img src={item.thumbnailUrl} alt={item.title} />
                         ) : (
-                          <div className="portfolio-img-placeholder">{item.title.charAt(0)}</div>
+                          <div className="portfolio-img-placeholder">
+                            {item.title.charAt(0)}
+                          </div>
                         )}
                       </div>
                       <div className="portfolio-details">
@@ -237,7 +290,11 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                       <div className="review-header">
                         <div className="review-rating">
                           {[...Array(5)].map((_, i) => (
-                            <Star key={i} size={14} className={i < review.rating ? "filled" : "empty"} />
+                            <Star
+                              key={i}
+                              size={14}
+                              className={i < review.rating ? "filled" : "empty"}
+                            />
                           ))}
                         </div>
                         {review.createdAt && (
@@ -246,7 +303,9 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                           </span>
                         )}
                       </div>
-                      {review.comment && <p className="review-comment">{review.comment}</p>}
+                      {review.comment && (
+                        <p className="review-comment">{review.comment}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -262,21 +321,36 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
           <div className="modal-content">
             <div className="modal-header">
               <h3>Report Profile</h3>
-              <button onClick={() => setReportModalOpen(false)} className="close-btn" aria-label="Close">
+              <button
+                onClick={() => setReportModalOpen(false)}
+                className="close-btn"
+                aria-label="Close"
+              >
                 <X size={20} />
               </button>
             </div>
             {reportDone ? (
-              <p className="modal-desc">Thank you. Our compliance team will review your report.</p>
+              <p className="modal-desc">
+                Thank you. Our compliance team will review your report.
+              </p>
             ) : (
               <>
-                <p className="modal-desc">Why are you reporting this profile?</p>
-                <select value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
+                <p className="modal-desc">
+                  Why are you reporting this profile?
+                </p>
+                <select
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                >
                   <option value="">Select a reason...</option>
                   <option value="Fraud or scam">Fraud or scam</option>
                   <option value="Impersonation">Impersonation</option>
-                  <option value="Inappropriate content">Inappropriate content</option>
-                  <option value="Off-platform payment request">Off-platform payment request</option>
+                  <option value="Inappropriate content">
+                    Inappropriate content
+                  </option>
+                  <option value="Off-platform payment request">
+                    Off-platform payment request
+                  </option>
                   <option value="Other">Other</option>
                 </select>
                 <textarea
@@ -287,10 +361,19 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                 ></textarea>
                 {reportError && <p className="report-error">{reportError}</p>}
                 <div className="modal-actions">
-                  <button onClick={() => setReportModalOpen(false)} className="btn-secondary">Cancel</button>
+                  <button
+                    onClick={() => setReportModalOpen(false)}
+                    className="btn-secondary"
+                  >
+                    Cancel
+                  </button>
                   <button
                     onClick={() => void submitReport()}
-                    disabled={reportSending || !reportReason || reportDetails.trim().length < 5}
+                    disabled={
+                      reportSending ||
+                      !reportReason ||
+                      reportDetails.trim().length < 5
+                    }
                     className="btn-danger"
                   >
                     {reportSending ? "Submitting..." : "Submit Report"}

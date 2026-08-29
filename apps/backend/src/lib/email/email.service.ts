@@ -80,11 +80,18 @@ function getTransport(): nodemailer.Transporter | null {
  * Sends via SMTP when configured; otherwise logs to console & test memory
  * so local dev still shows what WOULD have been delivered.
  */
-export async function sendEmail(payload: EmailPayload): Promise<{ success: boolean; messageId?: string }> {
+export async function sendEmail(
+  payload: EmailPayload,
+): Promise<{ success: boolean; messageId?: string }> {
   const from = payload.from || env.EMAIL_FROM;
   const to = payload.to;
   const subject = payload.subject;
-  const text = payload.text || payload.html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const text =
+    payload.text ||
+    payload.html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
   sentEmailsLog.push({ ...payload, from });
 
@@ -98,7 +105,10 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
         html: payload.html,
         text,
       });
-      logger.info({ to, subject, messageId: info.messageId }, "Email delivered via SMTP");
+      logger.info(
+        { to, subject, messageId: info.messageId },
+        "Email delivered via SMTP",
+      );
       return { success: true, messageId: info.messageId };
     } catch (err) {
       logger.error({ err, to, subject }, "Failed to send email via SMTP");
@@ -109,10 +119,12 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
   // Development / fallback logging
   logger.warn(
     { to, subject },
-    "SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS) - email NOT delivered, logged to console only."
+    "SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS) - email NOT delivered, logged to console only.",
   );
   // eslint-disable-next-line no-console
-  console.log(`\n================== 📧 [DEV - NOT SENT] EMAIL ==================`);
+  console.log(
+    `\n================== 📧 [DEV - NOT SENT] EMAIL ==================`,
+  );
   console.log(`To: ${to}`);
   console.log(`Subject: ${subject}`);
   console.log(`Body:\n${text}`);
@@ -124,8 +136,12 @@ export async function sendEmail(payload: EmailPayload): Promise<{ success: boole
 /**
  * 1. Password Reset Transactional Email
  */
-export async function sendPasswordResetEmail(options: PasswordResetEmailOptions) {
-  const resetUrl = options.resetUrl || `${env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(options.token)}`;
+export async function sendPasswordResetEmail(
+  options: PasswordResetEmailOptions,
+) {
+  const resetUrl =
+    options.resetUrl ||
+    `${env.FRONTEND_URL}/reset-password?token=${encodeURIComponent(options.token)}`;
   const userName = options.name ? escapeHtml(options.name) : "Yekis Member";
 
   const html = `
@@ -179,9 +195,18 @@ export async function sendPasswordResetEmail(options: PasswordResetEmailOptions)
  * 2. Milestone Escrow Invoice & Order Receipt Email
  */
 export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
-  const formattedAmount = (options.amountEtb).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const recipient = options.recipientName ? escapeHtml(options.recipientName) : "Valued Customer";
-  const dateStr = (options.paidAt || new Date()).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const formattedAmount = options.amountEtb.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  const recipient = options.recipientName
+    ? escapeHtml(options.recipientName)
+    : "Valued Customer";
+  const dateStr = (options.paidAt || new Date()).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   const html = `
     <!DOCTYPE html>
@@ -280,8 +305,12 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
 /**
  * 3. Platform Movement Notification Email
  */
-export async function sendPlatformMovementEmail(options: PlatformMovementEmailOptions) {
-  const recipient = options.recipientName ? escapeHtml(options.recipientName) : "Member";
+export async function sendPlatformMovementEmail(
+  options: PlatformMovementEmailOptions,
+) {
+  const recipient = options.recipientName
+    ? escapeHtml(options.recipientName)
+    : "Member";
   const actionUrl = options.actionUrl || `${env.FRONTEND_URL}`;
   const actionText = options.actionText || "View in Workspace";
 

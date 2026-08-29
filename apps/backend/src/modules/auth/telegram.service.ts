@@ -16,11 +16,9 @@ const TelegramUser = z.object({
   photo_url: z.string().url().optional(),
 });
 
-
 // === MAIN FUNCTIONS ===
 export class TelegramAuthError extends Error {}
 export class TelegramNotConfiguredError extends Error {}
-
 
 // === INTERFACES & TYPES ===
 export type TelegramUser = z.infer<typeof TelegramUser>;
@@ -43,12 +41,17 @@ function verifyTelegramHash(initData: string, botToken: string) {
 
   const secret = createHmac("sha256", "WebAppData").update(botToken).digest();
   const dataCheckString = buildDataCheckString(params);
-  const calculatedHash = createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  const calculatedHash = createHmac("sha256", secret)
+    .update(dataCheckString)
+    .digest("hex");
 
   const received = Buffer.from(hash, "hex");
   const calculated = Buffer.from(calculatedHash, "hex");
 
-  if (received.length !== calculated.length || !timingSafeEqual(received, calculated)) {
+  if (
+    received.length !== calculated.length ||
+    !timingSafeEqual(received, calculated)
+  ) {
     throw new TelegramAuthError("Telegram initData signature is invalid.");
   }
 
@@ -60,7 +63,9 @@ function parseAndCheckFreshness(params: URLSearchParams) {
   const userRaw = params.get("user");
 
   if (!authDateRaw || !userRaw) {
-    throw new TelegramAuthError("Telegram initData is missing auth_date or user.");
+    throw new TelegramAuthError(
+      "Telegram initData is missing auth_date or user.",
+    );
   }
 
   const authDateSeconds = Number(authDateRaw);
@@ -98,21 +103,26 @@ function telegramPhone(telegramId: number) {
 
 export async function loginWithTelegram(initData: string, role?: string) {
   if (!env.TELEGRAM_BOT_TOKEN) {
-    throw new TelegramNotConfiguredError("TELEGRAM_BOT_TOKEN is not configured.");
+    throw new TelegramNotConfiguredError(
+      "TELEGRAM_BOT_TOKEN is not configured.",
+    );
   }
 
   const params = verifyTelegramHash(initData, env.TELEGRAM_BOT_TOKEN);
   const telegram = parseAndCheckFreshness(params);
   const email = telegramEmail(telegram.id);
 
-  const selectedRole = role === "FREELANCER" || role === "BOTH" ? role : "CLIENT";
+  const selectedRole =
+    role === "FREELANCER" || role === "BOTH" ? role : "CLIENT";
   const user = await prisma.user.upsert({
     where: { email },
     update: {
       languagePreference: telegram.language_code === "am" ? "am" : "en",
       firstName: telegram.first_name || undefined,
       lastName: telegram.last_name || undefined,
-      displayName: telegram.first_name ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}` : undefined,
+      displayName: telegram.first_name
+        ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}`
+        : undefined,
       avatarUrl: telegram.photo_url || undefined,
       ...(role ? { role: selectedRole } : {}),
     },
@@ -123,15 +133,22 @@ export async function loginWithTelegram(initData: string, role?: string) {
       role: selectedRole,
       firstName: telegram.first_name || "",
       lastName: telegram.last_name || "",
-      displayName: telegram.first_name ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}` : "Telegram Member",
+      displayName: telegram.first_name
+        ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}`
+        : "Telegram Member",
       avatarUrl: telegram.photo_url || null,
       languagePreference: telegram.language_code === "am" ? "am" : "en",
       // No fabricated DOB - AML data integrity. Real DOB captured at Tier-2 Fayda.
       kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
       wallet: { create: { balanceMinor: 0 } },
       consents: {
+        // Mirrors the five-purpose registration model (Master Design §12.2).
+        // platform_notifications is granted: the bot IS the notification
+        // channel the user launched — using it is the affirmative opt-in.
         create: [
           { purpose: "kyc_data_processing", granted: true },
+          { purpose: "financial_data_processing", granted: true },
+          { purpose: "platform_notifications", granted: true },
           { purpose: "telegram_account_linking", granted: true },
           { purpose: "marketing_communications", granted: false },
           { purpose: "analytics", granted: false },

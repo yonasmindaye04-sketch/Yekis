@@ -1,7 +1,11 @@
 // === IMPORTS ===
 import { Router } from "express";
 import multer from "multer";
-import { SubmitTopUpInput, TopUpReviewDecisionInput, FlagTopUpInput } from "@marketplace/schemas";
+import {
+  SubmitTopUpInput,
+  TopUpReviewDecisionInput,
+  FlagTopUpInput,
+} from "@marketplace/schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
@@ -19,11 +23,16 @@ import {
 
 export const topupsRouter = Router();
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
-
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+});
 
 // === MAIN FUNCTIONS ===
-function handleKnownErrors(err: unknown, res: import("express").Response): boolean {
+function handleKnownErrors(
+  err: unknown,
+  res: import("express").Response,
+): boolean {
   if (err instanceof TopUpNotFoundError) {
     res.status(404).json({ error: "NOT_FOUND" });
     return true;
@@ -47,45 +56,63 @@ topupsRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
   }
 });
 
-topupsRouter.post("/", requireAuth, upload.single("receipt"), async (req: AuthedRequest, res) => {
-  if (!req.file) return res.status(400).json({ error: "MISSING_RECEIPT_FILE" });
+topupsRouter.post(
+  "/",
+  requireAuth,
+  upload.single("receipt"),
+  async (req: AuthedRequest, res) => {
+    if (!req.file)
+      return res.status(400).json({ error: "MISSING_RECEIPT_FILE" });
 
-  // amountMinor arrives as a string over multipart form fields — coerce
-  // before validating, same pattern as the KYC document submission route.
-  const parsed = SubmitTopUpInput.safeParse({
-    provider: req.body.provider,
-    amountMinor: Number(req.body.amountMinor),
-    referenceNumber: req.body.referenceNumber,
-  });
-  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
-
-  try {
-    const topUp = await submitTopUp({
-      userId: req.user!.id,
-      provider: parsed.data.provider,
-      amountMinor: parsed.data.amountMinor,
-      referenceNumber: parsed.data.referenceNumber,
-      fileBuffer: req.file.buffer,
-      contentType: req.file.mimetype,
+    // amountMinor arrives as a string over multipart form fields — coerce
+    // before validating, same pattern as the KYC document submission route.
+    const parsed = SubmitTopUpInput.safeParse({
+      provider: req.body.provider,
+      amountMinor: Number(req.body.amountMinor),
+      referenceNumber: req.body.referenceNumber,
     });
-    return res.status(201).json({ id: topUp.id, status: topUp.status });
-  } catch (err) {
-    logger.error({ err }, "Top-up submission failed");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+
+    try {
+      const topUp = await submitTopUp({
+        userId: req.user!.id,
+        provider: parsed.data.provider,
+        amountMinor: parsed.data.amountMinor,
+        referenceNumber: parsed.data.referenceNumber,
+        fileBuffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+      return res.status(201).json({ id: topUp.id, status: topUp.status });
+    } catch (err) {
+      logger.error({ err }, "Top-up submission failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // ---------- Staff-only ----------
 
-topupsRouter.get("/queue", requireAuth, requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"), async (req: AuthedRequest, res) => {
-  const page = req.query.page ? parseInt(req.query.page as string) : undefined;
-  const pageSize = req.query.pageSize ? parseInt(req.query.pageSize as string) : undefined;
-  const search = req.query.search as string | undefined;
-  const status = req.query.status as string | undefined;
+topupsRouter.get(
+  "/queue",
+  requireAuth,
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  async (req: AuthedRequest, res) => {
+    const page = req.query.page
+      ? parseInt(req.query.page as string)
+      : undefined;
+    const pageSize = req.query.pageSize
+      ? parseInt(req.query.pageSize as string)
+      : undefined;
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
 
-  const queue = await getTopUpQueue({ page, pageSize, search, status });
-  return res.json(queue);
-});
+    const queue = await getTopUpQueue({ page, pageSize, search, status });
+    return res.json(queue);
+  },
+);
 
 topupsRouter.get(
   "/:topUpId/receipt-url",
@@ -100,7 +127,7 @@ topupsRouter.get(
       logger.error({ err }, "Failed to generate receipt view URL");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 topupsRouter.post(
@@ -109,14 +136,17 @@ topupsRouter.post(
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
     try {
-      const result = await approveTopUp({ staffUserId: req.user!.id, topUpId: req.params.topUpId as string });
+      const result = await approveTopUp({
+        staffUserId: req.user!.id,
+        topUpId: req.params.topUpId as string,
+      });
       return res.json(result);
     } catch (err) {
       if (handleKnownErrors(err, res)) return;
       logger.error({ err }, "Top-up approval failed");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 topupsRouter.post(
@@ -124,8 +154,14 @@ topupsRouter.post(
   requireAuth,
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
-    const parsed = TopUpReviewDecisionInput.safeParse({ decision: "REJECTED", ...req.body });
-    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    const parsed = TopUpReviewDecisionInput.safeParse({
+      decision: "REJECTED",
+      ...req.body,
+    });
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
     try {
       const result = await rejectTopUp({
@@ -139,7 +175,7 @@ topupsRouter.post(
       logger.error({ err }, "Top-up rejection failed");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 topupsRouter.post(
@@ -148,7 +184,10 @@ topupsRouter.post(
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
     const parsed = FlagTopUpInput.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
     try {
       const result = await flagTopUpSuspicious({
@@ -162,5 +201,5 @@ topupsRouter.post(
       logger.error({ err }, "Failed to flag top-up");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );

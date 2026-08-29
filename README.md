@@ -67,6 +67,8 @@ The local PostgreSQL host port is `5433`. Follow [SETUP.md](SETUP.md) for enviro
 | [DATABASE.md](DATABASE.md) | Prisma entities, relationships, invariants, and migrations |
 | [SETUP.md](SETUP.md) | Local setup, ports, commands, and troubleshooting entry points |
 | [COMPLETENESS_CHECKLIST.md](COMPLETENESS_CHECKLIST.md) | Delivery and production-readiness matrix |
+| [PRIORITIZED_BACKLOG.md](PRIORITIZED_BACKLOG.md) | Gap analysis of the external marketplace checklist vs. current code, with execution phases |
+| [GIG_MODEL_PLAN.md](GIG_MODEL_PLAN.md) | Schema/module plan for the proposed Fiverr-style gig ordering system |
 | [CHANGELOG.md](CHANGELOG.md) | Chronological record of changes |
 | [DECISIONS.md](DECISIONS.md) | Durable architectural and product decisions |
 

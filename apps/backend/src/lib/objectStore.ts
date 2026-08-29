@@ -1,5 +1,9 @@
 // === IMPORTS ===
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
@@ -38,7 +42,7 @@ export async function uploadKycDocument(params: {
       ContentType: params.contentType,
       // Server-side encryption should be enforced at the bucket policy level
       // in staging/production, not just per-request here.
-    })
+    }),
   );
 
   return key;
@@ -54,26 +58,59 @@ export async function uploadTopUpReceipt(params: {
   contentType: string;
 }): Promise<string> {
   const key = `topup-receipts/${params.userId}/${randomUUID()}`;
-
   await objectStoreClient.send(
     new PutObjectCommand({
       Bucket: env.OBJECT_STORE_BUCKET,
       Key: key,
       Body: params.fileBuffer,
       ContentType: params.contentType,
-    })
+    }),
   );
-
   return key;
 }
+
+export async function uploadProposalAttachment(params: {
+  jobId: string;
+  userId: string;
+  fileBuffer: Buffer;
+  contentType: string;
+}): Promise<string> {
+  const key = `proposal-attachments/${params.jobId}/${params.userId}/${randomUUID()}`;
+  await objectStoreClient.send(
+    new PutObjectCommand({
+      Bucket: env.OBJECT_STORE_BUCKET,
+      Key: key,
+      Body: params.fileBuffer,
+      ContentType: params.contentType,
+    }),
+  );
+  return key;
+}
+
+export async function getProposalAttachmentUrl(key: string): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: env.OBJECT_STORE_BUCKET,
+    Key: key,
+  });
+  return getSignedUrl(objectStoreClient, command, { expiresIn: 3600 });
+}
+
 
 /**
  * Generic signed-URL generator — getKycDocumentUrl below is a thin,
  * backward-compatible wrapper so existing imports keep working unchanged.
  */
-export async function getSignedObjectUrl(storageKey: string, expiresInSeconds = 300): Promise<string> {
-  const command = new GetObjectCommand({ Bucket: env.OBJECT_STORE_BUCKET, Key: storageKey });
-  return getSignedUrl(objectStoreClient, command, { expiresIn: expiresInSeconds });
+export async function getSignedObjectUrl(
+  storageKey: string,
+  expiresInSeconds = 300,
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: env.OBJECT_STORE_BUCKET,
+    Key: storageKey,
+  });
+  return getSignedUrl(objectStoreClient, command, {
+    expiresIn: expiresInSeconds,
+  });
 }
 
 /**
@@ -81,7 +118,10 @@ export async function getSignedObjectUrl(storageKey: string, expiresInSeconds = 
  * document during manual review. Never store or log this URL — it's
  * time-boxed and should be requested fresh each time it's needed.
  */
-export async function getKycDocumentUrl(storageKey: string, expiresInSeconds = 300): Promise<string> {
+export async function getKycDocumentUrl(
+  storageKey: string,
+  expiresInSeconds = 300,
+): Promise<string> {
   return getSignedObjectUrl(storageKey, expiresInSeconds);
 }
 
@@ -102,7 +142,7 @@ export async function uploadEvidenceBundle(params: {
       Key: key,
       Body: params.fileBuffer,
       ContentType: "application/json",
-    })
+    }),
   );
 
   return key;

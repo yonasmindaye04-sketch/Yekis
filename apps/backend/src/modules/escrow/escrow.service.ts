@@ -2,10 +2,10 @@ import type { PaymentProvider } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { autoReleaseQueue, notificationQueue } from "../../queue/queues.js";
+import { createHash } from "node:crypto";
 import { calculateFees, type FeeBreakdown } from "./fees.js";
 import type { Prisma } from "@prisma/client";
 import { telebirrClient } from "./providers/telebirr.client.js";
-import { chapaClient } from "./providers/chapa.client.js";
 import { cbeClient } from "./providers/cbe.client.js";
 import type { PaymentProviderClient } from "./providers/paymentProvider.interface.js";
 import { env } from "../../config/env.js";
@@ -31,13 +31,14 @@ export class ActiveContractWithdrawalBlockedError extends Error {}
  * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
 export class MilestoneReleaseClaimLostError extends Error {
   constructor(public milestoneId: string) {
-    super(`Milestone ${milestoneId} was already settled by another release path`);
+    super(
+      `Milestone ${milestoneId} was already settled by another release path`,
+    );
   }
 }
 
 const PROVIDER_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
   TELEBIRR: telebirrClient,
-  CHAPA: chapaClient,
   CBE_BIRR: cbeClient,
 };
 
@@ -68,13 +69,21 @@ export async function fundMilestone(params: {
     include: { contract: true },
   });
   if (!milestone) throw new MilestoneNotFoundError();
-  if (milestone.contract.clientId !== params.clientId) throw new NotContractPartyError();
+  if (milestone.contract.clientId !== params.clientId)
+    throw new NotContractPartyError();
 
-  if (!milestone.contract.clientAcceptedAt || !milestone.contract.freelancerAcceptedAt) {
-    throw new ContractNotFullyExecutedError("Both parties must accept the contract before funding escrow.");
+  if (
+    !milestone.contract.clientAcceptedAt ||
+    !milestone.contract.freelancerAcceptedAt
+  ) {
+    throw new ContractNotFullyExecutedError(
+      "Both parties must accept the contract before funding escrow.",
+    );
   }
   if (milestone.escrowState !== "PAYMENT_PENDING") {
-    throw new InvalidEscrowStateError(`Cannot fund a milestone in state ${milestone.escrowState}.`);
+    throw new InvalidEscrowStateError(
+      `Cannot fund a milestone in state ${milestone.escrowState}.`,
+    );
   }
 
   const freelancerKyc = await prisma.kycRecord.findUnique({
@@ -108,10 +117,16 @@ export async function fundMilestone(params: {
     eventType: "ESCROW_FUNDING_INITIATED",
     entityType: "Milestone",
     entityId: milestone.id,
-    metadata: { provider: params.provider, amountMinor: fees.clientTotalChargeMinor },
+    metadata: {
+      provider: params.provider,
+      amountMinor: fees.clientTotalChargeMinor,
+    },
   });
 
-  return { redirectUrl: initiated.redirectUrl, providerTransactionId: initiated.providerTransactionId };
+  return {
+    redirectUrl: initiated.redirectUrl,
+    providerTransactionId: initiated.providerTransactionId,
+  };
 }
 
 /**
@@ -126,13 +141,21 @@ export async function fundMilestoneFromWallet(params: {
     include: { contract: true },
   });
   if (!milestone) throw new MilestoneNotFoundError();
-  if (milestone.contract.clientId !== params.clientId) throw new NotContractPartyError();
+  if (milestone.contract.clientId !== params.clientId)
+    throw new NotContractPartyError();
 
-  if (!milestone.contract.clientAcceptedAt || !milestone.contract.freelancerAcceptedAt) {
-    throw new ContractNotFullyExecutedError("Both parties must accept the contract before funding escrow.");
+  if (
+    !milestone.contract.clientAcceptedAt ||
+    !milestone.contract.freelancerAcceptedAt
+  ) {
+    throw new ContractNotFullyExecutedError(
+      "Both parties must accept the contract before funding escrow.",
+    );
   }
   if (milestone.escrowState !== "PAYMENT_PENDING") {
-    throw new InvalidEscrowStateError(`Cannot fund a milestone in state ${milestone.escrowState}.`);
+    throw new InvalidEscrowStateError(
+      `Cannot fund a milestone in state ${milestone.escrowState}.`,
+    );
   }
 
   const freelancerKyc = await prisma.kycRecord.findUnique({
@@ -143,10 +166,12 @@ export async function fundMilestoneFromWallet(params: {
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  const wallet = await prisma.wallet.findUnique({ where: { userId: params.clientId } });
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId: params.clientId },
+  });
   if (!wallet || wallet.balanceMinor < fees.clientTotalChargeMinor) {
     throw new InsufficientBalanceError(
-      `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor} minor units, available: ${wallet?.balanceMinor ?? 0}.`
+      `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor} minor units, available: ${wallet?.balanceMinor ?? 0}.`,
     );
   }
 
@@ -176,23 +201,39 @@ export async function fundMilestoneFromWallet(params: {
   await notificationQueue.add("escrow-funded", {
     userId: milestone.contract.freelancerId,
     milestoneId: milestone.id,
-    message: "Escrow has been funded from the client's wallet — you can begin work.",
+    message:
+      "Escrow has been funded from the client's wallet — you can begin work.",
   });
 
   // Dispatch formal order invoice receipt email to the client
   try {
-    const clientUser = await prisma.user.findUnique({ where: { id: params.clientId } });
-    const freelancerUser = await prisma.user.findUnique({ where: { id: milestone.contract.freelancerId } });
-    if (clientUser && clientUser.email && !clientUser.email.endsWith("@yekis.local")) {
+    const clientUser = await prisma.user.findUnique({
+      where: { id: params.clientId },
+    });
+    const freelancerUser = await prisma.user.findUnique({
+      where: { id: milestone.contract.freelancerId },
+    });
+    if (
+      clientUser &&
+      clientUser.email &&
+      !clientUser.email.endsWith("@yekis.local")
+    ) {
       sendInvoiceReceiptEmail({
         email: clientUser.email,
-        recipientName: clientUser.displayName || clientUser.firstName || undefined,
+        recipientName:
+          clientUser.displayName || clientUser.firstName || undefined,
         invoiceNumber: `INV-${Date.now().toString().slice(-6)}-${milestone.id.slice(-4).toUpperCase()}`,
         milestoneTitle: milestone.title || "Project Milestone",
         amountEtb: fees.clientTotalChargeMinor / 100,
-        payerName: clientUser.displayName || clientUser.firstName || clientUser.email,
-        payeeName: freelancerUser?.displayName || freelancerUser?.firstName || "Freelancer",
-      }).catch((err) => logger.error({ err }, "Failed to dispatch invoice receipt email"));
+        payerName:
+          clientUser.displayName || clientUser.firstName || clientUser.email,
+        payeeName:
+          freelancerUser?.displayName ||
+          freelancerUser?.firstName ||
+          "Freelancer",
+      }).catch((err) =>
+        logger.error({ err }, "Failed to dispatch invoice receipt email"),
+      );
     }
   } catch (err) {
     logger.warn({ err }, "Failed to prepare invoice receipt email");
@@ -201,10 +242,15 @@ export async function fundMilestoneFromWallet(params: {
   try {
     await runPostFundingChecks(params.clientId);
   } catch (err) {
-    logger.error({ err, milestoneId: milestone.id }, "TMS post-funding check failed");
+    logger.error(
+      { err, milestoneId: milestone.id },
+      "TMS post-funding check failed",
+    );
   }
 
-  return await prisma.milestone.findUniqueOrThrow({ where: { id: milestone.id } });
+  return await prisma.milestone.findUniqueOrThrow({
+    where: { id: milestone.id },
+  });
 }
 
 /**
@@ -225,13 +271,16 @@ export async function handlePaymentWebhook(params: {
   if (!transaction) {
     logger.warn(
       { providerTransactionId: params.providerTransactionId },
-      "Webhook received for unknown transaction — ignoring."
+      "Webhook received for unknown transaction — ignoring.",
     );
     return;
   }
 
   if (transaction.status !== "PENDING") {
-    logger.info({ transactionId: transaction.id }, "Webhook for already-settled transaction - ignoring.");
+    logger.info(
+      { transactionId: transaction.id },
+      "Webhook for already-settled transaction - ignoring.",
+    );
     return;
   }
 
@@ -242,7 +291,10 @@ export async function handlePaymentWebhook(params: {
   const outcome = await prisma.$transaction(async (tx) => {
     const claim = await tx.paymentTransaction.updateMany({
       where: { id: transaction.id, status: "PENDING" },
-      data: { status: params.status, rawWebhookPayload: params.rawPayload as never },
+      data: {
+        status: params.status,
+        rawWebhookPayload: params.rawPayload as never,
+      },
     });
 
     if (claim.count === 0) return "ALREADY_SETTLED" as const;
@@ -273,7 +325,7 @@ export async function handlePaymentWebhook(params: {
   if (outcome === "ALREADY_SETTLED") {
     logger.info(
       { transactionId: transaction.id },
-      "Settlement claim lost - a concurrent webhook/reconciliation already resolved this transaction."
+      "Settlement claim lost - a concurrent webhook/reconciliation already resolved this transaction.",
     );
     return;
   }
@@ -298,38 +350,66 @@ export async function handlePaymentWebhook(params: {
   try {
     await runPostFundingChecks(transaction.milestone.contract.clientId);
   } catch (err) {
-    logger.error({ err, milestoneId: transaction.milestoneId }, "TMS post-funding check failed");
+    logger.error(
+      { err, milestoneId: transaction.milestoneId },
+      "TMS post-funding check failed",
+    );
   }
 }
 
 /** Freelancer marks work as delivered for a funded milestone. */
-export async function submitMilestone(params: { freelancerId: string; milestoneId: string; deliverableUrl?: string }) {
+export async function submitMilestone(params: {
+  freelancerId: string;
+  milestoneId: string;
+  deliverableUrl?: string;
+  fileBuffer?: Buffer;
+}) {
   const milestone = await prisma.milestone.findUnique({
     where: { id: params.milestoneId },
     include: { contract: true },
   });
   if (!milestone) throw new MilestoneNotFoundError();
-  if (milestone.contract.freelancerId !== params.freelancerId) throw new NotContractPartyError();
-  if (milestone.escrowState !== "ESCROW_HELD" && milestone.escrowState !== "WORK_IN_PROGRESS") {
-    throw new InvalidEscrowStateError(`Cannot submit a milestone in state ${milestone.escrowState}.`);
+  if (milestone.contract.freelancerId !== params.freelancerId)
+    throw new NotContractPartyError();
+  if (
+    milestone.escrowState !== "ESCROW_HELD" &&
+    milestone.escrowState !== "WORK_IN_PROGRESS"
+  ) {
+    throw new InvalidEscrowStateError(
+      `Cannot submit a milestone in state ${milestone.escrowState}.`,
+    );
   }
 
   const releaseAt = autoReleaseDate();
 
   const updated = await prisma.milestone.update({
     where: { id: milestone.id },
-    data: { escrowState: "SUBMITTED_FOR_REVIEW", submittedAt: new Date(), autoReleaseAt: releaseAt, deliverableUrl: params.deliverableUrl },
+    data: {
+      escrowState: "SUBMITTED_FOR_REVIEW",
+      submittedAt: new Date(),
+      autoReleaseAt: releaseAt,
+      deliverableUrl: params.deliverableUrl,
+      deliverableHash: params.fileBuffer
+        ? createHash("sha256").update(params.fileBuffer).digest("hex")
+        : undefined,
+    },
   });
 
   await autoReleaseQueue.add(
     "warn",
     { milestoneId: milestone.id, kind: "warn" },
-    { jobId: `warn-${milestone.id}`, delay: warnDate(releaseAt).getTime() - Date.now() }
+    {
+      jobId: `warn-${milestone.id}`,
+      delay: warnDate(releaseAt).getTime() - Date.now(),
+    },
   );
   await autoReleaseQueue.add(
     "release",
     { milestoneId: milestone.id, kind: "release" },
-    { jobId: `release-${milestone.id}`, delay: releaseAt.getTime() - Date.now() }
+    {
+      jobId: `release-${milestone.id}`,
+      delay: releaseAt.getTime() - Date.now(),
+    },
   );
 
   await recordAuditEvent({
@@ -350,18 +430,28 @@ export async function submitMilestone(params: { freelancerId: string; milestoneI
 }
 
 /** Client explicitly accepts and releases funds — the non-auto path. */
-export async function acceptMilestone(params: { clientId: string; milestoneId: string }) {
+export async function acceptMilestone(params: {
+  clientId: string;
+  milestoneId: string;
+}) {
   const milestone = await prisma.milestone.findUnique({
     where: { id: params.milestoneId },
     include: { contract: true },
   });
   if (!milestone) throw new MilestoneNotFoundError();
-  if (milestone.contract.clientId !== params.clientId) throw new NotContractPartyError();
+  if (milestone.contract.clientId !== params.clientId)
+    throw new NotContractPartyError();
   if (milestone.escrowState !== "SUBMITTED_FOR_REVIEW") {
-    throw new InvalidEscrowStateError(`Cannot accept a milestone in state ${milestone.escrowState}.`);
+    throw new InvalidEscrowStateError(
+      `Cannot accept a milestone in state ${milestone.escrowState}.`,
+    );
   }
 
-  await releaseMilestoneFunds(milestone.id, milestone.contract.freelancerId, milestone.amountMinor);
+  await releaseMilestoneFunds(
+    milestone.id,
+    milestone.contract.freelancerId,
+    milestone.amountMinor,
+  );
 
   await autoReleaseQueue.remove(`warn-${milestone.id}`);
   await autoReleaseQueue.remove(`release-${milestone.id}`);
@@ -432,7 +522,7 @@ async function checkVatThresholdAfterRelease(milestoneId: string) {
 
   logger.warn(
     { accumulatedFeeMinor: account.accumulatedFeeMinor },
-    "VAT threshold alert raised"
+    "VAT threshold alert raised",
   );
 }
 
@@ -493,50 +583,64 @@ function recordPlatformEarnings(
 }
 
 /** Shared by acceptMilestone (explicit) and the auto-release worker (timeout). */
-export async function releaseMilestoneFunds(milestoneId: string, freelancerId: string, amountMinor: number) {
-  const freelancerKyc = await prisma.kycRecord.findUnique({ where: { userId: freelancerId } });
-  const fees = calculateFees({ milestoneAmountMinor: amountMinor, freelancerHasTin: !!freelancerKyc?.tin });
-
-  await prisma.$transaction(async (tx) => {
-    // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
-    // release job firing simultaneously) can flip the milestone into
-    // RELEASED. Two entry states are legal here:
-    //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
-    //   DISPUTED             - staff resolution or arbitration award
-    // The loser gets count=0 and throws BEFORE any wallet credit,
-    // eliminating the historical double-payout race.
-    const claim = await tx.milestone.updateMany({
-      where: { id: milestoneId, escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] } },
-      data: { escrowState: "RELEASED", releasedAt: new Date() },
-    });
-
-    if (claim.count === 0) {
-      throw new MilestoneReleaseClaimLostError(milestoneId);
-    }
-
-    await tx.wallet.update({
-      where: { userId: freelancerId },
-      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-    });
-
-    await tx.user.update({
-      where: { id: freelancerId },
-      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    });
-
-    // Platform-side ledger entries — without these, platform revenue and
-    // withholding remittance reports would permanently read zero.
-    await recordPlatformEarnings(tx, fees, milestoneId);
-  }).catch((err) => {
-    if (err instanceof MilestoneReleaseClaimLostError) {
-      logger.info(
-        { milestoneId, freelancerId },
-        "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first."
-      );
-      return;
-    }
-    throw err;
+export async function releaseMilestoneFunds(
+  milestoneId: string,
+  freelancerId: string,
+  amountMinor: number,
+) {
+  const freelancerKyc = await prisma.kycRecord.findUnique({
+    where: { userId: freelancerId },
   });
+  const fees = calculateFees({
+    milestoneAmountMinor: amountMinor,
+    freelancerHasTin: !!freelancerKyc?.tin,
+  });
+
+  await prisma
+    .$transaction(async (tx) => {
+      // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
+      // release job firing simultaneously) can flip the milestone into
+      // RELEASED. Two entry states are legal here:
+      //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
+      //   DISPUTED             - staff resolution or arbitration award
+      // The loser gets count=0 and throws BEFORE any wallet credit,
+      // eliminating the historical double-payout race.
+      const claim = await tx.milestone.updateMany({
+        where: {
+          id: milestoneId,
+          escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
+        },
+        data: { escrowState: "RELEASED", releasedAt: new Date() },
+      });
+
+      if (claim.count === 0) {
+        throw new MilestoneReleaseClaimLostError(milestoneId);
+      }
+
+      await tx.wallet.update({
+        where: { userId: freelancerId },
+        data: { balanceMinor: { increment: fees.freelancerNetMinor } },
+      });
+
+      await tx.user.update({
+        where: { id: freelancerId },
+        data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+      });
+
+      // Platform-side ledger entries — without these, platform revenue and
+      // withholding remittance reports would permanently read zero.
+      await recordPlatformEarnings(tx, fees, milestoneId);
+    })
+    .catch((err) => {
+      if (err instanceof MilestoneReleaseClaimLostError) {
+        logger.info(
+          { milestoneId, freelancerId },
+          "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
+        );
+        return;
+      }
+      throw err;
+    });
 
   try {
     await checkVatThresholdAfterRelease(milestoneId);
@@ -566,18 +670,27 @@ export async function withdrawFromWallet(params: {
   provider: PaymentProvider;
   payoutAccountIdentifier: string;
 }) {
-  const user = await prisma.user.findUnique({ where: { id: params.userId }, select: { role: true } });
-  if (user?.role === "CLIENT") {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: params.userId },
+  });
+  if (user.role === "CLIENT") {
     const activeContractMilestone = await prisma.milestone.findFirst({
       where: {
         contract: { clientId: params.userId },
-        escrowState: { in: ["PAYMENT_PENDING", "ESCROW_HELD", "WORK_IN_PROGRESS", "SUBMITTED_FOR_REVIEW"] },
+        escrowState: {
+          in: [
+            "PAYMENT_PENDING",
+            "ESCROW_HELD",
+            "WORK_IN_PROGRESS",
+            "SUBMITTED_FOR_REVIEW",
+          ],
+        },
       },
       select: { id: true },
     });
     if (activeContractMilestone) {
       throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have active contracts. Wait for all milestones to complete or be refunded."
+        "You cannot withdraw while you have active contracts. Wait for all milestones to complete or be refunded.",
       );
     }
 
@@ -590,14 +703,24 @@ export async function withdrawFromWallet(params: {
     });
     if (openDispute) {
       throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved."
+        "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
       );
     }
   }
 
-  const wallet = await prisma.wallet.findUnique({ where: { userId: params.userId } });
+  if (user.isComplianceHeld) {
+    throw new Error(
+      "Your account is under compliance review. Withdrawals are temporarily restricted.",
+    );
+  }
+
+  const wallet = await prisma.wallet.findUnique({
+    where: { userId: params.userId },
+  });
   if (!wallet || wallet.balanceMinor < params.amountMinor) {
-    throw new InsufficientBalanceError("Requested amount exceeds wallet balance.");
+    throw new InsufficientBalanceError(
+      "Requested amount exceeds wallet balance.",
+    );
   }
 
   const identityMatches = await checkWalletMismatch({
@@ -606,14 +729,20 @@ export async function withdrawFromWallet(params: {
   });
   if (!identityMatches) {
     throw new WithdrawalHeldForReviewError(
-      "Withdrawal destination does not match the identity on file — held for compliance review."
+      "Withdrawal destination does not match the identity on file — held for compliance review.",
     );
   }
 
   try {
-    await runPassThroughCheck({ userId: params.userId, withdrawalAmountMinor: params.amountMinor });
+    await runPassThroughCheck({
+      userId: params.userId,
+      withdrawalAmountMinor: params.amountMinor,
+    });
   } catch (err) {
-    logger.error({ err, userId: params.userId }, "TMS pass-through check failed");
+    logger.error(
+      { err, userId: params.userId },
+      "TMS pass-through check failed",
+    );
   }
 
   // Atomic conditional decrement: two concurrent withdrawals both pass the
@@ -626,7 +755,9 @@ export async function withdrawFromWallet(params: {
   });
 
   if (debited.count === 0) {
-    throw new InsufficientBalanceError("Requested amount exceeds wallet balance.");
+    throw new InsufficientBalanceError(
+      "Requested amount exceeds wallet balance.",
+    );
   }
 
   await recordAuditEvent({
@@ -639,7 +770,7 @@ export async function withdrawFromWallet(params: {
 
   logger.warn(
     { userId: params.userId },
-    "Withdrawal payout API not yet implemented for any provider — balance debited but no funds actually sent. Do not deploy to production."
+    "Withdrawal payout API not yet implemented for any provider — balance debited but no funds actually sent. Do not deploy to production.",
   );
 
   return { balanceMinor: wallet.balanceMinor - params.amountMinor };
@@ -648,7 +779,11 @@ export async function withdrawFromWallet(params: {
 /**
  * Refund path for a disputed milestone.
  */
-export async function refundMilestoneToClient(milestoneId: string, clientId: string, amountMinor: number) {
+export async function refundMilestoneToClient(
+  milestoneId: string,
+  clientId: string,
+  amountMinor: number,
+) {
   await prisma.$transaction([
     prisma.milestone.update({
       where: { id: milestoneId },
@@ -668,10 +803,12 @@ export async function refundMilestoneToClient(milestoneId: string, clientId: str
 
   logger.warn(
     { milestoneId },
-    "Refund credited to in-platform wallet, not a real provider refund — no refund API is wired up yet."
+    "Refund credited to in-platform wallet, not a real provider refund — no refund API is wired up yet.",
   );
 }
 
-export function getProviderClient(provider: PaymentProvider): PaymentProviderClient {
+export function getProviderClient(
+  provider: PaymentProvider,
+): PaymentProviderClient {
   return PROVIDER_CLIENTS[provider];
 }

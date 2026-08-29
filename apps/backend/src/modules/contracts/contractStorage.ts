@@ -11,7 +11,10 @@ import { env } from "../../config/env.js";
  */
 
 // === MAIN FUNCTIONS ===
-export async function uploadContractDocument(params: { jobId: string; fileBuffer: Buffer }): Promise<string> {
+export async function uploadContractDocument(params: {
+  jobId: string;
+  fileBuffer: Buffer;
+}): Promise<string> {
   const key = `contracts/${params.jobId}/service-agreement-${Date.now()}.pdf`;
 
   await objectStoreClient.send(
@@ -20,7 +23,7 @@ export async function uploadContractDocument(params: { jobId: string; fileBuffer
       Key: key,
       Body: params.fileBuffer,
       ContentType: "application/pdf",
-    })
+    }),
   );
 
   return key;

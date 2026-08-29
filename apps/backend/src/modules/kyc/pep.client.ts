@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { logger } from "../../lib/logger.js";
 
-
 // === INTERFACES & TYPES ===
 export interface PepScreeningResult {
   isMatch: boolean;
@@ -23,12 +22,13 @@ const MOCK_WATCHLIST = new Set<string>([
   "test flagged person",
 ]);
 
-
 // === MAIN FUNCTIONS ===
-export async function screenForPep(fullName: string): Promise<PepScreeningResult> {
+export async function screenForPep(
+  fullName: string,
+): Promise<PepScreeningResult> {
   logger.warn(
     { fullName },
-    "PEP screening provider not yet selected — using local mock watchlist. Do not deploy this to production."
+    "PEP screening provider not yet selected — using local mock watchlist. Do not deploy this to production.",
   );
 
   const isMatch = MOCK_WATCHLIST.has(fullName.trim().toLowerCase());

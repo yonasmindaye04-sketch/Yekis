@@ -20,14 +20,20 @@ import { releaseMilestoneFunds } from "../modules/escrow/escrow.service.js";
 export const autoReleaseWorker = new Worker(
   "auto-release",
   async (job) => {
-    const { milestoneId, kind } = job.data as { milestoneId: string; kind: "warn" | "release" };
+    const { milestoneId, kind } = job.data as {
+      milestoneId: string;
+      kind: "warn" | "release";
+    };
 
     const milestone = await prisma.milestone.findUnique({
       where: { id: milestoneId },
       include: { contract: true },
     });
     if (!milestone) {
-      logger.warn({ milestoneId }, "Auto-release job fired for missing milestone — skipping");
+      logger.warn(
+        { milestoneId },
+        "Auto-release job fired for missing milestone — skipping",
+      );
       return;
     }
 
@@ -36,7 +42,7 @@ export const autoReleaseWorker = new Worker(
     if (milestone.escrowState !== "SUBMITTED_FOR_REVIEW") {
       logger.info(
         { milestoneId, currentState: milestone.escrowState },
-        "Auto-release job fired but milestone has moved on — skipping"
+        "Auto-release job fired but milestone has moved on — skipping",
       );
       return;
     }
@@ -46,10 +52,13 @@ export const autoReleaseWorker = new Worker(
     // If the auto-release job fires while the cooling-off window is still open, skip it —
     // the client's cancellation right takes legal precedence over the auto-release timer.
     // ⚠️ Conflict note documented in schema.prisma on Contract.cancellableUntil.
-    if (milestone.contract.cancellableUntil && milestone.contract.cancellableUntil > new Date()) {
+    if (
+      milestone.contract.cancellableUntil &&
+      milestone.contract.cancellableUntil > new Date()
+    ) {
       logger.warn(
         { milestoneId, cancellableUntil: milestone.contract.cancellableUntil },
-        "Auto-release skipped: contract is still within the 7-day cooling-off window (ECA Proclamation 1205/2020)"
+        "Auto-release skipped: contract is still within the 7-day cooling-off window (ECA Proclamation 1205/2020)",
       );
       return;
     }
@@ -58,7 +67,8 @@ export const autoReleaseWorker = new Worker(
       await notificationQueue.add("auto-release-warning", {
         userId: milestone.contract.clientId,
         milestoneId,
-        message: "A milestone will auto-release to the freelancer in 24 hours unless you act.",
+        message:
+          "A milestone will auto-release to the freelancer in 24 hours unless you act.",
       });
       return;
     }
@@ -68,7 +78,11 @@ export const autoReleaseWorker = new Worker(
     // client acceptance (escrow.service.ts's acceptMilestone) — auto-release
     // must not silently skip the platform fee and withholding tax that the
     // explicit-accept path applies.
-    await releaseMilestoneFunds(milestoneId, milestone.contract.freelancerId, milestone.amountMinor);
+    await releaseMilestoneFunds(
+      milestoneId,
+      milestone.contract.freelancerId,
+      milestone.amountMinor,
+    );
 
     await recordAuditEvent({
       eventType: "ESCROW_AUTO_RELEASED",
@@ -85,5 +99,5 @@ export const autoReleaseWorker = new Worker(
 
     logger.info({ milestoneId }, "Escrow auto-released");
   },
-  { connection: redis }
+  { connection: redis },
 );

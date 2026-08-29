@@ -23,7 +23,12 @@ export async function listSkills(category?: SkillCategory) {
   });
 
   if (!category) {
-    await redis.set(SKILLS_CACHE_KEY, JSON.stringify(skills), "EX", SKILLS_CACHE_TTL);
+    await redis.set(
+      SKILLS_CACHE_KEY,
+      JSON.stringify(skills),
+      "EX",
+      SKILLS_CACHE_TTL,
+    );
   }
 
   return skills;
@@ -31,7 +36,15 @@ export async function listSkills(category?: SkillCategory) {
 
 export async function listCategories() {
   return [
-    "DEVELOPMENT", "DESIGN", "MARKETING", "WRITING", "TRANSLATION",
-    "DATA_ENTRY", "VIDEO_AUDIO", "BUSINESS", "ENGINEERING", "OTHER"
+    "DEVELOPMENT",
+    "DESIGN",
+    "MARKETING",
+    "WRITING",
+    "TRANSLATION",
+    "DATA_ENTRY",
+    "VIDEO_AUDIO",
+    "BUSINESS",
+    "ENGINEERING",
+    "OTHER",
   ];
 }

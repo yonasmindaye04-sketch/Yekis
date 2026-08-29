@@ -10,26 +10,40 @@ export const webhooksRouter = Router();
 // Stricter, provider-specific rate limit — separate from the general /api
 // limit, since these are unauthenticated-by-design endpoints and a more
 // likely abuse target.
-const webhookLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
-
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // === MAIN FUNCTIONS ===
 
 /**
  * Generic webhook handler for providers that use HTTP-header-based signatures
- * (e.g. Chapa, CBE). Telebirr has its own handler below because its
+ * (currently CBE). Telebirr has its own handler below because its
  * signature is embedded in the JSON body, not in an HTTP header.
  */
-function buildWebhookHandler(provider: PaymentProvider, signatureHeaderName: string) {
-  return async (req: import("express").Request, res: import("express").Response) => {
+function buildWebhookHandler(
+  provider: PaymentProvider,
+  signatureHeaderName: string,
+) {
+  return async (
+    req: import("express").Request,
+    res: import("express").Response,
+  ) => {
     const rawBody = req.body as Buffer; // populated by express.raw() below, NOT parsed JSON
-    const signatureHeader = req.headers[signatureHeaderName] as string | undefined;
+    const signatureHeader = req.headers[signatureHeaderName] as
+      string | undefined;
 
     const client = getProviderClient(provider);
     const isValid = client.verifyWebhookSignature({ rawBody, signatureHeader });
 
     if (!isValid) {
-      logger.warn({ provider }, "Webhook signature verification failed — rejecting.");
+      logger.warn(
+        { provider },
+        "Webhook signature verification failed — rejecting.",
+      );
       return res.status(401).json({ error: "INVALID_SIGNATURE" });
     }
 
@@ -48,7 +62,9 @@ function buildWebhookHandler(provider: PaymentProvider, signatureHeaderName: str
     try {
       await handlePaymentWebhook({
         provider,
-        providerTransactionId: String(payload.transaction_id ?? payload.tx_ref ?? ""),
+        providerTransactionId: String(
+          payload.transaction_id ?? payload.tx_ref ?? "",
+        ),
         status: mapProviderStatus(payload.status),
         rawPayload: payload,
       });
@@ -59,7 +75,6 @@ function buildWebhookHandler(provider: PaymentProvider, signatureHeaderName: str
     }
   };
 }
-
 
 /**
  * Dedicated Telebirr webhook handler.
@@ -80,7 +95,10 @@ async function handleTelebirrWebhook(
 
   // 1. Verify signature (extracted from body by the client's verifyWebhookSignature)
   const client = getProviderClient("TELEBIRR");
-  const isValid = client.verifyWebhookSignature({ rawBody, signatureHeader: undefined });
+  const isValid = client.verifyWebhookSignature({
+    rawBody,
+    signatureHeader: undefined,
+  });
 
   if (!isValid) {
     logger.warn("Telebirr webhook signature verification failed — rejecting.");
@@ -125,7 +143,10 @@ async function handleTelebirrWebhook(
     // 6. Respond with Telebirr's expected success format
     return res.status(200).json({ code: 0, msg: "success" });
   } catch (err) {
-    logger.error({ err, merchOrderId }, "Failed to process Telebirr payment webhook");
+    logger.error(
+      { err, merchOrderId },
+      "Failed to process Telebirr payment webhook",
+    );
     return res.status(500).json({ code: -1, msg: "INTERNAL_ERROR" });
   }
 }
@@ -133,7 +154,9 @@ async function handleTelebirrWebhook(
 /**
  * Maps Telebirr trade_status values to our internal payment status.
  */
-function mapTelebirrStatus(tradeStatus: string): "SUCCESS" | "FAILED" | "PENDING" {
+function mapTelebirrStatus(
+  tradeStatus: string,
+): "SUCCESS" | "FAILED" | "PENDING" {
   const s = tradeStatus.toLowerCase();
   if (["completed", "success"].includes(s)) return "SUCCESS";
   if (["fail", "failed", "closed", "cancelled"].includes(s)) return "FAILED";
@@ -142,7 +165,8 @@ function mapTelebirrStatus(tradeStatus: string): "SUCCESS" | "FAILED" | "PENDING
 
 function mapProviderStatus(raw: unknown): "SUCCESS" | "FAILED" | "PENDING" {
   const s = String(raw).toLowerCase();
-  if (["success", "successful", "completed", "paid"].includes(s)) return "SUCCESS";
+  if (["success", "successful", "completed", "paid"].includes(s))
+    return "SUCCESS";
   if (["failed", "declined", "cancelled", "error"].includes(s)) return "FAILED";
   return "PENDING";
 }
@@ -150,8 +174,20 @@ function mapProviderStatus(raw: unknown): "SUCCESS" | "FAILED" | "PENDING" {
 const rawBodyParser = raw({ type: "*/*", limit: "1mb" });
 
 // Telebirr uses a dedicated handler (body-embedded RSA-PSS signature)
-webhooksRouter.post("/telebirr", webhookLimiter, rawBodyParser, handleTelebirrWebhook);
+webhooksRouter.post(
+  "/telebirr",
+  webhookLimiter,
+  rawBodyParser,
+  handleTelebirrWebhook,
+);
 
-// Chapa and CBE use the generic handler (HTTP-header-based HMAC signatures)
-webhooksRouter.post("/chapa", webhookLimiter, rawBodyParser, buildWebhookHandler("CHAPA", "x-chapa-signature"));
-webhooksRouter.post("/cbe", webhookLimiter, rawBodyParser, buildWebhookHandler("CBE_BIRR", "x-cbe-signature"));
+// CBE uses the generic handler (HTTP-header-based HMAC signature).
+// PAY-002: Chapa was removed from the approved payment architecture —
+// its webhook route and client adapter were deleted in the 2026-08-26
+// unification (see migrations/20260826090000_tms_rules_and_chapa_removal).
+webhooksRouter.post(
+  "/cbe",
+  webhookLimiter,
+  rawBodyParser,
+  buildWebhookHandler("CBE_BIRR", "x-cbe-signature"),
+);

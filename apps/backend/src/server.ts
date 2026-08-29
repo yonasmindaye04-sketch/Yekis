@@ -17,11 +17,13 @@ import "./queue/withholdingRemittance.worker.js";
 import "./queue/paymentReconcile.worker.js";
 import "./queue/reviewReveal.worker.js";
 import "./queue/featuredRefresh.worker.js";
+import "./queue/tmsScan.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
 import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
 import { schedulePaymentReconcileJob } from "./queue/paymentReconcile.worker.js";
 import { scheduleReviewRevealJob } from "./queue/reviewReveal.worker.js";
 import { scheduleFeaturedRefreshJob } from "./queue/featuredRefresh.worker.js";
+import { scheduleTmsScanJob } from "./queue/tmsScan.worker.js";
 
 // T2-K: PEP stub safety guard — structurally impossible to run production with the mock.
 // A silent mock PEP check in production is a real AML/CTF regulatory violation, not
@@ -30,9 +32,9 @@ if (env.NODE_ENV === "production" && env.PEP_PROVIDER === "mock") {
   // eslint-disable-next-line no-console
   console.error(
     "FATAL: PEP_PROVIDER is set to 'mock' in production. " +
-    "This means all PEP/sanctions checks pass silently. " +
-    "Set PEP_PROVIDER=real and wire up a real watchlist provider before deploying. " +
-    "See COMPLIANCE_BLOCKERS.md §PEP Screening."
+      "This means all PEP/sanctions checks pass silently. " +
+      "Set PEP_PROVIDER=real and wire up a real watchlist provider before deploying. " +
+      "See COMPLIANCE_BLOCKERS.md §PEP Screening.",
   );
   process.exit(1);
 }
@@ -41,7 +43,7 @@ const app = buildApp();
 
 const server = app.listen(env.PORT, async () => {
   logger.info(`🚀 API listening on port ${env.PORT} (${env.NODE_ENV})`);
-  
+
   // Start Telegram bot
   try {
     const started = await startBot();
@@ -53,13 +55,24 @@ const server = app.listen(env.PORT, async () => {
   }
 });
 
-scheduleRecurringJobs().catch((err) => logger.error({ err }, "Failed to schedule KYC refresh jobs"));
-scheduleWithholdingRemittanceJob().catch((err) => logger.error({ err }, "Failed to schedule withholding remittance job"));
-schedulePaymentReconcileJob().catch((err) => logger.error({ err }, "Failed to schedule payment reconciliation job"));
-scheduleReviewRevealJob().catch((err) => logger.error({ err }, "Failed to schedule review reveal job"));
-scheduleFeaturedRefreshJob().catch((err) => logger.error({ err }, "Failed to schedule featured refresh job"));
-
-
+scheduleRecurringJobs().catch((err) =>
+  logger.error({ err }, "Failed to schedule KYC refresh jobs"),
+);
+scheduleWithholdingRemittanceJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule withholding remittance job"),
+);
+schedulePaymentReconcileJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule payment reconciliation job"),
+);
+scheduleReviewRevealJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule review reveal job"),
+);
+scheduleFeaturedRefreshJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule featured refresh job"),
+);
+scheduleTmsScanJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule TMS scan job"),
+);
 
 // === MAIN FUNCTIONS ===
 function shutdown(signal: string) {

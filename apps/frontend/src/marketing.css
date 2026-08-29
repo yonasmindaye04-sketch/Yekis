@@ -451,7 +451,7 @@
      so the marketing grid stacks normally. */
   display: block;
   margin-top: auto;
-  padding: 36px 0 20px;
+  padding: 28px 0 16px;
   border-top: 1px solid var(--yekis-border);
 }
 
@@ -463,9 +463,8 @@
 
 .footer-grid {
   display: grid;
-  /* Cap brand stretch; give link columns equal, readable minimums so
-     headings align on a clean rhythm across the row. */
-  grid-template-columns: minmax(240px, 1.4fr) repeat(3, minmax(150px, 1fr));
+  /* Brand column + 4 link columns (Platform, Company, Legal, Social) */
+  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr));
   gap: 40px;
   align-items: start;
 }
@@ -548,6 +547,13 @@
   color: #16a34a;
 }
 
+.footer-social-col a {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
 .footer-bottom {
   display: flex !important;
   align-items: center !important;
@@ -557,7 +563,7 @@
   width: 100% !important;
   margin-top: 26px !important;
   padding-top: 16px !important;
-  border-top: 1px solid var(--yekis-border) !important;
+  border-top: none !important;
   color: var(--yekis-muted) !important;
   font-size: 0.875rem !important;
 }

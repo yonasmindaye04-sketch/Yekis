@@ -6,7 +6,10 @@ import { SCENE_TTL_MS } from "../types.js";
  * Scenes that sit idle longer than SCENE_TTL_MS are automatically cleared.
  * This prevents users from submitting stale data (e.g., proposing on an expired job).
  */
-export async function sceneTimeoutMiddleware(ctx: BotContext, next: () => Promise<void>) {
+export async function sceneTimeoutMiddleware(
+  ctx: BotContext,
+  next: () => Promise<void>,
+) {
   // Check if we're in a scene and it has a start timestamp
   if (ctx.session.scene && ctx.session.sceneStartedAt) {
     const elapsed = Date.now() - ctx.session.sceneStartedAt;
@@ -23,7 +26,7 @@ export async function sceneTimeoutMiddleware(ctx: BotContext, next: () => Promis
       const t = ctx.i18n?.t ?? ((key: string) => key);
       await ctx.reply(
         ctx.t("errors.scene_expired", { scene: expiredScene }) ||
-        `Your ${expiredScene} session expired due to inactivity. Please start again.`
+          `Your ${expiredScene} session expired due to inactivity. Please start again.`,
       );
     }
   }
@@ -37,7 +40,7 @@ export async function sceneTimeoutMiddleware(ctx: BotContext, next: () => Promis
 export function startScene(
   ctx: BotContext,
   sceneName: string,
-  initialData: Record<string, any> = {}
+  initialData: Record<string, any> = {},
 ): void {
   ctx.session.scene = sceneName;
   ctx.session.sceneStep = 0;
@@ -50,7 +53,7 @@ export function startScene(
  */
 export function advanceScene(
   ctx: BotContext,
-  dataUpdates: Record<string, any> = {}
+  dataUpdates: Record<string, any> = {},
 ): void {
   if (ctx.session.scene) {
     ctx.session.sceneStep = (ctx.session.sceneStep ?? 0) + 1;

@@ -1,5 +1,5 @@
-import { Share2, MessageCircle, Link2 } from 'lucide-react';
-import { useState } from 'react';
+import { Share2, MessageCircle, Link2 } from "lucide-react";
+import { useState } from "react";
 
 function Twitter(props: { size?: number }) {
   return (
@@ -27,7 +27,11 @@ interface ShareButtonsProps {
 
 export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
   const [copied, setCopied] = useState(false);
-  const shareUrl = url || (typeof window !== 'undefined' ? window.location.href : 'https://yekis.com');
+  const shareUrl =
+    url ||
+    (typeof window !== "undefined"
+      ? window.location.href
+      : "https://yekis.com");
   const encodedUrl = encodeURIComponent(shareUrl);
   const encodedTitle = encodeURIComponent(title);
 
@@ -35,7 +39,9 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
     if (navigator.share) {
       try {
         await navigator.share({ title, url: shareUrl });
-      } catch { /* user cancelled */ }
+      } catch {
+        /* user cancelled */
+      }
     }
   };
 
@@ -44,28 +50,50 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
       await navigator.clipboard.writeText(shareUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard not available */ }
+    } catch {
+      /* clipboard not available */
+    }
   };
 
   return (
-    <div className={`share-buttons ${compact ? 'share-compact' : ''}`}>
-      {'share' in navigator && (
-        <button onClick={handleNativeShare} className="share-btn share-native" aria-label="Share">
+    <div className={`share-buttons ${compact ? "share-compact" : ""}`}>
+      {"share" in navigator && (
+        <button
+          onClick={handleNativeShare}
+          className="share-btn share-native"
+          aria-label="Share"
+        >
           <Share2 size={16} />
           {!compact && <span>Share</span>}
         </button>
       )}
-      <a href={`https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`} target="_blank" rel="noopener noreferrer" className="share-btn share-telegram" aria-label="Share on Telegram">
+      <a
+        href={`https://t.me/share/url?url=${encodedUrl}&text=${encodedTitle}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="share-btn share-telegram"
+        aria-label="Share on Telegram"
+      >
         <MessageCircle size={16} />
         {!compact && <span>Telegram</span>}
       </a>
-      <a href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`} target="_blank" rel="noopener noreferrer" className="share-btn share-twitter" aria-label="Share on X">
+      <a
+        href={`https://twitter.com/intent/tweet?url=${encodedUrl}&text=${encodedTitle}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="share-btn share-twitter"
+        aria-label="Share on X"
+      >
         <Twitter size={16} />
         {!compact && <span>X</span>}
       </a>
-      <button onClick={handleCopy} className="share-btn share-copy" aria-label="Copy link">
+      <button
+        onClick={handleCopy}
+        className="share-btn share-copy"
+        aria-label="Copy link"
+      >
         <Link2 size={16} />
-        {!compact && <span>{copied ? 'Copied!' : 'Copy link'}</span>}
+        {!compact && <span>{copied ? "Copied!" : "Copy link"}</span>}
       </button>
     </div>
   );

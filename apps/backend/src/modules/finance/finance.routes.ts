@@ -33,7 +33,7 @@ financeRouter.get(
       logger.error({ err }, "Failed to fetch finance reconciliation");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 // T2-B: Fee credit ledger
@@ -43,15 +43,19 @@ financeRouter.get(
   requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
-      const page = req.query.page ? parseInt(req.query.page as string) : undefined;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const page = req.query.page
+        ? parseInt(req.query.page as string)
+        : undefined;
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string)
+        : undefined;
       const ledger = await getFeeCreditLedger({ page, limit });
       return res.json(ledger);
     } catch (err) {
       logger.error({ err }, "Failed to fetch fee credit ledger");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 // T2-C: Withholding tax reports list
@@ -61,15 +65,19 @@ financeRouter.get(
   requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
   async (req: AuthedRequest, res) => {
     try {
-      const page = req.query.page ? parseInt(req.query.page as string) : undefined;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const page = req.query.page
+        ? parseInt(req.query.page as string)
+        : undefined;
+      const limit = req.query.limit
+        ? parseInt(req.query.limit as string)
+        : undefined;
       const reports = await getWithholdingReports({ page, limit });
       return res.json(reports);
     } catch (err) {
       logger.error({ err }, "Failed to fetch withholding reports");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );
 
 const MarkFiledSchema = z.object({
@@ -84,7 +92,9 @@ financeRouter.post(
   async (req: AuthedRequest, res) => {
     const parsed = MarkFiledSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
     }
 
     try {
@@ -95,8 +105,11 @@ financeRouter.post(
       });
       return res.json(result);
     } catch (err) {
-      logger.error({ err, reportId: req.params.reportId }, "Failed to mark withholding report as filed");
+      logger.error(
+        { err, reportId: req.params.reportId },
+        "Failed to mark withholding report as filed",
+      );
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
-  }
+  },
 );

@@ -1,8 +1,5 @@
-
-
-
 // === INTERFACES & TYPES ===
-export type StatusType = 
+export type StatusType =
   | "PENDING"
   | "PENDING_REVIEW"
   | "UNDER_REVIEW"
@@ -20,9 +17,14 @@ export type StatusType =
   | "RESOLVED"
   | string;
 
-
 // === MAIN COMPONENT ===
-export function StatusBadge({ status, className = "" }: { status: StatusType; className?: string }) {
+export function StatusBadge({
+  status,
+  className = "",
+}: {
+  status: StatusType;
+  className?: string;
+}) {
   let badgeClass = "status-pill";
   let label = status.replace(/_/g, " ");
 
@@ -31,7 +33,15 @@ export function StatusBadge({ status, className = "" }: { status: StatusType; cl
     badgeClass += " success";
   } else if (["REJECTED", "STR_FILED", "STAGE_4_ARBITRATION"].includes(s)) {
     badgeClass += " error";
-  } else if (["PENDING", "PENDING_REVIEW", "UNDER_REVIEW", "OPEN", "STAGE_3_MEDIATION"].includes(s)) {
+  } else if (
+    [
+      "PENDING",
+      "PENDING_REVIEW",
+      "UNDER_REVIEW",
+      "OPEN",
+      "STAGE_3_MEDIATION",
+    ].includes(s)
+  ) {
     badgeClass += " warning";
   }
 

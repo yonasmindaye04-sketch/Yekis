@@ -14,7 +14,7 @@ export async function getFeaturedTalent() {
       logger.error({ err: e }, "Failed to parse cached featured talent");
     }
   }
-  
+
   return refreshFeaturedCarousel();
 }
 
@@ -22,7 +22,7 @@ export async function refreshFeaturedCarousel() {
   try {
     const featuredUsers = new Map();
     const result: any[] = [];
-    
+
     // 1. Staff-pinned (up to 3)
     const staffPinnedLogs = await prisma.featuredLog.findMany({
       where: { reason: "STAFF_PINNED" },
@@ -33,9 +33,9 @@ export async function refreshFeaturedCarousel() {
           include: {
             primarySkill: true,
             kyc: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     for (const log of staffPinnedLogs) {
@@ -43,11 +43,11 @@ export async function refreshFeaturedCarousel() {
       const user = log.user;
       if (!user || featuredUsers.has(user.id)) continue;
       if (user.role === "CLIENT" || user.isSuspended) continue;
-      
+
       featuredUsers.set(user.id, true);
       result.push(buildFeaturedCard(user, "STAFF_PINNED"));
     }
-    
+
     // 2. Top-rated (up to 4)
     const topRated = await prisma.user.findMany({
       where: {
@@ -56,22 +56,22 @@ export async function refreshFeaturedCarousel() {
         profileVisibility: "PUBLIC",
         isSuspended: false,
         kyc: {
-          status: "VERIFIED"
-        }
+          status: "VERIFIED",
+        },
       },
       orderBy: { ratingBayesianScore: "desc" },
       take: 10,
       include: {
         primarySkill: true,
         kyc: true,
-      }
+      },
     });
 
     let topRatedCount = 0;
     for (const user of topRated) {
       if (topRatedCount >= 4) break;
       if (featuredUsers.has(user.id)) continue;
-      
+
       featuredUsers.set(user.id, true);
       result.push(buildFeaturedCard(user, "TOP_RATED"));
       topRatedCount++;
@@ -80,7 +80,7 @@ export async function refreshFeaturedCarousel() {
     // 3. Recently verified (up to 3)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
+
     const recentlyVerified = await prisma.user.findMany({
       where: {
         role: { in: ["FREELANCER", "BOTH"] },
@@ -88,84 +88,86 @@ export async function refreshFeaturedCarousel() {
         isSuspended: false,
         kyc: {
           status: "VERIFIED",
-          lastVerifiedAt: { gte: thirtyDaysAgo }
-        }
+          lastVerifiedAt: { gte: thirtyDaysAgo },
+        },
       },
       orderBy: {
         kyc: {
-          lastVerifiedAt: "desc"
-        }
+          lastVerifiedAt: "desc",
+        },
       },
       take: 10,
       include: {
         primarySkill: true,
         kyc: true,
-      }
+      },
     });
 
     let verifiedCount = 0;
     for (const user of recentlyVerified) {
       if (verifiedCount >= 3) break;
       if (featuredUsers.has(user.id)) continue;
-      
+
       featuredUsers.set(user.id, true);
       result.push(buildFeaturedCard(user, "RECENTLY_VERIFIED"));
       verifiedCount++;
     }
 
     // 4. Category balancing (up to 2)
-    const existingCategoryIds = result.map(u => u.primarySkill?.id).filter(Boolean);
+    const existingCategoryIds = result
+      .map((u) => u.primarySkill?.id)
+      .filter(Boolean);
     const categoryBalancing = await prisma.user.findMany({
       where: {
         role: { in: ["FREELANCER", "BOTH"] },
         profileVisibility: "PUBLIC",
         isSuspended: false,
         kyc: {
-          status: "VERIFIED"
+          status: "VERIFIED",
         },
-        primarySkillId: { notIn: existingCategoryIds }
+        primarySkillId: { notIn: existingCategoryIds },
       },
       orderBy: { ratingBayesianScore: "desc" },
       take: 5,
       include: {
         primarySkill: true,
         kyc: true,
-      }
+      },
     });
 
     let categoryCount = 0;
     for (const user of categoryBalancing) {
       if (categoryCount >= 2) break;
       if (featuredUsers.has(user.id)) continue;
-      
+
       featuredUsers.set(user.id, true);
       result.push(buildFeaturedCard(user, "CATEGORY_BALANCING"));
       categoryCount++;
     }
 
     // Update lastFeaturedAt and create FeaturedLog for newly featured
-    const userIds = result.map(r => r.id);
-    
+    const userIds = result.map((r) => r.id);
+
     if (userIds.length > 0) {
       await prisma.$transaction([
         prisma.user.updateMany({
           where: { id: { in: userIds } },
-          data: { lastFeaturedAt: new Date() }
+          data: { lastFeaturedAt: new Date() },
         }),
         prisma.featuredLog.createMany({
-          data: result.map(r => ({
+          data: result.map((r) => ({
             userId: r.id,
             reason: r.reason as any,
             category: (r.primarySkill?.category || "OTHER") as any,
-            featuredAt: new Date()
-          }))
-        })
+            featuredAt: new Date(),
+          })),
+        }),
       ]);
     }
 
     await redis.set("featured:carousel", JSON.stringify(result), "EX", 3600);
     logger.info(`Refreshed featured carousel with ${result.length} users`);
-    
+
     return result;
   } catch (error) {
     logger.error({ err: error }, "Error refreshing featured carousel");
@@ -173,7 +175,12 @@ export async function refreshFeaturedCarousel() {
   }
 }
 
-export async function pinUser(staffId: string, userId: string, category: string, notes?: string) {
+export async function pinUser(
+  staffId: string,
+  userId: string,
+  category: string,
+  notes?: string,
+) {
   try {
     await prisma.featuredLog.create({
       data: {
@@ -181,20 +188,20 @@ export async function pinUser(staffId: string, userId: string, category: string,
         reason: "STAFF_PINNED",
         pinnedByStaffId: staffId,
         category: category as any,
-        notes
-      }
+        notes,
+      },
     });
 
     await redis.del("featured:carousel");
-    
+
     await recordAuditEvent({
       eventType: "PIN_FEATURED_USER",
       entityType: "User",
       entityId: userId,
       userId: staffId,
-      metadata: { category, notes }
+      metadata: { category, notes },
     });
-    
+
     return { success: true };
   } catch (error) {
     logger.error({ err: error }, "Error pinning user");
@@ -209,17 +216,19 @@ function buildFeaturedCard(user: any, reason: string) {
     ucid: user.ucid,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
-    primarySkill: user.primarySkill ? {
-      id: user.primarySkill.id,
-      nameEn: user.primarySkill.nameEn,
-      nameAm: user.primarySkill.nameAm,
-      category: user.primarySkill.category
-    } : null,
+    primarySkill: user.primarySkill
+      ? {
+          id: user.primarySkill.id,
+          nameEn: user.primarySkill.nameEn,
+          nameAm: user.primarySkill.nameAm,
+          category: user.primarySkill.category,
+        }
+      : null,
     ratingAverage: user.ratingAverage,
     ratingCount: user.ratingCount,
     totalJobsCompleted: user.totalJobsCompleted,
     kycBadge: user.kyc?.status === "VERIFIED" ? "shield" : null,
     isAvailableForWork: user.isAvailableForWork,
-    reason
+    reason,
   };
 }

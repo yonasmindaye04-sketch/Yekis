@@ -20,7 +20,9 @@ export function ProfileReportsQueue() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [selectedReport, setSelectedReport] = useState<ProfileReport | null>(null);
+  const [selectedReport, setSelectedReport] = useState<ProfileReport | null>(
+    null,
+  );
   const [resolveStatus, setResolveStatus] = useState("RESOLVED_NO_ACTION");
   const [staffNotes, setStaffNotes] = useState("");
   const [isResolving, setIsResolving] = useState(false);
@@ -29,11 +31,17 @@ export function ProfileReportsQueue() {
     setIsLoading(true);
     setError("");
     try {
-      const data = (await api.getProfileReports(page)) as { items: ProfileReport[]; total: number; pageSize: number };
+      const data = (await api.getProfileReports(page)) as {
+        items: ProfileReport[];
+        total: number;
+        pageSize: number;
+      };
       setReports(data.items || []);
       setTotalPages(Math.ceil((data.total || 0) / (data.pageSize || 20)) || 1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load profile reports");
+      setError(
+        err instanceof Error ? err.message : "Failed to load profile reports",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +61,11 @@ export function ProfileReportsQueue() {
     if (!selectedReport) return;
     setIsResolving(true);
     try {
-      await api.resolveProfileReport(selectedReport.id, resolveStatus, staffNotes);
+      await api.resolveProfileReport(
+        selectedReport.id,
+        resolveStatus,
+        staffNotes,
+      );
       setSelectedReport(null);
       loadReports();
     } catch (err) {
@@ -70,8 +82,15 @@ export function ProfileReportsQueue() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-800">Profile Reports</h2>
-        <button onClick={loadReports} className="text-sm font-medium text-emerald-600 hover:text-emerald-700">Refresh</button>
+        <h2 className="text-lg font-semibold text-slate-800">
+          Profile Reports
+        </h2>
+        <button
+          onClick={loadReports}
+          className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+        >
+          Refresh
+        </button>
       </div>
 
       {error && (
@@ -85,7 +104,9 @@ export function ProfileReportsQueue() {
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-8 text-center">
           <ShieldAlert size={32} className="mx-auto text-slate-400 mb-3" />
           <p className="text-slate-600 font-medium">No pending reports</p>
-          <p className="text-slate-500 text-sm mt-1">The profile reports queue is currently empty.</p>
+          <p className="text-slate-500 text-sm mt-1">
+            The profile reports queue is currently empty.
+          </p>
         </div>
       ) : (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
@@ -102,11 +123,19 @@ export function ProfileReportsQueue() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {reports.map((report) => (
-                  <tr key={report.id} className="hover:bg-slate-50 transition-colors">
+                  <tr
+                    key={report.id}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <User size={16} className="text-slate-400" />
-                        <a href={`/profile/${report.reportedUserId}`} target="_blank" rel="noreferrer" className="text-emerald-600 font-medium hover:underline">
+                        <a
+                          href={`/profile/${report.reportedUserId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-emerald-600 font-medium hover:underline"
+                        >
                           {report.reportedUser?.email || report.reportedUserId}
                         </a>
                       </div>
@@ -115,8 +144,15 @@ export function ProfileReportsQueue() {
                       {report.reporterUser?.email || report.reporterUserId}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="font-medium text-slate-800">{report.reason}</span>
-                      <p className="text-xs text-slate-500 truncate max-w-xs" title={report.details}>{report.details}</p>
+                      <span className="font-medium text-slate-800">
+                        {report.reason}
+                      </span>
+                      <p
+                        className="text-xs text-slate-500 truncate max-w-xs"
+                        title={report.details}
+                      >
+                        {report.details}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-slate-500">
                       {new Date(report.createdAt).toLocaleDateString()}
@@ -134,20 +170,22 @@ export function ProfileReportsQueue() {
               </tbody>
             </table>
           </div>
-          
+
           {totalPages > 1 && (
             <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between bg-slate-50">
               <button
                 disabled={page === 1}
-                onClick={() => setPage(p => p - 1)}
+                onClick={() => setPage((p) => p - 1)}
                 className="text-sm font-medium text-slate-600 disabled:opacity-50"
               >
                 Previous
               </button>
-              <span className="text-sm text-slate-500">Page {page} of {totalPages}</span>
+              <span className="text-sm text-slate-500">
+                Page {page} of {totalPages}
+              </span>
               <button
                 disabled={page === totalPages}
-                onClick={() => setPage(p => p + 1)}
+                onClick={() => setPage((p) => p + 1)}
                 className="text-sm font-medium text-slate-600 disabled:opacity-50"
               >
                 Next
@@ -158,30 +196,45 @@ export function ProfileReportsQueue() {
       )}
 
       {selectedReport && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm"
           onClick={() => setSelectedReport(null)}
         >
-          <div 
+          <div
             className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-800">Resolve Profile Report</h3>
-              <button onClick={() => setSelectedReport(null)} className="text-slate-400 hover:text-slate-600">×</button>
+              <h3 className="text-lg font-semibold text-slate-800">
+                Resolve Profile Report
+              </h3>
+              <button
+                onClick={() => setSelectedReport(null)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                ×
+              </button>
             </div>
-            
+
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Report Details</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Report Details
+                </label>
                 <div className="bg-slate-50 border border-slate-200 rounded p-3 text-sm text-slate-700">
-                  <p><strong>Reason:</strong> {selectedReport.reason}</p>
-                  <p className="mt-1"><strong>Details:</strong> {selectedReport.details}</p>
+                  <p>
+                    <strong>Reason:</strong> {selectedReport.reason}
+                  </p>
+                  <p className="mt-1">
+                    <strong>Details:</strong> {selectedReport.details}
+                  </p>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Resolution Action</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Resolution Action
+                </label>
                 <select
                   value={resolveStatus}
                   onChange={(e) => setResolveStatus(e.target.value)}
@@ -194,7 +247,9 @@ export function ProfileReportsQueue() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Staff Notes</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Staff Notes
+                </label>
                 <textarea
                   value={staffNotes}
                   onChange={(e) => setStaffNotes(e.target.value)}

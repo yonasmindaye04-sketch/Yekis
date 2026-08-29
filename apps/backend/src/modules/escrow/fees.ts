@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { env } from "../../config/env.js";
 
-
 // === INTERFACES & TYPES ===
 export interface FeeBreakdown {
   grossAmountMinor: number;
@@ -19,18 +18,27 @@ export interface FeeBreakdown {
  */
 
 // === MAIN FUNCTIONS ===
-export function calculateFees(params: { milestoneAmountMinor: number; freelancerHasTin: boolean }): FeeBreakdown {
+export function calculateFees(params: {
+  milestoneAmountMinor: number;
+  freelancerHasTin: boolean;
+}): FeeBreakdown {
   const gross = params.milestoneAmountMinor;
 
-  const platformFeeFromFreelancer = Math.round(gross * env.PLATFORM_FEE_RATE_FREELANCER);
-  const platformFeeFromClient = Math.round(gross * env.PLATFORM_FEE_RATE_CLIENT);
+  const platformFeeFromFreelancer = Math.round(
+    gross * env.PLATFORM_FEE_RATE_FREELANCER,
+  );
+  const platformFeeFromClient = Math.round(
+    gross * env.PLATFORM_FEE_RATE_CLIENT,
+  );
 
   const withholdingRate = params.freelancerHasTin
     ? env.WITHHOLDING_RATE_WITH_TIN
     : env.WITHHOLDING_RATE_WITHOUT_TIN;
 
   const withholdingTax =
-    gross >= env.WITHHOLDING_THRESHOLD_MINOR ? Math.round(gross * withholdingRate) : 0;
+    gross >= env.WITHHOLDING_THRESHOLD_MINOR
+      ? Math.round(gross * withholdingRate)
+      : 0;
 
   const freelancerNet = gross - platformFeeFromFreelancer - withholdingTax;
   const clientTotalCharge = gross + platformFeeFromClient;

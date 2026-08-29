@@ -22,7 +22,9 @@ import { logger } from "../lib/logger.js";
  * See COMPLIANCE_BLOCKERS.md §ERA Tax Remittance.
  */
 
-const withholdingRemittanceQueue = new Queue("withholding-remittance", { connection: redis });
+const withholdingRemittanceQueue = new Queue("withholding-remittance", {
+  connection: redis,
+});
 
 export const withholdingRemittanceWorker = new Worker(
   "withholding-remittance",
@@ -30,16 +32,29 @@ export const withholdingRemittanceWorker = new Worker(
     const now = new Date();
     // Prior month: if today is Aug 2026, compute for Jul 2026
     const priorMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const periodStart = new Date(priorMonthDate.getFullYear(), priorMonthDate.getMonth(), 1);
-    const periodEnd = new Date(priorMonthDate.getFullYear(), priorMonthDate.getMonth() + 1, 1);
+    const periodStart = new Date(
+      priorMonthDate.getFullYear(),
+      priorMonthDate.getMonth(),
+      1,
+    );
+    const periodEnd = new Date(
+      priorMonthDate.getFullYear(),
+      priorMonthDate.getMonth() + 1,
+      1,
+    );
 
     // ISO month string e.g. "2026-07"
     const periodMonth = `${priorMonthDate.getFullYear()}-${String(priorMonthDate.getMonth() + 1).padStart(2, "0")}`;
 
     // Check if already computed for this period (idempotent — safe to run again if job retries).
-    const existing = await prisma.withholdingRemittanceReport.findUnique({ where: { periodMonth } });
+    const existing = await prisma.withholdingRemittanceReport.findUnique({
+      where: { periodMonth },
+    });
     if (existing) {
-      logger.info({ periodMonth }, "Withholding remittance report already exists for period — skipping");
+      logger.info(
+        { periodMonth },
+        "Withholding remittance report already exists for period — skipping",
+      );
       return;
     }
 
@@ -73,10 +88,10 @@ export const withholdingRemittanceWorker = new Worker(
 
     logger.info(
       { periodMonth, totalWithholdingMinor, transactionCount },
-      "Withholding remittance report generated — Finance must use this to file with ERA manually."
+      "Withholding remittance report generated — Finance must use this to file with ERA manually.",
     );
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 /** Call once at startup — BullMQ deduplicates by jobId, safe to call on every boot. */
@@ -88,7 +103,9 @@ export async function scheduleWithholdingRemittanceJob() {
       // 1st of each month at 02:00 EAT (23:00 UTC, UTC+3)
       repeat: { pattern: "0 23 1 * *" },
       jobId: "withholding-remittance-monthly",
-    }
+    },
   );
-  logger.info("Monthly withholding remittance job scheduled (1st of month at 02:00 EAT)");
+  logger.info(
+    "Monthly withholding remittance job scheduled (1st of month at 02:00 EAT)",
+  );
 }

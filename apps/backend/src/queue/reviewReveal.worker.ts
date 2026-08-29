@@ -18,9 +18,9 @@ export const reviewRevealWorker = new Worker(
         where: {
           isBlind: true,
           createdAt: { lt: fourteenDaysAgo },
-          revealedAt: null
+          revealedAt: null,
         },
-        select: { id: true, targetUserId: true }
+        select: { id: true, targetUserId: true },
       });
 
       if (reviewsToReveal.length === 0) {
@@ -28,16 +28,18 @@ export const reviewRevealWorker = new Worker(
         return;
       }
 
-      const reviewIds = reviewsToReveal.map(r => r.id);
-      const targetUserIds = [...new Set(reviewsToReveal.map(r => r.targetUserId))];
+      const reviewIds = reviewsToReveal.map((r) => r.id);
+      const targetUserIds = [
+        ...new Set(reviewsToReveal.map((r) => r.targetUserId)),
+      ];
 
       // Update reviews
       await prisma.review.updateMany({
         where: { id: { in: reviewIds } },
         data: {
           isBlind: false,
-          revealedAt: new Date()
-        }
+          revealedAt: new Date(),
+        },
       });
 
       // Simple rating recalculation for affected users
@@ -45,25 +47,30 @@ export const reviewRevealWorker = new Worker(
         const userReviews = await prisma.review.aggregate({
           where: { targetUserId: userId, isBlind: false },
           _avg: { rating: true },
-          _count: { id: true }
+          _count: { id: true },
         });
 
         await prisma.user.update({
           where: { id: userId },
           data: {
             ratingAverage: userReviews._avg.rating || 0,
-            ratingCount: userReviews._count.id || 0
-          }
+            ratingCount: userReviews._count.id || 0,
+          },
         });
       }
 
-      logger.info(`reviewRevealWorker: Revealed ${reviewIds.length} reviews and updated ratings for ${targetUserIds.length} users.`);
+      logger.info(
+        `reviewRevealWorker: Revealed ${reviewIds.length} reviews and updated ratings for ${targetUserIds.length} users.`,
+      );
     } catch (error) {
-      logger.error({ err: error }, "reviewRevealWorker: Error revealing reviews");
+      logger.error(
+        { err: error },
+        "reviewRevealWorker: Error revealing reviews",
+      );
       throw error;
     }
   },
-  { connection: redis }
+  { connection: redis },
 );
 
 reviewRevealWorker.on("failed", (job, err) => {
@@ -75,6 +82,6 @@ export async function scheduleReviewRevealJob() {
   await reviewRevealQueue.add(
     "reveal-sweep",
     {},
-    { repeat: { pattern: "0 4 * * *" }, jobId: "review-reveal-daily" } // 04:00 daily
+    { repeat: { pattern: "0 4 * * *" }, jobId: "review-reveal-daily" }, // 04:00 daily
   );
 }

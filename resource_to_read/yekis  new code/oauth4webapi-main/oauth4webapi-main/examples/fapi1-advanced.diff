@@ -1,0 +1,169 @@
+diff --git a/examples/oauth.ts b/examples/fapi1-advanced.ts
+index d55e62d..a8d1d32 100644
+--- a/examples/oauth.ts
++++ b/examples/fapi1-advanced.ts
+@@ -1,20 +1,39 @@
++import * as undici from 'undici'
+ import * as oauth from 'oauth4webapi'
+ 
+ // Prerequisites
+ 
+-let getCurrentUrl!: (...args: any) => URL
++let getAuthorizationResponseOrURLWithFragment!: (...args: any) => URL
+ let issuer!: URL // Authorization server's Issuer Identifier URL
+ let algorithm!:
+   | 'oauth2' /* For .well-known/oauth-authorization-server discovery */
+   | 'oidc' /* For .well-known/openid-configuration discovery */
+   | undefined /* Defaults to 'oidc' */
+ let client_id!: string
+-let client_secret!: string
+ /**
+  * Value used in the authorization request as redirect_uri pre-registered at the Authorization
+  * Server.
+  */
+ let redirect_uri!: string
++/**
++ * A key corresponding to the mtlsClientCertificate.
++ */
++let mtlsClientKey!: string
++/**
++ * A certificate the client has pre-registered at the Authorization Server for use with Mutual-TLS
++ * client authentication method.
++ */
++let mtlsClientCertificate!: string
++/**
++ * A key that is pre-registered at the Authorization Server that the client is supposed to sign its
++ * Request Objects with.
++ */
++let jarPrivateKey!: oauth.CryptoKey
++/**
++ * A key that the client has pre-registered at the Authorization Server for use with Private Key JWT
++ * client authentication method.
++ */
++let clientPrivateKey!: oauth.CryptoKey
+ 
+ // End of prerequisites
+ 
+@@ -23,7 +42,7 @@ const as = await oauth
+   .then((response) => oauth.processDiscoveryResponse(issuer, response))
+ 
+ const client: oauth.Client = { client_id }
+-const clientAuth = oauth.ClientSecretPost(client_secret)
++const clientAuth = oauth.PrivateKeyJwt(clientPrivateKey)
+ 
+ const code_challenge_method = 'S256'
+ /**
+@@ -31,38 +50,45 @@ const code_challenge_method = 'S256'
+  * the code_verifier and nonce in the end-user session such that it can be recovered as the user
+  * gets redirected from the authorization server back to your application.
+  */
++const nonce = oauth.generateRandomNonce()
+ const code_verifier = oauth.generateRandomCodeVerifier()
+ const code_challenge = await oauth.calculatePKCECodeChallenge(code_verifier)
+-let state: string | undefined
++
++let request: string
++{
++  const params = new URLSearchParams()
++  params.set('client_id', client.client_id)
++  params.set('code_challenge', code_challenge)
++  params.set('code_challenge_method', code_challenge_method)
++  params.set('redirect_uri', redirect_uri)
++  params.set('response_type', 'code id_token')
++  params.set('scope', 'openid api:read')
++  params.set('nonce', nonce)
++
++  request = await oauth.issueRequestObject(as, client, params, jarPrivateKey)
++}
+ 
+ {
+   // redirect user to as.authorization_endpoint
+   const authorizationUrl = new URL(as.authorization_endpoint!)
+   authorizationUrl.searchParams.set('client_id', client.client_id)
+-  authorizationUrl.searchParams.set('redirect_uri', redirect_uri)
+-  authorizationUrl.searchParams.set('response_type', 'code')
+-  authorizationUrl.searchParams.set('scope', 'api:read')
+-  authorizationUrl.searchParams.set('code_challenge', code_challenge)
+-  authorizationUrl.searchParams.set('code_challenge_method', code_challenge_method)
+-
+-  /**
+-   * We cannot be sure the AS supports PKCE so we're going to use state too. Use of PKCE is
+-   * backwards compatible even if the AS doesn't support it which is why we're using it regardless.
+-   */
+-  if (as.code_challenge_methods_supported?.includes('S256') !== true) {
+-    state = oauth.generateRandomState()
+-    authorizationUrl.searchParams.set('state', state)
+-  }
++  authorizationUrl.searchParams.set('request', request)
+ 
+   // now redirect the user to authorizationUrl.href
+ }
+ 
+ // one eternity later, the user lands back on the redirect_uri
++// Detached Signature ID Token Validation
+ // Authorization Code Grant Request & Response
+ let access_token: string
+ {
+-  const currentUrl: URL = getCurrentUrl()
+-  const params = oauth.validateAuthResponse(as, client, currentUrl, state)
++  const authorizationResponse: URLSearchParams | URL = getAuthorizationResponseOrURLWithFragment()
++  const params = await oauth.validateDetachedSignatureResponse(
++    as,
++    client,
++    authorizationResponse,
++    nonce,
++  )
+ 
+   const response = await oauth.authorizationCodeGrantRequest(
+     as,
+@@ -71,9 +97,27 @@ let access_token: string
+     params,
+     redirect_uri,
+     code_verifier,
++    {
++      [oauth.customFetch]: (url, init) => {
++        return undici.fetch(url, {
++          ...init,
++          dispatcher: new undici.Agent({
++            connect: {
++              key: mtlsClientKey,
++              cert: mtlsClientCertificate,
++            },
++          }),
++        })
++      },
++    },
+   )
+ 
+-  const result = await oauth.processAuthorizationCodeResponse(as, client, response)
++  const result = await oauth.processAuthorizationCodeResponse(as, client, response, {
++    expectedNonce: nonce,
++  })
++
++  // Check ID Token signature for non-repudiation purposes
++  await oauth.validateApplicationLevelSignature(as, response)
+ 
+   console.log('Access Token Response', result)
+   ;({ access_token } = result)
+@@ -85,6 +129,21 @@ let access_token: string
+     access_token,
+     'GET',
+     new URL('https://rs.example.com/api'),
++    undefined,
++    undefined,
++    {
++      [oauth.customFetch]: (url, init) => {
++        return undici.fetch(url, {
++          ...init,
++          dispatcher: new undici.Agent({
++            connect: {
++              key: mtlsClientKey,
++              cert: mtlsClientCertificate,
++            },
++          }),
++        })
++      },
++    },
+   )
+ 
+   console.log('Protected Resource Response', await response.json())

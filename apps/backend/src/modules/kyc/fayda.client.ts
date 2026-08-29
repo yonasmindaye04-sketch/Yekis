@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { logger } from "../../lib/logger.js";
 
-
 // === INTERFACES & TYPES ===
 export interface FaydaVerificationResult {
   success: boolean;
@@ -33,7 +32,7 @@ export async function verifyWithFayda(params: {
 }): Promise<FaydaVerificationResult> {
   logger.warn(
     { documentNumber: params.documentNumber },
-    "Fayda API integration not yet live — using mock verification. Do not deploy this to production."
+    "Fayda API integration not yet live — using mock verification. Do not deploy this to production.",
   );
 
   // Mock behavior: fail deterministically for a specific test value so the

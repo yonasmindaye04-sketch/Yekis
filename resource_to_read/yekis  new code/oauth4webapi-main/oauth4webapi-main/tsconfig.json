@@ -1,0 +1,25 @@
+{
+  "files": ["src/index.ts"],
+  "compilerOptions": {
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2022",
+    "module": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "strict": true,
+    "removeComments": true,
+    "rootDir": "src",
+    "outDir": "build",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitAny": true,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "verbatimModuleSyntax": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "types": [],
+    "stripInternal": true,
+    "erasableSyntaxOnly": true
+  }
+}

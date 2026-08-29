@@ -21,7 +21,6 @@ const EXCLUDED_FIELDS = new Set([
   "biz_content",
 ]);
 
-
 // === MAIN FUNCTIONS ===
 
 /**
@@ -57,7 +56,9 @@ export function createNonceStr(len = 32): string {
  * The mandate_data sub-object (if present inside biz_content) is
  * serialized as its JSON string value, not flattened further.
  */
-export function buildSigningString(requestObject: Record<string, unknown>): string {
+export function buildSigningString(
+  requestObject: Record<string, unknown>,
+): string {
   const fieldMap: Record<string, string> = {};
 
   // 1. Collect root-level fields
@@ -65,7 +66,8 @@ export function buildSigningString(requestObject: Record<string, unknown>): stri
     if (EXCLUDED_FIELDS.has(key)) continue;
     const val = requestObject[key];
     if (val !== undefined && val !== null) {
-      fieldMap[key] = typeof val === "object" ? JSON.stringify(val) : String(val);
+      fieldMap[key] =
+        typeof val === "object" ? JSON.stringify(val) : String(val);
     }
   }
 
@@ -76,7 +78,8 @@ export function buildSigningString(requestObject: Record<string, unknown>): stri
       if (EXCLUDED_FIELDS.has(key)) continue;
       const val = (bizContent as Record<string, unknown>)[key];
       if (val !== undefined && val !== null) {
-        fieldMap[key] = typeof val === "object" ? JSON.stringify(val) : String(val);
+        fieldMap[key] =
+          typeof val === "object" ? JSON.stringify(val) : String(val);
       }
     }
   }
@@ -95,7 +98,10 @@ export function buildSigningString(requestObject: Record<string, unknown>): stri
  * @param privateKeyPem - RSA private key in PKCS#8 PEM format
  * @returns Base64-encoded signature
  */
-export function signWithRsaPss(dataString: string, privateKeyPem: string): string {
+export function signWithRsaPss(
+  dataString: string,
+  privateKeyPem: string,
+): string {
   const signer = createSign("RSA-SHA256");
   signer.update(dataString, "utf8");
   signer.end();

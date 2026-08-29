@@ -38,7 +38,10 @@ export function createRedisSessionStorage(): StorageAdapter<BotSession> {
 
         // Version migration
         if (parsed.version !== SESSION_VERSION) {
-          logger.info({ key, oldVersion: parsed.version, newVersion: SESSION_VERSION }, "Migrating session version");
+          logger.info(
+            { key, oldVersion: parsed.version, newVersion: SESSION_VERSION },
+            "Migrating session version",
+          );
           return migrateSession(parsed);
         }
 
@@ -55,7 +58,12 @@ export function createRedisSessionStorage(): StorageAdapter<BotSession> {
           ...value,
           version: SESSION_VERSION,
         };
-        await redis.set(sessionKey(key), JSON.stringify(sessionWithVersion), "EX", SESSION_TTL_SECONDS);
+        await redis.set(
+          sessionKey(key),
+          JSON.stringify(sessionWithVersion),
+          "EX",
+          SESSION_TTL_SECONDS,
+        );
       } catch (error) {
         logger.error({ error, key }, "Failed to set session in Redis");
       }
@@ -85,7 +93,8 @@ function migrateSession(oldSession: BotSession): BotSession {
     kycStatus: oldSession.kycStatus,
     staffRole: oldSession.staffRole,
     language: oldSession.language,
-    notificationSettings: oldSession.notificationSettings ?? initial.notificationSettings,
+    notificationSettings:
+      oldSession.notificationSettings ?? initial.notificationSettings,
   };
 }
 

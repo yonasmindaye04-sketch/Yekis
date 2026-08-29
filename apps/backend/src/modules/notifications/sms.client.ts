@@ -11,11 +11,14 @@ import { env } from "../../config/env.js";
  */
 
 // === MAIN FUNCTIONS ===
-export async function sendSms(params: { phone: string; message: string }): Promise<{ sent: boolean }> {
+export async function sendSms(params: {
+  phone: string;
+  message: string;
+}): Promise<{ sent: boolean }> {
   if (!env.SMS_ETHIOPIA_API_KEY) {
     logger.warn(
       { phone: params.phone },
-      "SMS_ETHIOPIA_API_KEY not set — logging instead of sending. Configure to enable real SMS."
+      "SMS_ETHIOPIA_API_KEY not set — logging instead of sending. Configure to enable real SMS.",
     );
     return { sent: false };
   }
@@ -25,7 +28,7 @@ export async function sendSms(params: { phone: string; message: string }): Promi
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "KEY": env.SMS_ETHIOPIA_API_KEY,
+        KEY: env.SMS_ETHIOPIA_API_KEY,
       },
       body: JSON.stringify({
         msisdn: params.phone.replace("+", ""), // SMSEthiopia expects numbers like 251911234567
@@ -35,7 +38,10 @@ export async function sendSms(params: { phone: string; message: string }): Promi
 
     if (!response.ok) {
       const errorText = await response.text();
-      logger.error({ status: response.status, errorText }, "SMSEthiopia API error");
+      logger.error(
+        { status: response.status, errorText },
+        "SMSEthiopia API error",
+      );
       return { sent: false };
     }
 
@@ -45,4 +51,3 @@ export async function sendSms(params: { phone: string; message: string }): Promi
     return { sent: false };
   }
 }
-

@@ -11,7 +11,6 @@ import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 
-
 // === MAIN FUNCTIONS ===
 export class AgeRestrictionError extends Error {}
 export class DuplicateUserError extends Error {}
@@ -29,14 +28,15 @@ export async function registerUser(input: RegisterInput) {
   // Contractual-capacity gate — confirmed with counsel in Phase 0.
   if (calculateAge(dob) < env.MINIMUM_CONTRACTING_AGE) {
     throw new AgeRestrictionError(
-      `Must be at least ${env.MINIMUM_CONTRACTING_AGE} years old to register.`
+      `Must be at least ${env.MINIMUM_CONTRACTING_AGE} years old to register.`,
     );
   }
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { phone: input.phone }] },
   });
-  if (existing) throw new DuplicateUserError("Email or phone already registered.");
+  if (existing)
+    throw new DuplicateUserError("Email or phone already registered.");
 
   const passwordHash = await argon2.hash(input.password);
 
@@ -52,9 +52,26 @@ export async function registerUser(input: RegisterInput) {
         kyc: { create: { tier: "TIER_1", status: "PENDING" } },
         wallet: { create: { balanceMinor: 0 } },
         consents: {
+          // Master Design §12.2: granular, unbundled consent — two purposes
+          // are legally required (no opt-out), three are optional opt-ins
+          // recorded individually with timestamps (PDPP Arts. 8 & 11).
           create: [
-            { purpose: "kyc_data_processing", granted: input.consents.kycDataProcessing },
-            { purpose: "marketing_communications", granted: input.consents.marketingCommunications },
+            {
+              purpose: "kyc_data_processing",
+              granted: input.consents.kycDataProcessing,
+            },
+            {
+              purpose: "financial_data_processing",
+              granted: input.consents.financialDataProcessing,
+            },
+            {
+              purpose: "platform_notifications",
+              granted: input.consents.platformNotifications,
+            },
+            {
+              purpose: "marketing_communications",
+              granted: input.consents.marketingCommunications,
+            },
             { purpose: "analytics", granted: input.consents.analytics },
           ],
         },
@@ -73,8 +90,16 @@ export async function registerUser(input: RegisterInput) {
   return user;
 }
 
-export async function createAuthTokens(user: { id: string; role: string; ucid: string | null; staffRole?: string | null }) {
-  const accessToken = await new SignJWT({ role: user.role, staffRole: user.staffRole ?? null })
+export async function createAuthTokens(user: {
+  id: string;
+  role: string;
+  ucid: string | null;
+  staffRole?: string | null;
+}) {
+  const accessToken = await new SignJWT({
+    role: user.role,
+    staffRole: user.staffRole ?? null,
+  })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setExpirationTime(env.JWT_ACCESS_TTL)
@@ -86,10 +111,17 @@ export async function createAuthTokens(user: { id: string; role: string; ucid: s
     .setExpirationTime(env.JWT_REFRESH_TTL)
     .sign(refreshSecret);
 
-  return { accessToken, refreshToken, user: { id: user.id, ucid: user.ucid, role: user.role } };
+  return {
+    accessToken,
+    refreshToken,
+    user: { id: user.id, ucid: user.ucid, role: user.role },
+  };
 }
 
-export function normalizeLoginIdentifier(rawIdentifier: string): { email?: string; phone?: string } {
+export function normalizeLoginIdentifier(rawIdentifier: string): {
+  email?: string;
+  phone?: string;
+} {
   const trimmed = rawIdentifier.trim();
   if (trimmed.includes("@")) {
     return { email: trimmed.toLowerCase() };
@@ -107,7 +139,10 @@ export function normalizeLoginIdentifier(rawIdentifier: string): { email?: strin
   if (trimmed.startsWith("+")) {
     return { phone: trimmed };
   }
-  return { phone: digits ? `+251${digits}` : undefined, email: trimmed.toLowerCase() };
+  return {
+    phone: digits ? `+251${digits}` : undefined,
+    email: trimmed.toLowerCase(),
+  };
 }
 
 export async function loginUser(input: LoginInput) {
@@ -166,7 +201,7 @@ export async function requestPasswordReset(email: string) {
       userId: user.id,
       tokenHash,
       expiresAt,
-    }
+    },
   });
 
   await recordAuditEvent({
@@ -193,7 +228,7 @@ export async function resetPassword(token: string, newPassword: string) {
 
   const resetRecord = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
-    include: { user: true }
+    include: { user: true },
   });
 
   if (!resetRecord || resetRecord.used || resetRecord.expiresAt < new Date()) {
@@ -205,12 +240,12 @@ export async function resetPassword(token: string, newPassword: string) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: resetRecord.userId },
-      data: { passwordHash }
+      data: { passwordHash },
     });
 
     await tx.passwordResetToken.update({
       where: { id: resetRecord.id },
-      data: { used: true }
+      data: { used: true },
     });
   });
 

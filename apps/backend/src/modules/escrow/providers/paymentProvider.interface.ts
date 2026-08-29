@@ -1,4 +1,3 @@
-
 // === INTERFACES & TYPES ===
 export interface InitiatePaymentResult {
   providerTransactionId: string;
@@ -17,7 +16,10 @@ export interface PaymentProviderClient {
   /** Verifies a webhook's authenticity BEFORE any business logic touches
    *  the payload. Every provider client must implement this — never trust
    *  a webhook just because it hit our endpoint. */
-  verifyWebhookSignature(params: { rawBody: Buffer; signatureHeader: string | undefined }): boolean;
+  verifyWebhookSignature(params: {
+    rawBody: Buffer;
+    signatureHeader: string | undefined;
+  }): boolean;
 
   /**
    * Server-to-server status poll used by the payment reconciliation sweep.

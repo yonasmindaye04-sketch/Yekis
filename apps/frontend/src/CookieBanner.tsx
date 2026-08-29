@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { Shield, X } from 'lucide-react';
-import { initAnalytics } from './analytics';
-import './CookieBanner.css';
+import { useState, useEffect } from "react";
+import { Shield, X } from "lucide-react";
+import { initAnalytics } from "./analytics";
+import "./CookieBanner.css";
 
 interface ConsentState {
   necessary: true; // Always true, not toggleable
@@ -17,7 +17,7 @@ export function CookieBanner() {
   const [marketing, setMarketing] = useState(false);
 
   useEffect(() => {
-    const consent = localStorage.getItem('yekis_consent');
+    const consent = localStorage.getItem("yekis_consent");
     if (!consent) {
       // Show banner after a short delay for better UX
       const timer = setTimeout(() => setVisible(true), 1500);
@@ -34,7 +34,7 @@ export function CookieBanner() {
       marketing: marketingVal,
       timestamp: new Date().toISOString(),
     };
-    localStorage.setItem('yekis_consent', JSON.stringify(consent));
+    localStorage.setItem("yekis_consent", JSON.stringify(consent));
     setVisible(false);
     if (analyticsVal) initAnalytics();
   };
@@ -50,9 +50,16 @@ export function CookieBanner() {
           </div>
           <div>
             <h3>Your privacy matters</h3>
-            <p>We use cookies to improve your experience. Some are necessary for the site to work; others help us understand how you use Yekis.</p>
+            <p>
+              We use cookies to improve your experience. Some are necessary for
+              the site to work; others help us understand how you use Yekis.
+            </p>
           </div>
-          <button className="cookie-close" onClick={() => saveConsent(false, false)} aria-label="Dismiss">
+          <button
+            className="cookie-close"
+            onClick={() => saveConsent(false, false)}
+            aria-label="Dismiss"
+          >
             <X size={18} />
           </button>
         </div>
@@ -64,43 +71,69 @@ export function CookieBanner() {
                 <strong>Essential cookies</strong>
                 <span className="cookie-always-on">Always on</span>
               </div>
-              <p>Required for the site to function. Includes KYC data processing consent (required for platform use, not toggleable).</p>
+              <p>
+                Required for the site to function. Includes KYC data processing
+                consent (required for platform use, not toggleable).
+              </p>
             </div>
             <div className="cookie-category">
               <div className="cookie-category-header">
                 <strong>Analytics</strong>
                 <label className="cookie-toggle">
-                  <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={analytics}
+                    onChange={(e) => setAnalytics(e.target.checked)}
+                  />
                   <span className="cookie-toggle-slider" />
                 </label>
               </div>
-              <p>Helps us understand how visitors use the site so we can improve it.</p>
+              <p>
+                Helps us understand how visitors use the site so we can improve
+                it.
+              </p>
             </div>
             <div className="cookie-category">
               <div className="cookie-category-header">
                 <strong>Marketing</strong>
                 <label className="cookie-toggle">
-                  <input type="checkbox" checked={marketing} onChange={(e) => setMarketing(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={marketing}
+                    onChange={(e) => setMarketing(e.target.checked)}
+                  />
                   <span className="cookie-toggle-slider" />
                 </label>
               </div>
-              <p>Used to show you relevant content and measure campaign effectiveness.</p>
+              <p>
+                Used to show you relevant content and measure campaign
+                effectiveness.
+              </p>
             </div>
           </div>
         )}
 
         <div className="cookie-actions">
           {!showDetails && (
-            <button className="cookie-btn-details" onClick={() => setShowDetails(true)}>
+            <button
+              className="cookie-btn-details"
+              onClick={() => setShowDetails(true)}
+            >
               Manage preferences
             </button>
           )}
           {showDetails && (
-            <button className="cookie-btn-save" onClick={() => saveConsent(analytics, marketing)}>
+            <button
+              className="cookie-btn-save"
+              onClick={() => saveConsent(analytics, marketing)}
+            >
               Save preferences
             </button>
           )}
-          <button className="cookie-btn-accept" onClick={() => saveConsent(true, true)}>
+          <button
+            className="cookie-btn-accept"
+            onClick={() => saveConsent(true, true)}
+          >
             Accept all
           </button>
         </div>
