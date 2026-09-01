@@ -320,3 +320,88 @@ export const MediatorResolutionInput = z
     message: "freelancerShareMinor is required when outcome is PARTIAL_SPLIT.",
   });
 export type MediatorResolutionInput = z.infer<typeof MediatorResolutionInput>;
+
+// ---------- Gigs (Fiverr-style service packages) ----------
+// See docs/GIG_MODEL_PLAN.md. Amounts are integer minor units (ETB cents).
+
+export const GigPackageTier = z.enum(["BASIC", "STANDARD", "PREMIUM"]);
+export type GigPackageTier = z.infer<typeof GigPackageTier>;
+
+export const GigStatus = z.enum(["DRAFT", "ACTIVE", "PAUSED", "REJECTED", "ARCHIVED"]);
+export type GigStatus = z.infer<typeof GigStatus>;
+
+const GigFaqItem = z.object({ question: z.string().min(1), answer: z.string().min(1) });
+const GigRequirement = z.object({
+  label: z.string().min(1),
+  type: z.enum(["text", "textarea", "choice"]).default("text"),
+  required: z.boolean().default(true),
+  options: z.array(z.string()).optional(),
+});
+
+export const GigPackageInput = z.object({
+  tier: GigPackageTier,
+  title: z.string().min(2).max(120),
+  description: z.string().min(5).max(2000),
+  deliveryDays: z.number().int().min(1).max(365),
+  revisionsIncluded: z.number().int().min(0).max(20).default(1),
+  priceMinor: z.number().int().positive(),
+  addOns: z.array(z.object({ label: z.string().min(1), priceMinor: z.number().int().nonnegative() })).optional(),
+});
+export type GigPackageInput = z.infer<typeof GigPackageInput>;
+
+export const CreateGigInput = z.object({
+  title: z.string().min(5).max(120),
+  category: LaunchCategory,
+  description: z.string().min(20).max(5000),
+  tags: z.array(z.string().min(1).max(50)).max(20),
+  requirements: z.array(GigRequirement).max(20),
+  faqJson: z.array(GigFaqItem).max(30).optional(),
+  thumbnailUrl: z.string().url().max(500).optional(),
+  mediaUrls: z.array(z.string().url()).max(20).optional(),
+  autoAcceptOrders: z.boolean().default(true),
+  maxRevisions: z.number().int().min(0).max(20).default(2),
+  packages: z.array(GigPackageInput).min(1).max(3),
+});
+export type CreateGigInput = z.infer<typeof CreateGigInput>;
+
+export const UpdateGigInput = CreateGigInput.partial().omit({ packages: true });
+export type UpdateGigInput = z.infer<typeof UpdateGigInput>;
+
+export const GigSearchQuery = z.object({
+  category: LaunchCategory.optional(),
+  q: z.string().max(120).optional(),
+  minPriceMinor: z.coerce.number().int().nonnegative().optional(),
+  maxPriceMinor: z.coerce.number().int().nonnegative().optional(),
+  status: GigStatus.optional().default("ACTIVE"),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(50).default(20),
+});
+export type GigSearchQuery = z.infer<typeof GigSearchQuery>;
+
+export const CreateGigOrderInput = z.object({
+  packageId: z.string().cuid(),
+  requirementsAnswer: z.record(z.string(), z.any()).optional(),
+});
+export type CreateGigOrderInput = z.infer<typeof CreateGigOrderInput>;
+
+export const SubmitGigDeliveryInput = z.object({
+  deliverableUrl: z.string().max(2000).optional(),
+});
+export type SubmitGigDeliveryInput = z.infer<typeof SubmitGigDeliveryInput>;
+
+export const RequestGigRevisionInput = z.object({
+  note: z.string().min(5).max(2000),
+});
+export type RequestGigRevisionInput = z.infer<typeof RequestGigRevisionInput>;
+
+export const CreateGigReviewInput = z.object({
+  rating: z.number().int().min(1).max(5),
+  categoryRatings: z.object({
+    communication: z.number().int().min(1).max(5),
+    quality: z.number().int().min(1).max(5),
+    deadline: z.number().int().min(1).max(5),
+    valueForMoney: z.number().int().min(1).max(5),
+  }),
+  comment: z.string().max(2000).optional(),
+});
+export type CreateGigReviewInput = z.infer<typeof CreateGigReviewInput>;

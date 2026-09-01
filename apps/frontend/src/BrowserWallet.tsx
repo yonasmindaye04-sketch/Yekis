@@ -30,6 +30,7 @@ export function BrowserWallet({
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutIdentifier, setPayoutIdentifier] = useState("");
   const [showTopUp, setShowTopUp] = useState(false);
+  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
 
   const setSuccess = (msg: string) => {
     setMessage(msg);
@@ -38,6 +39,28 @@ export function BrowserWallet({
   const setError = (msg: string) => {
     setMessage(msg);
     setMessageIsError(true);
+  };
+
+  const submitCheckoutTopUp = async () => {
+    const amountNum = Number(amount);
+    if (!amountNum || amountNum <= 0) {
+      setError("Please enter a valid amount.");
+      return;
+    }
+    setIsSubmitting(true);
+    setMessage("");
+    try {
+      const { redirectUrl } = await api.initiateCheckoutTopUp(
+        Math.round(amountNum * 100),
+        "TELEBIRR"
+      );
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      }
+    } catch (err) {
+      setError(`Error: ${err instanceof Error ? err.message : "Failed to initiate top-up"}`);
+      setIsSubmitting(false);
+    }
   };
 
   const submitTopUp = async () => {
@@ -250,109 +273,158 @@ export function BrowserWallet({
       <section className="panel browser-topup-panel">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Manual top-up</p>
-            <h2>Add funds with a receipt</h2>
+            <p className="eyebrow">Add funds</p>
+            <h2>Top up your wallet</h2>
           </div>
           <button
             className="btn-icon"
-            onClick={() => setShowTopUp((v) => !v)}
-            aria-label={showTopUp ? "Collapse top-up" : "Expand top-up"}
+            aria-expanded={showTopUp}
+            aria-label={showTopUp ? "Hide top-up options" : "Show top-up options"}
+            onClick={() => setShowTopUp((s) => !s)}
           >
-            {showTopUp ? "−" : "+"}
+            <Upload size={18} />
           </button>
         </div>
-
         {showTopUp && (
           <>
-            <p className="wallet-help">
-              Send money to your selected account, then upload the receipt for
-              staff approval.
-            </p>
-            <div className="payment-grid">
+            <div className="tabs" style={{ marginBottom: 16 }}>
               <button
-                className={
-                  topUpRail === "TELEBIRR"
-                    ? "payment-account selected"
-                    : "payment-account"
-                }
-                onClick={() => setTopUpRail("TELEBIRR")}
+                className={topUpMethod === "INSTANT" ? "active" : ""}
+                onClick={() => setTopUpMethod("INSTANT")}
               >
-                <img
-                  src="/payment/Telebirr.png"
-                  alt="Telebirr"
-                  style={{
-                    width: "70px",
-                    height: "70px",
-                    objectFit: "contain",
-                    borderRadius: "8px",
-                    flexShrink: 0,
-                  }}
-                />
-                <div className="payment-account-text">
-                  <strong>Telebirr</strong>
-                  <span>Yekis top-up account</span>
-                  <code>0910 011 818</code>
-                </div>
+                Instant Checkout
               </button>
               <button
-                className={
-                  topUpRail === "CBE_BIRR"
-                    ? "payment-account selected"
-                    : "payment-account"
-                }
-                onClick={() => setTopUpRail("CBE_BIRR")}
+                className={topUpMethod === "MANUAL" ? "active" : ""}
+                onClick={() => setTopUpMethod("MANUAL")}
               >
-                <img
-                  src="/payment/cbe payment.jpg"
-                  alt="CBE Bank"
-                  style={{
-                    width: "70px",
-                    height: "70px",
-                    objectFit: "cover",
-                    borderRadius: "8px",
-                    flexShrink: 0,
-                  }}
-                />
-                <div className="payment-account-text">
-                  <strong>CBE Bank</strong>
-                  <span>Yekis top-up account</span>
-                  <code>1000 223 344</code>
-                </div>
+                Manual Transfer
               </button>
             </div>
 
-            <div className="browser-topup-fields">
-              <label>
-                Amount sent
-                <input
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  type="number"
-                  min="1"
-                  placeholder="ETB"
-                />
-              </label>
-              <label>
-                Reference number
-                <input
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  placeholder="e.g. TB-12345"
-                />
-              </label>
-              <label className="browser-upload">
-                Receipt
-                <small>
-                  <Upload size={15} />{" "}
-                  {receipt?.name ?? "Choose an image or PDF"}
-                </small>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
-                />
-              </label>
-            </div>
+            {topUpMethod === "INSTANT" ? (
+              <div className="browser-topup-fields">
+                <p style={{ gridColumn: "1 / -1", color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                  Pay with Telebirr online. Your wallet will be credited automatically.
+                </p>
+                <label style={{ gridColumn: "1 / -1" }}>
+                  Amount to add (ETB)
+                  <input
+                    type="number"
+                    min="1"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="e.g. 1000"
+                  />
+                </label>
+                <button
+                  className="btn-primary"
+                  style={{ gridColumn: "1 / -1", justifyContent: "center" }}
+                  disabled={isSubmitting}
+                  onClick={() => void submitCheckoutTopUp()}
+                >
+                  <img src="/payment/Telebirr.png" alt="" style={{ width: 24, height: 24, objectFit: "contain", marginRight: 8, background: "#fff", borderRadius: 4 }} />
+                  {isSubmitting ? "Starting checkout..." : "Pay with Telebirr"}
+                </button>
+              </div>
+            ) : (
+              <>
+                <p className="wallet-help">
+                  Send money to your selected account, then upload the receipt for
+                  staff approval.
+                </p>
+                <div className="payment-grid">
+                  <button
+                    className={
+                      topUpRail === "TELEBIRR"
+                        ? "payment-account selected"
+                        : "payment-account"
+                    }
+                    onClick={() => setTopUpRail("TELEBIRR")}
+                  >
+                    <img
+                      src="/payment/Telebirr.png"
+                      alt="Telebirr"
+                      style={{
+                        width: "70px",
+                        height: "70px",
+                        objectFit: "contain",
+                        borderRadius: "8px",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div className="payment-account-text">
+                      <strong>Telebirr</strong>
+                      <span>Yekis top-up account</span>
+                      <code>0910 011 818</code>
+                    </div>
+                  </button>
+                  <button
+                    className={
+                      topUpRail === "CBE_BIRR"
+                        ? "payment-account selected"
+                        : "payment-account"
+                    }
+                    onClick={() => setTopUpRail("CBE_BIRR")}
+                  >
+                    <img
+                      src="/payment/cbe payment.jpg"
+                      alt="CBE Bank"
+                      style={{
+                        width: "70px",
+                        height: "70px",
+                        objectFit: "cover",
+                        borderRadius: "8px",
+                        flexShrink: 0,
+                      }}
+                    />
+                    <div className="payment-account-text">
+                      <strong>CBE Bank</strong>
+                      <span>Yekis top-up account</span>
+                      <code>1000 223 344</code>
+                    </div>
+                  </button>
+                </div>
+                <div className="browser-topup-fields">
+                  <label>
+                    Amount sent (ETB)
+                    <input
+                      type="number"
+                      min="1"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="e.g. 5000"
+                    />
+                  </label>
+                  <label>
+                    Transaction/reference number
+                    <input
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                      placeholder="e.g. TB-12345"
+                    />
+                  </label>
+                  <label style={{ gridColumn: "1 / -1" }}>
+                    Receipt Image
+                    <input
+                      type="file"
+                      accept="image/*,.pdf"
+                      onChange={(e) =>
+                        setReceipt(e.target.files?.[0] || null)
+                      }
+                    />
+                  </label>
+                </div>
+                <button
+                  className="btn-primary"
+                  style={{ marginTop: 16 }}
+                  disabled={isSubmitting}
+                  onClick={() => void submitTopUp()}
+                >
+                  {isSubmitting ? "Submitting..." : "Submit for approval"}
+                </button>
+              </>
+            )}
 
             {message && (
               <p
@@ -364,14 +436,6 @@ export function BrowserWallet({
                 {message}
               </p>
             )}
-
-            <button
-              className="btn-primary"
-              onClick={() => void submitTopUp()}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Submitting..." : "Submit for approval"}
-            </button>
           </>
         )}
       </section>

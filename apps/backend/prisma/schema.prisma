@@ -250,6 +250,12 @@ model User {
   directThreadsAsClient     DirectThread[]  @relation("ClientThreads")
   directThreadsAsFreelancer DirectThread[]  @relation("FreelancerThreads")
 
+  // --- GIG RELATIONS ---
+  gigsOwned   Gig[]       @relation("GigFreelancer")
+  gigOrders   GigOrder[]  @relation("GigOrderClient")
+  gigAuthored GigReview[] @relation("GigReviewAuthor")
+  gigReceived GigReview[] @relation("GigReviewTarget")
+
   // --- PROFILE RELATIONS ---
   skills               UserSkill[]
   portfolioItems       PortfolioItem[]
@@ -469,6 +475,7 @@ model Wallet {
 
 enum TopUpStatus {
   PENDING
+  CHECKOUT_PENDING // Telebirr checkout initiated, awaiting webhook
   APPROVED
   REJECTED
   FLAGGED
@@ -482,20 +489,21 @@ enum TopUpStatus {
 // don't currently offer a confirmed webhook-based collection path for
 // direct wallet top-ups the way they do for a per-milestone charge.
 model WalletTopUp {
-  id                String          @id @default(cuid())
-  userId            String
-  user              User            @relation(fields: [userId], references: [id])
-  walletId          String
-  wallet            Wallet          @relation(fields: [walletId], references: [id])
-  provider          PaymentProvider
-  amountMinor       Int
-  referenceNumber   String
-  receiptImagePath  String // object store pointer — never a public URL
-  status            TopUpStatus     @default(PENDING)
-  reviewedByStaffId String?
-  rejectionReason   String?
-  reviewedAt        DateTime?
-  createdAt         DateTime        @default(now())
+  id                    String          @id @default(cuid())
+  userId                String
+  user                  User            @relation(fields: [userId], references: [id])
+  walletId              String
+  wallet                Wallet          @relation(fields: [walletId], references: [id])
+  provider              PaymentProvider
+  amountMinor           Int
+  referenceNumber       String          @default("")
+  providerTransactionId String?         @unique // Telebirr merch_order_id for automatic checkout
+  receiptImagePath      String? // object store pointer — null for automatic checkout top-ups
+  status                TopUpStatus     @default(PENDING)
+  reviewedByStaffId     String?
+  rejectionReason       String?
+  reviewedAt            DateTime?
+  createdAt             DateTime        @default(now())
 
   @@index([status])
   @@index([userId])
@@ -906,16 +914,24 @@ model PlatformOperatingAccount {
 // Append-only fee credit log — immutable record of each credit to the
 // PlatformOperatingAccount, enabling per-milestone fee reconciliation.
 model PlatformFeeCredit {
-  id                     String   @id @default(cuid())
-  milestoneId            String
+  id                     String     @id @default(cuid())
+  // Nullable so a single append-only ledger supports both contract milestone
+  // releases AND gig-order releases (see GIG_MODEL_PLAN.md). Exactly one of
+  // these two reference strings is set per row. Deliberately NOT foreign-keyed:
+  // the append-only ledger predates referential integrity and must tolerate
+  // historical rows whose milestone was since retained outside the Milestone
+  // relation (see DATABASE.md append-only convention).
+  milestoneId            String?
+  gigOrderId             String?
   // Freelancer-side fee (deducted from gross before freelancer gets paid)
   feeFromFreelancerMinor Int
   // Client-side add-on (collected when client funds; already in wallet debit)
   feeFromClientMinor     Int
   withholdingMinor       Int
-  createdAt              DateTime @default(now())
+  createdAt              DateTime   @default(now())
 
   @@index([milestoneId])
+  @@index([gigOrderId])
   @@index([createdAt])
 }
 
@@ -948,4 +964,152 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ---------- Gigs (Fiverr-style service packages) ----------
+// See docs/GIG_MODEL_PLAN.md for the full design. Gigs reuse the existing
+// EscrowState enum + calculateFees + Wallet + PlatformFeeCredit ledger so the
+// same trust, fee, and withholding model governs both bidding and direct-buy.
+// NOTE: Gig disputes intentionally deferred — the Dispute model is contract /
+// milestone-scoped and requires a polymorphic refactor before gig orders can
+// escalate through the formal five-stage process (tracked as open decision).
+
+enum GigStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  REJECTED
+  ARCHIVED
+}
+
+enum GigPackageTier {
+  BASIC
+  STANDARD
+  PREMIUM
+}
+
+enum GigOrderStatus {
+  PENDING_PAYMENT
+  ESCROW_HELD
+  WORK_IN_PROGRESS
+  SUBMITTED_FOR_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum GigRevisionStatus {
+  NONE
+  REQUESTED
+  SUBMITTED
+}
+
+model Gig {
+  id           String @id @default(cuid())
+  freelancerId String
+  freelancer   User   @relation("GigFreelancer", fields: [freelancerId], references: [id])
+
+  title        String
+  category     LaunchCategory
+  description  String
+  tags         Json
+  faqJson      Json?
+  requirements Json
+
+  thumbnailUrl String?
+  mediaUrls    Json
+
+  status           GigStatus @default(DRAFT)
+  // Moderation checkpoint (MVP: DRAFT -> ACTIVE via explicit submit) — see
+  // GIG_MODEL_PLAN.md open decision #3.
+  autoAcceptOrders Boolean   @default(true)
+  maxRevisions     Int       @default(2)
+
+  viewCount     Int   @default(0)
+  ratingAverage Float @default(0)
+  ratingCount   Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  packages GigPackage[]
+  orders   GigOrder[]
+
+  @@index([freelancerId, status])
+  @@index([category, status])
+}
+
+model GigPackage {
+  id                String         @id @default(cuid())
+  gigId             String
+  gig               Gig            @relation(fields: [gigId], references: [id], onDelete: Cascade)
+  tier              GigPackageTier
+  title             String
+  description       String
+  deliveryDays      Int
+  revisionsIncluded Int            @default(1)
+  priceMinor        Int
+  addOns            Json?
+
+  orders GigOrder[]
+
+  @@unique([gigId, tier])
+}
+
+model GigOrder {
+  id        String     @id @default(cuid())
+  gigId     String
+  gig       Gig        @relation(fields: [gigId], references: [id])
+  packageId String
+  package   GigPackage @relation(fields: [packageId], references: [id])
+  clientId  String
+  client    User       @relation("GigOrderClient", fields: [clientId], references: [id])
+
+  requirementsAnswer Json?
+
+  status      GigOrderStatus @default(PENDING_PAYMENT)
+  escrowState EscrowState    @default(PAYMENT_PENDING)
+
+  submittedAt     DateTime?
+  deliverableUrl  String?
+  deliverableHash String?
+  autoReleaseAt   DateTime?
+  releasedAt      DateTime?
+
+  revisionStatus      GigRevisionStatus @default(NONE)
+  revisionRequestNote String?
+  revisionsUsed       Int               @default(0)
+
+  totalChargeMinor Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  review     GigReview?
+
+  @@index([gigId, status])
+  @@index([clientId, status])
+}
+
+model GigReview {
+  id           String   @id @default(cuid())
+  orderId      String   @unique
+  order        GigOrder @relation(fields: [orderId], references: [id])
+  authorId     String
+  author       User     @relation("GigReviewAuthor", fields: [authorId], references: [id])
+  targetUserId String
+  targetUser   User     @relation("GigReviewTarget", fields: [targetUserId], references: [id])
+
+  rating          Int
+  categoryRatings Json
+  comment         String?
+
+  isBlind    Boolean   @default(true)
+  revealedAt DateTime?
+
+  response    String?
+  respondedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([targetUserId])
 }

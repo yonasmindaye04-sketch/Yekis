@@ -65,6 +65,10 @@ erDiagram
 | `FeaturedLog` | History of users featured in the talent carousel |
 | `ProfileReport` | Moderation flags against inappropriate profile content |
 | `ProfileView` | Analytical tracking of profile views |
+| `Gig` | Freelancer service package (Fiverr-style); owns `GigPackage` tiers, `GigOrder`s, and `GigReview`s |
+| `GigPackage` | Pricing tier under a gig (BASIC/STANDARD/PREMIUM); unique `(gigId, tier)` |
+| `GigOrder` | Client purchase of a package; reuses `EscrowState` + `totalChargeMinor`; revision loop counters |
+| `GigReview` | Client review of a completed order, with `categoryRatings` JSON (communication/quality/deadline/value) |
 
 ## Monetary Representation
 
@@ -116,6 +120,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260809150000_add_chat_with_staff_assignment` | Staff support assignment and scoped chat management |
 | `20260821215600_add_profile_reviews_chat_platform_models` | Profile items, reviews, user skills, counter offers, direct messaging, platform metrics, and password reset tokens |
 | `20260826090000_tms_rules_and_chapa_removal` | TMS alignment (Master Design §11.4): added ROUND_AMOUNTS, strDeadlineAt (24h SLA), and removed Chapa |
+| `20260829120000_gig_marketplace` | Gig/Package/Order/Review models + enums; `PlatformFeeCredit.milestoneId` nullable + `gigOrderId` column (append-only ledger now supports both contract and gig releases) |
 
 Do not edit an applied migration. Change `schema.prisma`, create a new migration, review its SQL, then regenerate the Prisma client.
 

@@ -154,10 +154,9 @@ export function App() {
   const [faydaIdNumber, setFaydaIdNumber] = useState("");
   const [faydaIdPhoto, setFaydaIdPhoto] = useState<File | null>(null);
   const [selfieWithIdPhoto, setSelfieWithIdPhoto] = useState<File | null>(null);
+  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR">(
-    "TELEBIRR",
-  );
+  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR">("TELEBIRR");
   const [topUpReference, setTopUpReference] = useState("");
   const [topUpReceipt, setTopUpReceipt] = useState<File | null>(null);
   const [topUpRequests, setTopUpRequests] = useState<TopUpRequest[]>([]);
@@ -454,6 +453,27 @@ export function App() {
     window.localStorage.setItem("yekis-role", newRole);
     setActiveTab("home");
     setShowJobForm(false);
+  };
+
+  const submitCheckoutTopUp = async () => {
+    const amount = Number(topUpAmount);
+    if (!amount || amount <= 0) {
+      alert("Please enter a valid amount.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { redirectUrl } = await api.initiateCheckoutTopUp(
+        Math.round(amount * 100),
+        "TELEBIRR"
+      );
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      }
+    } catch (err) {
+      alert(`Error: ${err instanceof Error ? err.message : "Failed to initiate top-up"}`);
+      setIsLoading(false);
+    }
   };
 
   const submitTopUp = async () => {
@@ -1921,83 +1941,126 @@ export function App() {
                       <div className="panel-heading">
                         <h2>Add Funds</h2>
                       </div>
-                      <p
-                        style={{
-                          marginBottom: 14,
-                          color: "var(--text-secondary)",
-                          fontSize: "0.85rem",
-                        }}
-                      >
-                        Send money to one of the accounts below, then upload
-                        your receipt for approval.
-                      </p>
-                      <div className="payment-grid">
-                        {Object.entries(paymentAccounts).map(
-                          ([key, account]) => (
-                            <button
-                              className={
-                                topUpRail === key
-                                  ? "payment-account selected"
-                                  : "payment-account"
-                              }
-                              key={key}
-                              onClick={() =>
-                                setTopUpRail(key as "TELEBIRR" | "CBE_BIRR")
-                              }
-                            >
-                              <img
-                                src={account.image}
-                                alt={account.label}
-                                style={account.imgStyle}
-                              />
-                              <div className="payment-account-text">
-                                <strong>{account.label}</strong>
-                                <span>{account.accountName}</span>
-                                <code>{account.accountNumber}</code>
-                              </div>
-                            </button>
-                          ),
-                        )}
+                      <div className="tabs" style={{ marginBottom: 16 }}>
+                        <button
+                          className={topUpMethod === "INSTANT" ? "active" : ""}
+                          onClick={() => setTopUpMethod("INSTANT")}
+                        >
+                          Instant Checkout
+                        </button>
+                        <button
+                          className={topUpMethod === "MANUAL" ? "active" : ""}
+                          onClick={() => setTopUpMethod("MANUAL")}
+                        >
+                          Manual Transfer
+                        </button>
                       </div>
-                      <label>
-                        Amount sent
-                        <input
-                          value={topUpAmount}
-                          onChange={(event) =>
-                            setTopUpAmount(event.target.value)
-                          }
-                          inputMode="decimal"
-                          placeholder="e.g. 5000"
-                        />
-                      </label>
-                      <label>
-                        Transaction/reference number
-                        <input
-                          value={topUpReference}
-                          onChange={(event) =>
-                            setTopUpReference(event.target.value)
-                          }
-                          placeholder="e.g. TB-12345"
-                        />
-                      </label>
-                      <label>
-                        Receipt image
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(event) =>
-                            setTopUpReceipt(event.target.files?.[0] ?? null)
-                          }
-                        />
-                      </label>
-                      <button
-                        className="btn-primary"
-                        style={{ marginTop: 16 }}
-                        onClick={submitTopUp}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? "Submitting..." : "Submit for approval"}
-                      </button>
+
+                      {topUpMethod === "INSTANT" ? (
+                        <>
+                          <p style={{ marginBottom: 14, color: "var(--text-secondary)", fontSize: "0.85rem" }}>
+                            Pay with Telebirr online. Your wallet will be credited automatically.
+                          </p>
+                          <label>
+                            Amount to add (ETB)
+                            <input
+                              value={topUpAmount}
+                              onChange={(event) => setTopUpAmount(event.target.value)}
+                              inputMode="decimal"
+                              placeholder="e.g. 1000"
+                            />
+                          </label>
+                          <button
+                            className="btn-primary"
+                            style={{ marginTop: 16, width: "100%", display: "flex", justifyContent: "center" }}
+                            onClick={submitCheckoutTopUp}
+                            disabled={isLoading}
+                          >
+                            <img src="/payment/Telebirr.png" alt="" style={{ width: 24, height: 24, objectFit: "contain", marginRight: 8, background: "#fff", borderRadius: 4 }} />
+                            {isLoading ? "Starting checkout..." : "Pay with Telebirr"}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p
+                            style={{
+                              marginBottom: 14,
+                              color: "var(--text-secondary)",
+                              fontSize: "0.85rem",
+                            }}
+                          >
+                            Send money to one of the accounts below, then upload
+                            your receipt for approval.
+                          </p>
+                          <div className="payment-grid">
+                            {Object.entries(paymentAccounts).map(
+                              ([key, account]) => (
+                                <button
+                                  className={
+                                    topUpRail === key
+                                      ? "payment-account selected"
+                                      : "payment-account"
+                                  }
+                                  key={key}
+                                  onClick={() =>
+                                    setTopUpRail(key as "TELEBIRR" | "CBE_BIRR")
+                                  }
+                                >
+                                  <img
+                                    src={account.image}
+                                    alt={account.label}
+                                    style={account.imgStyle}
+                                  />
+                                  <div className="payment-account-text">
+                                    <strong>{account.label}</strong>
+                                    <span>{account.accountName}</span>
+                                    <code>{account.accountNumber}</code>
+                                  </div>
+                                </button>
+                              ),
+                            )}
+                          </div>
+                          <label>
+                            Amount sent (ETB)
+                            <input
+                              value={topUpAmount}
+                              onChange={(event) =>
+                                setTopUpAmount(event.target.value)
+                              }
+                              inputMode="decimal"
+                              placeholder="e.g. 5000"
+                            />
+                          </label>
+                          <label>
+                            Transaction/reference number
+                            <input
+                              value={topUpReference}
+                              onChange={(event) =>
+                                setTopUpReference(event.target.value)
+                              }
+                              placeholder="e.g. TB-12345"
+                            />
+                          </label>
+                          <label>
+                            Receipt image
+                            <input
+                              type="file"
+                              accept="image/*,.pdf"
+                              onChange={(event) =>
+                                setTopUpReceipt(event.target.files?.[0] ?? null)
+                              }
+                            />
+                          </label>
+                          <button
+                            className="btn-primary"
+                            style={{ marginTop: 16 }}
+                            onClick={submitTopUp}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? "Submitting..." : "Submit for approval"}
+                          </button>
+                        </>
+                      )}
                     </section>
                     <section className="panel">
                       <div className="panel-heading">

@@ -1,4 +1,4 @@
-﻿# API Reference
+# API Reference
 
 Last updated: 2026-08-15
 
@@ -188,8 +188,9 @@ The mounted base path is `/api/v1/escrow/topups`.
 | `GET` | `/api/v1/escrow/topups/:topUpId` | Owner | Get one top-up |
 | `GET` | `/api/v1/escrow/topups/admin/queue` | Staff | List pending top-ups |
 | `POST` | `/api/v1/escrow/topups/admin/:topUpId/review` | Staff | Approve/reject; approval credits wallet |
+| `POST` | `/api/v1/wallet/topups/checkout` | Authenticated | Initiate automatic Telebirr C2B web checkout for wallet top-up |
 
-Manual top-up is `multipart/form-data` with `receipt`, `amountEtb`, `rail`, `senderName`, and `senderReference`. Rails are `TELEBIRR` and `CBE_BIRR`; maximum receipt size is 8 MB.
+Manual top-up is `multipart/form-data` with `receipt`, `amountMinor`, `provider`, and `referenceNumber`. Rails are `TELEBIRR` and `CBE_BIRR`; maximum receipt size is 8 MB. Automatic top-up takes `{ amountMinor, provider: "TELEBIRR" }` and returns `{ redirectUrl, topUpId }`.
 
 ## Signed Payment Webhooks
 
@@ -286,6 +287,28 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | `GET` | `/api/v1/featured` | Public | List featured talent carousel |
 | `POST` | `/api/v1/portfolio` | Authenticated Freelancer | Add portfolio item |
 | `GET` | `/api/v1/staff/reports` | Staff | List and manage profile reports |
+
+## Gigs (Fiverr-style Service Packages)
+
+See `GIG_MODEL_PLAN.md` for the full design. Amounts are integer minor units (ETB cents).
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/gigs/search` | Public | Faceted gig search (`category`, `q`, `page`, `pageSize`) |
+| `GET` | `/api/v1/gigs/:gigId` | Public | Gig detail incl. packages and freelancer |
+| `POST` | `/api/v1/gigs` | Freelancer/Both, Tier 1 verified | Create a gig with packages |
+| `GET` | `/api/v1/gigs/mine` | Authenticated Freelancer | List own gigs |
+| `PATCH` | `/api/v1/gigs/:gigId` | Owner, Tier 1 verified | Update a gig |
+| `POST` | `/api/v1/gigs/:gigId/status` | Owner | Set `ACTIVE` / `PAUSED` / `ARCHIVED` / `REJECTED` |
+| `POST` | `/api/v1/gigs/orders` | Client, Tier 1 verified | Order a package |
+| `POST` | `/api/v1/gigs/orders/:orderId/fund` | Client, Tier 1 verified | Fund order from wallet (escrow held) |
+| `POST` | `/api/v1/gigs/orders/:orderId/submit` | Freelancer | Submit delivery (schedules auto-release) |
+| `POST` | `/api/v1/gigs/orders/:orderId/revision` | Client | Request a revision |
+| `POST` | `/api/v1/gigs/orders/:orderId/accept` | Client | Accept and release funds |
+| `POST` | `/api/v1/gigs/orders/:orderId/review` | Client | Submit category-rated gig review |
+| `GET` | `/api/v1/gigs/orders/:orderId` | Party | Get order status/history |
+
+Gig orders reuse the existing `EscrowState` machine, `calculateFees`, `PlatformFeeCredit`, and a dedicated BullMQ auto-release worker (`gig-auto-release`). Gig disputes are deferred pending the polymorphic-refactor decision in `GIG_MODEL_PLAN.md`.
 
 ## TMS
 

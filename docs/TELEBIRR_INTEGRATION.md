@@ -108,6 +108,13 @@ The Fabric token is cached in Redis (`telebirr.token.ts`).
 
 ## 7. Current Project State
 
-As of August 2026, the primary escrow funding flow uses the **Wallet-First** approach (where clients top up their in-platform wallet manually via receipt upload, and escrow is funded from that balance). 
+As of August 2026, the Telebirr Web Checkout integration is actively used for **Automatic Wallet Top-Ups**.
 
-The direct Telebirr Web Checkout integration described in this document is fully implemented and tested, but currently bypassed in the UI in favor of the wallet flow. The code remains intact and functional for when direct C2B payments are re-enabled. Payouts (B2C) for freelancer withdrawals are currently mocked/stubbed and will require integration with Telebirr's B2C API.
+When a user clicks "Pay with Telebirr" on the Wallet page:
+1. `initiateCheckoutTopUp` is called, creating a `WalletTopUp` record in the database with status `CHECKOUT_PENDING` and returning the checkout URL.
+2. The user pays on Telebirr.
+3. Telebirr sends a webhook to `POST /api/v1/webhooks/telebirr`.
+4. The webhook handler (`handleTelebirrWebhook`) detects that the `merch_order_id` belongs to a `WalletTopUp` record instead of an escrow `PaymentTransaction`.
+5. It routes to `handleTopUpWebhook`, which atomically approves the top-up and credits the user's wallet balance.
+
+Payouts (B2C) for freelancer withdrawals are currently mocked/stubbed and will require integration with Telebirr's B2C API.

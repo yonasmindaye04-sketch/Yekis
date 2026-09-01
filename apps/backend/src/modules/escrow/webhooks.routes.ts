@@ -4,6 +4,8 @@ import rateLimit from "express-rate-limit";
 import type { PaymentProvider } from "@marketplace/schemas";
 import { getProviderClient, handlePaymentWebhook } from "./escrow.service.js";
 import { logger } from "../../lib/logger.js";
+import { prisma } from "../../lib/prisma.js";
+import { handleTopUpWebhook } from "../topups/topup.service.js";
 
 export const webhooksRouter = Router();
 
@@ -133,12 +135,26 @@ async function handleTelebirrWebhook(
 
   // 5. Process the webhook through the shared escrow handler
   try {
-    await handlePaymentWebhook({
-      provider: "TELEBIRR",
-      providerTransactionId: merchOrderId,
-      status,
-      rawPayload: payload,
+    // Check if this merch_order_id belongs to a WalletTopUp first
+    const isTopUp = await prisma.walletTopUp.findUnique({
+      where: { providerTransactionId: merchOrderId },
+      select: { id: true },
     });
+
+    if (isTopUp) {
+      await handleTopUpWebhook({
+        providerTransactionId: merchOrderId,
+        status,
+        rawPayload: payload,
+      });
+    } else {
+      await handlePaymentWebhook({
+        provider: "TELEBIRR",
+        providerTransactionId: merchOrderId,
+        status,
+        rawPayload: payload,
+      });
+    }
 
     // 6. Respond with Telebirr's expected success format
     return res.status(200).json({ code: 0, msg: "success" });

@@ -28,3 +28,8 @@ export const paymentReconcileQueue = new Queue("payment-reconcile", {
 });
 // Master Design §11.4: automated AML scan every 15 minutes
 export const tmsScanQueue = new Queue("tms-scan", { connection: redis });
+// Gig order auto-release (see docs/GIG_MODEL_PLAN.md) — mirrors auto-release
+// for milestone contracts but keyed on gigOrderId instead of milestoneId.
+export const gigAutoReleaseQueue = new Queue("gig-auto-release", {
+  connection: redis,
+});

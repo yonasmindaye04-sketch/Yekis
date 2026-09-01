@@ -21,6 +21,7 @@ import { skillsRouter } from "./modules/skills/skills.routes.js";
 import { reviewRouter } from "./modules/reviews/review.routes.js";
 import { featuredRouter } from "./modules/featured/featured.routes.js";
 import { portfolioRouter } from "./modules/portfolio/portfolio.routes.js";
+import { gigsRouter } from "./modules/gigs/gig.routes.js";
 import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
 import { financeRouter } from "./modules/finance/finance.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
@@ -90,6 +91,7 @@ export function buildApp() {
   app.use("/api/v1/reviews", reviewRouter);
   app.use("/api/v1/featured", featuredRouter);
   app.use("/api/v1/portfolio", portfolioRouter);
+  app.use("/api/v1/gigs", gigsRouter);
   app.use("/api/v1/staff", staffProfileRouter);
   app.use("/api/v1/finance", financeRouter);
   app.use("/api/v1/admin", adminRouter);

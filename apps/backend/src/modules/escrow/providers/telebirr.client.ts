@@ -51,7 +51,7 @@ function hasCredentials(): boolean {
 function generateMerchOrderId(): string {
   const ts = Date.now();
   const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
-  return `YKS-${ts}-${rand}`;
+  return `YKS${ts}${rand}`;
 }
 
 // === MAIN EXPORT ===
@@ -95,7 +95,7 @@ export const telebirrClient: PaymentProviderClient = {
         merch_code: env.TELEBIRR_MERCHANT_CODE,
         merch_order_id: merchOrderId,
         trade_type: "Checkout",
-        title: `Yekis Escrow — ${params.reference}`,
+        title: `Yekis Escrow ${params.reference.replace(/[^a-zA-Z0-9 ]/g, ' ')}`,
         total_amount: amountStr,
         trans_currency: params.currency,
         timeout_express: env.TELEBIRR_TIMEOUT_EXPRESS,

@@ -40,6 +40,7 @@ import {
   Moon,
   Eye,
   EyeOff,
+  Package,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -61,6 +62,7 @@ import "./marketing.css";
 import { PageLoadSplash, ScrollEffects } from "./components/motion";
 import { initAnalytics, events } from "./analytics";
 import { SocialSignInButtons } from "./components/SocialSignInButtons";
+import { GigMarketplace } from "./GigMarketplace";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
@@ -68,6 +70,7 @@ type PlatformRole = "CLIENT" | "FREELANCER" | "ADMIN" | "MEDIATOR";
 type View =
   | "overview"
   | "jobs"
+  | "gigs"
   | "contracts"
   | "wallet"
   | "chat"
@@ -116,6 +119,7 @@ const navIconMap: Record<string, React.ReactNode> = {
   overview: <LayoutDashboard size={18} />,
   jobs: <Briefcase size={18} />,
   "find-work": <Search size={18} />,
+  gigs: <Package size={18} />,
   contracts: <FileText size={18} />,
   wallet: <Wallet size={18} />,
   chat: <MessageCircle size={18} />,
@@ -327,6 +331,7 @@ export function FullPlatformApp() {
     const common = [
       { view: "overview" as View, iconKey: "overview", label: "Overview" },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
+      { view: "gigs" as View, iconKey: "gigs", label: "Gigs" },
       { view: "contracts" as View, iconKey: "contracts", label: "Contracts" },
       { view: "wallet" as View, iconKey: "wallet", label: "Wallet" },
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
@@ -1191,6 +1196,8 @@ export function FullPlatformApp() {
             />
           </section>
         )}
+
+        {view === "gigs" && <GigMarketplace />}
 
         {view === "contracts" && (
           <section className="platform-content">

@@ -19,6 +19,7 @@ import {
   TopUpNotFoundError,
   TopUpAlreadyResolvedError,
   getUserTopUps,
+  initiateCheckoutTopUp,
 } from "./topup.service.js";
 
 export const topupsRouter = Router();
@@ -92,6 +93,28 @@ topupsRouter.post(
     }
   },
 );
+
+topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
+  const { amountMinor, provider } = req.body;
+  if (!amountMinor || typeof amountMinor !== "number" || amountMinor <= 0) {
+    return res.status(400).json({ error: "INVALID_AMOUNT" });
+  }
+  if (provider !== "TELEBIRR") {
+    return res.status(400).json({ error: "UNSUPPORTED_PROVIDER" });
+  }
+
+  try {
+    const result = await initiateCheckoutTopUp({
+      userId: req.user!.id,
+      amountMinor,
+      provider,
+    });
+    return res.json(result);
+  } catch (err) {
+    logger.error({ err }, "Top-up checkout initiation failed");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
 
 // ---------- Staff-only ----------
 

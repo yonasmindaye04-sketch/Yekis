@@ -5,11 +5,20 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Added
+- **Automatic Telebirr Wallet Top-Up (2026-08-29)**: Wired the existing Telebirr payment engine to the wallet top-up flow. Users can now choose "Instant Checkout" in the Add Funds section, pay via Telebirr's web checkout, and have their wallet auto-credited via the webhook integration.
+- **Gig / Service Packages (Fiverr-style) — backend & frontend foundation (2026-08-29)**:
+  - New `Gig`, `GigPackage`, `GigOrder`, `GigReview` Prisma models + `GigStatus`/`GigPackageTier`/`GigOrderStatus`/`GigRevisionStatus` enums (migration `20260829120000_gig_marketplace`).
+  - `PlatformFeeCredit.milestoneId` made nullable + new `gigOrderId` column — a single append-only ledger now records both contract and gig releases.
+  - New `apps/backend/src/modules/gigs/` (`gig.service.ts`, `gig.routes.ts`): gig CRUD, faceted search, wallet funding, delivery, revision loop, fee/withholding-aware acceptance, and category-rated reviews.
+  - `gig-auto-release` BullMQ queue + `gigAutoRelease.worker.ts` for no-action auto-release of gig orders.
+  - Shared Zod schemas in `packages/schemas` (`CreateGigInput`, `GigSearchQuery`, `CreateGigOrderInput`, `CreateGigReviewInput`, etc.).
+  - Frontend `GigMarketplace.tsx` (browse / filter / order + fund) wired into `FullPlatformApp` nav ("Gigs" view) and `api/client.ts`.
 - **`docs/PRIORITIZED_BACKLOG.md` (2026-08-29)** — section-by-section gap analysis (DONE/PARTIAL/MISSING/BLOCKED) mapping the external 36-section marketplace checklist to the current codebase, plus a 5-phase execution plan (money-unblock → UX fundamentals → hybrid model → monetize → scale).
 - **`docs/GIG_MODEL_PLAN.md` (2026-08-29)** — full Prisma schema + backend module + frontend page plan for the Fiverr-style Gig/Package marketplace, designed to reuse the existing escrow/auto-release/dispute/Bayes-review engines. Open decisions: polymorphic payment vs. naming gigOrderId, moderation-before-publish.
 - README.md documentation map appended with both new documents.
 
 ### Fixed
+- **`topup.service.ts` null-guard (2026-08-29)**: `getReceiptViewUrl` now short-circuits for automatic Telebirr checkout top-ups (no receipt image), so the nullable `receiptImagePath` field typechecks alongside the in-progress checkout schema drift.
 - **Backend Dependency & Build Fixes (2026-08-28)**:
   - Installed missing `axios` dependency in `apps/backend/package.json` required for eSignet OIDC KYC client (`esignet.client.ts`).
   - Added `ROUND_AMOUNTS` to `TransactionFlagType` enum and `strDeadlineAt` to `TransactionFlag` model in `apps/backend/prisma/schema.prisma`, synchronizing with migration `20260826090000_tms_rules_and_chapa_removal` and regenerated Prisma Client.

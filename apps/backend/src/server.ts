@@ -4,6 +4,14 @@
 // becoming unhandled rejections (which crash Node >= 15).
 import "express-async-errors";
 import { env } from "./config/env.js";
+
+// Telebirr's developer portal uses a self-signed/untrusted certificate.
+// We must bypass Node's strict TLS validation in development, otherwise
+// fetch() calls to their API will fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+if (env.NODE_ENV !== "production") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 import { buildApp } from "./app.js";
 import { logger } from "./lib/logger.js";
 import { startBot, stopBot } from "./modules/bot/bot.service.js";
@@ -18,6 +26,7 @@ import "./queue/paymentReconcile.worker.js";
 import "./queue/reviewReveal.worker.js";
 import "./queue/featuredRefresh.worker.js";
 import "./queue/tmsScan.worker.js";
+import "./queue/gigAutoRelease.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
 import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
 import { schedulePaymentReconcileJob } from "./queue/paymentReconcile.worker.js";

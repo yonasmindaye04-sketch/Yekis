@@ -98,6 +98,7 @@ export interface Job {
   deadline: string;
   status: string;
   proposalsCount?: number;
+  proposedMilestones?: { title: string; amountMinor: number; dueDate: string }[];
   contract?: { id: string } | null;
 }
 
@@ -235,6 +236,72 @@ export interface AuthUser {
   email: string;
   phone: string;
   languagePreference: string;
+}
+
+export interface GigPackage {
+  id: string;
+  tier: "BASIC" | "STANDARD" | "PREMIUM";
+  title: string;
+  description: string;
+  deliveryDays: number;
+  revisionsIncluded: number;
+  priceMinor: number;
+  addOns?: { label: string; priceMinor: number }[] | null;
+}
+
+export interface Gig {
+  id: string;
+  freelancerId: string;
+  title: string;
+  category: string;
+  description: string;
+  tags: string[];
+  requirements: { label: string; type: string; required: boolean; options?: string[] }[];
+  faqJson?: { question: string; answer: string }[] | null;
+  thumbnailUrl?: string | null;
+  mediaUrls: string[];
+  status: string;
+  autoAcceptOrders: boolean;
+  maxRevisions: number;
+  viewCount: number;
+  ratingAverage: number;
+  ratingCount: number;
+  createdAt: string;
+  packages?: GigPackage[];
+  freelancer?: { id: string; displayName: string | null; avatarUrl: string | null; bio: string | null; profileCompleteness: number };
+}
+
+export interface GigOrder {
+  id: string;
+  gigId: string;
+  packageId: string;
+  clientId: string;
+  status: string;
+  escrowState: string;
+  submittedAt?: string | null;
+  deliverableUrl?: string | null;
+  autoReleaseAt?: string | null;
+  revisionStatus: string;
+  revisionRequestNote?: string | null;
+  revisionsUsed: number;
+  totalChargeMinor: number;
+  createdAt: string;
+  gig?: { id: string; title: string; freelancerId: string };
+  package?: GigPackage;
+}
+
+export interface CreateGigPayload {
+  title: string;
+  category: string;
+  description: string;
+  tags: string[];
+  requirements: { label: string; type: string; required: boolean; options?: string[] }[];
+  faqJson?: { question: string; answer: string }[];
+  thumbnailUrl?: string;
+  mediaUrls?: string[];
+  autoAcceptOrders: boolean;
+  maxRevisions: number;
+  packages: { tier: "BASIC" | "STANDARD" | "PREMIUM"; title: string; description: string; deliveryDays: number; revisionsIncluded: number; priceMinor: number; addOns?: { label: string; priceMinor: number }[] }[];
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
@@ -485,6 +552,13 @@ class ApiClient {
     return this.request(`/api/v1/wallet/topups/${topUpId}/receipt-url`);
   }
 
+  async initiateCheckoutTopUp(amountMinor: number, provider: string): Promise<{ redirectUrl: string; topUpId: string }> {
+    return this.request("/api/v1/wallet/topups/checkout", {
+      method: "POST",
+      body: JSON.stringify({ amountMinor, provider }),
+    });
+  }
+
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
     const headers: Record<string, string> = {};
     if (this.accessToken) {
@@ -591,11 +665,10 @@ class ApiClient {
     formData.append("file", file);
     
     // We use native fetch here because this.request expects JSON body by default
-    const token = this.tokenProvider();
     const headers: Record<string, string> = {};
-    if (token) headers["Authorization"] = `Bearer ${token}`;
-    
-    const res = await fetch(`${this.baseUrl}/api/v1/jobs/${jobId}/proposals/upload`, {
+    if (this.accessToken) headers["Authorization"] = `Bearer ${this.accessToken}`;
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/jobs/${jobId}/proposals/upload`, {
       method: "POST",
       headers,
       body: formData,
@@ -774,6 +847,48 @@ class ApiClient {
   }
   async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
     return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
+  }
+
+  // --- Gigs (Fiverr-style service packages) ---
+  async searchGigs(params?: { category?: string; q?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<Gig>> {
+    const searchParams = new URLSearchParams();
+    if (params?.category) searchParams.set("category", params.category);
+    if (params?.q) searchParams.set("q", params.q);
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+    return this.request(`/api/v1/gigs/search?${searchParams.toString()}`);
+  }
+
+  async getGig(gigId: string): Promise<Gig> {
+    return this.request(`/api/v1/gigs/${gigId}`);
+  }
+
+  async createGig(input: CreateGigPayload): Promise<Gig> {
+    return this.request("/api/v1/gigs", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  async createGigOrder(packageId: string, requirementsAnswer?: Record<string, unknown>): Promise<GigOrder> {
+    return this.request("/api/v1/gigs/orders", { method: "POST", body: JSON.stringify({ packageId, requirementsAnswer }) });
+  }
+
+  async fundGigOrder(orderId: string): Promise<GigOrder> {
+    return this.request(`/api/v1/gigs/orders/${orderId}/fund`, { method: "POST" });
+  }
+
+  async submitGigDelivery(orderId: string, deliverableUrl?: string): Promise<GigOrder> {
+    return this.request(`/api/v1/gigs/orders/${orderId}/submit`, { method: "POST", body: JSON.stringify({ deliverableUrl }) });
+  }
+
+  async requestGigRevision(orderId: string, note: string): Promise<GigOrder> {
+    return this.request(`/api/v1/gigs/orders/${orderId}/revision`, { method: "POST", body: JSON.stringify({ note }) });
+  }
+
+  async acceptGigOrder(orderId: string): Promise<GigOrder> {
+    return this.request(`/api/v1/gigs/orders/${orderId}/accept`, { method: "POST" });
+  }
+
+  async reviewGigOrder(orderId: string, input: { rating: number; categoryRatings: { communication: number; quality: number; deadline: number; valueForMoney: number }; comment?: string }): Promise<unknown> {
+    return this.request(`/api/v1/gigs/orders/${orderId}/review`, { method: "POST", body: JSON.stringify(input) });
   }
 }
 

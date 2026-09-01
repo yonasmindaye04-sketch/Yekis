@@ -67,9 +67,9 @@ export async function getFabricToken(): Promise<string> {
     expirationDate?: string;
   };
 
-  if (data.code !== 200 || !data.token) {
+  if (!data.token) {
     throw new Error(
-      `Telebirr token request returned error: code=${data.code}, msg=${data.msg}`,
+      `Telebirr token request returned error: code=${data.code || data.errorCode}, msg=${data.msg || data.errorMsg}`,
     );
   }
 

@@ -9,6 +9,7 @@ import {
 } from "../../lib/objectStore.js";
 import { notificationQueue } from "../../queue/queues.js";
 import { logger } from "../../lib/logger.js";
+import { telebirrClient } from "../escrow/providers/telebirr.client.js";
 
 // === MAIN FUNCTIONS ===
 export class TopUpNotFoundError extends Error {}
@@ -140,6 +141,14 @@ export async function getTopUpQueue(params?: {
 export async function getReceiptViewUrl(topUpId: string) {
   const topUp = await prisma.walletTopUp.findUnique({ where: { id: topUpId } });
   if (!topUp) throw new TopUpNotFoundError();
+
+  // Automatic Telebirr checkout top-ups (providerTransactionId set) have no
+  // manual receipt photo, so there is nothing to sign a URL for.
+  if (!topUp.receiptImagePath) {
+    throw new TopUpNotFoundError(
+      "This top-up has no receipt image (automatic checkout).",
+    );
+  }
 
   const url = await getSignedObjectUrl(topUp.receiptImagePath);
   return { url, expiresInSeconds: 300 };
@@ -289,4 +298,154 @@ export async function getUserTopUps(userId: string) {
     where: { userId },
     orderBy: { createdAt: "desc" },
   });
+}
+
+// ---------- Automatic Telebirr Checkout Top-Up ----------
+
+export class TopUpCheckoutError extends Error {}
+
+/**
+ * Initiates an automatic Telebirr C2B Web Checkout for a wallet top-up.
+ * Returns a redirect URL that the frontend should send the user to.
+ */
+export async function initiateCheckoutTopUp(params: {
+  userId: string;
+  amountMinor: number;
+  provider: PaymentProvider;
+}) {
+  const wallet = await prisma.wallet.findUniqueOrThrow({
+    where: { userId: params.userId },
+  });
+
+  // Use the existing Telebirr payment engine
+  const initiated = await telebirrClient.initiatePayment({
+    amountMinor: params.amountMinor,
+    currency: "ETB",
+    reference: `wallet-topup-${params.userId}`,
+  });
+
+  // Create a WalletTopUp record to track this checkout
+  const topUp = await prisma.walletTopUp.create({
+    data: {
+      userId: params.userId,
+      walletId: wallet.id,
+      provider: params.provider,
+      amountMinor: params.amountMinor,
+      providerTransactionId: initiated.providerTransactionId,
+      status: "CHECKOUT_PENDING",
+    },
+  });
+
+  await recordAuditEvent({
+    userId: params.userId,
+    eventType: "TOPUP_CHECKOUT_INITIATED",
+    entityType: "WalletTopUp",
+    entityId: topUp.id,
+    metadata: {
+      provider: params.provider,
+      amountMinor: params.amountMinor,
+      providerTransactionId: initiated.providerTransactionId,
+    },
+  });
+
+  logger.info(
+    { topUpId: topUp.id, providerTransactionId: initiated.providerTransactionId },
+    "Telebirr checkout top-up initiated",
+  );
+
+  return {
+    topUpId: topUp.id,
+    redirectUrl: initiated.redirectUrl,
+    providerTransactionId: initiated.providerTransactionId,
+  };
+}
+
+/**
+ * Handles the Telebirr webhook callback for a wallet top-up.
+ * Atomically credits the wallet on success.
+ */
+export async function handleTopUpWebhook(params: {
+  providerTransactionId: string;
+  status: "SUCCESS" | "FAILED" | "PENDING";
+  rawPayload: unknown;
+}) {
+  const topUp = await prisma.walletTopUp.findFirst({
+    where: { providerTransactionId: params.providerTransactionId },
+  });
+
+  if (!topUp) {
+    logger.warn(
+      { providerTransactionId: params.providerTransactionId },
+      "Top-up webhook received for unknown transaction — ignoring.",
+    );
+    return;
+  }
+
+  if (topUp.status !== "CHECKOUT_PENDING") {
+    logger.info(
+      { topUpId: topUp.id, status: topUp.status },
+      "Top-up webhook for already-settled top-up — ignoring.",
+    );
+    return;
+  }
+
+  if (params.status === "PENDING") {
+    logger.info({ topUpId: topUp.id }, "Top-up still pending — no action.");
+    return;
+  }
+
+  if (params.status === "FAILED") {
+    await prisma.walletTopUp.update({
+      where: { id: topUp.id },
+      data: { status: "REJECTED", rejectionReason: "Payment failed at provider" },
+    });
+
+    await recordAuditEvent({
+      userId: topUp.userId,
+      eventType: "TOPUP_CHECKOUT_FAILED",
+      entityType: "WalletTopUp",
+      entityId: topUp.id,
+      metadata: { providerTransactionId: params.providerTransactionId },
+    });
+
+    await notificationQueue.add("topup-failed", {
+      userId: topUp.userId,
+      message: `Your wallet top-up of ETB ${(topUp.amountMinor / 100).toFixed(2)} was not successful. Please try again.`,
+    });
+
+    return;
+  }
+
+  // SUCCESS — atomically credit the wallet
+  await prisma.$transaction([
+    prisma.walletTopUp.update({
+      where: { id: topUp.id },
+      data: { status: "APPROVED", reviewedAt: new Date() },
+    }),
+    prisma.wallet.update({
+      where: { id: topUp.walletId },
+      data: { balanceMinor: { increment: topUp.amountMinor } },
+    }),
+  ]);
+
+  await recordAuditEvent({
+    userId: topUp.userId,
+    eventType: "TOPUP_AUTO_APPROVED",
+    entityType: "WalletTopUp",
+    entityId: topUp.id,
+    metadata: {
+      amountMinor: topUp.amountMinor,
+      providerTransactionId: params.providerTransactionId,
+    },
+  });
+
+  await notificationQueue.add("topup-success", {
+    userId: topUp.userId,
+    message: `Your wallet has been credited with ETB ${(topUp.amountMinor / 100).toFixed(2)}. Funds are ready to use!`,
+  });
+
+  logger.info(
+    { topUpId: topUp.id, amountMinor: topUp.amountMinor },
+    "Telebirr checkout top-up auto-approved — wallet credited.",
+  );
 }
