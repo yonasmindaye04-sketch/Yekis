@@ -10,6 +10,7 @@ import {
   InvalidTokenError,
   requestPasswordReset,
   resetPassword,
+  refreshSession,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
@@ -248,6 +249,35 @@ authRouter.post("/reset-password", async (req, res) => {
         .json({ error: "INVALID_TOKEN", message: err.message });
     }
     logger.error({ err }, "Unexpected error during password reset");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+/**
+ * Exchanges a valid refresh token for a fresh access/refresh pair.
+ * This endpoint is the reason sessions can outlive the short access-token TTL:
+ * previously the refresh token was issued at login but had no consumer, so
+ * every user was silently logged out every JWT_ACCESS_TTL (default 15m).
+ */
+authRouter.post("/refresh", async (req, res) => {
+  const parsed = z
+    .object({ refreshToken: z.string().min(20) })
+    .safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  }
+  try {
+    const result = await refreshSession(parsed.data.refreshToken);
+    return res.json(result);
+  } catch (err) {
+    if (err instanceof InvalidTokenError) {
+      return res
+        .status(401)
+        .json({ error: "INVALID_REFRESH_TOKEN", message: err.message });
+    }
+    logger.error({ err }, "Unexpected error during session refresh");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });

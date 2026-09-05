@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Save, Check } from "lucide-react";
 import { api } from "./api/client";
+import "./ProfilePage.css";
 
 interface SkillTaxonomy {
   id: string;
@@ -147,24 +148,28 @@ export const ProfileEditPage = () => {
   return (
     <div className="profile-edit-page">
       <div className="profile-edit-container">
-        <div className="profile-edit-header">
-          <h1>Edit Profile</h1>
-          <div className="completeness-indicator">
-            <span>Profile Completeness</span>
-            <div className="progress-bar">
+        <div className="completeness-card">
+          <div className="completeness-info">
+            <strong>Profile Completeness</strong>
+            <span>Complete your profile to build trust and win higher-value contracts</span>
+          </div>
+          <div className="completeness-meter">
+            <div className="completeness-bar">
               <div
-                className="progress-fill"
+                className="completeness-fill"
                 style={{ width: `${formData.profileCompleteness || 0}%` }}
-              ></div>
+              />
             </div>
-            <strong>{formData.profileCompleteness}%</strong>
+            <span className="completeness-pct">{formData.profileCompleteness || 0}%</span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="profile-edit-form panel">
-          <div className="form-content">
-            <div className="form-grid">
-              <div className="form-group">
+          {/* Section 1: Personal Details */}
+          <div className="form-section">
+            <h3 className="form-section-title">Personal Details</h3>
+            <div className="form-row-2col">
+              <div className="form-field">
                 <label>First Name</label>
                 <input
                   type="text"
@@ -172,9 +177,10 @@ export const ProfileEditPage = () => {
                   value={formData.firstName}
                   onChange={handleChange}
                   required
+                  placeholder="First name"
                 />
               </div>
-              <div className="form-group">
+              <div className="form-field">
                 <label>Last Name</label>
                 <input
                   type="text"
@@ -182,115 +188,134 @@ export const ProfileEditPage = () => {
                   value={formData.lastName}
                   onChange={handleChange}
                   required
+                  placeholder="Last name"
                 />
               </div>
             </div>
 
-            <div className="form-group">
+            <div className="form-field">
               <label>Professional Bio</label>
               <textarea
                 name="bio"
                 value={formData.bio}
                 onChange={handleChange}
                 rows={4}
-                placeholder="Tell clients about your expertise..."
+                placeholder="Tell clients about your expertise, background, and what makes your work exceptional..."
               />
             </div>
+          </div>
 
-            <hr />
+          <hr className="form-divider" />
 
-            <div className="skills-section">
-              <h3>Skills &amp; Expertise</h3>
+          {/* Section 2: Skills & Expertise */}
+          <div className="form-section">
+            <h3 className="form-section-title">Skills &amp; Expertise</h3>
+            <p className="form-section-desc">
+              Highlight your core specializations so clients can discover you for relevant projects.
+            </p>
 
-              <div className="form-group">
-                <label>Primary Skill</label>
-                <select
-                  name="primarySkillId"
-                  value={formData.primarySkillId ?? ""}
-                  onChange={handleChange}
-                >
-                  <option value="">Select your main expertise</option>
-                  {skillTaxonomy.map((skill) => (
-                    <option key={skill.id} value={skill.id}>
-                      {skill.nameEn ?? skill.id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Additional Skills</label>
-                <p className="field-hint">
-                  Tap to toggle - selected skills are highlighted.
-                </p>
-                <div className="tags-list">
-                  {skillTaxonomy.map((skill) => {
-                    const selected = formData.skillIds.includes(skill.id);
-                    return (
-                      <button
-                        key={skill.id}
-                        type="button"
-                        className={`tag tag-toggle ${selected ? "tag-selected" : ""}`}
-                        onClick={() => toggleSkill(skill.id)}
-                      >
-                        {skill.nameEn ?? skill.id}
-                      </button>
-                    );
-                  })}
-                  {skillTaxonomy.length === 0 && (
-                    <span className="tag">No skills available</span>
-                  )}
-                </div>
-              </div>
+            <div className="form-field">
+              <label>Primary Skill</label>
+              <select
+                name="primarySkillId"
+                value={formData.primarySkillId ?? ""}
+                onChange={handleChange}
+              >
+                <option value="">Select your main expertise</option>
+                {skillTaxonomy.map((skill) => (
+                  <option key={skill.id} value={skill.id}>
+                    {skill.nameEn ?? skill.id}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <hr />
-
-            <div className="preferences-section">
-              <h3>Preferences</h3>
-
-              <div className="preference-item">
-                <div className="preference-info">
-                  <h4>Available for Work</h4>
-                  <p>Show a badge indicating you're accepting new projects</p>
-                </div>
-                <label className="toggle-switch">
-                  <input
-                    type="checkbox"
-                    name="isAvailableForWork"
-                    checked={!!formData.isAvailableForWork}
-                    onChange={handleChange}
-                  />
-                  <span className="slider"></span>
-                </label>
-              </div>
-
-              <div className="form-group visibility-settings">
-                <label>Profile Visibility</label>
-                <div className="visibility-options">
-                  {["PUBLIC", "PROPOSERS", "PRIVATE"].map((vis) => (
+            <div className="form-field">
+              <label>Additional Skills</label>
+              <p className="form-section-desc">
+                Tap to toggle – selected skills are highlighted.
+              </p>
+              <div className="skills-tags-container">
+                {skillTaxonomy.map((skill) => {
+                  const selected = formData.skillIds.includes(skill.id);
+                  return (
                     <button
-                      key={vis}
+                      key={skill.id}
                       type="button"
-                      onClick={() => handleVisibilityChange(vis)}
-                      className={`visibility-btn ${formData.profileVisibility === vis ? "active" : ""}`}
+                      className={`tag-toggle-btn ${selected ? "selected" : ""}`}
+                      onClick={() => toggleSkill(skill.id)}
                     >
-                      {vis.charAt(0) + vis.slice(1).toLowerCase()}
+                      {skill.nameEn ?? skill.id}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
+                {skillTaxonomy.length === 0 && (
+                  <span className="tag">No skills available</span>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="form-actions">
-            {saveSuccess && (
-              <span className="success-msg">
-                <Check size={16} /> Saved successfully
-              </span>
-            )}
-            {saveError && <span className="report-error">{saveError}</span>}
-            <button type="submit" disabled={saving} className="btn-primary">
+          <hr className="form-divider" />
+
+          {/* Section 3: Preferences */}
+          <div className="form-section">
+            <h3 className="form-section-title">Preferences</h3>
+            <p className="form-section-desc">
+              Manage your marketplace availability and client visibility options.
+            </p>
+
+            <div className="preference-card">
+              <div className="preference-text">
+                <strong>Available for Work</strong>
+                <span>Show an active badge indicating you're accepting new projects</span>
+              </div>
+              <label className="switch-control">
+                <input
+                  type="checkbox"
+                  name="isAvailableForWork"
+                  checked={!!formData.isAvailableForWork}
+                  onChange={handleChange}
+                />
+                <span className="switch-slider" />
+              </label>
+            </div>
+
+            <div className="visibility-group">
+              <label style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--color-text)", margin: 0 }}>
+                Profile Visibility
+              </label>
+              <div className="visibility-pills">
+                {[
+                  { id: "PUBLIC", label: "Public", desc: "Visible to all clients across the marketplace" },
+                  { id: "PROPOSERS", label: "Clients Only", desc: "Visible only when you submit proposals" },
+                  { id: "PRIVATE", label: "Private", desc: "Hidden from search; only visible in active contracts" },
+                ].map((vis) => (
+                  <button
+                    key={vis.id}
+                    type="button"
+                    onClick={() => handleVisibilityChange(vis.id)}
+                    className={`visibility-pill-btn ${formData.profileVisibility === vis.id ? "active" : ""}`}
+                  >
+                    <strong>{vis.label}</strong>
+                    <small>{vis.desc}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Form Actions */}
+          <div className="form-actions-bar">
+            <div>
+              {saveSuccess && (
+                <span className="save-status-msg">
+                  <Check size={16} /> Saved successfully
+                </span>
+              )}
+              {saveError && <span className="save-error-msg">{saveError}</span>}
+            </div>
+            <button type="submit" disabled={saving} className="btn-primary" style={{ minWidth: 160 }}>
               <Save size={16} />
               {saving ? "Saving..." : "Save Changes"}
             </button>

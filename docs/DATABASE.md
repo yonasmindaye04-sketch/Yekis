@@ -69,6 +69,10 @@ erDiagram
 | `GigPackage` | Pricing tier under a gig (BASIC/STANDARD/PREMIUM); unique `(gigId, tier)` |
 | `GigOrder` | Client purchase of a package; reuses `EscrowState` + `totalChargeMinor`; revision loop counters |
 | `GigReview` | Client review of a completed order, with `categoryRatings` JSON (communication/quality/deadline/value) |
+| `LedgerAccount` | General ledger account in chart of accounts (Asset, Liability, Revenue); tracks running `balanceMinor` |
+| `LedgerJournal` | Atomic accounting transaction container with unique `idempotencyKey` and references |
+| `LedgerEntry` | Individual debit or credit line item; enforces zero-sum invariant per journal |
+| `PayoutTransaction` | Freelancer withdrawal record tracking Telebirr B2C disbursement lifecycle and statuses |
 
 ## Monetary Representation
 
@@ -103,9 +107,10 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `ProposalStatus` | `SUBMITTED`, `SHORTLISTED`, `ACCEPTED`, `REJECTED`, `WITHDRAWN` |
 | `EscrowState` | `PAYMENT_PENDING`, `ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `ACCEPTED`, `RELEASED`, `DISPUTED`, `REFUNDED`, `PARTIAL_REFUND` |
 | `DisputeStage` | `NONE`, negotiation, evidence, mediation, arbitration, `RESOLVED` |
-| `DisputeResolutionOutcome` | `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, `PARTIAL_SPLIT` |
-| `PaymentProvider` | `TELEBIRR`, `CBE_BIRR` — PAY-002: `CHAPA` removed 2026-08-26 (app layer); inert enum value remains in PG16 until a PG17+ migration can drop it |
+| `PaymentProvider` | `TELEBIRR`, `CBE_BIRR`, `M_PESA` — Safaricom M-Pesa added alongside Telebirr and CBE; `CHAPA` removed 2026-08-26 (app layer); inert enum value remains in PG16 until a PG17+ migration can drop it |
 | `TransactionFlagType` | `STRUCTURING`, `VELOCITY`, `ROUND_AMOUNTS`, `PASS_THROUGH`, `WALLET_MISMATCH`, `STAFF_FLAGGED`, `VAT_THRESHOLD_REACHED` |
+| `LedgerAccountType` | `ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `EXPENSE` |
+| `PayoutStatus` | `PENDING`, `PROCESSING`, `CONFIRMED`, `FAILED`, `REVERSED` |
 
 ## Migration History
 

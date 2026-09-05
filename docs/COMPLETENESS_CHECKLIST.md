@@ -35,6 +35,8 @@ Last reviewed: 2026-08-15
 - [x] Tier 2 request/review and withdrawal gate
 - [x] Wallet-mismatch compliance hold with no debit
 - [x] Manual top-up submission, staff review, and wallet credit
+- [x] Multi-rail payment choices (Telebirr, Commercial Bank of Ethiopia CBE, and Safaricom M-Pesa) across Instant Checkout, Manual Transfer, and Freelancer Withdrawals
+- [x] Manual verification fallback: actionable transfer fallback on API failure and receipt attachment to unconfirmed checkout requests (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`)
 - [x] In-app notifications and support chat surfaces
 - [x] Staff KYC, top-up, dispute, TMS, and Finance queues
 - [x] Finance reconciliation read models and fee credit ledger
@@ -70,6 +72,10 @@ Last reviewed: 2026-08-15
 - [x] Auto-release worker respects the 7-day cooling-off window
 - [x] KYC refresh worker sends re-review notifications to users
 - [x] Server refuses to boot in production with a mocked PEP provider
+- [x] Double-entry general ledger with zero-sum invariant enforcement (`LedgerAccount`, `LedgerJournal`, `LedgerEntry`)
+- [x] Multi-script anti-circumvention engine (Amharic Fidel numerals, spelled words, obfuscation stripping, and leetspeak)
+- [x] WebSocket real-time foundation mounted at `/api/v1/ws` with JWT authentication and channel subscriptions
+- [x] Telebirr B2C disbursement rail with automatic wallet rollback on provider refusal and double-entry ledger posting
 
 ## Frontend
 
@@ -149,7 +155,7 @@ Last reviewed: 2026-08-15
 - [ ] Live Telebirr production credentials verification and settlement reconciliation
 - [ ] Chapa collection sandbox verification and reconciliation
 - [ ] CBE Birr collection sandbox verification and reconciliation
-- [ ] Real payout/disbursement API with pending, success, failure, reversal, and reconciliation states
+- [x] Real payout/disbursement API with pending, success, failure, reversal, and reconciliation states (Telebirr B2C disbursement with `PayoutTransaction` lifecycle)
 - [ ] Production SMS credentials/templates/delivery monitoring
 - [ ] Telegram account linking and production push verification
 - [ ] Confirm FIC STR filing operating procedure; the platform records but does not submit filings

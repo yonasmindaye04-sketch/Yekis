@@ -61,10 +61,12 @@ export async function getFabricToken(): Promise<string> {
   }
 
   const data = (await response.json()) as {
-    code: number;
-    msg: string;
+    code?: number;
+    msg?: string;
     token?: string;
     expirationDate?: string;
+    errorCode?: number;
+    errorMsg?: string;
   };
 
   if (!data.token) {

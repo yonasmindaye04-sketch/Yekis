@@ -1,6 +1,7 @@
 import { SessionFlavor } from "grammy";
 import { ConversationFlavor } from "@grammyjs/conversations";
 import { I18nFlavor } from "@grammyjs/i18n";
+import type { StaffRole } from "@prisma/client";
 
 export const SESSION_VERSION = 1;
 export const SCENE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -13,7 +14,7 @@ export interface BotSession {
   role?: "CLIENT" | "FREELANCER" | "BOTH" | "STAFF";
   kycTier?: "TIER_1" | "TIER_2" | "TIER_3";
   kycStatus?: "VERIFIED" | "PENDING" | "REJECTED" | "UNDER_REVIEW";
-  staffRole?: "COMPLIANCE_OFFICER" | "ADMIN";
+  staffRole?: StaffRole;
   language: "en" | "am";
   scene?: string;
   sceneStep?: number;

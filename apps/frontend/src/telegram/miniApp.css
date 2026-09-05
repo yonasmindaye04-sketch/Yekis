@@ -368,3 +368,25 @@
 .back-btn:hover {
   background: var(--color-bg-hover, #1e3038);
 }
+
+/* Telegram Mini App Onboarding / Home Layout & Space Management */
+.welcome-screen {
+  padding: 38px 22px 52px !important; /* Ample header and footer breathing space */
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.welcome-screen-inner {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  width: 100%;
+  padding-top: 6px;
+  padding-bottom: 24px;
+}
+
+

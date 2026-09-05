@@ -7,6 +7,7 @@ import {
   FileText,
   Gavel,
   Paperclip,
+  Search,
   Send,
   WalletCards,
   X,
@@ -50,6 +51,7 @@ export function JobsWorkspace({
   const [dueDate, setDueDate] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const refresh = useCallback(async () => {
     if (role === "CLIENT") {
@@ -161,31 +163,47 @@ export function JobsWorkspace({
             <article className="workflow-item" key={job.id}>
               <div className="workflow-item-head">
                 <div>
-                  <span className="status-pill">{label(job.status)}</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                    <span className="status-pill">{label(job.status)}</span>
+                    <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--color-primary)" }}>
+                      {money(job.budgetMinMinor)} – {money(job.budgetMaxMinor)}
+                    </span>
+                  </div>
                   <h3>{job.title}</h3>
                   <p>{job.description}</p>
+                  <small style={{ color: "var(--color-text-secondary)", fontSize: "0.82rem" }}>
+                    Category: {job.category.replaceAll("_", " ")} · Deadline: {date(job.deadline)}
+                  </small>
                 </div>
-                <strong>{proposalsByJob[job.id]?.length ?? 0} proposals</strong>
+                <span className="status-pill" style={{ background: "var(--color-bg-subtle)", fontWeight: 700, whiteSpace: "nowrap" }}>
+                  {proposalsByJob[job.id]?.length ?? 0} proposals
+                </span>
               </div>
               {(proposalsByJob[job.id] ?? []).length > 0 && (
                 <div className="proposal-list">
                   {proposalsByJob[job.id].map((proposal) => (
-                    <div className="proposal-row" key={proposal.id}>
-                      <div>
-                        <strong>
+                    <div className="proposal-row" key={proposal.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong style={{ fontSize: "0.92rem", color: "var(--color-text)" }}>
                           {proposal.freelancer?.email ?? "Freelancer"}
                         </strong>
-                        <span>
-                          {money(proposal.quotedAmountMinor)} ·{" "}
-                          {proposal.estimatedDays} days ·{" "}
-                          {label(proposal.status)}
-                        </span>
-                        <p>{proposal.coverLetter}</p>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "3px 0 6px" }}>
+                          <span style={{ fontWeight: 600, color: "var(--color-primary)", fontSize: "0.86rem" }}>
+                            {money(proposal.quotedAmountMinor)}
+                          </span>
+                          <span style={{ color: "var(--color-text-secondary)", fontSize: "0.82rem" }}>
+                            · {proposal.estimatedDays} days
+                          </span>
+                          <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "closed" : ""}`}>
+                            {label(proposal.status)}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: "0.86rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>{proposal.coverLetter}</p>
                       </div>
                       {["SUBMITTED", "SHORTLISTED"].includes(
                         proposal.status,
                       ) && (
-                        <div className="workflow-actions">
+                        <div className="workflow-actions" style={{ flexShrink: 0, marginTop: 4 }}>
                           {proposal.status === "SUBMITTED" && (
                             <button
                               className="btn-secondary"
@@ -261,35 +279,54 @@ export function JobsWorkspace({
             <h2>Your proposals</h2>
           </div>
           {myProposals.map((proposal) => (
-            <div className="proposal-row" key={proposal.id}>
+            <div className="proposal-row" key={proposal.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
               <div>
-                <strong>{proposal.job?.title ?? "Job"}</strong>
-                <span>
-                  {money(proposal.quotedAmountMinor)} · {label(proposal.status)}
+                <strong style={{ fontSize: "0.92rem", color: "var(--color-text)" }}>{proposal.job?.title ?? "Job"}</strong>
+                <span style={{ display: "block", marginTop: 2, fontSize: "0.84rem", color: "var(--color-text-secondary)" }}>
+                  {money(proposal.quotedAmountMinor)} · {proposal.estimatedDays} days
                 </span>
               </div>
-              {["SUBMITTED", "SHORTLISTED"].includes(proposal.status) && (
-                <button
-                  className="btn-secondary"
-                  disabled={busy}
-                  onClick={() =>
-                    void act(
-                      () => api.withdrawProposal(proposal.id),
-                      "Proposal withdrawn.",
-                    )
-                  }
-                >
-                  Withdraw
-                </button>
-              )}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "closed" : ""}`}>
+                  {label(proposal.status)}
+                </span>
+                {["SUBMITTED", "SHORTLISTED"].includes(proposal.status) && (
+                  <button
+                    className="btn-secondary"
+                    disabled={busy}
+                    style={{ padding: "5px 12px", height: "auto", minHeight: "32px", fontSize: "0.82rem" }}
+                    onClick={() =>
+                      void act(
+                        () => api.withdrawProposal(proposal.id),
+                        "Proposal withdrawn.",
+                      )
+                    }
+                  >
+                    Withdraw
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </section>
       )}
-      {openJobs.length === 0 ? (
-        <p className="empty-state">No open jobs yet.</p>
+      <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", background: "var(--color-bg-elevated)", border: "1px solid var(--color-border)", padding: "7px 14px", borderRadius: "10px", flex: 1, minWidth: "220px" }}>
+          <Search size={15} style={{ color: "var(--color-text-secondary)", flexShrink: 0 }} />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search open briefs by title or keyword..."
+            style={{ border: "none", background: "transparent", outline: "none", width: "100%", fontSize: "0.86rem", color: "var(--color-text)" }}
+          />
+        </div>
+      </div>
+      {openJobs.filter(j => !searchQuery.trim() || j.title.toLowerCase().includes(searchQuery.toLowerCase()) || j.description.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+        <p className="empty-state">No matching open jobs found.</p>
       ) : (
-        openJobs.map((job) => {
+        openJobs
+          .filter(j => !searchQuery.trim() || j.title.toLowerCase().includes(searchQuery.toLowerCase()) || j.description.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map((job) => {
           const existing = proposalByJob.get(job.id);
           const showDetail = detailJobId === job.id;
           const showForm = selectedJobId === job.id;
@@ -298,28 +335,46 @@ export function JobsWorkspace({
             <article className="workflow-item" key={job.id}>
               <div className="workflow-item-head" style={showDetail ? { cursor: 'pointer' } : {}} onClick={() => !showForm && setDetailJobId(showDetail ? null : job.id)}>
                 <div>
-                  <span className="status-pill">Open</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 4 }}>
+                    <span className="status-pill">Open</span>
+                    <span style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--color-primary)" }}>
+                      {money(job.budgetMinMinor)} – {money(job.budgetMaxMinor)}
+                    </span>
+                  </div>
                   <h3>{job.title}</h3>
                   {!showDetail && <p>{job.description.substring(0, 150)}{job.description.length > 150 ? "..." : ""}</p>}
                   <small>
-                    {money(job.budgetMinMinor)} - {money(job.budgetMaxMinor)} ·
-                    due {date(job.deadline)}
+                    Category: {job.category.replaceAll("_", " ")} · Deadline: {date(job.deadline)}
                   </small>
                 </div>
                 {existing ? (
                   <span className="status-pill">{label(existing.status)}</span>
                 ) : (
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     {!showForm && (
-                      <button
-                        className="btn-secondary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDetailJobId(showDetail ? null : job.id);
-                        }}
-                      >
-                        {showDetail ? "Hide Details" : "View Details"}
-                      </button>
+                      <>
+                        <button
+                          className="btn-secondary"
+                          style={{ padding: "6px 14px", height: "auto", minHeight: "34px", fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailJobId(showDetail ? null : job.id);
+                          }}
+                        >
+                          {showDetail ? "Hide Details" : "View Details"}
+                        </button>
+                        <button
+                          className="btn-primary"
+                          style={{ padding: "6px 14px", height: "auto", minHeight: "34px", fontSize: "0.82rem" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDetailJobId(null);
+                            setSelectedJobId(job.id);
+                          }}
+                        >
+                          Apply
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -330,13 +385,42 @@ export function JobsWorkspace({
                   <h4>Description</h4>
                   <p>{job.description}</p>
                   
-                  {job.proposedMilestones && (
-                    <>
-                      <h4>Proposed Milestones</h4>
-                      <pre style={{ background: "var(--color-bg-subtle)", padding: 12, borderRadius: 8, fontSize: "0.85rem", overflow: "auto", whiteSpace: "pre-wrap", color: "var(--color-text)" }}>
-                        {JSON.stringify(job.proposedMilestones, null, 2)}
-                      </pre>
-                    </>
+                  {job.proposedMilestones && Array.isArray(job.proposedMilestones) && job.proposedMilestones.length > 0 && (
+                    <div style={{ marginTop: 14 }}>
+                      <h4 style={{ fontSize: "0.88rem", marginBottom: 8 }}>Proposed Milestones</h4>
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {job.proposedMilestones.map((m: any, idx: number) => (
+                          <div
+                            key={idx}
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                              padding: "10px 14px",
+                              background: "var(--color-bg-subtle)",
+                              border: "1px solid var(--color-border)",
+                              borderRadius: "8px",
+                            }}
+                          >
+                            <div>
+                              <strong style={{ fontSize: "0.88rem", color: "var(--color-text)" }}>{m.title || `Milestone #${idx + 1}`}</strong>
+                              {m.dueDate && (
+                                <span style={{ display: "block", fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                                  Due: {new Date(m.dueDate).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontWeight: 700, color: "var(--color-primary)", fontSize: "0.9rem" }}>
+                              {m.amount?.amountMinor
+                                ? `ETB ${(m.amount.amountMinor / 100).toLocaleString()}`
+                                : m.amountMinor
+                                ? `ETB ${(m.amountMinor / 100).toLocaleString()}`
+                                : ""}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   
                   {!existing && (
@@ -550,15 +634,32 @@ export function ContractsWorkspace({
             role === "CLIENT"
               ? contract.clientAcceptedAt
               : contract.freelancerAcceptedAt;
+          const isCancelled = contract.status === "CANCELLED";
+          const isCoolingOffEligible =
+            role === "CLIENT" &&
+            contract.status === "ACTIVE" &&
+            !!contract.cancellableUntil &&
+            new Date(contract.cancellableUntil) > new Date() &&
+            !contract.milestones.some((m) => m.escrowState !== "PAYMENT_PENDING");
+
           return (
             <article className="workflow-item" key={contract.id}>
               <div className="workflow-item-head">
                 <div>
-                  <span className="status-pill">
-                    {contract.fullyExecuted
-                      ? "Fully executed"
-                      : "Awaiting signatures"}
-                  </span>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                    <span className={`status-pill ${isCancelled ? "closed" : ""}`}>
+                      {isCancelled
+                        ? "Cancelled"
+                        : contract.fullyExecuted
+                        ? "Fully executed"
+                        : "Awaiting signatures"}
+                    </span>
+                    {contract.status === "ACTIVE" && contract.cancellableUntil && (
+                      <span className="status-note" style={{ fontSize: "0.78rem" }}>
+                        Cooling-off until {date(contract.cancellableUntil)}
+                      </span>
+                    )}
+                  </div>
                   <h3>{contract.job.title}</h3>
                   <small>Agreement {contract.templateVersion}</small>
                 </div>
@@ -569,7 +670,7 @@ export function ContractsWorkspace({
                   >
                     <FileText size={15} /> View PDF
                   </button>
-                  {!acceptedByMe && (
+                  {!isCancelled && !acceptedByMe && (
                     <button
                       className="btn-primary"
                       disabled={busy}
@@ -581,6 +682,27 @@ export function ContractsWorkspace({
                       }
                     >
                       Accept agreement
+                    </button>
+                  )}
+                  {isCoolingOffEligible && (
+                    <button
+                      className="btn-secondary danger-button"
+                      disabled={busy}
+                      title="ECA Proclamation No. 1205/2020: 7-day cooling-off cancellation prior to funding"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Cancel this contract under your 7-day statutory cooling-off right (ECA Proclamation No. 1205/2020)? This action is immediate and cannot be undone.",
+                          )
+                        ) {
+                          void act(
+                            () => api.cancelContractCoolingOff(contract.id),
+                            "Contract successfully cancelled under statutory cooling-off.",
+                          );
+                        }
+                      }}
+                    >
+                      Cancel contract
                     </button>
                   )}
                 </div>
@@ -596,7 +718,7 @@ export function ContractsWorkspace({
               </div>
               <div className="milestone-list">
                 {contract.milestones.map((milestone) => {
-                  const canDispute = [
+                  const canDispute = !isCancelled && [
                     "ESCROW_HELD",
                     "WORK_IN_PROGRESS",
                     "SUBMITTED_FOR_REVIEW",
@@ -614,7 +736,8 @@ export function ContractsWorkspace({
                         {label(milestone.escrowState)}
                       </span>
                       <div className="workflow-actions">
-                        {role === "CLIENT" &&
+                        {!isCancelled &&
+                          role === "CLIENT" &&
                           contract.fullyExecuted &&
                           milestone.escrowState === "PAYMENT_PENDING" && (
                             <button
@@ -631,13 +754,19 @@ export function ContractsWorkspace({
                               <WalletCards size={15} /> Fund from wallet
                             </button>
                           )}
-                        {role === "CLIENT" &&
+                        {!isCancelled &&
+                          role === "CLIENT" &&
                           !contract.fullyExecuted &&
                           milestone.escrowState === "PAYMENT_PENDING" && (
                             <span className="status-note">
                               Sign the agreement to auto-fund escrow
                             </span>
                           )}
+                        {isCancelled && (
+                          <span className="status-note">
+                            Contract cancelled
+                          </span>
+                        )}
                         {role === "FREELANCER" &&
                           ["ESCROW_HELD", "WORK_IN_PROGRESS"].includes(
                             milestone.escrowState,

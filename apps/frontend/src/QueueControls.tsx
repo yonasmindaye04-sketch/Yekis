@@ -101,13 +101,15 @@ export function QueueControls({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "1rem",
+            gap: "0.75rem",
+            flexWrap: "wrap",
             flex: 1,
+            minWidth: 0,
           }}
         >
           <div
             className="search-bar"
-            style={{ position: "relative", width: "300px" }}
+            style={{ position: "relative", width: "min(100%, 280px)", minWidth: "160px" }}
           >
             <Search
               size={16}

@@ -1,15 +1,21 @@
 // === IMPORTS ===
 import { Router } from "express";
 import { z } from "zod";
+import multer from "multer";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
+import {
+  uploadChatAttachment,
+  getChatAttachmentStream,
+} from "../../lib/objectStore.js";
 import {
   ConversationAccessError,
   ConversationNotFoundError,
   InvalidMessageError,
   createConversation,
   createGuestConversation,
+  createDirectConversation,
   listConversations,
   listMessages,
   sendMessage,
@@ -17,13 +23,26 @@ import {
   listStaffConversations,
   setConversationStatus,
   assignConversationToStaff,
+  generateSmartReplies,
+  summarizeConversation,
+  extractDealTerms,
 } from "./chat.service.js";
 
 export const chatRouter = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 15 * 1024 * 1024 }, // 15MB limit
+});
+
 const ConversationInput = z.object({ subject: z.string().min(3).max(160) });
+const DirectConversationInput = z.object({
+  recipientId: z.string().min(1),
+  subject: z.string().min(2).max(160),
+});
 const MessageInput = z.object({
   body: z.string().min(1).max(5000),
-  attachmentUrl: z.string().url().optional(),
+  attachmentUrl: z.string().optional(),
 });
 const GuestInput = z.object({
   email: z.string().email(),
@@ -147,6 +166,58 @@ chatRouter.post(
 );
 
 chatRouter.post(
+  "/upload",
+  requireAuth,
+  upload.single("file"),
+  async (req: AuthedRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "MISSING_FILE" });
+      }
+
+      const key = await uploadChatAttachment({
+        userId: req.user!.id,
+        fileName: req.file.originalname || "attachment",
+        fileBuffer: req.file.buffer,
+        contentType: req.file.mimetype || "application/octet-stream",
+      });
+
+      return res.json({
+        url: `/api/v1/chat/attachments/${encodeURIComponent(key)}`,
+        key,
+        fileName: req.file.originalname,
+        fileSize: req.file.size,
+        mimeType: req.file.mimetype,
+      });
+    } catch (err) {
+      logger.error({ err }, "Failed to upload chat attachment");
+      return res.status(500).json({ error: "UPLOAD_FAILED" });
+    }
+  },
+);
+
+chatRouter.get("/attachments/:key(*)", async (req, res) => {
+  try {
+    const rawKey = req.params.key as string;
+    const key = decodeURIComponent(rawKey);
+    const { stream, contentType, contentLength } =
+      await getChatAttachmentStream(key);
+
+    if (contentType) {
+      res.setHeader("Content-Type", contentType);
+    }
+    if (contentLength) {
+      res.setHeader("Content-Length", contentLength);
+    }
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    stream.pipe(res);
+  } catch (err) {
+    logger.warn({ err, key: req.params.key }, "Chat attachment not found");
+    return res.status(404).json({ error: "NOT_FOUND" });
+  }
+});
+
+chatRouter.post(
   "/conversations/:conversationId/read",
   requireAuth,
   async (req: AuthedRequest, res) => {
@@ -165,11 +236,91 @@ chatRouter.post(
   },
 );
 
+chatRouter.post(
+  "/direct",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = DirectConversationInput.safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    try {
+      return res.status(201).json(
+        await createDirectConversation({
+          userId: req.user!.id,
+          recipientId: parsed.data.recipientId,
+          subject: parsed.data.subject,
+        }),
+      );
+    } catch (err) {
+      if (handleError(err, res)) return;
+      logger.error({ err }, "Failed to create direct conversation");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ── Mini-Me AI Co-Pilot / Assistant Endpoints ─────────────────────────────────
+chatRouter.post(
+  "/conversations/:conversationId/assistant/suggest-replies",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const suggestions = await generateSmartReplies({
+        conversationId: req.params.conversationId as string,
+        userId: req.user!.id,
+      });
+      return res.json({ suggestions });
+    } catch (err) {
+      if (handleError(err, res)) return;
+      logger.error({ err }, "Failed to generate smart replies");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+chatRouter.post(
+  "/conversations/:conversationId/assistant/summarize",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const summary = await summarizeConversation({
+        conversationId: req.params.conversationId as string,
+        userId: req.user!.id,
+      });
+      return res.json(summary);
+    } catch (err) {
+      if (handleError(err, res)) return;
+      logger.error({ err }, "Failed to summarize chat conversation");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+chatRouter.post(
+  "/conversations/:conversationId/assistant/extract-deal",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const dealTerms = await extractDealTerms({
+        conversationId: req.params.conversationId as string,
+        userId: req.user!.id,
+      });
+      return res.json(dealTerms);
+    } catch (err) {
+      if (handleError(err, res)) return;
+      logger.error({ err }, "Failed to extract deal terms");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 // ── Staff/Admin routes ─────────────────────────────────────────────────────────
 chatRouter.get(
   "/admin/conversations",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page
@@ -180,7 +331,7 @@ chatRouter.get(
         : undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      // COMPLIANCE_OFFICERs only see their own; ADMINs can filter or see all
+      // COMPLIANCE_OFFICERs and SUPPORT agents only see their own; ADMINs can filter or see all
       const isAdmin = req.user!.staffRole === "ADMIN";
       const staffId = isAdmin
         ? (req.query.staffId as string | undefined)
@@ -198,7 +349,7 @@ chatRouter.get(
 chatRouter.patch(
   "/admin/conversations/:conversationId/status",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
   async (req, res) => {
     const parsed = z
       .object({ status: z.enum(["OPEN", "CLOSED"]) })
@@ -252,7 +403,7 @@ chatRouter.patch(
 chatRouter.post(
   "/admin/conversations/:conversationId/claim",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
   async (req: AuthedRequest, res) => {
     try {
       return res.json(

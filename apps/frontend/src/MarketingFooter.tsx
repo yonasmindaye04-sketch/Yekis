@@ -1,4 +1,5 @@
 import { Send, MessageCircle, Bot, Mail, ShieldCheck } from "lucide-react";
+import "./marketing.css";
 
 type MarketingFooterProps = {
   onNavigate: (page: string) => void;
@@ -10,7 +11,17 @@ export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
       <div className="marketing-container">
         <div className="footer-grid">
           <div className="footer-col footer-brand">
-            <div className="landing-brand" style={{ marginBottom: 16 }}>
+            <div
+              className="landing-brand"
+              style={{ marginBottom: 16, cursor: "pointer" }}
+              onClick={() => onNavigate("home")}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") onNavigate("home");
+              }}
+              aria-label="Yekis Home"
+            >
               <img
                 src="/svgviewer-output.svg"
                 alt="Yekis Logo"

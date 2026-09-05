@@ -9,6 +9,7 @@ import {
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
+import { prisma } from "../../lib/prisma.js";
 import {
   submitTopUp,
   getTopUpQueue,
@@ -20,6 +21,8 @@ import {
   TopUpAlreadyResolvedError,
   getUserTopUps,
   initiateCheckoutTopUp,
+  handleTopUpWebhook,
+  attachReceiptToTopUp,
 } from "./topup.service.js";
 
 export const topupsRouter = Router();
@@ -99,7 +102,8 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
   if (!amountMinor || typeof amountMinor !== "number" || amountMinor <= 0) {
     return res.status(400).json({ error: "INVALID_AMOUNT" });
   }
-  if (provider !== "TELEBIRR") {
+  const allowedProviders = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+  if (!allowedProviders.includes(provider)) {
     return res.status(400).json({ error: "UNSUPPORTED_PROVIDER" });
   }
 
@@ -115,6 +119,62 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
+
+topupsRouter.post(
+  "/:topUpId/attach-receipt",
+  requireAuth,
+  upload.single("receipt"),
+  async (req: AuthedRequest, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "MISSING_RECEIPT_FILE" });
+    }
+    const referenceNumber = (req.body.referenceNumber || "").trim();
+    if (!referenceNumber || referenceNumber.length < 3) {
+      return res.status(400).json({ error: "INVALID_REFERENCE" });
+    }
+
+    try {
+      const topUp = await attachReceiptToTopUp({
+        userId: req.user!.id,
+        topUpId: req.params.topUpId as string,
+        referenceNumber,
+        fileBuffer: req.file.buffer,
+        contentType: req.file.mimetype,
+      });
+      return res.json({ id: topUp.id, status: topUp.status, referenceNumber: topUp.referenceNumber });
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to attach receipt to top-up");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+topupsRouter.post(
+  "/checkout/:topUpId/simulate-success",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const topUp = await prisma.walletTopUp.findUnique({
+        where: { id: req.params.topUpId },
+      });
+      if (!topUp || topUp.userId !== req.user!.id) {
+        return res.status(404).json({ error: "NOT_FOUND" });
+      }
+
+      await handleTopUpWebhook({
+        providerTransactionId: topUp.providerTransactionId || "",
+        status: "SUCCESS",
+        rawPayload: { simulated: true },
+      });
+
+      return res.json({ success: true, message: "Top-up approved successfully." });
+    } catch (err) {
+      logger.error({ err }, "Failed to simulate top-up success");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // ---------- Staff-only ----------
 

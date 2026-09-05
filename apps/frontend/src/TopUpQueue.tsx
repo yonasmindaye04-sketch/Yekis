@@ -163,11 +163,62 @@ export function TopUpQueue({
   const getDestinationAccount = (provider: string) => {
     switch (provider) {
       case "TELEBIRR":
-        return "Platform Telebirr (0910011818)";
+        return "Platform Telebirr (0910 011 818)";
       case "CBE_BIRR":
-        return "Platform CBE (1000XXXXX)";
+        return "Platform CBE Bank (1000 223 344)";
+      case "M_PESA":
+        return "Platform Safaricom M-Pesa (0777 011 818 / Till: 882199)";
       default:
         return `Platform ${provider} Account`;
+    }
+  };
+
+  const getProviderBadge = (provider: string) => {
+    switch (provider) {
+      case "TELEBIRR":
+        return (
+          <span
+            className="tier-badge"
+            style={{
+              backgroundColor: "rgba(0, 114, 188, 0.12)",
+              color: "#0072bc",
+              border: "1px solid rgba(0, 114, 188, 0.3)",
+              fontWeight: 600,
+            }}
+          >
+            Telebirr
+          </span>
+        );
+      case "CBE_BIRR":
+        return (
+          <span
+            className="tier-badge"
+            style={{
+              backgroundColor: "rgba(122, 33, 130, 0.12)",
+              color: "#7a2182",
+              border: "1px solid rgba(122, 33, 130, 0.3)",
+              fontWeight: 600,
+            }}
+          >
+            CBE Bank
+          </span>
+        );
+      case "M_PESA":
+        return (
+          <span
+            className="tier-badge"
+            style={{
+              backgroundColor: "rgba(0, 168, 89, 0.12)",
+              color: "#00a859",
+              border: "1px solid rgba(0, 168, 89, 0.3)",
+              fontWeight: 600,
+            }}
+          >
+            Safaricom M-Pesa
+          </span>
+        );
+      default:
+        return <span className="tier-badge">{provider}</span>;
     }
   };
 
@@ -242,7 +293,7 @@ export function TopUpQueue({
                   <strong>
                     ETB {(item.amountMinor / 100).toLocaleString()}
                   </strong>
-                  <span className="tier-badge">{item.provider}</span>
+                  {getProviderBadge(item.provider)}
                   {item.userHistory && item.userHistory.approvedCount > 0 && (
                     <span
                       className="status-pill success"
@@ -292,7 +343,7 @@ export function TopUpQueue({
                     </div>
                     <div className="info-field">
                       <label>Provider</label>
-                      <div>{selectedItem.provider}</div>
+                      <div style={{ marginTop: 4 }}>{getProviderBadge(selectedItem.provider)}</div>
                     </div>
                     <div className="info-field">
                       <label>Reference Number</label>

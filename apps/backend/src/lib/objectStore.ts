@@ -1,12 +1,14 @@
-// === IMPORTS ===
 import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
 import { env } from "../config/env.js";
+import { logger } from "./logger.js";
 
 export const objectStoreClient = new S3Client({
   endpoint: env.OBJECT_STORE_ENDPOINT,
@@ -17,6 +19,32 @@ export const objectStoreClient = new S3Client({
     secretAccessKey: env.OBJECT_STORE_SECRET_KEY,
   },
 });
+
+export async function ensureObjectStoreReady(): Promise<void> {
+  try {
+    await objectStoreClient.send(
+      new HeadBucketCommand({ Bucket: env.OBJECT_STORE_BUCKET }),
+    );
+    logger.info({ bucket: env.OBJECT_STORE_BUCKET }, "Object store bucket is ready.");
+  } catch (err: unknown) {
+    const error = err as { name?: string; $metadata?: { httpStatusCode?: number } };
+    if (error?.name === "NotFound" || error?.$metadata?.httpStatusCode === 404) {
+      try {
+        await objectStoreClient.send(
+          new CreateBucketCommand({ Bucket: env.OBJECT_STORE_BUCKET }),
+        );
+        logger.info(
+          { bucket: env.OBJECT_STORE_BUCKET },
+          "Created missing object store bucket successfully.",
+        );
+      } catch (createErr) {
+        logger.error({ err: createErr }, "Failed to create object store bucket.");
+      }
+    } else {
+      logger.warn({ err }, "Could not reach object store at startup — will retry on upload.");
+    }
+  }
+}
 
 /**
  * Uploads a KYC document under a per-user, per-document-type key. Returns
@@ -146,6 +174,78 @@ export async function uploadEvidenceBundle(params: {
   );
 
   return key;
+}
+
+/**
+ * Uploads a chat attachment. Stores in object store with local disk backup
+ * and returns the storage key.
+ */
+export async function uploadChatAttachment(params: {
+  userId: string;
+  fileName: string;
+  fileBuffer: Buffer;
+  contentType: string;
+}): Promise<string> {
+  const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const key = `chat-attachments/${params.userId}/${randomUUID()}-${safeName}`;
+
+  try {
+    await objectStoreClient.send(
+      new PutObjectCommand({
+        Bucket: env.OBJECT_STORE_BUCKET,
+        Key: key,
+        Body: params.fileBuffer,
+        ContentType: params.contentType,
+      }),
+    );
+  } catch (err) {
+    logger.warn({ err, key }, "Failed to upload chat attachment to object store, saving locally");
+  }
+
+  // Also write to local storage as fallback
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const localDir = path.resolve(process.cwd(), "uploads", "chat-attachments", params.userId);
+    await fs.mkdir(localDir, { recursive: true });
+    const localFile = path.resolve(localDir, path.basename(key));
+    await fs.writeFile(localFile, params.fileBuffer);
+  } catch (err) {
+    logger.warn({ err }, "Could not write chat attachment to local backup");
+  }
+
+  return key;
+}
+
+export async function getChatAttachmentStream(storageKey: string) {
+  try {
+    const command = new GetObjectCommand({
+      Bucket: env.OBJECT_STORE_BUCKET,
+      Key: storageKey,
+    });
+    const response = await objectStoreClient.send(command);
+    return {
+      stream: response.Body as import("node:stream").Readable,
+      contentType: response.ContentType || "application/octet-stream",
+      contentLength: response.ContentLength,
+    };
+  } catch (err) {
+    // Try local backup
+    try {
+      const fs = await import("node:fs");
+      const path = await import("node:path");
+      const localFile = path.resolve(process.cwd(), "uploads", ...storageKey.split("/"));
+      if (fs.existsSync(localFile)) {
+        const stat = fs.statSync(localFile);
+        return {
+          stream: fs.createReadStream(localFile),
+          contentType: "application/octet-stream",
+          contentLength: stat.size,
+        };
+      }
+    } catch {}
+    throw err;
+  }
 }
 
 // TIER 3 — PDPP Art. 22 DATA LOCALIZATION BLOCKER:

@@ -3,3 +3,6 @@ dist/
 .env
 *.log
 .DS_Store
+apps/backend/src/**/*.js
+apps/backend/src/**/*.d.ts
+apps/backend/src/**/*.js.map

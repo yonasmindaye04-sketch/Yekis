@@ -14,6 +14,9 @@ if (env.NODE_ENV !== "production") {
 
 import { buildApp } from "./app.js";
 import { logger } from "./lib/logger.js";
+import { prisma } from "./lib/prisma.js";
+import { initWebSocketServer } from "./lib/socket.js";
+import { ensureObjectStoreReady } from "./lib/objectStore.js";
 import { startBot, stopBot } from "./modules/bot/bot.service.js";
 // Importing the worker file starts it listening on the queue as a side effect.
 // In production, run workers as a separate process/container from the API
@@ -52,6 +55,31 @@ const app = buildApp();
 
 const server = app.listen(env.PORT, async () => {
   logger.info(`🚀 API listening on port ${env.PORT} (${env.NODE_ENV})`);
+
+  // Initialize Real-Time WebSocket Server
+  try {
+    initWebSocketServer(server);
+  } catch (error) {
+    logger.error({ error }, "Failed to mount WebSocket server");
+  }
+
+  // Verify Database Connection at startup
+  prisma
+    .$connect()
+    .then(() => {
+      logger.info("🐘 Database connected to PostgreSQL");
+    })
+    .catch((err) => {
+      logger.error(
+        { err },
+        "❌ PostgreSQL is unreachable at localhost:5433! Make sure Docker is running ('docker compose up -d').",
+      );
+    });
+
+  // Ensure MinIO / S3 object store bucket is initialized
+  ensureObjectStoreReady().catch((err) =>
+    logger.error({ err }, "Failed to initialize object store bucket"),
+  );
 
   // Start Telegram bot
   try {

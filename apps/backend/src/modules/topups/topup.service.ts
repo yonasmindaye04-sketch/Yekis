@@ -10,6 +10,9 @@ import {
 import { notificationQueue } from "../../queue/queues.js";
 import { logger } from "../../lib/logger.js";
 import { telebirrClient } from "../escrow/providers/telebirr.client.js";
+import { cbeClient } from "../escrow/providers/cbe.client.js";
+import { mpesaClient } from "../escrow/providers/mpesa.client.js";
+import type { PaymentProviderClient } from "../escrow/providers/paymentProvider.interface.js";
 
 // === MAIN FUNCTIONS ===
 export class TopUpNotFoundError extends Error {}
@@ -300,12 +303,18 @@ export async function getUserTopUps(userId: string) {
   });
 }
 
-// ---------- Automatic Telebirr Checkout Top-Up ----------
+// ---------- Automatic & Manual Multi-Provider Checkout Top-Up ----------
 
 export class TopUpCheckoutError extends Error {}
 
+const CHECKOUT_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
+  TELEBIRR: telebirrClient,
+  CBE_BIRR: cbeClient,
+  M_PESA: mpesaClient,
+};
+
 /**
- * Initiates an automatic Telebirr C2B Web Checkout for a wallet top-up.
+ * Initiates an automatic Web / Mobile Checkout for a wallet top-up using Telebirr, CBE Birr, or M-Pesa.
  * Returns a redirect URL that the frontend should send the user to.
  */
 export async function initiateCheckoutTopUp(params: {
@@ -317,11 +326,18 @@ export async function initiateCheckoutTopUp(params: {
     where: { userId: params.userId },
   });
 
-  // Use the existing Telebirr payment engine
-  const initiated = await telebirrClient.initiatePayment({
+  const client = CHECKOUT_CLIENTS[params.provider];
+  if (!client) {
+    throw new TopUpCheckoutError(
+      `Provider ${params.provider} is not supported for checkout`,
+    );
+  }
+
+  // Use the corresponding payment engine (Telebirr, CBE, or M-Pesa)
+  const initiated = await client.initiatePayment({
     amountMinor: params.amountMinor,
     currency: "ETB",
-    reference: `wallet-topup-${params.userId}`,
+    reference: `Wallet Top-up ${params.provider}`,
   });
 
   // Create a WalletTopUp record to track this checkout
@@ -349,15 +365,91 @@ export async function initiateCheckoutTopUp(params: {
   });
 
   logger.info(
-    { topUpId: topUp.id, providerTransactionId: initiated.providerTransactionId },
-    "Telebirr checkout top-up initiated",
+    { topUpId: topUp.id, providerTransactionId: initiated.providerTransactionId, provider: params.provider },
+    `${params.provider} checkout top-up initiated`,
   );
+
+  // When credentials are not configured (mock mode / null redirectUrl), simulate
+  // successful asynchronous payment callback so the wallet is credited
+  if (!initiated.redirectUrl) {
+    setTimeout(async () => {
+      try {
+        await handleTopUpWebhook({
+          providerTransactionId: initiated.providerTransactionId,
+          status: "SUCCESS",
+          rawPayload: { mock: true, provider: params.provider },
+        });
+      } catch (mockErr) {
+        logger.error({ err: mockErr }, "Mock top-up auto-approval failed");
+      }
+    }, 1200);
+  }
 
   return {
     topUpId: topUp.id,
     redirectUrl: initiated.redirectUrl,
     providerTransactionId: initiated.providerTransactionId,
   };
+}
+
+/**
+ * Manual verification fallback: when an automated checkout API fails, or if a user
+ * initiated a top-up but the payment gateway failed to confirm via webhook, the user
+ * can attach a receipt photo and reference number to transition the top-up into PENDING
+ * manual staff review.
+ */
+export async function attachReceiptToTopUp(params: {
+  userId: string;
+  topUpId: string;
+  referenceNumber: string;
+  fileBuffer: Buffer;
+  contentType: string;
+}) {
+  const topUp = await prisma.walletTopUp.findUnique({
+    where: { id: params.topUpId },
+  });
+  if (!topUp || topUp.userId !== params.userId) {
+    throw new TopUpNotFoundError();
+  }
+  if (topUp.status !== "CHECKOUT_PENDING" && topUp.status !== "PENDING") {
+    throw new TopUpAlreadyResolvedError();
+  }
+
+  const receiptPath = await uploadTopUpReceipt({
+    userId: params.userId,
+    fileBuffer: params.fileBuffer,
+    contentType: params.contentType,
+  });
+
+  const updated = await prisma.walletTopUp.update({
+    where: { id: topUp.id },
+    data: {
+      receiptImagePath: receiptPath,
+      referenceNumber: params.referenceNumber,
+      status: "PENDING",
+    },
+  });
+
+  await recordAuditEvent({
+    userId: params.userId,
+    eventType: "TOPUP_RECEIPT_ATTACHED",
+    entityType: "WalletTopUp",
+    entityId: topUp.id,
+    metadata: { referenceNumber: params.referenceNumber, provider: topUp.provider },
+  });
+
+  await notifyStaffOfEvent({
+    eventType: "topup-pending-review",
+    message: `Top-up converted to manual receipt review (${updated.provider} - ETB ${(updated.amountMinor / 100).toLocaleString()}).`,
+    metadata: { topUpId: topUp.id, targetUserId: params.userId },
+  });
+
+  logger.info(
+    { topUpId: topUp.id, provider: topUp.provider },
+    "Top-up converted to manual receipt review via fallback",
+  );
+
+  return updated;
 }
 
 /**

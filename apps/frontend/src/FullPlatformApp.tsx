@@ -10,7 +10,7 @@ import {
   type WalletResponse,
 } from "./api/client";
 import { LandingPage } from "./LandingPage";
-import { SupportChat } from "./SupportChat";
+import { ChatWorkspace } from "./ChatWorkspace";
 import { StaffDashboard } from "./StaffDashboard";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
@@ -34,6 +34,7 @@ import {
   Plus,
   LogOut,
   ArrowLeft,
+  ArrowRight,
   User as UserIcon,
   Edit,
   Sun,
@@ -41,6 +42,7 @@ import {
   Eye,
   EyeOff,
   Package,
+  X,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -128,6 +130,95 @@ const navIconMap: Record<string, React.ReactNode> = {
   profile: <UserIcon size={18} />,
 };
 
+function AuthVisualAnimation() {
+  return (
+    <div className="auth-vis" aria-hidden="true">
+      {/* Soft gradient accent */}
+      <div className="auth-vis-glow" />
+
+      {/* Dot grid texture */}
+      <svg className="auth-vis-dots" viewBox="0 0 200 200">
+        {Array.from({ length: 100 }, (_, i) => {
+          const col = i % 10;
+          const row = Math.floor(i / 10);
+          return (
+            <circle
+              key={i}
+              cx={col * 22 + 5}
+              cy={row * 22 + 5}
+              r="1.2"
+              fill="var(--color-text-secondary)"
+              opacity="0.18"
+            />
+          );
+        })}
+      </svg>
+
+      {/* Metrics row — 3 key indicators */}
+      <div className="auth-vis-metrics">
+        <div className="auth-vis-metric" style={{ animationDelay: "0.4s" }}>
+          <span className="auth-vis-metric-num">2,400+</span>
+          <span className="auth-vis-metric-label">Contracts signed</span>
+        </div>
+        <div className="auth-vis-metric-divider" />
+        <div className="auth-vis-metric" style={{ animationDelay: "0.7s" }}>
+          <span className="auth-vis-metric-num">ETB 12M+</span>
+          <span className="auth-vis-metric-label">Secured in escrow</span>
+        </div>
+        <div className="auth-vis-metric-divider" />
+        <div className="auth-vis-metric" style={{ animationDelay: "1.0s" }}>
+          <span className="auth-vis-metric-num">98%</span>
+          <span className="auth-vis-metric-label">Payout success rate</span>
+        </div>
+      </div>
+
+      {/* Live activity feed — staggered slide-ins */}
+      <div className="auth-vis-feed">
+        <div className="auth-vis-feed-item" style={{ animationDelay: "1.2s" }}>
+          <div className="auth-vis-feed-icon green" />
+          <div className="auth-vis-feed-body">
+            <strong>Milestone delivered</strong>
+            <span>UI Design — ETB 18,000</span>
+          </div>
+          <span className="auth-vis-feed-time">2m ago</span>
+        </div>
+        <div className="auth-vis-feed-item" style={{ animationDelay: "1.8s" }}>
+          <div className="auth-vis-feed-icon blue" />
+          <div className="auth-vis-feed-body">
+            <strong>Contract signed</strong>
+            <span>Mobile App Development</span>
+          </div>
+          <span className="auth-vis-feed-time">8m ago</span>
+        </div>
+        <div className="auth-vis-feed-item" style={{ animationDelay: "2.4s" }}>
+          <div className="auth-vis-feed-icon green" />
+          <div className="auth-vis-feed-body">
+            <strong>Escrow funded</strong>
+            <span>ETB 24,500 locked</span>
+          </div>
+          <span className="auth-vis-feed-time">14m ago</span>
+        </div>
+      </div>
+
+      {/* Trust badges row */}
+      <div className="auth-vis-trust">
+        <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>Escrow protected</span>
+        </div>
+        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>KYC verified</span>
+        </div>
+        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.4s" }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          <span>Telebirr &amp; CBE</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function FullPlatformApp() {
   const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
@@ -147,6 +238,8 @@ export function FullPlatformApp() {
   const [consentNotifications, setConsentNotifications] = useState(false);
   const [consentMarketing, setConsentMarketing] = useState(false);
   const [consentAnalytics, setConsentAnalytics] = useState(false);
+  const [showCookiePrefs, setShowCookiePrefs] = useState(false);
+  const [legalModal, setLegalModal] = useState<"terms" | "privacy" | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
   const [view, setView] = useState<View>("overview");
@@ -249,7 +342,7 @@ export function FullPlatformApp() {
         });
       }
       const session = await api.login(email, password);
-      api.setToken(session.accessToken);
+      api.setSession(session);
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
@@ -494,6 +587,7 @@ export function FullPlatformApp() {
             src="/svgviewer-output.svg"
             alt="Yekis Logo"
             className="platform-logo"
+            style={{ width: 72, height: 72, borderRadius: 18, marginBottom: 8 }}
           />
           <p className="eyebrow">Yekis jobs</p>
           <h1>Work with clarity.</h1>
@@ -509,6 +603,7 @@ export function FullPlatformApp() {
             <span>02</span>
             <strong>Built for Ethiopian clients and freelancers.</strong>
           </div>
+          <AuthVisualAnimation />
         </div>
         <form className="auth-panel" onSubmit={submitAuth}>
           <div className="auth-panel-header">
@@ -532,11 +627,6 @@ export function FullPlatformApp() {
                       : "Create an account"}
               </h2>
             </div>
-            <img
-              src="/svgviewer-output.svg"
-              alt="Yekis Logo"
-              className="platform-logo small"
-            />
           </div>
           {authMode === "register" && (
             <div className="segmented-control">
@@ -559,7 +649,7 @@ export function FullPlatformApp() {
           {(authMode === "login" ||
             authMode === "register" ||
             authMode === "forgot-password") && (
-            <label>
+            <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
               Email
               <input
                 type="email"
@@ -567,22 +657,43 @@ export function FullPlatformApp() {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder="you@example.com"
                 required
+                style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
               />
             </label>
           )}
           {authMode === "register" && (
-            <label>
-              Phone
-              <input
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                placeholder="+251911223344"
-                required
-              />
-            </label>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1.15fr 0.85fr",
+                gap: "10px",
+                marginTop: "4px",
+              }}
+            >
+              <label style={{ margin: 0, fontSize: "0.8rem", fontWeight: 600 }}>
+                Phone
+                <input
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="+251911223344"
+                  required
+                  style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
+                />
+              </label>
+              <label style={{ margin: 0, fontSize: "0.8rem", fontWeight: 600 }}>
+                Date of birth
+                <input
+                  type="date"
+                  value={dateOfBirth}
+                  onChange={(event) => setDateOfBirth(event.target.value)}
+                  required
+                  style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
+                />
+              </label>
+            </div>
           )}
           {authMode === "reset-password" && (
-            <label>
+            <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
               Reset token
               <input
                 type="text"
@@ -590,15 +701,56 @@ export function FullPlatformApp() {
                 onChange={(event) => setResetToken(event.target.value)}
                 placeholder="Enter reset token"
                 required
+                style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
               />
             </label>
           )}
           {(authMode === "login" ||
             authMode === "register" ||
             authMode === "reset-password") && (
-            <label>
-              {authMode === "reset-password" ? "New Password" : "Password"}
-              <div style={{ position: "relative", marginTop: "6px" }}>
+            <div style={{ marginTop: "6px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: "4px",
+                }}
+              >
+                <label
+                  style={{
+                    margin: 0,
+                    fontSize: "0.82rem",
+                    fontWeight: 600,
+                    color: "var(--color-text-secondary)",
+                  }}
+                >
+                  {authMode === "reset-password" ? "New password" : "Password"}
+                </label>
+                {authMode === "login" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode("forgot-password");
+                      setError("");
+                      setSuccessMessage("");
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      padding: 0,
+                      color: "var(--color-primary)",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      transition: "opacity 0.15s ease",
+                    }}
+                  >
+                    Forgot your password?
+                  </button>
+                )}
+              </div>
+              <div style={{ position: "relative" }}>
                 <input
                   type={showPassword ? "text" : "password"}
                   value={password}
@@ -610,7 +762,17 @@ export function FullPlatformApp() {
                       : undefined
                   }
                   required
-                  style={{ paddingRight: "40px", margin: 0 }}
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    paddingRight: "40px",
+                    paddingLeft: "12px",
+                    paddingTop: "9px",
+                    paddingBottom: "9px",
+                    margin: 0,
+                    fontSize: "0.88rem",
+                    borderRadius: "8px",
+                  }}
                 />
                 <button
                   type="button"
@@ -624,81 +786,16 @@ export function FullPlatformApp() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
                   }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-            </label>
-          )}
-          {authMode === "register" && (
-            <label>
-              Date of birth
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(event) => setDateOfBirth(event.target.value)}
-                required
-              />
-            </label>
-          )}
-          {authMode === "register" && (
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                fontSize: "0.82rem",
-                color: "var(--color-text-secondary)",
-                marginTop: 6,
-              }}
-            >
-              <input
-                id="termsCheck"
-                type="checkbox"
-                checked={termsAccepted}
-                onChange={(event) => setTermsAccepted(event.target.checked)}
-                required
-                style={{
-                  accentColor: "var(--color-primary)",
-                  flexShrink: 0,
-                  margin: 0,
-                  width: "auto",
-                  cursor: "pointer",
-                }}
-              />
-              <label
-                htmlFor="termsCheck"
-                style={{ margin: 0, cursor: "pointer", display: "inline" }}
-              >
-                I agree to the{" "}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowLanding(true);
-                    setMarketingPage("terms" as MarketingPage);
-                  }}
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  Terms
-                </a>
-                {" & "}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    setShowLanding(true);
-                    setMarketingPage("privacy" as MarketingPage);
-                  }}
-                  style={{ color: "var(--color-primary)" }}
-                >
-                  Privacy Policy
-                </a>
-                , including required identity (KYC) and financial data
-                processing.
-              </label>
             </div>
           )}
           {authMode === "register" && (
@@ -706,84 +803,201 @@ export function FullPlatformApp() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 4,
-                fontSize: "0.78rem",
-                color: "var(--color-text-secondary)",
-                marginTop: 4,
+                gap: 6,
+                marginTop: 8,
+                marginBottom: 2,
               }}
             >
-              <span style={{ fontWeight: 600 }}>
-                Optional — choose what we may use:
-              </span>
-              <label
-                htmlFor="notifConsent"
+              <div
                 style={{
-                  margin: 0,
-                  cursor: "pointer",
                   display: "flex",
-                  gap: 8,
                   alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  fontSize: "0.82rem",
+                  color: "var(--color-text-secondary)",
                 }}
               >
-                <input
-                  id="notifConsent"
-                  type="checkbox"
-                  checked={consentNotifications}
-                  onChange={(e) => setConsentNotifications(e.target.checked)}
+                <label
+                  htmlFor="termsCheck"
                   style={{
-                    accentColor: "var(--color-primary)",
-                    width: "auto",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                     margin: 0,
+                    cursor: "pointer",
+                    fontSize: "0.82rem",
                   }}
-                />
-                Platform notifications (escrow updates, dispute alerts)
-              </label>
-              <label
-                htmlFor="mktConsent"
-                style={{
-                  margin: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  id="mktConsent"
-                  type="checkbox"
-                  checked={consentMarketing}
-                  onChange={(e) => setConsentMarketing(e.target.checked)}
+                >
+                  <input
+                    id="termsCheck"
+                    type="checkbox"
+                    checked={termsAccepted}
+                    onChange={(event) => setTermsAccepted(event.target.checked)}
+                    required
+                    style={{
+                      accentColor: "var(--color-primary)",
+                      flexShrink: 0,
+                      margin: 0,
+                      width: "16px",
+                      height: "16px",
+                      cursor: "pointer",
+                    }}
+                  />
+                  <span>
+                    I agree to the{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setLegalModal("terms");
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "var(--color-primary)",
+                        fontWeight: 600,
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                        fontSize: "inherit",
+                      }}
+                    >
+                      Terms
+                    </button>
+                    {" & "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setLegalModal("privacy");
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        padding: 0,
+                        color: "var(--color-primary)",
+                        fontWeight: 600,
+                        textDecoration: "underline",
+                        cursor: "pointer",
+                        fontSize: "inherit",
+                      }}
+                    >
+                      Privacy Policy
+                    </button>
+                  </span>
+                </label>
+
+                <button
+                  type="button"
+                  onClick={() => setShowCookiePrefs(!showCookiePrefs)}
                   style={{
-                    accentColor: "var(--color-primary)",
-                    width: "auto",
-                    margin: 0,
+                    background: "none",
+                    border: "none",
+                    padding: "2px 6px",
+                    color: "var(--color-primary)",
+                    fontSize: "0.76rem",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 2,
                   }}
-                />
-                Marketing communications
-              </label>
-              <label
-                htmlFor="anaConsent"
-                style={{
-                  margin: 0,
-                  cursor: "pointer",
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  id="anaConsent"
-                  type="checkbox"
-                  checked={consentAnalytics}
-                  onChange={(e) => setConsentAnalytics(e.target.checked)}
+                  title="Customize privacy & notification preferences"
+                >
+                  {showCookiePrefs ? "Options ▲" : "Options ▾"}
+                </button>
+              </div>
+
+              {showCookiePrefs && (
+                <div
                   style={{
-                    accentColor: "var(--color-primary)",
-                    width: "auto",
-                    margin: 0,
+                    padding: "10px 12px",
+                    background: "var(--color-bg)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: 8,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 6,
+                    fontSize: "0.76rem",
+                    color: "var(--color-text-secondary)",
+                    marginTop: 4,
                   }}
-                />
-                Anonymized analytics sharing
-              </label>
+                >
+                  <span style={{ fontWeight: 600, color: "var(--color-text)" }}>
+                    Optional privacy & notification preferences:
+                  </span>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      margin: 0,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={consentNotifications}
+                      onChange={(e) => setConsentNotifications(e.target.checked)}
+                      style={{
+                        accentColor: "var(--color-primary)",
+                        width: 14,
+                        height: 14,
+                        margin: 0,
+                      }}
+                    />
+                    <span>Platform alerts (milestones & escrow updates)</span>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      margin: 0,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={consentMarketing}
+                      onChange={(e) => setConsentMarketing(e.target.checked)}
+                      style={{
+                        accentColor: "var(--color-primary)",
+                        width: 14,
+                        height: 14,
+                        margin: 0,
+                      }}
+                    />
+                    <span>Marketing communications</span>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      margin: 0,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={consentAnalytics}
+                      onChange={(e) => setConsentAnalytics(e.target.checked)}
+                      style={{
+                        accentColor: "var(--color-primary)",
+                        width: 14,
+                        height: 14,
+                        margin: 0,
+                      }}
+                    />
+                    <span>Anonymized product telemetry</span>
+                  </label>
+                </div>
+              )}
             </div>
           )}
           {error && <div className="form-error">{error}</div>}
@@ -805,6 +1019,7 @@ export function FullPlatformApp() {
           <button
             className="btn-primary wide"
             disabled={isLoading || (authMode === "register" && !termsAccepted)}
+            style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
               ? "Please wait..."
@@ -816,20 +1031,6 @@ export function FullPlatformApp() {
                     ? "Set password"
                     : "Create account"}
           </button>
-          {authMode === "login" && (
-            <button
-              type="button"
-              className="auth-switch"
-              onClick={() => {
-                setAuthMode("forgot-password");
-                setError("");
-                setSuccessMessage("");
-              }}
-              style={{ marginTop: "-8px", marginBottom: "4px" }}
-            >
-              Forgot your password?
-            </button>
-          )}
           {(authMode === "login" || authMode === "register") && (
             <SocialSignInButtons
               onAuthed={() => {
@@ -851,6 +1052,125 @@ export function FullPlatformApp() {
               : "Already have an account? Sign in"}
           </button>
         </form>
+
+        {legalModal && (
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0, 0, 0, 0.65)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 100,
+              padding: "20px",
+            }}
+            onClick={() => setLegalModal(null)}
+          >
+            <div
+              style={{
+                background: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "16px",
+                width: "min(100%, 580px)",
+                maxHeight: "82vh",
+                overflowY: "auto",
+                padding: "24px 28px",
+                boxShadow: "0 16px 36px rgba(0,0,0,0.3)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid var(--color-border)",
+                  paddingBottom: "12px",
+                  marginBottom: "16px",
+                }}
+              >
+                <strong style={{ fontSize: "1.15rem", color: "var(--color-text)" }}>
+                  {legalModal === "terms" ? "Terms of Service" : "Privacy Policy"}
+                </strong>
+                <button
+                  type="button"
+                  onClick={() => setLegalModal(null)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-text-secondary)",
+                    cursor: "pointer",
+                    padding: 4,
+                  }}
+                  aria-label="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {legalModal === "terms" ? (
+                <div style={{ fontSize: "0.86rem", lineHeight: 1.55, color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ margin: 0 }}>
+                    Welcome to <strong>Yekis Jobs</strong>. By creating an account or using the platform, you agree to these fundamental marketplace standards:
+                  </p>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>1. Escrow Protection</strong>
+                    <p style={{ margin: "2px 0 0" }}>Clients deposit milestone funds into secure escrow before work begins. Funds are disbursed upon milestone approval.</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>2. Dispute Mediation</strong>
+                    <p style={{ margin: "2px 0 0" }}>Disputes are resolved through fair evidence submission, staff mediation, and AACCSA arbitration standards.</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>3. Identity Verification (KYC)</strong>
+                    <p style={{ margin: "2px 0 0" }}>Users agree to verify identity via Fayda / Ethiopian National ID before initiating withdrawals, ensuring a trusted marketplace.</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>4. Fee Attribution</strong>
+                    <p style={{ margin: "2px 0 0" }}>Platform commissions and Telebirr/CBE payment rail charges adhere to the posted transparent fee schedule.</p>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ fontSize: "0.86rem", lineHeight: 1.55, color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ margin: 0 }}>
+                    <strong>Yekis Jobs</strong> values your confidentiality and complies with the Ethiopian Personal Data Protection Proclamation:
+                  </p>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>1. Data Collection & Purpose</strong>
+                    <p style={{ margin: "2px 0 0" }}>We collect phone numbers, emails, and KYC identification strictly to safeguard payments and satisfy AML/CTF statutory compliance.</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>2. Bank-Grade Encryption</strong>
+                    <p style={{ margin: "2px 0 0" }}>All identification documents and transaction records are encrypted at rest and in transit.</p>
+                  </div>
+                  <div>
+                    <strong style={{ color: "var(--color-text)" }}>3. No Third-Party Selling</strong>
+                    <p style={{ margin: "2px 0 0" }}>Your personal data is never sold or shared with third-party marketing networks.</p>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    setTermsAccepted(true);
+                    setLegalModal(null);
+                  }}
+                  style={{ padding: "8px 18px", fontSize: "0.88rem" }}
+                >
+                  I Understand & Agree
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     );
   }
@@ -976,27 +1296,77 @@ export function FullPlatformApp() {
 
             {/* Featured section - different for clients and freelancers */}
             {isFreelancer ? (
-              <div className="featured-jobs-section">
-                <h2>Featured Jobs for You</h2>
-                <p>
-                  {jobs.length === 0
-                    ? "No open jobs at the moment. Check back soon."
-                    : ""}
-                </p>
-                {jobs.length > 0 && (
-                  <div className="job-grid">
+              <div className="featured-jobs-section" style={{ margin: "24px 0" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <div>
+                    <h2 style={{ fontSize: "1.2rem", fontWeight: 700, margin: 0, color: "var(--color-text)" }}>
+                      Recommended for you
+                    </h2>
+                    <p style={{ margin: "2px 0 0", fontSize: "0.86rem", color: "var(--color-text-secondary)" }}>
+                      Open briefs matching verified Ethiopian talent
+                    </p>
+                  </div>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: "0.82rem", padding: "6px 14px", height: "auto", minHeight: "34px" }}
+                    onClick={() => setView("jobs")}
+                  >
+                    View all opportunities <ArrowRight size={14} />
+                  </button>
+                </div>
+                {jobs.filter((job) => job.status === "OPEN").length === 0 ? (
+                  <p className="empty-state">No open jobs at the moment. Check back soon.</p>
+                ) : (
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                      gap: 16,
+                    }}
+                  >
                     {jobs
                       .filter((job) => job.status === "OPEN")
+                      .slice(0, 3)
                       .map((job) => (
-                        <article key={job.id} className="job-platform-card">
+                        <article
+                          key={job.id}
+                          className="panel"
+                          style={{
+                            padding: "20px",
+                            display: "flex",
+                            flexDirection: "column",
+                            justifyContent: "space-between",
+                            gap: 12,
+                            borderRadius: "14px",
+                            border: "1px solid var(--color-border)",
+                            transition: "all 0.18s ease",
+                          }}
+                        >
                           <div>
-                            <span className="status-pill">Open</span>
-                            <h3>{job.title}</h3>
-                            <p>{job.description.substring(0, 100)}...</p>
-                            <small>
-                              ETB {(job.budgetMinMinor / 100).toLocaleString()}{" "}
-                              – {(job.budgetMaxMinor / 100).toLocaleString()}
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                              <span className="status-pill">Open</span>
+                              <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-primary)" }}>
+                                ETB {(job.budgetMinMinor / 100).toLocaleString()} – {(job.budgetMaxMinor / 100).toLocaleString()}
+                              </span>
+                            </div>
+                            <h3 style={{ fontSize: "1.02rem", fontWeight: 700, margin: "0 0 6px", color: "var(--color-text)" }}>
+                              {job.title}
+                            </h3>
+                            <p style={{ fontSize: "0.86rem", color: "var(--color-text-secondary)", margin: 0, lineHeight: 1.45 }}>
+                              {job.description.substring(0, 110)}...
+                            </p>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingTop: 10, borderTop: "1px solid var(--color-border)" }}>
+                            <small style={{ color: "var(--color-text-tertiary)", fontSize: "0.78rem" }}>
+                              Due {new Date(job.deadline).toLocaleDateString()}
                             </small>
+                            <button
+                              className="btn-primary"
+                              style={{ fontSize: "0.8rem", padding: "5px 12px", minHeight: "32px" }}
+                              onClick={() => setView("jobs")}
+                            >
+                              View Brief
+                            </button>
                           </div>
                         </article>
                       ))}
@@ -1120,7 +1490,7 @@ export function FullPlatformApp() {
               <form className="panel job-form" onSubmit={submitJob}>
                 <h3>New job brief</h3>
                 <div className="form-grid">
-                  <label>
+                  <label style={{ gridColumn: "span 2" }}>
                     Title
                     <input
                       value={jobTitle}
@@ -1184,7 +1554,11 @@ export function FullPlatformApp() {
                     />
                   </label>
                 </div>
-                <button className="btn-primary" disabled={isLoading}>
+                <button
+                  className="btn-primary"
+                  style={{ marginTop: 18, width: "fit-content" }}
+                  disabled={isLoading}
+                >
                   Publish job
                 </button>
               </form>
@@ -1229,17 +1603,13 @@ export function FullPlatformApp() {
         )}
 
         {view === "chat" && (
-          <section className="platform-content">
-            <div className="content-toolbar">
-              <div>
-                <h2>Support chat</h2>
-                <p>
-                  Get help with jobs, contracts, payments, verification, or
-                  disputes.
-                </p>
-              </div>
-            </div>
-            <SupportChat userId={user.id} />
+          <section className="platform-content chat-page-container">
+            <ChatWorkspace
+              user={user}
+              userId={user.id}
+              role={platformRole as "CLIENT" | "FREELANCER"}
+              onNavigateToContracts={() => setView("contracts")}
+            />
           </section>
         )}
 

@@ -128,7 +128,7 @@ export function StaffCompliancePanel({
   return (
     <section
       className="staff-panel staff-kyc-panel"
-      style={{ minHeight: "600px", marginTop: "20px" }}
+      style={{ minHeight: "560px", marginTop: 0 }}
     >
       <div className="staff-panel-heading" style={{ marginBottom: "1rem" }}>
         <div>

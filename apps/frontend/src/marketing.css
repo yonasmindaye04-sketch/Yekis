@@ -451,28 +451,70 @@
      so the marketing grid stacks normally. */
   display: block;
   margin-top: auto;
-  padding: 28px 0 16px;
+  padding: 56px 0 28px;
   border-top: 1px solid var(--yekis-border);
+  background-color: var(--yekis-bg);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .marketing-footer > .marketing-container {
   /* Undo `.landing-footer > div:last-child { display: flex }` which would
      otherwise place .footer-grid and .footer-bottom side by side. */
   display: block;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0 6%;
+  box-sizing: border-box;
 }
 
 .footer-grid {
   display: grid;
-  /* Brand column + 4 link columns (Platform, Company, Legal, Social) */
-  grid-template-columns: minmax(220px, 1.4fr) repeat(4, minmax(130px, 1fr));
-  gap: 40px;
+  /* Brand column (2fr) + 3 standard link columns (1fr) + Social column with icons (1.2fr) */
+  grid-template-columns: minmax(260px, 2fr) repeat(3, minmax(130px, 1fr)) minmax(160px, 1.2fr);
+  gap: clamp(24px, 3.5vw, 48px);
   align-items: start;
+  width: 100%;
+}
+
+.footer-brand {
+  max-width: 100%;
+  padding-right: 0;
+}
+
+.footer-brand .landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--yekis-copy);
+  text-decoration: none;
+}
+
+.footer-brand .landing-brand strong {
+  font-size: 1.2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.footer-desc {
+  margin: 0;
+  color: var(--yekis-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 320px;
 }
 
 .footer-col h4 {
-  margin-bottom: 14px;
-  font-size: 1rem;
+  margin: 0 0 16px 0;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  font-size: 0.95rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: #ffffff;
 }
 
@@ -480,61 +522,25 @@
   color: #18181b;
 }
 
-.footer-brand {
-  max-width: 100%;
-  padding-right: 24px;
-}
-
-.footer-desc {
-  margin: 0 0 14px;
-  color: var(--yekis-muted);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.marketing-footer .footer-social {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* Higher specificity than index.css `.landing-footer a` (border: 0) which
-   otherwise strips the icon boxes depending on bundle order. */
-.marketing-footer .footer-social a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  padding: 0;
-  background: none;
-  border: 1px solid var(--yekis-border);
-  border-radius: 8px;
-  color: var(--yekis-muted);
-  transition: all 0.2s ease;
-}
-
-.marketing-footer .footer-social a:hover,
-.marketing-footer .footer-social a:focus-visible {
-  color: var(--yekis-bg) !important;
-  background-color: var(--yekis-lime);
-  border-color: var(--yekis-lime);
-  transform: translateY(-2px);
-}
-
 .footer-col button,
 .footer-col a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: none;
   border: none;
+  margin: 0;
+  padding: 7px 0;
   color: var(--yekis-muted);
   cursor: pointer;
-  padding: 6px 0;
   text-decoration: none;
   text-align: left;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.5;
   font-family: inherit;
-  transition: color 0.2s ease;
+  transition: color 0.18s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .footer-col button:hover,
@@ -547,11 +553,21 @@
   color: #16a34a;
 }
 
-.footer-social-col a {
-  display: flex !important;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
+.footer-col a svg,
+.footer-col button svg {
+  flex-shrink: 0;
+  color: var(--yekis-muted);
+  transition: color 0.18s ease;
+}
+
+.footer-col a:hover svg,
+.footer-col button:hover svg {
+  color: var(--yekis-lime);
+}
+
+:root[data-theme="light"] .footer-col a:hover svg,
+:root[data-theme="light"] .footer-col button:hover svg {
+  color: #16a34a;
 }
 
 .footer-bottom {
@@ -559,11 +575,11 @@
   align-items: center !important;
   justify-content: space-between !important;
   flex-wrap: wrap !important;
-  gap: 14px !important;
+  gap: 16px !important;
   width: 100% !important;
-  margin-top: 26px !important;
-  padding-top: 16px !important;
-  border-top: none !important;
+  margin-top: 40px !important;
+  padding-top: 24px !important;
+  border-top: 1px solid var(--yekis-border) !important;
   color: var(--yekis-muted) !important;
   font-size: 0.875rem !important;
 }
@@ -594,7 +610,7 @@
   border-radius: 8px;
   color: var(--yekis-muted) !important;
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 6px 14px;
   font-size: 0.8125rem;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -853,7 +869,7 @@
 @media (max-width: 1024px) {
   .footer-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 32px;
+    gap: 36px 32px;
   }
   .footer-brand {
     grid-column: 1 / -1;
@@ -904,6 +920,29 @@
     gap: 28px;
   }
 
+  .marketing-footer {
+    padding: 40px 0 24px;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 32px 20px;
+  }
+
+  .footer-bottom {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 16px !important;
+    margin-top: 32px !important;
+    padding-top: 20px !important;
+  }
+
+  .footer-bottom-left {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
   .landing-chat-fab {
     right: 5%;
     bottom: 20px;
@@ -931,6 +970,11 @@
   .footer-grid {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+
+  .footer-col h4 {
+    min-height: auto;
+    margin-bottom: 10px;
   }
 
   .landing-chat-fab {

@@ -50,9 +50,8 @@ export const DisputeCategory = z.enum([
 ]);
 export type DisputeCategory = z.infer<typeof DisputeCategory>;
 
-// PAY-002: Chapa is REMOVED from the approved payment architecture
-// (Telebirr + CBE only). The enum value was dropped via migration.
-export const PaymentProvider = z.enum(["TELEBIRR", "CBE_BIRR"]);
+// PAY-002: Approved payment architecture: Telebirr, CBE Birr, and Safaricom M-Pesa.
+export const PaymentProvider = z.enum(["TELEBIRR", "CBE_BIRR", "M_PESA"]);
 export type PaymentProvider = z.infer<typeof PaymentProvider>;
 
 // Launch categories — locked in Phase 0. Keep this list here so the whole

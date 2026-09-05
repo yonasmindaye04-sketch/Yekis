@@ -57,7 +57,7 @@ export function GigMarketplace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
-  const order = async (gig: Gig, pkg: GigPackage) => {
+  const order = async (pkg: GigPackage) => {
     setOrdering(true);
     setNotice("");
     try {
@@ -119,7 +119,7 @@ export function GigMarketplace() {
                 className="btn-primary"
                 style={{ width: "100%", marginTop: 8 }}
                 disabled={ordering}
-                onClick={() => void order(selected, pkg)}
+                onClick={() => void order(pkg)}
               >
                 <Package size={16} style={{ marginRight: 6 }} />
                 Order & Pay

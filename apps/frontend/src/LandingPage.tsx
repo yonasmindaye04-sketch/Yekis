@@ -653,66 +653,88 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           >
             <div
               className="glass-panel"
-              style={{ border: "1px solid var(--color-border)" }}
+              style={{
+                border: "1px solid var(--color-border)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                padding: "32px",
+                borderRadius: "16px",
+              }}
             >
-              <p className="hero-eyebrow" style={{ marginBottom: 12 }}>
-                For clients
-              </p>
-              <h3
-                style={{
-                  fontSize: 22,
-                  marginBottom: 12,
-                  color: "var(--color-text)",
-                }}
-              >
-                Hire verified Ethiopian professionals.
-              </h3>
-              <p
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 15,
-                  marginBottom: 24,
-                }}
-              >
-                Post your project brief, compare proposals, fund approved
-                milestones into escrow, and track delivery effortlessly.
-              </p>
+              <div>
+                <p className="hero-eyebrow" style={{ marginBottom: 12 }}>
+                  For clients
+                </p>
+                <h3
+                  style={{
+                    fontSize: 22,
+                    marginBottom: 12,
+                    color: "var(--color-text)",
+                  }}
+                >
+                  Hire verified Ethiopian professionals.
+                </h3>
+                <p
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontSize: 15,
+                    marginBottom: 24,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Post your project brief, compare proposals, fund approved
+                  milestones into escrow, and track delivery effortlessly.
+                </p>
+              </div>
               <button
                 className="btn-primary"
                 onClick={() => onStart("register")}
+                style={{ width: "fit-content" }}
               >
                 Create a client workspace
               </button>
             </div>
             <div
               className="glass-panel"
-              style={{ border: "1px solid var(--color-border)" }}
+              style={{
+                border: "1px solid var(--color-border)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                padding: "32px",
+                borderRadius: "16px",
+              }}
             >
-              <p className="hero-eyebrow" style={{ marginBottom: 12 }}>
-                For freelancers
-              </p>
-              <h3
-                style={{
-                  fontSize: 22,
-                  marginBottom: 12,
-                  color: "var(--color-text)",
-                }}
-              >
-                Get hired, work safely, and get paid on time.
-              </h3>
-              <p
-                style={{
-                  color: "var(--color-text-secondary)",
-                  fontSize: 15,
-                  marginBottom: 24,
-                }}
-              >
-                Find quality projects, submit proposals, work with guaranteed
-                milestone escrow, and build a verified career profile.
-              </p>
+              <div>
+                <p className="hero-eyebrow" style={{ marginBottom: 12 }}>
+                  For freelancers
+                </p>
+                <h3
+                  style={{
+                    fontSize: 22,
+                    marginBottom: 12,
+                    color: "var(--color-text)",
+                  }}
+                >
+                  Get hired, work safely, and get paid on time.
+                </h3>
+                <p
+                  style={{
+                    color: "var(--color-text-secondary)",
+                    fontSize: 15,
+                    marginBottom: 24,
+                    lineHeight: 1.55,
+                  }}
+                >
+                  Find quality projects, submit proposals, work with guaranteed
+                  milestone escrow, and build a verified career profile.
+                </p>
+              </div>
               <button
                 className="btn-secondary"
                 onClick={() => onStart("register")}
+                style={{ width: "fit-content" }}
               >
                 Join as a freelancer
               </button>

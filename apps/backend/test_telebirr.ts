@@ -1,11 +1,12 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 import { telebirrClient } from './src/modules/escrow/providers/telebirr.client.js';
 
 async function run() {
   try {
     const result = await telebirrClient.initiatePayment({
-      amountMinor: 10000, // 100.00 ETB
+      amountMinor: 1000, // 10.00 ETB
       currency: 'ETB',
-      reference: 'Test Payment'
+      reference: 'Wallet Top-up'
     });
     console.log('Payment initiation successful!');
     console.log('Provider Transaction ID:', result.providerTransactionId);

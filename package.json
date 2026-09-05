@@ -7,9 +7,12 @@
     "packages/*"
   ],
   "scripts": {
+    "predev": "docker compose up -d",
     "dev": "pnpm -r --parallel dev",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"

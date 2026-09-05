@@ -25,6 +25,7 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 |---|---|---|---|
 | `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents |
 | `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
+| `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange a valid refresh token for a new access+refresh pair. Suspended accounts are refused here too — a suspension takes effect at the next silent refresh. |
 | `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
 
 Registration body:
@@ -135,8 +136,11 @@ Accepting a proposal rejects competing proposals, moves the job to `IN_PROGRESS`
 | `GET` | `/api/v1/contracts/:contractId` | Contract party | Get contract details |
 | `GET` | `/api/v1/contracts/:contractId/document` | Contract party | Get a temporary signed URL for the PDF |
 | `POST` | `/api/v1/contracts/:contractId/accept` | Contract party | Record that party's independent signature timestamp |
+| `POST` | `/api/v1/contracts/:contractId/cancel-cooling-off` | Client party | Exercise statutory 7-day cooling-off cancellation before work begins (ECA Proclamation No. 1205/2020) |
 
 Funding is unavailable until both `clientAcceptedAt` and `freelancerAcceptedAt` are set.
+The 7-day cooling-off cancellation right may only be exercised by the client while all contract milestones remain in `PAYMENT_PENDING` (no escrow funds held).
+
 
 ## Escrow And Wallet
 
@@ -175,22 +179,38 @@ Withdrawal body:
 }
 ```
 
-Providers are `TELEBIRR`, `CHAPA`, and `CBE_BIRR`. Wallet mismatch returns `202` with `HELD_FOR_REVIEW` and does not debit the wallet. A passing request currently debits and records locally but does not call a live payout provider.
+Providers are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`. Wallet mismatch returns `202` with `HELD_FOR_REVIEW` and does not debit the wallet. A passing request creates a `PayoutTransaction`, initiates automated B2C disbursement via the provider (with deterministic sandbox simulation when credentials are not configured), posts double-entry ledger entries upon confirmation, and rolls back the wallet balance if the provider rejects the payout.
 
-## Manual Top-Ups
+Withdrawal response (`200 OK`):
 
-The mounted base path is `/api/v1/escrow/topups`.
+```json
+{
+  "payoutId": "payout-cuid",
+  "status": "CONFIRMED",
+  "amountMinor": 500000,
+  "netAmountMinor": 497500,
+  "feeMinor": 2500,
+  "balanceMinor": 1500000
+}
+```
+
+## Top-Ups And Manual Fallback
+
+The mounted base path is `/api/v1/escrow/topups` (with wallet shortcuts at `/api/v1/wallet/topups`).
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/escrow/topups/manual` | Authenticated | Upload receipt and create review request |
+| `POST` | `/api/v1/escrow/topups/manual` | Authenticated | Upload receipt and create manual review request |
 | `GET` | `/api/v1/escrow/topups` | Authenticated | List own top-ups |
 | `GET` | `/api/v1/escrow/topups/:topUpId` | Owner | Get one top-up |
 | `GET` | `/api/v1/escrow/topups/admin/queue` | Staff | List pending top-ups |
 | `POST` | `/api/v1/escrow/topups/admin/:topUpId/review` | Staff | Approve/reject; approval credits wallet |
-| `POST` | `/api/v1/wallet/topups/checkout` | Authenticated | Initiate automatic Telebirr C2B web checkout for wallet top-up |
+| `POST` | `/api/v1/wallet/topups/checkout` | Authenticated | Initiate automated checkout (`TELEBIRR`, `CBE_BIRR`, `M_PESA`) |
+| `POST` | `/api/v1/wallet/topups/:topUpId/attach-receipt` | Owner | Attach manual transfer receipt to unconfirmed/stalled checkout request |
 
-Manual top-up is `multipart/form-data` with `receipt`, `amountMinor`, `provider`, and `referenceNumber`. Rails are `TELEBIRR` and `CBE_BIRR`; maximum receipt size is 8 MB. Automatic top-up takes `{ amountMinor, provider: "TELEBIRR" }` and returns `{ redirectUrl, topUpId }`.
+Manual top-up is `multipart/form-data` with `receipt`, `amountMinor`, `provider`, and `referenceNumber`. Supported rails are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`; maximum receipt size is 8 MB.
+
+Automatic top-up accepts `{ amountMinor, provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA" }` and returns `{ redirectUrl, topUpId }`. If an automated gateway is unreachable or experiences latency, users can utilize the **Manual Verification Fallback** to transfer funds directly and submit the transfer reference and receipt for immediate staff queue review without losing transaction context.
 
 ## Signed Payment Webhooks
 
@@ -335,11 +355,15 @@ The API records a filing performed by a human; it does not submit to the FIC. A 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/chat/guest` | Public | Create guest support conversation |
-| `GET` | `/api/v1/chat/conversations` | Authenticated | List own conversations |
-| `POST` | `/api/v1/chat/conversations` | Authenticated | Create conversation |
-| `GET` | `/api/v1/chat/conversations/:conversationId/messages` | Participant | List messages |
-| `POST` | `/api/v1/chat/conversations/:conversationId/messages` | Participant | Send message |
+| `GET` | `/api/v1/chat/conversations` | Authenticated | List own conversations (with `otherParticipant` details) |
+| `POST` | `/api/v1/chat/conversations` | Authenticated | Create support conversation |
+| `POST` | `/api/v1/chat/direct` | Authenticated | Create/fetch direct 2-party conversation with client/freelancer |
+| `GET` | `/api/v1/chat/conversations/:conversationId/messages` | Participant | List messages in thread |
+| `POST` | `/api/v1/chat/conversations/:conversationId/messages` | Participant | Send message (broadcasts real-time to channel & recipient) |
 | `POST` | `/api/v1/chat/conversations/:conversationId/read` | Participant | Update read marker |
+| `POST` | `/api/v1/chat/conversations/:conversationId/assistant/suggest-replies` | Participant | Mini-Me AI suggested smart replies |
+| `POST` | `/api/v1/chat/conversations/:conversationId/assistant/summarize` | Participant | Mini-Me AI thread digest (deliverables, budget, timeline) |
+| `POST` | `/api/v1/chat/conversations/:conversationId/assistant/extract-deal` | Participant | Mini-Me AI deal terms extractor into escrow milestone |
 | `GET` | `/api/v1/chat/admin/conversations` | Staff | List support queue (scoped by assignedStaffId for non-admins) |
 | `POST` | `/api/v1/chat/admin/conversations/:id/claim` | Staff | Claim an unassigned conversation |
 | `PATCH` | `/api/v1/chat/admin/conversations/:id/assign` | Admin | Reassign a conversation to a specific staff member |
@@ -362,7 +386,67 @@ The API records a filing performed by a human; it does not submit to the FIC. A 
 
 Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Domain errors use a stable `error` code and may include a human-readable `message`.
 
-### POST /api/v1/jobs/:jobId/proposals/upload`n- **Auth:** Freelancer (Tier 1 KYC required)
+### POST /api/v1/jobs/:jobId/proposals/upload
+- **Auth:** Freelancer (Tier 1 KYC required)
 - **Description:** Uploads a document attachment (PDF, image, doc) for a proposal.
-- **Body:** \multipart/form-data\ with a \ile\ field.
-- **Returns:** \{ path: string }\`n
+- **Body:** `multipart/form-data` with a `file` field.
+- **Returns:** `{ "path": string }`
+
+## Chat & Messaging
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/chat/conversations` | Authenticated | List all active direct and support conversations for the user |
+| `GET` | `/api/v1/chat/conversations/:id/messages` | Authenticated participant / staff | Retrieve chronological message history |
+| `POST` | `/api/v1/chat/conversations/:id/messages` | Authenticated participant / staff | Send text message with optional `attachmentUrl` |
+| `POST` | `/api/v1/chat/upload` | Authenticated | Upload file attachment (`multipart/form-data`, 15MB limit) |
+| `GET` | `/api/v1/chat/attachments/:key(*)` | Authenticated / public media stream | Stream uploaded chat attachment with MIME headers |
+| `POST` | `/api/v1/chat/direct` | Authenticated | Start or retrieve 1-on-1 direct negotiation conversation |
+| `POST` | `/api/v1/chat/support` | Authenticated | Create a customer support thread |
+| `POST` | `/api/v1/chat/conversations/:id/read` | Authenticated participant | Mark conversation messages as read |
+| `GET` | `/api/v1/chat/conversations/:id/assistant/suggest-replies` | Authenticated participant | Generate AI Mini-Me quick reply suggestions |
+| `GET` | `/api/v1/chat/conversations/:id/assistant/summarize` | Authenticated participant | Summarize contract negotiation topics and milestones |
+| `GET` | `/api/v1/chat/conversations/:id/assistant/extract-deal` | Authenticated participant | Extract milestone deliverables, price, and deadline |
+
+### POST /api/v1/chat/upload
+- **Auth:** Authenticated (`Bearer <token>`)
+- **Body:** `multipart/form-data` with `file` field (max 15MB)
+- **Response:**
+  ```json
+  {
+    "url": "/api/v1/chat/attachments/chat-attachments/user-uuid/filename.png",
+    "key": "chat-attachments/user-uuid/filename.png",
+    "fileName": "filename.png",
+    "fileSize": 1048576,
+    "mimeType": "image/png"
+  }
+  ```
+
+### GET /api/v1/chat/attachments/:key(*)
+- **Description:** Streams attachment files stored in MinIO object storage (or local disk fallback). Sets `Content-Type`, `Content-Length`, and caching headers.
+
+## Real-Time WebSocket API (`/api/v1/ws`)
+
+Connect to: `ws://127.0.0.1:4000/api/v1/ws?token=<access-token>`
+
+### Authentication & Connection
+- **URL Parameter:** `token` — JWT access token.
+- Unauthenticated connections are closed with code `4001` or `4003`.
+- Authenticated sockets are automatically subscribed to `user:<userId>` and (if staff) `staff:alerts`.
+
+### Client Actions (JSON Messages)
+```json
+{ "action": "subscribe", "channel": "conversation:<conversationId>" }
+{ "action": "unsubscribe", "channel": "conversation:<conversationId>" }
+{ "action": "typing", "conversationId": "<conversationId>", "isTyping": true }
+{ "action": "read", "conversationId": "<conversationId>" }
+```
+
+### Server Events
+- `connected`: Handshake confirmation with userId.
+- `chat:message`: Broadcasts new message payload to `conversation:<conversationId>`.
+- `chat:typing`: Broadcasts counterpart typing state `{ userId, conversationId, isTyping }`.
+- `chat:read`: Broadcasts read receipt `{ userId, conversationId, readAt }`.
+- `chat:new_message`: Pushed to recipient's private user channel `user:<userId>` for live unread counter badges.
+
+

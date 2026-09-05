@@ -36,4 +36,28 @@ export interface PaymentProviderClient {
   queryPaymentStatus?(params: {
     providerTransactionId: string;
   }): Promise<{ status: "SUCCESS" | "FAILED" | "PENDING" } | null>;
+
+  /**
+   * B2C Disbursement (payout) to a freelancer's mobile wallet or bank account.
+   */
+  initiateDisbursement?(params: {
+    amountMinor: number;
+    currency: "ETB";
+    recipientPhone: string;
+    referenceId: string;
+  }): Promise<InitiateDisbursementResult>;
+
+  /**
+   * Status check for an in-flight or processing disbursement.
+   */
+  queryDisbursementStatus?(params: {
+    providerPayoutId: string;
+  }): Promise<{ status: "CONFIRMED" | "PROCESSING" | "FAILED"; errorMessage?: string } | null>;
 }
+
+export interface InitiateDisbursementResult {
+  providerPayoutId: string;
+  status: "CONFIRMED" | "PROCESSING" | "FAILED";
+  errorMessage?: string;
+}
+

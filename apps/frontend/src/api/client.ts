@@ -45,23 +45,27 @@ export interface TopUpRequest {
   id: string;
   userId: string;
   amountMinor: number;
-  provider: "TELEBIRR" | "CBE_BIRR";
-  senderName: string;
+  provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+  senderName?: string;
   referenceNumber: string;
-  receiptPath: string;
-  status: "PENDING_REVIEW" | "APPROVED" | "REJECTED";
+  receiptPath?: string;
+  receiptImagePath?: string | null;
+  providerTransactionId?: string | null;
+  status: "PENDING" | "CHECKOUT_PENDING" | "PENDING_REVIEW" | "APPROVED" | "REJECTED" | "FLAGGED";
   createdAt: string;
   reviewedAt: string | null;
-  reviewedBy: string | null;
+  reviewedBy?: string | null;
   rejectionReason: string | null;
 }
 
 export interface TopUpQueueItem {
   id: string;
   userId: string;
-  provider: "TELEBIRR" | "CBE_BIRR";
+  provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
   amountMinor: number;
   referenceNumber: string;
+  providerTransactionId?: string | null;
+  receiptImagePath?: string | null;
   status: string;
   createdAt: string;
   user?: {
@@ -147,6 +151,8 @@ export interface Contract {
   clientAcceptedAt: string | null;
   freelancerAcceptedAt: string | null;
   fullyExecuted: boolean;
+  status: string;
+  cancellableUntil?: string | null;
   createdAt: string;
   job: { id: string; title: string; status: string };
   milestones: Milestone[];
@@ -206,7 +212,18 @@ export interface ChatConversation {
   createdAt: string;
   updatedAt: string;
   latestMessage: { body: string; createdAt: string; senderId: string } | null;
+  otherParticipant?: {
+    id: string;
+    email: string;
+    role: string;
+    displayName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarUrl?: string | null;
+  } | null;
+  isSupport?: boolean;
   unread: boolean;
+  assignedStaff?: { id: string; name: string } | null;
 }
 
 export interface ChatMessage {
@@ -214,8 +231,40 @@ export interface ChatMessage {
   conversationId: string;
   senderId: string;
   body: string;
+  attachmentUrl?: string | null;
   createdAt: string;
-  sender: { id: string; role: string; staffRole: string | null };
+  sender: {
+    id: string;
+    email?: string;
+    role: string;
+    staffRole: string | null;
+    displayName?: string | null;
+    firstName?: string | null;
+    lastName?: string | null;
+    avatarUrl?: string | null;
+  };
+}
+
+export interface SmartRepliesResponse {
+  suggestions: string[];
+}
+
+export interface ConversationSummaryResponse {
+  topic: string;
+  keyPoints: string[];
+  agreedBudgetETB: string | null;
+  detectedTimeline: string;
+  nextStep: string;
+  messageCount: number;
+  lastActivity?: string;
+}
+
+export interface DealTermsResponse {
+  suggestedTitle: string;
+  suggestedBudgetETB: number;
+  estimatedDays: number;
+  confidence: "HIGH" | "MEDIUM" | "LOW";
+  readyForEscrow: boolean;
 }
 
 export interface StaffConversation {
@@ -310,6 +359,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 // === MAIN FUNCTIONS ===
 class ApiClient {
   private accessToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
+  private refreshToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-refresh-token") : null;
+  private refreshPromise: Promise<void> | null = null;
 
   setToken(token: string | null) {
     this.accessToken = token;
@@ -322,24 +373,102 @@ class ApiClient {
     }
   }
 
+  /**
+   * Persist the full session (access + refresh tokens). Every successful
+   * auth call site should use this — previously only the access token was
+   * stored, so the short-lived access token was the only thing keeping a
+   * session alive, causing hard logouts every JWT_ACCESS_TTL (15 min).
+   */
+  setSession(tokens: { accessToken: string; refreshToken?: string | null }) {
+    this.setToken(tokens.accessToken);
+    this.refreshToken = tokens.refreshToken ?? null;
+    if (typeof window !== "undefined") {
+      if (tokens.refreshToken) {
+        window.localStorage.setItem("yekis-refresh-token", tokens.refreshToken);
+      } else {
+        window.localStorage.removeItem("yekis-refresh-token");
+      }
+    }
+  }
+
   clearToken() {
     this.setToken(null);
+    this.refreshToken = null;
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("yekis-refresh-token");
+    }
+  }
+
+  getToken(): string | null {
+    return this.accessToken;
+  }
+
+  /**
+   * Silent session refresh. Called once (deduped across concurrent requests).
+   * The backend /auth/refresh route both validates the refresh token and
+   * re-issues the pair, rotating the stored token so a stolen old copy can't
+   * be replayed.
+   */
+  private async tryRefresh(): Promise<void> {
+    if (this.refreshPromise) return this.refreshPromise;
+    const doing: Promise<void> = (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/v1/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken: this.refreshToken }),
+        });
+        if (!res.ok) throw new Error("refresh failed");
+        const data = (await res.json()) as {
+          accessToken: string;
+          refreshToken: string;
+        };
+        this.setSession(data);
+      } catch (err) {
+        this.clearToken();
+        throw err;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+    this.refreshPromise = doing;
+    return doing;
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-      ...(options.headers as Record<string, string>),
+    const performRequest = async (token: string | null) => {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...(options.headers as Record<string, string>),
+      };
+
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      return fetch(`${API_BASE_URL}${path}`, {
+        ...options,
+        headers,
+      });
     };
 
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
+    let response = await performRequest(this.accessToken);
 
-    const response = await fetch(`${API_BASE_URL}${path}`, {
-      ...options,
-      headers,
-    });
+    // Access token expired → attempt a silent refresh, then retry the request
+    // once. Refresh itself never goes through this branch to avoid a loop.
+    if (
+      response.status === 401 &&
+      this.refreshToken &&
+      !path.includes("/auth/")
+    ) {
+      try {
+        await this.tryRefresh();
+        response = await performRequest(this.accessToken);
+      } catch {
+        // tryRefresh already cleared the session on failure — let the original
+        // 401 surface below (app will re-render the login screen).
+      }
+    }
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
@@ -430,12 +559,76 @@ class ApiClient {
     return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ email, body }) });
   }
 
+  async createDirectConversation(recipientId: string, subject: string): Promise<ChatConversation> {
+    return this.request("/api/v1/chat/direct", {
+      method: "POST",
+      body: JSON.stringify({ recipientId, subject }),
+    });
+  }
+
   async getChatMessages(conversationId: string): Promise<ChatMessage[]> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/messages`);
   }
 
-  async sendChatMessage(conversationId: string, body: string): Promise<ChatMessage> {
-    return this.request(`/api/v1/chat/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify({ body }) });
+  async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string): Promise<ChatMessage> {
+    return this.request(`/api/v1/chat/conversations/${conversationId}/messages`, {
+      method: "POST",
+      body: JSON.stringify({ body, attachmentUrl }),
+    });
+  }
+
+  async uploadChatAttachment(file: File): Promise<{ url: string; fileName: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/chat/upload`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.url) return data;
+      }
+    } catch {
+      // Fallback to Data URL if upload endpoint is unavailable
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve({
+          url: reader.result as string,
+          fileName: file.name,
+        });
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async getSmartReplies(conversationId: string): Promise<SmartRepliesResponse> {
+    return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/suggest-replies`, {
+      method: "POST",
+    });
+  }
+
+  async summarizeChat(conversationId: string): Promise<ConversationSummaryResponse> {
+    return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/summarize`, {
+      method: "POST",
+    });
+  }
+
+  async extractDealTerms(conversationId: string): Promise<DealTermsResponse> {
+    return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/extract-deal`, {
+      method: "POST",
+    });
   }
 
   async markChatRead(conversationId: string): Promise<{ ok: boolean }> {
@@ -559,6 +752,12 @@ class ApiClient {
     });
   }
 
+  async simulateTopUpSuccess(topUpId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/v1/wallet/topups/checkout/${topUpId}/simulate-success`, {
+      method: "POST",
+    });
+  }
+
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
     const headers: Record<string, string> = {};
     if (this.accessToken) {
@@ -574,6 +773,26 @@ class ApiClient {
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
       throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async attachTopUpReceipt(topUpId: string, data: FormData): Promise<TopUpRequest> {
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/v1/wallet/topups/${topUpId}/attach-receipt`, {
+      method: "POST",
+      headers,
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
+      throw new Error(error.message || error.error || `HTTP ${response.status}`);
     }
 
     return response.json();
@@ -718,10 +937,13 @@ class ApiClient {
     return this.request("/api/v1/jobs", { method: "POST", body: JSON.stringify(input) });
   }
 
-  // Escrow
+  // Escrow & Contracts
   async getContracts(): Promise<Contract[]> { return this.request("/api/v1/contracts"); }
   async acceptContract(contractId: string): Promise<Contract> {
     return this.request(`/api/v1/contracts/${contractId}/accept`, { method: "POST" });
+  }
+  async cancelContractCoolingOff(contractId: string): Promise<Contract> {
+    return this.request(`/api/v1/contracts/${contractId}/cancel-cooling-off`, { method: "POST" });
   }
   async getContractDocumentUrl(contractId: string): Promise<{ url: string }> {
     return this.request(`/api/v1/contracts/${contractId}/document`);
@@ -731,7 +953,7 @@ class ApiClient {
     return this.request("/api/v1/escrow/milestones");
   }
 
-  async fundMilestone(contractId: string, milestoneId: string, provider: "TELEBIRR" | "CBE_BIRR"): Promise<{ redirectUrl: string | null; providerTransactionId: string }> {
+  async fundMilestone(contractId: string, milestoneId: string, provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA"): Promise<{ redirectUrl: string | null; providerTransactionId: string }> {
     return this.request("/api/v1/escrow/fund", {
       method: "POST",
       body: JSON.stringify({ contractId, milestoneId, provider }),
@@ -758,7 +980,7 @@ class ApiClient {
   }
 
 
-  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CBE_BIRR"; payoutAccountIdentifier: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
+  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA"; payoutAccountIdentifier: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
     return this.request("/api/v1/escrow/wallet/withdraw", { method: "POST", body: JSON.stringify(input) });
   }
 

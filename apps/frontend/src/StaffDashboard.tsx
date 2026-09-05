@@ -16,6 +16,12 @@ import {
   Users,
   Sun,
   Moon,
+  Scale,
+  LogOut,
+  ExternalLink,
+  FileText,
+  Loader2,
+  X,
 } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
 import {
@@ -30,6 +36,26 @@ import { KycQueue } from "./KycQueue";
 import { TopUpQueue } from "./TopUpQueue";
 import { DisputeQueue } from "./DisputeQueue";
 import { ProfileReportsQueue } from "./ProfileReportsQueue";
+
+function isImageAttachment(url: string | null | undefined): boolean {
+  if (!url) return false;
+  if (url.startsWith("data:image/")) return true;
+  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
+}
+
+function getAttachmentLabel(url: string | null | undefined): string {
+  if (!url) return "Attachment";
+  if (url.startsWith("data:image/")) return "Image attachment";
+  const clean = url.split("?")[0];
+  const parts = clean.split("/");
+  const last = parts[parts.length - 1];
+  try {
+    const decoded = decodeURIComponent(last);
+    return decoded.replace(/^[a-f0-9-]+_?/, "") || "Attachment";
+  } catch {
+    return "Attachment";
+  }
+}
 
 // === INTERFACES & TYPES ===
 type StaffDashboardProps = { user: MeResponse; onLogout: () => void };
@@ -87,6 +113,8 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   >(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reply, setReply] = useState("");
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
   const [queueScope, setQueueScope] = useState<"ALL" | "MINE">("ALL");
   const [viewingEvidence, setViewingEvidence] = useState<
     EvidenceDocument[] | null
@@ -214,15 +242,38 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   }, [selectedConversation]);
 
   const sendReply = async () => {
-    if (!selectedConversation || !reply.trim() || isSending) return;
+    if (
+      !selectedConversation ||
+      (!reply.trim() && !attachedFile) ||
+      isSending ||
+      isUploadingAttachment
+    )
+      return;
     setIsSending(true);
     try {
+      let attachmentUrl: string | undefined = undefined;
+      if (attachedFile) {
+        setIsUploadingAttachment(true);
+        try {
+          const res = await api.uploadChatAttachment(attachedFile);
+          attachmentUrl = res.url;
+        } catch (uploadErr) {
+          console.warn("Attachment upload failed in staff reply", uploadErr);
+        } finally {
+          setIsUploadingAttachment(false);
+        }
+      }
+
+      const bodyToSend =
+        reply.trim() || (attachedFile ? `📎 ${attachedFile.name}` : "📎 Attachment");
       const message = await api.sendChatMessage(
         selectedConversation,
-        reply.trim(),
+        bodyToSend,
+        attachmentUrl,
       );
       setMessages((current) => [...current, message]);
       setReply("");
+      setAttachedFile(null);
       await loadConversations(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to send reply");
@@ -302,7 +353,11 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
           <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
           <div>
             <strong>
-              {user.staffRole === "ADMIN" ? "Administrator" : "Staff desk"}
+              {user.staffRole === "ADMIN"
+                ? "Administrator"
+                : user.staffRole === "SUPPORT"
+                  ? "Customer support"
+                  : "Staff desk"}
             </strong>
             <small>{user.email}</small>
           </div>
@@ -326,39 +381,48 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               <MessageSquare size={18} />
             </span>
             <span className="nav-label">Support</span>
+            {openCount > 0 && <span className="nav-badge">{openCount}</span>}
           </button>
-          <button
-            className={activeTab === "TOPUPS" ? "active" : ""}
-            onClick={() => setActiveTab("TOPUPS")}
-          >
-            <span className="nav-icon">
-              <WalletCards size={18} />
-            </span>
-            <span className="nav-label">Receipts</span>
-          </button>
-          <button
-            className={activeTab === "KYC" ? "active" : ""}
-            onClick={() => setActiveTab("KYC")}
-          >
-            <span className="nav-icon">
-              <ShieldCheck size={18} />
-            </span>
-            <span className="nav-label">Identity</span>
-          </button>
+          {user.staffRole !== "SUPPORT" && (
+            <button
+              className={activeTab === "TOPUPS" ? "active" : ""}
+              onClick={() => setActiveTab("TOPUPS")}
+            >
+              <span className="nav-icon">
+                <WalletCards size={18} />
+              </span>
+              <span className="nav-label">Receipts</span>
+              {queueCounts.topups > 0 && (
+                <span className="nav-badge">{queueCounts.topups}</span>
+              )}
+            </button>
+          )}
+          {user.staffRole !== "SUPPORT" && (
+            <button
+              className={activeTab === "KYC" ? "active" : ""}
+              onClick={() => setActiveTab("KYC")}
+            >
+              <span className="nav-icon">
+                <ShieldCheck size={18} />
+              </span>
+              <span className="nav-label">Identity</span>
+              {queueCounts.kyc > 0 && (
+                <span className="nav-badge">{queueCounts.kyc}</span>
+              )}
+            </button>
+          )}
           {user.staffRole === "ADMIN" && (
             <button
               className={activeTab === "DISPUTES" ? "active" : ""}
               onClick={() => setActiveTab("DISPUTES")}
             >
               <span className="nav-icon">
-                <span
-                  className="metric-symbol"
-                  style={{ fontSize: 16, fontWeight: "bold" }}
-                >
-                  !
-                </span>
+                <Scale size={18} />
               </span>
               <span className="nav-label">Disputes</span>
+              {queueCounts.disputes > 0 && (
+                <span className="nav-badge">{queueCounts.disputes}</span>
+              )}
             </button>
           )}
           {user.staffRole === "ADMIN" && (
@@ -374,46 +438,47 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
           )}
         </nav>
 
-        <button className="sidebar-settings" onClick={onLogout}>
-          Sign out
+        <button className="sidebar-settings sidebar-logout" onClick={onLogout}>
+          <span className="nav-icon">
+            <LogOut size={18} />
+          </span>
+          <span className="nav-label">Sign out</span>
         </button>
       </aside>
 
       {/* ── Main ────────────────────────────────────────── */}
       <main className="staff-main">
         <header className="staff-topbar">
-          <div>
+          <div className="staff-topbar-title-area">
             <p className="eyebrow">Operations workspace</p>
-            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-              <h1>
-                {activeTab === "OVERVIEW" && "Keep Yekis moving."}
-                {activeTab === "SUPPORT" && "Support desk"}
-                {activeTab === "TOPUPS" && "Receipt reviews"}
-                {activeTab === "KYC" && "Identity reviews"}
-                {activeTab === "DISPUTES" && "Disputes"}
-                {activeTab === "PROFILES" && "Profile Moderation"}
-              </h1>
-              <div className="staff-filter-toggle">
-                <button
-                  className={queueScope === "ALL" ? "active" : ""}
-                  onClick={() => setQueueScope("ALL")}
-                >
-                  All Queues
-                </button>
-                <button
-                  className={queueScope === "MINE" ? "active" : ""}
-                  onClick={() => setQueueScope("MINE")}
-                >
-                  My Queue
-                </button>
-              </div>
-            </div>
+            <h1>
+              {activeTab === "OVERVIEW" && "Keep Yekis moving."}
+              {activeTab === "SUPPORT" && "Support desk"}
+              {activeTab === "TOPUPS" && "Receipt reviews"}
+              {activeTab === "KYC" && "Identity reviews"}
+              {activeTab === "DISPUTES" && "Disputes"}
+              {activeTab === "PROFILES" && "Profile Moderation"}
+            </h1>
             <p>
               Coordinate support, payments, identity checks, and disputes from
               one desk.
             </p>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div className="staff-topbar-actions">
+            <div className="staff-filter-toggle">
+              <button
+                className={queueScope === "ALL" ? "active" : ""}
+                onClick={() => setQueueScope("ALL")}
+              >
+                All Queues
+              </button>
+              <button
+                className={queueScope === "MINE" ? "active" : ""}
+                onClick={() => setQueueScope("MINE")}
+              >
+                My Queue
+              </button>
+            </div>
             <button
               type="button"
               className="theme-toggle"
@@ -423,18 +488,6 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   ? "Switch to dark mode"
                   : "Switch to light mode"
               }
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 38,
-                height: 38,
-                borderRadius: "50%",
-                background: "var(--color-bg-elevated)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-              }}
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
@@ -443,7 +496,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               onClick={() => void loadConversations()}
               disabled={isLoading}
             >
-              <RefreshCw size={15} /> Refresh
+              <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} /> Refresh
             </button>
           </div>
         </header>
@@ -456,50 +509,70 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         )}
 
         {activeTab === "OVERVIEW" && (
-          <div className="staff-dashboard-top-section">
+          <div className="staff-overview-layout">
             <section className="staff-metrics">
               <article
                 className="clickable"
                 onClick={() => setActiveTab("SUPPORT")}
               >
-                <MessageSquare size={19} />
-                <span>Open support</span>
-                <div className="metric-details">
-                  <strong>{openCount}</strong>
-                  {renderSla(supportHours)}
+                <div className="staff-metric-icon-wrap">
+                  <MessageSquare size={20} />
+                </div>
+                <div className="staff-metric-body">
+                  <span>Open support</span>
+                  <div className="metric-details">
+                    <strong>{openCount}</strong>
+                    {renderSla(supportHours)}
+                  </div>
                 </div>
               </article>
               <article
                 className="clickable"
                 onClick={() => setActiveTab("TOPUPS")}
               >
-                <WalletCards size={19} />
-                <span>Receipt reviews</span>
-                <div className="metric-details">
-                  <strong>{queueCounts.topups}</strong>
+                <div className="staff-metric-icon-wrap">
+                  <WalletCards size={20} />
+                </div>
+                <div className="staff-metric-body">
+                  <span>Receipt reviews</span>
+                  <div className="metric-details">
+                    <strong>{queueCounts.topups}</strong>
+                  </div>
                 </div>
               </article>
               <article
                 className="clickable"
                 onClick={() => setActiveTab("KYC")}
               >
-                <ShieldCheck size={19} />
-                <span>Identity reviews</span>
-                <div className="metric-details">
-                  <strong>{queueCounts.kyc}</strong>
+                <div className="staff-metric-icon-wrap">
+                  <ShieldCheck size={20} />
+                </div>
+                <div className="staff-metric-body">
+                  <span>Identity reviews</span>
+                  <div className="metric-details">
+                    <strong>{queueCounts.kyc}</strong>
+                  </div>
                 </div>
               </article>
               <article
                 className="clickable"
                 onClick={() => setActiveTab("DISPUTES")}
               >
-                <span className="metric-symbol">!</span>
-                <span>Disputes</span>
-                <div className="metric-details">
-                  <strong>{queueCounts.disputes}</strong>
+                <div className="staff-metric-icon-wrap">
+                  <Scale size={20} />
+                </div>
+                <div className="staff-metric-body">
+                  <span>Disputes</span>
+                  <div className="metric-details">
+                    <strong>{queueCounts.disputes}</strong>
+                  </div>
                 </div>
               </article>
             </section>
+            <StaffCompliancePanel
+              onChanged={loadConversations}
+              onError={setError}
+            />
           </div>
         )}
 
@@ -652,74 +725,128 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                           No messages in this conversation yet.
                         </p>
                       ) : (
-                        messages.map((message) => (
-                          <div
-                            key={message.id}
-                            className={
-                              message.senderId === user.id
-                                ? "staff-message own"
-                                : "staff-message"
-                            }
-                          >
-                            <p>{message.body}</p>
-                            <small>
-                              {message.senderId === user.id
-                                ? "You"
-                                : message.sender.staffRole
-                                  ? "Yekis team"
-                                  : message.sender.role}
-                              {" · "}
-                              {dateLabel(message.createdAt)}
-                            </small>
-                          </div>
-                        ))
+                        messages.map((message) => {
+                          const isOwn = message.senderId === user.id;
+                          return (
+                            <div
+                              key={message.id}
+                              className={
+                                isOwn ? "staff-message own" : "staff-message"
+                              }
+                            >
+                              <p>{message.body}</p>
+                              {message.attachmentUrl && (
+                                <div className="staff-msg-attachment">
+                                  {isImageAttachment(message.attachmentUrl) && (
+                                    <a
+                                      href={message.attachmentUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="staff-attachment-img-link"
+                                    >
+                                      <img
+                                        src={message.attachmentUrl}
+                                        alt={getAttachmentLabel(message.attachmentUrl)}
+                                        className="staff-attachment-preview"
+                                        loading="lazy"
+                                      />
+                                    </a>
+                                  )}
+                                  <a
+                                    href={message.attachmentUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="staff-attachment-badge"
+                                    download={getAttachmentLabel(message.attachmentUrl)}
+                                  >
+                                    <FileText size={14} />
+                                    <span>{getAttachmentLabel(message.attachmentUrl)}</span>
+                                    <ExternalLink size={12} />
+                                  </a>
+                                </div>
+                              )}
+                              <small>
+                                {isOwn
+                                  ? "You"
+                                  : message.sender.staffRole
+                                    ? "Yekis team"
+                                    : message.sender.role}
+                                {" · "}
+                                {dateLabel(message.createdAt)}
+                              </small>
+                            </div>
+                          );
+                        })
                       )}
                       <div ref={messagesEnd} />
                     </div>
 
                     {/* Reply box — only for open conversations */}
                     {selected.status === "OPEN" ? (
-                      <div className="staff-reply">
-                        <button
-                          className="chat-compose-icon"
-                          aria-label="Attach a file"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.onchange = (e) => {
-                              const file = (e.target as HTMLInputElement)
-                                .files?.[0];
-                              if (file)
-                                setReply(
-                                  (r) => r + (r ? " " : "") + `📎 ${file.name}`,
-                                );
-                            };
-                            input.click();
-                          }}
-                        >
-                          <Paperclip size={20} />
-                        </button>
-                        <input
-                          value={reply}
-                          onChange={(e) => setReply(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              void sendReply();
+                      <div className="staff-reply-wrapper">
+                        {attachedFile && (
+                          <div className="staff-attachment-tag">
+                            <FileText size={13} />
+                            <span>{attachedFile.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setAttachedFile(null)}
+                              title="Remove attachment"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        )}
+                        <div className="staff-reply">
+                          <label
+                            className="chat-compose-icon"
+                            aria-label="Attach a file"
+                            title="Attach a file"
+                            style={{ cursor: "pointer" }}
+                          >
+                            <Paperclip size={20} />
+                            <input
+                              type="file"
+                              style={{ display: "none" }}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  setAttachedFile(file);
+                                }
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                          <input
+                            value={reply}
+                            onChange={(e) => setReply(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void sendReply();
+                              }
+                            }}
+                            placeholder="Reply to this conversation…"
+                            disabled={isSending || isUploadingAttachment}
+                            style={{ flex: 1, minWidth: 0 }}
+                          />
+                          <button
+                            className="chat-send"
+                            onClick={() => void sendReply()}
+                            disabled={
+                              isSending ||
+                              isUploadingAttachment ||
+                              (!reply.trim() && !attachedFile)
                             }
-                          }}
-                          placeholder="Reply to this conversation…"
-                          disabled={isSending}
-                          style={{ flex: 1, minWidth: 0 }}
-                        />
-                        <button
-                          className="chat-send"
-                          onClick={() => void sendReply()}
-                          disabled={isSending || !reply.trim()}
-                          aria-label="Send message"
-                        >
-                          <Send size={18} />
-                        </button>
+                            aria-label="Send message"
+                          >
+                            {isUploadingAttachment ? (
+                              <Loader2 size={18} className="spin" />
+                            ) : (
+                              <Send size={18} />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="staff-reply staff-reply-closed">
@@ -836,11 +963,6 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
             <ProfileReportsQueue />
           </section>
         )}
-
-        <StaffCompliancePanel
-          onChanged={loadConversations}
-          onError={setError}
-        />
       </main>
 
       {viewingEvidence && (

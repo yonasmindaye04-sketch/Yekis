@@ -58,12 +58,25 @@ const paymentAccounts = {
   CBE_BIRR: {
     label: "CBE Bank",
     accountName: "Yekis Jobs",
-    accountNumber: "1000 0000 0000 0000",
+    accountNumber: "1000 223 344",
     image: "/payment/cbe payment.jpg",
     imgStyle: {
       width: "70px",
       height: "70px",
       objectFit: "cover",
+      borderRadius: "8px",
+      flexShrink: 0,
+    } as React.CSSProperties,
+  },
+  M_PESA: {
+    label: "Safaricom M-Pesa",
+    accountName: "Yekis Jobs",
+    accountNumber: "0777 011 818 (Till: 882199)",
+    image: "/payment/mpesa.svg",
+    imgStyle: {
+      width: "70px",
+      height: "70px",
+      objectFit: "contain",
       borderRadius: "8px",
       flexShrink: 0,
     } as React.CSSProperties,
@@ -156,7 +169,16 @@ export function App() {
   const [selfieWithIdPhoto, setSelfieWithIdPhoto] = useState<File | null>(null);
   const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR">("TELEBIRR");
+  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
+  const [checkoutRail, setCheckoutRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
+  const [checkoutFallback, setCheckoutFallback] = useState<{
+    amount: string;
+    provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+    reason: string;
+  } | null>(null);
+  const [attachingReceiptTopUpId, setAttachingReceiptTopUpId] = useState<string | null>(null);
+  const [attachRefNumber, setAttachRefNumber] = useState("");
+  const [attachReceiptFile, setAttachReceiptFile] = useState<File | null>(null);
   const [topUpReference, setTopUpReference] = useState("");
   const [topUpReceipt, setTopUpReceipt] = useState<File | null>(null);
   const [topUpRequests, setTopUpRequests] = useState<TopUpRequest[]>([]);
@@ -195,6 +217,22 @@ export function App() {
     days: "7",
     coverLetter: "",
     attachments: [],
+  });
+
+  const [telebirrModal, setTelebirrModal] = useState<{
+    isOpen: boolean;
+    redirectUrl: string | null;
+    topUpId: string | null;
+    amount: number;
+    provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+    isSimulating: boolean;
+  }>({
+    isOpen: false,
+    redirectUrl: null,
+    topUpId: null,
+    amount: 0,
+    provider: "TELEBIRR",
+    isSimulating: false,
   });
 
   const fetchWallet = async () => {
@@ -352,7 +390,7 @@ export function App() {
         session.user.role === "ADMIN" ? "ADMIN" : selectedRole;
       setRole(backendRole);
       window.localStorage.setItem("yekis-role", backendRole);
-      api.setToken(session.accessToken);
+      api.setSession(session);
       setTelegramAuthStatus("ready");
       await loadData();
     } catch (err) {
@@ -413,7 +451,7 @@ export function App() {
         password: mobilePassword,
       });
 
-      api.setToken(res.accessToken);
+      api.setSession(res);
       const me = await api.getMe();
       setUserProfile(me);
       const backendRole = me.role === "ADMIN" ? "ADMIN" : (me.role as Role);
@@ -455,6 +493,13 @@ export function App() {
     setShowJobForm(false);
   };
 
+  const switchToManualFallback = (p: "TELEBIRR" | "CBE_BIRR" | "M_PESA", amt?: string) => {
+    setTopUpMethod("MANUAL");
+    setTopUpRail(p);
+    if (amt) setTopUpAmount(amt);
+    setCheckoutFallback(null);
+  };
+
   const submitCheckoutTopUp = async () => {
     const amount = Number(topUpAmount);
     if (!amount || amount <= 0) {
@@ -462,16 +507,61 @@ export function App() {
       return;
     }
     setIsLoading(true);
+    setCheckoutFallback(null);
     try {
-      const { redirectUrl } = await api.initiateCheckoutTopUp(
+      const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
         Math.round(amount * 100),
-        "TELEBIRR"
+        checkoutRail,
       );
+
+      setTelebirrModal({
+        isOpen: true,
+        redirectUrl: redirectUrl || null,
+        topUpId: topUpId || null,
+        amount,
+        provider: checkoutRail,
+        isSimulating: false,
+      });
+
       if (redirectUrl) {
-        window.location.href = redirectUrl;
+        const tg = window.Telegram?.WebApp;
+        if (tg && typeof tg.openLink === "function") {
+          tg.openLink(redirectUrl);
+        } else {
+          window.open(redirectUrl, "_blank");
+        }
       }
     } catch (err) {
-      alert(`Error: ${err instanceof Error ? err.message : "Failed to initiate top-up"}`);
+      const errText = err instanceof Error ? err.message : "Payment gateway request failed";
+      setCheckoutFallback({
+        amount: topUpAmount.trim(),
+        provider: checkoutRail,
+        reason: errText,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const submitAttachReceipt = async () => {
+    if (!attachingReceiptTopUpId || !attachRefNumber.trim() || !attachReceiptFile) {
+      alert("Please enter the reference number and attach the transfer receipt.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append("referenceNumber", attachRefNumber.trim());
+      formData.append("receipt", attachReceiptFile);
+      await api.attachTopUpReceipt(attachingReceiptTopUpId, formData);
+      setAttachingReceiptTopUpId(null);
+      setAttachRefNumber("");
+      setAttachReceiptFile(null);
+      await Promise.all([fetchTopUpRequests(), fetchWallet()]);
+      alert("Receipt attached successfully! Staff will review and credit your wallet.");
+    } catch (err) {
+      alert(`Error attaching receipt: ${err instanceof Error ? err.message : "Failed"}`);
+    } finally {
       setIsLoading(false);
     }
   };
@@ -646,10 +736,6 @@ export function App() {
     }
   };
 
-  const handleOpenJobDetail = (job: Job) => {
-    setJobDetail({ isOpen: true, job });
-  };
-
   const handleOpenProposal = (job: Job) => {
     setJobDetail({ isOpen: false, job: null });
     setProposalModal({
@@ -730,17 +816,9 @@ export function App() {
   if (telegramAuthStatus !== "ready") {
     return (
       <main className="welcome-screen">
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            paddingBottom: "32px",
-          }}
-        >
+        <div className="welcome-screen-inner">
           {showMobileLogin && (
-            <div className="welcome-topbar" style={{ marginBottom: "16px" }}>
+            <div className="welcome-topbar" style={{ marginBottom: "14px" }}>
               <button
                 className="back-btn"
                 onClick={() => {
@@ -759,23 +837,23 @@ export function App() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              marginBottom: "16px",
+              marginBottom: "18px",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <img
                 src="/svgviewer-output.svg"
                 alt="Yekis Logo"
                 className="platform-logo"
-                style={{ width: "42px", height: "42px", flexShrink: 0 }}
+                style={{ width: "44px", height: "44px", flexShrink: 0 }}
               />
               <div>
                 <p
                   className="eyebrow"
                   style={{
                     margin: "0 0 4px 0",
-                    fontSize: "0.7rem",
-                    letterSpacing: "0.05em",
+                    fontSize: "0.75rem",
+                    letterSpacing: "0.06em",
                   }}
                 >
                   YEKIS JOBS
@@ -783,8 +861,8 @@ export function App() {
                 <h1
                   style={{
                     margin: 0,
-                    fontSize: "1.6rem",
-                    lineHeight: 1.1,
+                    fontSize: "1.65rem",
+                    lineHeight: 1.2,
                     letterSpacing: "-0.02em",
                   }}
                 >
@@ -802,42 +880,40 @@ export function App() {
               }
               style={{ flexShrink: 0 }}
             >
-              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+              {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
             </button>
           </div>
+
           <p
             className="welcome-copy"
             style={{
-              fontSize: "0.9rem",
-              lineHeight: 1.4,
-              margin: 0,
+              fontSize: "0.92rem",
+              lineHeight: 1.5,
+              margin: "0 0 24px 0",
               color: "var(--color-text-secondary)",
             }}
           >
             A trusted Ethiopian workspace for finding talent, delivering work,
             and keeping every payment clear.
           </p>
-        </div>
 
-        <div>
-          {" "}
           <div
             style={{
               display: "flex",
               width: "100%",
               background: "var(--color-bg-elevated)",
-              padding: 4,
-              borderRadius: 10,
+              padding: 5,
+              borderRadius: 12,
               border: "1px solid var(--color-border)",
-              marginBottom: 16,
+              marginBottom: 20,
             }}
           >
             <button
               type="button"
               style={{
                 flex: 1,
-                padding: "9px 12px",
-                borderRadius: 8,
+                padding: "12px 14px",
+                borderRadius: 9,
                 border: "none",
                 background: !showMobileLogin
                   ? "var(--color-primary)"
@@ -846,7 +922,7 @@ export function App() {
                   ? "#ffffff"
                   : "var(--color-text-secondary)",
                 fontWeight: 700,
-                fontSize: "0.85rem",
+                fontSize: "0.9rem",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
               }}
@@ -861,8 +937,8 @@ export function App() {
               type="button"
               style={{
                 flex: 1,
-                padding: "9px 12px",
-                borderRadius: 8,
+                padding: "12px 14px",
+                borderRadius: 9,
                 border: "none",
                 background: showMobileLogin
                   ? "var(--color-primary)"
@@ -871,7 +947,7 @@ export function App() {
                   ? "#ffffff"
                   : "var(--color-text-secondary)",
                 fontWeight: 700,
-                fontSize: "0.85rem",
+                fontSize: "0.9rem",
                 cursor: "pointer",
                 transition: "all 0.2s ease",
               }}
@@ -890,24 +966,29 @@ export function App() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "8px",
-                marginBottom: "20px",
+                gap: "10px",
+                padding: "10px 16px",
+                background: "var(--color-bg-elevated)",
+                borderRadius: "10px",
+                border: "1px solid var(--color-border)",
+                marginBottom: "22px",
+                boxSizing: "border-box",
               }}
             >
               <CheckCircle2
-                size={16}
+                size={18}
                 style={{ color: "var(--color-primary)", flexShrink: 0 }}
               />
               <div
                 style={{
                   textAlign: "left",
-                  fontSize: "0.85rem",
+                  fontSize: "0.88rem",
                   color: "var(--color-text-secondary)",
                 }}
               >
                 <span>
                   Verified Telegram:{" "}
-                  <strong>
+                  <strong style={{ color: "var(--color-text)" }}>
                     {telegram.unsafeUser.first_name}{" "}
                     {telegram.unsafeUser.last_name || ""}
                   </strong>
@@ -951,7 +1032,7 @@ export function App() {
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "10px",
+                gap: "16px",
                 width: "100%",
               }}
             >
@@ -964,26 +1045,40 @@ export function App() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: "14px",
-                    padding: "16px",
+                    gap: "16px",
+                    padding: "20px 18px",
                     background: "var(--color-bg-elevated)",
                     border: "1px solid var(--color-border)",
-                    borderRadius: "12px",
+                    borderRadius: "16px",
                     textAlign: "left",
                     width: "100%",
+                    boxSizing: "border-box",
+                    cursor: "pointer",
                     transition: "all 0.2s ease",
                   }}
                 >
-                  <div style={{ color: "var(--color-primary)", flexShrink: 0 }}>
+                  <div
+                    style={{
+                      width: "48px",
+                      height: "48px",
+                      borderRadius: "12px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "rgba(34, 197, 94, 0.12)",
+                      color: "var(--color-primary)",
+                      flexShrink: 0,
+                    }}
+                  >
                     {option.icon}
                   </div>
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <strong
                       style={{
                         display: "block",
-                        fontSize: "0.95rem",
+                        fontSize: "1.05rem",
                         color: "var(--color-text)",
-                        marginBottom: "4px",
+                        marginBottom: "5px",
                       }}
                     >
                       {option.title}
@@ -991,9 +1086,9 @@ export function App() {
                     <p
                       style={{
                         margin: 0,
-                        fontSize: "0.8rem",
+                        fontSize: "0.86rem",
                         color: "var(--color-text-secondary)",
-                        lineHeight: 1.3,
+                        lineHeight: 1.45,
                       }}
                     >
                       {option.description}
@@ -1333,6 +1428,260 @@ export function App() {
                 >
                   Back
                 </button>
+              </div>
+            </section>
+          </section>
+        )}
+
+        {/* Telebirr Top-Up Pop-Up / Modal */}
+        {telebirrModal.isOpen && (
+          <section className="platform-content">
+            <section className="panel" style={{ maxWidth: 480, margin: "0 auto" }}>
+              <div
+                className="panel-heading"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid var(--color-border)",
+                  paddingBottom: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <img
+                    src={
+                      telebirrModal.provider === "TELEBIRR"
+                        ? "/payment/Telebirr.png"
+                        : telebirrModal.provider === "CBE_BIRR"
+                          ? "/payment/cbe payment.jpg"
+                          : "/payment/mpesa.svg"
+                    }
+                    alt={
+                      telebirrModal.provider === "TELEBIRR"
+                        ? "Telebirr"
+                        : telebirrModal.provider === "CBE_BIRR"
+                          ? "CBE Birr"
+                          : "M-Pesa"
+                    }
+                    style={{ width: 28, height: 28, objectFit: "contain", borderRadius: 4, background: "#fff" }}
+                  />
+                  <h2 style={{ margin: 0, fontSize: "1.2rem" }}>
+                    {telebirrModal.provider === "TELEBIRR"
+                      ? "Telebirr Checkout"
+                      : telebirrModal.provider === "CBE_BIRR"
+                        ? "CBE Birr Checkout"
+                        : "M-Pesa Checkout"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-text-secondary)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setTelebirrModal((prev) => ({ ...prev, isOpen: false }))}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div
+                  style={{
+                    background: "var(--color-bg)",
+                    padding: "16px",
+                    borderRadius: "12px",
+                    border: "1px solid var(--color-border)",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <span style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>
+                      Top-up Amount
+                    </span>
+                    <strong style={{ display: "block", fontSize: "1.4rem", color: "var(--color-primary)" }}>
+                      ETB {telebirrModal.amount.toLocaleString()}
+                    </strong>
+                  </div>
+                  <span
+                    style={{
+                      background: "rgba(34, 197, 94, 0.12)",
+                      color: "var(--color-primary)",
+                      padding: "4px 10px",
+                      borderRadius: 20,
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Instant Checkout
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "0.85rem",
+                    color: "var(--color-text-secondary)",
+                    lineHeight: 1.5,
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    background: "var(--color-bg-elevated)",
+                    border: "1px solid var(--color-border)",
+                  }}
+                >
+                  <p style={{ margin: "0 0 8px 0" }}>
+                    {telebirrModal.provider === "TELEBIRR"
+                      ? "Telebirr"
+                      : telebirrModal.provider === "CBE_BIRR"
+                        ? "CBE Birr"
+                        : "Safaricom M-Pesa"}{" "}
+                    payment gateway was launched in your browser. Complete the payment there, or use sandbox simulation below:
+                  </p>
+                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--color-text-tertiary)" }}>
+                    <strong>Note for Dev/Testing:</strong> In sandbox environments, entering real customer numbers may fail. Click <strong>Simulate Instant Payment</strong> below to approve without sandbox phone numbers.
+                  </p>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+                  {telebirrModal.redirectUrl && (
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      onClick={() => {
+                        const tg = window.Telegram?.WebApp;
+                        if (tg && typeof tg.openLink === "function") {
+                          tg.openLink(telebirrModal.redirectUrl!);
+                        } else {
+                          window.open(telebirrModal.redirectUrl!, "_blank");
+                        }
+                      }}
+                    >
+                      Re-open {telebirrModal.provider === "TELEBIRR" ? "Telebirr" : telebirrModal.provider === "CBE_BIRR" ? "CBE Birr" : "M-Pesa"} Paygate
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ width: "100%", justifyContent: "center" }}
+                    disabled={telebirrModal.isSimulating}
+                    onClick={async () => {
+                      if (!telebirrModal.topUpId) return;
+                      setTelebirrModal((prev) => ({ ...prev, isSimulating: true }));
+                      try {
+                        await api.simulateTopUpSuccess(telebirrModal.topUpId);
+                        alert(`Success! ETB ${telebirrModal.amount.toLocaleString()} credited to your wallet.`);
+                        setTelebirrModal((prev) => ({ ...prev, isOpen: false, isSimulating: false }));
+                        await fetchWallet();
+                        await fetchTopUpRequests();
+                      } catch (err) {
+                        alert(`Simulation error: ${err instanceof Error ? err.message : "Failed"}`);
+                        setTelebirrModal((prev) => ({ ...prev, isSimulating: false }));
+                      }
+                    }}
+                  >
+                    {telebirrModal.isSimulating ? "Processing..." : "Simulate Instant Payment (Sandbox)"}
+                  </button>
+
+                  <button
+                    type="button"
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "var(--color-text-secondary)",
+                      cursor: "pointer",
+                      fontSize: "0.85rem",
+                      padding: "8px",
+                    }}
+                    onClick={() => setTelebirrModal((prev) => ({ ...prev, isOpen: false }))}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </section>
+          </section>
+        )}
+
+        {/* Manual Verification Receipt Attachment Modal */}
+        {attachingReceiptTopUpId && (
+          <section className="platform-content">
+            <section className="panel" style={{ maxWidth: 480, margin: "0 auto" }}>
+              <div
+                className="panel-heading"
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  borderBottom: "1px solid var(--color-border)",
+                  paddingBottom: 12,
+                  marginBottom: 16,
+                }}
+              >
+                <div>
+                  <p className="eyebrow" style={{ margin: "0 0 2px 0" }}>Manual Fallback</p>
+                  <h3 style={{ margin: 0, fontSize: "1.15rem" }}>Attach Payment Receipt</h3>
+                </div>
+                <button
+                  type="button"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "var(--color-text-secondary)",
+                    cursor: "pointer",
+                  }}
+                  onClick={() => setAttachingReceiptTopUpId(null)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: 14 }}>
+                If your automated payment was completed or delayed, submit your reference number and receipt here. Our operations team will promptly review and credit your balance.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <label>
+                  Transaction Reference Number
+                  <input
+                    value={attachRefNumber}
+                    onChange={(e) => setAttachRefNumber(e.target.value)}
+                    placeholder="e.g. TB-12345 or CBE-REF"
+                  />
+                </label>
+
+                <label>
+                  Receipt File (Image or PDF)
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(e) => setAttachReceiptFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    style={{ flex: 1, justifyContent: "center" }}
+                    onClick={submitAttachReceipt}
+                    disabled={isLoading}
+                  >
+                    {isLoading ? "Submitting..." : "Submit to Staff Queue"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setAttachingReceiptTopUpId(null)}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </section>
           </section>
@@ -1959,8 +2308,55 @@ export function App() {
                       {topUpMethod === "INSTANT" ? (
                         <>
                           <p style={{ marginBottom: 14, color: "var(--text-secondary)", fontSize: "0.85rem" }}>
-                            Pay with Telebirr online. Your wallet will be credited automatically.
+                            Pay with instant mobile checkout. Your wallet will be credited automatically.
                           </p>
+
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "repeat(3, 1fr)",
+                              gap: 8,
+                              marginBottom: 16,
+                            }}
+                          >
+                            <button
+                              type="button"
+                              className={checkoutRail === "TELEBIRR" ? "payment-account selected" : "payment-account"}
+                              style={{ padding: "8px 6px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                              onClick={() => {
+                                setCheckoutRail("TELEBIRR");
+                                setCheckoutFallback(null);
+                              }}
+                            >
+                              <img src="/payment/Telebirr.png" alt="Telebirr" style={{ width: 36, height: 36, objectFit: "contain" }} />
+                              <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>Telebirr</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={checkoutRail === "CBE_BIRR" ? "payment-account selected" : "payment-account"}
+                              style={{ padding: "8px 6px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                              onClick={() => {
+                                setCheckoutRail("CBE_BIRR");
+                                setCheckoutFallback(null);
+                              }}
+                            >
+                              <img src="/payment/cbe payment.jpg" alt="CBE Birr" style={{ width: 36, height: 36, objectFit: "cover", borderRadius: 4 }} />
+                              <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>CBE Birr</span>
+                            </button>
+                            <button
+                              type="button"
+                              className={checkoutRail === "M_PESA" ? "payment-account selected" : "payment-account"}
+                              style={{ padding: "8px 6px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}
+                              onClick={() => {
+                                setCheckoutRail("M_PESA");
+                                setCheckoutFallback(null);
+                              }}
+                            >
+                              <img src="/payment/mpesa.svg" alt="M-Pesa" style={{ width: 36, height: 36, objectFit: "contain" }} />
+                              <span style={{ fontSize: "0.8rem", fontWeight: 600 }}>M-Pesa</span>
+                            </button>
+                          </div>
+
                           <label>
                             Amount to add (ETB)
                             <input
@@ -1970,14 +2366,54 @@ export function App() {
                               placeholder="e.g. 1000"
                             />
                           </label>
+
+                          {checkoutFallback && (
+                            <div
+                              style={{
+                                marginTop: 12,
+                                padding: 12,
+                                borderRadius: 8,
+                                background: "rgba(239, 68, 68, 0.08)",
+                                border: "1px solid rgba(239, 68, 68, 0.25)",
+                              }}
+                            >
+                              <p style={{ margin: "0 0 6px 0", fontSize: "0.85rem", color: "#dc2626", fontWeight: 600 }}>
+                                Gateway unreachable: {checkoutFallback.reason}
+                              </p>
+                              <p style={{ margin: "0 0 10px 0", fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.4 }}>
+                                Don't let an API outage stop you! Switch to manual verification to transfer directly and attach your receipt for immediate staff credit.
+                              </p>
+                              <button
+                                type="button"
+                                className="btn-secondary"
+                                style={{ width: "100%", justifyContent: "center", fontSize: "0.85rem", padding: "8px 12px" }}
+                                onClick={() => switchToManualFallback(checkoutFallback.provider, checkoutFallback.amount)}
+                              >
+                                Switch to Manual Verification →
+                              </button>
+                            </div>
+                          )}
+
                           <button
                             className="btn-primary"
                             style={{ marginTop: 16, width: "100%", display: "flex", justifyContent: "center" }}
                             onClick={submitCheckoutTopUp}
                             disabled={isLoading}
                           >
-                            <img src="/payment/Telebirr.png" alt="" style={{ width: 24, height: 24, objectFit: "contain", marginRight: 8, background: "#fff", borderRadius: 4 }} />
-                            {isLoading ? "Starting checkout..." : "Pay with Telebirr"}
+                            <img
+                              src={
+                                checkoutRail === "TELEBIRR"
+                                  ? "/payment/Telebirr.png"
+                                  : checkoutRail === "CBE_BIRR"
+                                    ? "/payment/cbe payment.jpg"
+                                    : "/payment/mpesa.svg"
+                              }
+                              alt=""
+                              style={{ width: 24, height: 24, objectFit: "contain", marginRight: 8, background: "#fff", borderRadius: 4 }}
+                            />
+                            {isLoading
+                              ? "Starting checkout..."
+                              : `Pay with ${checkoutRail === "TELEBIRR" ? "Telebirr" : checkoutRail === "CBE_BIRR" ? "CBE Birr" : "M-Pesa"}`}
                           </button>
                         </>
                       ) : (
@@ -2003,7 +2439,7 @@ export function App() {
                                   }
                                   key={key}
                                   onClick={() =>
-                                    setTopUpRail(key as "TELEBIRR" | "CBE_BIRR")
+                                    setTopUpRail(key as "TELEBIRR" | "CBE_BIRR" | "M_PESA")
                                   }
                                 >
                                   <img
@@ -2073,18 +2509,35 @@ export function App() {
                           </p>
                         ) : (
                           topUpRequests.map((request) => (
-                            <div className="list-row" key={request.id}>
-                              <div>
+                            <div className="list-row" key={request.id} style={{ alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--color-border)" }}>
+                              <div style={{ flex: 1 }}>
                                 <strong>
                                   ETB{" "}
                                   {(request.amountMinor / 100).toLocaleString()}
                                 </strong>
-                                <span>
+                                <div style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginTop: 2 }}>
                                   {request.provider === "TELEBIRR"
                                     ? "Telebirr"
-                                    : "CBE Bank"}{" "}
+                                    : request.provider === "CBE_BIRR"
+                                      ? "CBE Bank"
+                                      : "Safaricom M-Pesa"}{" "}
                                   · {request.referenceNumber}
-                                </span>
+                                </div>
+                                {request.status === "CHECKOUT_PENDING" && (
+                                  <div style={{ marginTop: 6 }}>
+                                    <button
+                                      type="button"
+                                      className="btn-secondary"
+                                      style={{ fontSize: "0.75rem", padding: "4px 8px" }}
+                                      onClick={() => {
+                                        setAttachingReceiptTopUpId(request.id);
+                                        setAttachRefNumber(request.referenceNumber || "");
+                                      }}
+                                    >
+                                      Attach receipt for verification
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                               <span className="status-pill">
                                 {request.status.replace("_", " ")}

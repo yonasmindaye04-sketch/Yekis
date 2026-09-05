@@ -61,6 +61,48 @@ async function main() {
   });
 
   console.log("  ✅ Admin user seeded");
+
+  console.log("🌱 Seeding compliance officer user...");
+
+  await prisma.user.upsert({
+    where: { email: "compliance@yekis.et" },
+    update: { staffRole: "COMPLIANCE_OFFICER" },
+    create: {
+      email: "compliance@yekis.et",
+      phone: "+251910011819",
+      passwordHash: await bcrypt.hash("test1234"),
+      role: "CLIENT",
+      dateOfBirth: new Date("1990-01-01"),
+      staffRole: "COMPLIANCE_OFFICER",
+      firstName: "Compliance",
+      lastName: "Yekis",
+      kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+      wallet: { create: { balanceMinor: 0 } },
+    },
+  });
+
+  console.log("  ✅ Compliance officer user seeded");
+
+  console.log("🌱 Seeding customer support user...");
+
+  await prisma.user.upsert({
+    where: { email: "support@yekis.et" },
+    update: { staffRole: "SUPPORT" },
+    create: {
+      email: "support@yekis.et",
+      phone: "+251910011820",
+      passwordHash: await bcrypt.hash("test1234"),
+      role: "CLIENT",
+      dateOfBirth: new Date("1990-01-01"),
+      staffRole: "SUPPORT",
+      firstName: "Support",
+      lastName: "Yekis",
+      kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+      wallet: { create: { balanceMinor: 0 } },
+    },
+  });
+
+  console.log("  ✅ Customer support user seeded");
   console.log("🎉 Seeding complete!");
 }
 

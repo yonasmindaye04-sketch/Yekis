@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import argon2 from "argon2";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 import { randomBytes, createHash } from "crypto";
 import type { RegisterInput, LoginInput } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
@@ -175,6 +175,43 @@ export async function loginUser(input: LoginInput) {
   await recordAuditEvent({
     userId: user.id,
     eventType: "USER_LOGGED_IN",
+    entityType: "User",
+    entityId: user.id,
+  });
+
+  return result;
+}
+
+/**
+ * Session refresh — exchanges a still-valid refresh token for a fresh
+ * access/refresh pair. Added because the refresh token was previously issued
+ * at login but never usable (no endpoint consumed it), which forced users to
+ * re-authenticate every JWT_ACCESS_TTL (15 minutes by default).
+ *
+ * The user's suspension status is re-checked on every refresh, so a staff
+ * suspension or STR-filed account termination takes effect at the next silent
+ * refresh rather than lasting the full refresh window.
+ */
+export async function refreshSession(refreshToken: string) {
+  let userId: string;
+  try {
+    const { payload } = await jwtVerify(refreshToken, refreshSecret);
+    if (typeof payload.sub !== "string") throw new Error("missing sub");
+    userId = payload.sub;
+  } catch {
+    throw new InvalidTokenError("Refresh token is invalid or expired.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.isSuspended) {
+    throw new InvalidTokenError("Session is no longer valid.");
+  }
+
+  const result = await createAuthTokens(user);
+
+  await recordAuditEvent({
+    userId: user.id,
+    eventType: "USER_SESSION_REFRESHED",
     entityType: "User",
     entityId: user.id,
   });

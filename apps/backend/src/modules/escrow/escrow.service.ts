@@ -7,6 +7,7 @@ import { calculateFees, type FeeBreakdown } from "./fees.js";
 import type { Prisma } from "@prisma/client";
 import { telebirrClient } from "./providers/telebirr.client.js";
 import { cbeClient } from "./providers/cbe.client.js";
+import { mpesaClient } from "./providers/mpesa.client.js";
 import type { PaymentProviderClient } from "./providers/paymentProvider.interface.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
@@ -20,6 +21,12 @@ import {
   WithdrawalHeldForReviewError,
 } from "../tms/tms.service.js";
 import { checkAndUpdateContractCompletion } from "../contracts/contracts.service.js";
+import {
+  recordEscrowFundingLedger,
+  recordMilestoneReleaseLedger,
+  recordDisputeRefundLedger,
+  recordWithdrawalDisbursementLedger,
+} from "../finance/ledger.service.js";
 
 export class MilestoneNotFoundError extends Error {}
 export class NotContractPartyError extends Error {}
@@ -40,6 +47,7 @@ export class MilestoneReleaseClaimLostError extends Error {
 const PROVIDER_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
   TELEBIRR: telebirrClient,
   CBE_BIRR: cbeClient,
+  M_PESA: mpesaClient,
 };
 
 function autoReleaseDate(): Date {
@@ -175,16 +183,23 @@ export async function fundMilestoneFromWallet(params: {
     );
   }
 
-  await prisma.$transaction([
-    prisma.wallet.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.wallet.update({
       where: { userId: params.clientId },
       data: { balanceMinor: { decrement: fees.clientTotalChargeMinor } },
-    }),
-    prisma.milestone.update({
+    });
+    await tx.milestone.update({
       where: { id: milestone.id },
       data: { escrowState: "ESCROW_HELD" },
-    }),
-  ]);
+    });
+    await recordEscrowFundingLedger(tx, {
+      clientId: params.clientId,
+      milestoneId: milestone.id,
+      totalChargedMinor: fees.clientTotalChargeMinor,
+      milestoneGrossMinor: fees.grossAmountMinor,
+      platformFeeFromClientMinor: fees.platformFeeFromClientMinor,
+    });
+  });
 
   await recordAuditEvent({
     userId: params.clientId,
@@ -630,6 +645,16 @@ export async function releaseMilestoneFunds(
       // Platform-side ledger entries — without these, platform revenue and
       // withholding remittance reports would permanently read zero.
       await recordPlatformEarnings(tx, fees, milestoneId);
+
+      // Double-entry general ledger posting
+      await recordMilestoneReleaseLedger(tx, {
+        freelancerId,
+        milestoneId,
+        milestoneGrossMinor: amountMinor,
+        freelancerNetMinor: fees.freelancerNetMinor,
+        platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+        withholdingTaxMinor: fees.withholdingTaxMinor,
+      });
     })
     .catch((err) => {
       if (err instanceof MilestoneReleaseClaimLostError) {
@@ -768,12 +793,145 @@ export async function withdrawFromWallet(params: {
     metadata: { amountMinor: params.amountMinor, provider: params.provider },
   });
 
-  logger.warn(
-    { userId: params.userId },
-    "Withdrawal payout API not yet implemented for any provider — balance debited but no funds actually sent. Do not deploy to production.",
-  );
+  // Telebirr B2C fee (0.5% standard cashout)
+  const feeMinor = Math.round(params.amountMinor * 0.005);
+  const netAmountMinor = params.amountMinor - feeMinor;
 
-  return { balanceMinor: wallet.balanceMinor - params.amountMinor };
+  const payout = await prisma.payoutTransaction.create({
+    data: {
+      userId: params.userId,
+      walletId: wallet.id,
+      amountMinor: params.amountMinor,
+      feeMinor,
+      netAmountMinor,
+      provider: params.provider,
+      payoutAccountIdentifier: params.payoutAccountIdentifier,
+      status: "PROCESSING",
+    },
+  });
+
+  const providerClient = getProviderClient(params.provider);
+  if (!providerClient.initiateDisbursement) {
+    // Provider does not support automated disbursements — roll back wallet
+    await prisma.wallet.update({
+      where: { userId: params.userId },
+      data: { balanceMinor: { increment: params.amountMinor } },
+    });
+    await prisma.payoutTransaction.update({
+      where: { id: payout.id },
+      data: {
+        status: "FAILED",
+        errorMessage: `Provider ${params.provider} does not support automated disbursements.`,
+      },
+    });
+    throw new Error(
+      `Provider ${params.provider} does not support automated disbursements.`,
+    );
+  }
+
+  let disbursementResult;
+  try {
+    disbursementResult = await providerClient.initiateDisbursement({
+      amountMinor: netAmountMinor,
+      currency: "ETB",
+      recipientPhone: params.payoutAccountIdentifier,
+      referenceId: payout.id,
+    });
+  } catch (err) {
+    logger.error(
+      { err, payoutId: payout.id },
+      "Disbursement request threw unhandled error",
+    );
+    disbursementResult = {
+      providerPayoutId: payout.id,
+      status: "PROCESSING" as const,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  if (disbursementResult.status === "FAILED") {
+    // Roll back the wallet debit immediately on provider rejection
+    await prisma.wallet.update({
+      where: { userId: params.userId },
+      data: { balanceMinor: { increment: params.amountMinor } },
+    });
+    await prisma.payoutTransaction.update({
+      where: { id: payout.id },
+      data: {
+        status: "FAILED",
+        errorMessage:
+          disbursementResult.errorMessage || "Provider rejected disbursement",
+      },
+    });
+    await recordAuditEvent({
+      userId: params.userId,
+      eventType: "WALLET_WITHDRAWAL_FAILED",
+      entityType: "PayoutTransaction",
+      entityId: payout.id,
+      metadata: { reason: disbursementResult.errorMessage },
+    });
+    throw new Error(
+      `Withdrawal failed: ${disbursementResult.errorMessage || "Provider rejected disbursement"}`,
+    );
+  }
+
+  if (disbursementResult.status === "CONFIRMED") {
+    await prisma.payoutTransaction.update({
+      where: { id: payout.id },
+      data: {
+        status: "CONFIRMED",
+        providerPayoutId: disbursementResult.providerPayoutId,
+        settledAt: new Date(),
+      },
+    });
+
+    // Record double-entry general ledger entry
+    await prisma.$transaction(async (tx) => {
+      await recordWithdrawalDisbursementLedger(tx, {
+        userId: params.userId,
+        payoutId: payout.id,
+        grossAmountMinor: params.amountMinor,
+        feeMinor,
+        netAmountMinor,
+        provider: params.provider,
+      });
+    });
+
+    await recordAuditEvent({
+      userId: params.userId,
+      eventType: "WALLET_WITHDRAWAL_CONFIRMED",
+      entityType: "PayoutTransaction",
+      entityId: payout.id,
+      metadata: {
+        amountMinor: params.amountMinor,
+        netAmountMinor,
+        feeMinor,
+        providerPayoutId: disbursementResult.providerPayoutId,
+      },
+    });
+  } else {
+    // PROCESSING: awaiting webhook or reconciliation worker sweep
+    await prisma.payoutTransaction.update({
+      where: { id: payout.id },
+      data: {
+        status: "PROCESSING",
+        providerPayoutId: disbursementResult.providerPayoutId,
+      },
+    });
+  }
+
+  const updatedWallet = await prisma.wallet.findUniqueOrThrow({
+    where: { userId: params.userId },
+  });
+
+  return {
+    payoutId: payout.id,
+    status: disbursementResult.status,
+    amountMinor: params.amountMinor,
+    netAmountMinor,
+    feeMinor,
+    balanceMinor: updatedWallet.balanceMinor,
+  };
 }
 
 /**
@@ -784,28 +942,29 @@ export async function refundMilestoneToClient(
   clientId: string,
   amountMinor: number,
 ) {
-  await prisma.$transaction([
-    prisma.milestone.update({
+  await prisma.$transaction(async (tx) => {
+    await tx.milestone.update({
       where: { id: milestoneId },
       data: { escrowState: "REFUNDED" },
-    }),
-    prisma.wallet.update({
+    });
+    await tx.wallet.update({
       where: { userId: clientId },
       data: { balanceMinor: { increment: amountMinor } },
-    }),
-  ]);
+    });
+    await recordDisputeRefundLedger(tx, {
+      clientId,
+      milestoneId,
+      amountMinor,
+    });
+  });
 
   try {
     await checkAndUpdateContractCompletion(milestoneId);
   } catch (err) {
     logger.error({ err, milestoneId }, "Contract completion check failed");
   }
-
-  logger.warn(
-    { milestoneId },
-    "Refund credited to in-platform wallet, not a real provider refund — no refund API is wired up yet.",
-  );
 }
+
 
 export function getProviderClient(
   provider: PaymentProvider,

@@ -35,9 +35,9 @@ export function BrowserVerification() {
   }, [refresh]);
 
   const submit = async () => {
-    if (!fullName || !dob || !documentNumber || !idPhoto || !selfie) {
+    if (!fullName || !dob || !documentNumber || !idPhoto) {
       setMessage(
-        "Add your name, date of birth, Fayda ID number, ID photo, and selfie holding the ID.",
+        "Add your name, date of birth, Fayda ID number, and photo of the ID card (front and back).",
       );
       return;
     }
@@ -103,12 +103,12 @@ export function BrowserVerification() {
             <p className="eyebrow">Fayda identity review</p>
             <h2>Verify your identity</h2>
             <p>
-              Upload your Fayda ID and a selfie holding it. Fayda verification
-              may clear Tier 1 automatically or route it to staff review.
+              Upload your Fayda ID. Fayda verification completes a biometric
+              selfie check in a secure popup and may clear Tier 1 automatically.
             </p>
           </div>
         </div>
-        <div className="form-grid verification-form">
+        <div className="form-grid verification-form" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
           <label>
             Full name
             <input
@@ -125,7 +125,7 @@ export function BrowserVerification() {
               onChange={(event) => setDob(event.target.value)}
             />
           </label>
-          <label className="form-wide">
+          <label className="form-wide" style={{ gridColumn: "1 / -1" }}>
             Fayda ID number
             <input
               value={documentNumber}
@@ -133,11 +133,11 @@ export function BrowserVerification() {
               placeholder="Enter your Fayda ID number"
             />
           </label>
-          <label className="verification-upload">
+          <label className="verification-upload form-wide" style={{ gridColumn: "1 / -1" }}>
             Fayda ID photo
-            <small>
+            <small style={{ minHeight: 48, cursor: "pointer" }}>
               <Upload size={16} />
-              {idPhoto?.name ?? "Choose ID photo"}
+              {idPhoto?.name ?? "Choose ID photo (front and back)"}
             </small>
             <input
               type="file"
@@ -145,19 +145,12 @@ export function BrowserVerification() {
               onChange={(event) => setIdPhoto(event.target.files?.[0] ?? null)}
             />
           </label>
-          <label className="verification-upload">
-            Selfie holding Fayda ID
-            <small>
-              <Upload size={16} />
-              {selfie?.name ?? "Choose selfie"}
-            </small>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => setSelfie(event.target.files?.[0] ?? null)}
-            />
-          </label>
         </div>
+        <p className="wallet-help" style={{ marginTop: "4px" }}>
+          Identity verification now uses Fayda (eSignet) biometrics. After
+          submitting your ID here you will complete a verification check in
+          the Fayda popup directly from the Identity section.
+        </p>
         {message && (
           <p className="verification-message">
             <Check size={16} />
@@ -168,6 +161,7 @@ export function BrowserVerification() {
           className="btn-primary"
           onClick={() => void submit()}
           disabled={sending}
+          style={{ width: "fit-content", marginTop: 8 }}
         >
           {sending ? "Submitting..." : "Submit Tier 1 documents"}
         </button>
@@ -190,7 +184,7 @@ export function BrowserVerification() {
               withdrawals are enabled.
             </p>
           </div>
-          <div className="form-grid">
+          <div className="form-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
             <label>
               TIN
               <input
@@ -212,6 +206,7 @@ export function BrowserVerification() {
             className="btn-primary"
             onClick={() => void requestTier2()}
             disabled={sending}
+            style={{ width: "fit-content", marginTop: 16 }}
           >
             Request Tier 2
           </button>
