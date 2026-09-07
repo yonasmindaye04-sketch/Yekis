@@ -7,12 +7,26 @@ import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
+import type { StaffRole } from "@prisma/client";
 import {
   PERMISSIONS,
   ROLE_PERMISSIONS,
   STAFF_ROLES,
   requirePermission,
 } from "./permissions.js";
+import {
+  listUsers,
+  getUserSummary,
+  listContracts,
+  getContractDetail,
+} from "./usersContracts.service.js";
+import {
+  listPayments,
+  listEscrows,
+  listPayouts,
+  getLedgerSummary,
+  listLedgerJournals,
+} from "./financeAdmin.service.js";
 
 /**
  * Staff-only platform administration surface. Everything here requires a
@@ -178,7 +192,7 @@ adminRouter.post(
         previousState: { isSuspended: false },
         newState: { isSuspended: true },
         requestId: String(req.id ?? ""),
-        ipAddress: req.ip,
+        ipAddress: req.ip ?? null,
       });
 
       return res.json({ id: user.id, isSuspended: user.isSuspended });
@@ -214,7 +228,7 @@ adminRouter.post(
         previousState: { isSuspended: true },
         newState: { isSuspended: false },
         requestId: String(req.id ?? ""),
-        ipAddress: req.ip,
+        ipAddress: req.ip ?? null,
       });
 
       return res.json({ id: user.id, isSuspended: user.isSuspended });
@@ -279,7 +293,7 @@ adminRouter.post(
  */
 adminRouter.get(
   "/permissions/matrix",
-  requirePermission("admins.manage"),
+  requirePermission("dashboard.view"),
   (_req: AuthedRequest, res) => {
     return res.json({ permissions: PERMISSIONS, roles: ROLE_PERMISSIONS });
   },
@@ -339,7 +353,7 @@ adminRouter.post(
         .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
     }
     const nextRole = parsed.data.staffRole;
-    const targetUserId = req.params.userId;
+    const targetUserId = String(req.params.userId);
     const actorId = req.user!.id;
 
     try {
@@ -363,7 +377,7 @@ adminRouter.post(
       if (strippingFullAccess) {
         const adminsLeft = await prisma.user.count({
           where: {
-            staffRole: { in: [...FULL_ACCESS_ROLES] },
+            staffRole: { in: Array.from(FULL_ACCESS_ROLES) as StaffRole[] },
             isSuspended: false,
             id: { not: targetUserId },
           },
@@ -377,7 +391,7 @@ adminRouter.post(
 
       const updated = await prisma.user.update({
         where: { id: targetUserId },
-        data: { staffRole: nextRole },
+        data: { staffRole: nextRole as StaffRole | null },
         select: { id: true, email: true, staffRole: true },
       });
 
@@ -391,12 +405,181 @@ adminRouter.post(
         newState: { staffRole: nextRole },
         metadata: { targetEmail: target.email },
         requestId: String(req.id ?? ""),
-        ipAddress: req.ip,
+        ipAddress: req.ip ?? null,
       });
 
       return res.json(updated);
     } catch (err) {
       logger.error({ err }, "Failed to update staff role");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Users Management ----------
+adminRouter.get(
+  "/users",
+  requirePermission("users.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const params = {
+        page: Math.max(1, parseInt(String(req.query.page)) || 1),
+        limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+        role: req.query.role as string | undefined,
+        q: (req.query.q as string) ?? undefined,
+      };
+      return res.json(await listUsers(params));
+    } catch (err) {
+      logger.error({ err }, "Failed to list users");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.get(
+  "/users/:userId",
+  requirePermission("users.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const data = await getUserSummary(String(req.params.userId));
+      if (!data) return res.status(404).json({ error: "NOT_FOUND" });
+      return res.json(data);
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch user detail");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Contracts Management ----------
+adminRouter.get(
+  "/contracts",
+  requirePermission("contracts.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const params = {
+        page: Math.max(1, parseInt(String(req.query.page)) || 1),
+        limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+        status: req.query.status as string | undefined,
+        q: (req.query.q as string) ?? undefined,
+      };
+      return res.json(await listContracts(params));
+    } catch (err) {
+      logger.error({ err }, "Failed to list contracts");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.get(
+  "/contracts/:contractId",
+  requirePermission("contracts.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const data = await getContractDetail(String(req.params.contractId));
+      if (!data) return res.status(404).json({ error: "NOT_FOUND" });
+      return res.json(data);
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch contract detail");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Payments ----------
+adminRouter.get(
+  "/payments",
+  requirePermission("payments.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(
+        await listPayments({
+          page: Math.max(1, parseInt(String(req.query.page)) || 1),
+          limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+          status: req.query.status as string | undefined,
+          provider: req.query.provider as string | undefined,
+          q: req.query.q as string | undefined,
+        }),
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to list payments");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Escrow (milestones) ----------
+adminRouter.get(
+  "/escrows",
+  requirePermission("escrow.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(
+        await listEscrows({
+          page: Math.max(1, parseInt(String(req.query.page)) || 1),
+          limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+          escrowState: req.query.escrowState as string | undefined,
+          q: req.query.q as string | undefined,
+        }),
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to list escrows");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Payouts ----------
+adminRouter.get(
+  "/payouts",
+  requirePermission("payouts.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(
+        await listPayouts({
+          page: Math.max(1, parseInt(String(req.query.page)) || 1),
+          limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+          status: req.query.status as string | undefined,
+          provider: req.query.provider as string | undefined,
+          q: req.query.q as string | undefined,
+        }),
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to list payouts");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Ledger ----------
+adminRouter.get(
+  "/ledger",
+  requirePermission("ledger.view"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      return res.json(await getLedgerSummary());
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch ledger summary");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.get(
+  "/ledger/journals",
+  requirePermission("ledger.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(
+        await listLedgerJournals({
+          page: Math.max(1, parseInt(String(req.query.page)) || 1),
+          limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+          referenceType: req.query.referenceType as string | undefined,
+          q: req.query.q as string | undefined,
+        }),
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to list ledger journals");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

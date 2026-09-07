@@ -377,12 +377,29 @@ The API records a filing performed by a human; it does not submit to the FIC. A 
 | `202` | Accepted but held for compliance review |
 | `400` | Validation or malformed input |
 | `401` | Missing/invalid authentication or webhook signature |
-| `403` | Role, ownership, party, staff, or KYC gate denied |
+| `403` | Role, ownership, party, staff, or permission denied |
 | `404` | Resource not found |
 | `409` | Current state does not permit the transition |
 | `422` | Insufficient wallet balance |
 | `429` | Rate limit exceeded |
 | `500` | Unexpected server failure |
+
+## Admin / Staff (Phase 1 RBAC)
+
+All staged behind `requirePermission(...)` or narrower staff roles.
+
+| Method | Path | Permission | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/admin/audit-logs` | `audit.view` | Immutable audit log viewer |
+| `GET` | `/api/v1/admin/users/search` | `users.view` | Search users by email/phone/UCID/display name |
+| `POST` | `/api/v1/admin/users/:id/suspend` | `users.suspend` | Suspend an account (writes USER_SUSPENDED audit) |
+| `POST` | `/api/v1/admin/users/:id/unsuspend` | `users.suspend` | Reactivate a suspended account |
+| `POST` | `/api/v1/admin/users/:id/force-kyc-rereview` | `kyc.review` | Force a periodic KYC re-review |
+| `GET` | `/api/v1/admin/staff` | `admins.manage` | List all staff accounts |
+| `POST` | `/api/v1/admin/staff/:userId/role` | `admins.manage` | Assign/remove a staff role (audited) |
+| `GET` | `/api/v1/admin/permissions/matrix` | any staff | Current role → permission map |
+
+Existing protected queue routes (KYC, top-ups, disputes, TMS, etc.) remain on `requireStaffRole(...)` and are unchanged by Phase 1.
 
 Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Domain errors use a stable `error` code and may include a human-readable `message`.
 

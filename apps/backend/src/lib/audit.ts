@@ -32,7 +32,7 @@ export async function recordAuditEvent(params: {
   newState?: Record<string, unknown> | null; // after-snapshot
   amountMinor?: number;
   requestId?: string; // pino-http request id (req.id)
-  ipAddress?: string; // client IP (req.ip under TRUST_PROXY)
+  ipAddress?: string | null; // client IP (req.ip under TRUST_PROXY)
 }) {
   await prisma.auditLog.create({
     data: {

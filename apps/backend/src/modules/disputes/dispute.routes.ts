@@ -174,7 +174,7 @@ disputesRouter.post(
 disputesRouter.get(
   "/staff/queue",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "DISPUTE_MEDIATOR"),
   async (req: AuthedRequest, res) => {
     const page = req.query.page
       ? parseInt(req.query.page as string)
@@ -193,7 +193,7 @@ disputesRouter.get(
 disputesRouter.post(
   "/:disputeId/resolve",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "DISPUTE_MEDIATOR"),
   async (req: AuthedRequest, res) => {
     const parsed = MediatorResolutionInput.safeParse(req.body);
     if (!parsed.success) {
@@ -226,7 +226,7 @@ disputesRouter.post(
 disputesRouter.post(
   "/:disputeId/claim",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "DISPUTE_MEDIATOR"),
   async (req: AuthedRequest, res) => {
     try {
       const result = await claimDisputeAsMediator({
@@ -258,7 +258,7 @@ const ArbitrationAwardInput = z.object({
 disputesRouter.post(
   "/:disputeId/arbitration-award",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "DISPUTE_MEDIATOR"),
   async (req: AuthedRequest, res) => {
     const parsed = ArbitrationAwardInput.safeParse(req.body);
     if (!parsed.success) {

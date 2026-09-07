@@ -72,6 +72,9 @@ const COMPLIANCE_SET: readonly PermissionKey[] = [
   // Preserved from the legacy guard: compliance staff previously read audit
   // logs via requireStaffRole("ADMIN", "COMPLIANCE_OFFICER").
   "audit.view",
+  // Compliance officers review manual top-up receipts today (requireStaffRole
+  // ("COMPLIANCE_OFFICER", "ADMIN") in topup.routes.ts) — keep that power.
+  "topups.review",
 ];
 
 // === ROLE → PERMISSION MATRIX ===

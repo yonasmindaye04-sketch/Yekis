@@ -353,8 +353,49 @@ export interface CreateGigPayload {
   packages: { tier: "BASIC" | "STANDARD" | "PREMIUM"; title: string; description: string; deliveryDays: number; revisionsIncluded: number; priceMinor: number; addOns?: { label: string; priceMinor: number }[] }[];
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+// --- Admin / RBAC (Phase 1) ---
+export interface AuditLogRow {
+  id: string;
+  userId: string | null;
+  eventType: string;
+  entityType: string;
+  entityId: string;
+  action: string | null;
+  actorRole: string | null;
+  previousState?: Record<string, unknown> | null;
+  newState?: Record<string, unknown> | null;
+  amountMinor: number | null;
+  requestId: string | null;
+  ipAddress: string | null;
+  createdAt: string;
+  user?: { id: string; email: string; staffRole: string | null };
+}
 
+export interface AuditLogList {
+  items: AuditLogRow[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface StaffUser {
+  id: string;
+  ucid: string;
+  email: string;
+  phone: string;
+  displayName: string | null;
+  role: string;
+  staffRole: string | null;
+  isSuspended: boolean;
+  createdAt: string;
+}
+
+export interface PermissionMatrix {
+  permissions: string[];
+  roles: Record<string, readonly string[]>;
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
 class ApiClient {
@@ -1069,6 +1110,91 @@ class ApiClient {
   }
   async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
     return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
+  }
+
+  // --- Admin RBAC & audit ---
+  async getPermissionMatrix(): Promise<PermissionMatrix> {
+    return this.request("/api/v1/admin/permissions/matrix");
+  }
+  async getStaffUsers(params?: { page?: number }): Promise<{ items: StaffUser[]; total: number; page: number; limit: number }> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    return this.request(`/api/v1/admin/staff?${qs.toString()}`);
+  }
+  async setStaffRole(userId: string, staffRole: string | null): Promise<{ id: string; email: string; staffRole: string | null }> {
+    return this.request(`/api/v1/admin/staff/${userId}/role`, { method: "POST", body: JSON.stringify({ staffRole }) });
+  }
+  async getAuditLogs(params?: { page?: number; limit?: number; userId?: string; entityType?: string; action?: string; from?: string; to?: string }): Promise<AuditLogList> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.userId) qs.set("userId", params.userId);
+    if (params?.entityType) qs.set("entityType", params.entityType);
+    if (params?.action) qs.set("eventType", params.action);
+    return this.request(`/api/v1/admin/audit-logs?${qs.toString()}`);
+  }
+
+  // --- Admin: users + contracts (Phase 2) ---
+  async adminListUsers(params?: { page?: number; limit?: number; q?: string; role?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.role) qs.set("role", params.role);
+    return this.request(`/api/v1/admin/users?${qs.toString()}`);
+  }
+  async adminGetUser(userId: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/users/${userId}`);
+  }
+  async adminListContracts(params?: { page?: number; limit?: number; q?: string; status?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    return this.request(`/api/v1/admin/contracts?${qs.toString()}`);
+  }
+  async adminGetContract(contractId: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/contracts/${contractId}`);
+  }
+
+  // --- Admin finance (Phase 3) ---
+  async adminListPayments(params?: { page?: number; limit?: number; q?: string; status?: string; provider?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    if (params?.provider) qs.set("provider", params.provider);
+    return this.request(`/api/v1/admin/payments?${qs.toString()}`);
+  }
+  async adminListEscrows(params?: { page?: number; limit?: number; q?: string; escrowState?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.escrowState) qs.set("escrowState", params.escrowState);
+    return this.request(`/api/v1/admin/escrows?${qs.toString()}`);
+  }
+  async adminListPayouts(params?: { page?: number; limit?: number; q?: string; status?: string; provider?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    if (params?.provider) qs.set("provider", params.provider);
+    return this.request(`/api/v1/admin/payouts?${qs.toString()}`);
+  }
+  async adminLedgerSummary(): Promise<unknown> {
+    return this.request("/api/v1/admin/ledger");
+  }
+  async adminLedgerJournals(params?: { page?: number; limit?: number; q?: string; referenceType?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.referenceType) qs.set("referenceType", params.referenceType);
+    return this.request(`/api/v1/admin/ledger/journals?${qs.toString()}`);
   }
 
   // --- Gigs (Fiverr-style service packages) ---

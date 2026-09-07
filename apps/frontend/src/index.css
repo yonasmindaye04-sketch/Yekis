@@ -824,6 +824,20 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .sidebar-role small { overflow: hidden; color: var(--color-text-secondary); font-size: 0.85rem; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { display: grid; flex: 0 0 32px; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--color-primary-light); color: var(--color-primary); font-weight: 700; }
 .sidebar-nav { display: grid; gap: 4px; }
+/* ── Grouped nav (admin/ops Phase 1) ─────────────────────────── */
+.sidebar-group { margin-bottom: 4px; }
+.sidebar-group-header {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; padding: 8px 10px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--color-text-secondary);
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  cursor: pointer; transition: color 0.15s ease;
+}
+.sidebar-group-header:hover { color: var(--color-text); }
+.sidebar-nav .sidebar-group .nav-label { font-size: 0.94rem; }
+.sidebar-nav button { padding-inline: 14px; }
+.sidebar-nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+.sidebar-nav button:disabled:hover { background: transparent; color: var(--color-text-secondary); transform: none; }
 .sidebar-nav button, .sidebar-settings { display: flex; align-items: center; gap: 16px; width: 100%; padding: 12px; border: 0; border-radius: 9px; background: transparent; color: var(--color-text-secondary); text-align: left; transition: all .18s ease; cursor: pointer; }
 .sidebar-nav button:hover { background: var(--color-bg-subtle); color: var(--color-text); transform: translateX(2px); }
 .sidebar-nav button .nav-icon { display: flex; align-items: center; justify-content: center; width: 22px; flex-shrink: 0; color: var(--color-text-secondary); transition: color .18s; }

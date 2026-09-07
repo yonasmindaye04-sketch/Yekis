@@ -34,6 +34,10 @@ import { StaffCompliancePanel } from "./StaffCompliancePanel";
 import { EvidenceViewer, type EvidenceDocument } from "./EvidenceViewer";
 import { KycQueue } from "./KycQueue";
 import { TopUpQueue } from "./TopUpQueue";
+import { AuditLogsPage } from "./AuditLogsPage";
+import { AdminsPage } from "./AdminsPage";
+import { AdminContractsPage } from "./AdminContractsPage";
+import { AdminUsersPage } from "./AdminUsersPage";
 import { DisputeQueue } from "./DisputeQueue";
 import { ProfileReportsQueue } from "./ProfileReportsQueue";
 
@@ -104,10 +108,71 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     topups: 0,
     disputes: 0,
   });
-  const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
   const [activeTab, setActiveTab] = useState<
-    "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES"
+    "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES" | "AUDIT" | "ADMINS" | "USERS" | "CONTRACTS"
   >("OVERVIEW");
+  const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
+    {},
+  );
+
+  const toggleGroup = (label: string) =>
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+
+  // Compact frontend surface check — visibility only. The backend is the
+  // single source of truth (requirePermission in permissions.ts); this mirror
+  // only hides links the user cannot open. Keep in sync with backend matrix.
+  const STAFF_MATRIX: Record<string, Set<string>> = useMemo(() => {
+    const make = (keys: string[]) => new Set(keys);
+    return {
+      SUPER_ADMIN: make(["*"]),
+      ADMIN: make(["*"]),
+      OPERATIONS_ADMIN: make([
+        "dashboard.view", "users.view", "users.suspend", "contracts.view",
+        "escrow.view", "payments.view", "payouts.view", "disputes.view",
+        "support.handle", "monitoring.view", "receipts.view",
+      ]),
+      FINANCE_ADMIN: make([
+        "dashboard.view", "users.view", "payments.view", "escrow.view",
+        "payouts.view", "ledger.view", "reconciliation.view", "reports.view",
+        "receipts.view", "audit.view",
+      ]),
+      DISPUTE_MEDIATOR: make([
+        "dashboard.view", "users.view", "contracts.view", "disputes.view",
+        "disputes.mediate", "disputes.resolve",
+      ]),
+      COMPLIANCE_ADMIN: make([
+        "dashboard.view", "users.view", "kyc.review", "tms.review",
+        "topups.review", "support.handle", "disputes.view", "disputes.mediate",
+        "monitoring.view", "audit.view",
+      ]),
+      COMPLIANCE_OFFICER: make([
+        "dashboard.view", "users.view", "kyc.review", "tms.review",
+        "topups.review", "support.handle", "disputes.view", "disputes.mediate",
+        "monitoring.view", "audit.view",
+      ]),
+      SUPPORT: make(["dashboard.view", "users.view", "support.handle"]),
+    };
+  }, []);
+
+  const can = useCallback(
+    (perm: string) => {
+      const set = STAFF_MATRIX[user.staffRole ?? ""] ?? new Set();
+      return set.has("*") || set.has(perm);
+    },
+    [STAFF_MATRIX, user.staffRole],
+  );
+
+  const ROLE_LABELS: Record<string, string> = {
+    SUPER_ADMIN: "Super Administrator",
+    ADMIN: "Administrator (legacy)",
+    OPERATIONS_ADMIN: "Operations",
+    FINANCE_ADMIN: "Finance",
+    DISPUTE_MEDIATOR: "Dispute Mediator",
+    COMPLIANCE_ADMIN: "Compliance",
+    COMPLIANCE_OFFICER: "Compliance",
+    SUPPORT: "Customer Support",
+  };
   const [selectedConversation, setSelectedConversation] = useState<
     string | null
   >(null);
@@ -353,89 +418,138 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
           <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
           <div>
             <strong>
-              {user.staffRole === "ADMIN"
-                ? "Administrator"
-                : user.staffRole === "SUPPORT"
-                  ? "Customer support"
-                  : "Staff desk"}
+              {ROLE_LABELS[user.staffRole ?? ""] ?? "Staff desk"}
             </strong>
             <small>{user.email}</small>
           </div>
         </div>
 
         <nav className="sidebar-nav">
-          <button
-            className={activeTab === "OVERVIEW" ? "active" : ""}
-            onClick={() => setActiveTab("OVERVIEW")}
-          >
-            <span className="nav-icon">
-              <LayoutDashboard size={18} />
-            </span>
-            <span className="nav-label">Overview</span>
-          </button>
-          <button
-            className={activeTab === "SUPPORT" ? "active" : ""}
-            onClick={() => setActiveTab("SUPPORT")}
-          >
-            <span className="nav-icon">
-              <MessageSquare size={18} />
-            </span>
-            <span className="nav-label">Support</span>
-            {openCount > 0 && <span className="nav-badge">{openCount}</span>}
-          </button>
-          {user.staffRole !== "SUPPORT" && (
-            <button
-              className={activeTab === "TOPUPS" ? "active" : ""}
-              onClick={() => setActiveTab("TOPUPS")}
-            >
-              <span className="nav-icon">
-                <WalletCards size={18} />
-              </span>
-              <span className="nav-label">Receipts</span>
-              {queueCounts.topups > 0 && (
-                <span className="nav-badge">{queueCounts.topups}</span>
-              )}
-            </button>
-          )}
-          {user.staffRole !== "SUPPORT" && (
-            <button
-              className={activeTab === "KYC" ? "active" : ""}
-              onClick={() => setActiveTab("KYC")}
-            >
-              <span className="nav-icon">
-                <ShieldCheck size={18} />
-              </span>
-              <span className="nav-label">Identity</span>
-              {queueCounts.kyc > 0 && (
-                <span className="nav-badge">{queueCounts.kyc}</span>
-              )}
-            </button>
-          )}
-          {user.staffRole === "ADMIN" && (
-            <button
-              className={activeTab === "DISPUTES" ? "active" : ""}
-              onClick={() => setActiveTab("DISPUTES")}
-            >
-              <span className="nav-icon">
-                <Scale size={18} />
-              </span>
-              <span className="nav-label">Disputes</span>
-              {queueCounts.disputes > 0 && (
-                <span className="nav-badge">{queueCounts.disputes}</span>
-              )}
-            </button>
-          )}
-          {user.staffRole === "ADMIN" && (
-            <button
-              className={activeTab === "PROFILES" ? "active" : ""}
-              onClick={() => setActiveTab("PROFILES")}
-            >
-              <span className="nav-icon">
-                <Users size={18} />
-              </span>
-              <span className="nav-label">Profiles</span>
-            </button>
-          )}
+          {/* Config-driven grouped navigation. Items with `disabled` are visible
+           * placeholders for later phases — they render but never route. Only
+           * pages with a real backend are enabled (per ADMIN_PHASE1_PLAN.md). */}
+          {(
+            [
+              {
+                label: "Overview",
+                items: [
+                  { key: "OVERVIEW", label: "Overview", icon: <LayoutDashboard size={18} />, perm: "dashboard.view" },
+                ],
+              },
+              {
+                label: "CASES",
+                items: [
+                  { key: "SUPPORT", label: "Support", icon: <MessageSquare size={18} />, perm: "support.handle", badge: openCount || undefined },
+                  { key: "DISPUTES", label: "Disputes", icon: <Scale size={18} />, perm: "disputes.view", badge: queueCounts.disputes || undefined },
+                ],
+              },
+              {
+                label: "VERIFICATION",
+                items: [
+                  { key: "KYC", label: "Identity", icon: <ShieldCheck size={18} />, perm: "kyc.review", badge: queueCounts.kyc || undefined },
+                ],
+              },
+              {
+                label: "FINANCE",
+                items: [
+                  { key: "TOPUPS", label: "Receipts", icon: <WalletCards size={18} />, perm: "topups.review", badge: queueCounts.topups || undefined },
+                  { key: "REPORTS", label: "Reports", icon: <FileText size={18} />, perm: "reports.view", disabled: true },
+                ],
+              },
+              {
+                label: "OPERATIONS",
+                items: [
+                  { key: "CONTRACTS", label: "Contracts", icon: <FileText size={18} />, perm: "contracts.view" },
+                ],
+              },
+              {
+                label: "USERS",
+                items: [
+                  { key: "USERS", label: "Users", icon: <Users size={18} />, perm: "users.view" },
+                  { key: "PROFILES", label: "Profiles", icon: <Users size={18} />, perm: "users.view" },
+                ],
+              },
+              {
+                label: "ADMINISTRATION",
+                items: [
+                  { key: "AUDIT", label: "Audit Logs", icon: <FileText size={18} />, perm: "audit.view" },
+                  { key: "ADMINS", label: "Admins & Permissions", icon: <Users size={18} />, perm: "admins.manage" },
+                ],
+              },
+              // Coming soon: OPERATIONS (Contracts/Escrow/Payments/Payouts),
+              // MONITORING, SETTINGS — disabled until later phases land.
+            ] as {
+              label: string;
+              items: {
+                key:
+                  | "OVERVIEW"
+                  | "SUPPORT"
+                  | "KYC"
+                  | "TOPUPS"
+                  | "DISPUTES"
+                  | "PROFILES"
+                  | "AUDIT"
+                  | "ADMINS"
+                  | "REPORTS"
+                  | "USERS"
+                  | "CONTRACTS";
+                label: string;
+                icon: React.ReactNode;
+                perm: string;
+                badge?: number;
+                disabled?: boolean;
+              }[];
+            }[]
+          ).map((group) => {
+            // Default all groups to expanded — collapsing is opt-in via the
+            // group header, since all sections are intentionally visible.
+            const expanded = expandedGroups[group.label] ?? true;
+            const anyItem = group.items.filter((item) => can(item.perm));
+            if (anyItem.length === 0) return null;
+            return (
+              <div className="sidebar-group" key={group.label}>
+                {group.items.length > 1 ? (
+                  <button
+                    type="button"
+                    className="sidebar-group-header"
+                    onClick={() => toggleGroup(group.label)}
+                    aria-expanded={expanded}
+                  >
+                    <span className="nav-label">{group.label}</span>
+                    <ChevronDown
+                      size={14}
+                      style={{
+                        transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
+                        transition: "transform 0.15s",
+                      }}
+                    />
+                  </button>
+                ) : (
+                  null
+                )}
+                {expanded &&
+                  group.items.map((item) =>
+                    !can(item.perm) ? null : (
+                      <button
+                        key={item.key}
+                        className={activeTab === item.key ? "active" : ""}
+                        disabled={(item as any).disabled}
+                        onClick={() =>
+                          !(item as any).disabled &&
+                          setActiveTab(item.key as typeof activeTab)
+                        }
+                      >
+                        <span className="nav-icon">{item.icon}</span>
+                        <span className="nav-label">{item.label}</span>
+                        {item.badge ? (
+                          <span className="nav-badge">{item.badge}</span>
+                        ) : null}
+                      </button>
+                    ),
+                  )}
+              </div>
+            );
+          })}
         </nav>
 
         <button className="sidebar-settings sidebar-logout" onClick={onLogout}>
@@ -457,7 +571,11 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               {activeTab === "TOPUPS" && "Receipt reviews"}
               {activeTab === "KYC" && "Identity reviews"}
               {activeTab === "DISPUTES" && "Disputes"}
-              {activeTab === "PROFILES" && "Profile Moderation"}
+              {activeTab === "PROFILES" && "Profile moderation"}
+              {activeTab === "AUDIT" && "Immutable audit trail"}
+              {activeTab === "ADMINS" && "Admins & permissions"}
+              {activeTab === "USERS" && "Clients & freelancers"}
+              {activeTab === "CONTRACTS" && "Contracts & milestones"}
             </h1>
             <p>
               Coordinate support, payments, identity checks, and disputes from
@@ -961,6 +1079,50 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               </button>
             </div>
             <ProfileReportsQueue />
+          </section>
+        )}
+
+        {/* Audit Logs Tab */}
+        {activeTab === "AUDIT" && (
+          <section
+            id="panel-audit"
+            className="staff-panel"
+            style={{ padding: "1.5rem" }}
+          >
+            <AuditLogsPage />
+          </section>
+        )}
+
+        {/* Admins & Permissions Tab */}
+        {activeTab === "ADMINS" && (
+          <section
+            id="panel-admins"
+            className="staff-panel"
+            style={{ padding: "1.5rem" }}
+          >
+            <AdminsPage />
+          </section>
+        )}
+
+        {/* Users Library Tab (Phase 2) */}
+        {activeTab === "USERS" && (
+          <section
+            id="panel-users"
+            className="staff-panel"
+            style={{ padding: "1.5rem" }}
+          >
+            <AdminUsersPage />
+          </section>
+        )}
+
+        {/* Contracts Tab (Phase 2) */}
+        {activeTab === "CONTRACTS" && (
+          <section
+            id="panel-contracts"
+            className="staff-panel"
+            style={{ padding: "1.5rem" }}
+          >
+            <AdminContractsPage />
           </section>
         )}
       </main>

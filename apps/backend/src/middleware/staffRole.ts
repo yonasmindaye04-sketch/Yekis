@@ -5,7 +5,9 @@ import type { AuthedRequest } from "./auth.js";
 
 // === MAIN FUNCTIONS ===
 export function requireStaffRole(
-  ...allowedRoles: Array<"COMPLIANCE_OFFICER" | "ADMIN" | "SUPPORT">
+  // Typed as plain strings: the StaffRole enum grows over time (Phase 1 RBAC)
+  // and guards should never need a type edit when a new role is added.
+  ...allowedRoles: string[]
 ) {
   return async (req: AuthedRequest, res: Response, next: NextFunction) => {
     if (!req.user) return res.status(401).json({ error: "Unauthenticated" });
