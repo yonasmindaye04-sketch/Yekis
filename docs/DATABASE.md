@@ -56,7 +56,7 @@ erDiagram
 | `DisputeEvidence` | Party statement tied to a dispute |
 | `TransactionFlag` | AML/TMS rule result and staff review/STR metadata (includes `strDeadlineAt` — 24h STR SLA clock set at detection) |
 | `Notification` | User notification ledger and delivery metadata |
-| `Conversation` | Support thread with participant relations and `assignedStaffId` for scoped staff access |
+| `Conversation` | Support thread with participant relations, creatorId, and `assignedStaffId` for scoped staff access (creator and auto-assigned staff are registered as participants upon ticket creation) |
 | `AuditLog` | Append-only event record for important state transitions |
 | `Skill` | Standardized skills available for profiles |
 | `UserSkill` | Junction table for user skills and proficiency |

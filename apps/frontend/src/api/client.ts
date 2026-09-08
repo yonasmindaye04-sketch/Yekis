@@ -512,7 +512,16 @@ class ApiClient {
     }
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
+      if (response.status === 429) {
+        throw new Error("Too many requests. Please wait a moment before trying again.");
+      }
+      let error: { message?: string; error?: string } = {};
+      try {
+        error = await response.json();
+      } catch {
+        const text = await response.text().catch(() => "");
+        error = { error: text || `HTTP ${response.status}` };
+      }
       throw new Error(error.message || error.error || `HTTP ${response.status}`);
     }
 

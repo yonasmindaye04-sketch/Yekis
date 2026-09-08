@@ -320,7 +320,14 @@ chatRouter.post(
 chatRouter.get(
   "/admin/conversations",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
+  requireStaffRole(
+    "COMPLIANCE_OFFICER",
+    "ADMIN",
+    "SUPPORT",
+    "SUPER_ADMIN",
+    "OPERATIONS_ADMIN",
+    "COMPLIANCE_ADMIN",
+  ),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page
@@ -331,9 +338,14 @@ chatRouter.get(
         : undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      // COMPLIANCE_OFFICERs and SUPPORT agents only see their own; ADMINs can filter or see all
-      const isAdmin = req.user!.staffRole === "ADMIN";
-      const staffId = isAdmin
+      // Full staff can see all queues or filter; others see their own assigned
+      const isFullStaff = [
+        "ADMIN",
+        "SUPER_ADMIN",
+        "OPERATIONS_ADMIN",
+        "SUPPORT",
+      ].includes(req.user!.staffRole || "");
+      const staffId = isFullStaff
         ? (req.query.staffId as string | undefined)
         : req.user!.id;
       return res.json(
@@ -349,7 +361,14 @@ chatRouter.get(
 chatRouter.patch(
   "/admin/conversations/:conversationId/status",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
+  requireStaffRole(
+    "COMPLIANCE_OFFICER",
+    "ADMIN",
+    "SUPPORT",
+    "SUPER_ADMIN",
+    "OPERATIONS_ADMIN",
+    "COMPLIANCE_ADMIN",
+  ),
   async (req, res) => {
     const parsed = z
       .object({ status: z.enum(["OPEN", "CLOSED"]) })
@@ -373,11 +392,11 @@ chatRouter.patch(
   },
 );
 
-// Assign a conversation to a staff member (Admin only)
+// Assign a conversation to a staff member (Admin / Super Admin only)
 chatRouter.patch(
   "/admin/conversations/:conversationId/assign",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requireStaffRole("ADMIN", "SUPER_ADMIN", "OPERATIONS_ADMIN"),
   async (req: AuthedRequest, res) => {
     const parsed = z.object({ staffId: z.string() }).safeParse(req.body);
     if (!parsed.success)
@@ -403,7 +422,14 @@ chatRouter.patch(
 chatRouter.post(
   "/admin/conversations/:conversationId/claim",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT"),
+  requireStaffRole(
+    "COMPLIANCE_OFFICER",
+    "ADMIN",
+    "SUPPORT",
+    "SUPER_ADMIN",
+    "OPERATIONS_ADMIN",
+    "COMPLIANCE_ADMIN",
+  ),
   async (req: AuthedRequest, res) => {
     try {
       return res.json(

@@ -1,7 +1,13 @@
 # Project Context
 
-Last updated: 2026-09-05
+Last updated: 2026-09-08
 
+> **Update 2026-09-08 (Admin Dashboard Accessibility, Authentication, and Support Chat Delivery):**
+> 1. Staff Sidebar Scroll Accessibility: Resolved the issue where lower menu options (Audit Logs, Admins & Permissions, Sign out) became inaccessible when accordion groups expand. Updated `.staff-sidebar` with strict viewport containment and `.staff-sidebar .sidebar-nav` with `flex: 1 1 0; min-height: 0; overflow-y: auto;` with slim custom scrollbars and a pinned bottom sign-out button.
+> 2. Admin Router Authentication Fix: Resolved the `401 {"error": "Unauthenticated"}` error across the Admin Overview and operations features by mounting `adminRouter.use(requireAuth)` at the router level in `admin.routes.ts`, reliably populating `req.user` for all permission checks.
+> 3. Polling-Resilient Rate Limiting: Fixed login `UNKNOWN_ERROR` lockouts caused by background dashboard polling exceeding the legacy 300-request/15-minute rate limit. Increased general API limits in `app.ts` to 2,000 req/15m in production and 10,000 in development, added structured JSON error payloads, and enhanced `client.ts` to handle 429 gracefully with clear feedback.
+> 4. Support Desk Delivery & Multi-Staff Routing: Fixed landing page floating chat inquiries failing to reach support agents. In `chat.service.ts` and `chat.routes.ts`, expanded auto-assignment to all active staff roles (`SUPPORT`, `ADMIN`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`), registered assigned staff as conversation participants, wired real-time fan-out notifications via `notifyStaffOfEvent("SUPPORT_REQUEST_CREATED")`, and updated `LandingPage.tsx` to maintain conversation sessions for continuous follow-up messages.
+>
 > **Update 2026-09-05 (Late Afternoon - CBE & Safaricom M-Pesa Integration + Manual Verification Fallback):**
 > 1. Multi-Rail Payments Expansion: Added **Commercial Bank of Ethiopia (CBE / CBE Birr)** and **Safaricom M-Pesa (Ethiopia)** alongside Telebirr across Instant Checkout, Manual Transfers, and Freelancer Wallet Withdrawals.
 > 2. Safaricom M-Pesa Payment Client: Built `mpesa.client.ts` implementing the `PaymentProviderClient` interface with B2C disbursement simulation, transaction reference generation, and registered under `PROVIDER_CLIENTS` in `escrow.service.ts`.

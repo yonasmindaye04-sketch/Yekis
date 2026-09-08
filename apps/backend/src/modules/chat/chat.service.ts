@@ -1,6 +1,7 @@
 // === IMPORTS ===
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { randomInt } from "node:crypto";
 import { broadcastToConversation, sendToUser } from "../../lib/socket.js";
 
@@ -50,15 +51,29 @@ export async function createGuestConversation(params: {
   // Auto-assign to a staff member with fewest open conversations
   const assignedStaff = await pickAvailableStaff();
 
+  const participantsToCreate: { userId: string }[] = [{ userId: user.id }];
+  if (assignedStaff) {
+    participantsToCreate.push({ userId: assignedStaff.id });
+  }
+
   const conversation = await prisma.conversation.create({
     data: {
       creatorId: user.id,
       subject: "Website support request",
       assignedStaffId: assignedStaff?.id ?? null,
-      participants: { create: { userId: user.id } },
+      participants: { create: participantsToCreate },
       messages: { create: { senderId: user.id, body } },
     },
     include: { assignedStaff: { select: STAFF_SELECT } },
+  });
+
+  // Notify all staff of new support inquiry
+  void notifyStaffOfEvent({
+    eventType: "SUPPORT_REQUEST_CREATED",
+    message: `New support request from ${email}: "${body.slice(0, 100)}"`,
+    metadata: { conversationId: conversation.id, email },
+  }).catch((err) => {
+    // Non-blocking notification error
   });
 
   return {
@@ -74,10 +89,21 @@ export async function createGuestConversation(params: {
   };
 }
 
-/** Pick the staff member (ADMIN or COMPLIANCE_OFFICER) with fewest open assigned conversations */
+/** Pick the staff member (SUPPORT, ADMIN, SUPER_ADMIN, OPERATIONS_ADMIN, COMPLIANCE_OFFICER) with fewest open assigned conversations */
 async function pickAvailableStaff() {
   const staffUsers = await prisma.user.findMany({
-    where: { staffRole: { in: ["ADMIN", "COMPLIANCE_OFFICER"] } },
+    where: {
+      staffRole: {
+        in: [
+          "SUPPORT",
+          "ADMIN",
+          "SUPER_ADMIN",
+          "OPERATIONS_ADMIN",
+          "COMPLIANCE_OFFICER",
+          "COMPLIANCE_ADMIN",
+        ],
+      },
+    },
     select: {
       id: true,
       email: true,
@@ -86,7 +112,10 @@ async function pickAvailableStaff() {
         select: { conversationsAssigned: { where: { status: "OPEN" } } },
       },
     },
-    orderBy: { conversationsAssigned: { _count: "asc" } },
+    orderBy: [
+      { conversationsAssigned: { _count: "asc" } },
+      { createdAt: "asc" },
+    ],
     take: 1,
   });
   return staffUsers[0] ?? null;
@@ -115,15 +144,18 @@ async function getConversationAccess(conversationId: string, userId: string) {
     where: { id: userId },
     select: { staffRole: true },
   });
-  const isStaff =
-    user?.staffRole === "ADMIN" ||
-    user?.staffRole === "COMPLIANCE_OFFICER";
+  const isStaff = Boolean(user?.staffRole);
 
-  // Staff can only access conversations assigned to them (unless ADMIN can see all)
+  // Staff can access support conversations (ADMIN, SUPER_ADMIN, SUPPORT, OPERATIONS_ADMIN can access all support tickets)
   if (isStaff) {
-    const isAdmin = user?.staffRole === "ADMIN";
+    const isFullStaff =
+      user?.staffRole === "ADMIN" ||
+      user?.staffRole === "SUPER_ADMIN" ||
+      user?.staffRole === "SUPPORT" ||
+      user?.staffRole === "OPERATIONS_ADMIN";
     const isAssigned = conversation.assignedStaffId === userId;
-    if (!isAdmin && !isAssigned) throw new ConversationAccessError();
+    const isParticipant = conversation.participants.length > 0;
+    if (!isFullStaff && !isAssigned && !isParticipant) throw new ConversationAccessError();
   } else {
     if (!conversation.participants.length) throw new ConversationAccessError();
   }

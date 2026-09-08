@@ -466,4 +466,24 @@ Connect to: `ws://127.0.0.1:4000/api/v1/ws?token=<access-token>`
 - `chat:read`: Broadcasts read receipt `{ userId, conversationId, readAt }`.
 - `chat:new_message`: Pushed to recipient's private user channel `user:<userId>` for live unread counter badges.
 
+## Administration & Support Routing (`/api/v1/admin` & `/api/v1/chat/admin`)
+
+All administrative surfaces are protected by router-level `requireAuth` and granular `requirePermission(...)` or `requireStaffRole(...)`.
+
+### Admin Endpoints (`/api/v1/admin/*`)
+- **Authentication:** `Bearer <JWT>` required for all routes via `adminRouter.use(requireAuth)`.
+- **Permissions:** Validated on every call via database-backed `requirePermission(key)` checks against the role matrix (`SUPER_ADMIN`, `ADMIN`, `OPERATIONS_ADMIN`, `FINANCE_ADMIN`, `COMPLIANCE_ADMIN`, `DISPUTE_MEDIATOR`, `SUPPORT`).
+- **Endpoints:**
+  - `GET /api/v1/admin/dashboard/summary`: Operations command center metrics and recent activity.
+  - `GET /api/v1/admin/audit-logs`: Paginated immutable audit trail.
+  - `GET /api/v1/admin/system/health`: Live health status of Redis, DB, MinIO, and double-entry ledger balance.
+  - `GET /api/v1/admin/finance/reports`: Financial volumes, fees, payouts, and marketplace contract status breakdown.
+  - `GET /api/v1/admin/users`: User search and management with suspend/KYC re-review triggers.
+  - `GET /api/v1/admin/contracts`: Contract search and detail inspector.
+
+### Support Queue (`/api/v1/chat/admin/conversations`)
+- **Access:** `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT", "SUPER_ADMIN", "OPERATIONS_ADMIN", "COMPLIANCE_ADMIN")`.
+- **Visibility:** Full staff (`ADMIN`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `SUPPORT`) can view all open tickets across all staff or filter by `staffId`.
+- **Guest Inquiries (`POST /api/v1/chat/guest`):** Public entry point. Creates a guest account, assigns the ticket across active staff roles, adds assigned staff to participants, and triggers real-time fan-out notifications to staff via `notifyStaffOfEvent("SUPPORT_REQUEST_CREATED", ...)`.
+
 

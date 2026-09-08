@@ -89,7 +89,11 @@ Last reviewed: 2026-08-15
 - [x] Notification center and support chat
 - [x] Staff compliance panel for dispute outcomes and TMS decisions
 - [x] Staff live chat inbox: auto-poll (8 s), unread badges, OPEN/ALL filter, close/reopen conversation, auto-scroll, relative timestamps
-- [x] Guest chat widget: displays assigned staff member and supports file attachments
+- [x] Guest chat widget: displays assigned staff member, supports file attachments, and allows continuous follow-up conversations
+- [x] Staff sidebar accessibility: independent scrolling containment for expandable operational menus with pinned sign-out action
+- [x] Admin dashboard authentication: router-level `requireAuth` enforcement with granular `requirePermission` RBAC matrix
+- [x] Polling-resilient API rate limiting (2,000 req/15m prod, 10,000 dev) with JSON error responses and client graceful 429 handling
+- [x] Full support desk dispatch: real-time staff alerting on guest tickets, auto-assignment to all active staff roles, and shared queue visibility
 - [x] Loading, empty, action-busy, and user-visible error/confirmation states in primary workflows
 - [x] Complete Light/Dark mode design token system with WCAG AAA contrast, consistent brand colors, clean SVG icons without background box artifacts, and human-first copy
 - [x] **Platform Fee Tracking** (`PlatformFeeCredit`)

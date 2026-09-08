@@ -67,6 +67,9 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   const [chatStep, setChatStep] = useState<
     "initial" | "asking_email" | "submitted"
   >("initial");
+  const [guestConversationId, setGuestConversationId] = useState<string | null>(
+    null,
+  );
   const [supportSending, setSupportSending] = useState(false);
   const [assignedStaff, setAssignedStaff] = useState<{
     id: string;
@@ -114,7 +117,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           },
         ]);
         setChatStep("asking_email");
-      }, 800);
+      }, 600);
     } else if (chatStep === "asking_email") {
       if (!text.includes("@")) {
         setMessages((prev) => [
@@ -130,18 +133,20 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       setSupportSending(true);
       try {
         const firstUserMsg =
-          messages.find((m) => m.sender === "user")?.text || "No message";
+          messages.find((m) => m.sender === "user")?.text || "Support request";
         const result = (await api.createGuestSupport(text, firstUserMsg)) as {
+          id?: string;
           assignedStaff?: { id: string; name: string };
         };
+        if (result?.id) setGuestConversationId(result.id);
         if (result?.assignedStaff) setAssignedStaff(result.assignedStaff);
         setMessages((prev) => [
           ...prev,
           {
             id: Date.now().toString(),
             text: result?.assignedStaff
-              ? `Thanks! You're now connected with ${result.assignedStaff.name}. We'll get back to you soon.`
-              : "Thanks! We've received your message and will email you shortly.",
+              ? `Thanks! Your ticket is sent to our support desk and connected with ${result.assignedStaff.name}. You can type any additional details here.`
+              : "Thanks! We've delivered your inquiry to our support team and will email you shortly. Feel free to add more details here.",
             sender: "agent",
           },
         ]);
@@ -159,6 +164,17 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         ]);
       } finally {
         setSupportSending(false);
+      }
+    } else if (chatStep === "submitted") {
+      if (guestConversationId) {
+        setSupportSending(true);
+        try {
+          await api.sendChatMessage(guestConversationId, text);
+        } catch (err) {
+          console.warn("Follow-up message delivery note:", err);
+        } finally {
+          setSupportSending(false);
+        }
       }
     }
   };
@@ -828,8 +844,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
             )}
             <div ref={messagesEndRef} />
           </div>
-          {chatStep !== "submitted" && (
-            <div className="chat-composer-area">
+          <div className="chat-composer-area">
               <button
                 className="chat-attach-btn"
                 style={{
@@ -869,10 +884,12 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
                 placeholder={
                   chatStep === "asking_email"
-                    ? "Your email address..."
-                    : attachedFile
-                      ? `📎 ${attachedFile.name}`
-                      : "Type your message..."
+                    ? "Your email address to connect..."
+                    : chatStep === "submitted"
+                      ? "Send another follow-up message..."
+                      : attachedFile
+                        ? `📎 ${attachedFile.name}`
+                        : "Type your message..."
                 }
                 disabled={supportSending}
               />
@@ -886,7 +903,6 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
                 <Send size={18} />
               </button>
             </div>
-          )}
         </aside>
       )}
 

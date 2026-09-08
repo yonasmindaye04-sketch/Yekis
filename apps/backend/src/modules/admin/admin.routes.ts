@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { Router } from "express";
 import { z } from "zod";
-import type { AuthedRequest } from "../../middleware/auth.js";
+import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
@@ -47,6 +47,7 @@ import {
  */
 
 export const adminRouter = Router();
+adminRouter.use(requireAuth);
 
 function parsePagination(query: Record<string, unknown>) {
   const page = Math.max(1, parseInt(String(query.page ?? "1")) || 1);

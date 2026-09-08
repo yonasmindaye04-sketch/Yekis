@@ -68,9 +68,13 @@ export function buildApp() {
     "/api",
     rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 300,
+      max: env.NODE_ENV === "production" ? 2000 : 10000,
       standardHeaders: true,
       legacyHeaders: false,
+      message: {
+        error: "TOO_MANY_REQUESTS",
+        message: "Too many requests, please try again in a moment.",
+      },
     }),
   );
 
