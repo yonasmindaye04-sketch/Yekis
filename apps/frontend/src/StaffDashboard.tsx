@@ -38,6 +38,17 @@ import { AuditLogsPage } from "./AuditLogsPage";
 import { AdminsPage } from "./AdminsPage";
 import { AdminContractsPage } from "./AdminContractsPage";
 import { AdminUsersPage } from "./AdminUsersPage";
+import { AdminPaymentsPage } from "./AdminPaymentsPage";
+import { AdminEscrowPage } from "./AdminEscrowPage";
+import { AdminPayoutsPage } from "./AdminPayoutsPage";
+import { AdminLedgerPage } from "./AdminLedgerPage";
+import { AdminReconciliationPage } from "./AdminReconciliationPage";
+import {
+  AdminOverviewPage,
+  AdminReportsPage,
+  AdminRiskPage,
+  AdminMonitoringPage,
+} from "./AdminOpsPages";
 import { DisputeQueue } from "./DisputeQueue";
 import { ProfileReportsQueue } from "./ProfileReportsQueue";
 
@@ -109,7 +120,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     disputes: 0,
   });
   const [activeTab, setActiveTab] = useState<
-    "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES" | "AUDIT" | "ADMINS" | "USERS" | "CONTRACTS"
+    "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES" | "AUDIT" | "ADMINS" | "USERS" | "CONTRACTS" | "PAYMENTS" | "ESCROW" | "PAYOUTS" | "LEDGER" | "RECONCILIATION" | "REPORTS" | "RISK" | "MONITORING"
   >("OVERVIEW");
   const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
@@ -441,6 +452,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 items: [
                   { key: "SUPPORT", label: "Support", icon: <MessageSquare size={18} />, perm: "support.handle", badge: openCount || undefined },
                   { key: "DISPUTES", label: "Disputes", icon: <Scale size={18} />, perm: "disputes.view", badge: queueCounts.disputes || undefined },
+                  { key: "RISK", label: "Risk & Fraud", icon: <ShieldCheck size={18} />, perm: "disputes.view" },
                 ],
               },
               {
@@ -453,13 +465,24 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 label: "FINANCE",
                 items: [
                   { key: "TOPUPS", label: "Receipts", icon: <WalletCards size={18} />, perm: "topups.review", badge: queueCounts.topups || undefined },
-                  { key: "REPORTS", label: "Reports", icon: <FileText size={18} />, perm: "reports.view", disabled: true },
+                  { key: "LEDGER", label: "Ledger", icon: <FileText size={18} />, perm: "ledger.view" },
+                  { key: "RECONCILIATION", label: "Reconciliation", icon: <FileText size={18} />, perm: "reconciliation.view" },
+                  { key: "REPORTS", label: "Reports", icon: <FileText size={18} />, perm: "reports.view" },
                 ],
               },
               {
                 label: "OPERATIONS",
                 items: [
                   { key: "CONTRACTS", label: "Contracts", icon: <FileText size={18} />, perm: "contracts.view" },
+                  { key: "PAYMENTS", label: "Payments", icon: <WalletCards size={18} />, perm: "payments.view" },
+                  { key: "ESCROW", label: "Escrow", icon: <Scale size={18} />, perm: "escrow.view" },
+                  { key: "PAYOUTS", label: "Payouts", icon: <Send size={18} />, perm: "payouts.view" },
+                ],
+              },
+              {
+                label: "MONITORING",
+                items: [
+                  { key: "MONITORING", label: "System Health", icon: <LayoutDashboard size={18} />, perm: "monitoring.view" },
                 ],
               },
               {
@@ -476,8 +499,6 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   { key: "ADMINS", label: "Admins & Permissions", icon: <Users size={18} />, perm: "admins.manage" },
                 ],
               },
-              // Coming soon: OPERATIONS (Contracts/Escrow/Payments/Payouts),
-              // MONITORING, SETTINGS — disabled until later phases land.
             ] as {
               label: string;
               items: {
@@ -492,7 +513,14 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   | "ADMINS"
                   | "REPORTS"
                   | "USERS"
-                  | "CONTRACTS";
+                  | "CONTRACTS"
+                  | "PAYMENTS"
+                  | "ESCROW"
+                  | "PAYOUTS"
+                  | "LEDGER"
+                  | "RECONCILIATION"
+                  | "RISK"
+                  | "MONITORING";
                 label: string;
                 icon: React.ReactNode;
                 perm: string;
@@ -576,6 +604,14 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               {activeTab === "ADMINS" && "Admins & permissions"}
               {activeTab === "USERS" && "Clients & freelancers"}
               {activeTab === "CONTRACTS" && "Contracts & milestones"}
+              {activeTab === "PAYMENTS" && "Payment rails & transactions"}
+              {activeTab === "ESCROW" && "Milestone escrow & held funds"}
+              {activeTab === "PAYOUTS" && "Disbursements & freelancer payouts"}
+              {activeTab === "LEDGER" && "Double-entry financial ledger"}
+              {activeTab === "RECONCILIATION" && "Ledger ↔ provider reconciliation"}
+              {activeTab === "REPORTS" && "Financial & marketplace reports"}
+              {activeTab === "RISK" && "Risk & fraud cases"}
+              {activeTab === "MONITORING" && "System health & provider status"}
             </h1>
             <p>
               Coordinate support, payments, identity checks, and disputes from
@@ -627,71 +663,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
         )}
 
         {activeTab === "OVERVIEW" && (
-          <div className="staff-overview-layout">
-            <section className="staff-metrics">
-              <article
-                className="clickable"
-                onClick={() => setActiveTab("SUPPORT")}
-              >
-                <div className="staff-metric-icon-wrap">
-                  <MessageSquare size={20} />
-                </div>
-                <div className="staff-metric-body">
-                  <span>Open support</span>
-                  <div className="metric-details">
-                    <strong>{openCount}</strong>
-                    {renderSla(supportHours)}
-                  </div>
-                </div>
-              </article>
-              <article
-                className="clickable"
-                onClick={() => setActiveTab("TOPUPS")}
-              >
-                <div className="staff-metric-icon-wrap">
-                  <WalletCards size={20} />
-                </div>
-                <div className="staff-metric-body">
-                  <span>Receipt reviews</span>
-                  <div className="metric-details">
-                    <strong>{queueCounts.topups}</strong>
-                  </div>
-                </div>
-              </article>
-              <article
-                className="clickable"
-                onClick={() => setActiveTab("KYC")}
-              >
-                <div className="staff-metric-icon-wrap">
-                  <ShieldCheck size={20} />
-                </div>
-                <div className="staff-metric-body">
-                  <span>Identity reviews</span>
-                  <div className="metric-details">
-                    <strong>{queueCounts.kyc}</strong>
-                  </div>
-                </div>
-              </article>
-              <article
-                className="clickable"
-                onClick={() => setActiveTab("DISPUTES")}
-              >
-                <div className="staff-metric-icon-wrap">
-                  <Scale size={20} />
-                </div>
-                <div className="staff-metric-body">
-                  <span>Disputes</span>
-                  <div className="metric-details">
-                    <strong>{queueCounts.disputes}</strong>
-                  </div>
-                </div>
-              </article>
-            </section>
-            <StaffCompliancePanel
-              onChanged={loadConversations}
-              onError={setError}
-            />
-          </div>
+          <section className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminOverviewPage />
+          </section>
         )}
 
         {/* ── Tab Content ───────────────────────────────── */}
@@ -721,6 +695,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                   </button>
                 </div>
                 <span className="status-pill">Live queue</span>
+                {renderSla(supportHours)}
               </div>
             </div>
 
@@ -1123,6 +1098,65 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
             style={{ padding: "1.5rem" }}
           >
             <AdminContractsPage />
+          </section>
+        )}
+
+        {/* Payments Tab (Phase 3) */}
+        {activeTab === "PAYMENTS" && (
+          <section id="panel-payments" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminPaymentsPage />
+          </section>
+        )}
+
+        {/* Escrow Tab (Phase 3) */}
+        {activeTab === "ESCROW" && (
+          <section id="panel-escrow" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminEscrowPage />
+          </section>
+        )}
+
+        {/* Payouts Tab (Phase 3) */}
+        {activeTab === "PAYOUTS" && (
+          <section id="panel-payouts" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminPayoutsPage />
+          </section>
+        )}
+
+        {/* Ledger Tab (Phase 3) */}
+        {activeTab === "LEDGER" && (
+          <section id="panel-ledger" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminLedgerPage />
+          </section>
+        )}
+
+        {/* Reconciliation Tab (Phase 4) */}
+        {activeTab === "RECONCILIATION" && (
+          <section id="panel-reconciliation" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminReconciliationPage />
+          </section>
+        )}
+
+        {/* Reports Tab (Phase 4) */}
+        {activeTab === "REPORTS" && (
+          <section id="panel-reports" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminReportsPage />
+          </section>
+        )}
+
+        {/* Risk & Fraud Tab (Phase 5) */}
+        {activeTab === "RISK" && (
+          <section id="panel-risk" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <StaffCompliancePanel onChanged={loadConversations} onError={setError} />
+            <div style={{ marginTop: 16 }}>
+              <AdminRiskPage />
+            </div>
+          </section>
+        )}
+
+        {/* Monitoring Tab (Phase 7) */}
+        {activeTab === "MONITORING" && (
+          <section id="panel-monitoring" className="staff-panel" style={{ padding: "1.5rem" }}>
+            <AdminMonitoringPage />
           </section>
         )}
       </main>

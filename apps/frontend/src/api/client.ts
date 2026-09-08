@@ -1197,6 +1197,25 @@ class ApiClient {
     return this.request(`/api/v1/admin/ledger/journals?${qs.toString()}`);
   }
 
+  // --- Admin ops (Phase 4-8) ---
+  async adminListReconciliation(params?: { page?: number; limit?: number; recStatus?: string; provider?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.recStatus) qs.set("recStatus", params.recStatus);
+    if (params?.provider) qs.set("provider", params.provider);
+    return this.request(`/api/v1/admin/reconciliation?${qs.toString()}`);
+  }
+  async adminReportsSummary(): Promise<unknown> {
+    return this.request("/api/v1/admin/reports/summary");
+  }
+  async adminDashboardSummary(): Promise<unknown> {
+    return this.request("/api/v1/admin/dashboard/summary");
+  }
+  async adminSystemHealth(): Promise<unknown> {
+    return this.request("/api/v1/admin/monitoring/health");
+  }
+
   // --- Gigs (Fiverr-style service packages) ---
   async searchGigs(params?: { category?: string; q?: string; page?: number; pageSize?: number }): Promise<PaginatedResponse<Gig>> {
     const searchParams = new URLSearchParams();

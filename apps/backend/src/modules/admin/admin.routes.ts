@@ -27,6 +27,12 @@ import {
   getLedgerSummary,
   listLedgerJournals,
 } from "./financeAdmin.service.js";
+import {
+  listReconciliation,
+  getReportsSummary,
+  getDashboardSummary,
+  getSystemHealth,
+} from "./operational.service.js";
 
 /**
  * Staff-only platform administration surface. Everything here requires a
@@ -580,6 +586,69 @@ adminRouter.get(
       );
     } catch (err) {
       logger.error({ err }, "Failed to list ledger journals");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Reconciliation (Phase 4) ----------
+adminRouter.get(
+  "/reconciliation",
+  requirePermission("reconciliation.view"),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(
+        await listReconciliation({
+          page: Math.max(1, parseInt(String(req.query.page)) || 1),
+          limit: Math.min(100, parseInt(String(req.query.limit)) || 20),
+          recStatus: req.query.recStatus as string | undefined,
+          provider: req.query.provider as string | undefined,
+        }),
+      );
+    } catch (err) {
+      logger.error({ err }, "Failed to list reconciliation");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Reports (Phase 4) ----------
+adminRouter.get(
+  "/reports/summary",
+  requirePermission("reports.view"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      return res.json(await getReportsSummary());
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch reports summary");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Overview (Phase 8) ----------
+adminRouter.get(
+  "/dashboard/summary",
+  requirePermission("dashboard.view"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      return res.json(await getDashboardSummary());
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch dashboard summary");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Monitoring (Phase 7) ----------
+adminRouter.get(
+  "/monitoring/health",
+  requirePermission("monitoring.view"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      return res.json(await getSystemHealth());
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch system health");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },
