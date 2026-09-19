@@ -3,6 +3,7 @@ import { Worker } from "bullmq";
 import { redis } from "../lib/redis.js";
 import { logger } from "../lib/logger.js";
 import { processNotification } from "../modules/notifications/notification.service.js";
+import { sendToUser } from "../lib/socket.js";
 
 /**
  * Every notificationQueue.add(type, { userId, message, ...metadata }) call
@@ -23,6 +24,19 @@ export const notificationWorker = new Worker(
       message: string;
       [k: string]: unknown;
     };
+
+    // Real-time push over the WebSocket fan-out first — any connected device
+    // gets the event instantly; the persistence/SMS/Telegram paths below
+    // remain the durable record.
+    try {
+      sendToUser(userId, `notify:${job.name}`, {
+        type: job.name,
+        message,
+        ...metadata,
+      });
+    } catch (err) {
+      logger.warn({ err, jobName: job.name }, "Real-time socket push failed");
+    }
 
     await processNotification({ userId, type: job.name, message, metadata });
   },

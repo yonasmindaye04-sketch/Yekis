@@ -1205,6 +1205,12 @@ class ApiClient {
     if (params?.referenceType) qs.set("referenceType", params.referenceType);
     return this.request(`/api/v1/admin/ledger/journals?${qs.toString()}`);
   }
+  async adminSettlePayout(payoutId: string, input: { decision: "CONFIRMED" | "FAILED"; providerPayoutId?: string; failureReason?: string }): Promise<unknown> {
+    return this.request(`/api/v1/admin/payouts/${payoutId}/settle`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
 
   // --- Admin ops (Phase 4-8) ---
   async adminListReconciliation(params?: { page?: number; limit?: number; recStatus?: string; provider?: string }): Promise<unknown> {

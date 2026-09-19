@@ -42,6 +42,24 @@ services:
     volumes:
       - miniodata:/data
 
+  # Full-text search backend. Optional: enable with
+  #   docker compose --profile search up -d
+  # and set OPENSEARCH_URL=http://localhost:9200 in apps/backend/.env.
+  # Without it, gig/job search falls back to the existing Postgres queries.
+  opensearch:
+    image: opensearchproject/opensearch:2.13.0
+    restart: unless-stopped
+    profiles: ["search"]
+    environment:
+      discovery.type: single-node
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - opensearchdata:/usr/share/opensearch/data
+
 volumes:
   pgdata:
   miniodata:
+  opensearchdata:

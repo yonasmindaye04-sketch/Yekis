@@ -394,10 +394,15 @@ async function showDisputeQueue(
   }
 
   for (const dispute of displayItems) {
+    const subjectLabel = dispute.contractId
+      ? `Contract: ${dispute.contractId.slice(0, 8)}`
+      : dispute.gigOrderId
+        ? `Gig order: ${dispute.gigOrderId.slice(0, 8)}`
+        : "Subject: unknown";
     const message =
       ` Dispute ${dispute.id.slice(0, 8)}\n` +
       `Stage: ${dispute.stage} | ${dispute.category}\n` +
-      `Contract: ${dispute.contractId.slice(0, 8)}\n` +
+      `${subjectLabel}\n` +
       `Created: ${new Date(dispute.createdAt).toLocaleDateString()}`;
 
     const kb = new InlineKeyboard()
@@ -434,8 +439,10 @@ async function showMediationView(
 
   let message = ` Mediation: ${disputeId}\n`;
   message += `Stage: ${dispute.stage} | ${dispute.category}\n`;
-  message += `Contract: ${dispute.contractId.slice(0, 8)}\n`;
-  message += `Milestone: ${dispute.milestoneId}\n\n`;
+  message += dispute.contractId
+    ? `Contract: ${dispute.contractId.slice(0, 8)}\n`
+    : `Gig order: ${dispute.gigOrderId?.slice(0, 8) ?? "unknown"}\n`;
+  message += `Milestone: ${dispute.milestoneId ?? "—"}\n\n`;
   message += `Evidence: ${dispute.evidence.length} items\n`;
 
   const kb = new InlineKeyboard()

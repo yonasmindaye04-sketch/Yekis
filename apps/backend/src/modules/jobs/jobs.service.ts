@@ -2,6 +2,11 @@
 import type { CreateJobInput, JobSearchQuery } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import {
+  isSearchConfigured,
+  indexJob,
+  searchText,
+} from "../search/searchIndex.service.js";
 
 // === MAIN FUNCTIONS ===
 export class ForbiddenRoleError extends Error {}
@@ -39,10 +44,40 @@ export async function createJob(params: {
     metadata: { category: job.category },
   });
 
+  // Search index upsert — no-op unless OPENSEARCH_URL is configured.
+  await indexJob(job);
+
   return job;
 }
 
-export async function searchJobs(query: JobSearchQuery) {
+export async function searchJobs(query: JobSearchQuery & { q?: string }) {
+  // OpenSearch path (typo-tolerant, relevance-scored) when configured; the
+  // Postgres path below remains the fallback so search never hard-fails.
+  if (isSearchConfigured() && query.q) {
+    const hits = await searchText("jobs", query.q, 100);
+    if (hits) {
+      const ids = hits.map((h) => h.id);
+      const byId = new Map(hits.map((h) => [h.id, h.score]));
+      const rows = await prisma.job.findMany({
+        where: {
+          id: { in: ids },
+          status: query.status,
+          ...(query.category ? { category: query.category } : {}),
+        },
+        include: { _count: { select: { proposals: true } } },
+      });
+      const sorted = rows
+        .sort((a, b) => (byId.get(b.id) ?? 0) - (byId.get(a.id) ?? 0))
+        .slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
+      return {
+        items: sorted,
+        total: rows.length,
+        page: query.page,
+        pageSize: query.pageSize,
+      };
+    }
+  }
+
   const where = {
     ...(query.category ? { category: query.category } : {}),
     status: query.status,

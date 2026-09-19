@@ -185,6 +185,10 @@ const EnvSchema = z.object({
   // Required for correct client IPs (rate limiting, audit logs) whenever the
   // API is not reached directly. Leave unset when running bare on localhost.
   TRUST_PROXY: z.coerce.number().int().min(0).optional(),
+
+  // OpenSearch (optional) — full-text search backend. Unset = search falls
+  // back to the existing Postgres queries; no dependency is required to boot.
+  OPENSEARCH_URL: z.string().url().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

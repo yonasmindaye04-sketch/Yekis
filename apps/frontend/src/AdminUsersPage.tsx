@@ -140,7 +140,20 @@ export function AdminUsersPage() {
             </thead>
             <tbody>
               {items.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid var(--color-border)", cursor: "pointer" }} onClick={() => void openDetail(row.id)}>
+                <tr
+                  key={row.id}
+                  style={{ borderBottom: "1px solid var(--color-border)", cursor: "pointer" }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Open user detail for ${row.displayName ?? row.email}`}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      void openDetail(row.id);
+                    }
+                  }}
+                  onClick={() => void openDetail(row.id)}
+                >
                   <td style={{ padding: "8px" }}>
                     <div>{row.displayName ?? row.email}</div>
                     <small style={{ color: "var(--color-text-secondary)" }}>{row.ucid}</small>

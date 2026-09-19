@@ -13,6 +13,11 @@ import { env } from "../../config/env.js";
 import { notificationQueue, gigAutoReleaseQueue } from "../../queue/queues.js";
 import { createHash } from "node:crypto";
 import { Prisma } from "@prisma/client";
+import {
+  isSearchConfigured,
+  indexGig,
+  searchText,
+} from "../search/searchIndex.service.js";
 
 // === ERRORS ===
 export class GigForbiddenError extends Error {}
@@ -32,8 +37,9 @@ function autoReleaseDate(): Date {
 
 /** Upsert platform revenue + create an append-only fee credit for a gig order
  * release. Mirrors escrow.service.ts recordPlatformEarnings but keys the
- * PlatformFeeCredit by gigOrderId instead of milestoneId. */
-async function recordGigPlatformEarnings(
+ * PlatformFeeCredit by gigOrderId instead of milestoneId. Exported for the
+ * gig-dispute resolution path (gigDispute.service.ts). */
+export async function recordGigPlatformEarnings(
   fees: FeeBreakdown,
   gigOrderId: string,
 ) {
@@ -109,10 +115,43 @@ export async function createGig(params: {
     metadata: { category: gig.category, status: gig.status },
   });
 
+  // Search index upsert — no-op unless OPENSEARCH_URL is configured.
+  await indexGig(gig);
+
   return gig;
 }
 
 export async function searchGigs(query: GigSearchQuery) {
+  // OpenSearch path: typo-tolerant scored search when configured & reachable.
+  // Falls through to Postgres whenever OpenSearch is absent or errors, so
+  // search never hard-fails.
+  if (isSearchConfigured() && query.q) {
+    const hits = await searchText("gigs", query.q, 100);
+    if (hits) {
+      const ids = hits.map((h) => h.id);
+      const byId = new Map(hits.map((h) => [h.id, h.score]));
+      const rows = await prisma.gig.findMany({
+        where: {
+          id: { in: ids },
+          status: query.status,
+          ...(query.category ? { category: query.category } : {}),
+        },
+        include: {
+          packages: { orderBy: { priceMinor: "asc" } },
+          freelancer: {
+            select: { id: true, displayName: true, avatarUrl: true },
+          },
+        },
+      });
+      // Preserve OpenSearch relevance order, then slice the page.
+      const sorted = rows
+        .sort((a, b) => (byId.get(b.id) ?? 0) - (byId.get(a.id) ?? 0))
+        .slice((query.page - 1) * query.pageSize, query.page * query.pageSize);
+      const total = rows.length;
+      return { items: sorted, total, page: query.page, pageSize: query.pageSize };
+    }
+  }
+
   const where = {
     status: query.status,
     ...(query.category ? { category: query.category } : {}),
@@ -222,6 +261,10 @@ export async function setGigStatus(params: {
     entityId: params.gigId,
     metadata: { status: params.status },
   });
+
+  // Keep the search index current with the visibility state.
+  await indexGig(updated);
+
   return updated;
 }
 

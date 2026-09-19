@@ -1,6 +1,6 @@
 // AdminPayoutsPage.tsx — disbursement visibility for freelancers
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Check, X } from "lucide-react";
 import { api } from "./api/client";
 
 interface PayoutRow {
@@ -28,6 +28,25 @@ export function AdminPayoutsPage() {
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [settlingId, setSettlingId] = useState<string | null>(null);
+  const [providerRef, setProviderRef] = useState("");
+  const [failReason, setFailReason] = useState("");
+
+  const settle = async (payoutId: string, decision: "CONFIRMED" | "FAILED") => {
+    try {
+      await api.adminSettlePayout(payoutId, {
+        decision,
+        providerPayoutId: decision === "CONFIRMED" ? providerRef || undefined : undefined,
+        failureReason: decision === "FAILED" ? failReason || undefined : undefined,
+      });
+      setSettlingId(null);
+      setProviderRef("");
+      setFailReason("");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to settle payout");
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);setError("");
@@ -76,6 +95,7 @@ export function AdminPayoutsPage() {
                 <th style={{ padding: "8px" }}>Net</th>
                 <th style={{ padding: "8px" }}>Status</th>
                 <th style={{ padding: "8px" }}>Reason</th>
+                <th style={{ padding: "8px" }}>Settle</th>
               </tr>
             </thead>
             <tbody>
@@ -88,6 +108,59 @@ export function AdminPayoutsPage() {
                   <td style={{ padding: "8px" }}>ETB {(row.netAmountMinor / 100).toLocaleString()}</td>
                   <td style={{ padding: "8px" }}><span className="status-pill">{row.status}</span></td>
                   <td style={{ padding: "8px", fontSize: "0.78rem" }} title={row.errorMessage ?? ""}>{row.errorMessage ?? "—"}</td>
+                  <td style={{ padding: "8px" }}>
+                    {(row.status === "PENDING" || row.status === "PROCESSING") && (
+                      settlingId === row.id ? (
+                        <div style={{ display: "grid", gap: 6, minWidth: 200 }}>
+                          <input
+                            placeholder="Provider reference (for confirm)"
+                            value={providerRef}
+                            onChange={(e) => setProviderRef(e.target.value)}
+                            style={{ fontSize: 12, padding: "4px 8px" }}
+                          />
+                          <input
+                            placeholder="Failure reason (for fail)"
+                            value={failReason}
+                            onChange={(e) => setFailReason(e.target.value)}
+                            style={{ fontSize: 12, padding: "4px 8px" }}
+                          />
+                          <div style={{ display: "flex", gap: 6 }}>
+                            <button
+                              className="btn-primary"
+                              style={{ fontSize: 12, padding: "4px 10px" }}
+                              onClick={() => void settle(row.id, "CONFIRMED")}
+                              title="Confirm the transfer executed out-of-band"
+                            >
+                              <Check size={13} /> Confirm
+                            </button>
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: 12, padding: "4px 10px", color: "#dc2626" }}
+                              onClick={() => void settle(row.id, "FAILED")}
+                              title="Mark failed — wallet will be re-credited"
+                            >
+                              <X size={13} /> Failed
+                            </button>
+                            <button
+                              className="btn-secondary"
+                              style={{ fontSize: 12, padding: "4px 10px" }}
+                              onClick={() => { setSettlingId(null); setProviderRef(""); setFailReason(""); }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          className="btn-secondary"
+                          style={{ fontSize: 12, padding: "4px 10px" }}
+                          onClick={() => setSettlingId(row.id)}
+                        >
+                          Settle
+                        </button>
+                      )
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

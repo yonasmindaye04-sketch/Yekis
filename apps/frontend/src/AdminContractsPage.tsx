@@ -27,6 +27,7 @@ interface ContractDetail {
   };
   milestones: MilestoneRow[];
   payments: { id: string; status: string; amountMinor: number; provider: string; createdAt: string }[];
+  disputes: { id: string; stage: string; category: string }[];
   totals: { escrowHeldMinor: number; milestoneCount: number };
 }
 
@@ -132,6 +133,18 @@ export function AdminContractsPage() {
                 ))}
               </tbody>
             </table>
+          )}
+          {detail.disputes && detail.disputes.length > 0 && (
+            <>
+              <h3 style={{ margin: "16px 0 8px" }}>Disputes</h3>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {detail.disputes.map((d) => (
+                  <span key={d.id} className="status-pill" title={d.id}>
+                    {d.category} · {d.stage.replace("STAGE_", "").replace("_", " ")}
+                  </span>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>

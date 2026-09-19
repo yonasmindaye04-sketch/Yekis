@@ -33,6 +33,11 @@ import {
   getDashboardSummary,
   getSystemHealth,
 } from "./operational.service.js";
+import {
+  settlePayout,
+  PayoutNotFoundError,
+  InvalidPayoutStateError,
+} from "./payoutAdmin.service.js";
 
 /**
  * Staff-only platform administration surface. Everything here requires a
@@ -553,6 +558,44 @@ adminRouter.get(
       );
     } catch (err) {
       logger.error({ err }, "Failed to list payouts");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/payouts/:payoutId/settle",
+  requirePermission("payouts.settle"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({
+        decision: z.enum(["CONFIRMED", "FAILED"]),
+        providerPayoutId: z.string().min(4).max(200).optional(),
+        failureReason: z.string().min(5).max(1000).optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const settled = await settlePayout({
+        staffUserId: req.user!.id,
+        payoutId: String(req.params.payoutId),
+        decision: parsed.data.decision,
+        providerPayoutId: parsed.data.providerPayoutId,
+        failureReason: parsed.data.failureReason,
+      });
+      return res.json(settled);
+    } catch (err) {
+      if (err instanceof PayoutNotFoundError) {
+        return res.status(404).json({ error: "NOT_FOUND", message: err.message });
+      }
+      if (err instanceof InvalidPayoutStateError) {
+        return res.status(409).json({ error: "CONFLICT", message: err.message });
+      }
+      logger.error({ err }, "Failed to settle payout");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

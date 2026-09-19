@@ -115,9 +115,12 @@ Last reviewed: 2026-08-15
 - [x] **Staff Mediation Console**
 - [x] **Evidence Bundle Assembly & Storage** (SHA-256 hashed JSON)
 - [x] **Mandatory Cooling-Off / Deadlines** (7-day resolution SLAs)
+- [x] Real-time `ws` layer: JWT-authenticated channels, chat typing/read receipts, staff alerts, and live `notify:*` event fan-out from the BullMQ notification worker
+- [x] Admin operations platform (Phases 1–8): RBAC permission matrix, hardened audit log, Users/Contracts/Payments/Escrow/Payouts/Ledger/Reconciliation/Reports/Risk/Monitoring, real-metrics Overview, manual payout settlement workflow
+- [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [ ] Complete Amharic translation review across newly added workflow surfaces
+- [ ] Professional Amharic linguistic review of all translated strings (marketing strings now filled; core + marketing both need a native-speaker pass)
 
 ## Marketing Site (Public)
 
@@ -131,7 +134,7 @@ Last reviewed: 2026-08-15
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [ ] Amharic translation integration (currently stubbed)
+- [x] Amharic translation integration — all `[TODO]` marketing stubs filled; professional linguistic review still open (see verification section)
 
 ## Automated And Manual Verification
 

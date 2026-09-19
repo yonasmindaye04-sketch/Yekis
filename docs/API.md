@@ -328,7 +328,17 @@ See `GIG_MODEL_PLAN.md` for the full design. Amounts are integer minor units (ET
 | `POST` | `/api/v1/gigs/orders/:orderId/review` | Client | Submit category-rated gig review |
 | `GET` | `/api/v1/gigs/orders/:orderId` | Party | Get order status/history |
 
-Gig orders reuse the existing `EscrowState` machine, `calculateFees`, `PlatformFeeCredit`, and a dedicated BullMQ auto-release worker (`gig-auto-release`). Gig disputes are deferred pending the polymorphic-refactor decision in `GIG_MODEL_PLAN.md`.
+Gig orders reuse the existing `EscrowState` machine, `calculateFees`, `PlatformFeeCredit`, and a dedicated BullMQ auto-release worker (`gig-auto-release`).
+
+### Gig order disputes
+
+Gig disputes share the milestone `Dispute` machine (polymorphic subject — migration `20260829233000_gig_disputes_polymorphic`).
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/gigs/orders/:orderId/dispute` | Order party | Raise a dispute (funded/working/submitted orders only; cancels auto-release) |
+| `POST` | `/api/v1/gigs/disputes/:disputeId/evidence` | Dispute party | Submit an evidence statement |
+| `POST` | `/api/v1/gigs/disputes/:disputeId/resolve` | Staff (mediator/compliance/admin) | Release / refund / partial-split resolution with fee-aware ledger + audit |
 
 ## TMS
 
@@ -398,6 +408,20 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `GET` | `/api/v1/admin/staff` | `admins.manage` | List all staff accounts |
 | `POST` | `/api/v1/admin/staff/:userId/role` | `admins.manage` | Assign/remove a staff role (audited) |
 | `GET` | `/api/v1/admin/permissions/matrix` | any staff | Current role → permission map |
+| `GET` | `/api/v1/admin/users` | `users.view` | Search/list users (q, role, page) |
+| `GET` | `/api/v1/admin/users/:userId` | `users.view` | User detail + KYC + wallet + activity rollup |
+| `GET` | `/api/v1/admin/contracts` | `contracts.view` | Search/list contracts (q, status, page) |
+| `GET` | `/api/v1/admin/contracts/:contractId` | `contracts.view` | Contract detail: milestones, payments, disputes, audits, escrow totals |
+| `GET` | `/api/v1/admin/payments` | `payments.view` | Payment transactions (provider, status, client email search) |
+| `GET` | `/api/v1/admin/escrows` | `escrow.view` | Milestone escrow rows + held-funds rollup |
+| `GET` | `/api/v1/admin/payouts` | `payouts.view` | Payout transactions + pending count |
+| `POST` | `/api/v1/admin/payouts/:payoutId/settle` | `payouts.settle` | Record out-of-band transfer outcome: CONFIRMED (provider ref; posts ledger journal) or FAILED (re-credits wallet; audited) |
+| `GET` | `/api/v1/admin/ledger` | `ledger.view` | Chart-of-accounts balances + double-entry integrity audit |
+| `GET` | `/api/v1/admin/ledger/journals` | `ledger.view` | Paginated journal entries (referenceType, q search) |
+| `GET` | `/api/v1/admin/reconciliation` | `reconciliation.view` | Provider vs internal escrow state (MATCHED / MISMATCH / PENDING / FAILED + amounts) |
+| `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates (real sums/counts) |
+| `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics + recent activity feed |
+| `GET` | `/api/v1/admin/monitoring/health` | `monitoring.view` | DB / Redis / object-store / Telebirr-config checks + ledger balance |
 
 Existing protected queue routes (KYC, top-ups, disputes, TMS, etc.) remain on `requireStaffRole(...)` and are unchanged by Phase 1.
 

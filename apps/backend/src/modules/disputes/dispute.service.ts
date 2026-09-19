@@ -249,6 +249,13 @@ export async function compileEvidenceBundle(disputeId: string): Promise<void> {
     },
   });
   if (!dispute) throw new DisputeNotFoundError();
+  // Polymorphic guard: evidence-bundle compilation is contract-scoped; gig
+  // disputes compile their own context (gigDispute.service.ts).
+  if (!dispute.contract) {
+    throw new InvalidDisputeStageError(
+      "Evidence bundle compilation requires a contract-backed dispute.",
+    );
+  }
 
   const milestone = dispute.contract.milestones.find(
     (m) => m.id === dispute.milestoneId,
@@ -386,6 +393,13 @@ export async function resolveDispute(params: {
     include: { contract: true },
   });
   if (!dispute) throw new DisputeNotFoundError();
+  // Polymorphic guard: milestone disputes resolve here; gig disputes use
+  // resolveGigDispute (gigDispute.service.ts).
+  if (!dispute.contract || !dispute.milestoneId) {
+    throw new InvalidDisputeStageError(
+      "This dispute is not milestone-backed; use the gig resolution path.",
+    );
+  }
   if (dispute.stage !== "STAGE_3_MEDIATION") {
     throw new InvalidDisputeStageError(
       `Cannot resolve a dispute at stage ${dispute.stage}.`,
@@ -672,10 +686,13 @@ export async function withdrawDisputeMutually(params: {
       },
     });
 
-    const otherPartyId =
-      dispute.contract.clientId === params.userId
+    const otherPartyId = dispute.contract
+      ? dispute.contract.clientId === params.userId
         ? dispute.contract.freelancerId
-        : dispute.contract.clientId;
+        : dispute.contract.clientId
+      : dispute.gigOrder!.clientId === params.userId
+        ? dispute.gigOrder!.gig.freelancerId
+        : dispute.gigOrder!.clientId;
     await notificationQueue.add("dispute-mutual-withdrawal-proposed", {
       userId: otherPartyId,
       disputeId: dispute.id,
@@ -733,13 +750,22 @@ export async function withdrawDisputeMutually(params: {
 async function getDisputeForParty(disputeId: string, userId: string) {
   const dispute = await prisma.dispute.findUnique({
     where: { id: disputeId },
-    include: { contract: true },
+    include: { contract: true, gigOrder: { include: { gig: true } } },
   });
   if (!dispute) throw new DisputeNotFoundError();
-  if (
-    dispute.contract.clientId !== userId &&
-    dispute.contract.freelancerId !== userId
-  ) {
+
+  // Polymorphic party check: contract disputes carry milestone parties; gig
+  // disputes carry the order's client and the gig's freelancer.
+  const isContractParty =
+    dispute.contract &&
+    (dispute.contract.clientId === userId ||
+      dispute.contract.freelancerId === userId);
+  const isGigParty =
+    dispute.gigOrder &&
+    (dispute.gigOrder.clientId === userId ||
+      dispute.gigOrder.gig.freelancerId === userId);
+
+  if (!isContractParty && !isGigParty) {
     throw new NotDisputePartyError();
   }
   return dispute;
@@ -748,13 +774,24 @@ async function getDisputeForParty(disputeId: string, userId: string) {
 export async function getDispute(userId: string, disputeId: string) {
   const dispute = await prisma.dispute.findUnique({
     where: { id: disputeId },
-    include: { evidence: true, contract: true },
+    include: {
+      evidence: true,
+      contract: true,
+      gigOrder: { include: { gig: true } },
+    },
   });
   if (!dispute) throw new DisputeNotFoundError();
-  if (
-    dispute.contract.clientId !== userId &&
-    dispute.contract.freelancerId !== userId
-  ) {
+
+  const isContractParty =
+    dispute.contract &&
+    (dispute.contract.clientId === userId ||
+      dispute.contract.freelancerId === userId);
+  const isGigParty =
+    dispute.gigOrder &&
+    (dispute.gigOrder.clientId === userId ||
+      dispute.gigOrder.gig.freelancerId === userId);
+
+  if (!isContractParty && !isGigParty) {
     throw new NotDisputePartyError();
   }
   return dispute;
@@ -763,7 +800,14 @@ export async function getDispute(userId: string, disputeId: string) {
 export async function getDisputesForUser(userId: string) {
   return prisma.dispute.findMany({
     where: {
-      contract: { OR: [{ clientId: userId }, { freelancerId: userId }] },
+      OR: [
+        { contract: { OR: [{ clientId: userId }, { freelancerId: userId }] } },
+        {
+          gigOrder: {
+            OR: [{ clientId: userId }, { gig: { freelancerId: userId } }],
+          },
+        },
+      ],
     },
     include: {
       evidence: true,
@@ -774,6 +818,13 @@ export async function getDisputesForUser(userId: string) {
           freelancerId: true,
           job: { select: { title: true } },
           milestones: true,
+        },
+      },
+      gigOrder: {
+        select: {
+          id: true,
+          clientId: true,
+          gig: { select: { title: true, freelancerId: true } },
         },
       },
     },

@@ -425,7 +425,7 @@ model Contract {
   createdAt            DateTime       @default(now())
 
   milestones Milestone[]
-  dispute    Dispute?
+  disputes   Dispute[] // one per milestone now that disputes are milestone-scoped
   review     Review?
 
   @@index([clientId])
@@ -530,9 +530,14 @@ enum DisputeResolutionOutcome {
 
 model Dispute {
   id                                     String                    @id @default(cuid())
-  contractId                             String                    @unique
-  contract                               Contract                  @relation(fields: [contractId], references: [id])
-  milestoneId                            String
+  // Polymorphic subject: exactly one of contractId / gigOrderId is set.
+  // contractId was previously NOT NULL + UNIQUE (one dispute per contract);
+  // both are now nullable so gig orders can share the same dispute machine.
+  contractId                             String?
+  contract                               Contract?                 @relation(fields: [contractId], references: [id])
+  gigOrderId                             String?                   @unique
+  gigOrder                               GigOrder?                 @relation(fields: [gigOrderId], references: [id])
+  milestoneId                            String?
   category                               DisputeCategory
   stage                                  DisputeStage              @default(STAGE_1_NEGOTIATION)
   raisedByUserId                         String
@@ -557,10 +562,12 @@ model Dispute {
   // T2-H: arbitration award tracking
   awardReferenceNumber                   String? // AACCSA or other arbitration body reference
   createdAt                              DateTime                  @default(now())
-  updatedAt                              DateTime                  @updatedAt
+  updatedAt                               DateTime                  @updatedAt
 
   evidence DisputeEvidence[]
 
+  @@index([contractId])
+  @@index([gigOrderId])
   @@index([milestoneId])
   @@index([stage])
 }
@@ -1016,6 +1023,7 @@ enum GigOrderStatus {
   ESCROW_HELD
   WORK_IN_PROGRESS
   SUBMITTED_FOR_REVIEW
+  DISPUTED
   COMPLETED
   CANCELLED
 }
@@ -1108,6 +1116,7 @@ model GigOrder {
   updatedAt DateTime @updatedAt
 
   review     GigReview?
+  dispute    Dispute?
 
   @@index([gigId, status])
   @@index([clientId, status])

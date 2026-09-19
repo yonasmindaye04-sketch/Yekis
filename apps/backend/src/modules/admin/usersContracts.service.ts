@@ -176,10 +176,8 @@ export async function getContractDetail(contractId: string) {
       },
       job: { select: { id: true, title: true, category: true, status: true, description: true } },
       milestones: true,
-      dispute: { select: { id: true, stage: true, category: true } },
+      disputes: { select: { id: true, stage: true, category: true } },
       review: true,
-      // Party-side disputes with matchStage relation here, escalations
-      // rely on the linked dispute having its own thread.
     },
   });
   if (!contract) return null;
@@ -223,7 +221,7 @@ export async function getContractDetail(contractId: string) {
     job: contract.job,
     milestones: contract.milestones,
     payments,
-    dispute: contract.dispute ?? null,
+    disputes: contract.disputes,
     review: contract.review ?? null,
     audits,
     totals: {

@@ -125,7 +125,10 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260809150000_add_chat_with_staff_assignment` | Staff support assignment and scoped chat management |
 | `20260821215600_add_profile_reviews_chat_platform_models` | Profile items, reviews, user skills, counter offers, direct messaging, platform metrics, and password reset tokens |
 | `20260826090000_tms_rules_and_chapa_removal` | TMS alignment (Master Design §11.4): added ROUND_AMOUNTS, strDeadlineAt (24h SLA), and removed Chapa |
-| `20260829120000_gig_marketplace` | Gig/Package/Order/Review models + enums; `PlatformFeeCredit.milestoneId` nullable + `gigOrderId` column (append-only ledger now supports both contract and gig releases) |
+| `20260829120000_gig_marketplace` | Gig/Package/Order/Review models + enums; `PlatformFeeCredit.milestoneId` nullable + `gigOrderId` column (append-only ledger supports both contract and gig releases) |
+| `20260829130000_add_support_staff_role` | `SUPPORT` staff role for chat-only customer support accounts |
+| `20260829220000_admin_phase1_rbac_audit` | Phase 1 RBAC: new `StaffRole` values (SUPER_ADMIN, OPERATIONS_ADMIN, FINANCE_ADMIN, DISPUTE_MEDIATOR, COMPLIANCE_ADMIN) + `AuditLog` hardening columns (`actorRole`, `action`, `previousState`, `newState`, `amountMinor`, `requestId`, `ipAddress`) with indexes |
+| `20260829233000_gig_disputes_polymorphic` | Polymorphic dispute subject: `Dispute.contractId`/`milestoneId` nullable (unique dropped), `Dispute.gigOrderId` (`@unique` + FK), DB CHECK enforcing exactly one subject per dispute, `GigOrderStatus.DISPUTED` |
 
 Do not edit an applied migration. Change `schema.prisma`, create a new migration, review its SQL, then regenerate the Prisma client.
 

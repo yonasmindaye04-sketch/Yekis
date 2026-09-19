@@ -11,6 +11,7 @@ import {
 } from "@marketplace/schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
+import { requireStaffRole } from "../../middleware/staffRole.js";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import {
@@ -34,6 +35,15 @@ import {
   GigNotPartyError,
   GigInsufficientBalanceError,
 } from "./gig.service.js";
+import {
+  raiseGigDispute,
+  submitGigDisputeEvidence,
+  resolveGigDispute,
+  GigDisputeNotFoundError,
+  NotGigDisputePartyError,
+  InvalidGigDisputeStateError,
+} from "./gigDispute.service.js";
+import { z } from "zod";
 
 export const gigsRouter = Router();
 
@@ -328,6 +338,137 @@ gigsRouter.get(
       return res.json(order);
     } catch (err) {
       logger.error({ err }, "Gig order fetch failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Gig order disputes (polymorphic Dispute machine) ----------
+
+const RaiseGigDisputeInput = z.object({
+  category: z.enum([
+    "NON_DELIVERY",
+    "LATE_DELIVERY",
+    "QUALITY_ISSUE",
+    "SCOPE_CREEP",
+    "NON_PAYMENT",
+    "COMMUNICATION_BREAKDOWN",
+  ]),
+  description: z.string().min(20).max(3000),
+});
+
+gigsRouter.post(
+  "/orders/:orderId/dispute",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = RaiseGigDisputeInput.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const dispute = await raiseGigDispute({
+        raisedByUserId: req.user!.id,
+        gigOrderId: String(req.params.orderId),
+        category: parsed.data.category,
+        description: parsed.data.description,
+      });
+      return res.status(201).json(dispute);
+    } catch (err) {
+      if (err instanceof NotGigDisputePartyError) {
+        return res.status(403).json({ error: "FORBIDDEN", message: err.message });
+      }
+      if (err instanceof GigDisputeNotFoundError) {
+        return res.status(404).json({ error: "NOT_FOUND", message: err.message });
+      }
+      if (err instanceof InvalidGigDisputeStateError) {
+        return res.status(409).json({ error: "CONFLICT", message: err.message });
+      }
+      logger.error({ err }, "Gig dispute raise failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+gigsRouter.post(
+  "/disputes/:disputeId/evidence",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({ statement: z.string().min(10).max(5000) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const evidence = await submitGigDisputeEvidence({
+        userId: req.user!.id,
+        disputeId: String(req.params.disputeId),
+        statement: parsed.data.statement,
+      });
+      return res.status(201).json(evidence);
+    } catch (err) {
+      if (err instanceof NotGigDisputePartyError) {
+        return res.status(403).json({ error: "FORBIDDEN", message: err.message });
+      }
+      if (err instanceof GigDisputeNotFoundError) {
+        return res.status(404).json({ error: "NOT_FOUND", message: err.message });
+      }
+      if (err instanceof InvalidGigDisputeStateError) {
+        return res.status(409).json({ error: "CONFLICT", message: err.message });
+      }
+      logger.error({ err }, "Gig dispute evidence failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+gigsRouter.post(
+  "/disputes/:disputeId/resolve",
+  requireAuth,
+  requireStaffRole(
+    "COMPLIANCE_OFFICER",
+    "COMPLIANCE_ADMIN",
+    "ADMIN",
+    "DISPUTE_MEDIATOR",
+  ),
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({
+        outcome: z.enum([
+          "RELEASE_TO_FREELANCER",
+          "REFUND_TO_CLIENT",
+          "PARTIAL_SPLIT",
+        ]),
+        recommendation: z.string().min(10).max(2000),
+        freelancerShareMinor: z.number().int().nonnegative().optional(),
+      })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const resolved = await resolveGigDispute({
+        staffUserId: req.user!.id,
+        disputeId: String(req.params.disputeId),
+        outcome: parsed.data.outcome,
+        recommendation: parsed.data.recommendation,
+        freelancerShareMinor: parsed.data.freelancerShareMinor,
+      });
+      return res.json(resolved);
+    } catch (err) {
+      if (err instanceof GigDisputeNotFoundError) {
+        return res.status(404).json({ error: "NOT_FOUND", message: err.message });
+      }
+      if (err instanceof InvalidGigDisputeStateError) {
+        return res.status(409).json({ error: "CONFLICT", message: err.message });
+      }
+      logger.error({ err }, "Gig dispute resolution failed");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },
