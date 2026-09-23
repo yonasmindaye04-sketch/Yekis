@@ -159,6 +159,17 @@ const EnvSchema = z.object({
 
   CBE_WEBHOOK_SECRET: z.string().optional(),
 
+  // SECURITY: mock/sandbox auto-settlement of wallet top-ups. Dev-only
+  // convenience so local Telebirr checkout testing can settle mock top-ups
+  // without a receipt. Default OFF, and topup.service additionally refuses
+  // to honour it when NODE_ENV=production — unverified money must never be
+  // minted in production. CBE Birr / M-Pesa top-ups are NEVER auto-approved,
+  // regardless of this flag (no live verification path exists for them).
+  ALLOW_MOCK_PAYMENT_AUTO_APPROVAL: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+
   // eSignet / Fayda OIDC integration (Tier 1 KYC)
   ESIGNET_DISCOVERY_URL: z.string().optional(),
   ESIGNET_CLIENT_ID: z.string().optional(),

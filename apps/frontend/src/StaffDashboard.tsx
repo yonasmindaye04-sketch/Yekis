@@ -239,13 +239,27 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
       setError("");
     }
     try {
-      const [chat, kyc, topups, disputes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.getStaffConversations(),
         api.getKycReviewQueue({ pageSize: 1 }),
         api.getTopUpReviewQueue({ pageSize: 1 }),
         api.getDisputeQueue({ pageSize: 1 }),
       ]);
-      setConversations(Array.isArray(chat) ? chat : chat.items);
+
+      const chat = results[0].status === "fulfilled" ? results[0].value : [];
+      const kyc = results[1].status === "fulfilled" ? results[1].value : { total: 0 };
+      const topups = results[2].status === "fulfilled" ? results[2].value : { total: 0 };
+      const disputes = results[3].status === "fulfilled" ? results[3].value : { total: 0 };
+
+      const errors = results
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r as PromiseRejectedResult).reason?.message || "Request failed");
+      
+      if (errors.length > 0 && !silent) {
+        setError(errors.join(", "));
+      }
+
+      setConversations(Array.isArray(chat) ? chat : chat.items || []);
       setQueueCounts({
         kyc: kyc.total || 0,
         topups: topups.total || 0,

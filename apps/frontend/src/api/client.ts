@@ -515,7 +515,7 @@ class ApiClient {
       if (response.status === 429) {
         throw new Error("Too many requests. Please wait a moment before trying again.");
       }
-      let error: { message?: string; error?: string } = {};
+      let error: { message?: string; error?: string };
       try {
         error = await response.json();
       } catch {

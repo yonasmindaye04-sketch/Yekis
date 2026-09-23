@@ -9,6 +9,7 @@ import {
 } from "../../lib/objectStore.js";
 import { notificationQueue } from "../../queue/queues.js";
 import { logger } from "../../lib/logger.js";
+import { env } from "../../config/env.js";
 import { telebirrClient } from "../escrow/providers/telebirr.client.js";
 import { cbeClient } from "../escrow/providers/cbe.client.js";
 import { mpesaClient } from "../escrow/providers/mpesa.client.js";
@@ -369,20 +370,43 @@ export async function initiateCheckoutTopUp(params: {
     `${params.provider} checkout top-up initiated`,
   );
 
-  // When credentials are not configured (mock mode / null redirectUrl), simulate
-  // successful asynchronous payment callback so the wallet is credited
+  // SECURITY: never fabricate a successful payment. When the provider has no
+  // live hosted checkout (mock/sandbox mode — null redirectUrl), the top-up
+  // MUST stay CHECKOUT_PENDING until money movement is verified, either by
+  //   (a) a signature-verified provider webhook, or
+  //   (b) the user attaching a receipt and staff approving it in the manual
+  //       review queue (attachReceiptToTopUp below).
+  // CBE Birr and M-Pesa currently have NO live verification path, so their
+  // top-ups always follow that verified-only manual path — auto-approving
+  // them would credit unbacked money to the wallet.
+  //
+  // The ONLY exception is the local Telebirr dev sandbox, and only when the
+  // operator explicitly opted in (ALLOW_MOCK_PAYMENT_AUTO_APPROVAL=true) AND
+  // the process is not running in production mode.
   if (!initiated.redirectUrl) {
-    setTimeout(async () => {
-      try {
-        await handleTopUpWebhook({
-          providerTransactionId: initiated.providerTransactionId,
-          status: "SUCCESS",
-          rawPayload: { mock: true, provider: params.provider },
-        });
-      } catch (mockErr) {
-        logger.error({ err: mockErr }, "Mock top-up auto-approval failed");
-      }
-    }, 1200);
+    const mockAutoApproveAllowed =
+      params.provider === "TELEBIRR" &&
+      env.NODE_ENV !== "production" &&
+      env.ALLOW_MOCK_PAYMENT_AUTO_APPROVAL;
+
+    if (mockAutoApproveAllowed) {
+      setTimeout(async () => {
+        try {
+          await handleTopUpWebhook({
+            providerTransactionId: initiated.providerTransactionId,
+            status: "SUCCESS",
+            rawPayload: { mock: true, provider: params.provider },
+          });
+        } catch (mockErr) {
+          logger.error({ err: mockErr }, "Mock top-up auto-approval failed");
+        }
+      }, 1200);
+    } else {
+      logger.info(
+        { topUpId: topUp.id, provider: params.provider },
+        "No live checkout for provider — top-up stays CHECKOUT_PENDING until a verified webhook or manual receipt review confirms payment.",
+      );
+    }
   }
 
   return {

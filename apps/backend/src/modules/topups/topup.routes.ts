@@ -10,6 +10,7 @@ import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
+import { env } from "../../config/env.js";
 import {
   submitTopUp,
   getTopUpQueue,
@@ -154,6 +155,14 @@ topupsRouter.post(
   "/checkout/:topUpId/simulate-success",
   requireAuth,
   async (req: AuthedRequest, res) => {
+    // SECURITY: sandbox/dev convenience ONLY. This endpoint credits a wallet
+    // without any payment verification, so it must never exist in production —
+    // in production, wallets may only be credited by a signature-verified
+    // provider webhook or a staff approval in the manual review queue.
+    if (env.NODE_ENV === "production") {
+      return res.status(404).json({ error: "NOT_FOUND" });
+    }
+
     try {
       const topUp = await prisma.walletTopUp.findUnique({
         where: { id: req.params.topUpId },

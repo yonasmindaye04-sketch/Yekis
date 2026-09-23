@@ -1541,9 +1541,11 @@ export function App() {
                         : "Safaricom M-Pesa"}{" "}
                     payment gateway was launched in your browser. Complete the payment there, or use sandbox simulation below:
                   </p>
-                  <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--color-text-tertiary)" }}>
-                    <strong>Note for Dev/Testing:</strong> In sandbox environments, entering real customer numbers may fail. Click <strong>Simulate Instant Payment</strong> below to approve without sandbox phone numbers.
-                  </p>
+                  {import.meta.env.DEV && (
+                    <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--color-text-tertiary)" }}>
+                      <strong>Note for Dev/Testing:</strong> In sandbox environments, entering real customer numbers may fail. Click <strong>Simulate Instant Payment</strong> below to approve without sandbox phone numbers.
+                    </p>
+                  )}
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
@@ -1565,28 +1567,33 @@ export function App() {
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    style={{ width: "100%", justifyContent: "center" }}
-                    disabled={telebirrModal.isSimulating}
-                    onClick={async () => {
-                      if (!telebirrModal.topUpId) return;
-                      setTelebirrModal((prev) => ({ ...prev, isSimulating: true }));
-                      try {
-                        await api.simulateTopUpSuccess(telebirrModal.topUpId);
-                        alert(`Success! ETB ${telebirrModal.amount.toLocaleString()} credited to your wallet.`);
-                        setTelebirrModal((prev) => ({ ...prev, isOpen: false, isSimulating: false }));
-                        await fetchWallet();
-                        await fetchTopUpRequests();
-                      } catch (err) {
-                        alert(`Simulation error: ${err instanceof Error ? err.message : "Failed"}`);
-                        setTelebirrModal((prev) => ({ ...prev, isSimulating: false }));
-                      }
-                    }}
-                  >
-                    {telebirrModal.isSimulating ? "Processing..." : "Simulate Instant Payment (Sandbox)"}
-                  </button>
+                  {/* Dev-only: the backend disables this endpoint in production.
+                      Hidden from production builds so real users never see a
+                      "get free money" button. */}
+                  {import.meta.env.DEV && (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ width: "100%", justifyContent: "center" }}
+                      disabled={telebirrModal.isSimulating}
+                      onClick={async () => {
+                        if (!telebirrModal.topUpId) return;
+                        setTelebirrModal((prev) => ({ ...prev, isSimulating: true }));
+                        try {
+                          await api.simulateTopUpSuccess(telebirrModal.topUpId);
+                          alert(`Success! ETB ${telebirrModal.amount.toLocaleString()} credited to your wallet.`);
+                          setTelebirrModal((prev) => ({ ...prev, isOpen: false, isSimulating: false }));
+                          await fetchWallet();
+                          await fetchTopUpRequests();
+                        } catch (err) {
+                          alert(`Simulation error: ${err instanceof Error ? err.message : "Failed"}`);
+                          setTelebirrModal((prev) => ({ ...prev, isSimulating: false }));
+                        }
+                      }}
+                    >
+                      {telebirrModal.isSimulating ? "Processing..." : "Simulate Instant Payment (Sandbox)"}
+                    </button>
+                  )}
 
                   <button
                     type="button"

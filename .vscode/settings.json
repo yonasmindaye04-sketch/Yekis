@@ -1,0 +1,13 @@
+{
+  // Tailwind CSS v4 uses custom at-rules (@theme, @plugin, @source, etc.)
+  // that the built-in CSS language service doesn't know. Vite + the
+  // @tailwindcss/vite plugin process them correctly at build time — this
+  // only silences the editor "Unknown at rule" hints.
+  "css.lint.unknownAtRules": "ignore",
+
+  // Route .css files through the Tailwind IntelliSense extension when it is
+  // installed, so directives, utilities, and @theme tokens validate natively.
+  "files.associations": {
+    "*.css": "tailwind"
+  }
+}

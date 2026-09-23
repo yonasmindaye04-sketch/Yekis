@@ -116,7 +116,11 @@ export function buildApp() {
       _next: express.NextFunction,
     ) => {
       logger.error({ err, path: req.path }, "Unhandled error");
-      res.status(500).json({ error: "INTERNAL_ERROR" });
+      res.status(500).json({ 
+        error: "INTERNAL_ERROR",
+        message: err.message,
+        stack: env.NODE_ENV === "development" ? err.stack : undefined 
+      });
     },
   );
 
