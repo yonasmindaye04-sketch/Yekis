@@ -26,6 +26,7 @@ import { ShareButtons } from "./ShareButtons";
 import { MarketingFooter } from "./MarketingFooter";
 import "./marketing.css";
 import { useScrollReveal } from "./components/motion";
+import Lightfall from "./components/Lightfall";
 
 type LandingPageProps = {
   onStart: (mode: "login" | "register") => void;
@@ -183,6 +184,25 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
     <main className="landing-page marketing-page">
       {/* === HERO SECTION (Item 2: Dual CTA above the fold) === */}
       <section className="hero-section" id="top" data-parallax="0.12">
+        <Lightfall
+          className="hero-lightfall-bg"
+          colors={["#d8f36b", "#77d9c5", "#5227FF"]}
+          backgroundColor="#0b1116"
+          speed={0.4}
+          streakCount={3}
+          streakWidth={1.2}
+          streakLength={1.5}
+          glow={0.8}
+          density={0.5}
+          twinkle={0.8}
+          zoom={3}
+          backgroundGlow={0.4}
+          opacity={1}
+          mouseInteraction={true}
+          mouseStrength={0.3}
+          mouseRadius={1.2}
+          mouseDampening={0.2}
+        />
         <p className="hero-eyebrow">
           Ethiopia's escrow-protected freelance marketplace
         </p>

@@ -79,7 +79,9 @@ export function AdminUsersPage() {
               </p>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <span className="status-pill">{u.role}{u.staffRole ? ` · ${u.staffRole}` : ""}</span>
+              <strong style={{ color: u.role === "CLIENT" ? "#16a34a" : u.role === "FREELANCER" ? "#2563eb" : "#7c3aed" }}>
+                {u.role}{u.staffRole ? ` · ${u.staffRole}` : ""}
+              </strong>
               {u.isSuspended && <span className="status-pill" style={{ background: "#dc2626", color: "#fff" }}>Suspended</span>}
             </div>
           </div>
@@ -161,8 +163,16 @@ export function AdminUsersPage() {
                   <td style={{ padding: "8px", fontSize: "0.84rem" }}>
                     {row.email}<br /><span style={{ color: "var(--color-text-secondary)" }}>{row.phone}</span>
                   </td>
-                  <td style={{ padding: "8px" }}><span className="status-pill">{row.role}</span></td>
-                  <td style={{ padding: "8px" }}><span className="status-pill">{row.cachedKycStatus ?? "NONE"}</span></td>
+                  <td style={{ padding: "8px" }}>
+                    <strong style={{ color: row.role === "CLIENT" ? "#16a34a" : row.role === "FREELANCER" ? "#2563eb" : "#7c3aed" }}>
+                      {row.role}
+                    </strong>
+                  </td>
+                  <td style={{ padding: "8px" }}>
+                    <strong style={{ color: (row.cachedKycStatus ?? "NONE") === "PENDING" ? "#d97706" : (row.cachedKycStatus ?? "NONE") === "VERIFIED" ? "#16a34a" : "#dc2626" }}>
+                      {row.cachedKycStatus ?? "NONE"}
+                    </strong>
+                  </td>
                   <td style={{ padding: "8px" }}>{new Date(row.createdAt).toLocaleDateString()}</td>
                   <td style={{ padding: "8px" }}><ChevronRight size={14} /></td>
                 </tr>

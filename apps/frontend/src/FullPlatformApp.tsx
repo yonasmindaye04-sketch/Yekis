@@ -1230,25 +1230,13 @@ export function FullPlatformApp() {
           >
             <button
               type="button"
-              className="theme-toggle"
+              className="icon-button theme-toggle"
               onClick={toggleTheme}
               aria-label={
                 theme === "light"
                   ? "Switch to dark mode"
                   : "Switch to light mode"
               }
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 38,
-                height: 38,
-                borderRadius: "50%",
-                background: "var(--color-bg-elevated)",
-                border: "1px solid var(--color-border)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-              }}
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>

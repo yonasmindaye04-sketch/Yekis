@@ -78,28 +78,34 @@ export const FeaturedCarousel = ({
                 <img src={talent.avatarUrl} alt={talent.displayName} />
               ) : (
                 <div className="carousel-avatar-fallback">
-                  {(talent.displayName || "?").charAt(0)}
+                  {(talent.displayName || "?").charAt(0).toUpperCase()}
                 </div>
               )}
-              <div
-                className={`carousel-badge ${talent.kycBadge === "shield" ? "tier-2" : "tier-1"}`}
-              >
-                {talent.kycBadge === "shield" ? (
-                  <Shield size={20} />
-                ) : (
-                  <CheckCircle size={20} />
-                )}
-              </div>
+              {talent.kycBadge && (
+                <div
+                  className={`carousel-badge ${talent.kycBadge === "shield" ? "tier-2" : "tier-1"}`}
+                >
+                  {talent.kycBadge === "shield" ? (
+                    <Shield size={20} />
+                  ) : (
+                    <CheckCircle size={20} />
+                  )}
+                </div>
+              )}
             </div>
             <h3 className="carousel-name">{talent.displayName}</h3>
             <p className="carousel-skill">
-              {talent.primarySkill?.nameEn ?? ""}
+              {talent.primarySkill?.nameEn || "Professional Freelancer"}
             </p>
 
             <div className="carousel-rating">
               <Star size={14} />
-              <span>{talent.ratingAverage ?? "-"}</span>
+              <span>{talent.ratingAverage && talent.ratingAverage > 0 ? talent.ratingAverage : "New"}</span>
             </div>
+            
+            <button className="btn-secondary" style={{ marginTop: "12px", width: "100%", fontSize: "0.85rem", padding: "6px" }}>
+              View Profile
+            </button>
           </div>
         ))}
       </div>

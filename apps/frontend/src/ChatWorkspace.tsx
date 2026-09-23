@@ -576,7 +576,6 @@ export function ChatWorkspace({
                     }`}
                   >
                     {avatarLetter}
-                    <span className="thread-status-dot online" />
                   </div>
 
                   <div className="thread-content">
@@ -605,17 +604,7 @@ export function ChatWorkspace({
           )}
         </div>
 
-        {/* Real-time status badge */}
-        <div className="chat-connection-footer">
-          <span
-            className={`connection-dot ${
-              isConnected ? "connected" : "disconnected"
-            }`}
-          />
-          <span className="connection-text">
-            {isConnected ? "Real-time Gateway Connected" : "Connecting Gateway..."}
-          </span>
-        </div>
+
       </aside>
 
       {/* ── RIGHT MAIN: ACTIVE CONVERSATION ── */}

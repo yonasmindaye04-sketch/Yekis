@@ -6,7 +6,6 @@ import {
   optionalAuth,
   type AuthedRequest,
 } from "../../middleware/auth.js";
-import { requireKycVerified } from "../../middleware/hardBlock.js";
 import * as profileService from "./profile.service.js";
 import {
   updateProfileSchema,
@@ -53,13 +52,15 @@ profileRouter.get(
 );
 
 // PATCH /me/profile
-// Hard-block rule (roadmap Phase 1): unverified users cannot change their
-// profile. KYC submission itself stays open via the kyc module — only
-// profile mutation is gated here.
+// Basic profile editing is open to all authenticated users (name, bio, skills,
+// availability, visibility — see updateProfileSchema). KYC verification stays
+// mandatory for every economic action instead: posting jobs, submitting
+// proposals, creating/purchasing gigs, funding escrow and withdrawals all keep
+// their requireKycVerified gates. Gating profile edits blocked onboarding —
+// users must be able to build a profile before they verify.
 profileRouter.patch(
   "/me/profile",
   requireAuth,
-  requireKycVerified("TIER_1"),
   async (req: AuthedRequest, res: Response) => {
     try {
       const userId = req.user!.id;

@@ -90,12 +90,15 @@ export async function registerUser(input: RegisterInput) {
   return user;
 }
 
-export async function createAuthTokens(user: {
-  id: string;
-  role: string;
-  ucid: string | null;
-  staffRole?: string | null;
-}) {
+export async function createAuthTokens(
+  user: {
+    id: string;
+    role: string;
+    ucid: string | null;
+    staffRole?: string | null;
+  },
+  originalIat?: number
+) {
   const accessToken = await new SignJWT({
     role: user.role,
     staffRole: user.staffRole ?? null,
@@ -105,7 +108,9 @@ export async function createAuthTokens(user: {
     .setExpirationTime(env.JWT_ACCESS_TTL)
     .sign(accessSecret);
 
-  const refreshToken = await new SignJWT({})
+  const iat = originalIat ?? Math.floor(Date.now() / 1000);
+
+  const refreshToken = await new SignJWT({ iat })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setExpirationTime(env.JWT_REFRESH_TTL)
@@ -194,10 +199,12 @@ export async function loginUser(input: LoginInput) {
  */
 export async function refreshSession(refreshToken: string) {
   let userId: string;
+  let originalIat: number | undefined;
   try {
     const { payload } = await jwtVerify(refreshToken, refreshSecret);
     if (typeof payload.sub !== "string") throw new Error("missing sub");
     userId = payload.sub;
+    originalIat = payload.iat as number | undefined;
   } catch {
     throw new InvalidTokenError("Refresh token is invalid or expired.");
   }
@@ -207,7 +214,15 @@ export async function refreshSession(refreshToken: string) {
     throw new InvalidTokenError("Session is no longer valid.");
   }
 
-  const result = await createAuthTokens(user);
+  if (originalIat) {
+    const isStaff = !!user.staffRole;
+    const maxSessionAge = isStaff ? 12 * 60 * 60 : 7 * 24 * 60 * 60; // 12h for staff, 7 days for normal
+    if (Math.floor(Date.now() / 1000) - originalIat > maxSessionAge) {
+      throw new InvalidTokenError("Session has expired. Please log in again.");
+    }
+  }
+
+  const result = await createAuthTokens(user, originalIat);
 
   await recordAuditEvent({
     userId: user.id,
