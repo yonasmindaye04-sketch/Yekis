@@ -153,10 +153,10 @@ export function AdminRiskPage() {
                   <td style={{ padding: "8px" }}>{f.type}</td>
                   <td style={{ padding: "8px" }}>
                     <span className="status-pill" style={{
-                      background: RISK_LEVEL[f.type] === "CRITICAL" ? "#dc2626"
+                      /* Text-first status design: bold semantic-colored text, no filled background */
+                      color: RISK_LEVEL[f.type] === "CRITICAL" ? "#dc2626"
                         : RISK_LEVEL[f.type] === "HIGH" ? "#d97706"
                         : RISK_LEVEL[f.type] === "MEDIUM" ? "#2563eb" : "#16a34a",
-                      color: "#fff",
                     }}>{RISK_LEVEL[f.type] ?? "LOW"}</span>
                   </td>
                   <td style={{ padding: "8px" }}><span className="status-pill">{f.status}</span></td>

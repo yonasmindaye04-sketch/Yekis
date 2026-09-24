@@ -2762,10 +2762,7 @@ export function App() {
                               </span>
                               <span
                                 className="status-pill"
-                                style={{
-                                  background: "rgba(239, 68, 68, 0.15)",
-                                  color: "#ef4444",
-                                }}
+                                style={{ color: "var(--color-error)" }}
                               >
                                 Disputed
                               </span>

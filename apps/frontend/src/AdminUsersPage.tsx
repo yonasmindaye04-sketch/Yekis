@@ -82,7 +82,7 @@ export function AdminUsersPage() {
               <strong style={{ color: u.role === "CLIENT" ? "#16a34a" : u.role === "FREELANCER" ? "#2563eb" : "#7c3aed" }}>
                 {u.role}{u.staffRole ? ` · ${u.staffRole}` : ""}
               </strong>
-              {u.isSuspended && <span className="status-pill" style={{ background: "#dc2626", color: "#fff" }}>Suspended</span>}
+              {u.isSuspended && <span className="status-pill" style={{ color: "var(--color-error)" }}>Suspended</span>}
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginTop: 16 }}>

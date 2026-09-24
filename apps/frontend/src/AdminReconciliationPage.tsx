@@ -39,11 +39,12 @@ export function AdminReconciliationPage() {
   useEffect(() => { void load(); }, [load]);
   const totalPages = Math.max(1, Math.ceil(total / 20));
 
+  // Text-first status design: bold semantic-colored text, no filled background
   const pillStyle = (s: string) => {
     const map: Record<string, string> = {
       MATCHED: "#16a34a", MISMATCH: "#dc2626", PENDING: "#d97706", FAILED: "#6b7280",
     };
-    return { background: map[s] ?? "var(--color-primary)", color: "#fff" };
+    return { color: map[s] ?? "var(--color-primary)" };
   };
 
   return (

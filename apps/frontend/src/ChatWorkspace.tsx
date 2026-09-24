@@ -83,7 +83,7 @@ export function ChatWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Real-time socket states
-  const [isConnected, setIsConnected] = useState(realtimeSocket.isConnected);
+  const [, setIsConnected] = useState(realtimeSocket.isConnected);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const typingTimerRef = useRef<number | null>(null);
 

@@ -355,8 +355,7 @@
 .review-response {
   margin-top: 12px;
   padding: 12px 14px;
-  border-left: 3px solid var(--color-primary);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
 }
 

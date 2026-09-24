@@ -175,7 +175,7 @@ export function JobsWorkspace({
                     Category: {job.category.replaceAll("_", " ")} · Deadline: {date(job.deadline)}
                   </small>
                 </div>
-                <span className="status-pill" style={{ background: "var(--color-bg-subtle)", fontWeight: 700, whiteSpace: "nowrap" }}>
+                <span className="status-pill" style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
                   {proposalsByJob[job.id]?.length ?? 0} proposals
                 </span>
               </div>
@@ -194,7 +194,7 @@ export function JobsWorkspace({
                           <span style={{ color: "var(--color-text-secondary)", fontSize: "0.82rem" }}>
                             · {proposal.estimatedDays} days
                           </span>
-                          <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "closed" : ""}`}>
+                          <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "error" : ""}`}>
                             {label(proposal.status)}
                           </span>
                         </div>
@@ -287,7 +287,7 @@ export function JobsWorkspace({
                 </span>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "closed" : ""}`}>
+                <span className={`status-pill ${proposal.status === "ACCEPTED" ? "badge-released" : proposal.status === "REJECTED" ? "error" : ""}`}>
                   {label(proposal.status)}
                 </span>
                 {["SUBMITTED", "SHORTLISTED"].includes(proposal.status) && (
@@ -647,7 +647,7 @@ export function ContractsWorkspace({
               <div className="workflow-item-head">
                 <div>
                   <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
-                    <span className={`status-pill ${isCancelled ? "closed" : ""}`}>
+                    <span className={`status-pill ${isCancelled ? "error" : contract.fullyExecuted ? "success" : "warning"}`}>
                       {isCancelled
                         ? "Cancelled"
                         : contract.fullyExecuted

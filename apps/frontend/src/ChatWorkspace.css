@@ -191,7 +191,11 @@
 
 .chat-thread-item.active {
   background: var(--color-bg-subtle);
-  border-left: 3px solid var(--color-primary);
+}
+
+.chat-thread-item.active .thread-name {
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .chat-thread-item.unread {
@@ -1044,7 +1048,6 @@
   padding: 8px 12px;
   border-radius: 8px;
   background: var(--color-bg-subtle);
-  border-left: 3px solid var(--color-primary);
 }
 
 .summary-list {
@@ -1086,18 +1089,16 @@
   text-transform: uppercase;
 }
 
+/* Text-first status design: bold semantic-colored text, no pale/filled backgrounds */
 .confidence-pill.high {
-  background: rgba(16, 185, 129, 0.15);
   color: #059669;
 }
 
 .confidence-pill.medium {
-  background: rgba(245, 158, 11, 0.15);
   color: #d97706;
 }
 
 .confidence-pill.low {
-  background: rgba(239, 68, 68, 0.15);
   color: #dc2626;
 }
 
@@ -1109,13 +1110,11 @@
 }
 
 .escrow-pill.ready {
-  background: #10b981;
-  color: #ffffff;
+  color: var(--color-success-text);
 }
 
 .escrow-pill.pending {
-  background: var(--color-bg-subtle);
-  color: var(--color-text-secondary);
+  color: var(--color-warning-text);
 }
 
 .deal-field label {

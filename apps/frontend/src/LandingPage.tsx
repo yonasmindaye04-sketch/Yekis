@@ -51,6 +51,8 @@ const categoryLabels: Record<string, string> = {
   DATA_ENTRY: "Data Processing",
 };
 
+const HERO_TITLE = "Your money is protected before a single hour of work begins.";
+
 export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   useScrollReveal();
   const [showSupport, setShowSupport] = useState(false);
@@ -180,6 +182,9 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
     }
   };
 
+  // Wave-stagger delay index per letter (spaces don't consume a slot)
+  let heroCharIndex = 0;
+
   return (
     <main className="landing-page marketing-page">
       {/* === HERO SECTION (Item 2: Dual CTA above the fold) === */}
@@ -203,17 +208,22 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           mouseRadius={1.2}
           mouseDampening={0.2}
         />
-        <p className="hero-eyebrow">
-          Ethiopia's escrow-protected freelance marketplace
-        </p>
-        <h1 className="hero-title">
-          Your money is protected before a single hour of work begins.
+        <h1 className="hero-title pop-text" aria-label={HERO_TITLE}>
+          {HERO_TITLE.split("").map((ch, i) =>
+            ch === " " ? (
+              " "
+            ) : (
+              <span
+                key={i}
+                className="pop-char"
+                aria-hidden="true"
+                style={{ "--i": heroCharIndex++ } as React.CSSProperties}
+              >
+                {ch}
+              </span>
+            ),
+          )}
         </h1>
-        <p className="hero-subtitle">
-          No handshake deals. No "I'll pay you when it's done." Your payment
-          sits safely with Yekis until you approve the work — or you get it
-          back.
-        </p>
         <div className="hero-actions">
           <button
             className="btn-primary"
