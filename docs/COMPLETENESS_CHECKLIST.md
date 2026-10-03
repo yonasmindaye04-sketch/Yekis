@@ -99,6 +99,23 @@ Last reviewed: 2026-08-15
 - [x] Full support desk dispatch: real-time staff alerting on guest tickets, auto-assignment to all active staff roles, and shared queue visibility
 - [x] Loading, empty, action-busy, and user-visible error/confirmation states in primary workflows
 - [x] Complete Light/Dark mode design token system with WCAG AAA contrast, consistent brand colors, clean SVG icons without background box artifacts, and human-first copy
+- [x] **Operations Console v2** (`apps/frontend/src/pages/ops/`) - single staff console replacing `StaffDashboard.tsx` + eight `Admin*Page.tsx` files (19 components retired)
+- [x] Command Center: Action Center ranking SLA breaches, risk, health, recon and queue work, with per-directive deep links
+- [x] Dependency-free SVG charts (area, grouped bar, donut, sparkline, h-bars) with empty-data guards
+- [x] Ctrl/Cmd+K command palette over pages and records, filtered by the signed-in role's permissions
+- [x] Collapsible operations sidebar (3-bar toggle, persisted in localStorage) with the mobile drawer preserved below 860px
+- [x] Working staff notifications popover (`GET /notifications`, mark-read) styled with the console's own tokens
+- [x] Real evidence viewer over signed document URLs (`GET /kyc/documents/:id/url`) and stored milestone deliverables - no mock scans
+- [x] Server-side search, filtering and pagination on every table page (debounced `q`, real totals)
+- [x] CSV export of on-screen rows for Contracts and Reports (RFC 4180, UTF-8 BOM)
+- [x] User moderation actions: suspend, reinstate, force KYC re-review
+- [x] TMS compliance actions: inspect rule payload, file STR with optional account suspension, dismiss flag, lift hold
+- [x] Dispute workflow: claim, add evidence, escalate stage, send to arbitration, resolve
+- [x] KYC decision history from `GET /kyc/:userId/history`
+- [x] Nav visibility driven by `GET /admin/permissions/matrix`, with a render-time fallback for forbidden deep links
+- [x] Carried-over staff surfaces rebuilt on the console's own patterns (two-pane queues, inline expand-row decisions, shared `Kv` stat strip)
+- [x] WCAG AA contrast for tertiary text (`--ops-text-3`) in both light and dark themes
+- [x] On-demand contract and user detail (removes a per-row N+1 request fan-out)
 - [x] **Platform Fee Tracking** (`PlatformFeeCredit`)
 - [x] **Withholding Tax Pool** (`PlatformOperatingAccount.accumulatedWithholdingMinor`)
 - [x] **VAT Tracking** (`PlatformOperatingAccount.accumulatedVatMinor` / `VAT_THRESHOLD_MINOR` alerts)

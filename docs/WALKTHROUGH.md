@@ -602,3 +602,61 @@ When implementation changes, update this walkthrough if the user journey, state 
     - Added the assigned staff member directly to conversation participants upon guest ticket creation, and wired `notifyStaffOfEvent` so in-app notifications and alerts are dispatched to all staff in real time.
     - Updated `getConversationAccess()` and `chat.routes.ts` so all staff roles can view, claim, and reply to open support tickets without being blocked by 403 Forbidden errors.
     - In `LandingPage.tsx`, updated the floating chat widget to persist `guestConversationId` in component state, enabling continuous conversation and follow-up messaging even after initial email submission.
+
+## Operations Console v2 (added 2026-10-03)
+
+The staff dashboard was rebuilt as a single console at `apps/frontend/src/pages/ops/`, replacing `StaffDashboard.tsx` and the eight `Admin*Page.tsx` files (nineteen components retired in total). `FullPlatformApp.tsx` mounts it for any account with a `staffRole`. This supersedes the earlier "Staff Dashboard Redesign" and related sections above, which described the previous arrangement.
+
+**Entry point.** `if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;`
+
+### Navigation and gating
+- **Collapsible sidebar**: the 3-bar button in the sidebar brand row hides the sidebar for full-width tables and charts. The choice persists in `localStorage` (`yekis-ops-nav`). At <=860px the same button opens the overlay drawer instead, so the two layouts never conflict.
+- Sidebar groups: **Overview** (Command Center) - **Cases** (Support Desk, Dispute Mediation, Risk and Fraud) - **Review Queues** (KYC Reviews, Profile Reports, Receipts) - **Financial** (Contracts, Payments, Payouts, Escrow, Reconciliation, Ledger, Reports) - **Administration** (Users, Staff and Roles, Audit Logs, System Health).
+- Entries are filtered by `opsPerms.ts`, which fetches `GET /admin/permissions/matrix` and resolves the signed-in `staffRole` against it. The backend still enforces every route (`requirePermission` on `/admin/*`, `requireStaffRole` elsewhere) - the console only hides links a reviewer cannot open. A deep link into a forbidden page falls back to the first permitted page.
+- Sidebar badges count open work per queue. The header also carries a working notifications popover (`GET /notifications`, mark-read via `POST /notifications/:id/read`) and the light/dark toggle.
+
+### Finding things
+Every table page searches and pages **on the server** (`page`, `limit`, `q`, plus endpoint filters) with a 350ms debounce, and the pager shows real totals. Two endpoints cannot do this honestly and say so in the UI: reconciliation applies its status filter client-side because the backend filters after pagination, and the audit log narrows the current page because that route has no text search and no date range.
+
+### Command Center
+1. **Stat cards** - total users, active contracts, funds in escrow, pending payouts, open disputes, pending KYC, support tickets, pending payments. No trend percentages or sparklines: the backend exposes aggregate totals only, with no time-series endpoint.
+2. **Action Center** - ranks live work by severity: breached dispute SLAs, then critical/high risk flags, failing health checks, recon mismatches, pending payouts, KYC queue, profile reports. Each directive opens the relevant page with the record focused.
+3. **Charts** - transaction volume by day, escrow by state, payouts vs refunds by week, review workload per queue. All dependency-free SVG. History charts are derived from the most recent 100 rows of the underlying list endpoints and the UI labels that window.
+4. **Recent activity** - newest audit events from `dashboard/summary.recentActivity`.
+
+### Review queues (hotkeys enabled)
+- **KYC Reviews** (`/kyc/review-queue`): up/down to move, `A` to approve, `R` to focus the rejection reason. Documents open through a 300-second signed URL from `GET /kyc/documents/:id/url`; decision history from `GET /kyc/:userId/history`.
+- **Dispute Mediation** (`/disputes/staff/queue`): SLA countdown per case, inline evidence thread, live fee-and-withholding split preview, and claim / add-evidence / escalate / send-to-arbitration alongside resolve.
+- **Profile Reports** (`/staff/reports`): resolve as no-action / hide / ban, plus the featured-carousel refresh.
+- **Receipts** (`/wallet/topups/queue`): approve, reject, or flag a manual transfer. Flagging raises a `STAFF_FLAGGED` transaction flag that then appears under Risk and Fraud.
+
+### Carried over from the previous dashboard
+Support inbox, receipt review, audit log browser, and Admins and Permissions - the last now rendering the **real** permission matrix from the backend instead of the invented one the old page displayed. Role changes accept "No console access" to demote an account. These surfaces use the console's own patterns: the two-pane `queue-wrap` / `q-card` / `queue-detail` layout (Support Desk mirrors KYC and Disputes), inline `expand-row` decisions (Receipts mirrors Payouts), and the `Kv` stat strip, `Empty`, `Banner` and `FilterSelect` primitives shared across every table page.
+
+### Staff actions, and what each one hits
+| Surface | Actions | Routes |
+|---|---|---|
+| Users | open profile, suspend, reinstate, force KYC re-review | `GET /admin/users/:id`, `POST /admin/users/:id/suspend`, `/unsuspend`, `/force-kyc-rereview` |
+| KYC | view signed documents, decision history, verify / reject / request clearer | `GET /kyc/documents/:id/url`, `GET /kyc/:userId/history`, `POST /kyc/:userId/review` |
+| Disputes | claim, add evidence, escalate stage, send to arbitration, resolve | `POST /disputes/:id/claim`, `/evidence`, `/escalate`, `/arbitration`, `/resolve` |
+| Risk | inspect rule payload, file STR (optionally suspending the account), dismiss, lift hold | `POST /tms/:flagId/file-str`, `/dismiss`, `POST /tms/users/:userId/lift-hold` |
+| Payouts | confirm / fail settlement with provider ref or failure reason | `POST /admin/payouts/:payoutId/settle` |
+| Receipts | approve, reject, flag as suspicious | `POST /wallet/topups/:id/approve`, `/reject`, `/flag` |
+| Staff | change role, remove console access | `POST /admin/staff/:userId/role` |
+| Profile reports | no-action / hide / ban, refresh featured carousel | `PATCH /staff/reports/:id`, `POST /featured/staff/refresh` |
+| Support | reply, attach files, close, reopen | `POST /chat/conversations/:id/messages`, `/chat/upload`, `PATCH /chat/admin/conversations/:id/status` |
+
+Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-second signed URL and renders what the object store returns, and a milestone deliverable opens from its stored `deliverableUrl`. There are no mock documents anywhere in the console.
+
+### Data layer
+`opsApi.ts` is an adapter over the shared `api` client (Bearer auth, `/api/v1`, automatic refresh) - not a second HTTP client. The console was authored against a planned `/admin/*` surface that does not exist; the mapping table is documented in `apps/frontend/src/pages/ops/README.md`. Because the non-`/admin` staff surfaces use `requireStaffRole`, restricted roles receive 403 on parts of the overview aggregate, so `overview()` degrades section-by-section rather than failing the page.
+
+### Accessibility
+`--ops-text-3` is tertiary text (timestamps, table sub-labels, hints) used by 27 rules. Both themes are tuned to clear WCAG AA (>=4.5:1) against the panel *and* the tinted `--ops-primary-soft` row background: `#646e7b` in light, `#8492a6` in dark. An earlier light-mode value measured only 2.65:1 - legible on the dark theme, invisible on the light one.
+
+### Fixed along the way
+- `getProfileReports`, `resolveProfileReport`, and `refreshFeaturedCarousel` all pointed at routes that do not exist (404). Profile moderation and carousel refresh were silently dead; all three now hit their real endpoints.
+- Contract and user detail load on demand rather than per-row, removing an N+1 request fan-out from those pages.
+- List pages searched and filtered a fixed 100 rows in the browser, so anything outside that window was invisible and the pager never moved. Search, filters and paging now run on the server.
+- Filter option lists had drifted from the API: escrow offered "PENDING" (rejected by `/admin/escrows`) and `M_PESA` was missing from every rail filter.
+- Contracts "Export CSV" and Reports "Download" had no handler. Both emit real CSV of the rows on screen.

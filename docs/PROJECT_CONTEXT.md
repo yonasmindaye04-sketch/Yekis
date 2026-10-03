@@ -1,5 +1,6 @@
 # Project Context
 
+> **Update 2026-10-03 (Operations Console v2):** The staff dashboard was consolidated into a single console at `apps/frontend/src/pages/ops/` (shell + 18 pages + shared components + one scoped stylesheet), retiring `StaffDashboard.tsx` and eight `Admin*Page.tsx` components. It mounts from `FullPlatformApp.tsx` for any account carrying a `staffRole`. `opsApi.ts` adapts the console onto the existing backend rather than being a second API client (the console was authored against a planned `/admin/*` surface that does not exist); `opsPerms.ts` derives nav visibility from `GET /admin/permissions/matrix`. Support inbox, receipt review, audit log, admins and permissions, and profile moderation were carried over. Three API client methods that pointed at non-existent routes were corrected, list pages now search/filter/page server-side, and `--ops-text-3` was retuned in both themes to clear WCAG AA.
 Last updated: 2026-10-03
 
 > **Update 2026-10-03 (Support chat hardening plan):** `docs/SUPPORT_CHAT_PLAN.md` records a

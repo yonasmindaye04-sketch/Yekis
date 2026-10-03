@@ -1,0 +1,170 @@
+[
+ {
+  "page": "1440/ws-client-popover-notifications",
+  "docH": "1283 vs 1283",
+  "matched": 152,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-chat",
+  "docH": "984 vs 984",
+  "matched": 80,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-contracts",
+  "docH": "960 vs 960",
+  "matched": 87,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-disputes",
+  "docH": "960 vs 960",
+  "matched": 61,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-gigs",
+  "docH": "960 vs 960",
+  "matched": 64,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-jobs",
+  "docH": "1048 vs 1048",
+  "matched": 94,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-overview",
+  "docH": "1283 vs 1283",
+  "matched": 138,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-profile-edit",
+  "docH": "1529 vs 1529",
+  "matched": 130,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-profile",
+  "docH": "960 vs 960",
+  "matched": 98,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-settings",
+  "docH": "960 vs 960",
+  "matched": 66,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-verification",
+  "docH": "1291 vs 1291",
+  "matched": 94,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-wallet",
+  "docH": "1091 vs 1091",
+  "matched": 101,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-popover-notifications",
+  "docH": "1247 vs 1247",
+  "matched": 139,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-chat",
+  "docH": "984 vs 984",
+  "matched": 80,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-contracts",
+  "docH": "960 vs 960",
+  "matched": 84,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-disputes",
+  "docH": "960 vs 960",
+  "matched": 61,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-find-work",
+  "docH": "960 vs 960",
+  "matched": 83,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-gigs",
+  "docH": "960 vs 960",
+  "matched": 64,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-overview",
+  "docH": "1247 vs 1247",
+  "matched": 130,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-profile-edit",
+  "docH": "1529 vs 1529",
+  "matched": 130,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-profile",
+  "docH": "960 vs 960",
+  "matched": 98,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-settings",
+  "docH": "960 vs 960",
+  "matched": 66,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-verification",
+  "docH": "1291 vs 1291",
+  "matched": 94,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-wallet",
+  "docH": "1282 vs 1282",
+  "matched": 98,
+  "diffCount": 0,
+  "status": "PARITY"
+ }
+]

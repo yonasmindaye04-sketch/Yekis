@@ -1,0 +1,520 @@
+[
+ {
+  "page": "1440/auth-forgot",
+  "docH": "960 vs 960",
+  "matched": 65,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/auth-login",
+  "docH": "960 vs 960",
+  "matched": 80,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/auth-register",
+  "docH": "960 vs 960",
+  "matched": 95,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/auth-reset",
+  "docH": "960 vs 960",
+  "matched": 71,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/cookie-prefs",
+  "docH": "5260 vs 5260",
+  "matched": 274,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/landing-home",
+  "docH": "5260 vs 5260",
+  "matched": 256,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/landing-support-chat",
+  "docH": "5260 vs 5260",
+  "matched": 272,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-about",
+  "docH": "1562 vs 1562",
+  "matched": 75,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-case-studies",
+  "docH": "1342 vs 1342",
+  "matched": 100,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-faq",
+  "docH": "1818 vs 1818",
+  "matched": 119,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-fees",
+  "docH": "1554 vs 1554",
+  "matched": 91,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-privacy",
+  "docH": "1342 vs 1342",
+  "matched": 76,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/marketing-terms",
+  "docH": "1392 vs 1392",
+  "matched": 82,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-administration",
+  "docH": "960 vs 960",
+  "matched": 114,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-admins-permissions",
+  "docH": "960 vs 960",
+  "matched": 421,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-audit-logs",
+  "docH": "960 vs 960",
+  "matched": 374,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-cases",
+  "docH": "960 vs 960",
+  "matched": 169,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-contracts",
+  "docH": "960 vs 960",
+  "matched": 361,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-disputes",
+  "docH": "960 vs 960",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-escrow",
+  "docH": "960 vs 960",
+  "matched": 303,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-finance",
+  "docH": "960 vs 960",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-identity",
+  "docH": "960 vs 960",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-ledger",
+  "docH": "960 vs 960",
+  "matched": 363,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-operations",
+  "docH": "960 vs 960",
+  "matched": 153,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-overview",
+  "docH": "960 vs 960",
+  "matched": 169,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-payments",
+  "docH": "960 vs 960",
+  "matched": 111,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-payouts",
+  "docH": "960 vs 960",
+  "matched": 113,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-profiles",
+  "docH": "960 vs 960",
+  "matched": 114,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-receipts",
+  "docH": "960 vs 960",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-reconciliation",
+  "docH": "960 vs 960",
+  "matched": 110,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-reports",
+  "docH": "960 vs 960",
+  "matched": 153,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-risk-fraud",
+  "docH": "960 vs 960",
+  "matched": 135,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-support",
+  "docH": "960 vs 960",
+  "matched": 116,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-system-health",
+  "docH": "960 vs 960",
+  "matched": 118,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/staff-view-users",
+  "docH": "960 vs 960",
+  "matched": 118,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-popover-notifications",
+  "docH": "1035 vs 1035",
+  "matched": 116,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-chat",
+  "docH": "984 vs 984",
+  "matched": 79,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-contracts",
+  "docH": "960 vs 960",
+  "matched": 59,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-disputes",
+  "docH": "960 vs 960",
+  "matched": 60,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-gigs",
+  "docH": "960 vs 960",
+  "matched": 63,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-jobs",
+  "docH": "960 vs 960",
+  "matched": 75,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-overview",
+  "docH": "1035 vs 1035",
+  "matched": 112,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-profile-edit",
+  "docH": "1529 vs 1529",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-profile",
+  "docH": "960 vs 960",
+  "matched": 96,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-settings",
+  "docH": "960 vs 960",
+  "matched": 65,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-verification",
+  "docH": "993 vs 993",
+  "matched": 82,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-client-view-wallet",
+  "docH": "1101 vs 1101",
+  "matched": 94,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-popover-notifications",
+  "docH": "998 vs 998",
+  "matched": 108,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-chat",
+  "docH": "984 vs 984",
+  "matched": 79,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-contracts",
+  "docH": "960 vs 960",
+  "matched": 59,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-disputes",
+  "docH": "960 vs 960",
+  "matched": 60,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-find-work",
+  "docH": "960 vs 960",
+  "matched": 73,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-gigs",
+  "docH": "960 vs 960",
+  "matched": 63,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-overview",
+  "docH": "998 vs 998",
+  "matched": 104,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-profile-edit",
+  "docH": "1529 vs 1529",
+  "matched": 129,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-profile",
+  "docH": "960 vs 960",
+  "matched": 96,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-settings",
+  "docH": "960 vs 960",
+  "matched": 65,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-verification",
+  "docH": "993 vs 993",
+  "matched": 82,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "1440/ws-freelancer-view-wallet",
+  "docH": "1282 vs 1282",
+  "matched": 97,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/auth-forgot",
+  "docH": "850 vs 850",
+  "matched": 14,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/auth-login",
+  "docH": "850 vs 850",
+  "matched": 29,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/auth-register",
+  "docH": "850 vs 850",
+  "matched": 44,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/auth-reset",
+  "docH": "850 vs 850",
+  "matched": 20,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/landing-home",
+  "docH": "8984 vs 8984",
+  "matched": 251,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/landing-support-chat",
+  "docH": "8984 vs 8984",
+  "matched": 269,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-about",
+  "docH": "2449 vs 2449",
+  "matched": 100,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-case-studies",
+  "docH": "2801 vs 2801",
+  "matched": 125,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-faq",
+  "docH": "2573 vs 2573",
+  "matched": 144,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-fees",
+  "docH": "2443 vs 2443",
+  "matched": 116,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-privacy",
+  "docH": "2254 vs 2254",
+  "matched": 101,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "400/marketing-terms",
+  "docH": "2433 vs 2433",
+  "matched": 107,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "700/auth-login",
+  "docH": "900 vs 900",
+  "matched": 29,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "700/landing-home",
+  "docH": "6782 vs 6782",
+  "matched": 252,
+  "diffCount": 0,
+  "status": "PARITY"
+ },
+ {
+  "page": "700/ws-client-view-overview",
+  "docH": "2085 vs 2085",
+  "matched": 97,
+  "diffCount": 0,
+  "status": "PARITY"
+ }
+]
