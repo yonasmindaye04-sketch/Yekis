@@ -395,6 +395,30 @@ export interface PermissionMatrix {
   roles: Record<string, readonly string[]>;
 }
 
+export interface KycReviewEvent {
+  id: string;
+  staffUserId: string;
+  decision: string;
+  tierAtDecision: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface StaffProfileReport {
+  id: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  staffNotes: string | null;
+  createdAt: string;
+  reportedUser: { id: string; ucid: string; displayName: string | null };
+}
+
+export interface StaffProfileReportPage {
+  data: StaffProfileReport[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
@@ -859,6 +883,9 @@ class ApiClient {
   async reviewKyc(userId: string, decision: "VERIFIED" | "REJECTED", rejectionReason?: string): Promise<unknown> {
     return this.request(`/api/v1/kyc/${userId}/review`, { method: "POST", body: JSON.stringify({ decision, rejectionReason }) });
   }
+  async getKycReviewHistory(userId: string): Promise<KycReviewEvent[]> {
+    return this.request(`/api/v1/kyc/${userId}/history`);
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getTopUpReviewQueue(params?: { page?: number; pageSize?: number; search?: string; status?: string; minAmount?: number; maxAmount?: number }): Promise<PaginatedResponse<any>> {
@@ -904,11 +931,18 @@ class ApiClient {
     if (params?.flagType) searchParams.set("flagType", params.flagType);
     return this.request(`/api/v1/tms/queue?${searchParams.toString()}`);
   }
-  async fileStr(flagId: string, reviewNotes: string, strReferenceNumber: string): Promise<TransactionFlag> {
-    return this.request(`/api/v1/tms/${flagId}/file-str`, { method: "POST", body: JSON.stringify({ reviewNotes, strReferenceNumber }) });
+  async fileStr(flagId: string, reviewNotes: string, strReferenceNumber: string, suspendAccount = false): Promise<TransactionFlag> {
+    return this.request(`/api/v1/tms/${flagId}/file-str`, { method: "POST", body: JSON.stringify({ reviewNotes, strReferenceNumber, suspendAccount }) });
   }
   async dismissFlag(flagId: string, reviewNotes: string): Promise<TransactionFlag> {
     return this.request(`/api/v1/tms/${flagId}/dismiss`, { method: "POST", body: JSON.stringify({ reviewNotes }) });
+  }
+  /** Lifts a compliance hold placed on a user account. */
+  async liftTmsHold(userId: string, reason?: string): Promise<unknown> {
+    return this.request(`/api/v1/tms/users/${userId}/lift-hold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async getTmsActivity(): Promise<Array<AuditLogRow & { user: { id: string; email: string; staffRole: string | null } }>> {
+    return this.request("/api/v1/tms/activity");
   }
 
   async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
@@ -1192,6 +1226,14 @@ class ApiClient {
   async escalateDisputeToArbitration(disputeId: string): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/arbitration`, { method: "POST" });
   }
+  /** Claims a mediation case for the signed-in mediator. 409 if already claimed. */
+  async claimDispute(disputeId: string): Promise<Dispute> {
+    return this.request(`/api/v1/disputes/${disputeId}/claim`, { method: "POST" });
+  }
+  /** Records the binding arbitration award for a case at stage 4. */
+  async awardDispute(disputeId: string, input: { awardReferenceNumber: string; outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT"; recommendation: string; freelancerShareMinor?: number }): Promise<Dispute> {
+    return this.request(`/api/v1/disputes/${disputeId}/arbitration-award`, { method: "POST", body: JSON.stringify(input) });
+  }
 
   // --- Profiles ---
   async getPublicProfile(userId: string): Promise<unknown> {
@@ -1221,7 +1263,7 @@ class ApiClient {
     return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
   }
   async refreshFeaturedCarousel(): Promise<unknown> {
-    return this.request(`/api/v1/profiles/featured/refresh`, { method: "POST" });
+    return this.request(`/api/v1/featured/staff/refresh`, { method: "POST" });
   }
   
   // --- Reviews ---
@@ -1257,13 +1299,17 @@ class ApiClient {
   }
 
   // --- Staff Profile Reports ---
-  async getProfileReports(page?: number): Promise<unknown> {
-    const params = new URLSearchParams();
-    if (page) params.set("page", String(page));
-    return this.request(`/api/v1/admin/profile-reports?${params.toString()}`);
+  // Reports are served by the staff-profile module (GET /api/v1/staff/reports),
+  // NOT by an /admin/profile-reports route — the response envelope is
+  // { data, pagination } and resolution is a PATCH on the same resource.
+  async getProfileReports(params?: { page?: number; limit?: number }): Promise<StaffProfileReportPage> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return this.request(`/api/v1/staff/reports?${qs.toString()}`);
   }
   async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
-    return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
+    return this.request(`/api/v1/staff/reports/${reportId}`, { method: "PATCH", body: JSON.stringify({ status, staffNotes }) });
   }
 
   // --- Admin RBAC & audit ---
@@ -1299,6 +1345,16 @@ class ApiClient {
   }
   async adminGetUser(userId: string): Promise<unknown> {
     return this.request(`/api/v1/admin/users/${userId}`);
+  }
+  async adminSuspendUser(userId: string, reason: string): Promise<{ id: string; isSuspended: boolean }> {
+    return this.request(`/api/v1/admin/users/${userId}/suspend`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminUnsuspendUser(userId: string): Promise<{ id: string; isSuspended: boolean }> {
+    return this.request(`/api/v1/admin/users/${userId}/unsuspend`, { method: "POST" });
+  }
+  /** Flags the KYC record for periodic re-review; returns the new due date. */
+  async adminForceKycRereview(userId: string): Promise<{ kycRecordId: string; periodicReviewPending: boolean; nextReviewDueAt: string | null }> {
+    return this.request(`/api/v1/admin/users/${userId}/force-kyc-rereview`, { method: "POST" });
   }
   async adminListContracts(params?: { page?: number; limit?: number; q?: string; status?: string }): Promise<unknown> {
     const qs = new URLSearchParams();
