@@ -1832,8 +1832,6 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       {/* Hero */}
       <HeroSection onStart={onStart} />
 
-      {/* Marquee trust rail */}
-      <MarqueeBar />
 
       {/* Stats */}
       <StatsSection />
