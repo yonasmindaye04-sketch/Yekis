@@ -149,7 +149,7 @@ export default function CommandPalette({
     <div className="pal-overlay" onClick={onClose}>
       <div className="pal" onClick={(e) => e.stopPropagation()}>
         <div className="pal-in">
-          <Search size={17} style={{ color: "#93a0b4" }} />
+          <Search size={17} style={{ color: "var(--ops-text-3)" }} />
           <input
             ref={inputRef}
             placeholder="Jump to a page, contract, user, dispute…"

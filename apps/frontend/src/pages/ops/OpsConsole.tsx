@@ -24,7 +24,6 @@ import {
   Moon,
   Search,
   Sun,
-  Zap,
 } from "lucide-react";
 import type { MeResponse } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
@@ -212,7 +211,18 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
             <div className="app">
               <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
                 <div className="brand">
-                  <div className="brand-logo"><Zap size={17} /></div>
+                  <button
+                    className="brand-toggle"
+                    onClick={toggleNav}
+                    aria-label="Hide navigation"
+                    aria-expanded
+                    title="Hide navigation for more space"
+                  >
+                    <Menu size={17} />
+                  </button>
+                  <div className="brand-logo">
+                    <img src="/svgviewer-output.svg" alt="Yekis Jobs" />
+                  </div>
                   <div>
                     <div className="brand-name">
                       Yekis<span className="brand-tag">OPS CONSOLE</span>
@@ -263,12 +273,13 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
 
               <div className="main">
                 <header className="header">
+                  {/* Restore control: only rendered/visible while the sidebar is collapsed,
+                      since the sidebar carries the toggle in its brand row. */}
                   <button
                     className="menu-btn"
                     onClick={toggleNav}
-                    aria-label={navCollapsed && !isNarrow ? "Show navigation" : "Hide navigation"}
-                    aria-expanded={!(navCollapsed && !isNarrow)}
-                    title={navCollapsed && !isNarrow ? "Show navigation" : "Hide navigation for more space"}
+                    aria-label="Show navigation"
+                    title="Show navigation"
                   >
                     <Menu size={18} />
                   </button>

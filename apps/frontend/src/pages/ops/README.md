@@ -58,10 +58,22 @@ src/styles/ops-console.css
 
 ## Navigation
 
-The 3-bar button in the header collapses the sidebar so wide tables and charts
-get the full viewport; the preference persists in `localStorage`
-(`yekis-ops-nav`). At ≤860px the same button drives the overlay drawer instead,
-and the collapse class is not applied.
+The 3-bar button in the **sidebar's brand row** collapses the sidebar so wide
+tables and charts get the full viewport; the preference persists in
+`localStorage` (`yekis-ops-nav`). Because a collapsed sidebar is off-canvas,
+the same control reappears in the header while collapsed — driven purely by
+CSS off `.nav-collapsed`, so there is no duplicated state. At ≤860px the header
+button also drives the overlay drawer, and the collapse class is not applied.
+
+## Theme and contrast
+
+`--ops-text-3` is tertiary text (timestamps, table sub-labels, hints) and is
+used by 27 rules. Both themes are tuned to clear WCAG AA (≥4.5:1) against the
+panel *and* the tinted `--ops-primary-soft` row background, because the earlier
+light-mode value measured only 2.65:1 — legible on the dark theme, invisible on
+the light one. Icons and glyphs that sit on the console surface must use
+`var(--ops-text-3)` or another token; do not hardcode a hex, or the dark theme
+loses them.
 
 ## Listing, search and paging
 

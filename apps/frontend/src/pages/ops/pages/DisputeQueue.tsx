@@ -385,7 +385,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         ) : (
           <div className="queue-detail card">
             <div className="empty-detail">
-              <Scale size={40} style={{ color: "#c3ccdb" }} />
+              <Scale size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a dispute to mediate.</p>
               <span className="kbd-hint">
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate

@@ -315,7 +315,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         ) : (
           <div className="queue-detail card">
             <div className="empty-detail">
-              <UserCheck size={40} style={{ color: "#c3ccdb" }} />
+              <UserCheck size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a record to review.</p>
               <span className="kbd-hint">
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate the queue

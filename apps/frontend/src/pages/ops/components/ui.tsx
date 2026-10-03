@@ -312,7 +312,7 @@ export function Empty({
 }) {
   return (
     <div className="empty">
-      <Icon size={30} style={{ color: "#c3ccdb" }} />
+      <Icon size={30} style={{ color: "var(--ops-text-3)" }} />
       <p style={{ marginTop: 10, fontWeight: 600 }}>{children}</p>
     </div>
   );
