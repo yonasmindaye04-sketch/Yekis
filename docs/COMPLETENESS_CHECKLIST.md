@@ -96,8 +96,17 @@ Last reviewed: 2026-08-15
 - [x] Command Center: Action Center ranking SLA breaches → risk → health → recon → queue work, with per-directive deep links
 - [x] Dependency-free SVG charts (area, grouped bar, donut, sparkline, h-bars) with empty-data guards
 - [x] Ctrl/⌘K command palette over pages and records, filtered by the signed-in role's permissions
+- [x] Collapsible operations sidebar (3-bar toggle, persisted) for full-width tables and charts, with the mobile drawer preserved below 860px
+- [x] Working staff notifications popover (`GET /notifications`, mark-read) styled with the console's tokens
+- [x] Real evidence viewer over signed document URLs (`GET /kyc/documents/:id/url`) and stored milestone deliverables — no mock scans
+- [x] Server-side search, filtering and pagination on every table page (debounced `q`, real totals), with endpoints that cannot filter server-side labelled as such
+- [x] CSV export of on-screen rows for Contracts and Reports (RFC 4180, UTF-8 BOM)
+- [x] User moderation actions: suspend, reinstate, force KYC re-review
+- [x] TMS compliance actions: inspect rule payload, file STR with optional account suspension, dismiss flag, lift hold
+- [x] Dispute workflow: claim, add evidence, escalate stage, send to arbitration, resolve
+- [x] KYC decision history from `GET /kyc/:userId/history`
 - [x] Nav visibility driven by `GET /admin/permissions/matrix`, with a render-time fallback for forbidden deep links
-- [x] Carried-over staff surfaces: support inbox, receipt/top-up review, audit log browser, admins & permissions (rendering the real permission matrix), profile moderation + featured-carousel refresh
+- [x] Carried-over staff surfaces rebuilt on the console's own patterns: two-pane `queue-wrap` queues (Support Desk, KYC, Disputes), inline `expand-row` decisions (Receipts, Payouts, Risk), and a shared `Kv` stat strip on every table page
 - [x] On-demand contract and user detail (removes a per-row N+1 request fan-out)
 - [x] Polling-resilient API rate limiting (2,000 req/15m prod, 10,000 dev) with JSON error responses and client graceful 429 handling
 - [x] Full support desk dispatch: real-time staff alerting on guest tickets, auto-assignment to all active staff roles, and shared queue visibility

@@ -2,6 +2,15 @@
 
 Last updated: 2026-10-03
 
+> **Update 2026-10-03 (Operations Console v2, follow-up):**
+> 1. Collapsible Navigation: The console header's 3-bar button hides the sidebar so wide tables and charts get the full viewport, persisted under `yekis-ops-nav`. At ≤860px the same button still drives the overlay drawer, so the collapse class is only applied on desktop.
+> 2. Real Server-Side Listing: Added `useListPage` (pushes `page`/`limit`/`q` with a 350ms debounce, resets to page 1 on filter change, returns real totals). Every table page previously fetched a fixed 100 rows and filtered in the browser, so search missed anything outside that window and `<Pager>` never moved. `loading` is now derived by tagging each response with its request, so stale rows cannot flash between pages.
+> 3. Removed Mock UI: `EvidenceViewer` no longer renders hardcoded JSX mockups of Ethiopian ID cards, TIN certificates and selfies — it resolves a `KycDocument` id into a 300-second signed URL and renders the real object, or opens a milestone's stored `deliverableUrl`. The inert notifications bell now reads `/notifications` and marks items read.
+> 4. Restored The Moderation Actions The Port Dropped: Retiring `StaffCompliancePanel` and the old queues had silently removed TMS decisions (file STR / dismiss / lift hold), user suspension, and dispute claim/escalate. All are wired again against routes that already existed, and the TMS queue payload now carries KYC tier, wallet balance and per-user flag history.
+> 5. Dead Buttons Removed: Contracts "Export CSV" and Reports "Download" had no handler and now emit real RFC 4180 CSV of the rows on screen; Overview "View all" pointed at the Ledger instead of the audit trail.
+> 6. Option Lists Pinned To The API: `opsConst.ts` centralises filter values against the Prisma enums the backend accepts — `/admin/escrows` rejects "PENDING" as an `escrowState`, and `M_PESA` is a supported rail that was absent from every rail filter.
+> 7. Design Consistency: Support Desk and Receipts were rebuilt on the console's own patterns (two-pane `queue-wrap` queues, inline `expand-row` decisions, `Kv` stat strips) so the carried-over surfaces match the rest.
+
 > **Update 2026-10-03 (Operations Console v2):**
 > 1. Staff Dashboard Consolidation: Replaced `StaffDashboard.tsx` and the eight `Admin*Page.tsx` components with one console at `apps/frontend/src/pages/ops/` (shell + 18 pages + shared components + a single scoped stylesheet). Nineteen files retired. Mounted from `FullPlatformApp.tsx` for any account carrying a `staffRole`.
 > 2. `opsApi.ts` Is An Adapter, Not A Second API Client: The console was authored against a planned `/admin/*` surface (`/admin/overview`, `/admin/badges`, `/admin/risk-flags`, `/admin/kyc/queue`, `/admin/disputes/mediation`, `/admin/profile-reports`) using cookie auth. None of those routes exist. The adapter maps every console operation onto real endpoints through the shared `api` client (Bearer auth, `/api/v1`, auto-refresh) — see `apps/frontend/src/pages/ops/README.md` for the full mapping table.
