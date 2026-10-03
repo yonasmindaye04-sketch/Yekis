@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "./api/client";
+import { YekisAvatar } from "./components/YekisAvatar";
 import "./ProfilePage.css";
 
 // Shape mirrors backend profile.service.ts getPublicProfile()
@@ -134,17 +135,14 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
           <div className="hero-content">
             <div className="hero-top-row">
               <div className="hero-user-info">
-                {profile.avatarUrl ? (
-                  <img
-                    src={profile.avatarUrl}
-                    alt={profile.displayName}
-                    className="hero-avatar"
-                  />
-                ) : (
-                  <div className="hero-avatar hero-avatar-fallback">
-                    {(profile.displayName || "?").charAt(0).toUpperCase()}
-                  </div>
-                )}
+                <YekisAvatar
+                  userId={userId}
+                  displayName={profile.displayName}
+                  avatarUrl={profile.avatarUrl}
+                  size={96}
+                  animate="hover"
+                  className="hero-avatar"
+                />
                 <div className="hero-text">
                   <h1>
                     {profile.displayName}

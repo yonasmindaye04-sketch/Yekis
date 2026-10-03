@@ -1,4 +1,4 @@
-
+﻿
 // === INTERFACES & TYPES ===
 export interface TelegramAuthResponse {
   accessToken: string;
@@ -416,7 +416,7 @@ class ApiClient {
 
   /**
    * Persist the full session (access + refresh tokens). Every successful
-   * auth call site should use this — previously only the access token was
+   * auth call site should use this â€” previously only the access token was
    * stored, so the short-lived access token was the only thing keeping a
    * session alive, causing hard logouts every JWT_ACCESS_TTL (15 min).
    */
@@ -495,7 +495,7 @@ class ApiClient {
 
     let response = await performRequest(this.accessToken);
 
-    // Access token expired → attempt a silent refresh, then retry the request
+    // Access token expired â†’ attempt a silent refresh, then retry the request
     // once. Refresh itself never goes through this branch to avoid a loop.
     if (
       response.status === 401 &&
@@ -506,7 +506,7 @@ class ApiClient {
         await this.tryRefresh();
         response = await performRequest(this.accessToken);
       } catch {
-        // tryRefresh already cleared the session on failure — let the original
+        // tryRefresh already cleared the session on failure â€” let the original
         // 401 surface below (app will re-render the login screen).
       }
     }
@@ -532,11 +532,54 @@ class ApiClient {
     return response.json();
   }
 
+  /**
+   * Request using an explicit bearer token instead of the session token.
+   *
+   * Used by the guest support widget, which holds a conversation-scoped token
+   * rather than a session. Deliberately skips the refresh/retry path: a guest
+   * token cannot be refreshed, and silently retrying with `this.accessToken`
+   * would either leak the visitor's session into a guest call or 401.
+   */
+  private async requestWithToken<T>(
+    path: string,
+    token: string,
+    options: RequestInit = {},
+  ): Promise<T> {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(options.headers as Record<string, string>),
+      Authorization: `Bearer ${token}`,
+    };
+
+    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error("Too many requests. Please wait a moment before trying again.");
+      }
+      let error: { message?: string; error?: string };
+      try {
+        error = await response.json();
+      } catch {
+        const text = await response.text().catch(() => "");
+        error = { error: text || `HTTP ${response.status}` };
+      }
+      throw new Error(error.message || error.error || `HTTP ${response.status}`);
+    }
+
+    if (response.status === 204) return {} as T;
+    return response.json();
+  }
+
   // Auth
-  async loginWithTelegram(initData: string, role?: string): Promise<TelegramAuthResponse> {
+  async loginWithTelegram(authData: string | Record<string, unknown>, role?: string): Promise<TelegramAuthResponse> {
+    const body =
+      typeof authData === "string"
+        ? { initData: authData, role }
+        : { ...authData, role };
     return this.request("/api/v1/auth/telegram", {
       method: "POST",
-      body: JSON.stringify({ initData, role }),
+      body: JSON.stringify(body),
     });
   }
 
@@ -547,14 +590,38 @@ class ApiClient {
     apple: boolean;
     facebook: boolean;
     telegram: boolean;
+    telegramBotUsername: string | null;
   }> {
     return this.request("/api/v1/auth/oauth/providers", { method: "GET" });
   }
 
-  async loginWithGoogleOAuth(idToken: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+  async linkTelegram(initData: string): Promise<{ telegramUserId: string; telegramChatId: string }> {
+    return this.request("/api/v1/auth/telegram/link", {
+      method: "POST",
+      body: JSON.stringify({ initData }),
+    });
+  }
+
+  async unlinkTelegram(): Promise<{ unlinked: boolean }> {
+    return this.request("/api/v1/auth/telegram/link", { method: "DELETE" });
+  }
+
+  /**
+   * Redeems the one-time code the Telegram bot mints via /login. This is the
+   * sign-in path that works when the Login Widget cannot render (domain not
+   * registered with @BotFather, or telegram.org blocked).
+   */
+  async loginWithTelegramCode(code: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    return this.request("/api/v1/auth/telegram/code", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async loginWithGoogleOAuth(idToken: string, role?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
     return this.request("/api/v1/auth/oauth/google", {
       method: "POST",
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ idToken, role }),
     });
   }
 
@@ -605,8 +672,43 @@ class ApiClient {
     return this.request("/api/v1/chat/conversations", { method: "POST", body: JSON.stringify({ subject }) });
   }
 
-  async createGuestSupport(email: string, body: string): Promise<{ id: string; subject: string; status: string; assignedStaff?: { id: string; name: string } | null }> {
+  /**
+   * Opens a support ticket and notifies the support desk immediately, so an
+   * agent sees it before the user's first message is even sent.
+   */
+  async createSupportConversation(subject: string): Promise<ChatConversation> {
+    return this.request("/api/v1/chat/support", {
+      method: "POST",
+      body: JSON.stringify({ subject }),
+    });
+  }
+
+  async createGuestSupport(email: string, body: string): Promise<{
+    id: string;
+    subject: string;
+    status: string;
+    assignedStaff?: { id: string; name: string } | null;
+    /** Scoped to this conversation only â€” see guestSupportToken.ts. */
+    accessToken: string;
+  }> {
     return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ email, body }) });
+  }
+
+  /** Reads a guest thread with the scoped token from createGuestSupport. */
+  async getGuestChatMessages(conversationId: string, token: string): Promise<ChatMessage[]> {
+    return this.requestWithToken(`/api/v1/chat/conversations/${conversationId}/messages`, token);
+  }
+
+  /** Sends a guest follow-up with the scoped token from createGuestSupport. */
+  async sendGuestChatMessage(
+    conversationId: string,
+    token: string,
+    body: string,
+  ): Promise<ChatMessage> {
+    return this.requestWithToken(`/api/v1/chat/conversations/${conversationId}/messages`, token, {
+      method: "POST",
+      body: JSON.stringify({ body }),
+    });
   }
 
   async createDirectConversation(recipientId: string, subject: string): Promise<ChatConversation> {

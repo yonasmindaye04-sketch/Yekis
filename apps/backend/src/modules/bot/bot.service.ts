@@ -15,6 +15,10 @@ import { BotContext } from "./types.js";
 import { registerCommands } from "./handlers/commands.js";
 import { registerCallbacks } from "./handlers/callbacks.js";
 import { registerScenes } from "./scenes/index.js";
+import {
+  buildPublicWebAppUrl,
+  isPublicFrontendUrl,
+} from "./utils/deepLink.js";
 
 let botInstance: Bot<BotContext> | null = null;
 
@@ -90,6 +94,20 @@ export async function startBot(): Promise<boolean> {
   }
   const bot = getBot() || createBot();
 
+  // Every "open the web app" link the bot emits is built from FRONTEND_URL.
+  // If it points somewhere a member's phone cannot reach, say so once, loudly,
+  // at boot — previously the bot silently substituted a hardcoded domain and
+  // members got "site can't be reached" with no clue why.
+  if (!isPublicFrontendUrl()) {
+    logger.warn(
+      { frontendUrl: env.FRONTEND_URL },
+      "FRONTEND_URL is not a public https origin. Bot web links will only work " +
+        "for someone on the same machine/network. Set FRONTEND_URL to your " +
+        "public origin (an https tunnel works for local testing) before " +
+        "releasing the bot to members.",
+    );
+  }
+
   // Pre-flight check: verify bot token validity with Telegram before setting commands or polling
   let me;
   try {
@@ -104,22 +122,29 @@ export async function startBot(): Promise<boolean> {
 
   try {
     // 1. Set Chat Menu Button (only works with HTTPS URLs - skip in local dev)
-    const frontendUrl = env.FRONTEND_URL || "";
-    if (frontendUrl.startsWith("https://")) {
+    const menuButtonUrl = buildPublicWebAppUrl("/");
+    if (menuButtonUrl) {
       await bot.api.setChatMenuButton({
         menu_button: {
           type: "web_app",
           text: "Open Yekis Jobs",
-          web_app: { url: frontendUrl },
+          web_app: { url: menuButtonUrl },
         },
       });
     } else {
-      logger.info("Skipping Web App menu button in dev (requires HTTPS)");
+      logger.warn(
+        { frontendUrl: env.FRONTEND_URL },
+        "Skipping Web App menu button: FRONTEND_URL is not a public https origin " +
+          "(Telegram rejects localhost/LAN/http for web_app buttons). Set " +
+          "FRONTEND_URL to your public origin, e.g. via an https tunnel, to enable it.",
+      );
     }
 
     // 2. Set Commands for Autocompletion
     await bot.api.setMyCommands([
-      { command: "start", description: "Start the bot & open Web App" },
+      { command: "start", description: "Sign in and open the Mini App" },
+      { command: "login", description: "Get a one-time code to sign in on the web" },
+      { command: "account", description: "Show which Yekis account you are signed in as" },
       { command: "menu", description: "Show the main menu panel" },
       { command: "jobs", description: "Browse available jobs" },
       { command: "wallet", description: "View your balance & manage funds" },
@@ -132,7 +157,11 @@ export async function startBot(): Promise<boolean> {
 
     // 3. Set Bot Description (Seen before pressing Start)
     await bot.api.setMyDescription(
-      "Welcome to Yekis Jobs! \n\nYour premier Ethiopian freelance marketplace.\n\nWhether you're looking to hire top talent or find your next big gig, we've got you covered with secure escrow payments, KYC verification, and built-in dispute resolution.\n\nHit 'Start' below to begin!",
+      "Yekis Jobs — Ethiopia's escrow-protected freelance marketplace.\n\n" +
+        "Press Start to sign in. This bot IS your account: you can browse jobs, " +
+        "track contracts, check your wallet and complete KYC right here.\n\n" +
+        "Need the web app? Tap \"Sign in on the web\" after /start and you'll be " +
+        "signed in automatically — no password needed.",
     );
 
     // 4. Set Bot Short Description (Seen on profile)

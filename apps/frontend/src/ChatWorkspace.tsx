@@ -15,6 +15,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { YekisAvatar } from "./components/YekisAvatar";
 import {
   api,
   type ChatConversation,
@@ -408,7 +409,9 @@ export function ChatWorkspace({
         );
         createdId = directConv.id;
       } else {
-        const supportConv = await api.createChatConversation(newChatSubject.trim());
+// Uses the support endpoint so the backend notifies the support desk and
+    // assigns an agent right away.
+        const supportConv = await api.createSupportConversation(newChatSubject.trim());
         createdId = supportConv.id;
       }
 
@@ -570,13 +573,19 @@ export function ChatWorkspace({
                     setShowMobileChatView(true);
                   }}
                 >
-                  <div
-                    className={`thread-avatar ${
-                      isSupport ? "support-avatar" : ""
-                    }`}
-                  >
-                    {avatarLetter}
-                  </div>
+                  {isSupport ? (
+                    <div className="thread-avatar support-avatar">
+                      {avatarLetter}
+                    </div>
+                  ) : (
+                    <YekisAvatar
+                      userId={c.otherParticipant?.id || c.id}
+                      displayName={title}
+                      size={40}
+                      animate="hover"
+                      className="thread-avatar"
+                    />
+                  )}
 
                   <div className="thread-content">
                     <div className="thread-title-row">
@@ -625,15 +634,18 @@ export function ChatWorkspace({
                 <ArrowLeft size={18} />
               </button>
 
-              <div className="chat-header-avatar">
-                {activeConversation.isSupport
-                  ? "Y"
-                  : (
-                      activeConversation.otherParticipant?.displayName?.[0] ||
-                      activeConversation.otherParticipant?.email?.[0] ||
-                      "U"
-                    ).toUpperCase()}
-              </div>
+              {activeConversation.isSupport ? (
+                <div className="chat-header-avatar">Y</div>
+              ) : (
+                <YekisAvatar
+                  userId={activeConversation.otherParticipant?.id}
+                  displayName={activeConversation.otherParticipant?.displayName}
+                  email={activeConversation.otherParticipant?.email}
+                  size={40}
+                  animate="hover"
+                  className="chat-header-avatar"
+                />
+              )}
 
               <div className="chat-header-meta">
                 <h3>
@@ -651,9 +663,9 @@ export function ChatWorkspace({
                       <span className="typing-dot">.</span>
                     </span>
                   ) : (
-                    <span>
+<span>
                       {activeConversation.isSupport
-                        ? "Official Support · Instant response"
+                        ? "Official Support"
                         : `${
                             activeConversation.otherParticipant?.role || "CLIENT"
                           } · Online`}

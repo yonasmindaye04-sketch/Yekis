@@ -6,6 +6,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { YekisAvatar } from "./components/YekisAvatar";
 
 // Shape mirrors backend featured.service.ts buildFeaturedCard()
 interface Talent {
@@ -74,13 +75,13 @@ export const FeaturedCarousel = ({
             className="carousel-card"
           >
             <div className="carousel-avatar-wrap">
-              {talent.avatarUrl ? (
-                <img src={talent.avatarUrl} alt={talent.displayName} />
-              ) : (
-                <div className="carousel-avatar-fallback">
-                  {(talent.displayName || "?").charAt(0).toUpperCase()}
-                </div>
-              )}
+              <YekisAvatar
+                userId={talent.id}
+                displayName={talent.displayName}
+                avatarUrl={talent.avatarUrl}
+                size={80}
+                animate="hover"
+              />
               {talent.kycBadge && (
                 <div
                   className={`carousel-badge ${talent.kycBadge === "shield" ? "tier-2" : "tier-1"}`}

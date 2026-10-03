@@ -1,4 +1,4 @@
-// === IMPORTS ===
+﻿// === IMPORTS ===
 import { Router } from "express";
 import { z } from "zod";
 import multer from "multer";
@@ -27,6 +27,8 @@ import {
   summarizeConversation,
   extractDealTerms,
 } from "./chat.service.js";
+import { issueGuestSupportToken } from "./guestSupportToken.js";
+import { requireGuestChatAccess } from "../../middleware/auth.js";
 
 export const chatRouter = Router();
 
@@ -36,6 +38,7 @@ const upload = multer({
 });
 
 const ConversationInput = z.object({ subject: z.string().min(3).max(160) });
+const SupportRequestInput = z.object({ subject: z.string().min(3).max(160) });
 const DirectConversationInput = z.object({
   recipientId: z.string().min(1),
   subject: z.string().min(2).max(160),
@@ -66,7 +69,7 @@ function handleError(err: unknown, res: import("express").Response) {
   return false;
 }
 
-// ── Guest support (no auth required) ──────────────────────────────────────────
+// â”€â”€ Guest support (no auth required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 chatRouter.post("/guest", async (req, res) => {
   const parsed = GuestInput.safeParse(req.body);
   if (!parsed.success)
@@ -74,7 +77,17 @@ chatRouter.post("/guest", async (req, res) => {
       .status(400)
       .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
   try {
-    return res.status(201).json(await createGuestConversation(parsed.data));
+    const conversation = await createGuestConversation(parsed.data);
+
+    // Hand the guest a token scoped to this one thread. Without it they could
+    // create a ticket but never read a reply or send a follow-up, because both
+    // routes require authentication and a visitor has no session.
+    const accessToken = await issueGuestSupportToken({
+      userId: conversation.creatorUserId,
+      conversationId: conversation.id,
+    });
+
+    return res.status(201).json({ ...conversation, accessToken });
   } catch (err) {
     if (handleError(err, res)) return;
     logger.error({ err }, "Failed to create guest support conversation");
@@ -82,7 +95,7 @@ chatRouter.post("/guest", async (req, res) => {
   }
 });
 
-// ── Authenticated user routes ──────────────────────────────────────────────────
+// â”€â”€ Authenticated user routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 chatRouter.get(
   "/conversations",
   requireAuth,
@@ -122,7 +135,7 @@ chatRouter.post(
 
 chatRouter.get(
   "/conversations/:conversationId/messages",
-  requireAuth,
+  requireGuestChatAccess,
   async (req: AuthedRequest, res) => {
     try {
       return res.json(
@@ -141,7 +154,7 @@ chatRouter.get(
 
 chatRouter.post(
   "/conversations/:conversationId/messages",
-  requireAuth,
+  requireGuestChatAccess,
   async (req: AuthedRequest, res) => {
     const parsed = MessageInput.safeParse(req.body);
     if (!parsed.success)
@@ -219,7 +232,7 @@ chatRouter.get("/attachments/:key(*)", async (req, res) => {
 
 chatRouter.post(
   "/conversations/:conversationId/read",
-  requireAuth,
+  requireGuestChatAccess,
   async (req: AuthedRequest, res) => {
     try {
       return res.json(
@@ -261,7 +274,7 @@ chatRouter.post(
   },
 );
 
-// ── Mini-Me AI Co-Pilot / Assistant Endpoints ─────────────────────────────────
+// â”€â”€ Mini-Me AI Co-Pilot / Assistant Endpoints â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 chatRouter.post(
   "/conversations/:conversationId/assistant/suggest-replies",
   requireAuth,
@@ -316,7 +329,7 @@ chatRouter.post(
   },
 );
 
-// ── Staff/Admin routes ─────────────────────────────────────────────────────────
+// â”€â”€ Staff/Admin routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 chatRouter.get(
   "/admin/conversations",
   requireAuth,

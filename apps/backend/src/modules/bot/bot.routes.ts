@@ -9,7 +9,7 @@ const router = Router();
 
 // Webhook endpoint - must be before body parser for raw body access
 router.post(
-  "/telegram/webhook",
+  "/webhook",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
       const bot = getBot();
@@ -37,7 +37,7 @@ router.post(
 );
 
 // Health check endpoint
-router.get("/telegram/health", async (req: Request, res: Response) => {
+router.get("/health", async (req: Request, res: Response) => {
   try {
     const bot = getBot();
     if (!bot) {
@@ -83,7 +83,7 @@ router.get("/telegram/health", async (req: Request, res: Response) => {
 
 // Bot info endpoint
 router.get(
-  "/telegram/info",
+  "/info",
   requireAuth,
   requireStaffRole("ADMIN"),
   async (req: Request, res: Response) => {
@@ -111,7 +111,7 @@ router.get(
 
 // Set webhook (admin only)
 router.post(
-  "/telegram/set-webhook",
+  "/set-webhook",
   requireAuth,
   requireStaffRole("ADMIN"),
   async (req: Request, res: Response) => {
@@ -157,7 +157,7 @@ router.post(
 
 // Delete webhook (admin only)
 router.post(
-  "/telegram/delete-webhook",
+  "/delete-webhook",
   requireAuth,
   requireStaffRole("ADMIN"),
   async (req: Request, res: Response) => {
@@ -179,7 +179,7 @@ router.post(
 
 // Start bot (for polling mode in development)
 router.post(
-  "/telegram/start-polling",
+  "/start-polling",
   requireAuth,
   requireStaffRole("ADMIN"),
   async (req: Request, res: Response) => {
@@ -206,7 +206,7 @@ router.post(
 
 // Stop bot
 router.post(
-  "/telegram/stop",
+  "/stop",
   requireAuth,
   requireStaffRole("ADMIN"),
   async (req: Request, res: Response) => {

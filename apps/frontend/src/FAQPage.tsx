@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { events } from "./analytics";
 import "./marketing.css";
 
 type FAQPageProps = {
@@ -23,6 +24,12 @@ export function FAQPage({ onNavigate, onStart: _onStart }: FAQPageProps) {
 
   const toggle = (index: number) => {
     setOpenIndex(openIndex === index ? null : index);
+  };
+
+  // Track which questions visitors actually open (question text only — no PII).
+  const trackToggle = (index: number, question: string) => {
+    if (openIndex !== index) events.faqExpanded(question);
+    toggle(index);
   };
 
   const faqs: FaqCategory[] = [
@@ -116,7 +123,7 @@ export function FAQPage({ onNavigate, onStart: _onStart }: FAQPageProps) {
                     <div key={currentIndex} className="faq-item" id={q.id}>
                       <button
                         className="faq-question"
-                        onClick={() => toggle(currentIndex)}
+                        onClick={() => trackToggle(currentIndex, q.q)}
                       >
                         {q.q}
                         <span>{openIndex === currentIndex ? "−" : "+"}</span>

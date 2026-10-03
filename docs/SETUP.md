@@ -76,6 +76,17 @@ Confirm the following groups are configured in `apps/backend/.env`:
 - Policy values: minimum age, withholding threshold/rates, auto-release days
 - Observability: `SENTRY_DSN`
 
+For the frontend, copy its example env file:
+
+```powershell
+Copy-Item apps/frontend/.env.example apps/frontend/.env
+```
+
+Configurable groups in `apps/frontend/.env`:
+
+- Google OAuth: `VITE_GOOGLE_CLIENT_ID` (must match the backend `GOOGLE_CLIENT_ID`)
+- Analytics: `VITE_GA_MEASUREMENT_ID` (GA4 `G-…` ID; leave empty to disable — analytics only loads in production builds and only after cookie consent, so keeping it empty locally is the norm). See the "Analytics (GA4)" section of the frontend README.
+
 > Blank provider credentials use development stub behavior only.
 
 ## 6. Start Local Infrastructure

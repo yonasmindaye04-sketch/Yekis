@@ -22,6 +22,7 @@ export interface LightfallProps {
   mouseRadius?: number;
   mouseDampening?: number;
   mixBlendMode?: string;
+  lightMode?: boolean;
 }
 
 type RGB = [number, number, number];
@@ -95,6 +96,7 @@ uniform float uOpacity;
 uniform float uMouseEnabled;
 uniform float uMouseStrength;
 uniform float uMouseRadius;
+uniform float uLightMode;
 
 varying vec2 vUv;
 
@@ -149,14 +151,16 @@ void mainImage(out vec4 o, vec2 C) {
   C = c0;
 
   vec2 P = vec2(2.0, 1.0) * uv0 - (r / r.x) * vec2(0.0, 1.0);
-  vec4 O = vec4(uBgColor * 90.0 * uBgGlow / (1e3 * dot(P, P) + 6.0), 0.0);
+  // Light mode skips the dark radial glow; its paper base is built in the
+  // uLightMode branch below.
+  vec4 O = vec4(uBgColor * 90.0 * uBgGlow * (1.0 - uLightMode) / (1e3 * dot(P, P) + 6.0), 0.0);
 
   float mGlow = 0.0;
   if (uMouseEnabled > 0.5) {
     vec2 mN = (iMouse + iMouse - r) / r.x;
     float md = length(uv0 - mN);
     mGlow = exp(-md * md / max(uMouseRadius * uMouseRadius, 1e-4)) * uMouseStrength;
-    O.rgb += uMouseColor * mGlow * 0.25;
+    O.rgb += uMouseColor * mGlow * mix(0.25, 1.0, uLightMode);
   }
 
   float zr = 5e-4 * uStreakWidth;
@@ -180,6 +184,36 @@ void mainImage(out vec4 o, vec2 C) {
   }
 
   vec3 colr = sqrt(tanhv(max(O.rgb * uGlow - vec3(0.04, 0.08, 0.02), 0.0)));
+  if (uLightMode > 0.5) {
+    // -- Light pipeline: color ribbons on paper ------------------------------
+    // The tonemap above is tuned for additive light on black and bleaches
+    // bright cores to white, which reads washed-out on paper. Rebuild from
+    // the raw accumulation instead. Hue comes from the max-normalized
+    // accumulation (palette colors re-saturate), and coverage follows the
+    // MAX CHANNEL rather than luminance so low-luminance hues (violet) stay
+    // as visible as green. Ink richness ramps with local intensity so faint
+    // tail edges fade into quiet paper tints while cores land rich and
+    // saturated; the twinkle/tail weighting keeps natural depth between
+    // foreground/background streaks.
+    vec3 acc = max(O.rgb * uGlow, 0.0);
+    float m = max(acc.r, max(acc.g, acc.b));
+    vec3 unit = m > 1e-4 ? acc / m : vec3(0.0);
+    // Ink richness ramps with local intensity: 0.48 halo tint -> 0.80 core.
+    float core = 1.0 - exp(-m * 0.9);
+    vec3 ink = unit * (0.48 + 0.32 * core);
+    // Hue-fair coverage: saturates fast so streak bodies stay colorful
+    // instead of dissolving into pastel washes.
+    float cover = 1.0 - exp(-m * 1.9);
+    // Premium paper base: warm off-white + very restrained ambient washes and
+    // a light corner vignette (deliberately softer than the dark glow).
+    vec3 base = uBgColor;
+    float ambG = exp(-dot(uv0 - vec2(0.0, 0.7), uv0 - vec2(0.0, 0.7)) * 1.7);
+    base = mix(base, vec3(0.882, 0.918, 0.796), ambG * 0.30);
+    float ambV = exp(-dot(uv0 - vec2(0.85, -0.8), uv0 - vec2(0.85, -0.8)) * 2.4);
+    base = mix(base, vec3(0.906, 0.894, 0.949), ambV * 0.22);
+    base *= 1.0 - 0.05 * smoothstep(0.5, 1.7, length(uv0 * vec2(0.82, 1.0)));
+    colr = mix(base, ink, cover);
+  }
   o = vec4(colr, uOpacity);
 }
 
@@ -210,7 +244,8 @@ const Lightfall: React.FC<LightfallProps> = ({
   mouseStrength = 0.5,
   mouseRadius = 1,
   mouseDampening = 0.15,
-  mixBlendMode
+  mixBlendMode,
+  lightMode = false
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
@@ -268,7 +303,8 @@ const Lightfall: React.FC<LightfallProps> = ({
       uOpacity: { value: opacity },
       uMouseEnabled: { value: mouseInteraction ? 1 : 0 },
       uMouseStrength: { value: mouseStrength },
-      uMouseRadius: { value: mouseRadius }
+      uMouseRadius: { value: mouseRadius },
+      uLightMode: { value: lightMode ? 1 : 0 }
     };
 
     const program = new Program(gl, { vertex, fragment, uniforms });
@@ -370,7 +406,8 @@ const Lightfall: React.FC<LightfallProps> = ({
     mouseInteraction,
     mouseStrength,
     mouseRadius,
-    mouseDampening
+    mouseDampening,
+    lightMode
   ]);
 
   return (

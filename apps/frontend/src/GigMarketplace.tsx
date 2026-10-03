@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Package, Search, Star } from "lucide-react";
 import { api, type Gig, type GigPackage } from "./api/client";
+import { events } from "./analytics";
 
 const categoryLabels: Record<string, string> = {
   WEB_APP_DEVELOPMENT: "Web App Development",
@@ -63,6 +64,7 @@ export function GigMarketplace() {
     try {
       const created = await api.createGigOrder(pkg.id);
       const funded = await api.fundGigOrder(created.id);
+      events.escrowFunded("gig_order");
       setNotice(
         `Order placed and funded (${formatBirr(funded.totalChargeMinor)}). The freelancer can begin work.`,
       );

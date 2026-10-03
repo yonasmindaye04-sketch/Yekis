@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw, Check, X } from "lucide-react";
 import { api } from "./api/client";
+import { events } from "./analytics";
 
 interface PayoutRow {
   id: string;
@@ -39,6 +40,11 @@ export function AdminPayoutsPage() {
         providerPayoutId: decision === "CONFIRMED" ? providerRef || undefined : undefined,
         failureReason: decision === "FAILED" ? failReason || undefined : undefined,
       });
+      // Analytics: staff confirmed the payout reached the payout rail.
+      if (decision === "CONFIRMED") {
+        const settled = items.find((p) => p.id === payoutId);
+        events.payoutCompleted(settled?.provider ?? "UNKNOWN");
+      }
       setSettlingId(null);
       setProviderRef("");
       setFailReason("");

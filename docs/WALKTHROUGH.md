@@ -1,6 +1,197 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-09-05
+Last validated: 2026-10-03
+
+> **Chatwoot Support Bridge — Backend Integration Completed (2026-10-03):**
+> - **What the 2026-10-02 pass actually delivered**: the widget embed only. No Chatwoot API client, no webhook receiver, no shared state with the internal chat store, and no configured tokens — so no message ever reached an agent inbox. This entry records the bridge that completes it.
+> - **Division of Labour**: Chatwoot backs **support tickets**. Peer-to-peer marketplace chat (client ↔ freelancer) stays on the internal WebSocket engine, which is the only thing that can carry participant chat, typing indicators, read receipts and attachments.
+> - **Chatwoot Application API Client (`apps/backend/src/modules/chat/chatwoot.client.ts`)**:
+>   - `findContact` / `upsertContact` — resolve a contact by our user id used as the Chatwoot `identifier`, falling back to email.
+>   - `createConversation` — seeds the mirrored conversation with its opening message (`source_id`, `inbox_id`, `contact_id`).
+>   - `createMessage` — pushes an outbound reply.
+>   - `toggleConversationStatus` — opens/resolves the remote conversation.
+>   - Auth via the `api_access_token` header against `/api/v1/accounts/:id/...`, with a 10s timeout per request and typed errors. Network/timeout failures are wrapped so the bridge can degrade uniformly.
+>   - `isOutgoingChatwootMessage` normalises `message_type`, which the API returns as an integer in JSON but documents as a string enum.
+> - **Bridge Orchestration (`apps/backend/src/modules/chat/chatwoot.service.ts`)**:
+>   - `linkConversationToChatwoot` — idempotently creates and records the remote IDs (`Conversation.chatwootConversationId`, `chatwootContactId`, `chatwootInboxId`), flipping `channel` to `CHATWOOT`. Audited as `SUPPORT_CONVERSATION_LINKED_CHATWOOT`.
+>   - `pushOutboundMessage` / `pushOutboundStatus` — called from `chat.service.ts`, fire-and-forget. A Chatwoot outage is logged and can never fail or delay an internal chat write.
+>   - `handleInboundMessage` / `handleInboundStatusChanged` / `handleInboundConversationCreated` — ingest agent replies, resolve/reopen state, and adopt Chatwoot-originated conversations whose contact carries a Yekis id.
+>   - Only **agent-authored, non-private** messages are ingested; incoming messages are skipped because we already hold them, and private notes never surface to users. Inbound replies are broadcast over the WebSocket, so they appear live in an open chat window.
+> - **Signature-Verified Webhook Receiver (`apps/backend/src/modules/chat/chatwoot.webhooks.ts`)**:
+>   - `POST /api/v1/webhooks/chatwoot`, mounted ahead of `express.json()` because Chatwoot signs the exact received bytes — re-serializing parsed JSON would break verification.
+>   - Verifies `X-Chatwoot-Signature` (`sha256=` + HMAC-SHA256 of `{timestamp}.{raw_body}`) using `crypto.timingSafeEqual`, rejects non-numeric or >5-minute-old timestamps as replays, and fails closed when no secret is configured. Separate 600 req/min limiter.
+>   - Always 2xx for understood-but-ignored events (otherwise Chatwoot redelivers forever); 5xx on a processing failure so the message is retried.
+> - **Persistence & Idempotency**: migration `20261003120000_chatwoot_support_bridge` adds `Conversation.channel`, `chatwootConversationId` (unique), `chatwootContactId`, `chatwootInboxId`; `ChatMessage.origin`, `ChatMessage.externalId` (unique). Additive only — existing conversations stay `INTERNAL` and are never mirrored. NULLs are distinct in Postgres, so unlimited internal conversations coexist while each Chatwoot id maps to exactly one thread. Inbound dedupes on `externalId` because Chatwoot retries until it gets a 2xx.
+> - **New Endpoints**: `POST /api/v1/chat/support` (open a ticket, mirrored immediately so an agent sees it before the first message) and `GET /api/v1/chat/support/chatwoot-health` (staff-only status). `GET /api/v1/chat/support/chatwoot-identity` now also returns `configured` so a null hash is never mistaken for "verified".
+> - **Configuration Is All-or-Nothing**: `CHATWOOT_BASE_URL` enables the bridge; the backend refuses to boot unless `CHATWOOT_API_ACCESS_TOKEN`, `CHATWOOT_ACCOUNT_ID`, `CHATWOOT_INBOX_ID`, `CHATWOOT_WEBHOOK_SECRET` and `CHATWOOT_INBOX_HMAC_KEY` are all set, because a half-configured bridge silently drops support replies. Unset entirely → fully inert. Blank env values are treated as absent so a `.env` copied from `.env.example` still boots.
+> - **Security Fix — WebSocket IDOR**: `lib/socket.ts` granted client-requested subscriptions with no authorization check, so any authenticated user could subscribe to `conversation:<any-id>` and receive another user's messages, typing state and read receipts live. `subscribe`/`typing`/`read` are now authorized against conversation membership, only the `conversation:*` family is subscribable, private channels are never client-requestable, positive results are memoized per socket, and a DB error fails closed.
+> - **Widget Fixes (`components/ChatwootWidget.tsx`)**: identity effect omitted `fetchedHash` from its deps (hash usually never sent → anti-impersonation silently off); it waited on a `chatwoot:ready` event nothing dispatches (replaced with a bounded poll for `window.$chatwoot`); global settings were spread after the computed values so a stale object could override the theme; the widget mounted on three shells and injected the SDK three times (now a module-level singleton). The fetched hash is keyed by user id. Non-component logic moved to `components/chatwoot/bridge.ts` so the module exports only a component (React Fast Refresh), with `vite-env.d.ts` typing the `VITE_CHATWOOT_*` vars.
+> - **Dead Code Removed**: `SupportChat.tsx` / `SupportChat.css` — an orphaned 5-second-polling widget imported nowhere.
+> - **Infrastructure**: `docker-compose.chatwoot.yml` no longer ships known default secrets (`SECRET_KEY_BASE=replace_with_hex_64_secret_key_base`, `chatwoot_secure_pass_123`); both are now `:?` required. Switched to `pgvector/pgvector:pg16` (Chatwoot v3.16 needs pgvector; the plain `postgres:14-alpine` image fails its migrations), dropped the obsolete `version` key, and added the `.env.chatwoot.example` its own header instructed you to copy. Confirmed `db:chatwoot_prepare` is the real, required migration step — the image entrypoint waits for Postgres but does **not** migrate.
+> - **Tests**: `tests/chatwoot-bridge.test.ts` — 14 cases over signature verification and the identity HMAC, with expected signatures computed independently of the implementation. Migration DDL was executed against a scratch database to confirm it applies and that NULL `chatwootConversationId` rows coexist while a duplicate Chatwoot id is rejected.
+>
+> **Chatwoot Real-Time Customer Support Integration (2026-10-02 — widget only, superseded by the entry above):**
+> - **Architecture & Selection**: Integrated Chatwoot as Yekis's official real-time customer support platform, preserving internal `ChatWorkspace` for freelancer-client contracts while giving clients/freelancers instant access to dedicated support agents.
+
+> **Telegram & Google Social Authentication Overhaul (2026-10-02):**
+> - **Facebook Removed & Replaced with Telegram**: Deprecated and purged Facebook SDK/auth from the sign-in/registration menu. Replaced with native Telegram social authentication featuring the official paper plane icon and signature `#24A1DE` styling.
+> - **Dual Telegram Verification Support**: Updated `apps/backend/src/modules/auth/telegram.service.ts` to cryptographically verify both Telegram MiniApp `initData` (`HMAC("WebAppData", botToken)`) and Telegram Web Login Widget payloads (`SHA256(botToken)`).
+> - **Google Icon Visibility Fix**: Eliminated the issue where Google Sign-In button was invisible due to empty placeholder divs and origin mismatch latency. Replaced with a permanent 36px circular button displaying the crisp 4-color Google "G" SVG icon, overlaid with Google GIS iframe and fallback prompt handler.
+> - **Full Registration Support for Google & Telegram**: Enabled users to register with either Google or Telegram with role preservation (`CLIENT` vs `FREELANCER`) selected on the registration form.
+> - **Interactive Telegram Login Modal**: Added a dedicated Telegram connection dialog with the official Login Widget and deep link to `@ye_kis_bot`.
+>
+
+> **Chatwoot Real-Time Customer Support Integration (2026-10-02):**
+> - **Architecture & Selection**: Integrated Chatwoot as Yekis's official real-time customer support platform, preserving internal `ChatWorkspace` for freelancer-client contracts while giving clients/freelancers instant access to dedicated support agents.
+> - **Frontend Widget Component (`components/ChatwootWidget.tsx`)**:
+>   - Built a lightweight, non-blocking React component managing the Chatwoot JavaScript SDK lifecycle.
+>   - Safe dynamic script injection with deduplication and clean teardown.
+>   - Synchronizes authenticated user identity (`id`, `email`, `phone`, `role`, `kycStatus`, `walletBalance`, `platform`) with Chatwoot contacts.
+>   - Auto-resets session on user logout to prevent cross-session chat bleed.
+>   - Syncs color scheme dynamically (`setColorScheme('dark' | 'light')`) matching the user's active theme.
+>   - Provides programmatic trigger utility `openChatwootSupport()` with fallback to email support if widget is unconfigured.
+> - **Backend HMAC Identity Verification (`apps/backend/src/lib/chatwoot.ts`)**:
+>   - Added `CHATWOOT_INBOX_HMAC_KEY` configuration to `apps/backend/src/config/env.ts` and `.env.example`.
+>   - Generates HMAC-SHA256 signatures (`getChatwootIdentifierHash`) verifying user authenticity to prevent chat identity spoofing.
+>   - Exposed `/api/v1/chat/support/chatwoot-identity` endpoint for secure client token retrieval.
+> - **Touchpoints & Triggers**:
+>   - Mounted `<ChatwootWidget />` in `FullPlatformApp.tsx` across landing, authentication, and platform workspace views.
+>   - Enhanced "Contact Support" in `MarketingFooter.tsx` to launch Chatwoot seamlessly.
+>   - Added "Chat with Support" button in user `Settings` panel.
+> - **Deployment & Self-Hosting Stack**:
+>   - Created `docker-compose.chatwoot.yml` with Chatwoot Web, Sidekiq worker, PostgreSQL, and Redis for self-hosting.
+> - **Build Verification**: ⚠️ This claim was inaccurate — the frontend did not compile at this point. `AdminOpsPages.tsx` contained `gap: 22px` (not valid JavaScript), was missing 12 `lucide-react` imports, and `StaffDashboard.tsx` called `<AdminOverviewPage />` without its three required props. All three were fixed and `pnpm --filter frontend run build` now genuinely passes; see the 2026-10-03 entry.
+>
+
+> **Blobatar Deterministic Profile Avatars Integration (2026-10-02):**
+> - **Dependency Installation**: Added `blobatar` (`^2.7.0`) and `@blobatar/react` (`^2.7.0`) to `apps/frontend`.
+> - **`<YekisAvatar>` Component (`components/YekisAvatar.tsx`)**: Built a centralized, reusable avatar component:
+>   - Deterministic seed based on `userId` (with fallback to `email` / `displayName` / `YekisUser`).
+>   - Renders animated geometric Blobatars with subtle hover physics (`animate="hover"`).
+>   - Seamless fallback: if user has a custom `avatarUrl`, it renders the custom image; falls back to Blobatar on load error or absence.
+>   - Respects user accessibility preferences (`prefers-reduced-motion: reduce`).
+> - **System Touchpoints Updated**:
+>   - **`App.tsx`**: Upgraded platform sidebar role badge and topbar user menu profile avatar to use `YekisAvatar`.
+>   - **`ProfilePage.tsx`**: Upgraded 96px hero avatar from single-letter fallback box to high-res animated Blobatar.
+>   - **`ProfileEditPage.tsx`**: Added an interactive "Profile Avatar (Blobatar)" section with a live preview and a "Shuffle Blobatar" button allowing users to re-roll their character's facial traits, colors, and eyes.
+>   - **`FeaturedCarousel.tsx`**: Replaced generic fallback initial squares for featured marketplace talent with lively Blobatars.
+>   - **`StaffDashboard.tsx`**: Upgraded Ops Console user chip avatar in the bottom navigation.
+>   - **`ChatWorkspace.tsx`**: Replaced static letter placeholders with distinct Blobatars for conversations and chat headers.
+> - **Styling & Motion**:
+>   - Imported `blobatar/motion.css` into `apps/frontend/src/index.css`.
+>   - Added theme-invariant container rules (`.yk-avatar-wrap`, `.yk-blobatar`) conforming to AGENTS.md theme parity rules.
+> - **Build Verification**: `pnpm -r build` passed completely with exit code 0 across all workspace packages.
+>
+
+> **Frontend Dependency Modernization & Stable Upgrades (2026-10-02):**
+> - **`apps/frontend/package.json`** — Upgraded dependencies to their latest stable releases:
+>   - **`react` & `react-dom`**: bumped to `^19.3.0` (with matching `@types/react` and `@types/react-dom` at `^19.3.0`).
+>   - **`framer-motion`**: upgraded to `^14.0.0`.
+>   - **`lucide-react`**: updated to `^1.50.0`.
+>   - **`vite`**: upgraded to `^8.3.2` with `@vitejs/plugin-react` `^6.1.1`.
+>   - **Tooling**: `@babel/core` `^8.0.6`, `@rolldown/plugin-babel` `^0.2.4`, `eslint` `^10.11.0`, `globals` `^17.13.0`, `typescript-eslint` `^8.71.0`, `typescript` `~7.0.2`.
+> - **Build Verification**: `pnpm --filter frontend build` (`tsc -b && vite build`) and `pnpm --filter backend build` (`tsc -p tsconfig.json`) both completed with exit code 0.
+
+
+> **"Ready to start?" CTA + Footer Redesign — Landing Page V2 bottom outro (2026-10-03):**
+> - **`LandingPageV2.tsx`** — `FinalCTASection` and `FooterV2` rebuilt from the supplied HTML reference as one continuous bottom outro:
+>   - **CTA — pointer-tracked spotlight panel** (`.v2-outro-cta`): full-bleed `340px` panel, `0 0 35px 35px` bottom corners, five-stop radial gradient. A lime spotlight (`::before`, `blur(24px)`) follows the cursor through the `--mouse-x` / `--mouse-y` custom properties, written directly to the DOM in a `pointermove` listener (no React re-render) and recentred on `pointerleave`. Behind it: a breathing ambient orb, two drifting colour blobs, an SVG-noise film, and two floating outline glyphs (`Shield`, `WalletCards`).
+>   - **CTA content**: mono kicker with a left accent bar (replaces `.v2-eyebrow`), `text-wrap: balance` headline + sub-copy, a flat lime primary button with a hover sheen sweep, and a glass ghost button. Buttons live on new `.v2-outro-btn*` classes so the shared `.v2-btn` system used by the hero is untouched. Hover/press motion (`translateY(-3px)`, `:active scale(.98)`, shine sweep) is pure CSS, exactly as in the reference.
+>   - **Footer — frosted card + giant word** (`.v2-footer-area`): rounded "lip" divider (`.v2-footer-divider`), left/right blurred glows, then a `blur(25px)` glass card with a `2.25fr / 1.65fr` top grid (brand column + three nav columns), a hairline rule, and a bottom row with copyright, the escrow trust note and legal links. Behind the card a masked, fade-out **"Yekis"** wordmark pops in on scroll. Brand lockup is a white rounded symbol tile with a lime sweep on hover; the social links are an icon row (each keeps `title` + `aria-label`) for **TikTok, Telegram, Instagram and Facebook** as inline brand SVGs.
+>   - **Giant wordmark — visibility + pop**:
+>     - The reference colour `#151b17` on the `#070907` panel measured **1.14:1contrast**, i.e. invisible. Now `#4e6553` (dark, **3.15:1**) / `#7d9464` (light, **3.09:1**), and the mask ramp was reshaped to `1 → .62 → .16 → 0` so the top of the glyphs lands solid rather than pre-faded.
+>     - `v2-out-word-pop` (`1250ms cubic-bezier(.16,1,.3,1) both`) animates `translateY(104px) scale(.84)` → overshoot `translateY(-14px) scale(1.045)` → settle, with `transform-origin: 50% 100%` so it grows out of the floor. Verified live over CDP: scale `.84 → .89 → .98 → 1.02 → 1.045 → 1`, offset `104 → 75 → 22 → 0 → -14 → 0`.
+>     - It gets its **own** `IntersectionObserver` (`threshold: .3`). The card is much taller than the wordmark, so sharing the card's observer (`threshold: .12`) fired the pop while the wordmark was still below the fold and the user never saw it.
+>     - `.v2-footer-area` gained `padding-bottom: clamp(72px, 14vh, 180px)`. The wordmark's box used to end exactly at the document bottom, so even at max scroll only its top ~80px was on screen.
+>     - A scroll-*scrubbed* variant (`--word-p` written by a rAF scroll loop) was prototyped and **rejected**: the document ends directly below the wordmark, so a scrub can never reach `1` and the word would sit permanently part-faded. The observer-triggered pop has no such dependency.
+>   - **Sized up**: the reference's `1000px` card at `12.5px` type read too small next to the rest of the page, so the card is now `min(1320px, 100% - 12%)` with `64px 68px 56px` padding / `34px` radius; nav links `15px`, headings `14px`, brand `20px`, description `15px`, social icons `22px`, bottom row `12.5px`, wordmark `clamp(150px, 22vw, 320px)`. The CTA panel grows to `380px` min-height with `52px` buttons and a `clamp(32px, 4vw, 52px)` headline.
+>   - **Motion is the reference's, not a second system**: CTA content plays the CSS `v2-out-content` keyframe; the footer card and wordmark are revealed by `IntersectionObserver`s flipping `.is-visible` (with an immediate-reveal fallback for reduced-motion / no-`IntersectionObserver`), matching the supplied script. No framer-motion primitives are used in this section.
+> - **`landing-v2.css`** — New scoped `.yk-v2 .v2-outro-*` / `.v2-footer-*` rules:
+>   - **New token family `--v2-out-*`** declared once per theme block (dark default + `:root[data-theme="light"]`). Light mode gets a paper treatment (`#dcecc0 → #ffffff` panel stops, olive `#5e7f16` accents, white glass card, `#7d9464` wordmark) with identical geometry — AGENTS.md theme-parity rule satisfied by construction. A single `--v2-out-flip` (`0` / `1`) drives the alpha of the two drifting colour blobs.
+>   - Added `--v2-font-mono` (`DM Mono` → `JetBrains Mono`) so the kicker stops hard-coding a family.
+>   - Six new keyframes: `v2-out-content`, `v2-out-ambient`, `v2-out-drift-a`, `v2-out-drift-b`, `v2-out-float`, `v2-out-word-pop`.
+>   - Responsive at `1024px` / `850px` (footer card narrows, top grid collapses, floating glyphs hidden) and `600px` (CTA panel grows, buttons go full-width, footer nav → 2 columns, base row stacks, wordmark → `32vw`).
+>   - Reduced-motion block now lands the footer card and wordmark in their final state (`animation: none !important` on the pop, since the `is-visible` selector outranks the base rule).
+>   - Dead `.v2-cta-card`, `.v2-cta-inner`, `.v2-footer-grid`, `.v2-footer-brand*`, `.v2-footer-col*`, `.v2-footer-copy`, `.v2-footer-bottom`, `.v2-footer-lang` rules and five orphaned breakpoint entries removed.
+> - **`LandingPageV2.tsx`** — the now-unused `Magnetic` and `Stagger` motion helpers and the `Send` / `Bot` / `Mail` icon imports were deleted (`noUnusedLocals` would fail the build otherwise). `Reveal` is still used by every other section.
+> - **`MobileCTA.tsx`** — the sticky mobile bar's hide-on-footer observer targeted `.landing-footer`, which the V2 home page does not use, so `querySelector` returned `null` and the bar never hid. Selector is now `.v2-footer-area, .landing-footer`.
+> - **Scope**: `MarketingFooter.tsx` (the legacy footer on non-home marketing pages) is unchanged — this redesign covers the home page only.
+> - **Open item**: TikTok / Instagram / Facebook social links are `href="#"` placeholders — real profile URLs still need filling in.
+> - **Pre-existing, unrelated**: `tsc -b` reports `TS6133` for `ChatwootWidget` and `openChatwootSupport` in `FullPlatformApp.tsx` — dead imports left by the in-progress Chatwoot integration, not touched by this work. It will fail `pnpm --filter frontend build` until they are either rendered or removed.
+> - **Build verified**: `vite build` exits 0; `tsc -b` clean for every file this change touches. Verified visually in headless Chrome via CDP at 1440×1000 in both themes (footer settled + mid-pop frame + CTA panel).
+
+> **"Floating Paths" Hero — Landing Page V2 hero replacement (2026-10-02):**
+> - **`LandingPageV2.tsx`** — `HeroSection` rebuilt on the Floating Paths hero prototype (pure CSS + a tiny rAF parallax loop; no WebGL):
+>   - Old hero removed: `Lightfall` WebGL background, grid/veil/cursor layers, `WaveTitle` per-character animation, hero sub-copy, scroll cue, and the `HERO_TITLE`/`GRADIENT_WORDS`/`DARK_COLORS`/`LIGHT_COLORS` constants (`Lightfall` itself stays in `components/Lightfall.tsx` for the v1 `LandingPage`).
+>   - New `FloatingPaths` component renders two mirrored SVG layers of 36 sweeping cubic curves each. Every path drifts on a single seamless linear `dash-offset` loop (dash period equals `pathLength=1`), desynced with negative delays — continuous, unidirectional, no flicker. Theme-aware via `--v2-path-a`/`--v2-path-b` tokens.
+>   - New `SpringTitle` component splits the headline "Find the right expertise." into per-letter spans (35 ms stagger) playing a bouncy `rotateX` spring entrance; ~2.2 s later a `.settled` class drops the animation so the hover transition owns the transform (all letters "pop" and glow violet). Two ambient glow orbs drift behind the field. A vanilla rAF loop lerps pointer position into opposite-direction parallax for the path layer and hero content.
+>   - CTAs: "Get started" → `onStart("register")`; "Browse categories" → smooth-scrolls to `#categories` (instant under `prefers-reduced-motion`). Buttons reuse the shared `.v2-btn`/`.v2-btn-secondary` system.
+>   - `useTheme` is no longer consumed by the hero (theming is pure CSS via `:root[data-theme]` tokens); the local theme toggle from the prototype is unnecessary because `MarketingHeader` already provides one.
+> - **`landing-v2.css`** — hero block (old `v2-hero-*` badge/grid/veil/cursor/sub/trust/scroll-cue/float-card rules and now-unused `v2-ping`/`v2-rail` keyframes removed) replaced with scoped `.yk-v2 .v2-fp-*` rules + `v2-fp-flow`/`v2-fp-drift`/`v2-fp-letter`/`v2-fp-up` keyframes:
+>   - **Theme-invariant base rules**: all layout/shape properties defined once (AGENTS.md parity rule); light/dark blocks only set the colour tokens `--v2-path-a`/`--v2-path-b`/`--v2-pop`/`--v2-pop-glow`/`--v2-glow-1`/`--v2-glow-2`.
+>   - **Reduced motion**: letters render static (no pop), path drift and glows disabled, CTA entrance skipped.
+>   - Big Shoulders Display / DM Mono were already imported in `index.css` for the scroll-stack deck — no new font fetch.
+> - **Build verified**: `pnpm --filter frontend build` (tsc + vite) exits 0.
+>
+> **"Find the Right Expertise" — Pinned Scroll-Stack Deck (2026-10-02):**
+> - **`LandingPageV2.tsx`** — Replaced the flat 3-column `CategoriesSection` grid (`CatCard` × 6) with a full-height **pinned scroll-stack deck** inspired by the provided HTML prototype.
+>   - `CATEGORIES` constant removed; replaced by `DECK_CARDS` array containing per-card CSS class, two-line title, roles count, media tag, and Lucide icon reference.
+>   - `CategoriesSection` now renders an 800-svh `<div class="stk-wrap">` with a `position:sticky` pin host. Six `<div class="stk-card stk-card--N">` elements stack inside a `stk-stage` perspective host.
+>   - A vanilla-JS `requestAnimationFrame` loop (inside `useEffect`) drives the entrance beat, scroll-progress deck-deal animation, pointer-tilt stage rotation, scroll-inertia kick, and inner-column parallax — identical physics to the prototype, no extra npm packages.
+>   - `IntersectionObserver` reveals the always-dark "Let's build." outro panel once it enters the viewport.
+>   - `prefersReducedMotion` check collapses the deck to a static 2-column grid and skips the rAF loop entirely.
+>   - Arrow-chip (`stk-chip`) on each card fires `onStart("register")`. "Get started" outro button fires `onStart("register")`; "Sign in" fires `onStart("login")`.
+>   - Three TypeScript null-assertion fixes applied (`cur!`, `cue!`) for refs captured inside closures after the null guard.
+> - **`landing-v2.css`** — Added `~430 lines` of `.yk-v2 .stk-*` scoped rules at the end of the file:
+>   - **Theme-invariant base rules**: all layout/shape properties (position, size, flex, gap, padding, border-radius, border-width/style, font-family, font-size, line-height, animation-delay etc.) defined once, never repeated in theme blocks — AGENTS.md theme-parity compliance.
+>   - **Dark theme (default)**: `.yk-v2 .stk-card` + `:root[data-theme="dark"] .yk-v2 .stk-card` — dark card backgrounds (#123f36 … #423610), `--stk-ac` / `--stk-glow` custom properties for per-card accent colour & glow.
+>   - **Light theme**: `:root[data-theme="light"] .yk-v2 .stk-card--N` — pastel card backgrounds (#d6f0ea … #fef3c4), dark text (#0d1418), muted accent colours. Only `color`, `background`, `border-color`, `box-shadow` change — no layout overrides.
+>   - **Responsive** (`max-width: 1000px`): cards switch to `flex-direction: column`, font-sizes clamp down.
+>   - **`prefers-reduced-motion`** fallback: `stk-wrap` height → `auto`, `stk-pin` → `position: static`, `stk-stage` → `display: grid; grid-template-columns: repeat(2, 1fr)`, all animations disabled.
+>   - Outro panel (`.stk-flat.stk-outro`) always renders with `background: #060807` regardless of theme — intentional design choice.
+>   - Four new keyframes: `stk-pulse`, `stk-float`, `stk-ring`, `stk-drip` (all `stk-`-prefixed to avoid collision).
+> - **`index.css`** — Extended the Google Fonts `@import` to include **Big Shoulders Display** (wght 700;800;900) and **DM Mono** (wght 400;500) — required by the deck card typography.
+> - **Build verified**: `npm run build` exits 0 — zero TypeScript errors, zero Vite errors. Bundle: 843.93 kB JS / 237.99 kB CSS (gzip: 234.74 kB / 41.43 kB).
+
+
+> **Ops Console Sidebar Redesign (2026-09-30):**
+> - **`StaffDashboard.tsx`** — Full sidebar restructure to match the Yekis Ops Console HTML reference design.
+>   - **Brand bar**: replaced the old logo `<img>` + plain `<strong>` with a gradient indigo icon-logo (`brand-logo-icon`) + bold `Yekis` text + `OPS CONSOLE` small-caps tag.
+>   - **Nav groups**: collapsed the previous 8 fragmented groups (CASES, VERIFICATION, FINANCE, OPERATIONS, MONITORING, USERS, ADMINISTRATION) into 4 canonical groups matching the ops console — **Overview**, **Financial**, **Review Queues**, **Operations**. Items reassigned: Contracts, Payments, Payouts, Escrow, Reconciliation, Ledger, Receipts → Financial; KYC Reviews, Dispute Mediation, Profile Reports, Support → Review Queues; Users, Staff & Roles, Reports, Risk Flags, Audit Logs, System Health → Operations.
+>   - **Collapsibility removed**: nav groups are now static section labels (`sdb-nav-label`) — no chevron, no toggle state. Removed unused `expandedGroups` state and `toggleGroup` helper.
+>   - **Nav item classes**: all nav buttons migrated from generic sidebar-nav button classes to scoped `sdb-nav-item` / `sdb-nav-icon` / `sdb-nav-text` classes. Active state changed from solid green fill to **indigo-tinted** background (`rgba(79,70,229,.08)` + `#4f46e5` text) matching the reference.
+>   - **Badges**: replaced `nav-badge` pill (green bg) with `sdb-nav-badge` — bold amber text (`#b45309`) with no background, `margin-left: auto`, per AGENTS.md status design rules.
+>   - **User footer chip**: moved user identity from a bordered card in the middle of the sidebar to a `sdb-footer` slot at the very bottom, containing a gradient indigo avatar (2-letter initials), name/email, and a `sdb-logout` button below it.
+>   - **Icon size**: all nav icons downscaled from 18px to 16px with `opacity: 0.75` default (1.0 on hover/active).
+>   - **Lucide imports updated**: added `BarChart2`, `Activity`, `BookOpen`, `AlertTriangle`, `CreditCard`, `Receipt`, `XCircle`; preserved `ChevronDown` (still used in topbar scope toggle).
+> - **`AdminsPage.tsx`** — Replaced inline `background` style on the staff status cell with `className="status-pill success/error"` — bold text-first design, no background pill, compliant with AGENTS.md status indicator rule.
+> - **`index.css`** — Replaced `.staff-shell` / `.staff-sidebar` / `.staff-identity` / `.sidebar-nav` block (lines 1064–1101) with new `sdb-*` rules:
+>   - **Brand**: `.sdb-brand`, `.brand-logo-icon`, `.brand-name`, `.brand-ops-tag`
+>   - **Nav**: `.sdb-nav`, `.sdb-nav-group`, `.sdb-nav-label`, `.sdb-nav-item`, `.sdb-nav-icon`, `.sdb-nav-text`, `.sdb-nav-badge`
+>   - **Footer**: `.sdb-footer`, `.sdb-user-chip`, `.sdb-avatar`, `.sdb-user-info`, `.sdb-user-name`, `.sdb-user-email`, `.sdb-logout`
+>   - **Theme rules**: dark mode overrides in `:root[data-theme="dark"]` blocks — only `color`, `background`, `border-color` changed; all layout/shape properties defined once in base rules (AGENTS.md theme-parity compliance).
+>   - **Responsive**: 900px breakpoint collapses sidebar to 64px icon-only strip (labels/text hidden, items centered); 640px hides sidebar entirely — same breakpoints as before, class names updated.
+>   - **Sidebar width**: changed from 260px to 252px to match reference.
+
+
+> **Landing Page V2 — Pinned Escrow Board (2026-10-03):**
+> - The "How your payment is protected" section is now a **pinned scroll board** instead of a four-column strip. The section is three bands: a static intro (eyebrow, headline, sub-copy, dispute link + the animated `EscrowVault`), a `480svh` pinned board, and a static footnote.
+> - **Board contents:** four thumbtacked step cards pinned to a ruled sheet at four corners, three dashed connectors that draw between consecutive steps, and three pinned status notes in the free margins ("Balance locked", "Milestone 2 of 3 approved", "Auto‑release in 5 days" — the same three facts the vault illustration used to float around itself).
+> - **Choreography:** `useScroll({ target, offset: ["start start", "end end"] })` → `useSpring` → `useMotionValueEvent`, all written to the DOM by one `paint(p, introT)` pass. Cards drop in with a back-out spring at `0 / .24 / .48 / .72`, connectors draw at `.16 / .40 / .64`, notes pop at `.30 / .56 / .80`, the ruled sheet parallaxes through `--esc-bgY`, and card 01 additionally drops on page load via a `0.95 s` `animate()` intro.
+> - **Connector reveal:** each connector is revealed by sliding the dash window on its mask path. `pathLength` is intentionally avoided — Blink does not scale `stroke-dashoffset` by `pathLength`, and `vector-effect: non-scaling-stroke` resolves dash lengths in screen px, so the usual `pathLength="1"` recipe leaves the connectors permanently visible. Real lengths come from `getTotalLength()` and the mask band is sized in board units.
+> - **Classes:** `esc-wrap` / `esc-pin` (sticky stage + ruled sheet + vignette) / `esc-card--1..4` / `esc-note--1..3` / `esc-wire*` / `esc-cue` / `esc-foot`; keyframes `esc-sway`, `esc-bob`, `esc-drip`.
+> - **Theme parity:** all colours resolve from existing `--v2-*` tokens; the only theme-conditional rules are the per-step accents and thumbtack hues (`--esc-ac`, `--esc-pin-head`, `--esc-pin-dot`). Structure, positions, sizes and breakpoints are theme-invariant.
+> - **Static fallbacks:** `≤900px` and `prefers-reduced-motion: reduce` both collapse the board to a stacked list (tilted via `--esc-rotm`, wires + cue removed) and JS paints the final state once — no scroll-jacking.
+> - Removed the now-unused `.v2-steps-grid` / `.v2-step*` rules and their orphaned breakpoints from `landing-v2.css`.
+>
+> **Landing Page V2 — Animated Design Branch `design/landing-v2` (2026-09-29):**
+> - **New branch `design/landing-v2`** created from `main` for a parallel landing page design. Zero changes to existing code on `main`.
+> - **`LandingPageV2.tsx`** — Drop-in replacement (same props). All animations via Framer Motion. Scoped to `.yk-v2` CSS namespace. Sections: Hero, Marquee, Stats, Escrow + EscrowVault, Fees, Categories, Testimonials, Trust, FAQ, Final CTA.
+> - **`landing-v2.css`** — Isolated design system. Theme-conditional blocks only change `color / background / border-color / box-shadow / opacity`. All layout/shape properties are un-themed (AGENTS.md theme-parity rule). All keyframes prefixed `v2-*`.
+> - **Motion primitives:** `Reveal`, `Stagger`, `Magnetic`, `CountUp`, `WaveTitle`, `EscrowVault`, spring FAQ accordion, `AnimatePresence` testimonials, 3D tilt categories, animated fee bar, scroll progress bar, cursor gradient, scroll-parallax CTA, back-to-top.
+> - **To preview:** `git checkout design/landing-v2` then `pnpm dev:frontend` → `http://localhost:5173`.
+> - **To compare:** `git checkout main` then `pnpm dev:frontend`.
+>
 
 > **Multi-Rail Payments (CBE & Safaricom M-Pesa) + Manual Verification Fallback (2026-09-05):**
 > - **CBE & Safaricom M-Pesa Integration**: Expanded payment options from Telebirr-only to a complete Ethiopian multi-rail infrastructure supporting **Telebirr**, **Commercial Bank of Ethiopia (CBE / CBE Birr)**, and **Safaricom M-Pesa (Ethiopia)** across Instant Checkout, Manual Bank Transfers, and Freelancer Withdrawals.
@@ -166,6 +357,7 @@ Important controls:
 
 | Surface | What is wired |
 |---|---|
+| Overview dashboard | Role greeting + hero CTA, featured talent / recommended jobs, expandable stat cards (wallet breakdown from top-ups, open-jobs by category, active-milestones by escrow state with ETB-secured total and a due-month bar chart), recent-activity feed with type/due-date filters and sort controls, inline milestone drill-down, live refresh status (realtime `notify:*` socket events + 60s visibility-gated poll) |
 | Authentication | Email registration/login and Telegram Mini App authentication |
 | Verification | Tier 1 document upload/status and Tier 2 request |
 | Jobs workspace | Search, post, view own jobs, bid, review/decide proposals, withdraw proposals |

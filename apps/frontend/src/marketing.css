@@ -337,6 +337,51 @@
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* Light mode: premium off-white field + dark ink text over the rich streaks */
+:root[data-theme="light"] .hero-section {
+  background: #f5f7f2;
+}
+
+:root[data-theme="light"] .marketing-page .hero-title {
+  color: var(--color-text) !important;
+}
+
+:root[data-theme="light"] .marketing-page .pop-text:hover .pop-char {
+  color: #6d28d9;
+}
+
+:root[data-theme="light"] .marketing-page .hero-subtitle {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+:root[data-theme="light"] .hero-section .btn-secondary {
+  border-color: rgba(15, 23, 42, 0.28);
+  color: var(--color-text);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+:root[data-theme="light"] .hero-section .btn-secondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.1);
+}
+
+/* Soft brand glow under the hero primary CTA on the light field */
+:root[data-theme="light"] .hero-section .btn-primary {
+  box-shadow: 0 10px 24px rgba(22, 163, 74, 0.28);
+}
+
+/* Landing-only floating help button: lighter shadows on paper */
+:root[data-theme="light"] .landing-chat-fab {
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.22);
+}
+
+:root[data-theme="light"] .landing-chat-fab:hover {
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.28);
+}
+
 /* Header over hero (unscrolled): force light text and transparent bg */
 .marketing-header:not(.is-scrolled) {
   color: #f7faf9;
@@ -354,6 +399,24 @@
 .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
 .marketing-header:not(.is-scrolled) .btn-ghost:hover {
   color: #d8f36b;
+}
+
+/* Light mode on the landing page: dark header text over the light hero */
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) {
+  color: var(--color-text);
+}
+
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost,
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-brand strong,
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .theme-toggle,
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .telegram-link {
+  color: var(--color-text);
+}
+
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
+  color: var(--color-primary);
 }
 
 /* Header when scrolled: restore theme colors and background */

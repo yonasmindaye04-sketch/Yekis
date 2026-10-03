@@ -78,6 +78,9 @@ export async function createGuestConversation(params: {
 
   return {
     id: conversation.id,
+    // Returned so the caller can mint a single-conversation guest token; not
+    // part of the client-facing response shape.
+    creatorUserId: user.id,
     subject: conversation.subject,
     status: conversation.status,
     assignedStaff: conversation.assignedStaff

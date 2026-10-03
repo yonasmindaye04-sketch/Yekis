@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, ChevronRight, FileText } from "lucide-react";
+import { RefreshCw, ChevronRight, ChevronLeft, FileText, Search } from "lucide-react";
 import { api } from "./api/client";
+import { statusTone } from "./AdminOpsPages";
 
 interface ContractRow {
   id: string;
@@ -30,6 +31,8 @@ interface ContractDetail {
   disputes: { id: string; stage: string; category: string }[];
   totals: { escrowHeldMinor: number; milestoneCount: number };
 }
+
+const fmt = (minor: number) => `ETB ${(minor / 100).toLocaleString()}`;
 
 export function AdminContractsPage() {
   const [items, setItems] = useState<ContractRow[]>([]);
@@ -68,79 +71,91 @@ export function AdminContractsPage() {
 
   if (detail) {
     return (
-      <div>
-        <button className="btn-secondary" style={{ marginBottom: 12 }} onClick={() => setDetail(null)}>← Back to contracts</button>
-        <div className="panel" style={{ padding: 16 }}>
-          <p className="eyebrow">Contract overview</p>
-          <h2 style={{ margin: "4px 0" }}>{detail.contract.jobTitle}</h2>
-          <p style={{ margin: 0, fontSize: "0.84rem", color: "var(--color-text-secondary)" }}>
+      <div className="oc-fade">
+        <button className="oc-back" onClick={() => setDetail(null)}>
+          <ChevronLeft size={15} /> Back to contracts
+        </button>
+        <div className="oc-card oc-card-pad">
+          <div className="oc-kv-k">Contract Overview</div>
+          <h2 style={{ fontSize: 20, margin: "6px 0 4px", letterSpacing: "-0.02em", fontWeight: 800 }}>
+            {detail.contract.jobTitle}
+          </h2>
+          <div style={{ fontSize: 12.5, color: "var(--oc-text-2)" }} className="oc-mono">
             {detail.contract.id} · {detail.contract.jobCategory} · {new Date(detail.contract.createdAt).toLocaleDateString()}
-          </p>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <span className="status-pill">{detail.contract.status}</span>
-            <span className="status-pill">Escrow held: ETB {(detail.totals.escrowHeldMinor / 100).toLocaleString()}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 14 }}>
-            <div className="panel" style={{ padding: 12 }}>
-              <p className="eyebrow" style={{ margin: "0 0 4px" }}>Client</p>
-              <strong>{detail.parties.client.displayName ?? detail.parties.client.email}</strong>
-              <div style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>{detail.parties.client.email}</div>
+          <div style={{ display: "flex", gap: 14, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
+            <span className={`oc-pill ${statusTone(detail.contract.status)}`}>
+              <span className="oc-pdot"></span>{detail.contract.status.replace(/_/g, " ")}
+            </span>
+            <span className="oc-pill oc-p-sky">
+              <span className="oc-pdot"></span>Escrow held: {fmt(detail.totals.escrowHeldMinor)}
+            </span>
+          </div>
+          <div className="oc-grid oc-g2" style={{ marginTop: 18 }}>
+            <div className="oc-kv">
+              <div className="oc-kv-k">Client</div>
+              <div className="oc-kv-v" style={{ fontSize: 15 }}>{detail.parties.client.displayName ?? detail.parties.client.email}</div>
+              <div style={{ fontSize: 12, color: "var(--oc-text-2)", marginTop: 2 }}>{detail.parties.client.email}</div>
             </div>
-            <div className="panel" style={{ padding: 12 }}>
-              <p className="eyebrow" style={{ margin: "0 0 4px" }}>Freelancer</p>
-              <strong>{detail.parties.freelancer.displayName ?? detail.parties.freelancer.email}</strong>
-              <div style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>{detail.parties.freelancer.email}</div>
+            <div className="oc-kv">
+              <div className="oc-kv-k">Freelancer</div>
+              <div className="oc-kv-v" style={{ fontSize: 15 }}>{detail.parties.freelancer.displayName ?? detail.parties.freelancer.email}</div>
+              <div style={{ fontSize: 12, color: "var(--oc-text-2)", marginTop: 2 }}>{detail.parties.freelancer.email}</div>
             </div>
           </div>
-          <h3 style={{ margin: "16px 0 8px" }}>Milestones</h3>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)" }}>
-                <th style={{ padding: "8px" }}>Title</th>
-                <th style={{ padding: "8px" }}>State</th>
-                <th style={{ padding: "8px" }}>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.milestones.map((m) => (
-                <tr key={m.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                  <td style={{ padding: "8px" }}>{m.title}</td>
-                  <td style={{ padding: "8px" }}><span className="status-pill">{m.escrowState}</span></td>
-                  <td style={{ padding: "8px" }}>ETB {(m.amountMinor / 100).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <h3 style={{ margin: "16px 0 8px" }}>Payments</h3>
-          {detail.payments.length === 0 ? <p className="empty-state">No payments recorded.</p> : (
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)" }}>
-                  <th style={{ padding: "8px" }}>Provider</th>
-                  <th style={{ padding: "8px" }}>Status</th>
-                  <th style={{ padding: "8px" }}>Amount</th>
-                  <th style={{ padding: "8px" }}>Created</th>
-                </tr>
-              </thead>
+          <div className="oc-sec-title" style={{ marginTop: 22 }}>Milestones ({detail.totals.milestoneCount})</div>
+          <div className="oc-tbl-wrap" style={{ border: "1px solid var(--oc-border-soft)", borderRadius: 10 }}>
+            <table className="oc-tbl">
+              <thead><tr><th>Title</th><th>State</th><th>Amount</th></tr></thead>
               <tbody>
-                {detail.payments.map((p) => (
-                  <tr key={p.id} style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "8px" }}>{p.provider}</td>
-                    <td style={{ padding: "8px" }}><span className="status-pill">{p.status}</span></td>
-                    <td style={{ padding: "8px" }}>ETB {(p.amountMinor / 100).toLocaleString()}</td>
-                    <td style={{ padding: "8px" }}>{new Date(p.createdAt).toLocaleDateString()}</td>
+                {detail.milestones.map((m) => (
+                  <tr key={m.id}>
+                    <td className="oc-cell-main">{m.title}</td>
+                    <td>
+                      <span className={`oc-pill ${statusTone(m.escrowState)}`}>
+                        <span className="oc-pdot"></span>{m.escrowState.replace(/_/g, " ")}
+                      </span>
+                    </td>
+                    <td className="oc-amount">{fmt(m.amountMinor)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="oc-sec-title" style={{ marginTop: 22 }}>Payments</div>
+          {detail.payments.length === 0 ? <div className="oc-empty">No payments recorded.</div> : (
+            <div className="oc-tbl-wrap" style={{ border: "1px solid var(--oc-border-soft)", borderRadius: 10 }}>
+              <table className="oc-tbl">
+                <thead><tr><th>Provider</th><th>Status</th><th>Amount</th><th>Created</th></tr></thead>
+                <tbody>
+                  {detail.payments.map((p) => (
+                    <tr key={p.id}>
+                      <td>
+                        <span className={`oc-rail ${p.provider === "TELEBIRR" ? "oc-rail-tele" : "oc-rail-cbe"}`}>
+                          <i></i>{p.provider}
+                        </span>
+                      </td>
+                      <td>
+                        <span className={`oc-pill ${statusTone(p.status)}`}>
+                          <span className="oc-pdot"></span>{p.status.replace(/_/g, " ")}
+                        </span>
+                      </td>
+                      <td className="oc-amount">{fmt(p.amountMinor)}</td>
+                      <td style={{ color: "var(--oc-text-2)" }}>{new Date(p.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {detail.disputes && detail.disputes.length > 0 && (
             <>
-              <h3 style={{ margin: "16px 0 8px" }}>Disputes</h3>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="oc-sec-title" style={{ marginTop: 22 }}>Disputes</div>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
                 {detail.disputes.map((d) => (
-                  <span key={d.id} className="status-pill" title={d.id}>
-                    {d.category} · {d.stage.replace("STAGE_", "").replace("_", " ")}
+                  <span key={d.id} className="oc-pill oc-p-red" title={d.id}>
+                    <span className="oc-pdot"></span>
+                    {d.category.replace(/_/g, " ")} · {d.stage.replace("STAGE_", "Stage ").replace(/_/g, " ")}
                   </span>
                 ))}
               </div>
@@ -152,68 +167,84 @@ export function AdminContractsPage() {
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
-        <input
-          placeholder="Search by title / client / freelancer / contract id"
-          value={q}
-          onChange={(e) => { setQ(e.target.value); setPage(1); }}
-          style={{ flex: 1, minWidth: 240 }}
-        />
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+    <div className="oc-fade">
+      <div className="oc-page-head">
+        <div>
+          <div className="oc-page-title">Contracts</div>
+          <div className="oc-page-sub">Manage and monitor all platform contracts, milestones and disputes</div>
+        </div>
+      </div>
+      <div className="oc-card oc-filters">
+        <div className="oc-f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search title, client, freelancer…"
+            value={q}
+            onChange={(e) => { setQ(e.target.value); setPage(1); }}
+          />
+        </div>
+        <select className="oc-sel" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
           <option value="ALL">All statuses</option>
           <option value="ACTIVE">Active</option>
           <option value="COMPLETED">Completed</option>
           <option value="TERMINATED">Terminated</option>
           <option value="CANCELLED">Cancelled</option>
         </select>
-        <button className="btn-secondary" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={14} /> Search
+        <button className="oc-btn oc-btn-ghost" onClick={() => void load()} disabled={loading}>
+          <RefreshCw size={14} className={loading ? "fa-spin" : ""} /> Refresh
         </button>
       </div>
-      {error && <p className="single-chat-error">{error}</p>}
-      {loading && items.length === 0 ? <p className="empty-state">Loading contracts…</p> : items.length === 0 ? (
-        <p className="empty-state">No contracts found.</p>
-      ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      {error && <p className="oc-empty" style={{ color: "var(--oc-red)" }}>{error}</p>}
+      <div className="oc-card">
+        <div className="oc-tbl-wrap">
+          <table className="oc-tbl">
             <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid var(--color-border)" }}>
-                <th style={{ padding: "8px" }}>Contract</th>
-                <th style={{ padding: "8px" }}>Client</th>
-                <th style={{ padding: "8px" }}>Freelancer</th>
-                <th style={{ padding: "8px" }}>Milestones</th>
-                <th style={{ padding: "8px" }}>Status</th>
-                <th style={{ padding: "8px" }}>Created</th>
-                <th style={{ padding: "8px" }}></th>
-              </tr>
+              <tr><th>Contract</th><th>Client</th><th>Freelancer</th><th>Milestones</th><th>Status</th><th>Created</th><th></th></tr>
             </thead>
             <tbody>
-              {items.map((row) => (
-                <tr key={row.id} style={{ borderBottom: "1px solid var(--color-border)", cursor: "pointer" }} onClick={() => void openDetail(row.id)}>
-                  <td style={{ padding: "8px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                      <FileText size={14} />
-                      <span>{row.job.title}</span>
+              {loading && items.length === 0 ? (
+                <tr><td colSpan={7}><div className="oc-empty">Loading contracts…</div></td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan={7}><div className="oc-empty">No contracts found.</div></td></tr>
+              ) : items.map((row) => (
+                <tr key={row.id} className="oc-clickable" onClick={() => void openDetail(row.id)}>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                      <span style={{ color: "var(--oc-text-3)" }}><FileText size={15} /></span>
+                      <div>
+                        <div className="oc-cell-main">{row.job.title}</div>
+                        <div className="oc-cell-sub oc-mono">{row.id}</div>
+                      </div>
                     </div>
-                    <small style={{ color: "var(--color-text-secondary)" }}>{row.id}</small>
                   </td>
-                  <td style={{ padding: "8px", fontSize: "0.8rem" }}>{row.client.displayName ?? row.client.email}</td>
-                  <td style={{ padding: "8px", fontSize: "0.8rem" }}>{row.freelancer.displayName ?? row.freelancer.email}</td>
-                  <td style={{ padding: "8px" }}>{row._count.milestones}</td>
-                  <td style={{ padding: "8px" }}><span className="status-pill">{row.status}</span></td>
-                  <td style={{ padding: "8px" }}>{new Date(row.createdAt).toLocaleDateString()}</td>
-                  <td style={{ padding: "8px" }}><ChevronRight size={14} /></td>
+                  <td>
+                    <div className="oc-cell-main" style={{ fontWeight: 600 }}>{row.client.displayName ?? row.client.email}</div>
+                    <div className="oc-cell-sub">{row.client.email}</div>
+                  </td>
+                  <td>
+                    <div className="oc-cell-main" style={{ fontWeight: 600 }}>{row.freelancer.displayName ?? row.freelancer.email}</div>
+                    <div className="oc-cell-sub">{row.freelancer.email}</div>
+                  </td>
+                  <td style={{ fontWeight: 700 }}>{row._count.milestones}</td>
+                  <td>
+                    <span className={`oc-pill ${statusTone(row.status)}`}>
+                      <span className="oc-pdot"></span>{row.status.replace(/_/g, " ")}
+                    </span>
+                  </td>
+                  <td style={{ color: "var(--oc-text-2)" }}>{new Date(row.createdAt).toLocaleDateString()}</td>
+                  <td style={{ color: "var(--oc-text-3)" }}><ChevronRight size={15} /></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      )}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-        <button className="btn-secondary" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>Prev</button>
-        <span style={{ alignSelf: "center", fontSize: "0.8rem" }}>{page} / {totalPages}</span>
-        <button className="btn-secondary" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next</button>
+        <div className="oc-pager">
+          <span className="oc-pager-info">Page {page} of {totalPages} · {total} records</span>
+          <div className="oc-pager-btns">
+            <button className="oc-btn oc-btn-ghost oc-btn-sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>← Prev</button>
+            <button className="oc-btn oc-btn-ghost oc-btn-sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next →</button>
+          </div>
+        </div>
       </div>
     </div>
   );

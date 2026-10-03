@@ -131,12 +131,7 @@ export function AdminsPage() {
                     </td>
                     <td style={{ padding: "10px 8px" }}>
                       <span
-                        className="status-pill"
-                        style={{
-                          background: s.isSuspended
-                            ? "var(--color-error-text)"
-                            : "var(--color-primary-light)",
-                        }}
+                        className={`status-pill ${s.isSuspended ? "error" : "success"}`}
                       >
                         {s.isSuspended ? "Suspended" : "Active"}
                       </span>

@@ -1,4 +1,4 @@
-// === IMPORTS ===
+﻿// === IMPORTS ===
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -31,7 +31,7 @@ export function buildApp() {
   const app = express();
 
   // Behind a reverse proxy (ngrok in dev, nginx/ALB in prod) Express must be
-  // told how many hops to trust, otherwise req.ip is the proxy's IP — which
+  // told how many hops to trust, otherwise req.ip is the proxy's IP â€” which
   // breaks rate limiting (all users share one bucket) and audit attribution.
   // Set TRUST_PROXY=1 for ngrok; unset it when running directly on localhost.
   if (env.TRUST_PROXY !== undefined) {
@@ -49,7 +49,7 @@ export function buildApp() {
   app.use(cors()); // tighten to your actual frontend origin(s) before production
   app.use(pinoHttp({ logger })); // doesn't touch the body, safe to run before the raw-body webhook routes
 
-  // Payment webhooks MUST be mounted before express.json() — their routes
+  // Payment webhooks MUST be mounted before express.json() â€” their routes
   // parse the raw body themselves (via express.raw()) so the signature can
   // be verified against the exact bytes the provider sent. Mounting them
   // after express.json() would mean verifying a signature against
@@ -62,7 +62,7 @@ export function buildApp() {
 
   app.use(express.json({ limit: "1mb" }));
 
-  // Generic API rate limit — payment webhook routes get their own, stricter
+  // Generic API rate limit â€” payment webhook routes get their own, stricter
   // limit defined alongside the webhook handlers themselves.
   app.use(
     "/api",
@@ -105,7 +105,7 @@ export function buildApp() {
     res.status(404).json({ error: "NOT_FOUND", path: req.path });
   });
 
-  // Central error handler — catches anything that slips past route-level
+  // Central error handler â€” catches anything that slips past route-level
   // try/catch. Never leak err.stack in production responses.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use(

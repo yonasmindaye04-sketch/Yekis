@@ -88,13 +88,18 @@ const EnvSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   TELEGRAM_WEBHOOK_URL: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  // Served to the client so the login widget and deep links always target the
+  // deployed bot. Without it the frontend falls back to a hardcoded handle.
+  TELEGRAM_BOT_USERNAME: z.string().optional(),
   // Social sign-in (oauth.service.ts). Each provider independently gated:
   // unset = button hidden client-side + endpoint returns 503.
   APPLE_CLIENT_ID: z.string().optional(),
   FACEBOOK_APP_ID: z.string().optional(),
   FACEBOOK_APP_SECRET: z.string().optional(),
   FRONTEND_URL: z.string().default("http://localhost:5173"),
-  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: z.coerce.number().default(86400),
+  // Replay window for a signed Telegram credential. A captured initData
+  // string is a bearer credential, so this must stay short: 15 minutes.
+  TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(900),
 
   // Google OAuth & Social Auth
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -199,7 +204,7 @@ const EnvSchema = z.object({
 
   // OpenSearch (optional) — full-text search backend. Unset = search falls
   // back to the existing Postgres queries; no dependency is required to boot.
-  OPENSEARCH_URL: z.string().url().optional(),
+OPENSEARCH_URL: z.string().url().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

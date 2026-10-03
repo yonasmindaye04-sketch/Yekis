@@ -183,6 +183,12 @@ model User {
   email                   String     @unique
   phone                   String     @unique
   passwordHash            String
+  // NULL while the account only ever authenticated via a federated provider
+  // (Google / Apple / Facebook / Telegram sentinel accounts). Set the moment
+  // the account registers or completes the password-reset flow. This is the
+  // guard that stops an unverified email match from merging a social identity
+  // into a real password account (account takeover).
+  passwordSetAt           DateTime?
   role                    UserRole
   languagePreference      String     @default("en")
   timezone                String     @default("Africa/Addis_Ababa") @db.VarChar(60)
@@ -274,6 +280,7 @@ model User {
   featuredLogs         FeaturedLog[]
   profileReports       ProfileReport[]      @relation("ReportedUser")
   passwordResetTokens  PasswordResetToken[]
+  telegramLoginCodes   TelegramLoginCode[]
   notificationSettings Json?
 
   @@index([faydaPsut])
@@ -710,10 +717,18 @@ model ChatMessage {
   sender         User         @relation(fields: [senderId], references: [id])
   body           String
   attachmentUrl  String? // optional file attachment stored in object store
+  // Provenance of the row: INTERNAL = composed in Yekis. Kept generic so an
+  // external channel can be folded in later without another migration.
+  origin         String       @default("INTERNAL")
+  // Upstream message id, used to make ingestion idempotent. Nullable, and NULLs
+  // are not equal in Postgres, so internal rows are unconstrained.
+  externalId     String?
   createdAt      DateTime     @default(now())
 
   @@index([conversationId])
   @@index([senderId])
+  @@index([origin])
+  @@unique([externalId])
 }
 
 // ---------- Skills Taxonomy ----------
@@ -994,6 +1009,34 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+/// Short-lived, single-use code that lets an already-authenticated Telegram
+/// member sign in on the web.
+///
+/// The bot proves identity server-side (Telegram delivers the update to our
+/// webhook/polling connection), but the browser has no way to present that
+/// proof: the official Login Widget needs the domain pre-registered with
+/// @BotFather and is blocked outright by some networks/ad blockers. So the bot
+/// mints a code and the web exchanges it for a normal session — the same
+/// device-code pattern used by CLI/desktop login flows.
+///
+/// Only the SHA-256 of the code is stored, it expires in minutes, it is
+/// single-use, and issuing a new one revokes every earlier outstanding code.
+model TelegramLoginCode {
+  id String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Telegram identity that authorised the code, for audit + forensics.
+  telegramUserId BigInt
+  // SHA-256 hex of the code. Unique so a lookup is a single index hit.
+  codeHash String   @unique
+  expiresAt DateTime
+  usedAt   DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ---------- Gigs (Fiverr-style service packages) ----------

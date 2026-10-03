@@ -9,7 +9,6 @@ import {
   WalletCards,
   CircleDot,
   CheckCheck,
-  ChevronDown,
   RefreshCw,
   Paperclip,
   Send,
@@ -22,8 +21,20 @@ import {
   FileText,
   Loader2,
   X,
+  BarChart2,
+  Activity,
+  BookOpen,
+  AlertTriangle,
+  CreditCard,
+  Receipt,
+  XCircle,
+  ChevronDown,
+  Menu,
+  Search,
 } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
+import "./ops-console.css";
+import { NotificationCenter } from "./NotificationCenter";
 import {
   api,
   type ChatMessage,
@@ -33,6 +44,7 @@ import {
 import { StaffCompliancePanel } from "./StaffCompliancePanel";
 import { EvidenceViewer, type EvidenceDocument } from "./EvidenceViewer";
 import { KycQueue } from "./KycQueue";
+import { YekisAvatar } from "./components/YekisAvatar";
 import { TopUpQueue } from "./TopUpQueue";
 import { AuditLogsPage } from "./AuditLogsPage";
 import { AdminsPage } from "./AdminsPage";
@@ -123,12 +135,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     "OVERVIEW" | "SUPPORT" | "KYC" | "TOPUPS" | "DISPUTES" | "PROFILES" | "AUDIT" | "ADMINS" | "USERS" | "CONTRACTS" | "PAYMENTS" | "ESCROW" | "PAYOUTS" | "LEDGER" | "RECONCILIATION" | "REPORTS" | "RISK" | "MONITORING"
   >("OVERVIEW");
   const [filter, setFilter] = useState<"OPEN" | "ALL">("OPEN");
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
-    {},
-  );
-
-  const toggleGroup = (label: string) =>
-    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Compact frontend surface check — visibility only. The backend is the
   // single source of truth (requirePermission in permissions.ts); this mirror
@@ -183,6 +190,27 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     COMPLIANCE_ADMIN: "Compliance",
     COMPLIANCE_OFFICER: "Compliance",
     SUPPORT: "Customer Support",
+  };
+  // Breadcrumb page names (mockup: "Ops / <Page>")
+  const CRUMB_LABELS: Record<string, string> = {
+    OVERVIEW: "Command Center",
+    SUPPORT: "Support",
+    TOPUPS: "Receipts",
+    KYC: "KYC Reviews",
+    DISPUTES: "Dispute Mediation",
+    PROFILES: "Profile Reports",
+    AUDIT: "Audit Logs",
+    ADMINS: "Staff & Roles",
+    USERS: "Users",
+    CONTRACTS: "Contracts",
+    PAYMENTS: "Payments",
+    ESCROW: "Escrow",
+    PAYOUTS: "Payouts",
+    LEDGER: "Ledger",
+    RECONCILIATION: "Reconciliation",
+    REPORTS: "Reports",
+    RISK: "Risk Flags",
+    MONITORING: "System Health",
   };
   const [selectedConversation, setSelectedConversation] = useState<
     string | null
@@ -409,19 +437,6 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
     "updatedAt",
   );
 
-  const renderSla = (hours: number | null, label = "waiting") => {
-    if (hours === null) return null;
-    let cls = "sla-ok";
-    if (hours > 24) cls = "sla-breached";
-    else if (hours > 2) cls = "sla-warning";
-    const txt = hours < 1 ? "< 1h" : `${Math.floor(hours)}h`;
-    return (
-      <span className={`sla-indicator ${cls}`}>
-        {label} {txt}
-      </span>
-    );
-  };
-
   const displayedConversations =
     queueScope === "MINE"
       ? visibleConversations.filter((c) => c.assignedStaff?.id === user.id)
@@ -430,87 +445,60 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
   return (
     <div className="staff-shell">
       {/* ── Sidebar ─────────────────────────────────────── */}
-      <aside className="staff-sidebar">
-        <div className="sidebar-brand">
-          <img
-            src="/svgviewer-output.svg"
-            alt="Yekis Logo"
-            className="platform-logo small"
-          />
-          <strong>Yekis</strong>
-        </div>
-        <div className="staff-identity">
-          <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
+      <aside className={`staff-sidebar${sidebarOpen ? " oc-open" : ""}`}>
+        <div className="oc-brand">
+          <div className="oc-brand-logo">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </div>
           <div>
-            <strong>
-              {ROLE_LABELS[user.staffRole ?? ""] ?? "Staff desk"}
-            </strong>
-            <small>{user.email}</small>
+            <span className="oc-brand-name">Yekis</span>
+            <span className="oc-brand-tag">OPS CONSOLE</span>
           </div>
         </div>
 
-        <nav className="sidebar-nav">
-          {/* Config-driven grouped navigation. Items with `disabled` are visible
-           * placeholders for later phases — they render but never route. Only
-           * pages with a real backend are enabled (per ADMIN_PHASE1_PLAN.md). */}
+        {/* Nav */}
+        <nav className="oc-nav">
           {(
             [
               {
                 label: "Overview",
                 items: [
-                  { key: "OVERVIEW", label: "Overview", icon: <LayoutDashboard size={18} />, perm: "dashboard.view" },
+                  { key: "OVERVIEW", label: "Command Center", icon: <LayoutDashboard size={16} />, perm: "dashboard.view" },
                 ],
               },
               {
-                label: "CASES",
+                label: "Financial",
                 items: [
-                  { key: "SUPPORT", label: "Support", icon: <MessageSquare size={18} />, perm: "support.handle", badge: openCount || undefined },
-                  { key: "DISPUTES", label: "Disputes", icon: <Scale size={18} />, perm: "disputes.view", badge: queueCounts.disputes || undefined },
-                  { key: "RISK", label: "Risk & Fraud", icon: <ShieldCheck size={18} />, perm: "disputes.view" },
+                  { key: "CONTRACTS",      label: "Contracts",      icon: <FileText size={16} />,    perm: "contracts.view" },
+                  { key: "PAYMENTS",       label: "Payments",       icon: <CreditCard size={16} />,  perm: "payments.view" },
+                  { key: "PAYOUTS",        label: "Payouts",        icon: <WalletCards size={16} />, perm: "payouts.view" },
+                  { key: "ESCROW",         label: "Escrow",         icon: <Scale size={16} />,       perm: "escrow.view" },
+                  { key: "RECONCILIATION", label: "Reconciliation", icon: <FileText size={16} />,    perm: "reconciliation.view" },
+                  { key: "LEDGER",         label: "Ledger",         icon: <BookOpen size={16} />,    perm: "ledger.view" },
+                  { key: "TOPUPS",         label: "Receipts",       icon: <Receipt size={16} />,     perm: "topups.review", badge: queueCounts.topups || undefined },
                 ],
               },
               {
-                label: "VERIFICATION",
+                label: "Review Queues",
                 items: [
-                  { key: "KYC", label: "Identity", icon: <ShieldCheck size={18} />, perm: "kyc.review", badge: queueCounts.kyc || undefined },
+                  { key: "KYC",      label: "KYC Reviews",      icon: <ShieldCheck size={16} />,   perm: "kyc.review",     badge: queueCounts.kyc      || undefined },
+                  { key: "DISPUTES", label: "Dispute Mediation", icon: <Scale size={16} />,         perm: "disputes.view",  badge: queueCounts.disputes || undefined },
+                  { key: "PROFILES", label: "Profile Reports",   icon: <AlertTriangle size={16} />, perm: "users.view" },
+                  { key: "SUPPORT",  label: "Support",           icon: <MessageSquare size={16} />, perm: "support.handle", badge: openCount            || undefined },
                 ],
               },
               {
-                label: "FINANCE",
+                label: "Operations",
                 items: [
-                  { key: "TOPUPS", label: "Receipts", icon: <WalletCards size={18} />, perm: "topups.review", badge: queueCounts.topups || undefined },
-                  { key: "LEDGER", label: "Ledger", icon: <FileText size={18} />, perm: "ledger.view" },
-                  { key: "RECONCILIATION", label: "Reconciliation", icon: <FileText size={18} />, perm: "reconciliation.view" },
-                  { key: "REPORTS", label: "Reports", icon: <FileText size={18} />, perm: "reports.view" },
-                ],
-              },
-              {
-                label: "OPERATIONS",
-                items: [
-                  { key: "CONTRACTS", label: "Contracts", icon: <FileText size={18} />, perm: "contracts.view" },
-                  { key: "PAYMENTS", label: "Payments", icon: <WalletCards size={18} />, perm: "payments.view" },
-                  { key: "ESCROW", label: "Escrow", icon: <Scale size={18} />, perm: "escrow.view" },
-                  { key: "PAYOUTS", label: "Payouts", icon: <Send size={18} />, perm: "payouts.view" },
-                ],
-              },
-              {
-                label: "MONITORING",
-                items: [
-                  { key: "MONITORING", label: "System Health", icon: <LayoutDashboard size={18} />, perm: "monitoring.view" },
-                ],
-              },
-              {
-                label: "USERS",
-                items: [
-                  { key: "USERS", label: "Users", icon: <Users size={18} />, perm: "users.view" },
-                  { key: "PROFILES", label: "Profiles", icon: <Users size={18} />, perm: "users.view" },
-                ],
-              },
-              {
-                label: "ADMINISTRATION",
-                items: [
-                  { key: "AUDIT", label: "Audit Logs", icon: <FileText size={18} />, perm: "audit.view" },
-                  { key: "ADMINS", label: "Admins & Permissions", icon: <Users size={18} />, perm: "admins.manage" },
+                  { key: "USERS",      label: "Users",         icon: <Users size={16} />,       perm: "users.view" },
+                  { key: "ADMINS",     label: "Staff & Roles", icon: <ShieldCheck size={16} />, perm: "admins.manage" },
+                  { key: "REPORTS",    label: "Reports",       icon: <BarChart2 size={16} />,   perm: "reports.view" },
+                  { key: "RISK",       label: "Risk Flags",    icon: <XCircle size={16} />,     perm: "tms.review" },
+                  { key: "AUDIT",      label: "Audit Logs",    icon: <FileText size={16} />,    perm: "audit.view" },
+                  { key: "MONITORING", label: "System Health", icon: <Activity size={16} />,    perm: "monitoring.view" },
                 ],
               },
             ] as {
@@ -539,101 +527,91 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 icon: React.ReactNode;
                 perm: string;
                 badge?: number;
-                disabled?: boolean;
               }[];
             }[]
           ).map((group) => {
-            // Default all groups to expanded — collapsing is opt-in via the
-            // group header, since all sections are intentionally visible.
-            const expanded = expandedGroups[group.label] ?? true;
-            const anyItem = group.items.filter((item) => can(item.perm));
-            if (anyItem.length === 0) return null;
+            const visibleItems = group.items.filter((item) => can(item.perm));
+            if (visibleItems.length === 0) return null;
             return (
-              <div className="sidebar-group" key={group.label}>
-                {group.items.length > 1 ? (
+              <div className="oc-nav-group" key={group.label}>
+                <span className="oc-nav-label">{group.label}</span>
+                {visibleItems.map((item) => (
                   <button
-                    type="button"
-                    className="sidebar-group-header"
-                    onClick={() => toggleGroup(group.label)}
-                    aria-expanded={expanded}
+                    key={item.key}
+                    className={`oc-nav-item${activeTab === item.key ? " active" : ""}`}
+                    onClick={() => {
+                      setActiveTab(item.key as typeof activeTab);
+                      setSidebarOpen(false);
+                    }}
                   >
-                    <span className="nav-label">{group.label}</span>
-                    <ChevronDown
-                      size={14}
-                      style={{
-                        transform: expanded ? "rotate(0deg)" : "rotate(-90deg)",
-                        transition: "transform 0.15s",
-                      }}
-                    />
+                    <span className="oc-nav-ic">{item.icon}</span>
+                    <span>{item.label}</span>
+                    {item.badge ? (
+                      <span className="oc-nav-badge">{item.badge}</span>
+                    ) : null}
                   </button>
-                ) : (
-                  null
-                )}
-                {expanded &&
-                  group.items.map((item) =>
-                    !can(item.perm) ? null : (
-                      <button
-                        key={item.key}
-                        className={activeTab === item.key ? "active" : ""}
-                        disabled={(item as any).disabled}
-                        onClick={() =>
-                          !(item as any).disabled &&
-                          setActiveTab(item.key as typeof activeTab)
-                        }
-                      >
-                        <span className="nav-icon">{item.icon}</span>
-                        <span className="nav-label">{item.label}</span>
-                        {item.badge ? (
-                          <span className="nav-badge">{item.badge}</span>
-                        ) : null}
-                      </button>
-                    ),
-                  )}
+                ))}
               </div>
             );
           })}
         </nav>
 
-        <button className="sidebar-settings sidebar-logout" onClick={onLogout}>
-          <span className="nav-icon">
-            <LogOut size={18} />
-          </span>
-          <span className="nav-label">Sign out</span>
-        </button>
+        {/* User footer */}
+        <div className="oc-side-footer">
+          <div className="oc-userchip">
+            <YekisAvatar
+              userId={user.id}
+              email={user.email}
+              size={34}
+              animate="hover"
+              className="oc-avatar"
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="nm">
+                {ROLE_LABELS[user.staffRole ?? ""] ?? "Staff desk"}
+              </div>
+              <div className="em">{user.email}</div>
+            </div>
+            <button
+              className="oc-logout"
+              onClick={onLogout}
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
+        </div>
       </aside>
+      <div
+        className={`oc-overlay${sidebarOpen ? " show" : ""}`}
+        onClick={() => setSidebarOpen(false)}
+      />
 
       {/* ── Main ────────────────────────────────────────── */}
       <main className="staff-main">
-        <header className="staff-topbar">
-          <div className="staff-topbar-title-area">
-            <p className="eyebrow">Operations workspace</p>
-            <h1>
-              {activeTab === "OVERVIEW" && "Keep Yekis moving."}
-              {activeTab === "SUPPORT" && "Support desk"}
-              {activeTab === "TOPUPS" && "Receipt reviews"}
-              {activeTab === "KYC" && "Identity reviews"}
-              {activeTab === "DISPUTES" && "Disputes"}
-              {activeTab === "PROFILES" && "Profile moderation"}
-              {activeTab === "AUDIT" && "Immutable audit trail"}
-              {activeTab === "ADMINS" && "Admins & permissions"}
-              {activeTab === "USERS" && "Clients & freelancers"}
-              {activeTab === "CONTRACTS" && "Contracts & milestones"}
-              {activeTab === "PAYMENTS" && "Payment rails & transactions"}
-              {activeTab === "ESCROW" && "Milestone escrow & held funds"}
-              {activeTab === "PAYOUTS" && "Disbursements & freelancer payouts"}
-              {activeTab === "LEDGER" && "Double-entry financial ledger"}
-              {activeTab === "RECONCILIATION" && "Ledger ↔ provider reconciliation"}
-              {activeTab === "REPORTS" && "Financial & marketplace reports"}
-              {activeTab === "RISK" && "Risk & fraud cases"}
-              {activeTab === "MONITORING" && "System health & provider status"}
-            </h1>
-            <p>
-              Coordinate support, payments, identity checks, and disputes from
-              one desk.
-            </p>
+        <header className="oc-header">
+          <button
+            className="oc-menu-btn"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Open navigation"
+          >
+            <Menu size={18} />
+          </button>
+          <div className="oc-crumb">
+            Ops / <b>{CRUMB_LABELS[activeTab] ?? activeTab}</b>
           </div>
-          <div className="staff-topbar-actions">
-            <div className="staff-filter-toggle">
+          <div className="oc-search">
+            <Search size={15} />
+            <input
+              placeholder="Search contracts, users, TX IDs…"
+              aria-label="Search (not wired yet)"
+              readOnly
+              title="Global console search — coming soon"
+            />
+          </div>
+          <div className="oc-hdr-right">
+            <div className="oc-seg">
               <button
                 className={queueScope === "ALL" ? "active" : ""}
                 onClick={() => setQueueScope("ALL")}
@@ -647,54 +625,60 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 My Queue
               </button>
             </div>
+            <NotificationCenter />
             <button
               type="button"
-              className="theme-toggle"
+              className="oc-icon-btn"
               onClick={toggleTheme}
               aria-label={
                 theme === "light"
                   ? "Switch to dark mode"
                   : "Switch to light mode"
               }
+              title={theme === "light" ? "Dark mode" : "Light mode"}
             >
-              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+              {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
             </button>
             <button
-              className="btn-secondary"
+              className="oc-btn oc-btn-ghost oc-btn-sm"
               onClick={() => void loadConversations()}
               disabled={isLoading}
             >
-              <RefreshCw size={15} className={isLoading ? "animate-spin" : ""} /> Refresh
+              <RefreshCw size={14} className={isLoading ? "fa-spin" : ""} /> Refresh
             </button>
           </div>
         </header>
 
+        <div className="oc-content">
         {error && (
-          <div className="staff-error">
-            <strong>Some queues need attention</strong>
-            <span>{error}</span>
+          <div className="oc-banner oc-b-red" style={{ marginBottom: 16 }}>
+            <span className="oc-banner-ic"><AlertTriangle size={17} /></span>
+            <div><b>Some queues need attention.</b> {error}</div>
           </div>
         )}
 
         {activeTab === "OVERVIEW" && (
-          <section className="staff-panel" style={{ padding: "1.5rem" }}>
-            <AdminOverviewPage />
-          </section>
+          <AdminOverviewPage
+            onNavigate={setActiveTab}
+            queueCounts={queueCounts}
+            openSupportCount={
+              conversations.filter((c) => c.status === "OPEN").length
+            }
+          />
         )}
 
         {/* ── Tab Content ───────────────────────────────── */}
 
         {/* Support Chat Tab */}
         {activeTab === "SUPPORT" && (
-          <section id="panel-support" className="staff-panel staff-chat-panel">
-            <div className="staff-panel-heading">
+          <div className="oc-fade">
+            <div className="oc-page-head">
               <div>
-                <p className="eyebrow">Support desk</p>
-                <h2>Client and freelancer conversations</h2>
+                <div className="oc-page-title">Support Desk</div>
+                <div className="oc-page-sub">Client and freelancer conversations</div>
               </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                {/* OPEN / ALL filter toggle */}
-                <div className="staff-filter-toggle">
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <div className="oc-seg">
                   <button
                     className={filter === "OPEN" ? "active" : ""}
                     onClick={() => setFilter("OPEN")}
@@ -708,17 +692,21 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     All
                   </button>
                 </div>
-                <span className="status-pill">Live queue</span>
-                {renderSla(supportHours)}
+                <span className="oc-pill oc-p-green"><span className="oc-pdot"></span>Live queue</span>
+                {supportHours !== null && (
+                  <span className={`oc-sla ${supportHours > 24 ? "breach" : supportHours > 2 ? "warn" : "ok"}`}>
+                    ● waiting {supportHours < 1 ? "< 1h" : `${Math.floor(supportHours)}h`}
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="staff-chat-layout">
+            <div className="oc-card oc-chat-split">
               {/* Conversation list */}
-              <div className="staff-queue-list">
+              <div className="oc-chat-list">
                 {displayedConversations.length === 0 ? (
-                  <div className="staff-inbox-empty">
-                    <MessageCircle size={32} />
+                  <div className="oc-empty">
+                    <MessageCircle size={32} style={{ color: "var(--oc-border-strong, #c3ccdb)" }} />
                     <p>
                       {filter === "OPEN"
                         ? "No open conversations."
@@ -731,32 +719,27 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     return (
                       <button
                         key={conversation.id}
-                        className={`staff-conversation${selectedConversation === conversation.id ? " active" : ""}${hasUnread ? " unread" : ""}`}
+                        className={`oc-conv${selectedConversation === conversation.id ? " active" : ""}`}
                         onClick={() => void openConversation(conversation)}
                       >
-                        <span className="staff-conv-dot-wrap">
+                        <span style={{ width: 10, display: "flex", justifyContent: "center", paddingTop: 4 }}>
                           {hasUnread && (
-                            <CircleDot
-                              size={10}
-                              className="staff-conv-unread-dot"
-                            />
+                            <CircleDot size={10} style={{ color: "var(--oc-primary)" }} />
                           )}
                         </span>
-                        <span className="staff-conv-body">
+                        <span className="oc-conv-body">
                           <strong>{conversation.subject}</strong>
                           <small>{conversation.creator.email}</small>
                           {conversation.messages[0] && (
-                            <span className="staff-conv-preview">
+                            <span className="oc-conv-preview">
                               {conversation.messages[0].body}
                             </span>
                           )}
                         </span>
-                        <span className="staff-conv-meta">
-                          <b
-                            className={`status-pill ${conversation.status === "CLOSED" ? "closed" : ""}`}
-                          >
-                            {conversation.status}
-                          </b>
+                        <span className="oc-conv-meta">
+                          <span className={`oc-pill ${conversation.status === "CLOSED" ? "oc-p-gray" : "oc-p-green"}`}>
+                            <span className="oc-pdot"></span>{conversation.status}
+                          </span>
                           <small>
                             <Clock size={10} />{" "}
                             {relativeTime(conversation.updatedAt)}
@@ -769,36 +752,21 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
               </div>
 
               {/* Thread view */}
-              <div className="staff-thread">
+              <div className="oc-thread">
                 {selected ? (
                   <>
-                    <div className="staff-thread-head">
+                    <div className="oc-thread-head">
                       <div>
                         <strong>{selected.subject}</strong>
                         <span>{selected.creator.email}</span>
                       </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                        }}
-                      >
-                        <span
-                          className={`status-pill ${selected.status === "CLOSED" ? "closed" : ""}`}
-                        >
-                          {selected.status}
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <span className={`oc-pill ${selected.status === "CLOSED" ? "oc-p-gray" : "oc-p-green"}`}>
+                          <span className="oc-pdot"></span>{selected.status}
                         </span>
                         {selected.status === "OPEN" ? (
                           <button
-                            className="btn-secondary"
-                            style={{
-                              fontSize: "0.78rem",
-                              padding: "4px 10px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
+                            className="oc-btn oc-btn-ghost oc-btn-sm"
                             onClick={closeConversation}
                             disabled={isClosing}
                             title="Mark this conversation as resolved"
@@ -807,14 +775,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                           </button>
                         ) : (
                           <button
-                            className="btn-secondary"
-                            style={{
-                              fontSize: "0.78rem",
-                              padding: "4px 10px",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 5,
-                            }}
+                            className="oc-btn oc-btn-ghost oc-btn-sm"
                             onClick={reopenConversation}
                             disabled={isClosing}
                             title="Reopen this conversation"
@@ -826,9 +787,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     </div>
 
                     {/* Messages */}
-                    <div className="staff-messages">
+                    <div className="oc-msgs">
                       {messages.length === 0 ? (
-                        <p className="empty-state">
+                        <p className="oc-empty" style={{ padding: "20px" }}>
                           No messages in this conversation yet.
                         </p>
                       ) : (
@@ -837,24 +798,20 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                           return (
                             <div
                               key={message.id}
-                              className={
-                                isOwn ? "staff-message own" : "staff-message"
-                              }
+                              className={isOwn ? "oc-msg own" : "oc-msg"}
                             >
                               <p>{message.body}</p>
                               {message.attachmentUrl && (
-                                <div className="staff-msg-attachment">
+                                <div className="oc-msg-attach">
                                   {isImageAttachment(message.attachmentUrl) && (
                                     <a
                                       href={message.attachmentUrl}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="staff-attachment-img-link"
                                     >
                                       <img
                                         src={message.attachmentUrl}
                                         alt={getAttachmentLabel(message.attachmentUrl)}
-                                        className="staff-attachment-preview"
                                         loading="lazy"
                                       />
                                     </a>
@@ -863,7 +820,7 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                                     href={message.attachmentUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="staff-attachment-badge"
+                                    className="oc-msg-file"
                                     download={getAttachmentLabel(message.attachmentUrl)}
                                   >
                                     <FileText size={14} />
@@ -890,9 +847,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
 
                     {/* Reply box — only for open conversations */}
                     {selected.status === "OPEN" ? (
-                      <div className="staff-reply-wrapper">
+                      <>
                         {attachedFile && (
-                          <div className="staff-attachment-tag">
+                          <div className="oc-reply-tag">
                             <FileText size={13} />
                             <span>{attachedFile.name}</span>
                             <button
@@ -904,14 +861,13 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                             </button>
                           </div>
                         )}
-                        <div className="staff-reply">
+                        <div className="oc-reply">
                           <label
-                            className="chat-compose-icon"
+                            className="oc-attach-btn"
                             aria-label="Attach a file"
                             title="Attach a file"
-                            style={{ cursor: "pointer" }}
                           >
-                            <Paperclip size={20} />
+                            <Paperclip size={18} />
                             <input
                               type="file"
                               style={{ display: "none" }}
@@ -935,10 +891,9 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                             }}
                             placeholder="Reply to this conversation…"
                             disabled={isSending || isUploadingAttachment}
-                            style={{ flex: 1, minWidth: 0 }}
                           />
                           <button
-                            className="chat-send"
+                            className="oc-send"
                             onClick={() => void sendReply()}
                             disabled={
                               isSending ||
@@ -948,35 +903,39 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                             aria-label="Send message"
                           >
                             {isUploadingAttachment ? (
-                              <Loader2 size={18} className="spin" />
+                              <Loader2 size={16} className="fa-spin" />
                             ) : (
-                              <Send size={18} />
+                              <Send size={16} />
                             )}
                           </button>
                         </div>
-                      </div>
+                      </>
                     ) : (
-                      <div className="staff-reply staff-reply-closed">
-                        <span>
-                          This conversation is closed. Reopen it to reply.
-                        </span>
+                      <div className="oc-reply" style={{ color: "var(--oc-text-3)", fontSize: 13, fontWeight: 600 }}>
+                        This conversation is closed. Reopen it to reply.
                       </div>
                     )}
                   </>
                 ) : (
-                  <div className="staff-thread-empty">
-                    <MessageCircle size={28} />
+                  <div className="oc-empty" style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+                    <MessageCircle size={28} style={{ color: "var(--oc-border-strong, #c3ccdb)" }} />
                     <p>Select a conversation to read and reply.</p>
                   </div>
                 )}
               </div>
             </div>
-          </section>
+          </div>
         )}
 
         {/* Top-up Receipts Tab */}
         {activeTab === "TOPUPS" && (
-          <section id="panel-receipts">
+          <div className="oc-fade">
+            <div className="oc-page-head">
+              <div>
+                <div className="oc-page-title">Receipt Reviews</div>
+                <div className="oc-page-sub">Verify manual wallet top-up receipts</div>
+              </div>
+            </div>
             <TopUpQueue
               onReview={async (id, d, r) => {
                 await api.reviewTopUp(id, d, r);
@@ -987,24 +946,24 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 await loadConversations();
               }}
             />
-          </section>
+          </div>
         )}
 
         {/* Identity Reviews Tab */}
         {activeTab === "KYC" && (
-          <section id="panel-identity">
+          <div className="oc-fade">
             <KycQueue
               onReview={async (id, d, r) => {
                 await api.reviewKyc(id, d, r);
                 await loadConversations();
               }}
             />
-          </section>
+          </div>
         )}
 
         {/* Disputes Tab */}
         {activeTab === "DISPUTES" && (
-          <section id="panel-disputes">
+          <div className="oc-fade">
             <DisputeQueue
               onResolve={async (id, o, r, s) => {
                 await api.resolveDispute(id, {
@@ -1015,31 +974,16 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                 await loadConversations();
               }}
             />
-          </section>
+          </div>
         )}
 
         {/* Profiles Tab */}
         {activeTab === "PROFILES" && (
-          <section
-            id="panel-profiles"
-            className="staff-panel"
-            style={{ padding: "1.5rem" }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "1.5rem",
-              }}
-            >
+          <div className="oc-fade">
+            <div className="oc-page-head">
               <div>
-                <h2 style={{ margin: 0, fontSize: "1.2rem" }}>
-                  Featured Profiles
-                </h2>
-                <p style={{ margin: 0, fontSize: "0.9rem", color: "#666" }}>
-                  Manage featured talent on the landing page
-                </p>
+                <div className="oc-page-title">Profile Moderation</div>
+                <div className="oc-page-sub">User reports & featured talent on the landing page</div>
               </div>
               <button
                 onClick={async () => {
@@ -1061,118 +1005,102 @@ export function StaffDashboard({ user, onLogout }: StaffDashboardProps) {
                     );
                   }
                 }}
-                className="btn-secondary"
-                style={{ display: "flex", alignItems: "center", gap: 5 }}
+                className="oc-btn oc-btn-ghost oc-btn-sm"
               >
-                <RefreshCw size={15} /> Refresh Carousel
+                <RefreshCw size={14} /> Refresh Carousel
               </button>
             </div>
             <ProfileReportsQueue />
-          </section>
+          </div>
         )}
 
         {/* Audit Logs Tab */}
         {activeTab === "AUDIT" && (
-          <section
-            id="panel-audit"
-            className="staff-panel"
-            style={{ padding: "1.5rem" }}
-          >
+          <div className="oc-fade">
             <AuditLogsPage />
-          </section>
+          </div>
         )}
 
         {/* Admins & Permissions Tab */}
         {activeTab === "ADMINS" && (
-          <section
-            id="panel-admins"
-            className="staff-panel"
-            style={{ padding: "1.5rem" }}
-          >
+          <div className="oc-fade">
             <AdminsPage />
-          </section>
+          </div>
         )}
 
-        {/* Users Library Tab (Phase 2) */}
+        {/* Users Library Tab */}
         {activeTab === "USERS" && (
-          <section
-            id="panel-users"
-            className="staff-panel"
-            style={{ padding: "1.5rem" }}
-          >
+          <div className="oc-fade">
             <AdminUsersPage />
-          </section>
+          </div>
         )}
 
-        {/* Contracts Tab (Phase 2) */}
+        {/* Contracts Tab */}
         {activeTab === "CONTRACTS" && (
-          <section
-            id="panel-contracts"
-            className="staff-panel"
-            style={{ padding: "1.5rem" }}
-          >
+          <div className="oc-fade">
             <AdminContractsPage />
-          </section>
+          </div>
         )}
 
-        {/* Payments Tab (Phase 3) */}
+        {/* Payments Tab */}
         {activeTab === "PAYMENTS" && (
-          <section id="panel-payments" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminPaymentsPage />
-          </section>
+          </div>
         )}
 
-        {/* Escrow Tab (Phase 3) */}
+        {/* Escrow Tab */}
         {activeTab === "ESCROW" && (
-          <section id="panel-escrow" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminEscrowPage />
-          </section>
+          </div>
         )}
 
-        {/* Payouts Tab (Phase 3) */}
+        {/* Payouts Tab */}
         {activeTab === "PAYOUTS" && (
-          <section id="panel-payouts" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminPayoutsPage />
-          </section>
+          </div>
         )}
 
-        {/* Ledger Tab (Phase 3) */}
+        {/* Ledger Tab */}
         {activeTab === "LEDGER" && (
-          <section id="panel-ledger" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminLedgerPage />
-          </section>
+          </div>
         )}
 
-        {/* Reconciliation Tab (Phase 4) */}
+        {/* Reconciliation Tab */}
         {activeTab === "RECONCILIATION" && (
-          <section id="panel-reconciliation" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminReconciliationPage />
-          </section>
+          </div>
         )}
 
-        {/* Reports Tab (Phase 4) */}
+        {/* Reports Tab */}
         {activeTab === "REPORTS" && (
-          <section id="panel-reports" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminReportsPage />
-          </section>
+          </div>
         )}
 
-        {/* Risk & Fraud Tab (Phase 5) */}
+        {/* Risk & Fraud Tab */}
         {activeTab === "RISK" && (
-          <section id="panel-risk" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <StaffCompliancePanel onChanged={loadConversations} onError={setError} />
             <div style={{ marginTop: 16 }}>
               <AdminRiskPage />
             </div>
-          </section>
+          </div>
         )}
 
-        {/* Monitoring Tab (Phase 7) */}
+        {/* Monitoring Tab */}
         {activeTab === "MONITORING" && (
-          <section id="panel-monitoring" className="staff-panel" style={{ padding: "1.5rem" }}>
+          <div className="oc-fade">
             <AdminMonitoringPage />
-          </section>
+          </div>
         )}
+        </div>
       </main>
 
       {viewingEvidence && (

@@ -22,11 +22,13 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { api } from "./api/client";
+import { events } from "./analytics";
 import { ShareButtons } from "./ShareButtons";
 import { MarketingFooter } from "./MarketingFooter";
 import "./marketing.css";
 import { useScrollReveal } from "./components/motion";
 import Lightfall from "./components/Lightfall";
+import { useTheme } from "./theme/ThemeContext";
 
 type LandingPageProps = {
   onStart: (mode: "login" | "register") => void;
@@ -53,8 +55,14 @@ const categoryLabels: Record<string, string> = {
 
 const HERO_TITLE = "Your money is protected before a single hour of work begins.";
 
+// Hero background palettes: dark keeps the original look; light uses deep
+// brand tones + a quiet neutral streak for depth on an off-white field.
+const HERO_LIGHTFALL_DARK_COLORS = ["#d8f36b", "#77d9c5", "#5227FF"];
+const HERO_LIGHTFALL_LIGHT_COLORS = ["#5E7F16", "#0F766E", "#5730C9", "#8A8F72"];
+
 export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   useScrollReveal();
+  const { theme } = useTheme();
   const [showSupport, setShowSupport] = useState(false);
   const [messages, setMessages] = useState<
     {
@@ -191,8 +199,13 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
       <section className="hero-section" id="top" data-parallax="0.12">
         <Lightfall
           className="hero-lightfall-bg"
-          colors={["#d8f36b", "#77d9c5", "#5227FF"]}
-          backgroundColor="#0b1116"
+          colors={
+            theme === "light"
+              ? HERO_LIGHTFALL_LIGHT_COLORS
+              : HERO_LIGHTFALL_DARK_COLORS
+          }
+          backgroundColor={theme === "light" ? "#f5f7f2" : "#0b1116"}
+          lightMode={theme === "light"}
           speed={0.4}
           streakCount={3}
           streakWidth={1.2}
@@ -227,7 +240,10 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
         <div className="hero-actions">
           <button
             className="btn-primary"
-            onClick={() => onStart("register")}
+            onClick={() => {
+              events.ctaClicked("hire");
+              onStart("register");
+            }}
             style={{ fontSize: "18px", padding: "16px 32px" }}
           >
             <Briefcase
@@ -238,7 +254,10 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           </button>
           <button
             className="btn-secondary"
-            onClick={() => onStart("register")}
+            onClick={() => {
+              events.ctaClicked("work");
+              onStart("register");
+            }}
             style={{ fontSize: "18px", padding: "16px 32px" }}
           >
             <Users

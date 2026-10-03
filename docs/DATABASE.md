@@ -1,4 +1,4 @@
-# Database Guide
+﻿# Database Guide
 
 Last updated: 2026-08-15
 
@@ -54,9 +54,9 @@ erDiagram
 | `TopUpRequest` | Receipt-backed manual credit request and staff decision |
 | `Dispute` | Unique milestone case, staged deadlines, resolution outcome and optional split |
 | `DisputeEvidence` | Party statement tied to a dispute |
-| `TransactionFlag` | AML/TMS rule result and staff review/STR metadata (includes `strDeadlineAt` — 24h STR SLA clock set at detection) |
+| `TransactionFlag` | AML/TMS rule result and staff review/STR metadata (includes `strDeadlineAt` â€” 24h STR SLA clock set at detection) |
 | `Notification` | User notification ledger and delivery metadata |
-| `Conversation` | Support thread with participant relations, creatorId, and `assignedStaffId` for scoped staff access (creator and auto-assigned staff are registered as participants upon ticket creation) |
+| `Conversation` | Support thread with participant relations, creatorId, and `assignedStaffId` for scoped staff access (creator and auto-assigned staff are registered as participants upon ticket creation). |
 | `AuditLog` | Append-only event record for important state transitions |
 | `Skill` | Standardized skills available for profiles |
 | `UserSkill` | Junction table for user skills and proficiency |
@@ -107,7 +107,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `ProposalStatus` | `SUBMITTED`, `SHORTLISTED`, `ACCEPTED`, `REJECTED`, `WITHDRAWN` |
 | `EscrowState` | `PAYMENT_PENDING`, `ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `ACCEPTED`, `RELEASED`, `DISPUTED`, `REFUNDED`, `PARTIAL_REFUND` |
 | `DisputeStage` | `NONE`, negotiation, evidence, mediation, arbitration, `RESOLVED` |
-| `PaymentProvider` | `TELEBIRR`, `CBE_BIRR`, `M_PESA` — Safaricom M-Pesa added alongside Telebirr and CBE; `CHAPA` removed 2026-08-26 (app layer); inert enum value remains in PG16 until a PG17+ migration can drop it |
+| `PaymentProvider` | `TELEBIRR`, `CBE_BIRR`, `M_PESA` â€” Safaricom M-Pesa added alongside Telebirr and CBE; `CHAPA` removed 2026-08-26 (app layer); inert enum value remains in PG16 until a PG17+ migration can drop it |
 | `TransactionFlagType` | `STRUCTURING`, `VELOCITY`, `ROUND_AMOUNTS`, `PASS_THROUGH`, `WALLET_MISMATCH`, `STAFF_FLAGGED`, `VAT_THRESHOLD_REACHED` |
 | `LedgerAccountType` | `ASSET`, `LIABILITY`, `EQUITY`, `REVENUE`, `EXPENSE` |
 | `PayoutStatus` | `PENDING`, `PROCESSING`, `CONFIRMED`, `FAILED`, `REVERSED` |
@@ -124,11 +124,29 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260807130000_one_pending_funding` | Add partial unique index for one pending funding attempt per milestone |
 | `20260809150000_add_chat_with_staff_assignment` | Staff support assignment and scoped chat management |
 | `20260821215600_add_profile_reviews_chat_platform_models` | Profile items, reviews, user skills, counter offers, direct messaging, platform metrics, and password reset tokens |
-| `20260826090000_tms_rules_and_chapa_removal` | TMS alignment (Master Design §11.4): added ROUND_AMOUNTS, strDeadlineAt (24h SLA), and removed Chapa |
+| `20260826090000_tms_rules_and_chapa_removal` | TMS alignment (Master Design Â§11.4): added ROUND_AMOUNTS, strDeadlineAt (24h SLA), and removed Chapa |
 | `20260829120000_gig_marketplace` | Gig/Package/Order/Review models + enums; `PlatformFeeCredit.milestoneId` nullable + `gigOrderId` column (append-only ledger supports both contract and gig releases) |
 | `20260829130000_add_support_staff_role` | `SUPPORT` staff role for chat-only customer support accounts |
 | `20260829220000_admin_phase1_rbac_audit` | Phase 1 RBAC: new `StaffRole` values (SUPER_ADMIN, OPERATIONS_ADMIN, FINANCE_ADMIN, DISPUTE_MEDIATOR, COMPLIANCE_ADMIN) + `AuditLog` hardening columns (`actorRole`, `action`, `previousState`, `newState`, `amountMinor`, `requestId`, `ipAddress`) with indexes |
-| `20260829233000_gig_disputes_polymorphic` | Polymorphic dispute subject: `Dispute.contractId`/`milestoneId` nullable (unique dropped), `Dispute.gigOrderId` (`@unique` + FK), DB CHECK enforcing exactly one subject per dispute, `GigOrderStatus.DISPUTED` |
+| `20260829233000_gig_disputes_polymorphic` | Polymorphic dispute subject: `Dispute.contractId`/`milestoneId` nullable (unique dropped), `Dispute.gigOrderId` (`@unique` + FK), DB CHECK enforcing exactly one subject per dispute, `GigOrderStatus.DISPUTED`. Rewritten to be idempotent on 2026-10-03 and extended with the missing `Dispute_gigOrderId_key` unique index â€” see "Re-runnable migrations" below. |
+
+| `20261003120000_chatwoot_support_bridge` | Added `Conversation.channel`/`chatwoot*` columns plus `ChatMessage.origin`/`externalId` for a third-party agent inbox that was evaluated and then dropped. |
+| `20261003140000_drop_chatwoot_bridge_columns` | Removes the four unused `Conversation` columns again. `ChatMessage.origin` and `ChatMessage.externalId` are KEPT: they are generic provenance and idempotency markers, not Chatwoot-specific. |
+### Re-runnable migrations
+
+`20260829233000_gig_disputes_polymorphic` is written to be safely re-runnable (`ADD COLUMN IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, and `DO $$ ... IF NOT EXISTS (pg_constraint) ... $$` guards around the FK and CHECK, since Postgres has no `ADD CONSTRAINT IF NOT EXISTS`). This matters because the migration previously assumed a virgin `Dispute` table and aborted on any database synchronised with `prisma db push` rather than `migrate`:
+
+```
+ERROR: column "gigOrderId" of relation "Dispute" already exists  (42701)
+```
+
+Re-running the fixed migration converges a drifted database to the intended schema instead of failing.
+
+It also closes a genuine integrity gap that predates the drift: **`schema.prisma` declares `Dispute.gigOrderId` as `@unique`, but no migration ever created that index.** Only `db push` had been providing it, so a database built purely from migrations would have permitted several disputes against the same gig order â€” on the escrow/dispute money path. The migration now creates `Dispute_gigOrderId_key` explicitly.
+
+`Dispute_subject_check` is deliberately *not* wrapped in a skip-if-violated guard: if existing rows violate "exactly one subject", the deploy must fail loudly rather than silently leave the money path unconstrained. Resolve offending rows first, then re-run.
+
+**Do not use `prisma db push` on a shared environment.** It desynchronises `_prisma_migrations` from the real schema, which is what produced this drift in the first place (see the 2026-09-21 CHANGELOG entry). Use `prisma migrate`.
 
 Do not edit an applied migration. Change `schema.prisma`, create a new migration, review its SQL, then regenerate the Prisma client.
 

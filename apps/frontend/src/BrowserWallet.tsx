@@ -9,6 +9,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { api, type TopUpRequest, type WalletResponse } from "./api/client";
+import { events } from "./analytics";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -204,6 +205,9 @@ export function BrowserWallet({
       } else {
         setWithdrawAmount("");
         setPayoutIdentifier("");
+        // Analytics: payout entered the settlement pipeline (completion is
+        // tracked as payout_completed when staff confirms settlement).
+        events.payoutRequested();
         setSuccess(
           "Withdrawal request recorded. Funds will be sent to your account.",
         );

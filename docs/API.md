@@ -1,4 +1,4 @@
-# API Reference
+﻿# API Reference
 
 Last updated: 2026-08-15
 
@@ -25,7 +25,7 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 |---|---|---|---|
 | `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents |
 | `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
-| `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange a valid refresh token for a new access+refresh pair. Suspended accounts are refused here too — a suspension takes effect at the next silent refresh. |
+| `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange a valid refresh token for a new access+refresh pair. Suspended accounts are refused here too â€” a suspension takes effect at the next silent refresh. |
 | `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
 
 Registration body:
@@ -332,7 +332,7 @@ Gig orders reuse the existing `EscrowState` machine, `calculateFees`, `PlatformF
 
 ### Gig order disputes
 
-Gig disputes share the milestone `Dispute` machine (polymorphic subject — migration `20260829233000_gig_disputes_polymorphic`).
+Gig disputes share the milestone `Dispute` machine (polymorphic subject â€” migration `20260829233000_gig_disputes_polymorphic`).
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
@@ -347,7 +347,7 @@ All TMS routes require staff access.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/api/v1/tms/queue` | List `PENDING_REVIEW` flags |
-| `POST` | `/api/v1/tms/:flagId/file-str` | Record external STR reference and notes; optional `suspendAccount` (Master Design §11.4) suspends the user |
+| `POST` | `/api/v1/tms/:flagId/file-str` | Record external STR reference and notes; optional `suspendAccount` (Master Design Â§11.4) suspends the user |
 | `POST` | `/api/v1/tms/:flagId/dismiss` | Dismiss false positive with notes |
 
 The API records a filing performed by a human; it does not submit to the FIC. A periodic BullMQ scan (`tms-scan`, every 15 minutes) re-runs the structuring / round-amounts / velocity rules and raises one-time `STR_SLA_BREACH` alerts for flags past their 24-hour deadline.
@@ -376,11 +376,25 @@ The API records a filing performed by a human; it does not submit to the FIC. A 
 | `POST` | `/api/v1/chat/conversations/:conversationId/assistant/extract-deal` | Participant | Mini-Me AI deal terms extractor into escrow milestone |
 | `GET` | `/api/v1/chat/admin/conversations` | Staff | List support queue (scoped by assignedStaffId for non-admins) |
 | `POST` | `/api/v1/chat/admin/conversations/:id/claim` | Staff | Claim an unassigned conversation |
-| `PATCH` | `/api/v1/chat/admin/conversations/:id/assign` | Admin | Reassign a conversation to a specific staff member |
+| `POST` | `/api/v1/chat/support` | Authenticated | Open a support ticket and notify the support desk immediately |
 
-## Common Responses
+### Guest support access
 
-| Status | Meaning |
+A visitor who messages support from the marketing site has no account and no
+session, so `requireAuth` would reject them. Without a way in, the widget could
+create a ticket but never read a reply or send a follow-up.
+
+`POST /api/v1/chat/guest` therefore returns an extra `accessToken`: a signed JWT
+carrying `typ: "guest_support"` and a single `conversationId`. It is deliberately
+not a login token — no refresh token, no `role`/`staffRole` claims, 12h TTL.
+
+The token is accepted by `GET/POST /api/v1/chat/conversations/:conversationId/messages`
+and `POST /api/v1/chat/conversations/:conversationId/read` via
+`requireGuestChatAccess`, which pins it to exactly that conversation. Presenting it
+for any other `conversationId` returns `403 TOKEN_SCOPE_MISMATCH` rather than
+falling through to a weaker check. The WebSocket handshake accepts it too (forced
+to non-staff), so replies arrive live.
+
 |---|---|
 | `200` | Successful read or transition |
 | `201` | Resource created |
@@ -407,7 +421,7 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `POST` | `/api/v1/admin/users/:id/force-kyc-rereview` | `kyc.review` | Force a periodic KYC re-review |
 | `GET` | `/api/v1/admin/staff` | `admins.manage` | List all staff accounts |
 | `POST` | `/api/v1/admin/staff/:userId/role` | `admins.manage` | Assign/remove a staff role (audited) |
-| `GET` | `/api/v1/admin/permissions/matrix` | any staff | Current role → permission map |
+| `GET` | `/api/v1/admin/permissions/matrix` | any staff | Current role â†’ permission map |
 | `GET` | `/api/v1/admin/users` | `users.view` | Search/list users (q, role, page) |
 | `GET` | `/api/v1/admin/users/:userId` | `users.view` | User detail + KYC + wallet + activity rollup |
 | `GET` | `/api/v1/admin/contracts` | `contracts.view` | Search/list contracts (q, status, page) |
@@ -443,11 +457,11 @@ Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Doma
 | `POST` | `/api/v1/chat/upload` | Authenticated | Upload file attachment (`multipart/form-data`, 15MB limit) |
 | `GET` | `/api/v1/chat/attachments/:key(*)` | Authenticated / public media stream | Stream uploaded chat attachment with MIME headers |
 | `POST` | `/api/v1/chat/direct` | Authenticated | Start or retrieve 1-on-1 direct negotiation conversation |
-| `POST` | `/api/v1/chat/support` | Authenticated | Create a customer support thread |
+| `POST` | `/api/v1/chat/support` | Authenticated | Open a support ticket and notify the support desk |
 | `POST` | `/api/v1/chat/conversations/:id/read` | Authenticated participant | Mark conversation messages as read |
-| `GET` | `/api/v1/chat/conversations/:id/assistant/suggest-replies` | Authenticated participant | Generate AI Mini-Me quick reply suggestions |
-| `GET` | `/api/v1/chat/conversations/:id/assistant/summarize` | Authenticated participant | Summarize contract negotiation topics and milestones |
-| `GET` | `/api/v1/chat/conversations/:id/assistant/extract-deal` | Authenticated participant | Extract milestone deliverables, price, and deadline |
+| `POST` | `/api/v1/chat/conversations/:id/assistant/suggest-replies` | Authenticated participant | Generate AI Mini-Me quick reply suggestions |
+| `POST` | `/api/v1/chat/conversations/:id/assistant/summarize` | Authenticated participant | Summarize contract negotiation topics and milestones |
+| `POST` | `/api/v1/chat/conversations/:id/assistant/extract-deal` | Authenticated participant | Extract milestone deliverables, price, and deadline |
 
 ### POST /api/v1/chat/upload
 - **Auth:** Authenticated (`Bearer <token>`)
@@ -471,7 +485,7 @@ Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Doma
 Connect to: `ws://127.0.0.1:4000/api/v1/ws?token=<access-token>`
 
 ### Authentication & Connection
-- **URL Parameter:** `token` — JWT access token.
+- **URL Parameter:** `token` â€” JWT access token.
 - Unauthenticated connections are closed with code `4001` or `4003`.
 - Authenticated sockets are automatically subscribed to `user:<userId>` and (if staff) `staff:alerts`.
 
@@ -482,6 +496,17 @@ Connect to: `ws://127.0.0.1:4000/api/v1/ws?token=<access-token>`
 { "action": "typing", "conversationId": "<conversationId>", "isTyping": true }
 { "action": "read", "conversationId": "<conversationId>" }
 ```
+
+**Channel authorization.** Every client-supplied channel is authorized against
+the database before it takes effect. `subscribe` accepts only the
+`conversation:<id>` family, and only when the socket's user participates in that
+conversation (staff may watch any conversation with an assigned agent).
+`typing` and `read` are re-checked the same way, so an arbitrary conversation id
+cannot be used to observe another user's messages or typing activity. Successful
+checks are memoized per socket for its lifetime. Private channels
+(`user:<id>`, `staff:alerts`) are attached server-side at handshake and can never
+be requested by a client. Unauthorized attempts are logged and ignored; a
+database error during the check fails closed.
 
 ### Server Events
 - `connected`: Handshake confirmation with userId.
@@ -509,5 +534,4 @@ All administrative surfaces are protected by router-level `requireAuth` and gran
 - **Access:** `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT", "SUPER_ADMIN", "OPERATIONS_ADMIN", "COMPLIANCE_ADMIN")`.
 - **Visibility:** Full staff (`ADMIN`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `SUPPORT`) can view all open tickets across all staff or filter by `staffId`.
 - **Guest Inquiries (`POST /api/v1/chat/guest`):** Public entry point. Creates a guest account, assigns the ticket across active staff roles, adds assigned staff to participants, and triggers real-time fan-out notifications to staff via `notifyStaffOfEvent("SUPPORT_REQUEST_CREATED", ...)`.
-
 

@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   api,
@@ -9,7 +9,8 @@ import {
   type TopUpRequest,
   type WalletResponse,
 } from "./api/client";
-import { LandingPage } from "./LandingPage";
+import { realtimeSocket } from "./api/socket";
+import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { StaffDashboard } from "./StaffDashboard";
 import { BrowserWallet } from "./BrowserWallet";
@@ -42,7 +43,9 @@ import {
   Eye,
   EyeOff,
   Package,
+  RefreshCw,
   X,
+  LifeBuoy,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -105,6 +108,108 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categories = Object.keys(categoryLabels);
+
+// === OVERVIEW INTERACTIVITY (additive helpers) ===
+type MetricCardKey = "wallet" | "jobs" | "milestones";
+type ActivityFilterKey =
+  | "ALL"
+  | "AWAITING_FUNDING"
+  | "IN_ESCROW"
+  | "SUBMITTED"
+  | "RELEASED"
+  | "DISPUTED";
+type ActivityDueWindow = "ANY" | "OVERDUE" | "NEXT_7" | "NEXT_30";
+type ActivitySort =
+  | "DEFAULT"
+  | "DUE_ASC"
+  | "DUE_DESC"
+  | "AMOUNT_DESC"
+  | "AMOUNT_ASC";
+
+const activityFilterLabels: Record<ActivityFilterKey, string> = {
+  ALL: "All",
+  AWAITING_FUNDING: "Awaiting funding",
+  IN_ESCROW: "In escrow",
+  SUBMITTED: "Submitted",
+  RELEASED: "Released",
+  DISPUTED: "Disputed",
+};
+
+const activityFilterStates: Record<Exclude<ActivityFilterKey, "ALL">, string[]> =
+  {
+    AWAITING_FUNDING: ["PAYMENT_PENDING"],
+    IN_ESCROW: ["ESCROW_HELD", "WORK_IN_PROGRESS"],
+    SUBMITTED: ["SUBMITTED_FOR_REVIEW", "ACCEPTED"],
+    RELEASED: ["RELEASED"],
+    DISPUTED: ["DISPUTED", "REFUNDED", "PARTIAL_REFUND"],
+  };
+
+/* Milestone states where milestone value is locked in escrow */
+const ESCROW_SECURED_STATES = [
+  "ESCROW_HELD",
+  "WORK_IN_PROGRESS",
+  "SUBMITTED_FOR_REVIEW",
+  "ACCEPTED",
+];
+
+/* Top-up statuses that have not yet landed in the wallet balance */
+const PENDING_TOPUP_STATES = [
+  "PENDING",
+  "CHECKOUT_PENDING",
+  "PENDING_REVIEW",
+  "FLAGGED",
+];
+
+const moneyETB = (minor: number) => `ETB ${(minor / 100).toLocaleString()}`;
+const compactETB = (minor: number) =>
+  `ETB ${Intl.NumberFormat(undefined, {
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(minor / 100)}`;
+const dateLabel = (value: string) => new Date(value).toLocaleDateString();
+const optionalDateLabel = (value: string | null) =>
+  value ? new Date(value).toLocaleDateString() : "—";
+
+/* Compact div-based bar chart: theme-token colors only, no layout drift */
+function MiniBarChart({
+  data,
+  caption,
+  formatValue,
+}: {
+  data: { key: string; label: string; value: number }[];
+  caption: string;
+  formatValue: (value: number) => string;
+}) {
+  if (data.length === 0) return null;
+  const max = Math.max(...data.map((entry) => entry.value));
+  return (
+    <div className="mini-chart-wrap">
+      <p className="mini-chart-caption">{caption}</p>
+      <div
+        className="mini-chart"
+        role="img"
+        aria-label={`${caption}. Peak month ${formatValue(max)}.`}
+      >
+        {data.map((entry) => (
+          <div
+            className="mini-chart-bar"
+            key={entry.key}
+            title={`${entry.label}: ${formatValue(entry.value)}`}
+          >
+            <span className="mini-chart-value">{formatValue(entry.value)}</span>
+            <div
+              className="mini-chart-fill"
+              style={{
+                height: `${Math.max(4, Math.round((entry.value / max) * 100))}%`,
+              }}
+            />
+            <span className="mini-chart-label">{entry.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
@@ -256,6 +361,20 @@ export function FullPlatformApp() {
   const [jobBudgetMin, setJobBudgetMin] = useState("");
   const [jobBudgetMax, setJobBudgetMax] = useState("");
   const [jobDeadline, setJobDeadline] = useState("");
+  /* Overview interactivity state (additive — defaults preserve prior behavior) */
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [realtimeLive, setRealtimeLive] = useState(false);
+  const [expandedMetric, setExpandedMetric] = useState<MetricCardKey | null>(
+    null,
+  );
+  const [activityFilter, setActivityFilter] = useState<ActivityFilterKey>("ALL");
+  const [activityDueWindow, setActivityDueWindow] =
+    useState<ActivityDueWindow>("ANY");
+  const [activitySort, setActivitySort] = useState<ActivitySort>("DEFAULT");
+  const [expandedActivityId, setExpandedActivityId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     // Auto-resume active session on visit without prompting to re-register
@@ -285,6 +404,68 @@ export function FullPlatformApp() {
     }
   }, []);
 
+  // === Analytics: boot + SPA page-view tracking ===
+  // initAnalytics() is gated internally: production build only, a configured
+  // VITE_GA_MEASUREMENT_ID, and analytics cookie consent (CookieBanner).
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
+  // Manual page_view on every client-side "route" change. The SPA keeps router
+  // state in React instead of the URL, so we hook these state transitions and
+  // report virtual paths ("/", "/faq", "/auth/register", "/app/wallet", ...).
+  useEffect(() => {
+    if (user?.staffRole) return; // staff dashboards are not part of the funnel
+    if (!user && showLanding) {
+      events.pageView(marketingPage === "home" ? "/" : `/${marketingPage}`);
+    } else if (!user) {
+      events.pageView(`/auth/${authMode}`);
+    } else {
+      events.pageView(`/app/${view}`);
+    }
+  }, [user, showLanding, marketingPage, authMode, view]);
+
+  // Auth funnel: signup_started fires each time the register form becomes
+  // visible (role is read from the entry render; later role toggles re-run
+  // this effect only when authMode/showLanding/user changed — the guard
+  // below prevents double-counting within one register-mode visit).
+  const signupTrackedRef = useRef(false);
+  useEffect(() => {
+    if (!user && !showLanding && authMode === "register") {
+      if (!signupTrackedRef.current) {
+        signupTrackedRef.current = true;
+        events.signupStarted({
+          method: "email",
+          user_type: role === "CLIENT" ? "client" : "freelancer",
+        });
+      }
+    } else {
+      signupTrackedRef.current = false;
+    }
+  }, [user, showLanding, authMode, role]);
+
+  // Auth funnel: auth_abandoned fires if the auth screen closes (back to
+  // landing / unmount) without a completed sign-in or sign-up.
+  const authVisitRef = useRef<{ flow: AuthMode; completed: boolean } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (user || showLanding) return;
+    authVisitRef.current = { flow: authMode, completed: false };
+    return () => {
+      const visit = authVisitRef.current;
+      authVisitRef.current = null;
+      if (visit && !visit.completed) events.authAbandoned(visit.flow);
+    };
+    // Only keyed on entering/leaving the auth screen; mode switches are
+    // tracked by the effect below so the abandonment flow stays current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, showLanding]);
+
+  useEffect(() => {
+    if (authVisitRef.current) authVisitRef.current.flow = authMode;
+  }, [authMode]);
+
   const loadWorkspace = async () => {
     const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] =
       await Promise.allSettled([
@@ -301,6 +482,69 @@ export function FullPlatformApp() {
     if (milestonesResult.status === "fulfilled")
       setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
+    setLastUpdatedAt(new Date());
+  };
+
+  // Ref-synced alias so the polling/socket effect can stay keyed on [user]
+  // exactly like the pre-existing mount effect above (no new hook deps).
+  const loadWorkspaceRef = useRef(loadWorkspace);
+  useEffect(() => {
+    loadWorkspaceRef.current = loadWorkspace;
+  });
+
+  // "Now" reference for due-window filters. Updated on each poll tick and on
+  // filter changes (event handlers) instead of during render, keeping render
+  // pure for the compiler-checked lint rules.
+  const [nowMs, setNowMs] = useState(0);
+
+  // Near-real-time overview: instant reload on notify:* socket events (the
+  // same events the NotificationCenter already listens to) plus a light 60s
+  // poll that pauses while the tab is hidden. No new backend endpoints.
+  useEffect(() => {
+    if (!user) return;
+    const reload = () => {
+      setNowMs(Date.now());
+      void loadWorkspaceRef.current().catch(() => {
+        /* transient failures leave the last successful snapshot on screen */
+      });
+    };
+    const notifyEvents = [
+      "notify:escrow-funded",
+      "notify:milestone-submitted",
+      "notify:escrow-released",
+      "notify:dispute-raised",
+      "notify:dispute-resolved",
+      "notify:auto-release-warning",
+      "notify:gig-order-funded",
+      "notify:gig-delivery-submitted",
+      "notify:gig-order-completed",
+    ];
+    realtimeSocket.connect();
+    notifyEvents.forEach((event) => realtimeSocket.on(event, reload));
+    const offStatus = realtimeSocket.onStatusChange(setRealtimeLive);
+    const startTimer = window.setTimeout(() => {
+      setNowMs(Date.now());
+    }, 0);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") reload();
+    }, 60_000);
+    return () => {
+      notifyEvents.forEach((event) => realtimeSocket.off(event, reload));
+      offStatus();
+      window.clearTimeout(startTimer);
+      window.clearInterval(timer);
+    };
+  }, [user]);
+
+  const refreshDashboard = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadWorkspace();
+    } catch {
+      /* session failures are surfaced by the initial load flow */
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const submitAuth = async (event: FormEvent) => {
@@ -343,6 +587,14 @@ export function FullPlatformApp() {
       }
       const session = await api.login(email, password);
       api.setSession(session);
+      // Analytics: mark the auth visit completed before the user state flips
+      // (the abandonment effect's cleanup reads this flag on logout/exit).
+      if (authVisitRef.current) authVisitRef.current.completed = true;
+      if (authMode === "register") {
+        events.signupCompleted(role === "CLIENT" ? "client" : "freelancer");
+      } else {
+        events.login("email");
+      }
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
@@ -401,6 +653,7 @@ export function FullPlatformApp() {
         ],
         deadline: jobDeadline,
       });
+      events.jobPosted();
       setJobTitle("");
       setJobDescription("");
       setJobBudgetMin("");
@@ -417,6 +670,131 @@ export function FullPlatformApp() {
 
   const platformRole = (user?.role as PlatformRole) || "CLIENT";
   const isFreelancer = platformRole === "FREELANCER";
+
+  // === OVERVIEW DERIVED DATA (computed from already-loaded workspace state) ===
+  const activeMilestones = useMemo(
+    () => milestones.filter((m) => m.escrowState !== "RELEASED"),
+    [milestones],
+  );
+  const escrowSecuredMinor = useMemo(
+    () =>
+      milestones
+        .filter((m) => ESCROW_SECURED_STATES.includes(m.escrowState))
+        .reduce((sum, m) => sum + m.amountMinor, 0),
+    [milestones],
+  );
+  const contractsInvolved = useMemo(
+    () => new Set(milestones.map((m) => m.contractId)).size,
+    [milestones],
+  );
+  const milestoneStateSummary = useMemo(() => {
+    const summary = new Map<string, { count: number; totalMinor: number }>();
+    for (const m of milestones) {
+      const entry = summary.get(m.escrowState) ?? { count: 0, totalMinor: 0 };
+      entry.count += 1;
+      entry.totalMinor += m.amountMinor;
+      summary.set(m.escrowState, entry);
+    }
+    return [...summary.entries()];
+  }, [milestones]);
+  const escrowByDueMonth = useMemo(() => {
+    const buckets = new Map<string, number>();
+    for (const m of milestones) {
+      const due = new Date(m.dueDate);
+      if (Number.isNaN(due.getTime())) continue;
+      const key = `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}`;
+      buckets.set(key, (buckets.get(key) ?? 0) + m.amountMinor);
+    }
+    return [...buckets.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-6)
+      .map(([key, value]) => ({
+        key,
+        label: new Date(`${key}-01T00:00:00`).toLocaleDateString([], {
+          month: "short",
+          year: "2-digit",
+        }),
+        value,
+      }));
+  }, [milestones]);
+  const topUpStats = useMemo(() => {
+    const pending = topUps.filter((t) => PENDING_TOPUP_STATES.includes(t.status));
+    const approved = topUps.filter((t) => t.status === "APPROVED");
+    const sum = (list: TopUpRequest[]) =>
+      list.reduce((total, t) => total + t.amountMinor, 0);
+    const dates = topUps.map((t) => t.createdAt).sort();
+    return {
+      pendingCount: pending.length,
+      pendingMinor: sum(pending),
+      approvedCount: approved.length,
+      approvedMinor: sum(approved),
+      lastCreatedAt: dates.length ? dates[dates.length - 1] : null,
+    };
+  }, [topUps]);
+  const jobStats = useMemo(() => {
+    const byCategory = new Map<string, number>();
+    let minMinor = 0;
+    let maxMinor = 0;
+    let soonestDeadline: string | null = null;
+    for (const job of jobs) {
+      byCategory.set(job.category, (byCategory.get(job.category) ?? 0) + 1);
+      minMinor += job.budgetMinMinor;
+      maxMinor += job.budgetMaxMinor;
+      if (!soonestDeadline || job.deadline < soonestDeadline)
+        soonestDeadline = job.deadline;
+    }
+    return {
+      byCategory: [...byCategory.entries()].sort((a, b) => b[1] - a[1]),
+      minMinor,
+      maxMinor,
+      soonestDeadline,
+    };
+  }, [jobs]);
+  const filteredMilestones = useMemo(() => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const now = nowMs;
+    let list = milestones;
+    if (activityFilter !== "ALL") {
+      const states = activityFilterStates[activityFilter];
+      list = list.filter((m) => states.includes(m.escrowState));
+    }
+    if (activityDueWindow !== "ANY" && now > 0) {
+      list = list.filter((m) => {
+        const due = new Date(m.dueDate).getTime();
+        if (Number.isNaN(due)) return false;
+        if (activityDueWindow === "OVERDUE")
+          return due < now && m.escrowState !== "RELEASED";
+        if (activityDueWindow === "NEXT_7")
+          return due >= now && due <= now + 7 * DAY_MS;
+        return due >= now && due <= now + 30 * DAY_MS;
+      });
+    }
+    if (activitySort !== "DEFAULT") {
+      const sorted = [...list];
+      sorted.sort((a, b) => {
+        const dueA = new Date(a.dueDate).getTime();
+        const dueB = new Date(b.dueDate).getTime();
+        if (activitySort === "DUE_ASC") return dueA - dueB;
+        if (activitySort === "DUE_DESC") return dueB - dueA;
+        if (activitySort === "AMOUNT_DESC") return b.amountMinor - a.amountMinor;
+      return a.amountMinor - b.amountMinor;
+    });
+      list = sorted;
+    }
+    return list;
+  }, [milestones, activityFilter, activityDueWindow, activitySort, nowMs]);
+
+  const toggleMetric = (key: MetricCardKey) =>
+    setExpandedMetric((current) => (current === key ? null : key));
+  const onMetricKeyDown = (
+    event: React.KeyboardEvent<HTMLElement>,
+    key: MetricCardKey,
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggleMetric(key);
+    }
+  };
 
   const navItems = useMemo(() => {
     const jobsLabel = platformRole === "FREELANCER" ? "Find work" : "Jobs";
@@ -470,8 +848,6 @@ export function FullPlatformApp() {
       "thank-you-contact": "Message Sent — Yekis",
     };
     document.title = pageTitles[marketingPage] || pageTitles.home;
-    initAnalytics();
-    events.pageView(marketingPage);
 
     return (
       <>
@@ -1033,7 +1409,11 @@ export function FullPlatformApp() {
           </button>
           {(authMode === "login" || authMode === "register") && (
             <SocialSignInButtons
+              role={authMode === "register" ? role : undefined}
               onAuthed={() => {
+                // Analytics: OAuth success completes the auth visit (the
+                // provider-specific "login" event fires in SocialSignInButtons).
+                if (authVisitRef.current) authVisitRef.current.completed = true;
                 void loadWorkspace().then(() => setShowLanding(false));
               }}
             />
@@ -1282,6 +1662,36 @@ export function FullPlatformApp() {
               )}
             </div>
 
+            {/* Live data status + manual refresh (near-real-time, no new endpoints) */}
+            <div className="overview-meta">
+              <span
+                className={realtimeLive ? "live-dot on" : "live-dot"}
+                aria-hidden="true"
+              />
+              <span className="overview-meta-text">
+                {realtimeLive ? "Live" : "Auto-refresh every 60s"} · Updated{" "}
+                {lastUpdatedAt
+                  ? lastUpdatedAt.toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  : "…"}
+              </span>
+              <button
+                type="button"
+                className="icon-button refresh-button"
+                onClick={() => void refreshDashboard()}
+                disabled={isRefreshing}
+                aria-label="Refresh dashboard data"
+                title="Refresh dashboard data"
+              >
+                <RefreshCw
+                  size={14}
+                  className={isRefreshing ? "refresh-spin" : undefined}
+                />
+              </button>
+            </div>
+
             {/* Featured section - different for clients and freelancers */}
             {isFreelancer ? (
               <div className="featured-jobs-section" style={{ margin: "24px 0" }}>
@@ -1371,28 +1781,166 @@ export function FullPlatformApp() {
             )}
 
             <div className="platform-metrics">
-              <article>
+              <article
+                className="metric-card"
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedMetric === "wallet"}
+                onClick={() => toggleMetric("wallet")}
+                onKeyDown={(event) => onMetricKeyDown(event, "wallet")}
+              >
                 <small>Wallet balance</small>
                 <strong>
                   ETB {(wallet.balanceMinor / 100).toLocaleString()}
                 </strong>
                 <span>Available balance</span>
+                <ChevronDown className="metric-chev" size={16} aria-hidden="true" />
+                {expandedMetric === "wallet" && (
+                  <div
+                    className="metric-breakdown"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="metric-breakdown-row">
+                      <span>Pending top-ups</span>
+                      <strong>
+                        {topUpStats.pendingCount} ·{" "}
+                        {moneyETB(topUpStats.pendingMinor)}
+                      </strong>
+                    </div>
+                    <div className="metric-breakdown-row">
+                      <span>Approved top-ups</span>
+                      <strong>
+                        {topUpStats.approvedCount} ·{" "}
+                        {moneyETB(topUpStats.approvedMinor)}
+                      </strong>
+                    </div>
+                    <div className="metric-breakdown-row">
+                      <span>Last top-up</span>
+                      <strong>
+                        {topUpStats.lastCreatedAt
+                          ? dateLabel(topUpStats.lastCreatedAt)
+                          : "—"}
+                      </strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="metric-action"
+                      onClick={() => setView("wallet")}
+                    >
+                      Open wallet <ArrowRight size={13} />
+                    </button>
+                  </div>
+                )}
               </article>
-              <article>
+              <article
+                className="metric-card"
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedMetric === "jobs"}
+                onClick={() => toggleMetric("jobs")}
+                onKeyDown={(event) => onMetricKeyDown(event, "jobs")}
+              >
                 <small>Open jobs</small>
                 <strong>{jobs.length}</strong>
                 <span>Matching opportunities</span>
+                <ChevronDown className="metric-chev" size={16} aria-hidden="true" />
+                {expandedMetric === "jobs" && (
+                  <div
+                    className="metric-breakdown"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {jobStats.byCategory.length === 0 ? (
+                      <span className="metric-breakdown-empty">
+                        No open jobs right now.
+                      </span>
+                    ) : (
+                      <>
+                        {jobStats.byCategory.map(([category, count]) => (
+                          <div className="metric-breakdown-row" key={category}>
+                            <span>
+                              {categoryLabels[category] ??
+                                category.replaceAll("_", " ")}
+                            </span>
+                            <strong>
+                              {count} {count === 1 ? "job" : "jobs"}
+                            </strong>
+                          </div>
+                        ))}
+                        <div className="metric-breakdown-row">
+                          <span>Combined budgets</span>
+                          <strong>
+                            {moneyETB(jobStats.minMinor)} –{" "}
+                            {moneyETB(jobStats.maxMinor)}
+                          </strong>
+                        </div>
+                        <div className="metric-breakdown-row">
+                          <span>Soonest deadline</span>
+                          <strong>
+                            {jobStats.soonestDeadline
+                              ? dateLabel(jobStats.soonestDeadline)
+                              : "—"}
+                          </strong>
+                        </div>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      className="metric-action"
+                      onClick={() => setView("jobs")}
+                    >
+                      {isFreelancer ? "Find work" : "View jobs"}{" "}
+                      <ArrowRight size={13} />
+                    </button>
+                  </div>
+                )}
               </article>
-              <article>
+              <article
+                className="metric-card"
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedMetric === "milestones"}
+                onClick={() => toggleMetric("milestones")}
+                onKeyDown={(event) => onMetricKeyDown(event, "milestones")}
+              >
                 <small>Active milestones</small>
-                <strong>
-                  {
-                    milestones.filter(
-                      (milestone) => milestone.escrowState !== "RELEASED",
-                    ).length
-                  }
-                </strong>
+                <strong>{activeMilestones.length}</strong>
                 <span>Across your contracts</span>
+                <ChevronDown className="metric-chev" size={16} aria-hidden="true" />
+                {expandedMetric === "milestones" && (
+                  <div
+                    className="metric-breakdown"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <div className="metric-breakdown-row">
+                      <span>ETB secured in escrow</span>
+                      <strong>{moneyETB(escrowSecuredMinor)}</strong>
+                    </div>
+                    <div className="metric-breakdown-row">
+                      <span>Contracts involved</span>
+                      <strong>{contractsInvolved}</strong>
+                    </div>
+                    {milestoneStateSummary.map(([state, info]) => (
+                      <div className="metric-breakdown-row" key={state}>
+                        <span>{state.replaceAll("_", " ")}</span>
+                        <strong>
+                          {info.count} · {moneyETB(info.totalMinor)}
+                        </strong>
+                      </div>
+                    ))}
+                    <MiniBarChart
+                      data={escrowByDueMonth}
+                      caption="Milestone value by due month"
+                      formatValue={compactETB}
+                    />
+                    <button
+                      type="button"
+                      className="metric-action"
+                      onClick={() => setView("contracts")}
+                    >
+                      View contracts <ArrowRight size={13} />
+                    </button>
+                  </div>
+                )}
               </article>
             </div>
 
@@ -1409,20 +1957,179 @@ export function FullPlatformApp() {
                     Your active contracts will appear here.
                   </p>
                 ) : (
-                  milestones.slice(0, 4).map((milestone) => (
-                    <div className="activity-row" key={milestone.id}>
-                      <span className="activity-dot" />
-                      <span>
-                        <strong>{milestone.title}</strong>
-                        <small>
-                          {milestone.escrowState.replaceAll("_", " ")}
-                        </small>
-                      </span>
-                      <b>
-                        ETB {(milestone.amountMinor / 100).toLocaleString()}
-                      </b>
+                  <>
+                    <div className="feed-controls">
+                      <div
+                        className="feed-chips"
+                        role="group"
+                        aria-label="Filter activity by type"
+                      >
+                        {(
+                          Object.keys(activityFilterLabels) as ActivityFilterKey[]
+                        )
+                          .filter(
+                            (key) =>
+                              key === "ALL" ||
+                              milestones.some((m) =>
+                                activityFilterStates[
+                                  key as Exclude<ActivityFilterKey, "ALL">
+                                ].includes(m.escrowState),
+                              ),
+                          )
+                          .map((key) => (
+                            <button
+                              type="button"
+                              key={key}
+                              className={
+                                activityFilter === key
+                                  ? "feed-chip active"
+                                  : "feed-chip"
+                              }
+                              onClick={() => setActivityFilter(key)}
+                            >
+                              {activityFilterLabels[key]}
+                            </button>
+                          ))}
+                      </div>
+                      <div className="feed-selects">
+                        <select
+                          className="feed-select"
+                          value={activityDueWindow}
+                          onChange={(event) => {
+                            setNowMs(Date.now());
+                            setActivityDueWindow(
+                              event.target.value as ActivityDueWindow,
+                            );
+                          }}
+                          aria-label="Filter by due date"
+                        >
+                          <option value="ANY">Any due date</option>
+                          <option value="OVERDUE">Overdue</option>
+                          <option value="NEXT_7">Due in 7 days</option>
+                          <option value="NEXT_30">Due in 30 days</option>
+                        </select>
+                        <select
+                          className="feed-select"
+                          value={activitySort}
+                          onChange={(event) =>
+                            setActivitySort(event.target.value as ActivitySort)
+                          }
+                          aria-label="Sort activity"
+                        >
+                          <option value="DEFAULT">Default order</option>
+                          <option value="DUE_ASC">Due soonest</option>
+                          <option value="DUE_DESC">Due latest</option>
+                          <option value="AMOUNT_DESC">
+                            Amount high to low
+                          </option>
+                          <option value="AMOUNT_ASC">Amount low to high</option>
+                        </select>
+                        {(activityFilter !== "ALL" ||
+                          activityDueWindow !== "ANY") && (
+                          <span className="feed-count">
+                            {filteredMilestones.length} of {milestones.length}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  ))
+                    {filteredMilestones.length === 0 ? (
+                      <p className="empty-state">
+                        No milestones match these filters.
+                      </p>
+                    ) : (
+                      filteredMilestones.slice(0, 4).map((milestone) => {
+                        const activityExpanded =
+                          expandedActivityId === milestone.id;
+                        return (
+                          <div className="activity-item" key={milestone.id}>
+                            <button
+                              type="button"
+                              className="activity-row"
+                              aria-expanded={activityExpanded}
+                              onClick={() =>
+                                setExpandedActivityId(
+                                  activityExpanded ? null : milestone.id,
+                                )
+                              }
+                            >
+                              <span className="activity-dot" />
+                              <span>
+                                <strong>{milestone.title}</strong>
+                                <small>
+                                  {milestone.escrowState.replaceAll("_", " ")}
+                                </small>
+                              </span>
+                              <b>
+                                ETB{" "}
+                                {(
+                                  milestone.amountMinor / 100
+                                ).toLocaleString()}
+                              </b>
+                              <ChevronDown
+                                className="row-chev"
+                                size={14}
+                                aria-hidden="true"
+                              />
+                            </button>
+                            {activityExpanded && (
+                              <div className="activity-detail">
+                                <div className="activity-detail-row">
+                                  <span>Milestone</span>
+                                  <strong className="mono">
+                                    #{milestone.id.slice(0, 8)}
+                                  </strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Status</span>
+                                  <strong>
+                                    {milestone.escrowState.replaceAll("_", " ")}
+                                  </strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Due date</span>
+                                  <strong>{dateLabel(milestone.dueDate)}</strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Submitted</span>
+                                  <strong>
+                                    {optionalDateLabel(milestone.submittedAt)}
+                                  </strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Auto-release</span>
+                                  <strong>
+                                    {optionalDateLabel(milestone.autoReleaseAt)}
+                                  </strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Released</span>
+                                  <strong>
+                                    {optionalDateLabel(milestone.releasedAt)}
+                                  </strong>
+                                </div>
+                                <div className="activity-detail-row">
+                                  <span>Amount</span>
+                                  <strong>
+                                    ETB{" "}
+                                    {(
+                                      milestone.amountMinor / 100
+                                    ).toLocaleString()}
+                                  </strong>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="metric-action"
+                                  onClick={() => setView("contracts")}
+                                >
+                                  Open in Contracts <ArrowRight size={13} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </>
                 )}
               </section>
               <section className="panel">
@@ -1681,6 +2388,18 @@ export function FullPlatformApp() {
                 <strong>Workspace role</strong>
                 <span>{roleLabel(platformRole)}</span>
               </div>
+              <div>
+                <strong>Customer Support</strong>
+                <span>Get real-time assistance with payments, jobs, or disputes.</span>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setView("chat")}
+                style={{ width: "fit-content", display: "inline-flex", alignItems: "center", gap: "8px" }}
+              >
+                <LifeBuoy size={16} /> Chat with Support
+              </button>
               <button className="btn-secondary" onClick={logout}>
                 <LogOut size={16} /> Sign out
               </button>

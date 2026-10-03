@@ -6,6 +6,12 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { logger } from "../../lib/logger.js";
 import argon2 from "argon2";
 import { randomBytes } from "node:crypto";
+import {
+  AccountLinkRequiredError,
+  accountLinkRequiredMessage,
+  isPasswordOwnedAccount,
+  withPlaceholderPhone,
+} from "./identity.js";
 
 /**
  * OAuth social sign-in: Google, Apple, Facebook.
@@ -194,7 +200,10 @@ export async function verifyFacebookAccessToken(
 
 // ---- Shared find-or-provision + token issuance ----
 
-export async function loginWithOAuthProfile(profile: OAuthProfile) {
+export async function loginWithOAuthProfile(
+  profile: OAuthProfile,
+  requestedRole?: "CLIENT" | "FREELANCER",
+) {
   const providerField = `${profile.provider.toLowerCase()}Id`;
 
   // 1. Existing link?
@@ -203,8 +212,25 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
   });
 
   if (user && !user.emailVerified) {
-    // OAuth providers verify email ownership - mark verified on first OAuth login.
-    await prisma.user.update({
+    // Refuse to claim an account that has its own password. Without a verified
+    // mailbox, an email match proves nothing: an attacker who pre-registers
+    // this address would otherwise receive the real account (and its escrow
+    // balance) the moment the owner clicks "Continue with <provider>".
+    // Federated-only accounts have no password to prove, so merging another
+    // provider into them stays safe.
+    if (isPasswordOwnedAccount(user)) {
+      logger.warn(
+        { userId: user.id, provider: profile.provider },
+        "Refusing OAuth merge into a password-owned account",
+      );
+      throw new AccountLinkRequiredError(
+        accountLinkRequiredMessage(profile.email),
+      );
+    }
+
+    // Federated providers verify email ownership - mark verified on first
+    // OAuth login.
+    user = await prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true },
     });
@@ -219,38 +245,44 @@ export async function loginWithOAuthProfile(profile: OAuthProfile) {
     const firstName = names[0] || "Member";
     const lastName = names.slice(1).join(" ") || "";
 
-    user = await prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email: profile.email,
-          emailVerified: true,
-          // Phone is collected later in onboarding; unique placeholder keeps
-          // the schema constraint satisfied without fabricating personal data.
-          phone: `+251000${Math.floor(100000 + Math.random() * 900000)}`,
-          passwordHash: sentinelHash,
-          firstName,
-          lastName,
-          displayName: profile.name ?? firstName,
-          avatarUrl: profile.avatarUrl,
-          role: "CLIENT",
-          languagePreference: "en",
-          kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
-          wallet: { create: { balanceMinor: 0 } },
-          consents: {
-            create: [
-              { purpose: "kyc_data_processing", granted: true },
-              {
-                purpose: `${profile.provider.toLowerCase()}_account_linking`,
-                granted: true,
-              },
-              { purpose: "marketing_communications", granted: false },
-              { purpose: "analytics", granted: false },
-            ],
+    const userRole = requestedRole === "FREELANCER" ? "FREELANCER" : "CLIENT";
+
+    user = await withPlaceholderPhone((phone) =>
+      prisma.$transaction(async (tx) => {
+        return tx.user.create({
+          data: {
+            email: profile.email,
+            emailVerified: true,
+            // Phone is collected later in onboarding; the reserved
+            // +251 0xxxxxxxx placeholder satisfies the unique constraint
+            // without fabricating an operator-allocated number.
+            phone,
+            passwordHash: sentinelHash,
+            // Stays NULL: marks the account as federated-owned so a later
+            // social sign-in on the same address may merge into it.
+            firstName,
+            lastName,
+            displayName: profile.name ?? firstName,
+            avatarUrl: profile.avatarUrl,
+            role: userRole,
+            languagePreference: "en",
+            kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+            wallet: { create: { balanceMinor: 0 } },
+            consents: {
+              create: [
+                { purpose: "kyc_data_processing", granted: true },
+                {
+                  purpose: `${profile.provider.toLowerCase()}_account_linking`,
+                  granted: true,
+                },
+                { purpose: "marketing_communications", granted: false },
+                { purpose: "analytics", granted: false },
+              ],
+            },
           },
-        },
-      });
-      return created;
-    });
+        });
+      }),
+    );
 
     await recordAuditEvent({
       userId: user.id,
@@ -298,6 +330,10 @@ export function getOAuthProviderAvailability() {
     google: !!env.GOOGLE_CLIENT_ID,
     apple: !!env.APPLE_CLIENT_ID,
     facebook: !!(env.FACEBOOK_APP_ID && env.FACEBOOK_APP_SECRET),
+    // Telegram needs a bot token to verify a credential at all. The username
+    // is served from here so the client never has to hardcode a bot handle
+    // that can drift from the deployed bot.
     telegram: !!env.TELEGRAM_BOT_TOKEN,
+    telegramBotUsername: env.TELEGRAM_BOT_USERNAME ?? null,
   };
 }

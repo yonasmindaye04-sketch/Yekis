@@ -19,6 +19,7 @@ import {
   type Job,
   type Proposal,
 } from "./api/client";
+import { events } from "./analytics";
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER";
@@ -130,6 +131,7 @@ export function JobsWorkspace({
         ],
         attachmentPaths,
       });
+      events.proposalSubmitted();
       setMessage("Proposal submitted.");
       await Promise.all([refresh(), onChanged()]);
       
@@ -675,10 +677,12 @@ export function ContractsWorkspace({
                       className="btn-primary"
                       disabled={busy}
                       onClick={() =>
-                        void act(
-                          () => api.acceptContract(contract.id),
-                          "Agreement accepted.",
-                        )
+                        void act(async () => {
+                          await api.acceptContract(contract.id);
+                          events.contractSigned(
+                            role === "CLIENT" ? "client" : "freelancer",
+                          );
+                        }, "Agreement accepted.")
                       }
                     >
                       Accept agreement
@@ -744,11 +748,12 @@ export function ContractsWorkspace({
                               className="btn-primary"
                               disabled={busy}
                               onClick={() =>
-                                void act(
-                                  () =>
-                                    api.fundMilestoneFromWallet(milestone.id),
-                                  "Escrow funded from your wallet. Work can begin!",
-                                )
+                                void act(async () => {
+                                  await api.fundMilestoneFromWallet(
+                                    milestone.id,
+                                  );
+                                  events.escrowFunded("contract_milestone");
+                                }, "Escrow funded from your wallet. Work can begin!")
                               }
                             >
                               <WalletCards size={15} /> Fund from wallet
@@ -775,10 +780,10 @@ export function ContractsWorkspace({
                               className="btn-primary"
                               disabled={busy}
                               onClick={() =>
-                                void act(
-                                  () => api.submitMilestone(milestone.id),
-                                  "Milestone submitted for review.",
-                                )
+                                void act(async () => {
+                                  await api.submitMilestone(milestone.id);
+                                  events.milestoneDelivered();
+                                }, "Milestone submitted for review.")
                               }
                             >
                               Submit delivery
@@ -790,10 +795,10 @@ export function ContractsWorkspace({
                               className="btn-primary"
                               disabled={busy}
                               onClick={() =>
-                                void act(
-                                  () => api.acceptMilestone(milestone.id),
-                                  "Milestone accepted and funds released.",
-                                )
+                                void act(async () => {
+                                  await api.acceptMilestone(milestone.id);
+                                  events.milestoneAccepted();
+                                }, "Milestone accepted and funds released.")
                               }
                             >
                               Accept delivery

@@ -11,6 +11,13 @@ export interface BotSession {
   telegramUserId: number;
   telegramChatId: number;
   userId?: string;
+  // Set when identity resolution deliberately refused to bind this Telegram
+  // account (e.g. the synthetic address belongs to a password-owned account).
+  // /start reads it to explain the fix instead of failing silently.
+  loginBlocked?: string;
+  // Rate-limit bookkeeping for /login so a member cannot orphan a stream of
+  // outstanding codes. Epoch seconds.
+  codeIssuedAt?: number;
   role?: "CLIENT" | "FREELANCER" | "BOTH" | "STAFF";
   kycTier?: "TIER_1" | "TIER_2" | "TIER_3";
   kycStatus?: "VERIFIED" | "PENDING" | "REJECTED" | "UNDER_REVIEW";

@@ -1,4 +1,5 @@
 import { Send, MessageCircle, Bot, Mail, ShieldCheck } from "lucide-react";
+import { openSupportChat } from "./components/supportChatEvents";
 import "./marketing.css";
 
 type MarketingFooterProps = {
@@ -45,7 +46,18 @@ export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
           <nav className="footer-col" aria-label="Company">
             <h4>Company</h4>
             <button onClick={() => onNavigate("about")}>About Us</button>
-            <a href="mailto:support@yekis.com">Contact Support</a>
+            <a
+              href="mailto:support@yekis.com"
+              onClick={(e) => {
+                // Prefer the in-page support widget; fall back to email when it
+                // isn't mounted on this page.
+                if (openSupportChat()) {
+                  e.preventDefault();
+                }
+              }}
+            >
+              Contact Support
+            </a>
           </nav>
           <nav className="footer-col" aria-label="Legal">
             <h4>Legal</h4>
@@ -73,7 +85,7 @@ export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
               <MessageCircle size={16} /> Community
             </a>
             <a
-              href="https://t.me/yekis_bot"
+              href="https://t.me/ye_kis_bot"
               target="_blank"
               rel="noopener noreferrer"
             >

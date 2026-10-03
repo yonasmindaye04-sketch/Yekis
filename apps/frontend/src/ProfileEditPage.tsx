@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Save, Check } from "lucide-react";
+import { Save, Check, RefreshCw } from "lucide-react";
 import { api } from "./api/client";
+import { YekisAvatar } from "./components/YekisAvatar";
 import "./ProfilePage.css";
 
 interface SkillTaxonomy {
@@ -23,6 +24,7 @@ interface ProfileFormState {
 
 export const ProfileEditPage = () => {
   const [formData, setFormData] = useState<ProfileFormState>({ skillIds: [] });
+  const [avatarSeed, setAvatarSeed] = useState<string>("");
   const [skillTaxonomy, setSkillTaxonomy] = useState<SkillTaxonomy[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -44,8 +46,9 @@ export const ProfileEditPage = () => {
           api.getSkills().catch(() => []),
         ]).then(([profileRes, skillsRes]) => ({ me, profileRes, skillsRes })),
       )
-      .then(({ profileRes, skillsRes }) => {
+      .then(({ me, profileRes, skillsRes }) => {
         if (cancelled) return;
+        setAvatarSeed(me.id);
         const p = profileRes as {
           firstName?: string;
           lastName?: string;
@@ -165,6 +168,42 @@ export const ProfileEditPage = () => {
         </div>
 
         <form onSubmit={handleSubmit} className="profile-edit-form panel">
+          {/* Section 0: Profile Character (Blobatar) */}
+          <div className="form-section">
+            <h3 className="form-section-title">Profile Avatar (Blobatar)</h3>
+            <p className="form-section-desc">
+              Your animated character generated deterministically by Blobatar. Hover over it to trigger micro-interactions.
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 20, marginTop: 14 }}>
+              <YekisAvatar
+                seed={avatarSeed}
+                avatarUrl={formData.avatarUrl}
+                size={84}
+                animate="hover"
+                className="hero-avatar"
+              />
+              <div>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px", fontSize: "0.88rem", cursor: "pointer" }}
+                  onClick={() => {
+                    const base = avatarSeed.split("#")[0] || "Yekis";
+                    setAvatarSeed(`${base}#v${Math.floor(Math.random() * 10000)}`);
+                  }}
+                >
+                  <RefreshCw size={15} />
+                  Shuffle Blobatar
+                </button>
+                <div style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)", marginTop: 6 }}>
+                  Re-rolls geometric traits, color palette, and eyes.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <hr className="form-divider" />
+
           {/* Section 1: Personal Details */}
           <div className="form-section">
             <h3 className="form-section-title">Personal Details</h3>

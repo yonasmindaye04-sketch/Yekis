@@ -5,6 +5,7 @@ import { randomBytes, createHash } from "crypto";
 import type { RegisterInput, LoginInput } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 
@@ -46,6 +47,9 @@ export async function registerUser(input: RegisterInput) {
         email: input.email,
         phone: input.phone,
         passwordHash,
+        // Marks the account as password-owned: a later social sign-in that
+        // merely matches this email must not be merged into it.
+        passwordSetAt: new Date(),
         role: input.role,
         languagePreference: input.languagePreference,
         dateOfBirth: dob,
@@ -168,7 +172,19 @@ export async function loginUser(input: LoginInput) {
 
   if (!user) throw new InvalidCredentialsError();
 
-  const valid = await argon2.verify(user.passwordHash, input.password);
+  // argon2.verify THROWS on a malformed hash rather than returning false.
+  // Legacy/seeded/corrupted rows would otherwise surface as a 500 on the
+  // login endpoint, which both misleads the caller and turns a data problem
+  // into an availability one. An unverifiable hash is simply not a match.
+  let valid = false;
+  try {
+    valid = await argon2.verify(user.passwordHash, input.password);
+  } catch (err) {
+    logger.warn(
+      { userId: user.id, err },
+      "Password hash could not be verified (malformed or unsupported)",
+    );
+  }
   if (!valid) throw new InvalidCredentialsError();
 
   if (user.isSuspended) {
@@ -292,7 +308,7 @@ export async function resetPassword(token: string, newPassword: string) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: resetRecord.userId },
-      data: { passwordHash },
+      data: { passwordHash, passwordSetAt: new Date() },
     });
 
     await tx.passwordResetToken.update({

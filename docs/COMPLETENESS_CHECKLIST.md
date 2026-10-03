@@ -1,4 +1,4 @@
-# Yekis_jobs Completeness Checklist
+﻿# Yekis_jobs Completeness Checklist
 
 Last reviewed: 2026-08-15
 
@@ -7,7 +7,7 @@ Last reviewed: 2026-08-15
 ## Product Journey
 
 - [x] Registration, login, age gate, consent capture, and JWT sessions
-- [x] Google (Gmail) & Social authentication with automatic workspace provisioning and session persistence
+- [x] Google & Telegram social authentication and registration with role selection (Client vs Freelancer), session persistence, and cryptographic verification
 - [x] Transactional email system (branded HTML templates for password resets, escrow order invoices/receipts with ETB amounts, platform movement alerts)
 - [x] Telegram Mini App dual authentication (1-tap Telegram WebApp HMAC verification + secure Mobile Phone & PIN login)
 - [x] Public user profiles with skills taxonomy, bio, and dynamic completeness score
@@ -38,6 +38,9 @@ Last reviewed: 2026-08-15
 - [x] Multi-rail payment choices (Telebirr, Commercial Bank of Ethiopia CBE, and Safaricom M-Pesa) across Instant Checkout, Manual Transfer, and Freelancer Withdrawals
 - [x] Manual verification fallback: actionable transfer fallback on API failure and receipt attachment to unconfirmed checkout requests (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`)
 - [x] In-app notifications and support chat surfaces
+- [x] Support runs entirely on the platform's own engine (no third-party agent inbox): ticket creation, agent auto-assignment/claim/reassign, OPEN/CLOSED workflow, live messaging, attachments, unread counts and audit trail
+- [x] Native customer support chat end to end: public widget creates a ticket, the visitor receives a conversation-scoped token so replies and follow-ups work without an account, staff work the queue in the admin dashboard, and updates arrive live over the WebSocket
+- [x] WebSocket channel authorization: client-requested subscriptions and typing/read broadcasts verified against conversation membership
 - [x] Staff KYC, top-up, dispute, TMS, and Finance queues
 - [x] Finance reconciliation read models and fee credit ledger
 - [x] Monthly withholding tax remittance reporting job
@@ -49,8 +52,8 @@ Last reviewed: 2026-08-15
 - [x] Secured dispute router replaces the legacy unauthenticated router at mount time
 - [x] Zod validation for shared and route-local payloads
 - [x] Role, staff, party, ownership, KYC-tier, and state-transition checks
-- [x] `PATCH /chat/admin/conversations/:id/status` — staff can close and reopen support conversations
-- [x] `/chat` — Guest support with automated load-balanced staff assignment and staff-scoped access control
+- [x] `PATCH /chat/admin/conversations/:id/status` â€” staff can close and reopen support conversations
+- [x] `/chat` â€” Guest support with automated load-balanced staff assignment and staff-scoped access control
 - [x] Self-bid prevention and one proposal per freelancer/job
 - [x] Serializable proposal acceptance prevents multiple winners
 - [x] One contract per job
@@ -116,7 +119,7 @@ Last reviewed: 2026-08-15
 - [x] **Evidence Bundle Assembly & Storage** (SHA-256 hashed JSON)
 - [x] **Mandatory Cooling-Off / Deadlines** (7-day resolution SLAs)
 - [x] Real-time `ws` layer: JWT-authenticated channels, chat typing/read receipts, staff alerts, and live `notify:*` event fan-out from the BullMQ notification worker
-- [x] Admin operations platform (Phases 1–8): RBAC permission matrix, hardened audit log, Users/Contracts/Payments/Escrow/Payouts/Ledger/Reconciliation/Reports/Risk/Monitoring, real-metrics Overview, manual payout settlement workflow
+- [x] Admin operations platform (Phases 1â€“8): RBAC permission matrix, hardened audit log, Users/Contracts/Payments/Escrow/Payouts/Ledger/Reconciliation/Reports/Risk/Monitoring, real-metrics Overview, manual payout settlement workflow
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
@@ -134,7 +137,7 @@ Last reviewed: 2026-08-15
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Amharic translation integration — all `[TODO]` marketing stubs filled; professional linguistic review still open (see verification section)
+- [x] Amharic translation integration â€” all `[TODO]` marketing stubs filled; professional linguistic review still open (see verification section)
 
 ## Automated And Manual Verification
 

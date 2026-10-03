@@ -9,8 +9,11 @@ export function MobileCTA({ onStart }: MobileCTAProps) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    // Hide when footer is in view
-    const footer = document.querySelector(".landing-footer");
+    // Hide when footer is in view (landing V2 uses .v2-footer-area,
+    // legacy marketing pages use .landing-footer)
+    const footer = document.querySelector(
+      ".v2-footer-area, .landing-footer",
+    );
     if (!footer) return;
 
     const observer = new IntersectionObserver(

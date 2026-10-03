@@ -1,6 +1,8 @@
 // === IMPORTS ===
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useTelegramMiniApp } from "./telegram/useTelegramMiniApp";
+import { initAnalytics, events } from "./analytics";
+import { CookieBanner } from "./CookieBanner";
 import {
   api,
   type TelegramAuthResponse,
@@ -10,6 +12,7 @@ import {
   type MeResponse,
 } from "./api/client";
 import { FullPlatformApp } from "./FullPlatformApp";
+import { YekisAvatar } from "./components/YekisAvatar";
 import {
   Home,
   Search,
@@ -325,11 +328,59 @@ export function App() {
       });
   }, [loadData]);
 
+  // === Analytics (Telegram Mini App shell) ===
+  // initAnalytics() is gated internally: production build only, configured
+  // VITE_GA_MEASUREMENT_ID, and analytics cookie consent (CookieBanner below).
+  useEffect(() => {
+    initAnalytics();
+  }, []);
+
+  // Derived display flags (moved above the effects so they can guard them)
+  const isPaymentReturn = window.location.pathname === "/payment/return";
+  const isNonTelegram = !telegram.isTelegram;
+
+  // Manual page_view on mini-app screen changes (tab state is this SPA's
+  // router). Skipped for the browser build — FullPlatformApp tracks itself.
+  useEffect(() => {
+    if (isNonTelegram || isPaymentReturn) return;
+    if (telegramAuthStatus !== "ready") {
+      events.pageView("/mini/welcome");
+    } else {
+      events.pageView(`/mini/${activeTab}`);
+    }
+  }, [isNonTelegram, isPaymentReturn, telegramAuthStatus, activeTab]);
+
+  // Auth funnel: fire auth_abandoned when the mobile sign-in/sign-up form is
+  // closed (back button) after the user started typing, without completing.
+  const mobileAbandonRef = useRef<"login" | "register" | null>(null);
+  const markMobileAuthCompletedOrAbandon = useCallback(
+    (completed: boolean) => {
+      const flow = mobileAbandonRef.current;
+      mobileAbandonRef.current = null;
+      if (!completed && flow) events.authAbandoned(flow);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!showMobileLogin) return;
+    if (mobilePhone.trim() || mobilePassword.trim()) {
+      mobileAbandonRef.current =
+        mobileAuthMode === "signup" ? "register" : "login";
+    }
+  }, [showMobileLogin, mobileAuthMode, mobilePhone, mobilePassword]);
+
+  const closeMobileLogin = useCallback(() => {
+    markMobileAuthCompletedOrAbandon(false);
+    setShowMobileLogin(false);
+    setTelegramAuthError("");
+  }, [markMobileAuthCompletedOrAbandon]);
+
   // Universal back handler
   const handleUniversalBack = useCallback(() => {
     if (proposalModal.isOpen) {
       setProposalModal((prev) => ({ ...prev, isOpen: false }));
     } else if (telegramAuthStatus !== "ready") {
+      markMobileAuthCompletedOrAbandon(false);
       setShowMobileLogin(false);
       setTelegramAuthError("");
     } else if (showJobForm) {
@@ -337,7 +388,13 @@ export function App() {
     } else if (activeTab !== "home") {
       setActiveTab("home");
     }
-  }, [activeTab, proposalModal.isOpen, showJobForm, telegramAuthStatus]);
+  }, [
+    activeTab,
+    proposalModal.isOpen,
+    showJobForm,
+    telegramAuthStatus,
+    markMobileAuthCompletedOrAbandon,
+  ]);
 
   // Hook into Telegram WebApp Native Back Button
   useEffect(() => {
@@ -385,12 +442,13 @@ export function App() {
         telegram.initData,
         selectedRole,
       );
+      api.setSession(session);
+      events.login("telegram");
       setTelegramSession(session);
       const backendRole =
         session.user.role === "ADMIN" ? "ADMIN" : selectedRole;
       setRole(backendRole);
       window.localStorage.setItem("yekis-role", backendRole);
-      api.setSession(session);
       setTelegramAuthStatus("ready");
       await loadData();
     } catch (err) {
@@ -444,6 +502,10 @@ export function App() {
             analytics: false,
           },
         });
+        // Analytics: account created (role only — never the phone/email).
+        events.signupCompleted(
+          mobileRole === "CLIENT" ? "client" : "freelancer",
+        );
       }
 
       const res = await api.loginWithMobile({
@@ -452,6 +514,8 @@ export function App() {
       });
 
       api.setSession(res);
+      markMobileAuthCompletedOrAbandon(true);
+      events.login("mobile");
       const me = await api.getMe();
       setUserProfile(me);
       const backendRole = me.role === "ADMIN" ? "ADMIN" : (me.role as Role);
@@ -670,6 +734,7 @@ export function App() {
         budgetMax: "",
         deadline: getDefaultMilestoneDueDate(),
       });
+      events.jobPosted();
       await fetchJobs();
       alert("Job created successfully!");
     } catch (err) {
@@ -685,6 +750,7 @@ export function App() {
     setIsLoading(true);
     try {
       await api.fundMilestoneFromWallet(milestoneId);
+      events.escrowFunded("contract_milestone");
       await fetchMilestones();
       await fetchWallet();
       alert("Milestone funded successfully into escrow!");
@@ -707,6 +773,7 @@ export function App() {
     setIsLoading(true);
     try {
       await api.acceptMilestone(milestoneId);
+      events.milestoneAccepted();
       await fetchMilestones();
       await fetchWallet();
       alert("Milestone accepted and escrow funds released!");
@@ -723,6 +790,7 @@ export function App() {
     setIsLoading(true);
     try {
       await api.submitMilestone(milestoneId);
+      events.milestoneDelivered();
       alert(
         "Deliverables submitted! The client has been notified to review and release funds.",
       );
@@ -781,6 +849,7 @@ export function App() {
         ],
         attachmentPaths,
       });
+      events.proposalSubmitted();
       setProposalModal({
         isOpen: false,
         jobId: "",
@@ -801,10 +870,6 @@ export function App() {
     }
   };
 
-  // Derived display flags
-  const isPaymentReturn = window.location.pathname === "/payment/return";
-  const isNonTelegram = !telegram.isTelegram;
-
   if (isPaymentReturn) {
     return <PaymentReturn />;
   }
@@ -821,10 +886,7 @@ export function App() {
             <div className="welcome-topbar" style={{ marginBottom: "14px" }}>
               <button
                 className="back-btn"
-                onClick={() => {
-                  setShowMobileLogin(false);
-                  setTelegramAuthError("");
-                }}
+                onClick={closeMobileLogin}
                 aria-label="Back"
               >
                 <ArrowLeft size={16} /> <span>Back</span>
@@ -1133,11 +1195,18 @@ export function App() {
                     cursor: "pointer",
                     fontWeight: 600,
                   }}
-                  onClick={() =>
-                    setMobileAuthMode(
-                      mobileAuthMode === "signin" ? "signup" : "signin",
-                    )
-                  }
+                  onClick={() => {
+                    const next =
+                      mobileAuthMode === "signin" ? "signup" : "signin";
+                    setMobileAuthMode(next);
+                    if (next === "signup") {
+                      events.signupStarted({
+                        method: "mobile",
+                        user_type:
+                          mobileRole === "CLIENT" ? "client" : "freelancer",
+                      });
+                    }
+                  }}
                 >
                   {mobileAuthMode === "signin"
                     ? "Need an account? Sign up"
@@ -1251,6 +1320,7 @@ export function App() {
             </div>
           )}
         </div>
+        <CookieBanner />
       </main>
     );
   }
@@ -1299,6 +1369,7 @@ export function App() {
 
   return (
     <div className="platform-shell mini-platform-shell">
+      <CookieBanner />
       <aside className="platform-sidebar">
         <div className="sidebar-brand">
           <img
@@ -1309,9 +1380,13 @@ export function App() {
           <strong>Yekis</strong>
         </div>
         <div className="sidebar-role">
-          <span className="avatar">
-            {displayName.slice(0, 1).toUpperCase()}
-          </span>
+          <YekisAvatar
+            userId={userProfile?.id}
+            displayName={displayName}
+            email={userProfile?.email}
+            size={32}
+            animate="hover"
+          />
           <span>
             <strong>{formatRole(role)}</strong>
             <small>{displayName}</small>
@@ -1376,9 +1451,13 @@ export function App() {
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
             <button className="user-menu" onClick={() => setActiveTab("kyc")}>
-              <span className="avatar">
-                {displayName.slice(0, 1).toUpperCase()}
-              </span>
+              <YekisAvatar
+                userId={userProfile?.id}
+                displayName={displayName}
+                email={userProfile?.email}
+                size={30}
+                animate="hover"
+              />
               <span>Profile</span>
             </button>
           </div>

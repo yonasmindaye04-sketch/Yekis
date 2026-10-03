@@ -5,11 +5,15 @@ import { URL } from "node:url";
 import { jwtVerify } from "jose";
 import { env } from "../config/env.js";
 import { logger } from "./logger.js";
+import { prisma } from "./prisma.js";
+import { isGuestSupportToken } from "../modules/chat/guestSupportToken.js";
 
 // === TYPES ===
 interface AuthenticatedSocket extends WebSocket {
   userId?: string;
   isStaff?: boolean;
+  /** True when authenticated with a single-conversation guest support token. */
+  isGuest?: boolean;
   isAlive?: boolean;
   subscriptions?: Set<string>;
 }
@@ -61,8 +65,15 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
         return;
       }
 
+      // A guest support token authenticates as the guest so their thread's
+      // messages reach them live. It must never be treated as staff: force
+      // isStaff off for these regardless of what the payload claims, so a
+      // forged staffRole on a guest token buys nothing.
+      const isGuestToken = isGuestSupportToken(payload as Record<string, unknown>);
+
       ws.userId = userId;
-      ws.isStaff = !!staffRole;
+      ws.isStaff = isGuestToken ? false : !!staffRole;
+      ws.isGuest = isGuestToken;
 
       // Register user socket
       if (!clientsByUserId.has(userId)) {
@@ -92,28 +103,43 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
 
     // Handle client messages (e.g. subscribing to chat threads)
     ws.on("message", (raw) => {
-      try {
-        const message = JSON.parse(raw.toString());
-        if (message.action === "subscribe" && typeof message.channel === "string") {
-          subscribeToChannel(ws, message.channel);
-        } else if (message.action === "unsubscribe" && typeof message.channel === "string") {
-          unsubscribeFromChannel(ws, message.channel);
-        } else if (message.action === "typing" && typeof message.conversationId === "string" && ws.userId) {
-          broadcastToChannel(`conversation:${message.conversationId}`, "chat:typing", {
-            userId: ws.userId,
-            conversationId: message.conversationId,
-            isTyping: Boolean(message.isTyping),
-          });
-        } else if (message.action === "read" && typeof message.conversationId === "string" && ws.userId) {
-          broadcastToChannel(`conversation:${message.conversationId}`, "chat:read", {
-            userId: ws.userId,
-            conversationId: message.conversationId,
-            readAt: new Date().toISOString(),
-          });
+      void (async () => {
+        try {
+          const message = JSON.parse(raw.toString());
+          if (!ws.userId) return;
+
+          if (message.action === "subscribe" && typeof message.channel === "string") {
+            if (await isChannelSubscribable(ws, message.channel)) {
+              subscribeToChannel(ws, message.channel);
+            } else {
+              logger.warn(
+                { userId: ws.userId, channel: message.channel },
+                "Rejected WebSocket subscribe to an unauthorized channel",
+              );
+            }
+          } else if (message.action === "unsubscribe" && typeof message.channel === "string") {
+            unsubscribeFromChannel(ws, message.channel);
+          } else if (message.action === "typing" && typeof message.conversationId === "string") {
+            // Re-check membership: broadcasting on an arbitrary conversation id
+            // leaks another user's typing activity.
+            if (!(await isConversationParticipant(ws, message.conversationId))) return;
+            broadcastToChannel(`conversation:${message.conversationId}`, "chat:typing", {
+              userId: ws.userId,
+              conversationId: message.conversationId,
+              isTyping: Boolean(message.isTyping),
+            });
+          } else if (message.action === "read" && typeof message.conversationId === "string") {
+            if (!(await isConversationParticipant(ws, message.conversationId))) return;
+            broadcastToChannel(`conversation:${message.conversationId}`, "chat:read", {
+              userId: ws.userId,
+              conversationId: message.conversationId,
+              readAt: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // Ignore malformed JSON messages
         }
-      } catch {
-        // Ignore malformed JSON messages
-      }
+      })();
     });
 
     ws.on("close", () => {
@@ -160,6 +186,78 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
 
   logger.info("WebSocket real-time server mounted at /api/v1/ws");
   return wss;
+}
+
+/**
+ * Per-socket memoization of authorized conversation ids.
+ *
+ * Channel authorization costs a DB round trip, and the frontend subscribes to
+ * the same conversation repeatedly (on mount, on thread switch, on reconnect).
+ * Caching positive results for the life of the socket keeps that from turning
+ * into a per-frame query storm.
+ */
+const authorizedConversations = new WeakMap<AuthenticatedSocket, Set<string>>();
+
+/**
+ * Whether the socket's user may receive events for a conversation.
+ *
+ * Mirrors the rule in chat.service.getConversationAccess: staff can watch any
+ * support conversation, everyone else only conversations they participate in.
+ */
+async function isConversationParticipant(
+  ws: AuthenticatedSocket,
+  conversationId: string,
+): Promise<boolean> {
+  if (!ws.userId || !conversationId) return false;
+
+  const cache = authorizedConversations.get(ws);
+  if (cache?.has(conversationId)) return true;
+
+  try {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: conversationId },
+      select: {
+        assignedStaffId: true,
+        participants: { where: { userId: ws.userId }, select: { id: true } },
+      },
+    });
+    if (!conversation) return false;
+
+    const isParticipant = conversation.participants.length > 0;
+    // Staff are trusted across support threads; regular users are not.
+    const allowed = isParticipant || (ws.isStaff === true && Boolean(conversation.assignedStaffId));
+
+    if (allowed) {
+      if (cache) cache.add(conversationId);
+      else authorizedConversations.set(ws, new Set([conversationId]));
+    }
+    return allowed;
+  } catch (err) {
+    // Fail closed. A DB blip must not turn into an authorization bypass.
+    logger.error({ err, conversationId }, "WebSocket channel authorization check failed");
+    return false;
+  }
+}
+
+/**
+ * Guard for client-requested subscriptions.
+ *
+ * Without this, any authenticated user could subscribe to
+ * `conversation:<any-id>` and receive another user's chat messages in real time
+ * — the WebSocket equivalent of an IDOR.
+ *
+ * Only the `conversation:*` family is client-subscribable. Private channels
+ * (`user:*`, `staff:*`) are attached server-side at authentication time and
+ * must never be granted on request.
+ */
+async function isChannelSubscribable(
+  ws: AuthenticatedSocket,
+  channel: string,
+): Promise<boolean> {
+  if (!channel.startsWith("conversation:")) return false;
+  const conversationId = channel.slice("conversation:".length);
+  if (!conversationId) return false;
+  return isConversationParticipant(ws, conversationId);
 }
 
 function subscribeToChannel(ws: AuthenticatedSocket, channel: string) {

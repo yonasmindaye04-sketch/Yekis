@@ -3,7 +3,7 @@ import { api } from "./client";
 
 export type SocketEventHandler<T = any> = (data: T) => void;
 
-class RealtimeSocketManager {
+export class RealtimeSocketManager {
   private ws: WebSocket | null = null;
   private reconnectTimer: number | null = null;
   private reconnectAttempts = 0;
@@ -13,10 +13,23 @@ class RealtimeSocketManager {
   private statusListeners = new Set<(connected: boolean) => void>();
   private pingInterval: number | null = null;
 
+  /**
+   * Optional token source that overrides `api.getToken()`.
+   *
+   * The landing support widget authenticates as a guest with a
+   * conversation-scoped token rather than a session, so it needs its own socket
+   * instead of fighting the app-wide singleton over one connection.
+   */
+  private readonly tokenOverride?: () => string | null;
+
   public isConnected = false;
 
+  constructor(options: { getToken?: () => string | null } = {}) {
+    this.tokenOverride = options.getToken;
+  }
+
   private getWebSocketUrl(): string | null {
-    const token = api.getToken();
+    const token = this.tokenOverride ? this.tokenOverride() : api.getToken();
     if (!token) return null;
 
     const apiBase = import.meta.env.VITE_API_BASE_URL;
