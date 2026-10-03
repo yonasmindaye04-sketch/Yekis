@@ -1,23 +1,55 @@
 /* ────────────────────────────────────────────────────────────────────────
-   Users.tsx — account browser with role filter + inline profile detail.
-   GET /admin/users
+   Users.tsx — account browser with server-side search, role filter, inline
+   profile detail and moderation actions.
+   GET /admin/users · GET /admin/users/:userId
+   POST /admin/users/:id/suspend · /unsuspend · /force-kyc-rereview
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useState } from "react";
-import { ChevronLeft, ChevronRight, RefreshCw, Search, Users as UsersIcon } from "lucide-react";
-import { dt, fmt, opsApi, useApi, withUserDetail } from "../opsApi";
+import {
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+  Search,
+  ShieldAlert,
+  UserCheck,
+  UserX,
+  Users as UsersIcon,
+} from "lucide-react";
+import { dt, fmt, opsApi, opsListApi, withUserDetail } from "../opsApi";
+import { useListPage } from "../opsList";
+import { USER_ROLES } from "../opsConst";
 import type { User } from "../opsTypes";
-import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill } from "../components/ui";
+import {
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  Kv,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  useToast,
+} from "../components/ui";
 
-const roleColor = (r: string) => (r === "CLIENT" ? "#15803d" : r === "FREELANCER" ? "#2563eb" : "#7c3aed");
+const roleColor = (r: string) =>
+  r === "CLIENT" ? "#15803d" : r === "FREELANCER" ? "#2563eb" : "#7c3aed";
 
 export default function UsersPage() {
-  const { data, error, loading, reload } = useApi<User[]>(opsApi.users);
-  const [role, setRole] = useState("ALL");
+  const toast = useToast();
+  const [role, setRole] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
 
-  // Wallet balance and activity counters live on a separate summary route, so
-  // they are fetched when the profile is opened rather than for every row.
+  const list = useListPage<User>(
+    (p) => opsListApi.users({ ...p, role }),
+    25,
+    [role],
+  );
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
+
+  /* Wallet balance and activity counters live on a separate summary route,
+     so they load when the profile is opened rather than for every row. */
   const [detail, setDetail] = useState<User | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
@@ -30,7 +62,7 @@ export default function UsersPage() {
       setDetailErr(null);
       try {
         const raw = await opsApi.userDetail(id);
-        const row = (data ?? []).find((u) => u.id === id);
+        const row = rows.find((u) => u.id === id);
         if (row) setDetail(withUserDetail(row, raw));
       } catch (e) {
         setDetailErr(e instanceof Error ? e.message : "Could not load profile");
@@ -38,7 +70,7 @@ export default function UsersPage() {
         setDetailBusy(false);
       }
     },
-    [data],
+    [rows],
   );
 
   const closeDetail = useCallback(() => {
@@ -47,8 +79,36 @@ export default function UsersPage() {
     setDetailErr(null);
   }, []);
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  const moderate = async (u: User, action: "suspend" | "unsuspend" | "rereview") => {
+    try {
+      if (action === "suspend") {
+        const reason = window.prompt(`Suspend ${u.email} — reason (min 5 characters):`) ?? "";
+        if (reason.trim().length < 5) {
+          toast("A reason of at least 5 characters is required.");
+          return;
+        }
+        await opsApi.suspendUser(u.id, reason.trim());
+        toast(`${u.email} suspended.`);
+      } else if (action === "unsuspend") {
+        await opsApi.unsuspendUser(u.id);
+        toast(`${u.email} reinstated.`);
+      } else {
+        const r = await opsApi.forceKycRereview(u.id);
+        toast(
+          r.nextReviewDueAt
+            ? `KYC re-review scheduled for ${dt(r.nextReviewDueAt)}.`
+            : "KYC re-review requested.",
+        );
+      }
+      reload();
+      if (detailId === u.id) void openDetail(u.id);
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Action failed");
+    }
+  };
+
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   if (detailId) {
     if (detailBusy && !detail) return <LoadingBox />;
@@ -79,17 +139,19 @@ export default function UsersPage() {
                 <div style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>{detail.email} · {detail.phone} · <span className="mono">{detail.ucid}</span></div>
               </div>
             </div>
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <span className="pill" style={{ color: roleColor(detail.role), fontSize: 13 }}><span className="pdot" />{detail.role}</span>
               {detail.suspended ? <Pill s="SUSPENDED" /> : null}
             </div>
           </div>
+
           <div className="grid g4" style={{ marginTop: 20 }}>
             <div className="kv"><div className="kv-k">Wallet Balance</div><div className="kv-v">{fmt(detail.wallet)}</div></div>
             <div className="kv"><div className="kv-k">KYC Status</div><div className="kv-v" style={{ fontSize: 14, paddingTop: 4 }}><Pill s={detail.kyc} /></div></div>
-            <div className="kv"><div className="kv-k">Email Verified</div><div className="kv-v">Yes</div></div>
+            <div className="kv"><div className="kv-k">Profile Completeness</div><div className="kv-v">{detail.completeness}%</div></div>
             <div className="kv"><div className="kv-k">Joined</div><div className="kv-v">{dt(detail.created)}</div></div>
           </div>
+
           <div className="kv" style={{ marginTop: 14 }}>
             <div className="kv-k" style={{ marginBottom: 10 }}>Activity</div>
             <div style={{ display: "flex", gap: 26, flexWrap: "wrap", fontSize: 13, color: "var(--ops-text-2)" }}>
@@ -101,30 +163,63 @@ export default function UsersPage() {
               <span>Orders: <b style={{ color: "var(--ops-text)" }}>{detail.act.orders}</b></span>
             </div>
           </div>
+
+          <div className="sec-title" style={{ marginTop: 22 }}>Moderation</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {detail.suspended ? (
+              <button className="btn btn-green btn-sm" onClick={() => void moderate(detail, "unsuspend")}>
+                <UserCheck size={13} /> Reinstate account
+              </button>
+            ) : (
+              <button className="btn btn-red btn-sm" onClick={() => void moderate(detail, "suspend")}>
+                <UserX size={13} /> Suspend account
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => void moderate(detail, "rereview")}>
+              <ShieldAlert size={13} /> Force KYC re-review
+            </button>
+          </div>
+          <div className="kbd-hint" style={{ marginTop: 8 }}>
+            Suspension requires <span className="mono">users.suspend</span>; forcing re-review requires{" "}
+            <span className="mono">kyc.review</span>. Both are enforced server-side and audited.
+          </div>
         </div>
       </div>
     );
   }
 
-  const rows = data.filter((u) => role === "ALL" || u.role === role);
   return (
     <div className="fade">
       <PageHead title="Users" sub="Browse platform accounts, KYC state and activity" />
-      <div className="card filters">
-        <div className="f-search"><Search size={15} /><input placeholder="Search email / phone / name / UCID" /></div>
-        <select className="sel" value={role} onChange={(e) => setRole(e.target.value)}>
-          {["ALL", "CLIENT", "FREELANCER", "BOTH"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "All roles" : s[0] + s.slice(1).toLowerCase()}</option>
-          ))}
-        </select>
-        <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Search</button>
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Matching accounts" v={total.toLocaleString()} />
+        <Kv k="On this page" v={String(rows.length)} />
+        <Kv k="Suspended" v={String(rows.filter((u) => u.suspended).length)} warn />
+        <Kv k="KYC verified" v={String(rows.filter((u) => u.kyc === "VERIFIED").length)} />
       </div>
-      <OpsTable heads={["User", "Contact", "Role", "KYC", "Status", "Joined", ""]} foot={<Pager n={rows.length} />}>
+      <div className="card filters">
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search email, phone, name or UCID…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect value={role} onChange={setRole} options={USER_ROLES} allLabel="All roles" label="Role" />
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+      <OpsTable
+        heads={["User", "Contact", "Role", "KYC", "Status", "Joined", ""]}
+        foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="accounts" />}
+      >
         {rows.length === 0 ? (
-          <tr><td colSpan={7}><Empty icon={UsersIcon}>No users match.</Empty></td></tr>
+          <tr><td colSpan={7}><Empty icon={UsersIcon}>No users match this search.</Empty></td></tr>
         ) : (
           rows.map((u) => (
-            <tr className="clickable" key={u.id} onClick={() => void openDetail(u.id)}>
+            <tr key={u.id} className="clickable" onClick={() => void openDetail(u.id)}>
               <td><div className="cell-main">{u.name ?? u.email}</div><div className="cell-sub mono">{u.ucid}</div></td>
               <td><div style={{ fontSize: 12.5 }}>{u.email}</div><div className="cell-sub">{u.phone}</div></td>
               <td><span className="pill" style={{ color: roleColor(u.role) }}><span className="pdot" />{u.role}</span></td>

@@ -8,6 +8,7 @@ import { dts, fmt, opsApi, useApi } from "../opsApi";
 import type { ReportsBundle } from "../opsTypes";
 import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
 import { ErrorBox, Kv, LoadingBox, PageHead, SecTitle } from "../components/ui";
+import { toCsv, downloadCsv, etb } from "../opsExport";
 
 const ST_C: Record<string, string> = {
   ACTIVE: "#059669",
@@ -21,6 +22,37 @@ export default function Reports() {
 
   if (loading && !data) return <LoadingBox />;
   if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+
+  /* Exports the same figures shown on screen — there is no server-side
+     export endpoint, so this is explicitly a snapshot of this report. */
+  const download = () =>
+    downloadCsv(
+      "yekis-reports",
+      toCsv(
+        ["Section", "Metric", "Value (ETB or count)"],
+        [
+          ["Financial", "Transaction volume", etb(f.vol)],
+          ["Financial", "Released funds", etb(f.released)],
+          ["Financial", "Refunded funds", etb(f.refunded)],
+          ["Financial", "Payouts", etb(f.payouts)],
+          ["Financial", "Platform fees", etb(f.fees)],
+          ["Financial", "Withholding tax accrued", etb(f.wh)],
+          ["Financial", "Failed payments", f.failPay],
+          ["Financial", "Failed payouts", f.failPo],
+          ["Marketplace", "Clients", mk.clients],
+          ["Marketplace", "Freelancers", mk.freelancers],
+          ["Marketplace", "Total contracts", mk.totalContracts],
+          ["Marketplace", "Open disputes", mk.disputes],
+          ["Marketplace", "Open risk flags", mk.flags],
+          ...Object.entries(mk.byStatus).map(([k, v]) => ["Marketplace", `Contracts · ${k}`, v]),
+          ...data.series.volume12.labels.map((l, i) => [
+            "Series · weekly volume (ETB M)",
+            l,
+            data.series.volume12.values[i] ?? 0,
+          ]),
+        ] as Array<Array<string | number>>,
+      ),
+    );
 
   const f = data.financial;
   const mk = data.marketplace;
@@ -38,7 +70,7 @@ export default function Reports() {
         right={
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>
-            <button className="btn btn-primary"><Download size={14} /> Download</button>
+            <button className="btn btn-primary" onClick={download}><Download size={14} /> Export CSV</button>
           </div>
         }
       />

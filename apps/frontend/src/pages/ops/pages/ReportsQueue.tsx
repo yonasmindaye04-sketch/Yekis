@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import { Check, RefreshCw, ShieldCheck, Users } from "lucide-react";
-import { dt, opsApi, useApi } from "../opsApi";
+import { dt, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
 import type { ProfileReport, ReportResolution } from "../opsTypes";
 import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, useToast } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
@@ -19,7 +20,8 @@ const RESOLVE_OPTS: { v: ReportResolution; l: string }[] = [
 export default function ReportsQueue() {
   const ui = useOpsUi();
   const toast = useToast();
-  const { data, error, loading, reload } = useApi<ProfileReport[]>(opsApi.profileReports);
+  const list = useListPage<ProfileReport>(opsListApi.profileReports);
+  const { rows, total, page, pages, loading, error, reload } = list;
   const [modal, setModal] = useState<{ id: string; action: ReportResolution; notes: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [busyFeatured, setBusyFeatured] = useState(false);
@@ -39,10 +41,10 @@ export default function ReportsQueue() {
     }
   };
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
-  const open = data.filter((r) => r.status === "OPEN");
-  const current = modal ? data.find((r) => r.id === modal.id) : null;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
+  const open = rows.filter((r) => r.status === "OPEN");
+  const current = modal ? rows.find((r) => r.id === modal.id) : null;
 
   const confirm = async () => {
     if (!modal || !modal.notes.trim()) return;
@@ -79,7 +81,10 @@ export default function ReportsQueue() {
           <Empty icon={ShieldCheck}>No pending reports — the queue is currently empty.</Empty>
         </div>
       ) : (
-        <OpsTable heads={["Reported User", "Reporter", "Reason", "Date", ""]} foot={<Pager n={open.length} />}>
+        <OpsTable
+          heads={["Reported User", "Reporter", "Reason", "Date", ""]}
+          foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="reports" />}
+        >
           {open.map((r) => (
             <tr key={r.id}>
               <td>

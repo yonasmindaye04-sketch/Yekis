@@ -397,6 +397,7 @@ export interface PermissionMatrix {
 
 export interface KycReviewEvent {
   id: string;
+  staffUserId: string;
   decision: string;
   tierAtDecision: string;
   reason: string | null;
@@ -785,11 +786,18 @@ class ApiClient {
     if (params?.flagType) searchParams.set("flagType", params.flagType);
     return this.request(`/api/v1/tms/queue?${searchParams.toString()}`);
   }
-  async fileStr(flagId: string, reviewNotes: string, strReferenceNumber: string): Promise<TransactionFlag> {
-    return this.request(`/api/v1/tms/${flagId}/file-str`, { method: "POST", body: JSON.stringify({ reviewNotes, strReferenceNumber }) });
+  async fileStr(flagId: string, reviewNotes: string, strReferenceNumber: string, suspendAccount = false): Promise<TransactionFlag> {
+    return this.request(`/api/v1/tms/${flagId}/file-str`, { method: "POST", body: JSON.stringify({ reviewNotes, strReferenceNumber, suspendAccount }) });
   }
   async dismissFlag(flagId: string, reviewNotes: string): Promise<TransactionFlag> {
     return this.request(`/api/v1/tms/${flagId}/dismiss`, { method: "POST", body: JSON.stringify({ reviewNotes }) });
+  }
+  /** Lifts a compliance hold placed on a user account. */
+  async liftTmsHold(userId: string, reason?: string): Promise<unknown> {
+    return this.request(`/api/v1/tms/users/${userId}/lift-hold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async getTmsActivity(): Promise<Array<AuditLogRow & { user: { id: string; email: string; staffRole: string | null } }>> {
+    return this.request("/api/v1/tms/activity");
   }
 
   async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
@@ -1073,6 +1081,14 @@ class ApiClient {
   async escalateDisputeToArbitration(disputeId: string): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/arbitration`, { method: "POST" });
   }
+  /** Claims a mediation case for the signed-in mediator. 409 if already claimed. */
+  async claimDispute(disputeId: string): Promise<Dispute> {
+    return this.request(`/api/v1/disputes/${disputeId}/claim`, { method: "POST" });
+  }
+  /** Records the binding arbitration award for a case at stage 4. */
+  async awardDispute(disputeId: string, input: { awardReferenceNumber: string; outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT"; recommendation: string; freelancerShareMinor?: number }): Promise<Dispute> {
+    return this.request(`/api/v1/disputes/${disputeId}/arbitration-award`, { method: "POST", body: JSON.stringify(input) });
+  }
 
   // --- Profiles ---
   async getPublicProfile(userId: string): Promise<unknown> {
@@ -1184,6 +1200,16 @@ class ApiClient {
   }
   async adminGetUser(userId: string): Promise<unknown> {
     return this.request(`/api/v1/admin/users/${userId}`);
+  }
+  async adminSuspendUser(userId: string, reason: string): Promise<{ id: string; isSuspended: boolean }> {
+    return this.request(`/api/v1/admin/users/${userId}/suspend`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminUnsuspendUser(userId: string): Promise<{ id: string; isSuspended: boolean }> {
+    return this.request(`/api/v1/admin/users/${userId}/unsuspend`, { method: "POST" });
+  }
+  /** Flags the KYC record for periodic re-review; returns the new due date. */
+  async adminForceKycRereview(userId: string): Promise<{ kycRecordId: string; periodicReviewPending: boolean; nextReviewDueAt: string | null }> {
+    return this.request(`/api/v1/admin/users/${userId}/force-kyc-rereview`, { method: "POST" });
   }
   async adminListContracts(params?: { page?: number; limit?: number; q?: string; status?: string }): Promise<unknown> {
     const qs = new URLSearchParams();

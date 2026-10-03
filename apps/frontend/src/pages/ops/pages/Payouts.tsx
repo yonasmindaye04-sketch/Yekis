@@ -1,33 +1,43 @@
 /* ────────────────────────────────────────────────────────────────────────
    Payouts.tsx — disbursement queue with inline settle row (confirm/fail).
-   GET /admin/payouts · POST /admin/payouts/:id/settle
+   GET /admin/payouts · POST /admin/payouts/:payoutId/settle
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
 import { Check, ChevronDown, Clock, RefreshCw, Search, X } from "lucide-react";
-import { fmt, opsApi, useApi } from "../opsApi";
+import { fmt, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
+import { PAYOUT_STATUSES, RAILS } from "../opsConst";
 import type { Payout } from "../opsTypes";
-import { Banner, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, Rail, useToast } from "../components/ui";
+import {
+  Banner,
+  ErrorBox,
+  FilterSelect,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  Rail,
+  useToast,
+} from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 
 export default function Payouts() {
   const ui = useOpsUi();
-  const toast = useToast();
-  const { data, error, loading, reload } = useApi<Payout[]>(opsApi.payouts);
-  const [status, setStatus] = useState("ALL");
-  const [prov, setProv] = useState("ALL");
+  const toast = useToast();  const [status, setStatus] = useState("");
+  const [provider, setProvider] = useState("");
   const [settleId, setSettleId] = useState<string | null>(null);
   const [ref, setRef] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
-
-  const pending = data.filter((p) => p.status === "PENDING" || p.status === "PROCESSING");
-  const rows = data.filter(
-    (p) => (status === "ALL" || p.status === status) && (prov === "ALL" || p.provider === prov),
+  const list = useListPage<Payout>(
+    (p) => opsListApi.payouts({ ...p, status, provider }),
+    25,
+    [status, provider],
   );
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
   const settle = async (id: string, outcome: "CONFIRMED" | "FAILED") => {
     setBusy(true);
@@ -37,8 +47,14 @@ export default function Payouts() {
         ref: ref.trim() || undefined,
         reason: outcome === "FAILED" ? reason.trim() || undefined : undefined,
       });
-      toast(outcome === "CONFIRMED" ? "Payout confirmed on rail." : "Payout failed — wallet re-credited.");
-      setSettleId(null); setRef(""); setReason("");
+      toast(
+        outcome === "CONFIRMED"
+          ? "Payout confirmed on rail."
+          : "Payout failed — wallet re-credited.",
+      );
+      setSettleId(null);
+      setRef("");
+      setReason("");
       reload();
       ui.refreshBadges();
     } catch (e) {
@@ -48,55 +64,85 @@ export default function Payouts() {
     }
   };
 
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
+
+  const pendingOnPage = rows.filter(
+    (p) => p.status === "PENDING" || p.status === "PROCESSING",
+  ).length;
+
   return (
     <div className="fade">
-      <PageHead title="Payouts & Disbursements" sub="Settle freelancer transfers executed out-of-band on provider rails" />
-      {pending.length ? (
-        <Banner tone="b-amber" icon={Clock} strong={`${pending.length} payout(s) awaiting disbursement.`} rest="Confirm once the transfer executed on the rail — failing re-credits the wallet." />
+      <PageHead
+        title="Payouts & Disbursements"
+        sub="Settle freelancer transfers executed out-of-band on provider rails"
+      />
+      {pendingOnPage ? (
+        <Banner
+          tone="b-amber"
+          icon={Clock}
+          strong={`${pendingOnPage} payout(s) awaiting disbursement on this page.`}
+          rest="Confirm once the transfer executed on the rail — failing re-credits the wallet."
+        />
       ) : null}
       <div className="card filters">
-        <div className="f-search"><Search size={15} /><input placeholder="Search by freelancer email or payout account…" /></div>
-        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {["ALL", "PENDING", "PROCESSING", "CONFIRMED", "FAILED", "REVERSED"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "Any status" : s}</option>
-          ))}
-        </select>
-        <select className="sel" value={prov} onChange={(e) => setProv(e.target.value)}>
-          {["ALL", "TELEBIRR", "CBE_BIRR"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "Any rail" : s}</option>
-          ))}
-        </select>
-        <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search provider ref, payout account or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect value={status} onChange={setStatus} options={PAYOUT_STATUSES} allLabel="Any status" label="Payout status" />
+        <FilterSelect value={provider} onChange={setProvider} options={RAILS} allLabel="Any rail" label="Provider" humanise={false} />
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
       </div>
-      <OpsTable heads={["Freelancer", "Payout Acct", "Provider Ref", "Provider", "Net", "Status", "Reason", "Settle"]} foot={<Pager n={rows.length} />}>
-        {rows.map((p) => {
-          const canSettle = p.status === "PENDING" || p.status === "PROCESSING";
-          return (
-            <FragmentRow
+      <OpsTable
+        heads={["Freelancer", "Payout Acct", "Provider Ref", "Provider", "Net", "Status", "Reason", "Settle"]}
+        foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="payouts" />}
+      >
+        {rows.length === 0 ? (
+          <tr><td colSpan={8}><EmptyPayout /></td></tr>
+        ) : (
+          rows.map((p) => (
+            <PayoutRow
               key={p.id}
               p={p}
-              canSettle={canSettle}
               open={settleId === p.id}
               busy={busy}
               refVal={ref}
               reasonVal={reason}
               onRef={setRef}
               onReason={setReason}
-              onToggle={() => { setSettleId(settleId === p.id ? null : p.id); setRef(""); setReason(""); }}
+              onToggle={() => {
+                setSettleId(settleId === p.id ? null : p.id);
+                setRef("");
+                setReason("");
+              }}
               onSettle={(o) => void settle(p.id, o)}
             />
-          );
-        })}
+          ))
+        )}
       </OpsTable>
     </div>
   );
 }
 
-function FragmentRow({
-  p, canSettle, open, busy, refVal, reasonVal, onRef, onReason, onToggle, onSettle,
+function EmptyPayout() {
+  return (
+    <div style={{ padding: "26px 16px", textAlign: "center", color: "var(--ops-text-2)" }}>
+      No payouts match this search.
+    </div>
+  );
+}
+
+function PayoutRow({
+  p, open, busy, refVal, reasonVal, onRef, onReason, onToggle, onSettle,
 }: {
   p: Payout;
-  canSettle: boolean;
   open: boolean;
   busy: boolean;
   refVal: string;
@@ -106,6 +152,7 @@ function FragmentRow({
   onToggle: () => void;
   onSettle: (o: "CONFIRMED" | "FAILED") => void;
 }) {
+  const settleable = p.status === "PENDING" || p.status === "PROCESSING";
   return (
     <>
       <tr>
@@ -119,7 +166,7 @@ function FragmentRow({
           {p.err ?? "—"}
         </td>
         <td>
-          {canSettle ? (
+          {settleable ? (
             <button className="btn btn-ghost btn-sm" onClick={onToggle}>
               {open ? "Close" : "Settle"} <ChevronDown size={12} />
             </button>

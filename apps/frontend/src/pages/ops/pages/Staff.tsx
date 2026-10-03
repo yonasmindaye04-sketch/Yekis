@@ -7,8 +7,9 @@
 
 import { useMemo, useState } from "react";
 import { Check, RefreshCw, Shield } from "lucide-react";
-import { opsApi, useApi } from "../opsApi";
+import { opsApi, opsListApi, useApi } from "../opsApi";
 import type { StaffMember, StaffRole } from "../opsTypes";
+import { useListPage } from "../opsList";
 import { ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, useToast } from "../components/ui";
 
 const ROLE_LABELS: Record<StaffRole, string> = {
@@ -24,7 +25,8 @@ const ROLE_LABELS: Record<StaffRole, string> = {
 
 export default function StaffPage() {
   const toast = useToast();
-  const { data, error, loading, reload } = useApi<StaffMember[]>(opsApi.staff);
+  const list = useListPage<StaffMember>(opsListApi.staff);
+  const { rows, total, page, pages, loading, error, reload } = list;
   const matrix = useApi(opsApi.permissionMatrix);
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StaffRole | null>("SUPPORT");
@@ -35,8 +37,8 @@ export default function StaffPage() {
     return Object.keys(roles).filter((r) => r !== "ADMIN");
   }, [matrix.data]);
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   const save = async (id: string) => {
     setBusy(true);
@@ -64,8 +66,8 @@ export default function StaffPage() {
         sub="Staff accounts and their permission scopes. All role changes are audited."
         right={<button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>}
       />
-      <OpsTable heads={["Email", "UCID", "User Role", "Staff Role", "Status", ""]} foot={<Pager n={data.length} />}>
-        {data.map((s) => (
+      <OpsTable heads={["Email", "UCID", "User Role", "Staff Role", "Status", ""]} foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="accounts" />}>
+        {rows.map((s) => (
           <tr key={s.id}>
             <td className="cell-main" style={{ fontWeight: 600 }}>{s.email}</td>
             <td className="mono" style={{ fontSize: 12, color: "var(--ops-text-2)" }}>{s.ucid}</td>

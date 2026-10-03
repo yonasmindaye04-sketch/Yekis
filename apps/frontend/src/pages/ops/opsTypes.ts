@@ -151,6 +151,8 @@ export interface User {
   kyc: KycState;
   created: string;
   suspended: boolean;
+  /** 0–100, only known once the detail summary has loaded. */
+  completeness: number;
   wallet: number;
   act: UserActivity;
 }
@@ -202,6 +204,18 @@ export interface RiskFlag {
   type: string;
   status: RiskStatus;
   created: string;
+  /** Rule-specific payload (STRUCTURING counts, VELOCITY windows, …). */
+  details: Record<string, unknown>;
+  strRef: string | null;
+  user: {
+    id: string;
+    email: string;
+    ucid: string;
+    kycTier: string | null;
+    kycStatus: string | null;
+    walletMinor: number | null;
+    flagCount: number;
+  };
 }
 export const RISK_LEVEL: Record<string, RiskLevel> = {
   STRUCTURING: "HIGH",
@@ -247,8 +261,24 @@ export interface Series {
 
 /* ── Review queues ── */
 export interface KycDoc {
+  /** KycDocument id — exchanged for a signed URL by the evidence viewer. */
+  id: string;
   t: string;
   k: "id-front" | "id-back" | "tin" | "license" | "selfie";
+}
+/**
+ * A document the viewer can open. Either `id` (a KycDocument, resolved to a
+ * short-lived signed URL) or `url` (a direct link such as a milestone
+ * deliverable) must be present.
+ */
+export interface ViewerDoc {
+  id?: string;
+  url?: string;
+  t: string;
+  k: "id-front" | "id-back" | "tin" | "license" | "selfie";
+  name?: string;
+  doc?: string;
+  tin?: string;
 }
 export interface KycHistory {
   d: string;
@@ -291,6 +321,8 @@ export interface DisputeItem {
   ms: string;
   amt: number;
   hasDel: boolean;
+  /** Direct link to the submitted deliverable, when one exists. */
+  deliverableUrl: string | null;
   slaH: number; // negative = breached
   created: string;
   ev: EvidenceMsg[];

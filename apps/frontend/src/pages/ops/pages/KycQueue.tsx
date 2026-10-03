@@ -1,14 +1,29 @@
 /* ────────────────────────────────────────────────────────────────────────
    KycQueue.tsx — identity review queue (list + detail).
-   GET /admin/kyc/queue · POST /admin/kyc/:id/decision
-   Hotkeys: ↑↓ navigate · A approve · R focus reason · Esc closes viewer.
+   GET  /kyc/review-queue · GET /kyc/:userId/history
+   POST /kyc/:userId/review · GET /kyc/documents/:id/url
+   Hotkeys: ↑↓ navigate · A approve · R focus reason.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Eye, RefreshCw, Search, ShieldCheck, UserCheck } from "lucide-react";
-import { dt, opsApi, useApi } from "../opsApi";
+import { dt, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
 import type { KycDecision, KycItem } from "../opsTypes";
-import { ChecksRow, Empty, ErrorBox, LoadingBox, PageHead, Pill, isTyping, useHotkeys, useToast } from "../components/ui";
+import {
+  ChecksRow,
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  Kv,
+  LoadingBox,
+  PageHead,
+  Pager,
+  Pill,
+  isTyping,
+  useHotkeys,
+  useToast,
+} from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 
 const KYC_REASONS = [
@@ -20,15 +35,55 @@ const KYC_REASONS = [
 export default function KycQueue({ focusId }: { focusId?: string }) {
   const ui = useOpsUi();
   const toast = useToast();
-  const { data, error, loading, reload } = useApi<KycItem[]>(opsApi.kycQueue);
-  const [status, setStatus] = useState<"UNDER_REVIEW" | "VERIFIED" | "REJECTED" | "ALL">("UNDER_REVIEW");
+  const [status, setStatus] = useState("UNDER_REVIEW");
   const [selId, setSelId] = useState<string | null>(focusId ?? null);
   const [reason, setReason] = useState("");
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const list = (data ?? []).filter((k) => status === "ALL" || k.status === status);
-  const sel = list.find((k) => k.id === selId) ?? null;
+  const page = useListPage<KycItem>(
+    (p) => opsListApi.kycQueue({ ...p, status: status || undefined }),
+    25,
+    [status],
+  );
+  const { rows, total, loading, error, reload } = page;
+
+  /* Review history lives on its own route; load it for the open record. */
+  const [history, setHistory] = useState<Record<string, KycItem["history"]>>({});
+
+  const sel = rows.find((k) => k.id === selId) ?? null;
+  /* The queue renders only the selected record's detail, with its history
+     merged in once the history route has answered. */
+  const list = useMemo(
+    () => (sel ? [{ ...sel, history: history[sel.id] ?? sel.history }] : []),
+    [sel, history],
+  );
+
+  /* Fetch the selected applicant's decision history once per selection. */
+  useEffect(() => {
+    if (!selId) return;
+    let alive = true;
+    void opsApi
+      .kycHistory(selId)
+      .then((events) => {
+        if (!alive) return;
+        setHistory((prev) => ({
+          ...prev,
+          [selId]: events.map((e) => ({
+            d: e.decision,
+            by: e.staffUserId,
+            at: e.createdAt,
+            reason: e.reason ?? undefined,
+          })),
+        }));
+      })
+      .catch(() => {
+        /* history is supplementary — a failure must not block the review */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [selId]);
 
   const decide = useCallback(
     async (decision: KycDecision, reasonOverride?: string) => {
@@ -79,8 +134,8 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
     ),
   );
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   const openDocs = (i: number) => {
     if (!sel) return;
@@ -98,25 +153,35 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         right={
           <span className="pill p-amber" style={{ fontSize: 13 }}>
             <span className="pdot" />
-            {data.filter((k) => k.status === "UNDER_REVIEW").length} pending review
+            {rows.filter((k) => k.status === "UNDER_REVIEW").length} pending review
           </span>
         }
       />
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Matching applications" v={total.toLocaleString()} />
+        <Kv k="On this page" v={String(rows.length)} />
+        <Kv k="PEP matches" v={String(rows.filter((k) => k.pep).length)} warn={rows.some((k) => k.pep)} />
+        <Kv k="With documents" v={String(rows.filter((k) => k.docs.length > 0).length)} />
+      </div>
       <div className="card filters">
         <div className="f-search">
           <Search size={15} />
-          <input placeholder="Search email, UCID or Fayda number…" />
+          <input
+            placeholder="Search email, phone or UCID…"
+            value={page.search}
+            onChange={(e) => page.setSearch(e.target.value)}
+          />
         </div>
-        <select
-          className="sel"
+        <FilterSelect
           value={status}
-          onChange={(e) => { setStatus(e.target.value as typeof status); setSelId(null); }}
-        >
-          <option value="UNDER_REVIEW">Under review</option>
-          <option value="VERIFIED">Verified</option>
-          <option value="REJECTED">Rejected</option>
-          <option value="ALL">All statuses</option>
-        </select>
+          onChange={(v) => {
+            setStatus(v);
+            setSelId(null);
+          }}
+          options={["UNDER_REVIEW", "VERIFIED", "REJECTED", "PENDING"]}
+          allLabel="All statuses"
+          label="KYC status"
+        />
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
@@ -153,6 +218,13 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
               </button>
             ))
           )}
+          <Pager
+            page={page.page}
+            pages={page.pages}
+            total={total}
+            onPage={page.setPage}
+            unit="applications"
+          />
         </div>
 
         {sel ? (

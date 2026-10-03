@@ -31,26 +31,53 @@ src/pages/ops/
   opsTypes.ts           console domain model (compact keys; money = minor units)
   opsBackend.ts         verbatim wire types for the real backend payloads
   opsApi.ts             the adapter (see below) + useApi hook + formatters
+  opsList.ts            useListPage() — server paging, debounced search, derived loading
+  opsConst.ts           option lists mirroring the Prisma enums the API accepts
+  opsExport.ts          RFC 4180 CSV export for on-screen tables
   opsUiContext.ts       navigate / openViewer / toast / refreshBadges
   components/
     charts.tsx          <AreaChart/> <BarChart/> <Donut/> <Sparkline/> <HBars/> + tooltip ctx
-    ui.tsx              Pill, Banner, StatCard, OpsTable, Pager, Kv, hotkeys, toasts…
+    ui.tsx              Pill, Banner, StatCard, OpsTable, Pager, FilterSelect, Kv, hotkeys…
     actionCenter.tsx    buildActionItems() + <ActionCenter/>
     CommandPalette.tsx  Ctrl/⌘K jump-to-anything (permission-filtered)
-    EvidenceViewer.tsx  zoom/rotate/drag lightbox with scan mockups
+    EvidenceViewer.tsx  zoom/rotate/drag lightbox over REAL signed document URLs
+    NotificationBell.tsx GET /notifications + mark-read, console-styled popover
   pages/
     Overview.tsx        Command Center: stat cards, Action Center, charts, activity
-    SupportDesk.tsx     support inbox (carried over)
-    DisputeQueue.tsx    mediation queue + resolution
-    Risk.tsx            TMS flags
-    KycQueue.tsx        identity review queue
+    SupportDesk.tsx     support inbox (two-pane queue pattern, like KYC/Disputes)
+    DisputeQueue.tsx    mediation, settlement preview, claim/evidence/escalate/arbitrate
+    Risk.tsx            TMS flags: file STR, dismiss, lift hold, rule detail
+    KycQueue.tsx        identity review + real document viewer + decision history
     ReportsQueue.tsx    profile reports + featured-carousel refresh
-    Receipts.tsx        wallet top-up review (carried over)
+    Receipts.tsx        wallet top-up review (two-pane expand-row decisions)
     Contracts.tsx  Payments.tsx  Payouts.tsx  Escrow.tsx
     Reconciliation.tsx  Ledger.tsx  Reports.tsx
     Users.tsx     Staff.tsx    AuditLogs.tsx   Monitoring.tsx
 src/styles/ops-console.css
 ```
+
+## Navigation
+
+The 3-bar button in the header collapses the sidebar so wide tables and charts
+get the full viewport; the preference persists in `localStorage`
+(`yekis-ops-nav`). At ≤860px the same button drives the overlay drawer instead,
+and the collapse class is not applied.
+
+## Listing, search and paging
+
+`useListPage(fetcher, limit, deps)` pushes `page`, `limit` and `q` to the
+server (350ms debounce) and returns real totals for `<Pager>`. Filters are
+passed through `deps`; changing any of them re-queries from page 1. `loading`
+is derived by tagging each response with the request that produced it, so
+stale rows never flash while the next page loads.
+
+Earlier revisions fetched a fixed 100 rows and filtered in the browser, which
+silently missed anything outside that window — that is gone.
+
+Endpoints that cannot filter or page honestly are labelled in the UI:
+`reconciliation` applies `recStatus` client-side because the backend filters it
+after pagination, and `audit-logs` narrows the current page because the route
+has no text search and no date filter.
 
 ## opsApi is an adapter, not a second API client
 
@@ -95,6 +122,27 @@ endpoints the backend actually serves, through the shared `api` client
 - **Settlement bodies are renamed, not invented.** `settlePayout` maps
   `{outcome, ref, reason}` → `{decision, providerPayoutId, failureReason}`.
   All money values are **minor units**; chart series are **ETB millions**.
+- **Evidence is real.** `EvidenceViewer` takes either a direct `url` (a
+  milestone deliverable) or a `KycDocument` id, which it exchanges for a
+  300-second signed URL via `GET /kyc/documents/:documentId/url`. It renders
+  whatever the object store returns; nothing is mocked.
+- **CSV export covers what is on screen.** `opsExport.ts` exports the current
+  page of the current filter and says so — there is no server-side export
+  route, so it does not pretend to export everything.
+
+## Staff actions wired to real routes
+
+| Surface | Actions |
+|---|---|
+| Users | open profile, suspend, reinstate, force KYC re-review |
+| KYC | view signed documents, decision history, verify / reject / request clearer |
+| Disputes | claim, add evidence, escalate stage, send to arbitration, resolve |
+| Risk | inspect rule payload, file STR (optional account suspension), dismiss, lift hold |
+| Payouts | confirm / fail settlement with provider ref or failure reason |
+| Receipts | approve, reject, flag as suspicious |
+| Staff | change role, remove console access |
+| Profile reports | no-action / hide / ban, refresh featured carousel |
+| Support | reply, attach files, close, reopen |
 
 ## Permission gating
 

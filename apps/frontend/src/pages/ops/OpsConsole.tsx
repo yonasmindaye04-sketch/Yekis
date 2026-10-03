@@ -18,7 +18,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ComponentType } from "react";
 import {
-  Bell,
   CheckCircle2,
   LogOut,
   Menu,
@@ -40,6 +39,7 @@ import { ChartTipContext } from "./components/charts";
 import type { ChartTipApi } from "./components/charts";
 import { ToastContext } from "./components/ui";
 import CommandPalette from "./components/CommandPalette";
+import NotificationBell from "./components/NotificationBell";
 import EvidenceViewer from "./components/EvidenceViewer";
 import type { ViewerDoc } from "./components/EvidenceViewer";
 
@@ -90,6 +90,9 @@ export interface OpsConsoleProps {
   onExit?: () => void;
 }
 
+/** localStorage key holding the sidebar collapsed/expanded preference. */
+const NAV_KEY = "yekis-ops-nav";
+
 export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const { theme, toggleTheme } = useTheme();
   const perms = useOpsPerms(user?.staffRole);
@@ -97,6 +100,11 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const [page, setPage] = useState<OpsPageId>("overview");
   const [focusId, setFocusId] = useState<string | undefined>(undefined);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  /* Desktop: sidebar hidden to free the full width for wide tables/charts.
+     Persisted so the choice survives a reload. */
+  const [navCollapsed, setNavCollapsed] = useState(
+    () => window.localStorage.getItem(NAV_KEY) === "collapsed",
+  );
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [viewer, setViewer] = useState<{ docs: ViewerDoc[]; idx: number } | null>(null);
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
@@ -104,6 +112,28 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const toastTimer = useRef<number | undefined>(undefined);
 
   const badges = useApi<OpsBadges>(opsApi.badges);
+
+  /* Below 860px the sidebar is an overlay drawer; above it, a collapsible
+     column. One 3-bar button drives whichever applies. */
+  const [isNarrow, setIsNarrow] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 860,
+  );
+  useEffect(() => {
+    const onResize = () => setIsNarrow(window.innerWidth <= 860);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  const toggleNav = useCallback(() => {
+    if (isNarrow) {
+      setSidebarOpen((o) => !o);
+    } else {
+      setNavCollapsed((c) => {
+        window.localStorage.setItem(NAV_KEY, c ? "expanded" : "collapsed");
+        return !c;
+      });
+    }
+  }, [isNarrow]);
 
   /* Groups with at least one page this role may open. */
   const groups = useMemo(
@@ -178,7 +208,7 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
     <OpsUiContext.Provider value={ui}>
       <ChartTipContext.Provider value={tipApi}>
         <ToastContext.Provider value={toast}>
-          <div className="ops-root">
+          <div className={`ops-root${navCollapsed && !isNarrow ? " nav-collapsed" : ""}`}>
             <div className="app">
               <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
                 <div className="brand">
@@ -235,8 +265,10 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                 <header className="header">
                   <button
                     className="menu-btn"
-                    onClick={() => setSidebarOpen((o) => !o)}
-                    aria-label="Toggle navigation"
+                    onClick={toggleNav}
+                    aria-label={navCollapsed && !isNarrow ? "Show navigation" : "Hide navigation"}
+                    aria-expanded={!(navCollapsed && !isNarrow)}
+                    title={navCollapsed && !isNarrow ? "Show navigation" : "Hide navigation for more space"}
                   >
                     <Menu size={18} />
                   </button>
@@ -256,12 +288,11 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                       className="icon-btn"
                       onClick={toggleTheme}
                       aria-label={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
+                      title={theme === "light" ? "Switch to dark mode" : "Switch to light mode"}
                     >
                       {theme === "light" ? <Moon size={17} /> : <Sun size={17} />}
                     </button>
-                    <button className="icon-btn" aria-label="Notifications">
-                      <Bell size={17} />
-                    </button>
+                    <NotificationBell />
                   </div>
                 </header>
                 <main className="content">

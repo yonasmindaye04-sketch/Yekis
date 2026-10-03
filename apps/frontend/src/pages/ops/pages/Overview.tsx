@@ -178,7 +178,7 @@ export default function Overview() {
         <div className="card card-pad">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div className="sec-title" style={{ marginBottom: 0 }}>Recent Activity</div>
-            <button className="btn btn-ghost btn-sm" onClick={() => ui.navigate("ledger")}>
+            <button className="btn btn-ghost btn-sm" onClick={() => ui.navigate("audit")}>
               View all
             </button>
           </div>

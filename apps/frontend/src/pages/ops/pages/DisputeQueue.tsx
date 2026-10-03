@@ -1,16 +1,43 @@
 /* ────────────────────────────────────────────────────────────────────────
    DisputeQueue.tsx — Stage-3 mediation: scope, evidence chat, outcome
-   selection with live settlement math, recommendation, resolve via
-   POST /admin/disputes/:id/resolve. Hotkeys: ↑↓ navigate.
+   selection with live settlement math, recommendation and resolution,
+   plus the claim / evidence / escalate / arbitrate workflow actions.
+   GET  /disputes/staff/queue
+   POST /disputes/:id/resolve · /claim · /evidence · /escalate · /arbitration
+   Hotkeys: ↑↓ navigate.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useMemo, useState } from "react";
-import { AlertTriangle, Eye, Scale } from "lucide-react";
-import { dt, dts, fmt2, opsApi, useApi } from "../opsApi";
+import { useCallback, useState } from "react";
+import {
+  AlertTriangle,
+  Clock,
+  Eye,
+  FileText,
+  HandHelping,
+  Scale,
+  Search,
+  TrendingUp,
+} from "lucide-react";
+import { dt, dts, fmt2, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
+import { DISPUTE_STAGES } from "../opsConst";
 import type { DisputeItem, DisputeOutcome } from "../opsTypes";
-import { Banner, Empty, ErrorBox, LoadingBox, PageHead, Pill, SlaBadge, isTyping, useHotkeys, useToast } from "../components/ui";
+import {
+  Banner,
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  Kv,
+  LoadingBox,
+  PageHead,
+  Pager,
+  Pill,
+  SlaBadge,
+  isTyping,
+  useHotkeys,
+  useToast,
+} from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
-import { Clock } from "lucide-react";
 
 const OUTCOMES: { id: DisputeOutcome; label: string }[] = [
   { id: "RELEASE_TO_FREELANCER", label: "Release to Freelancer" },
@@ -21,29 +48,35 @@ const OUTCOMES: { id: DisputeOutcome; label: string }[] = [
 export default function DisputeQueue({ focusId }: { focusId?: string }) {
   const ui = useOpsUi();
   const toast = useToast();
-  const { data, error, loading, reload } = useApi<DisputeItem[]>(opsApi.disputes);
+  const [stage, setStage] = useState("STAGE_3_MEDIATION");
   const [selId, setSelId] = useState<string | null>(focusId ?? null);
   const [outcome, setOutcome] = useState<DisputeOutcome | "">("");
   const [split, setSplit] = useState(50);
   const [rec, setRec] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const list = useMemo(() => data ?? [], [data]);
-  const sel = list.find((d) => d.id === selId) ?? null;
+  const list = useListPage<DisputeItem>(
+    (p) => opsListApi.disputes({ ...p, status: stage }),
+    25,
+    [stage],
+  );
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
+
+  const sel = rows.find((d) => d.id === selId) ?? null;
 
   useHotkeys(
     useCallback(
       (e: KeyboardEvent) => {
-        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !list.length) return;
-        const idx = list.findIndex((d) => d.id === selId);
-        if (e.key === "ArrowDown" && idx >= 0 && idx < list.length - 1) {
-          e.preventDefault(); setSelId(list[idx + 1].id); setOutcome("");
+        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !rows.length) return;
+        const idx = rows.findIndex((d) => d.id === selId);
+        if (e.key === "ArrowDown" && idx >= 0 && idx < rows.length - 1) {
+          e.preventDefault(); setSelId(rows[idx + 1].id); setOutcome("");
         }
         if (e.key === "ArrowUp" && idx > 0) {
-          e.preventDefault(); setSelId(list[idx - 1].id); setOutcome("");
+          e.preventDefault(); setSelId(rows[idx - 1].id); setOutcome("");
         }
       },
-      [list, selId, ui.viewerOpen, ui.paletteOpen],
+      [rows, selId, ui.viewerOpen, ui.paletteOpen],
     ),
   );
 
@@ -70,8 +103,40 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     }
   };
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  /* Non-terminal case actions. Each maps to a real backend route; the server
+     rejects stage transitions that do not apply and says why. */
+  const workflow = async (kind: "claim" | "evidence" | "escalate" | "arbitration") => {
+    if (!sel) return;
+    setBusy(true);
+    try {
+      if (kind === "claim") {
+        await opsApi.claimDispute(sel.id);
+        toast("Case claimed and assigned to you.");
+      } else if (kind === "evidence") {
+        const statement = window.prompt("Evidence statement to attach (min 10 characters):") ?? "";
+        if (statement.trim().length < 10) {
+          toast("An evidence statement of at least 10 characters is required.");
+          return;
+        }
+        await opsApi.submitDisputeEvidence(sel.id, statement.trim());
+        toast("Evidence statement attached to the case.");
+      } else if (kind === "escalate") {
+        await opsApi.escalateDispute(sel.id);
+        toast("Dispute escalated to the next stage.");
+      } else {
+        await opsApi.escalateToArbitration(sel.id);
+        toast("Dispute moved to stage 4 arbitration.");
+      }
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   /* settlement preview */
   let fGross = 0, cRefund = 0;
@@ -93,22 +158,47 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         right={
           <span className="pill p-violet" style={{ fontSize: 13 }}>
             <span className="pdot" />
-            {list.filter((d) => d.stage === "STAGE_3_MEDIATION").length} awaiting mediation
+            {rows.filter((d) => d.stage === "STAGE_3_MEDIATION").length} awaiting mediation
           </span>
         }
       />
-      {list.some((d) => d.slaH < 0) ? (
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Matching disputes" v={total.toLocaleString()} />
+        <Kv k="On this page" v={String(rows.length)} />
+        <Kv k="Escrow in view" v={fmt2(rows.reduce((s, d) => s + d.amt, 0))} />
+        <Kv k="SLA breached" v={String(rows.filter((d) => d.slaH < 0).length)} warn={rows.some((d) => d.slaH < 0)} />
+      </div>
+      {rows.some((d) => d.slaH < 0) ? (
         <Banner tone="b-red" icon={Clock} strong="SLA breach detected." rest="At least one dispute exceeded its mediation deadline — resolve it first." />
       ) : null}
 
+      <div className="card filters" style={{ marginBottom: 16 }}>
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search by client or freelancer email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect
+          value={stage}
+          onChange={setStage}
+          options={DISPUTE_STAGES}
+          allLabel="All stages"
+          label="Dispute stage"
+        />
+        <button className="btn btn-ghost" onClick={reload}>Refresh</button>
+      </div>
+
       <div className="queue-wrap">
         <div className="queue-list">
-          {list.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={Scale}>No active disputes in this view.</Empty>
             </div>
           ) : (
-            list.map((d) => (
+            rows.map((d) => (
               <button
                 key={d.id}
                 className={`q-card ${selId === d.id ? "selected" : ""}`}
@@ -128,6 +218,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
               </button>
             ))
           )}
+          <Pager page={page} pages={pages} total={total} onPage={setPage} unit="disputes" />
         </div>
 
         {sel ? (
@@ -159,7 +250,18 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                     <div className="doc-tiles">
                       <button
                         className="doc-tile"
-                        onClick={() => ui.openViewer([{ t: `Deliverable — ${sel.ms}`, k: "tin", name: "Delivery Package" }], 0)}
+                        onClick={() =>
+                          ui.openViewer(
+                            [
+                              {
+                                t: `Deliverable — ${sel.ms}`,
+                                k: "tin",
+                                url: sel.deliverableUrl ?? undefined,
+                              },
+                            ],
+                            0,
+                          )
+                        }
                       >
                         <Eye size={14} /> View deliverable file
                       </button>
@@ -237,6 +339,46 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 <span className="kbd-hint">
                   {outcome ? `Outcome: ${outcome.replace(/_/g, " ")}` : "Select an outcome to preview the settlement math"}
                 </span>
+              </div>
+
+              <div className="sec-title" style={{ marginTop: 22 }}>Case workflow</div>
+              <div className="kbd-hint" style={{ marginBottom: 8 }}>
+                Claiming assigns the case to you. Escalation and arbitration move it forward a
+                stage; both are rejected by the server once a case leaves the matching stage.
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => void workflow("claim")}
+                  title="Assign this mediation case to yourself"
+                >
+                  <HandHelping size={13} /> Claim case
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => void workflow("evidence")}
+                  title="Attach a mediator evidence statement to the case record"
+                >
+                  <FileText size={13} /> Add evidence note
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => void workflow("escalate")}
+                  title="Advance the dispute to the next negotiation stage"
+                >
+                  <TrendingUp size={13} /> Escalate stage
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={busy}
+                  onClick={() => void workflow("arbitration")}
+                  title="Move the dispute into stage 4 arbitration"
+                >
+                  <Scale size={13} /> Send to arbitration
+                </button>
               </div>
             </div>
           </div>

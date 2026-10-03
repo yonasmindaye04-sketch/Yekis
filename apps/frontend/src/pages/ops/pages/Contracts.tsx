@@ -6,15 +6,33 @@
 
 import { useCallback, useState } from "react";
 import { ChevronLeft, ChevronRight, Download, FileText, RefreshCw, Search } from "lucide-react";
-import { dt, fmt, opsApi, useApi, withContractDetail } from "../opsApi";
+import { dt, fmt, opsApi, opsListApi, withContractDetail } from "../opsApi";
+import { useListPage } from "../opsList";
+import { CONTRACT_STATUSES } from "../opsConst";
 import type { Contract } from "../opsTypes";
-import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, Rail } from "../components/ui";
+import {
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  Rail,
+} from "../components/ui";
+import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
 export default function Contracts() {
-  const { data, error, loading, reload } = useApi<Contract[]>(opsApi.contracts);
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("ALL");
+  const [status, setStatus] = useState("");
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  const list = useListPage<Contract>(
+    (p) => opsListApi.contracts({ ...p, status }),
+    25,
+    [status],
+  );
+  const { rows, page, pages, total, loading, error, reload } = list;
 
   // Milestones / payments / disputes live on a separate detail route, so the
   // row is fetched when it is opened rather than for every row up front.
@@ -22,21 +40,24 @@ export default function Contracts() {
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
 
-  const openDetail = useCallback(async (id: string) => {
-    setDetailId(id);
-    setDetail(null);
-    setDetailBusy(true);
-    setDetailErr(null);
-    try {
-      const raw = await opsApi.contractDetail(id);
-      const row = (data ?? []).find((c) => c.id === id);
-      if (row) setDetail(withContractDetail(row, raw));
-    } catch (e) {
-      setDetailErr(e instanceof Error ? e.message : "Could not load contract");
-    } finally {
-      setDetailBusy(false);
-    }
-  }, [data]);
+  const openDetail = useCallback(
+    async (id: string) => {
+      setDetailId(id);
+      setDetail(null);
+      setDetailBusy(true);
+      setDetailErr(null);
+      try {
+        const raw = await opsApi.contractDetail(id);
+        const row = rows.find((c) => c.id === id);
+        if (row) setDetail(withContractDetail(row, raw));
+      } catch (e) {
+        setDetailErr(e instanceof Error ? e.message : "Could not load contract");
+      } finally {
+        setDetailBusy(false);
+      }
+    },
+    [rows],
+  );
 
   const closeDetail = useCallback(() => {
     setDetailId(null);
@@ -44,8 +65,8 @@ export default function Contracts() {
     setDetailErr(null);
   }, []);
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   if (detailId) {
     if (detailBusy && !detail) return <LoadingBox />;
@@ -123,35 +144,50 @@ export default function Contracts() {
     return <LoadingBox />;
   }
 
-  const needle = q.toLowerCase();
-  const rows = data.filter(
-    (c) =>
-      (status === "ALL" || c.status === status) &&
-      (!needle || c.title.toLowerCase().includes(needle) || c.client.toLowerCase().includes(needle) || c.fl.toLowerCase().includes(needle)),
-  );
-
   return (
     <div className="fade">
       <PageHead
         title="Contracts"
         sub="Manage and monitor all platform contracts, milestones and disputes"
-        right={<button className="btn btn-primary"><Download size={14} /> Export CSV</button>}
+        right={
+          <button
+            className="btn btn-primary"
+            disabled={rows.length === 0}
+            onClick={() =>
+              downloadCsv(
+                `yekis-contracts-page-${page}`,
+                toCsv(
+                  ["Contract ID", "Title", "Category", "Client", "Client Email", "Freelancer", "Freelancer Email", "Milestones", "Status", "Created"],
+                  rows.map((c) => [
+                    c.id, c.title, c.cat, c.client, c.clientEmail,
+                    c.fl, c.flEmail, c.ms, c.status, dateOnly(c.created),
+                  ]),
+                ),
+              )
+            }
+          >
+            <Download size={14} /> Export this page
+          </button>
+        }
       />
       <div className="card filters">
         <div className="f-search">
           <Search size={15} />
-          <input placeholder="Search title, client, freelancer…" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input
+            placeholder="Search contract id, job title or party name…"
+            value={list.search}
+            onChange={(e) => list.setSearch(e.target.value)}
+          />
         </div>
-        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {["ALL", "ACTIVE", "COMPLETED", "TERMINATED", "CANCELLED"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "All statuses" : s[0] + s.slice(1).toLowerCase()}</option>
-          ))}
-        </select>
-        <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>
+        <FilterSelect value={status} onChange={setStatus} options={CONTRACT_STATUSES} allLabel="All statuses" label="Contract status" />
+        <button className="btn btn-ghost" onClick={list.reload}><RefreshCw size={14} /> Refresh</button>
       </div>
-      <OpsTable heads={["Contract", "Client", "Freelancer", "Milestones", "Status", "Created", ""]} foot={<Pager n={rows.length} />}>
+      <OpsTable
+        heads={["Contract", "Client", "Freelancer", "Milestones", "Status", "Created", ""]}
+        foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="contracts" />}
+      >
         {rows.length === 0 ? (
-          <tr><td colSpan={7}><Empty icon={FileText}>No contracts found.</Empty></td></tr>
+          <tr><td colSpan={7}><Empty icon={FileText}>No contracts match this search.</Empty></td></tr>
         ) : (
           rows.map((c) => (
             <tr className="clickable" key={c.id} onClick={() => void openDetail(c.id)}>

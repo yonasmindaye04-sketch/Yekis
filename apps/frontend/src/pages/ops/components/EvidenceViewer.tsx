@@ -1,127 +1,30 @@
 /* ────────────────────────────────────────────────────────────────────────
    EvidenceViewer.tsx — full-screen evidence overlay: zoom / rotate / drag
-   with keyboard support (← → navigate, Esc close). The "scans" are fake
-   document mockups rendered in JSX (same look as the HTML prototype).
+   with keyboard support (← → navigate, Esc close).
+
+   Documents are REAL. Each doc carries the backend KycDocument id; the
+   viewer exchanges it for a short-lived signed URL via
+   GET /api/v1/kyc/documents/:documentId/url and renders the image/object
+   the object store returns. Nothing here is a mockup.
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useState } from "react";
 import type { MouseEvent as RMouseEvent } from "react";
 import {
-  Camera,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  FileWarning,
+  Loader2,
   RotateCw,
   X,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { KycDoc } from "../opsTypes";
+import type { ViewerDoc } from "../opsTypes";
+import { opsApi } from "../opsApi";
 
-export interface ViewerDoc extends KycDoc {
-  name?: string;
-  doc?: string;
-  tin?: string;
-}
-
-function FakeDoc({ d }: { d: ViewerDoc }) {
-  if (d.k === "license")
-    return (
-      <div className="fdoc">
-        <div className="fdoc-band" />
-        <div className="fdoc-head">
-          <div className="fh-t">Federal Democratic Republic of Ethiopia<br />Business License</div>
-          <div className="fh-b">MoTRA</div>
-        </div>
-        <div className="fdoc-body">
-          <div className="fdoc-fields">
-            <div className="fdoc-field"><div className="ff-k">Trade Name</div><div className="ff-v">{d.name || "Sample Trade PLC"}</div></div>
-            <div className="fdoc-field"><div className="ff-k">License Number</div><div className="ff-v">BR-4471-A / 2016</div></div>
-            <div className="fdoc-field"><div className="ff-k">Main Business Activity</div><div className="ff-v">Software development &amp; design services</div></div>
-            <div className="fdoc-field"><div className="ff-k">Valid Until</div><div className="ff-v">12 Meskerem 2017 E.C.</div></div>
-          </div>
-          <div className="fdoc-foot">
-            <div className="fdoc-sig">Authorized signature</div>
-            <div className="fdoc-stamp">OFFICIAL<br />SEAL</div>
-          </div>
-        </div>
-      </div>
-    );
-  if (d.k === "tin")
-    return (
-      <div className="fdoc">
-        <div className="fdoc-band" />
-        <div className="fdoc-head">
-          <div className="fh-t">Taxpayer Identification Number<br />Certificate</div>
-          <div className="fh-b">MoR</div>
-        </div>
-        <div className="fdoc-body">
-          <div className="fdoc-fields">
-            <div className="fdoc-field"><div className="ff-k">Taxpayer Name</div><div className="ff-v">{d.name || "Sample Taxpayer"}</div></div>
-            <div className="fdoc-field"><div className="ff-k">TIN</div><div className="ff-v mono">{d.tin || "0012345678"}</div></div>
-            <div className="fdoc-field"><div className="ff-k">Registration Date</div><div className="ff-v">04 / 07 / 2015 E.C.</div></div>
-            <div className="fdoc-field"><div className="ff-k">Tax Category</div><div className="ff-v">Category “A” — Business Income</div></div>
-          </div>
-          <div className="fdoc-foot">
-            <div className="fdoc-sig">Registrar signature</div>
-            <div className="fdoc-stamp">MINISTRY OF<br />REVENUE</div>
-          </div>
-        </div>
-      </div>
-    );
-  if (d.k === "selfie")
-    return (
-      <div className="fdoc">
-        <div className="fdoc-band" />
-        <div className="fdoc-head">
-          <div className="fh-t">Identity Selfie Verification</div>
-          <div className="fh-b">LIVE CAPTURE</div>
-        </div>
-        <div className="fdoc-body">
-          <div className="fdoc-row">
-            <div className="fdoc-photo" style={{ width: 150, height: 180 }}>
-              <Camera size={40} />
-            </div>
-            <div className="fdoc-fields">
-              <div className="fdoc-field"><div className="ff-k">Status</div><div className="ff-v" style={{ color: "#15803d" }}>Liveness passed</div></div>
-              <div className="fdoc-field"><div className="ff-k">Face Match</div><div className="ff-v">97.4% confidence</div></div>
-              <div className="fdoc-field"><div className="ff-k">Captured</div><div className="ff-v">Jan 15, 2024 · 09:04</div></div>
-              <div className="fdoc-field"><div className="ff-k">Device</div><div className="ff-v">Android · Addis Ababa</div></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  const back = d.k === "id-back";
-  return (
-    <div className="fdoc">
-      <div className="fdoc-band" />
-      <div className="fdoc-head">
-        <div className="fh-t">Federal Democratic Republic of Ethiopia<br />National ID (Fayda)</div>
-        <div className="fh-b">{back ? "BACK" : "FRONT"}</div>
-      </div>
-      <div className="fdoc-body">
-        <div className="fdoc-row">
-          <div className="fdoc-photo"><Camera size={34} /></div>
-          <div className="fdoc-fields">
-            <div className="fdoc-field"><div className="ff-k">Full Name</div><div className="ff-v">{d.name || "Sample Citizen"}</div></div>
-            <div className="fdoc-field"><div className="ff-k">Fayda Number</div><div className="ff-v mono">{d.doc || "FAY-8842-0021"}</div></div>
-            <div className="fdoc-field"><div className="ff-k">Date of Birth</div><div className="ff-v">— / — / 1992</div></div>
-            <div className="fdoc-field"><div className="ff-k">Valid Until</div><div className="ff-v">2029</div></div>
-          </div>
-        </div>
-        <div className="fdoc-foot">
-          <div className="fdoc-sig">Holder signature</div>
-          <div className="fdoc-stamp">NATIONAL ID<br />PROGRAM</div>
-        </div>
-      </div>
-      <div className="fdoc-mrz">
-        {`ID<ETH${(d.doc || "FAY88420021").replace(/[^A-Z0-9]/g, "")}`}
-        <br />
-        9201014M2901011&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;04
-      </div>
-    </div>
-  );
-}
+export type { ViewerDoc };
 
 export default function EvidenceViewer({
   docs,
@@ -137,16 +40,70 @@ export default function EvidenceViewer({
   const [rot, setRot] = useState(0);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [drag, setDrag] = useState<{ sx: number; sy: number } | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const d = docs[idx];
+  const docKey = d ? `${d.id ?? d.url ?? ""}#${d.t}` : "";
+
+  /* Reset the viewport whenever the displayed document changes. Done during
+     render (React's "adjust state on prop change" pattern) rather than in an
+     effect, which would double-render on every navigation. */
+  const [lastKey, setLastKey] = useState(docKey);
+  if (lastKey !== docKey) {
+    setLastKey(docKey);
+    setScale(1);
+    setRot(0);
+    setPos({ x: 0, y: 0 });
+  }
 
   const nav = useCallback(
     (dir: number) => {
       setIdx((i) => Math.max(0, Math.min(docs.length - 1, i + dir)));
-      setScale(1);
-      setRot(0);
-      setPos({ x: 0, y: 0 });
     },
     [docs.length],
   );
+
+  /* Resolve the current document. A direct `url` (e.g. a milestone
+     deliverable) is used as-is; a KycDocument `id` is exchanged for a
+     short-lived signed URL. Nothing is mocked. */
+  useEffect(() => {
+    if (!d) return;
+    if (d.url) {
+      /* eslint-disable-next-line react-hooks/set-state-in-effect */
+      setUrl(d.url);
+      setLoadErr(null);
+      setLoading(false);
+      return;
+    }
+    if (!d.id) {
+      setUrl(null);
+      setLoadErr("This document has no viewable source.");
+      setLoading(false);
+      return;
+    }
+    let alive = true;
+    setLoading(true);
+    setLoadErr(null);
+    setUrl(null);
+    opsApi
+      .kycDocumentUrl(d.id)
+      .then((r) => {
+        if (alive) setUrl(r.url);
+      })
+      .catch((e: unknown) => {
+        if (alive) {
+          setLoadErr(e instanceof Error ? e.message : "Could not load document");
+        }
+      })
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [d]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -158,7 +115,6 @@ export default function EvidenceViewer({
     return () => window.removeEventListener("keydown", onKey);
   }, [nav, onClose]);
 
-  const d = docs[idx];
   if (!d) return null;
 
   const onMove = (e: RMouseEvent) => {
@@ -174,12 +130,24 @@ export default function EvidenceViewer({
           <h3>{d.t}</h3>
           <div className="viewer-count">
             {idx + 1} of {docs.length} · zoom {Math.round(scale * 100)}% · rotation {rot}°
+            {d.name ? ` · ${d.name}` : ""}
           </div>
         </div>
         <div className="viewer-controls">
           <button title="Zoom out" onClick={() => setScale((s) => Math.max(0.5, s - 0.5))}><ZoomOut size={18} /></button>
           <button title="Zoom in" onClick={() => setScale((s) => Math.min(4, s + 0.5))}><ZoomIn size={18} /></button>
           <button title="Rotate" onClick={() => setRot((r) => (r + 90) % 360)}><RotateCw size={18} /></button>
+          {url ? (
+            <a
+              className="v-link"
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              title="Open the underlying file in a new tab"
+            >
+              <ExternalLink size={16} />
+            </a>
+          ) : null}
           <span className="v-div" />
           <button title="Close (Esc)" onClick={onClose}><X size={18} /></button>
         </div>
@@ -211,21 +179,30 @@ export default function EvidenceViewer({
             setDrag({ sx: e.clientX - pos.x, sy: e.clientY - pos.y });
           }}
         >
-          <FakeDoc d={d} />
+          {loading ? (
+            <div className="viewer-status">
+              <Loader2 size={22} className="spin" /> Fetching a secure link…
+            </div>
+          ) : loadErr ? (
+            <div className="viewer-status err">
+              <FileWarning size={22} />
+              <div style={{ marginTop: 8 }}>{loadErr}</div>
+              <div style={{ fontSize: 11.5, opacity: 0.8, marginTop: 6 }}>
+                Signed links expire after 300 seconds.
+              </div>
+            </div>
+          ) : url ? (
+            <img className="viewer-img" src={url} alt={d.t} draggable={false} />
+          ) : null}
         </div>
       </div>
       {docs.length > 1 ? (
         <div className="viewer-thumbs">
           {docs.map((dd, i) => (
             <button
-              key={`${dd.k}-${i}`}
+              key={`${dd.id ?? dd.k}-${i}`}
               className={`thumb-btn ${i === idx ? "active" : ""}`}
-              onClick={() => {
-                setIdx(i);
-                setScale(1);
-                setRot(0);
-                setPos({ x: 0, y: 0 });
-              }}
+              onClick={() => setIdx(i)}
             >
               {dd.t}
             </button>

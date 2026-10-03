@@ -183,6 +183,37 @@ export function StatCard({
   );
 }
 
+export function FilterSelect({
+  value,
+  onChange,
+  options,
+  allLabel,
+  label,
+  humanise = true,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  /** Values excluding the "all" entry. */
+  options: readonly string[];
+  allLabel: string;
+  label?: string;
+  humanise?: boolean;
+}) {
+  return (
+    <select
+      className="sel"
+      value={value}
+      aria-label={label}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="">{allLabel}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>{humanise ? o.replace(/_/g, " ") : o}</option>
+      ))}
+    </select>
+  );
+}
+
 export function OpsTable({
   heads,
   foot,
@@ -211,13 +242,41 @@ export function OpsTable({
   );
 }
 
-export function Pager({ n }: { n: number }) {
+export function Pager({
+  page = 1,
+  pages = 1,
+  total = 0,
+  onPage,
+  unit = "records",
+}: {
+  page?: number;
+  pages?: number;
+  total?: number;
+  onPage?: (p: number) => void;
+  unit?: string;
+}) {
+  /* With no handler the pager is read-only (some pages hold one page of data). */
+  const canNav = typeof onPage === "function" && pages > 1;
   return (
     <div className="pager">
-      <span>Page 1 of 1 · {n} records</span>
+      <span>
+        Page {page} of {pages} · {total.toLocaleString()} {unit}
+      </span>
       <div className="pager-btns">
-        <button className="btn btn-ghost btn-sm" disabled>← Prev</button>
-        <button className="btn btn-ghost btn-sm" disabled>Next →</button>
+        <button
+          className="btn btn-ghost btn-sm"
+          disabled={!canNav || page <= 1}
+          onClick={() => onPage?.(page - 1)}
+        >
+          ← Prev
+        </button>
+        <button
+          className="btn btn-ghost btn-sm"
+          disabled={!canNav || page >= pages}
+          onClick={() => onPage?.(page + 1)}
+        >
+          Next →
+        </button>
       </div>
     </div>
   );

@@ -1,26 +1,53 @@
 /* ────────────────────────────────────────────────────────────────────────
    Receipts.tsx — wallet top-up review queue.
 
-   Carried over from the dashboard this console replaces. Approve, reject or
-   flag a top-up; flagging raises a STAFF_FLAGGED TransactionFlag that then
-   surfaces on the Risk & Fraud page. Approval/rejection/flagging are three
-   separate backend routes, all gated to COMPLIANCE_OFFICER | ADMIN.
+   Approve, reject or flag a manual transfer. Flagging raises a
+   STAFF_FLAGGED TransactionFlag that then surfaces under Risk & Fraud.
+   GET  /wallet/topups/queue
+   POST /wallet/topups/:id/approve · /reject · /flag
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useState } from "react";
-import { CheckCircle2, Eye, RefreshCw, TriangleAlert, WalletCards, XCircle } from "lucide-react";
-import { dt, fmt, opsApi, useApi } from "../opsApi";
+import { Fragment, useState } from "react";
+import {
+  CheckCircle2,
+  ChevronDown,
+  Eye,
+  RefreshCw,
+  Search,
+  TriangleAlert,
+  WalletCards,
+  XCircle,
+} from "lucide-react";
+import { dt, fmt, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
+import { TOPUP_STATUSES } from "../opsConst";
 import type { RawTopUpItem } from "../opsBackend";
-import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, Rail } from "../components/ui";
-import { useToast } from "../components/ui";
+import {
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  Kv,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  Rail,
+  useToast,
+} from "../components/ui";
 
 export default function Receipts() {
   const toast = useToast();
   const [status, setStatus] = useState("PENDING");
-  const { data, error, loading, reload } = useApi(() => opsApi.topUpQueue(status));
+  const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const rows = data ?? [];
+  const list = useListPage<RawTopUpItem>(
+    (p) => opsListApi.topUps({ ...p, status }),
+    25,
+    [status],
+  );
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
   const act = async (row: RawTopUpItem, kind: "APPROVED" | "REJECTED" | "FLAG") => {
     const reason =
@@ -43,8 +70,9 @@ export default function Receipts() {
           ? "Top-up approved and wallet credited."
           : kind === "REJECTED"
             ? "Top-up rejected."
-            : "Flagged for AML review.",
+            : "Flagged for AML review — see Risk & Fraud.",
       );
+      setOpenId(null);
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Action failed");
@@ -62,84 +90,150 @@ export default function Receipts() {
     }
   };
 
-  if (loading && !data) return <LoadingBox />;
-  if (error && !data) return <ErrorBox error={error} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
+
+  const pending = rows.filter((r) => r.status === "PENDING");
+  const pendingValue = pending.reduce((s, r) => s + r.amountMinor, 0);
 
   return (
     <div className="fade">
       <PageHead
         title="Receipt Reviews"
         sub="Manual bank and mobile-money transfers awaiting verification"
-        right={<button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>}
+        right={
+          <button className="btn btn-ghost" onClick={reload}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        }
       />
-      <div className="card filters">
-        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {["PENDING", "APPROVED", "REJECTED", "FLAGGED"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "All statuses" : s[0] + s.slice(1).toLowerCase()}</option>
-          ))}
-        </select>
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Matching transfers" v={total.toLocaleString()} />
+        <Kv k="Pending on page" v={String(pending.length)} warn={pending.length > 0} />
+        <Kv k="Pending value" v={fmt(pendingValue)} />
+        <Kv k="Without a receipt" v={String(rows.filter((r) => !r.receiptImagePath).length)} />
       </div>
+
+      <div className="card filters">
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search by user email or phone…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect
+          value={status}
+          onChange={setStatus}
+          options={TOPUP_STATUSES}
+          allLabel="All statuses"
+          label="Top-up status"
+        />
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
       <OpsTable
-        heads={["User", "Amount", "Rail", "Reference", "History", "Submitted", ""]}
-        foot={<Pager n={rows.length} />}
+        heads={["User", "Amount", "Rail", "Reference", "History", "Submitted", "Status", ""]}
+        foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="transfers" />}
       >
         {rows.length === 0 ? (
-          <tr><td colSpan={7}><Empty icon={WalletCards}>No top-ups in this state.</Empty></td></tr>
+          <tr><td colSpan={8}><Empty icon={WalletCards}>No top-ups in this state.</Empty></td></tr>
         ) : (
           rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <div className="cell-main">{r.user.email}</div>
-                <div className="cell-sub mono">{r.user.ucid}</div>
-              </td>
-              <td className="amount">{fmt(r.amountMinor)}</td>
-              <td><Rail p={r.provider} /></td>
-              <td className="mono" style={{ fontSize: 12.5 }}>{r.referenceNumber || "—"}</td>
-              <td style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
-                {r.userHistory.approvedCount} ok · {fmt(r.userHistory.approvedTotalMinor)}
-                {r.userHistory.rejectedCount ? ` · ${r.userHistory.rejectedCount} rejected` : ""}
-              </td>
-              <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>{dt(r.createdAt)}</td>
-              <td>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Pill s={r.status} />
-                  {r.receiptImagePath ? (
-                    <button className="btn btn-ghost btn-sm" onClick={() => void openReceipt(r)}>
-                      <Eye size={12} />
+            <Fragment key={r.id}>
+              <tr className="clickable" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+                <td>
+                  <div className="cell-main">{r.user.email}</div>
+                  <div className="cell-sub mono">{r.user.ucid}</div>
+                </td>
+                <td className="amount">{fmt(r.amountMinor)}</td>
+                <td><Rail p={r.provider} /></td>
+                <td className="mono" style={{ fontSize: 12.5 }}>{r.referenceNumber || "—"}</td>
+                <td style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
+                  {r.userHistory.approvedCount} approved · {fmt(r.userHistory.approvedTotalMinor)}
+                  {r.userHistory.rejectedCount ? ` · ${r.userHistory.rejectedCount} rejected` : ""}
+                </td>
+                <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>{dt(r.createdAt)}</td>
+                <td><Pill s={r.status} /></td>
+                <td>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {r.receiptImagePath ? (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        title="Open the receipt image"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void openReceipt(r);
+                        }}
+                      >
+                        <Eye size={12} />
+                      </button>
+                    ) : null}
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenId(openId === r.id ? null : r.id);
+                      }}
+                    >
+                      {openId === r.id ? "Close" : "Decide"}
+                      <ChevronDown size={12} />
                     </button>
-                  ) : null}
-                </div>
-              </td>
-            </tr>
+                  </div>
+                </td>
+              </tr>
+              {openId === r.id ? (
+                <tr className="expand-row">
+                  <td colSpan={8}>
+                    <div className="settle-grid">
+                      <div style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
+                        {r.receiptImagePath
+                          ? "A receipt image is attached — open it to verify before deciding."
+                          : "No receipt image was attached. This is normal for automatic checkout top-ups, which the provider confirms directly."}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          disabled={busyId === r.id || r.status !== "PENDING"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void act(r, "FLAG");
+                          }}
+                        >
+                          <TriangleAlert size={13} /> Flag as suspicious
+                        </button>
+                        <button
+                          className="btn btn-red btn-sm"
+                          disabled={busyId === r.id || r.status !== "PENDING"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void act(r, "REJECTED");
+                          }}
+                        >
+                          <XCircle size={13} /> Reject
+                        </button>
+                        <button
+                          className="btn btn-green btn-sm"
+                          disabled={busyId === r.id || r.status !== "PENDING"}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void act(r, "APPROVED");
+                          }}
+                        >
+                          <CheckCircle2 size={13} /> Approve &amp; credit
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
           ))
         )}
       </OpsTable>
-      {rows.some((r) => r.status === "PENDING") ? (
-        <div className="card card-pad" style={{ marginTop: 16 }}>
-          <div className="sec-title"><TriangleAlert size={16} /> Pending decisions</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-            {rows.filter((r) => r.status === "PENDING").map((r) => (
-              <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <div>
-                  <b>{r.user.email}</b>
-                  <span style={{ color: "var(--ops-text-2)", marginLeft: 8 }}>{fmt(r.amountMinor)}</span>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button className="btn btn-ghost btn-sm" disabled={busyId === r.id} onClick={() => void act(r, "FLAG")}>
-                    <TriangleAlert size={13} /> Flag
-                  </button>
-                  <button className="btn btn-ghost btn-sm" disabled={busyId === r.id} onClick={() => void act(r, "REJECTED")}>
-                    <XCircle size={13} /> Reject
-                  </button>
-                  <button className="btn btn-primary btn-sm" disabled={busyId === r.id} onClick={() => void act(r, "APPROVED")}>
-                    <CheckCircle2 size={13} /> Approve
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

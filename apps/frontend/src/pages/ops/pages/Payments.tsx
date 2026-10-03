@@ -1,45 +1,72 @@
 /* ────────────────────────────────────────────────────────────────────────
-   Payments.tsx — inbound client funding across rails. GET /admin/payments
+   Payments.tsx — inbound client funding across rails.
+
+   Search and filters are pushed to the server
+   (GET /admin/payments?page&limit&q&status&provider) so results are not
+   limited to whatever the first page happened to contain.
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useState } from "react";
 import { RefreshCw, Search } from "lucide-react";
-import { dts, fmt, opsApi, useApi } from "../opsApi";
+import { dts, fmt, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
+import { PAYMENT_STATUSES, RAILS } from "../opsConst";
 import type { Payment } from "../opsTypes";
-import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, Rail } from "../components/ui";
+import {
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  Rail,
+} from "../components/ui";
 
 export default function Payments() {
-  const { data, error, loading, reload } = useApi<Payment[]>(opsApi.payments);
-  const [status, setStatus] = useState("ALL");
-  const [prov, setProv] = useState("ALL");
+  const [status, setStatus] = useState("");
+  const [provider, setProvider] = useState("");
 
-  if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
-
-  const rows = data.filter(
-    (p) => (status === "ALL" || p.status === status) && (prov === "ALL" || p.provider === prov),
+  const list = useListPage<Payment>(
+    (p) => opsListApi.payments({ ...p, status, provider }),
+    25,
+    [status, provider],
   );
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
+
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   return (
     <div className="fade">
-      <PageHead title="Payments" sub="Inbound client funding transactions across Telebirr & CBE Birr rails" />
+      <PageHead
+        title="Payments"
+        sub="Inbound client funding transactions across Telebirr & CBE Birr rails"
+      />
       <div className="card filters">
-        <div className="f-search"><Search size={15} /><input placeholder="Search batch ID or client email…" /></div>
-        <select className="sel" value={status} onChange={(e) => setStatus(e.target.value)}>
-          {["ALL", "PENDING", "SUCCESS", "FAILED"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "Any status" : s}</option>
-          ))}
-        </select>
-        <select className="sel" value={prov} onChange={(e) => setProv(e.target.value)}>
-          {["ALL", "TELEBIRR", "CBE_BIRR"].map((s) => (
-            <option key={s} value={s}>{s === "ALL" ? "Any rail" : s}</option>
-          ))}
-        </select>
-        <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search provider TX id or client email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} allLabel="Any status" label="Payment status" />
+        <FilterSelect value={provider} onChange={setProvider} options={RAILS} allLabel="Any rail" label="Provider" humanise={false} />
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
       </div>
-      <OpsTable heads={["Provider TX ID", "Contract", "Client", "Provider", "Status", "Amount", "Created"]} foot={<Pager n={rows.length} />}>
+      <OpsTable
+        heads={["Provider TX ID", "Contract", "Client", "Provider", "Status", "Amount", "Created"]}
+        foot={
+          <Pager page={page} pages={pages} total={total} onPage={setPage} unit="transactions" />
+        }
+      >
         {rows.length === 0 ? (
-          <tr><td colSpan={7}><Empty icon={Search}>No payments match this filter.</Empty></td></tr>
+          <tr><td colSpan={7}><Empty icon={Search}>No payments match this search.</Empty></td></tr>
         ) : (
           rows.map((p) => (
             <tr key={p.id}>

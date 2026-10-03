@@ -1,63 +1,70 @@
 /* ────────────────────────────────────────────────────────────────────────
    AuditLogs.tsx — immutable audit trail.
-
-   Carried over from the dashboard this console replaces. Reads
-   GET /admin/audit-logs (audit.view). The endpoint has no date filter, so
-   this surface offers entityType / eventType narrowing over the newest rows.
+   GET /admin/audit-logs (audit.view). The route has no date filter and no
+   server-side text search, so the query narrows the loaded page; paging is
+   server-side.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useMemo, useState } from "react";
 import { FileText, RefreshCw, Search } from "lucide-react";
-import { dts, opsApi, useApi } from "../opsApi";
-import { Empty, ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill } from "../components/ui";
+import { dts, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
+import type { RawAuditLog } from "../opsBackend";
+import {
+  Empty,
+  ErrorBox,
+  Kv,
+  LoadingBox,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+} from "../components/ui";
 
 export default function AuditLogs() {
-  const { data, error, loading, reload } = useApi(opsApi.auditLogs);
-  const [q, setQ] = useState("");
+  const list = useListPage<RawAuditLog>(opsListApi.auditLogs);
+  const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
-  const rows = useMemo(() => data?.items ?? [], [data]);
-
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    if (needle.length < 2) return rows;
-    return rows.filter((r) =>
-      [r.eventType, r.entityType, r.entityId, r.action, r.actorRole, r.userId]
-        .filter(Boolean)
-        .some((f) => String(f).toLowerCase().includes(needle)),
-    );
-  }, [rows, q]);
-
-  if (loading && !data) return <LoadingBox />;
-  if (error && !data) return <ErrorBox error={error} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
   return (
     <div className="fade">
       <PageHead
         title="Audit Logs"
         sub="Append-only record of privileged actions across the platform"
-        right={<button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>}
+        right={
+          <button className="btn btn-ghost" onClick={reload}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        }
       />
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Total entries" v={total.toLocaleString()} />
+        <Kv k="On this page" v={String(rows.length)} />
+        <Kv k="With an amount" v={String(rows.filter((r) => r.amountMinor != null).length)} />
+        <Kv k="Staff actors" v={String(rows.filter((r) => r.actorRole).length)} />
+      </div>
       <div className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
-            placeholder="Filter loaded rows by event, entity or actor…"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+            placeholder="Filter this page by event, entity, actor or user id…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <span style={{ fontSize: 12, color: "var(--ops-text-3)", fontWeight: 600 }}>
-          Newest {rows.length} of {data?.total ?? 0} · server has no date filter
-        </span>
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
       </div>
       <OpsTable
         heads={["Event", "Entity", "Action", "Actor", "Amount", "IP", "When"]}
-        foot={<Pager n={filtered.length} />}
+        foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="entries" />}
       >
-        {filtered.length === 0 ? (
+        {rows.length === 0 ? (
           <tr><td colSpan={7}><Empty icon={FileText}>No audit entries match.</Empty></td></tr>
         ) : (
-          filtered.map((r) => (
+          rows.map((r) => (
             <tr key={r.id}>
               <td>
                 <div className="cell-main">{r.eventType.replace(/_/g, " ")}</div>
@@ -76,6 +83,12 @@ export default function AuditLogs() {
           ))
         )}
       </OpsTable>
+      <div className="kbd-hint" style={{ marginTop: 10 }}>
+        The audit endpoint supports <span className="mono">eventType</span>,{" "}
+        <span className="mono">entityType</span>, <span className="mono">entityId</span> and{" "}
+        <span className="mono">userId</span> filters but has no date range — free-text search
+        narrows the current page only.
+      </div>
     </div>
   );
 }

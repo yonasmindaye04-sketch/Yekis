@@ -308,6 +308,7 @@ export interface RawUserSummary {
     displayName: string | null;
     cachedKycTier: PrismaKycTier | null;
     cachedKycStatus: PrismaKycStatus | null;
+    profileCompleteness: number;
   };
   walletBalance: number;
   activity: {
@@ -396,7 +397,23 @@ export interface RawRiskFlag {
   status: string;
   createdAt: string;
   reviewNotes: string | null;
-  user: { id: string; email: string };
+  strReferenceNumber: string | null;
+  details: Record<string, unknown>;
+  user: {
+    id: string;
+    email: string;
+    phone: string;
+    ucid: string;
+    kyc: { tier: PrismaKycTier; status: PrismaKycStatus } | null;
+    wallet: { balanceMinor: number } | null;
+    transactionFlags: Array<{
+      id: string;
+      type: string;
+      status: string;
+      createdAt: string;
+      strFiledAt: string | null;
+    }>;
+  };
 }
 
 /* ── staff profile reports ── */

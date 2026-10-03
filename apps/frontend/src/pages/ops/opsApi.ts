@@ -46,6 +46,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
+import type { ListFetchParams } from "./opsList";
 import type {
   ActivityEvent,
   Contract,
@@ -377,6 +378,7 @@ const toUser = (r: RawUserRow): User => ({
   kyc: kycState(r.cachedKycStatus),
   created: r.createdAt,
   suspended: r.isSuspended,
+  completeness: 0,
   wallet: 0,
   act: { jobs: 0, props: 0, cClient: 0, cFree: 0, gigs: 0, orders: 0 },
 });
@@ -386,6 +388,7 @@ export const withUserDetail = (row: User, d: RawUserSummary): User => ({
   ...row,
   wallet: d.walletBalance,
   kyc: kycState(d.user.cachedKycStatus),
+  completeness: d.user.profileCompleteness ?? 0,
   act: {
     jobs: d.activity.jobsPosted,
     props: d.activity.proposalsSubmitted,
@@ -411,12 +414,13 @@ const toKyc = (r: RawKycItem): KycItem => ({
   doc: r.documentNumber ?? "—",
   status: r.status,
   updated: r.updatedAt,
-  docs: r.documents.map((d) => ({ t: d.documentType, k: KYCDOC[d.documentType] ?? "id-front" })),
+  docs: r.documents.map((d) => ({ id: d.id, t: d.documentType, k: KYCDOC[d.documentType] ?? "id-front" })),
   history: [],
 });
 
 const toDispute = (r: RawDisputeItem): DisputeItem => {
   const ms = r.contract?.milestones ?? [];
+  const deliverable = ms.find((m) => Boolean(m.deliverableUrl)) ?? null;
   return {
     id: r.id,
     cat: r.category,
@@ -427,6 +431,7 @@ const toDispute = (r: RawDisputeItem): DisputeItem => {
     ms: ms.map((m) => m.title).join(", ") || "—",
     amt: ms.reduce((s, m) => s + m.amountMinor, 0),
     hasDel: ms.some((m) => Boolean(m.deliverableUrl)),
+    deliverableUrl: deliverable?.deliverableUrl ?? null,
     slaH: hoursUntil(r.mediationDeadlineAt),
     created: r.createdAt,
     ev: r.evidence.map((e) => ({
@@ -445,6 +450,24 @@ const toProfileReport = (r: RawProfileReportPage["data"][number]): ProfileReport
   details: r.details ?? "",
   created: r.createdAt,
   status: reportStatus(r.status),
+});
+
+const toRiskFlag = (f: RawRiskFlag): RiskFlag => ({
+  id: f.id,
+  type: f.type,
+  status: flagStatus(f.status),
+  created: f.createdAt,
+  details: f.details ?? {},
+  strRef: f.strReferenceNumber ?? null,
+  user: {
+    id: f.user.id,
+    email: f.user.email,
+    ucid: f.user.ucid,
+    kycTier: f.user.kyc?.tier ?? null,
+    kycStatus: f.user.kyc?.status ?? null,
+    walletMinor: f.user.wallet?.balanceMinor ?? null,
+    flagCount: f.user.transactionFlags?.length ?? 0,
+  },
 });
 
 const toHealth = (h: RawSystemHealth): HealthState => ({
@@ -495,12 +518,7 @@ async function loadOverview(): Promise<OverviewBundle> {
     health: health ? toHealth(health) : EMPTY_HEALTH,
     escrows: escrows.items.map(toEscrow),
     recon: recon.items.map(toRecon),
-    riskFlags: flags.items.map((f) => ({
-      id: f.id,
-      type: f.type,
-      status: flagStatus(f.status),
-      created: f.createdAt,
-    })),
+    riskFlags: flags.items.map(toRiskFlag),
     queues: {
       kyc: kyc.items.map(toKyc),
       disputes: disputes.items.map(toDispute),
@@ -654,6 +672,240 @@ async function loadLedger(): Promise<LedgerBundle> {
 export const KYC_CLEARER_REASON =
   "Photo is unclear, blurry, or cropped. Please re-upload a clear image.";
 
+/** Paging + search plus the endpoint-specific filters a page exposes. */
+type ListFilters = ListFetchParams & {
+  status?: string;
+  provider?: string;
+  role?: string;
+  escrowState?: string;
+  recStatus?: string;
+  referenceType?: string;
+  flagType?: string;
+};
+
+/**
+ * Server-paginated list endpoints. Each returns the console row type plus the
+ * backend's own totals, so `useListPage` can drive <Pager> and search runs
+ * against the full dataset rather than the first page of it.
+ */
+export const opsListApi = {
+  payments: async ({ page, limit, q, status, provider }: ListFilters) => {
+    const r = (await api.adminListPayments({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+      provider: provider || undefined,
+    })) as { items: RawPayment[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toPayment), total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  payouts: async ({ page, limit, q, status, provider }: ListFilters) => {
+    const r = (await api.adminListPayouts({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+      provider: provider || undefined,
+    })) as { items: RawPayout[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toPayout), total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  escrows: async ({ page, limit, q, escrowState }: ListFilters) => {
+    const r = (await api.adminListEscrows({
+      page,
+      limit,
+      q: q || undefined,
+      escrowState: escrowState || undefined,
+    })) as { items: RawEscrow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toEscrow), total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  /**
+   * `recStatus` is applied after pagination server-side (its `total` is
+   * page-local), so it is applied here over the returned page instead of
+   * being sent. `provider` and `q` are genuine server filters.
+   */
+  reconciliation: async ({ page, limit, q, provider, recStatus }: ListFilters) => {
+    const r = (await api.adminListReconciliation({
+      page,
+      limit,
+      provider: provider || undefined,
+    })) as { items: RawReconRow[]; total: number; page: number; pageSize: number };
+    const needle = q.trim().toLowerCase();
+    const rows = r.items
+      .filter((x) => !needle || x.providerTransactionId.toLowerCase().includes(needle))
+      .filter((x) => !recStatus || x.reconciliationStatus === recStatus)
+      .map(toRecon);
+    return { rows, total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  contracts: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.adminListContracts({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+    })) as { items: RawContractRow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toContract), total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  users: async ({ page, limit, q, role }: ListFilters) => {
+    const r = (await api.adminListUsers({
+      page,
+      limit,
+      q: q || undefined,
+      role: role || undefined,
+    })) as { items: RawUserRow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toUser), total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  staff: async ({ page, limit }: ListFetchParams) => {
+    const r = (await api.getStaffUsers({ page })) as {
+      items: RawStaffRow[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+    void limit;
+    return {
+      rows: r.items.map(
+        (x): StaffMember => ({
+          id: x.id,
+          email: x.email,
+          ucid: x.ucid,
+          userRole: x.role,
+          staffRole: x.staffRole,
+          suspended: x.isSuspended,
+        }),
+      ),
+      total: r.total,
+      page: r.page,
+      pageSize: r.limit,
+    };
+  },
+
+  riskFlags: async ({ page, limit, q, flagType, status }: ListFilters) => {
+    const r = (await api.getTmsQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      flagType: flagType || undefined,
+      status: status || undefined,
+    })) as { items: RawRiskFlag[]; total: number; page: number; pageSize: number };
+    return {
+      rows: r.items.map(toRiskFlag),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
+  },
+
+  kycQueue: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.getKycReviewQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || undefined,
+    })) as unknown as {
+      items: RawKycItem[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+    return {
+      rows: r.items.map(toKyc),
+      total: r.total,
+      page: r.page,
+      pageSize: r.limit,
+    };
+  },
+
+  disputes: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.getDisputeQueue({ page, pageSize: limit, search: q || undefined, status: status || undefined })) as unknown as {
+      items: RawDisputeItem[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+    return {
+      rows: r.items.map(toDispute),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
+  },
+
+  auditLogs: async ({ page, limit, q }: ListFetchParams) => {
+    const r = await api.getAuditLogs({ page, limit });
+    const needle = q.trim().toLowerCase();
+    // The audit route has no server-side text filter, so narrow the page.
+    const rows = needle
+      ? r.items.filter((x) =>
+          [x.eventType, x.entityType, x.entityId, x.action, x.actorRole, x.userId]
+            .filter(Boolean)
+            .some((f) => String(f).toLowerCase().includes(needle)),
+        )
+      : r.items;
+    return { rows, total: r.total, page: r.page, pageSize: r.limit };
+  },
+
+  /** Receives wallet top-ups awaiting receipt verification. */
+  topUps: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.getTopUpReviewQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || "PENDING",
+    })) as RawTopUpPage;
+    return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  /** Staff support queue. */
+  conversations: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.getStaffConversations({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || "OPEN",
+    })) as RawConversationPage;
+    return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  /** Profile moderation reports (pending only, per the backend). */
+  profileReports: async ({ page, limit }: ListFetchParams) => {
+    const r = (await api.getProfileReports({ page, limit })) as RawProfileReportPage;
+    return {
+      rows: r.data.map(toProfileReport),
+      total: r.pagination.total,
+      page: r.pagination.page,
+      pageSize: r.pagination.limit,
+    };
+  },
+
+  ledgerJournals: async ({ page, limit, q, referenceType }: ListFilters) => {
+    const r = (await api.adminLedgerJournals({
+      page,
+      limit,
+      q: q || undefined,
+      referenceType: referenceType || "ALL",
+    })) as { items: RawJournal[]; total: number; page: number; pageSize: number };
+    return {
+      rows: r.items.map((j) => ({
+        id: j.id,
+        desc: j.description,
+        ref: j.referenceType,
+        dr: j.totalDebitsMinor,
+        cr: j.totalCreditsMinor,
+        posted: j.postedAt,
+      })),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
+  },
+};
+
 export const opsApi = {
   overview: () => loadOverview(),
   badges: () => loadBadges(),
@@ -697,13 +949,7 @@ export const opsApi = {
   setStaffRole: (id: string, role: StaffRole | null) => api.setStaffRole(id, role),
 
   reports: () => loadReports(),
-  riskFlags: async () =>
-    (await rFlags()).items.map((f) => ({
-      id: f.id,
-      type: f.type,
-      status: flagStatus(f.status),
-      created: f.createdAt,
-    })),
+  riskFlags: async () => (await rFlags()).items.map(toRiskFlag),
 
   kycQueue: async () => (await rKyc()).items.map(toKyc),
   kycHistory: (userId: string) => api.getKycReviewHistory(userId),
@@ -738,6 +984,47 @@ export const opsApi = {
   /* ── surfaces carried over from the dashboard this console replaces ── */
   auditLogs: () => rAudit(),
   permissionMatrix: () => rMatrix(),
+
+  /* ── compliance actions (tms) ── */
+  tmsUser: async (userId: string) => {
+    const r = (await api.getTmsQueue({ pageSize: 1, search: userId })) as {
+      items: RawRiskFlag[];
+    };
+    return r.items[0] ?? null;
+  },
+  tmsActivity: () => api.getTmsActivity(),
+  fileStr: (flagId: string, notes: string, ref: string, suspendAccount = false) =>
+    api.fileStr(flagId, notes, ref, suspendAccount),
+  dismissFlag: (flagId: string, notes: string) => api.dismissFlag(flagId, notes),
+  liftHold: (userId: string, reason?: string) => api.liftTmsHold(userId, reason),
+
+  /* ── user moderation actions (admin) ── */
+  suspendUser: (userId: string, reason: string) => api.adminSuspendUser(userId, reason),
+  unsuspendUser: (userId: string) => api.adminUnsuspendUser(userId),
+  forceKycRereview: (userId: string) => api.adminForceKycRereview(userId),
+
+  /* ── dispute workflow ── */
+  claimDispute: (id: string) => api.claimDispute(id),
+  escalateDispute: (id: string) => api.escalateDispute(id),
+  escalateToArbitration: (id: string) => api.escalateDisputeToArbitration(id),
+  submitDisputeEvidence: (id: string, statement: string) =>
+    api.submitDisputeEvidence(id, statement),
+  awardDispute: (
+    id: string,
+    input: {
+      awardReferenceNumber: string;
+      outcome: DisputeOutcome;
+      recommendation: string;
+      split?: number;
+    },
+  ) =>
+    api.awardDispute(id, {
+      awardReferenceNumber: input.awardReferenceNumber,
+      outcome: input.outcome,
+      recommendation: input.recommendation,
+      freelancerShareMinor: input.split,
+    }),
+
   reviewTopUp: (id: string, decision: "APPROVED" | "REJECTED", reason?: string) =>
     api.reviewTopUp(id, decision, reason),
   flagTopUp: (id: string, reason: string) => api.flagTopUpSuspicious(id, reason),

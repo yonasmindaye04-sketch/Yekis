@@ -1,9 +1,12 @@
 /* ────────────────────────────────────────────────────────────────────────
    SupportDesk.tsx — staff support inbox.
 
-   Carried over from the dashboard this console replaces. Reads
-   chat/admin/conversations and the shared conversation message routes;
-   replies, attachments and status changes all go through opsApi.
+   Uses the console's own two-pane queue pattern (queue-wrap / q-card /
+   queue-detail) so it matches KYC and Dispute Mediation visually.
+   GET   /chat/admin/conversations
+   GET   /chat/conversations/:id/messages
+   POST  /chat/conversations/:id/messages · /chat/upload
+   PATCH /chat/admin/conversations/:id/status
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,53 +16,74 @@ import {
   Paperclip,
   RefreshCw,
   RotateCcw,
+  Search,
   Send,
 } from "lucide-react";
-import { dts, opsApi, useApi } from "../opsApi";
+import { dts, opsApi, opsListApi } from "../opsApi";
+import { useListPage } from "../opsList";
 import type { RawChatMessage, RawConversation } from "../opsBackend";
-import { Empty, ErrorBox, LoadingBox, PageHead, Pill } from "../components/ui";
-import { useToast } from "../components/ui";
+import {
+  Empty,
+  ErrorBox,
+  FilterSelect,
+  Kv,
+  LoadingBox,
+  PageHead,
+  Pager,
+  Pill,
+  useToast,
+} from "../components/ui";
 
-function ageHours(iso: string): number {
-  return (Date.now() - new Date(iso).getTime()) / 3_600_000;
-}
+/** Hours a ticket has been open; drives the SLA chip. */
+const waitHours = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_600_000;
 
 export default function SupportDesk() {
   const toast = useToast();
-  const [scope, setScope] = useState<"OPEN" | "ALL">("OPEN");
-  const { data, error, loading, reload } = useApi(() => opsApi.conversations(scope));
+  const [scope, setScope] = useState("OPEN");
   const [selected, setSelected] = useState<string | null>(null);
+
+  const list = useListPage<RawConversation>(
+    (p) => opsListApi.conversations({ ...p, status: scope }),
+    25,
+    [scope],
+  );
+  const {
+    rows, total, page, pages, loading, error, search, setSearch, setPage, reload,
+  } = list;
+
   const [messages, setMessages] = useState<RawChatMessage[]>([]);
+  const [msgLoading, setMsgLoading] = useState(false);
   const [reply, setReply] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const convs = data?.items ?? [];
-  const active = convs.find((c) => c.id === selected) ?? null;
+  const active = rows.find((c) => c.id === selected) ?? null;
 
   const loadMessages = useCallback(async (id: string) => {
+    setMsgLoading(true);
     try {
       setMessages(await opsApi.chatMessages(id));
-    } catch {
-      /* a staff member may lose access mid-thread; keep the list usable */
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not load the thread");
+    } finally {
+      setMsgLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length]);
+  }, [toast]);
 
   const open = useCallback(
     (c: RawConversation) => {
       setSelected(c.id);
       setReply("");
       setFile(null);
-      setMessages([]);
       void loadMessages(c.id);
     },
     [loadMessages],
   );
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   const send = async () => {
     if (!selected || (!reply.trim() && !file) || busy) return;
@@ -89,14 +113,17 @@ export default function SupportDesk() {
       await opsApi.setConversationStatus(selected, status);
       toast(status === "CLOSED" ? "Conversation closed." : "Conversation reopened.");
       setSelected(null);
+      setMessages([]);
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not change status");
     }
   };
 
-  if (loading && !data) return <LoadingBox />;
-  if (error && !data) return <ErrorBox error={error} reload={reload} />;
+  if (loading && rows.length === 0) return <LoadingBox />;
+  if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
+
+  const breached = rows.filter((c) => c.status === "OPEN" && waitHours(c.updatedAt) > 24).length;
 
   return (
     <div className="fade">
@@ -104,89 +131,93 @@ export default function SupportDesk() {
         title="Support Desk"
         sub="Guest and client conversations routed to the staff queue"
         right={
-          <div style={{ display: "flex", gap: 8 }}>
-            <div className="f-search" style={{ padding: "0 10px", height: 32 }}>
-              <select
-                className="sel"
-                style={{ border: "none", background: "transparent", padding: 0 }}
-                value={scope}
-                onChange={(e) => setScope(e.target.value as "OPEN" | "ALL")}
-              >
-                <option value="OPEN">Open only</option>
-                <option value="ALL">All</option>
-              </select>
-            </div>
-            <button className="btn btn-ghost" onClick={reload}>
-              <RefreshCw size={14} /> Refresh
-            </button>
-          </div>
+          <button className="btn btn-ghost" onClick={reload}>
+            <RefreshCw size={14} /> Refresh
+          </button>
         }
       />
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <Kv k="Matching tickets" v={total.toLocaleString()} />
+        <Kv k="On this page" v={String(rows.length)} />
+        <Kv k="Unassigned" v={String(rows.filter((c) => !c.assignedStaff).length)} />
+        <Kv k="Waiting &gt; 24h" v={String(breached)} warn={breached > 0} />
+      </div>
 
-      <div className="grid" style={{ gridTemplateColumns: "minmax(260px, 340px) 1fr", alignItems: "start" }}>
-        <div className="card" style={{ maxHeight: "68vh", overflow: "auto" }}>
-          {convs.length === 0 ? (
-            <Empty icon={MessageSquare}>No conversations in this queue.</Empty>
+      <div className="card filters">
+        <div className="f-search">
+          <Search size={15} />
+          <input
+            placeholder="Search subject or requester email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <FilterSelect
+          value={scope}
+          onChange={setScope}
+          options={["OPEN", "CLOSED"]}
+          allLabel="All statuses"
+          label="Conversation status"
+        />
+        <button className="btn btn-ghost" onClick={reload}>
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
+      <div className="queue-wrap">
+        <div className="queue-list">
+          {rows.length === 0 ? (
+            <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+              <Empty icon={MessageSquare}>No conversations in this queue.</Empty>
+            </div>
           ) : (
-            <table className="tbl">
-              <tbody>
-                {convs.map((c) => {
-                  const last = c.messages[0];
-                  const wait = ageHours(c.updatedAt);
-                  return (
-                    <tr
-                      key={c.id}
-                      className="clickable"
-                      style={selected === c.id ? { background: "var(--ops-surface-2)" } : undefined}
-                      onClick={() => open(c)}
-                    >
-                      <td>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                          <span className="cell-main">{c.subject}</span>
-                          <Pill s={c.status} />
-                        </div>
-                        <div className="cell-sub">{c.creator.email}</div>
-                        {last ? (
-                          <div className="cell-sub" style={{ marginTop: 4 }}>
-                            {last.body.slice(0, 70)}
-                          </div>
-                        ) : null}
-                        <div style={{ display: "flex", gap: 8, marginTop: 5, alignItems: "center" }}>
-                          <span className="cell-sub">{dts(c.updatedAt)}</span>
-                          {c.status === "OPEN" && wait > 24 ? (
-                            <span className="sla breach">● waiting {Math.floor(wait)}h</span>
-                          ) : c.status === "OPEN" && wait > 2 ? (
-                            <span className="sla warn">● waiting {Math.floor(wait)}h</span>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            rows.map((c) => {
+              const last = c.messages[0];
+              const wait = waitHours(c.updatedAt);
+              return (
+                <button
+                  key={c.id}
+                  className={`q-card ${selected === c.id ? "selected" : ""}`}
+                  onClick={() => open(c)}
+                >
+                  <div className="q-head">
+                    <strong>{c.subject}</strong>
+                    <Pill s={c.status} />
+                  </div>
+                  <div className="q-sub">
+                    <span className="subject">{c.creator.email}</span>
+                    <span className="q-date">{dts(c.updatedAt)}</span>
+                  </div>
+                  {last ? (
+                    <div className="q-sub" style={{ marginTop: 4 }}>
+                      <span className="subject">{last.body.slice(0, 80)}</span>
+                    </div>
+                  ) : null}
+                  {c.status === "OPEN" && wait > 24 ? (
+                    <div style={{ marginTop: 7 }}>
+                      <span className="sla breach">● waiting {Math.floor(wait)}h</span>
+                    </div>
+                  ) : c.status === "OPEN" && wait > 2 ? (
+                    <div style={{ marginTop: 7 }}>
+                      <span className="sla warn">● waiting {Math.floor(wait)}h</span>
+                    </div>
+                  ) : null}
+                </button>
+              );
+            })
           )}
+          <Pager page={page} pages={pages} total={total} onPage={setPage} unit="tickets" />
         </div>
 
-        <div className="card card-pad" style={{ minHeight: 320 }}>
-          {!active ? (
-            <Empty icon={MessageSquare}>Select a conversation to read and reply.</Empty>
-          ) : (
-            <>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 12,
-                  marginBottom: 14,
-                }}
-              >
+        {active ? (
+          <div className="queue-detail card">
+            <div className="qd-head">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: 15 }}>{active.subject}</div>
-                  <div style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
-                    {active.creator.email}
-                    {active.assignedStaff ? ` · assigned to ${active.assignedStaff.name}` : " · unassigned"}
+                  <h3 style={{ margin: 0 }}>{active.subject}</h3>
+                  <div className="qd-meta">
+                    {active.creator.email} ·{" "}
+                    {active.assignedStaff ? `assigned to ${active.assignedStaff.name}` : "unassigned"}
                   </div>
                 </div>
                 {active.status === "OPEN" ? (
@@ -199,43 +230,28 @@ export default function SupportDesk() {
                   </button>
                 )}
               </div>
+            </div>
 
-              <div style={{ maxHeight: "42vh", overflow: "auto", display: "flex", flexDirection: "column", gap: 10 }}>
-                {messages.length === 0 ? (
-                  <Empty icon={MessageSquare}>No messages yet.</Empty>
+            <div className="qd-body">
+              <div className="ev-chat">
+                {msgLoading ? (
+                  <div className="empty" style={{ padding: 20 }}>Loading thread…</div>
+                ) : messages.length === 0 ? (
+                  <div className="empty" style={{ padding: 20 }}>No messages yet.</div>
                 ) : (
                   messages.map((m) => {
                     const fromStaff = Boolean(m.sender.staffRole);
                     return (
-                      <div
-                        key={m.id}
-                        style={{
-                          alignSelf: fromStaff ? "flex-end" : "flex-start",
-                          maxWidth: "78%",
-                          background: fromStaff ? "var(--ops-accent)" : "var(--ops-surface-2)",
-                          color: fromStaff ? "#fff" : "var(--ops-text)",
-                          borderRadius: 10,
-                          padding: "8px 11px",
-                        }}
-                      >
-                        <div style={{ fontSize: 11, opacity: 0.75, marginBottom: 3 }}>
-                          {m.sender.displayName ?? m.sender.email} · {dts(m.createdAt)}
+                      <div className={`ev-bubble ${fromStaff ? "freelancer" : "client"}`} key={m.id}>
+                        <div className="ev-b-head">
+                          <strong>
+                            {fromStaff ? "Staff" : (m.sender.displayName ?? m.sender.email)}
+                          </strong>
+                          <span>{dts(m.createdAt)}</span>
                         </div>
-                        <div style={{ fontSize: 13, whiteSpace: "pre-wrap" }}>{m.body}</div>
+                        <p>{m.body}</p>
                         {m.attachmentUrl ? (
-                          <a
-                            href={m.attachmentUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              gap: 5,
-                              marginTop: 6,
-                              fontSize: 12,
-                              textDecoration: "underline",
-                            }}
-                          >
+                          <a href={m.attachmentUrl} target="_blank" rel="noreferrer">
                             <Paperclip size={12} /> attachment
                           </a>
                         ) : null}
@@ -262,11 +278,7 @@ export default function SupportDesk() {
                 />
                 <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
                   <Paperclip size={13} />
-                  <input
-                    type="file"
-                    hidden
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                  />
+                  <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 </label>
                 <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void send()}>
                   <Send size={13} /> {busy ? "Sending…" : "Send"}
@@ -277,9 +289,15 @@ export default function SupportDesk() {
                   Attaching: {file.name}
                 </div>
               ) : null}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div className="queue-detail card">
+            <div className="qd-body">
+              <Empty icon={MessageSquare}>Select a conversation to read and reply.</Empty>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
