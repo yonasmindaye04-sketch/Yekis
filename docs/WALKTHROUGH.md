@@ -174,7 +174,7 @@ Important controls:
 | Wallet | Balance, manual top-up, top-up history, Tier 2 withdrawal |
 | Notifications | List unread/all notifications and mark read |
 | Support chat | Guest or authenticated conversations and messages |
-| Staff dashboard | KYC/top-up queues, dispute resolution, TMS filing and dismissal |
+| Staff dashboard | Operations Console (`apps/frontend/src/pages/ops/`): command center with Action Center, KYC/top-up/receipt queues, dispute resolution, TMS filing and dismissal, support inbox, audit log, admins & permissions, and system health |
 
 ## Featured Talent and Moderation
 
@@ -398,3 +398,36 @@ When implementation changes, update this walkthrough if the user journey, state 
     - Added the assigned staff member directly to conversation participants upon guest ticket creation, and wired `notifyStaffOfEvent` so in-app notifications and alerts are dispatched to all staff in real time.
     - Updated `getConversationAccess()` and `chat.routes.ts` so all staff roles can view, claim, and reply to open support tickets without being blocked by 403 Forbidden errors.
     - In `LandingPage.tsx`, updated the floating chat widget to persist `guestConversationId` in component state, enabling continuous conversation and follow-up messaging even after initial email submission.
+
+## Operations Console v2 (added 2026-10-03)
+
+The staff dashboard was rebuilt as a single console at `apps/frontend/src/pages/ops/`, replacing `StaffDashboard.tsx` and the eight `Admin*Page.tsx` files (nineteen components retired in total — see `docs/CHANGELOG.md`). `FullPlatformApp.tsx` mounts it for any account with a `staffRole`.
+
+**Entry point.** `if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;`
+
+### Navigation and gating
+- Sidebar groups: **Overview** (Command Center) · **Cases** (Support Desk, Dispute Mediation, Risk & Fraud) · **Review Queues** (KYC Reviews, Profile Reports, Receipts) · **Financial** (Contracts, Payments, Payouts, Escrow, Reconciliation, Ledger, Reports) · **Administration** (Users, Staff & Roles, Audit Logs, System Health).
+- Entries are filtered by `opsPerms.ts`, which fetches `GET /admin/permissions/matrix` and resolves the signed-in `staffRole` against it. The backend still enforces every route (`requirePermission` on `/admin/*`, `requireStaffRole` elsewhere) — the console only hides links a reviewer cannot open. A deep link into a forbidden page falls back to the first permitted page.
+- Sidebar badges count open work per queue (support tickets, KYC, disputes, profile reports, receipts, payouts, risk flags, recon).
+
+### Command Center
+1. **Stat cards** — total users, active contracts, funds in escrow, pending payouts, open disputes, pending KYC, support tickets, pending payments. No trend percentages or sparklines: the backend exposes aggregate totals only, with no time-series endpoint to derive a real trend from.
+2. **Action Center** — ranks live work by severity: breached dispute SLAs (critical) → critical/high risk flags → failing health checks → recon mismatches → pending payouts → KYC queue → profile reports. Each directive opens the relevant page with the record focused.
+3. **Charts** — transaction volume by day, escrow by state (donut), payouts vs refunds by week, and review workload per queue. All dependency-free SVG. History charts are derived from the most recent 100 rows of the underlying list endpoints and the UI labels that window.
+4. **Recent activity** — newest audit events from `dashboard/summary.recentActivity`.
+
+### Review queues (hotkeys enabled)
+- **KYC Reviews** (`/kyc/review-queue`) — `↑`/`↓` to move, `A` to approve, `R` to focus the rejection reason. "Clearer photo" resolves as a rejection carrying a re-upload reason, because the backend accepts `VERIFIED | REJECTED` only.
+- **Dispute Mediation** (`/disputes/staff/queue`) — SLA countdown per case (breached cases flagged red), inline evidence thread, live fee-and-withholding split preview before resolving.
+- **Profile Reports** (`/staff/reports`) — resolve as no-action / hide / ban, plus the featured-carousel refresh that the old Profiles tab carried.
+- **Receipts** (`/wallet/topups/queue`) — approve, reject, or flag a manual transfer. Flagging raises a `STAFF_FLAGGED` transaction flag that then appears under Risk & Fraud.
+
+### Carried over from the previous dashboard
+Support inbox (threaded replies, attachments, close/reopen, open/all scope), receipt review, audit log browser, and Admins & Permissions — the last now rendering the **real** permission matrix from the backend instead of the invented one the old page displayed. Role changes accept "No console access" to demote an account.
+
+### Data layer
+`opsApi.ts` is an adapter over the shared `api` client (Bearer auth, `/api/v1`, automatic refresh) — not a second HTTP client. The console was authored against a planned `/admin/*` surface that does not exist; the mapping table is documented in `apps/frontend/src/pages/ops/README.md`. Because the non-`/admin` staff surfaces use `requireStaffRole`, restricted roles receive 403 on parts of the overview aggregate, so `overview()` degrades section-by-section rather than failing the page.
+
+### Fixed along the way
+- `getProfileReports`, `resolveProfileReport`, and `refreshFeaturedCarousel` all pointed at routes that do not exist (404). Profile moderation and carousel refresh were silently dead; all three now hit their real endpoints.
+- Contract and user detail load on demand rather than per-row, removing an N+1 request fan-out from those pages.

@@ -497,13 +497,39 @@ All administrative surfaces are protected by router-level `requireAuth` and gran
 ### Admin Endpoints (`/api/v1/admin/*`)
 - **Authentication:** `Bearer <JWT>` required for all routes via `adminRouter.use(requireAuth)`.
 - **Permissions:** Validated on every call via database-backed `requirePermission(key)` checks against the role matrix (`SUPER_ADMIN`, `ADMIN`, `OPERATIONS_ADMIN`, `FINANCE_ADMIN`, `COMPLIANCE_ADMIN`, `DISPUTE_MEDIATOR`, `SUPPORT`).
-- **Endpoints:**
-  - `GET /api/v1/admin/dashboard/summary`: Operations command center metrics and recent activity.
-  - `GET /api/v1/admin/audit-logs`: Paginated immutable audit trail.
-  - `GET /api/v1/admin/system/health`: Live health status of Redis, DB, MinIO, and double-entry ledger balance.
-  - `GET /api/v1/admin/finance/reports`: Financial volumes, fees, payouts, and marketplace contract status breakdown.
-  - `GET /api/v1/admin/users`: User search and management with suspend/KYC re-review triggers.
-  - `GET /api/v1/admin/contracts`: Contract search and detail inspector.
+- **Overview & reporting**
+  - `GET /api/v1/admin/dashboard/summary` — `dashboard.view`. Operations metrics (`totalUsers`, `activeContracts`, `fundsInEscrowMinor`, `pendingPayouts`, `openDisputes`, `pendingIdentity`, `openSupportTickets`, `pendingPayments`, `pendingTopUps`) plus 12 most recent `recentActivity` audit events.
+  - `GET /api/v1/admin/monitoring/health` — `monitoring.view`. Checks for `database`, `redis`, `objectStore`, `telebirrConfigured` plus ledger debit/credit balance and `checkedAt`.
+  - `GET /api/v1/admin/reports/summary` — `reports.view`. Financial totals (volume, released, refunded, payouts, fees, withholding, failure counts) and marketplace totals (clients, freelancers, contracts by status, open disputes, open risk flags).
+  - `GET /api/v1/admin/audit-logs` — `audit.view`. Paginated `{ items, total, page, limit }`. Query: `page`, `limit`, `eventType`, `entityType`, `entityId`, `userId`. **No date filter exists.**
+- **Identity & access**
+  - `GET /api/v1/admin/permissions/matrix` — `dashboard.view`. `{ permissions: string[], roles: Record<role, string[]> }`. This is the source of truth for client-side nav gating.
+  - `GET /api/v1/admin/staff` — `admins.manage`. `{ items, total, page, limit }`.
+  - `POST /api/v1/admin/staff/:userId/role` — `admins.manage`. Body `{ staffRole: <role> | null }`; `null` demotes to a regular user. Returns `{ id, email, staffRole }`. `409` on self-edit or demoting the last super admin.
+- **Users & contracts**
+  - `GET /api/v1/admin/users` — `users.view`. Query `page`, `limit`, `role`, `q` (≥2 chars). `{ items, total, page, pageSize }`.
+  - `GET /api/v1/admin/users/search` — `users.view`. Same data but a different envelope (`limit` not `pageSize`) and no `ucid` in the select.
+  - `GET /api/v1/admin/users/:userId` — `users.view`. User + KYC + wallet balance + activity counters.
+  - `POST /api/v1/admin/users/:id/suspend` / `/unsuspend` — `users.suspend`.
+  - `POST /api/v1/admin/users/:id/force-kyc-rereview` — `kyc.review`.
+  - `GET /api/v1/admin/contracts`, `GET /api/v1/admin/contracts/:contractId` — `contracts.view`. Detail adds milestones, payments, disputes, review and per-contract audit entries.
+- **Finance**
+  - `GET /api/v1/admin/payments` — `payments.view`. Query `page`, `limit`, `status`, `provider`, `q`.
+  - `GET /api/v1/admin/escrows` — `escrow.view`. Query `escrowState` (a real `EscrowState` value), `q`. Also returns `escrowHeldMinor`.
+  - `GET /api/v1/admin/payouts` — `payouts.view`. Also returns `pendingPayouts`.
+  - `POST /api/v1/admin/payouts/:payoutId/settle` — `payouts.settle`. Body `{ decision: "CONFIRMED" | "FAILED", providerPayoutId?, failureReason? }`. Returns the updated payout row.
+  - `GET /api/v1/admin/ledger`, `GET /api/v1/admin/ledger/journals` — `ledger.view`. Summary carries `accounts[]` and an `integrity` block; journals carry `totalDebitsMinor`/`totalCreditsMinor`.
+  - `GET /api/v1/admin/reconciliation` — `reconciliation.view`. Adds `reconciliationStatus` and `differenceMinor` per transaction. Note: `recStatus` is filtered **after** pagination, so `total` is page-local.
+
+### Other staff surfaces (not under `/admin`)
+These use `requireStaffRole(...)` rather than `requirePermission(...)`, so a role can hold a console page's permission yet still be rejected at the route. The console degrades per-section rather than failing.
+
+- **KYC** (`/api/v1/kyc`, `COMPLIANCE_OFFICER | ADMIN`): `GET /review-queue` (envelope uses `limit`), `POST /:targetUserId/review` with `{ decision: "VERIFIED" | "REJECTED", rejectionReason? }` — there is **no** "clearer photo" decision, `GET /documents/:documentId/url`, `GET /:targetUserId/history`.
+- **Transaction monitoring** (`/api/v1/tms`, `COMPLIANCE_OFFICER | ADMIN`): `GET /queue`, `POST /:flagId/file-str`, `POST /:flagId/dismiss`, `GET /activity`, `POST /users/:userId/lift-hold`.
+- **Disputes** (`/api/v1/disputes`): `GET /staff/queue`, `POST /:disputeId/resolve` with `{ outcome, recommendation, freelancerShareMinor? }`, plus `/claim`, `/arbitration-award`, `/escalate`, `/evidence`.
+- **Profile reports** (`/api/v1/staff/reports`, `ADMIN | COMPLIANCE_OFFICER`): `GET /` returns `{ data, pagination }`; resolve with `PATCH /:reportId` and `{ status, staffNotes }`. *There is no `/api/v1/admin/profile-reports` route.*
+- **Wallet top-ups** (`/api/v1/wallet/topups/queue`): `approve`, `reject` (`{ rejectionReason }`), `flag` (`{ reason }`) are three separate routes; `GET /:topUpId/receipt-url` returns a 300s signed URL.
+- **Featured talent** (`/api/v1/featured`): `POST /staff/refresh` recomputes the carousel. *There is no `/api/v1/profiles/featured/refresh` route.*
 
 ### Support Queue (`/api/v1/chat/admin/conversations`)
 - **Access:** `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT", "SUPER_ADMIN", "OPERATIONS_ADMIN", "COMPLIANCE_ADMIN")`.

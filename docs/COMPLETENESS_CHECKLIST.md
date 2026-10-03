@@ -92,6 +92,13 @@ Last reviewed: 2026-08-15
 - [x] Guest chat widget: displays assigned staff member, supports file attachments, and allows continuous follow-up conversations
 - [x] Staff sidebar accessibility: independent scrolling containment for expandable operational menus with pinned sign-out action
 - [x] Admin dashboard authentication: router-level `requireAuth` enforcement with granular `requirePermission` RBAC matrix
+- [x] **Operations Console v2** (`apps/frontend/src/pages/ops/`) — single staff shell replacing `StaffDashboard.tsx` + eight `Admin*Page.tsx` files (19 components retired)
+- [x] Command Center: Action Center ranking SLA breaches → risk → health → recon → queue work, with per-directive deep links
+- [x] Dependency-free SVG charts (area, grouped bar, donut, sparkline, h-bars) with empty-data guards
+- [x] Ctrl/⌘K command palette over pages and records, filtered by the signed-in role's permissions
+- [x] Nav visibility driven by `GET /admin/permissions/matrix`, with a render-time fallback for forbidden deep links
+- [x] Carried-over staff surfaces: support inbox, receipt/top-up review, audit log browser, admins & permissions (rendering the real permission matrix), profile moderation + featured-carousel refresh
+- [x] On-demand contract and user detail (removes a per-row N+1 request fan-out)
 - [x] Polling-resilient API rate limiting (2,000 req/15m prod, 10,000 dev) with JSON error responses and client graceful 429 handling
 - [x] Full support desk dispatch: real-time staff alerting on guest tickets, auto-assignment to all active staff roles, and shared queue visibility
 - [x] Loading, empty, action-busy, and user-visible error/confirmation states in primary workflows

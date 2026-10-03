@@ -395,6 +395,29 @@ export interface PermissionMatrix {
   roles: Record<string, readonly string[]>;
 }
 
+export interface KycReviewEvent {
+  id: string;
+  decision: string;
+  tierAtDecision: string;
+  reason: string | null;
+  createdAt: string;
+}
+
+export interface StaffProfileReport {
+  id: string;
+  reason: string;
+  details: string | null;
+  status: string;
+  staffNotes: string | null;
+  createdAt: string;
+  reportedUser: { id: string; ucid: string; displayName: string | null };
+}
+
+export interface StaffProfileReportPage {
+  data: StaffProfileReport[];
+  pagination: { page: number; limit: number; total: number; totalPages: number };
+}
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
@@ -713,6 +736,9 @@ class ApiClient {
 
   async reviewKyc(userId: string, decision: "VERIFIED" | "REJECTED", rejectionReason?: string): Promise<unknown> {
     return this.request(`/api/v1/kyc/${userId}/review`, { method: "POST", body: JSON.stringify({ decision, rejectionReason }) });
+  }
+  async getKycReviewHistory(userId: string): Promise<KycReviewEvent[]> {
+    return this.request(`/api/v1/kyc/${userId}/history`);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1076,7 +1102,7 @@ class ApiClient {
     return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
   }
   async refreshFeaturedCarousel(): Promise<unknown> {
-    return this.request(`/api/v1/profiles/featured/refresh`, { method: "POST" });
+    return this.request(`/api/v1/featured/staff/refresh`, { method: "POST" });
   }
   
   // --- Reviews ---
@@ -1112,13 +1138,17 @@ class ApiClient {
   }
 
   // --- Staff Profile Reports ---
-  async getProfileReports(page?: number): Promise<unknown> {
-    const params = new URLSearchParams();
-    if (page) params.set("page", String(page));
-    return this.request(`/api/v1/admin/profile-reports?${params.toString()}`);
+  // Reports are served by the staff-profile module (GET /api/v1/staff/reports),
+  // NOT by an /admin/profile-reports route — the response envelope is
+  // { data, pagination } and resolution is a PATCH on the same resource.
+  async getProfileReports(params?: { page?: number; limit?: number }): Promise<StaffProfileReportPage> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return this.request(`/api/v1/staff/reports?${qs.toString()}`);
   }
   async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
-    return this.request(`/api/v1/admin/profile-reports/${reportId}/resolve`, { method: "POST", body: JSON.stringify({ status, staffNotes }) });
+    return this.request(`/api/v1/staff/reports/${reportId}`, { method: "PATCH", body: JSON.stringify({ status, staffNotes }) });
   }
 
   // --- Admin RBAC & audit ---

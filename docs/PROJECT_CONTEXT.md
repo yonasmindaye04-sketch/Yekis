@@ -1,6 +1,14 @@
 # Project Context
 
-Last updated: 2026-09-08
+Last updated: 2026-10-03
+
+> **Update 2026-10-03 (Operations Console v2):**
+> 1. Staff Dashboard Consolidation: Replaced `StaffDashboard.tsx` and the eight `Admin*Page.tsx` components with one console at `apps/frontend/src/pages/ops/` (shell + 18 pages + shared components + a single scoped stylesheet). Nineteen files retired. Mounted from `FullPlatformApp.tsx` for any account carrying a `staffRole`.
+> 2. `opsApi.ts` Is An Adapter, Not A Second API Client: The console was authored against a planned `/admin/*` surface (`/admin/overview`, `/admin/badges`, `/admin/risk-flags`, `/admin/kyc/queue`, `/admin/disputes/mediation`, `/admin/profile-reports`) using cookie auth. None of those routes exist. The adapter maps every console operation onto real endpoints through the shared `api` client (Bearer auth, `/api/v1`, auto-refresh) — see `apps/frontend/src/pages/ops/README.md` for the full mapping table.
+> 3. Permission Gating Moved To The Matrix: `opsPerms.ts` fetches `GET /admin/permissions/matrix` and filters sidebar entries and command-palette results by the signed-in `staffRole`, replacing the hand-maintained `STAFF_MATRIX` mirror. Because non-`/admin` staff surfaces use the coarser `requireStaffRole`, `overview()` degrades section-by-section rather than failing wholesale for restricted roles.
+> 4. Removed Fabricated Data: Dropped hardcoded stat-card trend percentages (there is no time-series endpoint) and the invented permission matrix in the old staff page (`MANAGE_STAFF`, `VIEW_LEDGER`, … matched no backend key). History charts are derived from the most recent 100 rows of the underlying list endpoints and labelled as windowed.
+> 5. Fixed Three 404 Endpoints: `getProfileReports`, `resolveProfileReport`, and `refreshFeaturedCarousel` all requested routes that do not exist, leaving profile moderation and the carousel refresh silently dead. Corrected to `GET/PATCH /api/v1/staff/reports` and `POST /api/v1/featured/staff/refresh`.
+> 6. N+1 Removal: Contract and user detail now load when a row is opened instead of per-row on list load.
 
 > **Update 2026-09-08 (Admin Dashboard Accessibility, Authentication, and Support Chat Delivery):**
 > 1. Staff Sidebar Scroll Accessibility: Resolved the issue where lower menu options (Audit Logs, Admins & Permissions, Sign out) became inaccessible when accordion groups expand. Updated `.staff-sidebar` with strict viewport containment and `.staff-sidebar .sidebar-nav` with `flex: 1 1 0; min-height: 0; overflow-y: auto;` with slim custom scrollbars and a pinned bottom sign-out button.
@@ -145,7 +153,7 @@ Users may have `CLIENT`, `FREELANCER`, or `BOTH` marketplace roles. Staff author
 - Receipt-based manual top-up with staff approval.
 - In-app notifications with SMS/Telegram worker integration.
 - Guest and authenticated support conversations with automated load-balanced staff assignment and file attachments.
-- Staff dashboard for KYC, top-up, dispute, and TMS queues.
+- Operations Console (`apps/frontend/src/pages/ops/`) for staff: command center with a severity-ranked Action Center, KYC / receipt / dispute / TMS review queues, support inbox, contracts, payments, payouts, escrow, reconciliation, ledger, reports, users, staff roles, audit log, and system health. Nav visibility is derived from the backend permission matrix.
 - Public-facing marketing site with escrow explanation, FAQ, transparent pricing, and technical SEO infrastructure (robots.txt, sitemap.xml, structured data).
 
 ## Current Implementation Status
