@@ -132,6 +132,61 @@ export async function requireGuestChatAccess(
 }
 
 /**
+ * Accepts either a normal session token or a guest support token, WITHOUT
+ * pinning the guest to a conversation.
+ *
+ * Used for endpoints a scoped guest legitimately needs but that carry no
+ * conversation in the path — currently attachment upload. The guest is still a
+ * real, server-side User id, so anything they create is attributed to them and
+ * reachable only through the scoped routes. Per-conversation confinement is
+ * enforced by `requireGuestChatAccess` on the message routes; do not use this
+ * middleware where a `conversationId` is available.
+ */
+export async function requireAuthAllowingGuest(
+  req: AuthedRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith("Bearer ")) {
+    return res
+      .status(401)
+      .json({ error: "Missing or malformed Authorization header" });
+  }
+
+  try {
+    const token = header.slice("Bearer ".length);
+    const { payload } = await jwtVerify(token, accessSecret);
+    const id = payload.sub as string;
+    if (!id) return res.status(401).json({ error: "Invalid or expired token" });
+
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { isSuspended: true },
+    });
+    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
+    if (user.isSuspended) {
+      return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+    }
+
+    if (isGuestSupportToken(payload as Record<string, unknown>)) {
+      // No role claims are honoured for guest tokens.
+      req.user = { id, role: "CLIENT", staffRole: null };
+      return next();
+    }
+
+    req.user = {
+      id,
+      role: payload.role as string,
+      staffRole: (payload.staffRole as string | null) ?? null,
+    };
+    return next();
+  } catch {
+    return res.status(401).json({ error: "Invalid or expired token" });
+  }
+}
+
+/**
  * Optional authentication — same as requireAuth but does NOT reject
  * unauthenticated requests. If a valid token is present, req.user is
  * populated; otherwise req.user stays undefined and the request proceeds.

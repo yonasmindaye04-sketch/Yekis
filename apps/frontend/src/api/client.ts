@@ -571,6 +571,49 @@ class ApiClient {
     return response.json();
   }
 
+  /**
+   * Fetches a chat attachment as a Blob using an explicit bearer token.
+   *
+   * Attachment routes are authorized, and browsers do NOT send an Authorization
+   * header for `<img src>` or plain link navigations — so attachments must be
+   * fetched explicitly and turned into an object URL.
+   */
+  async fetchAttachmentBlob(url: string, token: string): Promise<Blob> {
+    const absolute = url.startsWith("http")
+      ? url
+      : `${API_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+
+    const response = await fetch(absolute, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error("Attachment unavailable.");
+      }
+      throw new Error(`Could not load attachment (HTTP ${response.status}).`);
+    }
+    return response.blob();
+  }
+
+  /** Uploads a chat attachment using an explicit bearer token (guest sessions). */
+  async uploadGuestChatAttachment(file: File, token: string): Promise<{ url: string }> {
+    const absolute = `${API_BASE_URL}/api/v1/chat/upload`;
+    const form = new FormData();
+    form.append("file", file);
+
+    const response = await fetch(absolute, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed (HTTP ${response.status}).`);
+    }
+    return response.json();
+  }
+
   // Auth
   async loginWithTelegram(authData: string | Record<string, unknown>, role?: string): Promise<TelegramAuthResponse> {
     const body =

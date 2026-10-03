@@ -745,34 +745,12 @@ export function ChatWorkspace({
                         )}
                         <p className="bubble-body">{m.body}</p>
                         {m.attachmentUrl && (
-                          <div className="bubble-attachment-container">
-                            {isImageAttachment(m.attachmentUrl) && (
-                              <a
-                                href={m.attachmentUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="bubble-attachment-img-link"
-                              >
-                                <img
-                                  src={m.attachmentUrl}
-                                  alt={getAttachmentLabel(m.attachmentUrl)}
-                                  className="bubble-attachment-preview"
-                                  loading="lazy"
-                                />
-                              </a>
-                            )}
-                            <a
-                              href={m.attachmentUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="bubble-attachment"
-                              download={getAttachmentLabel(m.attachmentUrl)}
-                            >
-                              <FileText size={14} />
-                              <span>{getAttachmentLabel(m.attachmentUrl)}</span>
-                              <ExternalLink size={12} />
-                            </a>
-                          </div>
+                          <SecureAttachment
+                            url={m.attachmentUrl}
+                            token={api.getToken()}
+                            label={getAttachmentLabel(m.attachmentUrl)}
+                            isImage={isImageAttachment(m.attachmentUrl)}
+                          />
                         )}
                         <div className="bubble-meta">
                           <span className="bubble-time">

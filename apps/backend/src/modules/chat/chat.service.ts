@@ -349,6 +349,41 @@ export async function listConversations(userId: string) {
   });
 }
 
+/**
+ * Resolves a chat attachment storage key to the conversation that owns it, and
+ * checks whether the given user may read it.
+ *
+ * Attachment URLs are handed to browsers, proxies and access logs, so the route
+ * must not serve a file on the strength of the key alone — the key is opaque and
+ * unguessable, but a leaked URL would otherwise grant permanent access.
+ *
+ * The URL stored on the message is the canonical, reversible encoding of the
+ * key (`/api/v1/chat/attachments/<encodeURIComponent(key)>`), so ownership can be
+ * resolved by an indexed point lookup rather than a scan.
+ *
+ * @returns the conversationId when access is allowed, otherwise null.
+ */
+export async function authorizeAttachmentAccess(params: {
+  storageKey: string;
+  userId: string;
+}): Promise<string | null> {
+  const url = `/api/v1/chat/attachments/${encodeURIComponent(params.storageKey)}`;
+
+  const message = await prisma.chatMessage.findFirst({
+    where: { attachmentUrl: url },
+    select: { conversationId: true },
+  });
+  if (!message) return null;
+
+  try {
+    await getConversationAccess(message.conversationId, params.userId);
+    return message.conversationId;
+  } catch {
+    // ConversationNotFound / ConversationAccessError both mean "no".
+    return null;
+  }
+}
+
 export async function listMessages(params: {
   conversationId: string;
   userId: string;

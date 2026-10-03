@@ -187,7 +187,21 @@ export async function uploadChatAttachment(params: {
   contentType: string;
 }): Promise<string> {
   const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const key = `chat-attachments/${params.userId}/${randomUUID()}-${safeName}`;
+
+  // The key is deliberately opaque: it must NOT contain the uploader's user id.
+  // Attachment URLs are handed to browsers, proxies and access logs, so an
+  // internal identifier embedded in the path leaks it to every hop and makes
+  // keys enumerable by user. Ownership is enforced in the serving route, which
+  // resolves the key back to its conversation and checks access.
+  //
+  // The first two hex characters shard the object store so a single prefix does
+  // not become a hot partition.
+  //
+  // `params.userId` is still required by the signature and used for the local
+  // backup path only; it never reaches the object key.
+  const id = randomUUID();
+  const shard = id.slice(0, 2);
+  const key = `chat-attachments/${shard}/${id}-${safeName}`;
 
   try {
     await objectStoreClient.send(
@@ -202,11 +216,17 @@ export async function uploadChatAttachment(params: {
     logger.warn({ err, key }, "Failed to upload chat attachment to object store, saving locally");
   }
 
-  // Also write to local storage as fallback
+  // Also write to local storage as fallback. getChatAttachmentStream resolves
+  // local files by mirroring the storage key, so this must keep the same shape.
   try {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
-    const localDir = path.resolve(process.cwd(), "uploads", "chat-attachments", params.userId);
+    const localDir = path.resolve(
+      process.cwd(),
+      "uploads",
+      "chat-attachments",
+      shard,
+    );
     await fs.mkdir(localDir, { recursive: true });
     const localFile = path.resolve(localDir, path.basename(key));
     await fs.writeFile(localFile, params.fileBuffer);

@@ -27,9 +27,10 @@ import {
   generateSmartReplies,
   summarizeConversation,
   extractDealTerms,
+  authorizeAttachmentAccess,
 } from "./chat.service.js";
 import { issueGuestSupportToken } from "./guestSupportToken.js";
-import { requireGuestChatAccess } from "../../middleware/auth.js";
+import { requireGuestChatAccess, requireAuthAllowingGuest } from "../../middleware/auth.js";
 
 export const chatRouter = Router();
 
@@ -211,7 +212,8 @@ chatRouter.post(
 
 chatRouter.post(
   "/upload",
-  requireAuth,
+  requireAuthAllowingGuest,
+  attachmentUploadLimiter,
   upload.single("file"),
   async (req: AuthedRequest, res) => {
     try {
@@ -240,10 +242,29 @@ chatRouter.post(
   },
 );
 
-chatRouter.get("/attachments/:key(*)", async (req, res) => {
+chatRouter.get("/attachments/:key(*)", requireAuthAllowingGuest, async (req: AuthedRequest, res) => {
+  const rawKey = req.params.key as string;
+  let key: string;
   try {
-    const rawKey = req.params.key as string;
-    const key = decodeURIComponent(rawKey);
+    key = decodeURIComponent(rawKey);
+  } catch {
+    return res.status(400).json({ error: "INVALID_KEY" });
+  }
+
+  // Authorize before touching storage. The key is opaque and unguessable, but
+  // serving on the strength of the key alone would make any leaked URL a
+  // permanent, unauthenticated grant.
+  const conversationId = await authorizeAttachmentAccess({
+    storageKey: key,
+    userId: req.user!.id,
+  });
+  if (!conversationId) {
+    // 404 rather than 403: distinguishing them would let a stranger probe which
+    // attachment keys exist.
+    return res.status(404).json({ error: "NOT_FOUND" });
+  }
+
+  try {
     const { stream, contentType, contentLength } =
       await getChatAttachmentStream(key);
 
@@ -253,10 +274,14 @@ chatRouter.get("/attachments/:key(*)", async (req, res) => {
     if (contentLength) {
       res.setHeader("Content-Length", contentLength);
     }
-    res.setHeader("Cache-Control", "public, max-age=86400");
+    // Attachments are personal data (screenshots of statements, IDs). `private`
+    // forbids shared-proxy/CDN reuse; `no-store` also keeps them out of browser
+    // caches after sign-out.
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
     stream.pipe(res);
   } catch (err) {
-    logger.warn({ err, key: req.params.key }, "Chat attachment not found");
+    logger.warn({ err, key }, "Chat attachment not found");
     return res.status(404).json({ error: "NOT_FOUND" });
   }
 });

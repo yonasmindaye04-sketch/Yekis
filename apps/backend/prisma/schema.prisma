@@ -728,6 +728,9 @@ model ChatMessage {
   @@index([conversationId])
   @@index([senderId])
   @@index([origin])
+  // Supports the attachment route's ownership check: it resolves a requested
+  // storage key back to the owning message, then to its conversation.
+  @@index([attachmentUrl])
   @@unique([externalId])
 }
 
