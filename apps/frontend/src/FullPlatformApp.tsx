@@ -12,7 +12,7 @@ import {
 import { realtimeSocket } from "./api/socket";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
-import { StaffDashboard } from "./StaffDashboard";
+import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
@@ -821,7 +821,7 @@ export function FullPlatformApp() {
         ];
   }, [platformRole]);
 
-  if (user?.staffRole) return <StaffDashboard user={user} onLogout={logout} />;
+  if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;
 
   if (!user && showLanding) {
     const handleNavigate = (page: string) => {
