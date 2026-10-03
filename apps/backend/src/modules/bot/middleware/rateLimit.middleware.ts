@@ -27,12 +27,15 @@ function getRateLimitKey(
   ctx: BotContext,
   type: keyof typeof RATE_LIMITS,
 ): string {
-  const userId = ctx.session.telegramUserId || ctx.session.telegramChatId;
+  // Optional access: an update with no chat has no session key, and touching
+  // ctx.session then throws. The chat-session guard stops those updates earlier,
+  // but a rate limiter must never be the thing that crashes the bot.
+  const userId = ctx.session?.telegramUserId || ctx.session?.telegramChatId;
   return `${RATE_LIMITS[type]!.keyPrefix}:${userId}`;
 }
 
 function getLimitType(ctx: BotContext): keyof typeof RATE_LIMITS {
-  if (ctx.session.role === "STAFF") return "staff";
+  if (ctx.session?.role === "STAFF") return "staff";
 
   const update = ctx.update;
   if (update.callback_query?.data?.startsWith("staff:")) return "staff";
@@ -55,7 +58,7 @@ function getLimitType(ctx: BotContext): keyof typeof RATE_LIMITS {
     ];
     if (mutationCommands.some((c) => command.startsWith(c))) return "mutation";
   }
-  if (ctx.session.scene) return "scene";
+  if (ctx.session?.scene) return "scene";
 
   return "default";
 }
@@ -94,7 +97,7 @@ export async function rateLimitMiddleware(
       );
       logger.warn(
         {
-          userId: ctx.session.telegramUserId,
+          userId: ctx.session?.telegramUserId,
           type,
           current,
           limit: config.maxRequests,

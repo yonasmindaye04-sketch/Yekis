@@ -1,5 +1,6 @@
 ﻿// === IMPORTS ===
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import multer from "multer";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
@@ -31,6 +32,36 @@ import { issueGuestSupportToken } from "./guestSupportToken.js";
 import { requireGuestChatAccess } from "../../middleware/auth.js";
 
 export const chatRouter = Router();
+
+// === RATE LIMITS ===
+//
+// The guest intake endpoint is unauthenticated and creates a User, a
+// Conversation and message rows on every call, so without its own budget it is a
+// trivial write amplifier. The global /api limit (2000 / 15min in production) is
+// shared across every route and IP-agnostic in aggregate, which is far too loose
+// for anonymous writes.
+const guestIntakeLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "TOO_MANY_SUPPORT_REQUESTS",
+    message:
+      "You have reached the support request limit for this hour. Please try again later.",
+  },
+});
+
+const attachmentUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "TOO_MANY_UPLOADS",
+    message: "Too many file uploads. Please wait a moment before trying again.",
+  },
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -70,7 +101,7 @@ function handleError(err: unknown, res: import("express").Response) {
 }
 
 // â”€â”€ Guest support (no auth required) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-chatRouter.post("/guest", async (req, res) => {
+chatRouter.post("/guest", guestIntakeLimiter, async (req, res) => {
   const parsed = GuestInput.safeParse(req.body);
   if (!parsed.success)
     return res

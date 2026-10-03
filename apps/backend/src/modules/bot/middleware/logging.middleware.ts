@@ -6,8 +6,11 @@ export async function loggingMiddleware(
   next: () => Promise<void>,
 ) {
   const start = Date.now();
-  const userId = ctx.session.telegramUserId;
-  const chatId = ctx.session.telegramChatId;
+  // Defensive: requireChatSession() already stops chat-less updates, but
+  // touching ctx.session without a session key throws and would take this
+  // middleware (and therefore every handler) down with it.
+  const userId = ctx.session?.telegramUserId;
+  const chatId = ctx.session?.telegramChatId;
   const username = ctx.from?.username;
 
   // Log incoming update

@@ -116,6 +116,66 @@ scheduleTmsScanJob().catch((err) =>
 );
 
 // === MAIN FUNCTIONS ===
+
+/**
+ * Turns a listen failure into an actionable message.
+ *
+ * Without this, a port clash surfaced as a raw Node "Unhandled 'error' event"
+ * dump with a 20-line stack trace and no indication of WHICH process was
+ * holding the port — the single most confusing failure in local development.
+ * It is also the nastiest one to escape, because `tsx watch` keeps running
+ * after its child dies: the watcher holds no port, so it looks harmless, yet it
+ * respawns a server on the next file save and re-creates the clash.
+ */
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    const { execSync } = require("node:child_process") as typeof import("node:child_process");
+    let holder = "";
+    try {
+      const out = execSync(
+        `netstat -ano | findstr :${env.PORT} | findstr LISTENING`,
+        { encoding: "utf8", shell: "cmd.exe" },
+      ).trim();
+      const pid = out.split(/\s+/).pop();
+      if (pid) {
+        let name = "unknown";
+        try {
+          name =
+            execSync(`tasklist /FI "PID eq ${pid}" /NH`, {
+              encoding: "utf8",
+              shell: "cmd.exe",
+            })
+              .split(/\s+/)[1] ?? "unknown";
+        } catch {
+          /* tasklist unavailable */
+        }
+        holder = `\n  Held by PID ${pid} (${name}).`;
+      }
+    } catch {
+      /* best effort only */
+    }
+
+    console.error(
+      `\n=========================================================\n` +
+        `  Port ${env.PORT} is already in use.${holder}\n\n` +
+        `  Another copy of this server is still running. Common cause:\n` +
+        `  "tsx watch" keeps watching after its process crashes, so a\n` +
+        `  previous failed start is still alive and will grab the port\n` +
+        `  again on the next file save.\n\n` +
+        `  Free the port, then start again:\n` +
+        `    npx kill-port ${env.PORT}\n` +
+        `  ...or on Windows PowerShell:\n` +
+        `    Get-NetTCPConnection -LocalPort ${env.PORT} -State Listen |\n` +
+        `      ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }\n` +
+        `=========================================================\n`,
+    );
+    process.exit(1);
+  }
+
+  logger.error({ err }, "HTTP server error");
+  process.exit(1);
+});
+
 function shutdown(signal: string) {
   logger.info(`${signal} received, shutting down gracefully`);
   stopBot().catch((err) => logger.error({ err }, "Error stopping bot"));

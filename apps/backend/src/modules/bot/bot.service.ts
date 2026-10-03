@@ -7,6 +7,7 @@ import {
   createInitialSessionData,
 } from "./utils/sessionStorage.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
+import { requireChatSession } from "./middleware/sessionGuard.middleware.js";
 import { rateLimitMiddleware } from "./middleware/rateLimit.middleware.js";
 import { sceneTimeoutMiddleware } from "./middleware/sceneTimeout.middleware.js";
 import { loggingMiddleware } from "./middleware/logging.middleware.js";
@@ -154,6 +155,11 @@ export function createBot(): Bot<BotContext> {
     }),
   );
 
+  // Must come immediately after the session plugin and before ANY middleware
+  // that reads ctx.session: an update with no chat has no session key, and
+  // touching ctx.session throws, which would abort the entire chain.
+  bot.use(requireChatSession());
+
   // Conversations plugin for scenes
   bot.use(conversations());
 
@@ -175,14 +181,18 @@ export function createBot(): Bot<BotContext> {
   // Error handler
   bot.catch(async (err) => {
     const ctx = err.ctx;
-    logger.error(err.error, `Error handling update ${ctx?.update?.update_id}`);
+    logger.error(
+      {
+        err: err.error,
+        updateId: ctx?.update?.update_id,
+        method: (ctx as any)?.match,
+      },
+      `Error handling update ${ctx?.update?.update_id}`,
+    );
 
     // Try to notify user
     try {
-      const t = ctx?.t ?? ((k: string) => k);
-      await ctx?.reply(
-        ctx.t("errors_generic") || "Something went wrong. Please try again.",
-      );
+      await ctx?.reply(ctx.t("errors_generic") || "Something went wrong. Please try again.");
     } catch {
       // Ignore notification errors
     }
