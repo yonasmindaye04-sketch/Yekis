@@ -2,6 +2,25 @@
 
 Last updated: 2026-10-03
 
+> **Update 2026-10-03 (Support chat hardening plan):** `docs/SUPPORT_CHAT_PLAN.md` records a
+> verified findings list and a five-stage plan for the native support chat: (1) security —
+> rate-limit the public guest endpoint, strip `userId` from attachment keys, and fix the
+> unauthenticated / publicly-cached attachment route; (2) first-response-time tracking as the
+> core support metric; (3) staff-only internal notes; (4) CSAT; (5) audit completeness for
+> chat actions. Priority/severity, SLA, macros and a knowledge base are explicitly deferred
+> until there is real ticket volume to calibrate them against. A third-party agent inbox,
+> microservices and the wider integration/data-warehouse stack were considered and rejected as
+> disproportionate for a Node monolith at this stage.
+>
+> **Update 2026-10-03 (Customer support is now 100% native — Chatwoot reverted):**
+> 1. Why Chatwoot went: the bridge built earlier today worked, but it was the wrong shape. Chatwoot delivers webhooks through an `ssrf_filter` that rejects every private/loopback address with no override, so agent replies were undeliverable locally and would have needed a public ingress in production. It also meant a second inbox, a second message store, a second UI beside the staff dashboard's existing queue, a third-party bubble that cannot be styled to match the design system, and a ~3 GB container stack — all to obtain capabilities the platform already had.
+> 2. What was actually missing: **scoped guest access**. `POST /api/v1/chat/guest` is public, but reading and replying sat behind `requireAuth`, so a visitor could raise a ticket and then received `401` on every read and every follow-up. Staff replies were written to the database that the visitor never saw. That single gap is why the widget felt bolted on.
+> 3. The fix: `POST /api/v1/chat/guest` now returns a signed `accessToken` carrying `typ: "guest_support"` and one `conversationId` — no refresh token, no role/staff claims, 12h TTL, so it is not a login token. `requireGuestChatAccess` pins it to that single thread and returns `403 TOKEN_SCOPE_MISMATCH` for anything else. The WebSocket accepts it and forces `isStaff` off, so replies arrive live.
+> 4. Frontend: `LandingSupportChat` now keeps that token, opens its own socket instance (the app-wide singleton belongs to the logged-in session), and re-reads the authoritative thread so staff replies render on the correct side, with a 5s poll as fallback. `components/supportChatEvents.ts` lets the footer open the one native widget instead of mounting a second copy.
+> 5. Duplicate icon fixed: the landing page was rendering both the native bubble and the third-party bubble. Only the native one remains; Settings "Chat with Support" opens the chat workspace and the footer link opens the widget.
+> 6. Removed: widget component + SDK bridge, Application API client, bridge service, webhook receiver, signature helpers, `docker-compose.chatwoot.yml`, `.env.chatwoot.example`, the `chatwoot:*` scripts, every `CHATWOOT_*` env var, and the containers/volumes. `Conversation.channel` and the `chatwoot*` columns are dropped by `20261003140000_drop_chatwoot_bridge_columns`; `ChatMessage.origin`/`externalId` stay as generic markers.
+> 7. Net result: one chat system, one UI, no tunnel, no extra infrastructure, and support conversations that are actually two-way.
+>
 > **Update 2026-10-03 (Landing V2 "Ready to start?" CTA + Footer Redesign):**
 > 1. One Continuous Bottom Outro: `FinalCTASection` and `FooterV2` in `apps/frontend/src/LandingPageV2.tsx` were rebuilt from the supplied HTML reference into a single visual band — a full-bleed spotlight CTA panel, a rounded "lip" divider, and a footer area hosting a frosted glass card with a giant masked "Yekis" wordmark behind it.
 > 2. Pointer-Tracked Spotlight: the CTA panel's lime spotlight follows the cursor via the `--mouse-x` / `--mouse-y` custom properties. Both are written straight to the DOM inside a `pointermove` listener (no React state, no re-render) and recentre on `pointerleave`. Layered behind it: a breathing ambient orb, two drifting colour blobs, an SVG-noise film, and two floating outline glyphs.

@@ -88,6 +88,12 @@ const EnvSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   TELEGRAM_WEBHOOK_URL: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  // Per-call budget for Telegram Bot API requests. Node's fetch has no default
+  // timeout, so an unreachable api.telegram.org (firewall DROP, dead route)
+  // leaves the promise pending forever — which silently prevented the bot from
+  // ever starting to poll. Long polling is allowed a longer budget
+  // automatically. Default 10000ms.
+  TELEGRAM_API_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   // Served to the client so the login widget and deep links always target the
   // deployed bot. Without it the frontend falls back to a hardcoded handle.
   TELEGRAM_BOT_USERNAME: z.string().optional(),

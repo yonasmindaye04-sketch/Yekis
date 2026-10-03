@@ -22,12 +22,128 @@ import {
 
 let botInstance: Bot<BotContext> | null = null;
 
+/**
+ * Per-call budget for ordinary Bot API methods.
+ *
+ * WHY THIS EXISTS: Node's fetch has no default timeout, so when api.telegram.org
+ * is unreachable in a way that blackholes the connection (a firewall DROP, a
+ * dead DNS route — no RST, just silence) the request promise NEVER settles.
+ * `startBot()` awaits `getMe()` before starting polling, so a single blackholed
+ * request meant polling never began and the bot silently answered nothing — no
+ * error, no log line, no `/command` ever reaching a handler. Every call is now
+ * bounded so that failure mode becomes a fast, loud, typed error instead.
+ */
+const API_CALL_TIMEOUT_MS = env.TELEGRAM_API_TIMEOUT_MS ?? 10_000;
+
+/**
+ * Long polling intentionally holds a getUpdates request open for ~30s, so it
+ * needs a budget comfortably above that. Applying the short control timeout to
+ * it would abort every poll cycle and starve the bot.
+ */
+const LONG_POLLING_METHODS = new Set(["getUpdates"]);
+const POLL_CALL_TIMEOUT_MS = API_CALL_TIMEOUT_MS + 35_000;
+
+/**
+ * Rejects with a TelegramApiTimeoutError if `promise` has not settled in time.
+ * Used for call sites outside the grammY transformer (health checks, probes).
+ */
+export async function withApiTimeout<T>(
+  label: string,
+  promise: Promise<T>,
+  timeoutMs: number = API_CALL_TIMEOUT_MS,
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () =>
+            reject(
+              new TelegramApiTimeoutError(
+                `${label} did not respond within ${timeoutMs}ms`,
+              ),
+            ),
+          timeoutMs,
+        );
+        // Don't hold the event loop open just for this timer.
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export class TelegramApiTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TelegramApiTimeoutError";
+  }
+}
+
+/**
+ * Applies the timeout to every Bot API call grammY makes.
+ */
+function applyApiTimeout(bot: Bot<BotContext>) {
+  bot.api.config.use(async (prev, method, payload, signal) => {
+    const budget = LONG_POLLING_METHODS.has(method)
+      ? POLL_CALL_TIMEOUT_MS
+      : API_CALL_TIMEOUT_MS;
+
+    const controller = new AbortController();
+    // grammY's typings still reference the `abort-controller` package's
+    // AbortSignal and `reason` postdates the lib.dom available here, so this one
+    // boundary is bridged structurally rather than nominally.
+    const callerSignal = signal as unknown as {
+      aborted?: boolean;
+      reason?: unknown;
+      addEventListener?: (t: "abort", fn: () => void, o?: { once?: boolean }) => void;
+      removeEventListener?: (t: "abort", fn: () => void) => void;
+    } | null;
+
+    const onCallerAbort = () => controller.abort(callerSignal?.reason);
+    if (callerSignal) {
+      if (callerSignal.aborted) controller.abort(callerSignal.reason);
+      else
+        callerSignal.addEventListener?.("abort", onCallerAbort, {
+          once: true,
+        });
+    }
+
+    const timer = setTimeout(
+      () =>
+        controller.abort(
+          new TelegramApiTimeoutError(
+            `Telegram API ${method} did not respond within ${budget}ms`,
+          ),
+        ),
+      budget,
+    );
+    timer.unref?.();
+
+    try {
+      return await prev(
+        method,
+        payload,
+        controller.signal as unknown as NonNullable<
+          Parameters<typeof prev>[2]
+        >,
+      );
+    } finally {
+      clearTimeout(timer);
+      callerSignal?.removeEventListener?.("abort", onCallerAbort);
+    }
+  });
+}
+
 export function createBot(): Bot<BotContext> {
   if (!env.TELEGRAM_BOT_TOKEN) {
     throw new Error("TELEGRAM_BOT_TOKEN is not configured");
   }
 
   const bot = new Bot<BotContext>(env.TELEGRAM_BOT_TOKEN);
+  applyApiTimeout(bot);
 
   // Session storage (Redis with versioning)
   const sessionStorage = createRedisSessionStorage();
@@ -85,6 +201,54 @@ export function getBot(): Bot<BotContext> | null {
   return botInstance;
 }
 
+/**
+ * Verifies the bot token with the Bot API, retrying transient failures.
+ *
+ * Connectivity to api.telegram.org is unreliable on typical dev/corporate
+ * networks (intermittent connect timeouts, not refusals). Treating the FIRST
+ * timeout as fatal left the bot permanently dead with no way to recover short
+ * of a restart, and no error the user could act on beyond "it doesn't work".
+ */
+async function verifyBotIdentity(
+  bot: Bot<BotContext>,
+  attempts = 3,
+): Promise<{ ok: true; username: string } | { ok: false; timedOut: boolean; message: string }> {
+  let lastTimedOut = false;
+  let lastMessage = "unknown error";
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const me = await bot.api.getMe();
+      return { ok: true, username: me.username };
+    } catch (err: any) {
+      const message = err?.message || String(err);
+      lastMessage = message;
+      lastTimedOut =
+        err instanceof TelegramApiTimeoutError ||
+        err?.name === "TelegramApiTimeoutError" ||
+        err?.name === "AbortError" ||
+        err?.name === "TimeoutError" ||
+        /timeout/i.test(message);
+
+      // A rejected token will never become valid; do not retry that.
+      if (/Unauthorized|401|invalid token/i.test(message)) {
+        return { ok: false, timedOut: false, message };
+      }
+
+      if (attempt < attempts) {
+        const backoff = 1000 * 2 ** (attempt - 1);
+        logger.warn(
+          { attempt, attempts, backoffMs: backoff, error: message },
+          "Telegram Bot API unreachable — retrying",
+        );
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+      }
+    }
+  }
+
+  return { ok: false, timedOut: lastTimedOut, message: lastMessage };
+}
+
 export async function startBot(): Promise<boolean> {
   if (!env.TELEGRAM_BOT_TOKEN) {
     logger.warn(
@@ -108,20 +272,30 @@ export async function startBot(): Promise<boolean> {
     );
   }
 
-  // Pre-flight check: verify bot token validity with Telegram before setting commands or polling
-  let me;
-  try {
-    me = await bot.api.getMe();
-  } catch (err: any) {
-    logger.warn(
-      { error: err?.message || err },
-      "Telegram bot token validation failed (Unauthorized/unreachable). Bot will not start. Please verify TELEGRAM_BOT_TOKEN in .env.",
+  const identity = await verifyBotIdentity(bot);
+  if (!identity.ok) {
+    logger.error(
+      { error: identity.message, timedOut: identity.timedOut },
+      identity.timedOut
+        ? "Telegram Bot API is UNREACHABLE after retries (no response). The bot " +
+          "cannot receive updates and will not answer any command. Check outbound " +
+          "access to api.telegram.org, any firewall/proxy, and DNS. The rest of " +
+          "the platform is unaffected."
+        : "Telegram bot token validation failed. Bot will not start. Verify " +
+          "TELEGRAM_BOT_TOKEN in .env.",
     );
     return false;
   }
 
   try {
-    // 1. Set Chat Menu Button (only works with HTTPS URLs - skip in local dev)
+    // 1. Chat menu button.
+    //
+    // Telegram PERSISTS this server-side. If a previous session pointed it at a
+    // tunnel that is now dead, the menu button keeps launching a Mini App that
+    // cannot load — which looks exactly like "the Mini App is crashing". So we
+    // always reconcile it: set it when the origin is publicly reachable, and
+    // explicitly RESET it to the commands menu when it is not. Skipping the
+    // call is not enough, because the stale value survives.
     const menuButtonUrl = buildPublicWebAppUrl("/");
     if (menuButtonUrl) {
       await bot.api.setChatMenuButton({
@@ -131,12 +305,16 @@ export async function startBot(): Promise<boolean> {
           web_app: { url: menuButtonUrl },
         },
       });
+      logger.info({ menuButtonUrl }, "Chat menu button -> Mini App");
     } else {
+      await bot.api.setChatMenuButton({ menu_button: { type: "commands" } });
       logger.warn(
         { frontendUrl: env.FRONTEND_URL },
-        "Skipping Web App menu button: FRONTEND_URL is not a public https origin " +
-          "(Telegram rejects localhost/LAN/http for web_app buttons). Set " +
-          "FRONTEND_URL to your public origin, e.g. via an https tunnel, to enable it.",
+        "FRONTEND_URL is not a public https origin, so the Mini App menu button " +
+          "was RESET to the commands menu. Telegram requires https for web_app " +
+          "buttons, and any previously configured (possibly dead) tunnel URL " +
+          "would otherwise keep launching a Mini App that cannot load. Set " +
+          "FRONTEND_URL to your public origin to re-enable it.",
       );
     }
 
@@ -191,7 +369,11 @@ export async function startBot(): Promise<boolean> {
     logger.info(`Bot webhook set to ${env.TELEGRAM_WEBHOOK_URL}`);
   } else {
     try {
-      await bot.api.deleteWebhook({ drop_pending_updates: true });
+      // drop_pending_updates MUST stay false here. Any message a member sent
+      // while the bot was restarting is queued by Telegram; discarding it makes
+      // the bot look dead ("it doesn't answer any command") because their
+      // /start simply vanished. Replaying them is the correct behaviour.
+      await bot.api.deleteWebhook({ drop_pending_updates: false });
     } catch (e) {
       logger.warn({ err: e }, "Failed to delete webhook, polling might fail");
     }

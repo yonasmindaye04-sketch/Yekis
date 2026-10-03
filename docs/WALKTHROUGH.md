@@ -2,6 +2,18 @@
 
 Last validated: 2026-10-03
 
+> **Customer Support Chat — Native, Verified End to End (2026-10-03):**
+> - **Status**: support runs entirely on the platform's own engine. The Chatwoot third-party inbox built earlier today has been fully reverted (see CHANGELOG "Removed").
+> - **The bug that made it feel broken**: the public widget created a ticket, then every read and follow-up returned `401`, because `POST /api/v1/chat/guest` is unauthenticated while `GET/POST /api/v1/chat/conversations/:id/messages` required a session. Staff replies were stored but never shown to the visitor.
+> - **Guest scope (`modules/chat/guestSupportToken.ts`)**: `POST /api/v1/chat/guest` returns `accessToken`, a signed JWT with `typ: "guest_support"` and one `conversationId`. No refresh token, no role/staff claims, 12h TTL.
+> - **Enforcement (`middleware/auth.ts` → `requireGuestChatAccess`)**: accepted on the messages and read routes, pinned to that single conversation; any other id returns `403 TOKEN_SCOPE_MISMATCH`. Sessions still work unchanged on the same routes.
+> - **Realtime (`lib/socket.ts`)**: the handshake accepts guest tokens and forces `isStaff` off whatever the payload claims, so `chat:new_message` reaches the visitor.
+> - **Widget (`components/LandingSupportChat.tsx`)**: stores the token, opens a dedicated `RealtimeSocketManager` (the singleton belongs to the logged-in session), re-reads the server thread so senders render on the correct side, and falls back to a 5s poll. `components/supportChatEvents.ts` lets the footer open it without a second instance.
+> - **Entry points**: Settings "Chat with Support" opens the chat workspace; the footer "Contact Support" link opens the widget and falls back to `mailto:` when it is not mounted.
+> - **Duplicate icon**: resolved — the landing page previously rendered both the native bubble and the Chatwoot bubble; only the native one remains.
+> - **Verified live**: guest raised a ticket → read its own thread (`200`, previously `401`) → sent a follow-up (`201`) → an admin replied from the dashboard → the guest thread showed the reply → and the reply also arrived as a real-time `chat:new_message` push over the WebSocket. Scope test: the same token against a different conversation returns `403`.
+> - **Tests**: `tests/guest-support-token.test.ts` (6 cases). Suite is green at 101/101.
+
 > **Chatwoot Support Bridge — Backend Integration Completed (2026-10-03):**
 > - **What the 2026-10-02 pass actually delivered**: the widget embed only. No Chatwoot API client, no webhook receiver, no shared state with the internal chat store, and no configured tokens — so no message ever reached an agent inbox. This entry records the bridge that completes it.
 > - **Division of Labour**: Chatwoot backs **support tickets**. Peer-to-peer marketplace chat (client ↔ freelancer) stays on the internal WebSocket engine, which is the only thing that can carry participant chat, typing indicators, read receipts and attachments.

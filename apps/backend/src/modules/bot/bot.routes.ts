@@ -1,5 +1,5 @@
 import { Router, Request, Response, NextFunction } from "express";
-import { getBot, webhookHandler, startBot, stopBot } from "./bot.service.js";
+import { getBot, webhookHandler, startBot, stopBot, withApiTimeout } from "./bot.service.js";
 import { env } from "../../config/env.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
@@ -38,20 +38,31 @@ router.post(
 
 // Health check endpoint
 router.get("/health", async (req: Request, res: Response) => {
+  const bot = getBot();
+  if (!bot) {
+    return res.status(503).json({
+      status: "not_initialized",
+      hint: "TELEGRAM_BOT_TOKEN missing, or the bot failed to start.",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Bounded so an unreachable Bot API reports "unreachable" promptly instead
+  // of holding the request open until a client-side timeout.
   try {
-    const bot = getBot();
-    if (!bot) {
-      return res.status(503).json({
-        status: "not_initialized",
-        timestamp: new Date().toISOString(),
-      });
-    }
+    const [me, webhookInfo] = await Promise.all([
+      withApiTimeout("getMe", bot.api.getMe()),
+      withApiTimeout("getWebhookInfo", bot.api.getWebhookInfo()),
+    ]);
 
-    const me = await bot.api.getMe();
-    const webhookInfo = await bot.api.getWebhookInfo();
+    // A webhook that is set but has a pending/error state means updates are not
+    // being delivered. Surface it so this is diagnosable from the outside.
+    const delivering = webhookInfo.url
+      ? !webhookInfo.last_error_message
+      : true; // polling mode
 
-    res.json({
-      status: "ok",
+    res.status(delivering ? 200 : 503).json({
+      status: delivering ? "ok" : "degraded",
       bot: {
         id: me.id,
         username: me.username,
@@ -60,22 +71,23 @@ router.get("/health", async (req: Request, res: Response) => {
         canReadAllGroupMessages: me.can_read_all_group_messages,
         supportsInlineQueries: me.supports_inline_queries,
       },
+      transport: webhookInfo.url ? "webhook" : "polling",
       webhook: {
-        url: webhookInfo.url,
-        hasCustomCertificate: webhookInfo.has_custom_certificate,
+        url: webhookInfo.url || null,
         pendingUpdateCount: webhookInfo.pending_update_count,
         lastErrorDate: webhookInfo.last_error_date,
         lastErrorMessage: webhookInfo.last_error_message,
-        maxConnections: webhookInfo.max_connections,
-        allowedUpdates: webhookInfo.allowed_updates,
       },
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     logger.error({ error }, "Bot health check failed");
     res.status(503).json({
-      status: "error",
+      status: "unreachable",
       error: error instanceof Error ? error.message : "Unknown error",
+      hint:
+        "The Bot API did not respond. The bot cannot receive updates until " +
+        "outbound access to api.telegram.org works. Other platform features are unaffected.",
       timestamp: new Date().toISOString(),
     });
   }

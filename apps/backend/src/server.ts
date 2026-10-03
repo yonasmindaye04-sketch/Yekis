@@ -81,15 +81,19 @@ const server = app.listen(env.PORT, async () => {
     logger.error({ err }, "Failed to initialize object store bucket"),
   );
 
-  // Start Telegram bot
-  try {
-    const started = await startBot();
-    if (started) {
-      logger.info("🤖 Telegram bot started");
-    }
-  } catch (error) {
-    logger.error({ error }, "Failed to start Telegram bot");
-  }
+  // Start Telegram bot.
+  //
+  // Deliberately NOT awaited: the Bot API is an external dependency, and an
+  // unreachable api.telegram.org must never delay or wedge the HTTP server.
+  // startBot() fails fast on its own (see TELEGRAM_API_TIMEOUT_MS) and logs a
+  // precise reason, so fire-and-forget is safe here.
+  startBot()
+    .then((started) => {
+      if (started) logger.info("🤖 Telegram bot started");
+    })
+    .catch((error) => {
+      logger.error({ error }, "Failed to start Telegram bot");
+    });
 });
 
 scheduleRecurringJobs().catch((err) =>
