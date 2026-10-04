@@ -20,10 +20,11 @@ import type { ComponentType } from "react";
 import {
   CheckCircle2,
   LogOut,
-  Menu,
-  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Sun,
+  Moon,
 } from "lucide-react";
 import type { MeResponse } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
@@ -60,6 +61,7 @@ import StaffPage from "./pages/Staff";
 import Reports from "./pages/Reports";
 import Risk from "./pages/Risk";
 import Monitoring from "./pages/Monitoring";
+import ProfilePage from "./pages/Profile";
 
 const PAGE_MAP: Record<OpsPageId, ComponentType<{ focusId?: string }>> = {
   overview: Overview,
@@ -80,6 +82,7 @@ const PAGE_MAP: Record<OpsPageId, ComponentType<{ focusId?: string }>> = {
   staff: StaffPage,
   audit: AuditLogs,
   monitoring: Monitoring,
+  profile: ProfilePage,
 };
 
 export interface OpsConsoleProps {
@@ -177,6 +180,9 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
+  const email = user?.email ?? "";
+  const roleLabel = user?.staffRole ? ROLE_LABEL[user.staffRole] ?? user.staffRole : "Staff desk";
+
   const ui = useMemo(
     () => ({
       navigate,
@@ -185,8 +191,10 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
       paletteOpen,
       toast,
       refreshBadges: badges.reload,
+      account: user ? { id: user.id, email, staffRole: user.staffRole, roleLabel } : null,
+      can: perms.can,
     }),
-    [navigate, viewer, paletteOpen, toast, badges.reload],
+    [navigate, viewer, paletteOpen, toast, badges.reload, user, email, roleLabel, perms.can],
   );
 
   const tipApi = useMemo<ChartTipApi>(
@@ -200,8 +208,6 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const Page = PAGE_MAP[activePage];
   const current = OPS_PAGES.find((i) => i.id === activePage);
   const b = badges.data;
-  const email = user?.email ?? "";
-  const roleLabel = user?.staffRole ? ROLE_LABEL[user.staffRole] ?? user.staffRole : "Staff desk";
 
   return (
     <OpsUiContext.Provider value={ui}>
@@ -211,15 +217,6 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
             <div className="app">
               <aside className={`sidebar ${sidebarOpen ? "open" : ""}`}>
                 <div className="brand">
-                  <button
-                    className="brand-toggle"
-                    onClick={toggleNav}
-                    aria-label="Hide navigation"
-                    aria-expanded
-                    title="Hide navigation for more space"
-                  >
-                    <Menu size={17} />
-                  </button>
                   <div className="brand-logo">
                     <img src="/svgviewer-output.svg" alt="Yekis Jobs" />
                   </div>
@@ -250,12 +247,21 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                   ))}
                 </nav>
                 <div className="sidebar-foot">
-                  <div className="user-chip" title={email || undefined}>
-                    <div className="avatar">{email.slice(0, 1).toUpperCase() || "S"}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div className="nm">{roleLabel}</div>
-                      <div className="em">{email || "—"}</div>
-                    </div>
+                  <div className="user-chip">
+                    {/* Identity block opens the profile editor; sign-out stays a
+                        separate control so it can never be triggered by accident. */}
+                    <button
+                      className="user-chip-main"
+                      onClick={() => navigate("profile")}
+                      title="Edit your profile"
+                      aria-label={`Edit your profile — signed in as ${roleLabel}`}
+                    >
+                      <span className="avatar">{email.slice(0, 1).toUpperCase() || "S"}</span>
+                      <span className="user-chip-id">
+                        <span className="nm">{roleLabel}</span>
+                        <span className="em">{email || "—"}</span>
+                      </span>
+                    </button>
                     {onExit ? (
                       <button
                         className="icon-btn"
@@ -273,15 +279,21 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
 
               <div className="main">
                 <header className="header">
-                  {/* Restore control: only rendered/visible while the sidebar is collapsed,
-                      since the sidebar carries the toggle in its brand row. */}
+                  {/* Single sidebar control, always in the header. The glyph names
+                      the action it performs, and aria-expanded tracks the sidebar so
+                      assistive tech reads the current state rather than the action. */}
                   <button
                     className="menu-btn"
                     onClick={toggleNav}
-                    aria-label="Show navigation"
-                    title="Show navigation"
+                    aria-label={isNarrow ? "Toggle navigation" : navCollapsed ? "Show sidebar" : "Hide sidebar"}
+                    aria-expanded={isNarrow ? sidebarOpen : !navCollapsed}
+                    title={isNarrow ? "Toggle navigation" : navCollapsed ? "Show sidebar" : "Hide sidebar"}
                   >
-                    <Menu size={18} />
+                    {isNarrow || navCollapsed ? (
+                      <PanelLeftOpen size={17} />
+                    ) : (
+                      <PanelLeftClose size={17} />
+                    )}
                   </button>
                   <div className="crumb">
                     Ops / <b>{current?.name ?? ""}</b>

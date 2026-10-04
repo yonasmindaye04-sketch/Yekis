@@ -34,6 +34,10 @@ export const OPS_PERMS = {
   users: "users.view",
   staff: "admins.manage",
   audit: "audit.view",
+  /* Editing your own profile is not an administrative act — it is open to
+     every authenticated account, so it is gated on the baseline permission
+     every staff role already holds rather than on a moderation key. */
+  profile: "dashboard.view",
 } as const;
 
 export type OpsPageId = keyof typeof OPS_PERMS;

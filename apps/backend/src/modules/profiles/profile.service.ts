@@ -120,6 +120,9 @@ export async function getPublicProfile(
     avatarUrl: user.avatarUrl,
     profileCompleteness: user.profileCompleteness,
     isAvailableForWork: user.isAvailableForWork,
+    // Surfaced so the owner's own profile editor can show the current
+    // setting. It already governs what other viewers receive above.
+    profileVisibility: user.profileVisibility,
     primarySkillId: user.primarySkillId,
     skills: user.skills.map((s: any) => s.skill),
     portfolio: user.portfolioItems,

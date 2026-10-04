@@ -1640,7 +1640,8 @@ export function FullPlatformApp() {
             >
               {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
-            <NotificationCenter />
+            {/* Clicking a notification takes the user to the view it came from. */}
+            <NotificationCenter onNavigate={(v) => setView(v as View)} />
             <button className="user-menu" onClick={logout}>
               <span className="avatar">
                 {user.email.slice(0, 1).toUpperCase()}

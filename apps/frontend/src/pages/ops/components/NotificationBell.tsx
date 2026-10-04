@@ -2,17 +2,23 @@
    NotificationBell.tsx — staff notification popover.
 
    Reads GET /api/v1/notifications and marks items read via
-   POST /api/v1/notifications/:id/read. Styled with the console's own
-   tokens (scoped under .ops-root) rather than the marketing shell's.
+   POST /api/v1/notifications/:id/read. Clicking a row marks it read and
+   navigates to the queue that raised it (see api/notificationTargets.ts).
+   Styled with the console's own tokens (scoped under .ops-root) rather than
+   the marketing shell's.
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bell, CheckCheck } from "lucide-react";
+import { Bell, CheckCheck, CornerDownRight } from "lucide-react";
 import { api } from "../../../api/client";
 import type { NotificationItem } from "../../../api/client";
+import { opsTargetFor } from "../../../api/notificationTargets";
 import { dts } from "../opsApi";
+import { useOpsUi } from "../opsUiContext";
+import type { OpsPageId } from "../opsPerms";
 
 export default function NotificationBell() {
+  const { navigate, toast, can } = useOpsUi();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,6 +69,26 @@ export default function NotificationBell() {
   }, [open]);
 
   const unread = items.filter((i) => !i.isRead).length;
+
+  /* Open the queue the event came from. The permission check matters: a
+     SUPPORT reviewer receives the staff-wide fan-out for KYC and dispute
+     events too, and must not be pushed at a page their role cannot open. */
+  const open_target = async (n: NotificationItem) => {
+    const t = opsTargetFor(n);
+    if (t && can(t.page as OpsPageId)) {
+      navigate(t.page as OpsPageId, t.focusId);
+      setOpen(false);
+    } else if (t) {
+      toast("You do not have access to that queue");
+    }
+    if (n.isRead) return;
+    try {
+      await api.markNotificationRead(n.id);
+      setItems((cur) => cur.map((i) => (i.id === n.id ? { ...i, isRead: true } : i)));
+    } catch {
+      toast("Could not mark that notification as read");
+    }
+  };
 
   const markAll = async () => {
     const targets = items.filter((i) => !i.isRead);
@@ -116,14 +142,34 @@ export default function NotificationBell() {
             ) : items.length === 0 ? (
               <div className="notif-empty">Nothing here yet.</div>
             ) : (
-              items.map((n) => (
-                <div key={n.id} className={`notif-row ${n.isRead ? "" : "unread"}`}>
-                  <div className="notif-msg">{n.message}</div>
-                  <div className="notif-meta">
-                    {n.type.replace(/_/g, " ")} · {dts(n.createdAt)}
-                  </div>
-                </div>
-              ))
+              items.map((n) => {
+                const t = opsTargetFor(n);
+                /* Inert rows stay readable but are not focusable, so keyboard
+                   users are not offered a target that does nothing. */
+                const reachable = !!t && can(t.page as OpsPageId);
+                return (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={`notif-row ${n.isRead ? "" : "unread"}`}
+                    onClick={() => void open_target(n)}
+                    disabled={!reachable}
+                    title={
+                      reachable
+                        ? `Go to ${t!.page}`
+                        : t
+                          ? "Your role cannot open that queue"
+                          : "No queue for this event yet"
+                    }
+                  >
+                    <div className="notif-msg">{n.message}</div>
+                    <div className="notif-meta">
+                      {n.type.replace(/_/g, " ")} · {dts(n.createdAt)}
+                      {reachable ? <CornerDownRight size={11} className="notif-go" /> : null}
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

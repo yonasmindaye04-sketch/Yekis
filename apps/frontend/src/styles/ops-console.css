@@ -68,27 +68,24 @@
 .ops-root .nav-item.active svg{opacity:1}
 .ops-root .nav-badge{margin-left:auto;font-size:12px;font-weight:800;color:var(--ops-amber)}
 .ops-root .sidebar-foot{border-top:1px solid var(--ops-border);padding:12px}
-.ops-root .user-chip{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;transition:background .15s;cursor:pointer}
+.ops-root .user-chip{display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;transition:background .15s}
 .ops-root .user-chip:hover{background:var(--ops-row-hover)}
+/* The chip is now a container for two controls, so the hover/focus affordance
+   lives on the inner button rather than the wrapper. */
+.ops-root .user-chip-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:0;border:0;background:transparent;cursor:pointer;text-align:left;border-radius:8px}
+.ops-root .user-chip-main:focus-visible{outline:2px solid var(--ops-primary);outline-offset:2px}
+.ops-root .user-chip-id{display:block;flex:1;min-width:0}
 .ops-root .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#818cf8,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
 .ops-root .user-chip .nm{font-size:13px;font-weight:700;line-height:1.2}
 .ops-root .user-chip .em{font-size:11px;color:var(--ops-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.ops-root .menu-btn{border:1px solid var(--ops-border);background:var(--ops-panel);border-radius:9px;width:36px;height:36px;align-items:center;justify-content:center;color:var(--ops-text-2);flex-shrink:0;transition:background .15s,color .15s}
+/* Sidebar collapse control. One button, always in the header, always visible:
+   a panel glyph states the action it performs rather than the generic "menu"
+   metaphor, so it is never confused with an overflow menu. */
+.ops-root .menu-btn{border:1px solid var(--ops-border);background:var(--ops-panel);border-radius:9px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--ops-text-2);flex-shrink:0;transition:background .15s,color .15s}
 .ops-root .menu-btn:hover{background:var(--ops-row-hover);color:var(--ops-text)}
 
-/* 3-bar navigation toggle.
-   While the sidebar is expanded the control lives in its brand row. When
-   collapsed the sidebar is off-canvas, so the same control moves to the
-   header to stay reachable. Below 860px the header button additionally
-   drives the overlay drawer. */
-.ops-root .brand-toggle{width:32px;height:32px;border-radius:8px;border:1px solid var(--ops-border);background:transparent;color:var(--ops-text-2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:background .15s,color .15s}
-.ops-root .brand-toggle:hover{background:var(--ops-row-hover);color:var(--ops-text)}
-.ops-root .menu-btn{display:none}
-.ops-root.nav-collapsed .brand-toggle{display:none}
-.ops-root.nav-collapsed .menu-btn{display:flex}
-
-/* Collapsed navigation — the 3-bar toggle hides the sidebar so wide tables
+/* Collapsed navigation — the toggle hides the sidebar so wide tables
    and charts get the full viewport. Declared before the responsive block so
    the ≤860px drawer rules below keep winning on narrow screens. */
 .ops-root.nav-collapsed .sidebar{transform:translateX(-100%)}
@@ -161,6 +158,27 @@
 .ops-root textarea.inp-t:focus{border-color:var(--ops-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--ops-primary) 12%,transparent)}
 .ops-root .inp{width:100%;padding:8px 12px;border:1px solid var(--ops-border);border-radius:9px;background:var(--ops-panel);outline:none}
 .ops-root .inp:focus{border-color:var(--ops-primary);box-shadow:0 0 0 3px color-mix(in srgb,var(--ops-primary) 12%,transparent)}
+
+/* ── profile editor ── */
+.ops-root .field{display:flex;flex-direction:column;gap:6px}
+.ops-root .field-l{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;font-weight:800;color:var(--ops-text-2);text-transform:uppercase;letter-spacing:.06em}
+.ops-root .field-l em{font-style:normal;font-size:11px;font-weight:700;color:var(--ops-text-3);letter-spacing:0}
+.ops-root .field-l em.over{color:var(--ops-red)}
+.ops-root .hint{font-size:11.5px;color:var(--ops-text-3);line-height:1.5}
+.ops-root .hr{border:0;border-top:1px solid var(--ops-border-soft);margin:16px 0}
+.ops-root .field-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.ops-root .switch{position:relative;width:42px;height:24px;flex-shrink:0;border-radius:999px;border:1px solid var(--ops-border);background:var(--ops-input);cursor:pointer;padding:0;transition:background .18s,border-color .18s}
+.ops-root .switch>span{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--ops-text-3);transition:transform .18s,background .18s}
+.ops-root .switch.on{background:color-mix(in srgb,var(--ops-green) 26%,transparent);border-color:var(--ops-green)}
+.ops-root .switch.on>span{transform:translateX(18px);background:var(--ops-green)}
+.ops-root .switch:focus-visible{outline:2px solid var(--ops-primary);outline-offset:2px}
+.ops-root .meter{height:7px;border-radius:999px;background:var(--ops-input);border:1px solid var(--ops-border-soft);overflow:hidden;margin-top:14px}
+.ops-root .meter>span{display:block;height:100%;background:linear-gradient(90deg,var(--ops-primary),var(--ops-green));transition:width .3s}
+.ops-root .prof-id{display:flex;align-items:center;gap:14px}
+.ops-root .prof-name{font-size:17px;font-weight:800;letter-spacing:-.01em}
+.ops-root .prof-mail{font-size:12.5px;color:var(--ops-text-2);word-break:break-all}
+.ops-root .avatar-lg{width:56px;height:56px;flex-shrink:0;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;color:#fff;background:linear-gradient(135deg,var(--ops-primary),var(--ops-green));overflow:hidden}
+.ops-root .avatar-lg>img{width:100%;height:100%;object-fit:cover}
 .ops-root .lbl{display:block;font-size:11px;font-weight:800;color:var(--ops-text-2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
 
 /* tables */
@@ -432,6 +450,14 @@
 .ops-root .notif-row{padding:10px 12px;border-bottom:1px solid var(--ops-border-soft)}
 .ops-root .notif-row:last-child{border-bottom:none}
 .ops-root .notif-row.unread{background:var(--ops-primary-soft)}
+/* Rows are buttons so they are keyboard reachable and announce as actionable;
+   the hover inset hints at the click without shifting the text. */
+.ops-root button.notif-row{display:block;width:100%;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--ops-border-soft);cursor:pointer;transition:box-shadow .15s,background .15s}
+.ops-root button.notif-row:hover:not(:disabled){box-shadow:inset 3px 0 0 var(--ops-primary)}
+.ops-root button.notif-row:focus-visible{outline:2px solid var(--ops-primary);outline-offset:-2px}
+.ops-root button.notif-row:disabled{cursor:default;opacity:.72}
+.ops-root .notif-meta{display:flex;align-items:center;gap:5px}
+.ops-root .notif-go{margin-left:auto;flex-shrink:0;color:var(--ops-primary)}
 .ops-root .notif-msg{font-size:12.5px;color:var(--ops-text);line-height:1.45}
 .ops-root .notif-meta{font-size:11px;color:var(--ops-text-3);margin-top:3px}
 .ops-root .notif-empty{padding:26px 16px;text-align:center;font-size:12.5px;color:var(--ops-text-2)}
@@ -452,7 +478,6 @@
   .ops-root .sidebar{transform:translateX(-100%)}
   .ops-root .sidebar.open{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.2)}
   .ops-root .main{margin-left:0}
-  .ops-root .menu-btn{display:flex}
   .ops-root .g4,.ops-root .g3,.ops-root .g2,.ops-root .g6,.ops-root .g5{grid-template-columns:1fr 1fr}
   .ops-root .content{padding:18px}
   .ops-root .search-wrap{display:none}

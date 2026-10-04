@@ -41,6 +41,40 @@ export interface MeResponse {
   wallet: { balanceMinor: number } | null;
 }
 
+/** A profile skill as returned by GET /skills and embedded in profiles. */
+export interface SkillSummary {
+  id: string;
+  name: string;
+  category?: string | null;
+}
+
+/** Profile payload accepted by PATCH /users/me/profile (see profile.validation.ts). */
+export interface UpdateProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  bio?: string;
+  primarySkillId?: string;
+  skillIds?: string[];
+  isAvailableForWork?: boolean;
+  profileVisibility?: "PUBLIC" | "PROPOSERS" | "PRIVATE";
+}
+
+/** The signed-in user's own profile (GET /users/:id/profile with viewer === self). */
+export interface SelfProfile {
+  id: string;
+  displayName: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  profileCompleteness?: number | null;
+  isAvailableForWork?: boolean | null;
+  profileVisibility?: "PUBLIC" | "PROPOSERS" | "PRIVATE" | null;
+  primarySkillId?: string | null;
+  skills?: SkillSummary[];
+  isOwnProfile?: boolean;
+}
+
 export interface TopUpRequest {
   id: string;
   userId: string;
@@ -89,7 +123,16 @@ export interface KycStatusResponse {
   documentsSubmitted: string[];
 }
 
-export interface NotificationItem { id: string; type: string; message: string; isRead: boolean; createdAt: string; }
+export interface NotificationItem {
+  id: string;
+  type: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+  /** Event payload persisted alongside the record (entity ids, amounts, …).
+   *  Drives deep-linking: see lib/notificationTargets.ts. */
+  metadata?: Record<string, unknown> | null;
+}
 
 export interface Job {
   id: string;
@@ -1244,10 +1287,14 @@ class ApiClient {
   async getPublicProfile(userId: string): Promise<unknown> {
     return this.request(`/api/v1/users/${userId}/profile`);
   }
-  async updateProfile(data: unknown): Promise<unknown> {
+  /** The signed-in user's own profile, including the private fields. */
+  async getSelfProfile(userId: string): Promise<SelfProfile> {
+    return this.request(`/api/v1/users/${userId}/profile`);
+  }
+  async updateProfile(data: UpdateProfilePayload): Promise<SelfProfile> {
     return this.request(`/api/v1/users/me/profile`, { method: "PATCH", body: JSON.stringify(data) });
   }
-  async getProfileCompleteness(): Promise<unknown> {
+  async getProfileCompleteness(): Promise<{ profileCompleteness: number }> {
     return this.request(`/api/v1/users/me/profile/completeness`);
   }
   async reportProfile(userId: string, reason: string, details: string): Promise<unknown> {

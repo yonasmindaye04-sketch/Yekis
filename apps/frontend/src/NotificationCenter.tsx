@@ -1,11 +1,24 @@
 // === IMPORTS ===
 import { useEffect, useState } from "react";
-import { Bell, Check } from "lucide-react";
+import { Bell, Check, CornerDownRight } from "lucide-react";
 import { api, type NotificationItem } from "./api/client";
+import { appTargetFor } from "./api/notificationTargets";
 import { realtimeSocket } from "./api/socket";
 
+/** Views this component may navigate to; kept in step with FullPlatformApp's View. */
+const ROUTABLE = new Set([
+  "overview",
+  "jobs",
+  "gigs",
+  "contracts",
+  "wallet",
+  "chat",
+  "verification",
+  "cases",
+]);
+
 // === MAIN COMPONENT ===
-export function NotificationCenter() {
+export function NotificationCenter({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const unread = items.filter((item) => !item.isRead).length;
@@ -48,14 +61,24 @@ export function NotificationCenter() {
       realtimeSocket.off("notify:gig-order-completed", onNotify);
     };
   }, []);
-  const read = async (item: NotificationItem) => {
-    if (!item.isRead) {
+  /* Mark read, then jump to the view the event came from. Marking is attempted
+   even when there is no destination, so a click always clears the badge. */
+const read = async (item: NotificationItem) => {
+    const t = appTargetFor(item);
+    if (t && onNavigate && ROUTABLE.has(t.page)) {
+      onNavigate(t.page);
+      setOpen(false);
+    }
+    if (item.isRead) return;
+    try {
       await api.markNotificationRead(item.id);
       setItems((current) =>
         current.map((entry) =>
           entry.id === item.id ? { ...entry, isRead: true } : entry,
         ),
       );
+    } catch {
+      /* a failed read should not block navigation */
     }
   };
   return (
@@ -77,27 +100,36 @@ export function NotificationCenter() {
           {items.length === 0 ? (
             <p className="empty-state">No notifications yet.</p>
           ) : (
-            items.slice(0, 8).map((item) => (
-              <button
-                className={
-                  item.isRead ? "notification-item" : "notification-item unread"
-                }
-                key={item.id}
-                onClick={() => void read(item)}
-              >
-                <span>
-                  <strong>{item.type.replaceAll("-", " ")}</strong>
-                  <small>{item.message}</small>
-                  <em>
-                    {new Date(item.createdAt).toLocaleString([], {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </em>
-                </span>
-                {!item.isRead && <Check size={15} />}
-              </button>
-            ))
+            items.slice(0, 8).map((item) => {
+              const t = appTargetFor(item);
+              const reachable = !!t && !!onNavigate && ROUTABLE.has(t.page);
+              return (
+                <button
+                  className={
+                    item.isRead ? "notification-item" : "notification-item unread"
+                  }
+                  key={item.id}
+                  onClick={() => void read(item)}
+                  title={reachable ? `Go to ${t!.page}` : undefined}
+                >
+                  <span>
+                    <strong>{item.type.replaceAll("-", " ")}</strong>
+                    <small>{item.message}</small>
+                    <em>
+                      {new Date(item.createdAt).toLocaleString([], {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </em>
+                  </span>
+                  {reachable ? (
+                    <CornerDownRight size={15} className="notification-go" />
+                  ) : !item.isRead ? (
+                    <Check size={15} />
+                  ) : null}
+                </button>
+              );
+            })
           )}
         </div>
       )}

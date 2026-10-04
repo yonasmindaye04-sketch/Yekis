@@ -16,6 +16,7 @@ import {
   Shield,
   TriangleAlert,
   UserCheck,
+  UserRound,
   Users,
   Wallet,
   WalletCards,
@@ -119,6 +120,10 @@ export const OPS_NAV: OpsNavGroup[] = [
         badge: (b) => b.monitoring,
       },
     ],
+  },
+  {
+    label: "Account",
+    items: [{ id: "profile", name: "My Profile", icon: UserRound }],
   },
 ];
 

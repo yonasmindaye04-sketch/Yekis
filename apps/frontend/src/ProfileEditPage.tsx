@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Save, Check, RefreshCw } from "lucide-react";
-import { api } from "./api/client";
+import { api, type UpdateProfilePayload } from "./api/client";
 import { YekisAvatar } from "./components/YekisAvatar";
 import "./ProfilePage.css";
 
@@ -17,7 +17,8 @@ interface ProfileFormState {
   primarySkillId?: string | null;
   skillIds: string[];
   isAvailableForWork?: boolean;
-  profileVisibility?: string;
+  /** Narrowed to the API's enum so an arbitrary string cannot reach PATCH. */
+  profileVisibility?: UpdateProfilePayload["profileVisibility"];
   avatarUrl?: string | null;
   profileCompleteness?: number;
 }
@@ -106,7 +107,7 @@ export const ProfileEditPage = () => {
     }
   };
 
-  const handleVisibilityChange = (val: string) => {
+  const handleVisibilityChange = (val: NonNullable<UpdateProfilePayload["profileVisibility"]>) => {
     setFormData({ ...formData, profileVisibility: val });
   };
 
@@ -325,11 +326,11 @@ export const ProfileEditPage = () => {
                 Profile Visibility
               </label>
               <div className="visibility-pills">
-                {[
+                {([
                   { id: "PUBLIC", label: "Public", desc: "Visible to all clients across the marketplace" },
                   { id: "PROPOSERS", label: "Clients Only", desc: "Visible only when you submit proposals" },
                   { id: "PRIVATE", label: "Private", desc: "Hidden from search; only visible in active contracts" },
-                ].map((vis) => (
+                ] as const).map((vis) => (
                   <button
                     key={vis.id}
                     type="button"
