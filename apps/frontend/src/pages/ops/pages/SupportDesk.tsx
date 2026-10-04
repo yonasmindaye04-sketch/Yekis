@@ -20,6 +20,9 @@ import {
   Send,
 } from "lucide-react";
 import { dts, opsApi, opsListApi } from "../opsApi";
+import { api } from "../../../api/client";
+import { SecureAttachmentLink } from "../../../components/SecureAttachment";
+import { getAttachmentLabel } from "../../../components/attachmentMeta";
 import { useListPage } from "../opsList";
 import type { RawChatMessage, RawConversation } from "../opsBackend";
 import {
@@ -251,9 +254,11 @@ export default function SupportDesk() {
                         </div>
                         <p>{m.body}</p>
                         {m.attachmentUrl ? (
-                          <a href={m.attachmentUrl} target="_blank" rel="noreferrer">
-                            <Paperclip size={12} /> attachment
-                          </a>
+                          <SecureAttachmentLink
+                            url={m.attachmentUrl}
+                            token={api.getToken()}
+                            label={getAttachmentLabel(m.attachmentUrl)}
+                          />
                         ) : null}
                       </div>
                     );

@@ -1,7 +1,7 @@
 # Customer Support Chat — Implementation Plan
 
 Date: 2026-10-03
-Status: **Approved — Stage 1 in progress.** Decisions recorded in §6.
+Status: **Approved. Stage 1 complete and verified; Stage 2 next.** Decisions in §6.
 
 Scope: hardening and completing the **native** support chat. Chatwoot was removed on
 2026-10-03 (see CHANGELOG "Removed"); support now runs entirely on our own engine.
@@ -85,16 +85,31 @@ right columns (`actorRole`, `previousState`, `newState`, `ipAddress`).
 Ordered by risk-reduction per unit of effort, not by feature count. Each stage is
 independently shippable and independently revertible.
 
-### Stage 1 — Security (do first, no dependencies)
+### Stage 1 — Security ✅ COMPLETE
 | # | Work | Files | Est |
 |---|---|---|---|
-| 1.1 | Rate-limit `POST /chat/guest` (per-IP, generous but bounded) and `POST /chat/upload` | `chat.routes.ts` | 20 min |
-| 1.2 | Strip `userId` from the storage key → opaque path | `objectStore.ts` | 15 min |
-| 1.3 | Attachment delivery: authorized proxy + no shared caching **(Q1 = A)** | `chat.routes.ts`, `objectStore.ts`, frontend | 2–4 h |
-| 1.4 | Guest attachments actually work via the scoped token (F3, pulled forward) | `chat.routes.ts`, `LandingSupportChat.tsx` | 1–2 h |
-| 1.5 | Regression tests for 1.1–1.4 | `tests/` | 1–2 h |
+| 1.1 | Rate-limit `POST /chat/guest` (**20/hour/IP**) and `POST /chat/upload` (**60/hour**) | `chat.routes.ts` | done |
+| 1.2 | Storage key no longer contains the uploader's `userId`; sharded by uuid prefix | `objectStore.ts` | done |
+| 1.3 | Attachment route authorizes every read; `Cache-Control: private, no-store`; `nosniff` **(Q1 = A)** | `chat.routes.ts`, `chat.service.ts`, `SecureAttachment.tsx` | done |
+| 1.4 | Guest attachments actually work via the scoped token (F3) | `chat.routes.ts`, `LandingSupportChat.tsx` | done |
+| 1.5 | Regression tests: authorization (6), route surface (8) | `tests/` | done |
 
-**Risk:** 1.3 can break attachment rendering if done wrong — that is why Q1 must be answered first.
+**Also added:** `ChatMessage_attachmentUrl_idx` migration (`20261003160000`) so the
+ownership lookup is an indexed point lookup.
+
+**Access policy, now explicit:** the thread owner (including a guest holding the scoped
+token) and any **staff** may read an attachment. Staff access is intentional — the support
+desk cannot help without seeing the customer's screenshot. Non-participants get `404`,
+not `403`, so the endpoint cannot be used to probe which keys exist.
+
+**Live verification:** owner `200` · non-staff stranger `404` · anonymous `401` · staff `200`
+· guest intake limiter returns `429` after exactly 20 calls · key contains no user id.
+
+**Bug found and fixed during this stage:** `POST /api/v1/chat/support` had been deleted
+accidentally when the Chatwoot block was removed. TypeScript stayed green because the
+frontend holds the path as a string. Restored, and `tests/chat-routes.test.ts` now pins
+the router surface so this class of regression fails CI. The guard was mutation-tested:
+renaming the path makes it fail.
 
 ### Stage 2 — Metrics foundation
 | # | Work | Files | Est |

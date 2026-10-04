@@ -1,3 +1,4 @@
+import { InlineKeyboard } from "grammy";
 import { env } from "../../../config/env.js";
 
 /**
@@ -82,6 +83,79 @@ export function isPublicFrontendUrl(): boolean {
 export function buildPublicWebAppUrl(path = "/"): string | null {
   if (!isPublicFrontendUrl()) return null;
   return buildWebAppUrl(path);
+}
+
+/**
+ * Whether Telegram will accept this URL inside an inline keyboard button.
+ *
+ * IMPORTANT CORRECTION: Telegram validates the URL of EVERY inline keyboard
+ * button, not just `web_app` ones. A plain `url` button pointing at
+ * `http://localhost:5173` is rejected with
+ *
+ *   400 Bad Request: inline keyboard button URL '...' is invalid: Wrong HTTP URL
+ *
+ * and because the rejection applies to the whole sendMessage call, ONE such
+ * button means the user receives NO message at all — not even the text. So every
+ * button URL must be checked, and the button omitted when it fails.
+ */
+export function isPublishableWebUrl(url: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") return false;
+
+  const host = parsed.hostname.toLowerCase();
+  if (PRIVATE_HOSTNAMES.has(host)) return false;
+  if (host.endsWith(".local") || host.endsWith(".localhost")) return false;
+  if (/^10\./.test(host) || /^192\.168\./.test(host)) return false;
+  if (/^172\.(1[6-9]|2\d|3[01])\./.test(host)) return false;
+
+  return true;
+}
+
+/**
+ * Returns the URL if Telegram will accept it in a button, otherwise null.
+ * Use this at every button-construction site.
+ */
+export function safeWebUrl(url: string): string | null {
+  return isPublishableWebUrl(url) ? url : null;
+}
+
+/** Convenience wrapper: is a web button possible at all right now? */
+export function canLinkToWeb(): boolean {
+  return isPublicFrontendUrl();
+}
+
+/**
+ * Builds a keyboard containing ONLY the URL buttons Telegram will accept.
+ *
+ * Telegram rejects an inline keyboard button URL with
+ * "Wrong HTTP URL" for anything non-https, and that rejection fails the entire
+ * sendMessage call — so one unusable button means the member receives no
+ * message at all, not even the text. Filtering here means a keyboard degrades
+ * gracefully instead of nuking the reply.
+ *
+ * The returned keyboard may legitimately be empty; that is still a valid
+ * reply_markup.
+ */
+export function safeUrlKeyboard(
+  entries: { text: string; url: string }[],
+): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const entry of entries) {
+    const url = safeWebUrl(entry.url);
+    if (url) kb.url(entry.text, url);
+  }
+  return kb;
+}
+
+/** True when a keyboard ended up with no buttons at all. */
+export function isEmptyKeyboard(kb: InlineKeyboard): boolean {
+  return kb.inline_keyboard.length === 0;
 }
 
 /**

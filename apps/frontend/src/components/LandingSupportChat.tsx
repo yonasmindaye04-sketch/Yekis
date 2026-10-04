@@ -25,11 +25,15 @@ import { MessageCircle, Paperclip, Send } from "lucide-react";
 import { api, type ChatMessage } from "../api/client";
 import { RealtimeSocketManager } from "../api/socket";
 import { OPEN_SUPPORT_CHAT_EVENT } from "./supportChatEvents";
+import { SecureAttachment } from "./SecureAttachment";
+import { getAttachmentLabel, isImageAttachment } from "./attachmentMeta";
 
 type Bubble = {
   id: string;
   text: string;
   sender: "agent" | "user";
+  /** Storage path returned by the upload endpoint, when the message has a file. */
+  attachmentUrl?: string;
 };
 
 type ChatStep = "initial" | "asking_email" | "submitted";
@@ -139,6 +143,7 @@ export function LandingSupportChat() {
         // The visitor owns the thread's guest account, so anything they did not
         // send came from staff.
         sender: m.senderId === guestUserIdRef.current ? "user" : "agent",
+        ...(m.attachmentUrl ? { attachmentUrl: m.attachmentUrl } : {}),
       }));
       return [...scripted, ...real];
     });
@@ -188,6 +193,10 @@ export function LandingSupportChat() {
     if (!inputText.trim() && !attachedFile) return;
 
     const text = inputText.trim() || (attachedFile ? `📎 ${attachedFile.name}` : "");
+    // Captured before the composer resets: the upload happens later in the await
+    // chain, by which point `attachedFile` state is already null. This is the
+    // reason guest attachments were silently dropped.
+    const pendingFile = attachedFile;
 
     // Read before the state update so the first user message is still
     // available when the ticket is created below.
@@ -269,11 +278,25 @@ export function LandingSupportChat() {
       return;
     }
 
-    // submitted: append to the open ticket so the agent sees the full context.
+// submitted: append to the open ticket so the agent sees the full context.
     if (guestConversationId && guestToken) {
       setSending(true);
       try {
-        await api.sendGuestChatMessage(guestConversationId, guestToken, text);
+        // The attachment must actually be uploaded. Previously the paperclip
+        // showed the filename in the composer but nothing was ever sent, so a
+        // guest's screenshot was silently discarded.
+        let attachmentUrl: string | undefined;
+        if (pendingFile) {
+          const up = await api.uploadGuestChatAttachment(pendingFile, guestToken);
+          attachmentUrl = up.url;
+        }
+
+        await api.sendGuestChatMessage(
+          guestConversationId,
+          guestToken,
+          text,
+          attachmentUrl,
+        );
       } catch (err) {
         setMessages((prev) => [
           ...prev,
@@ -350,6 +373,14 @@ export function LandingSupportChat() {
                 className={`chat-bubble ${message.sender}`}
               >
                 <p>{message.text}</p>
+                {message.attachmentUrl && (
+                  <SecureAttachment
+                    url={message.attachmentUrl}
+                    token={guestToken}
+                    label={getAttachmentLabel(message.attachmentUrl)}
+                    isImage={isImageAttachment(message.attachmentUrl)}
+                  />
+                )}
               </div>
             ))}
             {sending && <div className="chat-bubble agent typing">...</div>}

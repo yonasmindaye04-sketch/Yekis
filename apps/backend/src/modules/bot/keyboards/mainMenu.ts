@@ -1,12 +1,14 @@
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
-import { env } from "../../../config/env.js";
+import { buildPublicWebAppUrl } from "../utils/deepLink.js";
 
 export function mainMenuKeyboard(ctx: BotContext): InlineKeyboard {
   const kb = new InlineKeyboard();
-  const frontendUrl = env.FRONTEND_URL || "";
 
-  if (frontendUrl && frontendUrl.startsWith("https://")) {
+  // Telegram requires a public https origin for web_app buttons; a loopback or
+  // LAN address is rejected and would fail the entire sendMessage.
+  const frontendUrl = buildPublicWebAppUrl("/");
+  if (frontendUrl) {
     kb.webApp("Open Yekis Jobs", frontendUrl).row();
   }
 

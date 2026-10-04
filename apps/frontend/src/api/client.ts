@@ -771,11 +771,16 @@ class ApiClient {
     conversationId: string,
     token: string,
     body: string,
+    attachmentUrl?: string,
   ): Promise<ChatMessage> {
-    return this.requestWithToken(`/api/v1/chat/conversations/${conversationId}/messages`, token, {
-      method: "POST",
-      body: JSON.stringify({ body }),
-    });
+    return this.requestWithToken(
+      `/api/v1/chat/conversations/${conversationId}/messages`,
+      token,
+      {
+        method: "POST",
+        body: JSON.stringify({ body, ...(attachmentUrl ? { attachmentUrl } : {}) }),
+      },
+    );
   }
 
   async createDirectConversation(recipientId: string, subject: string): Promise<ChatConversation> {

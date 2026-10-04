@@ -25,7 +25,11 @@ import {
   formatWalletCard,
 } from "../formatters/index.js";
 import { prisma } from "../../../lib/prisma.js";
-import { webAppRoutes } from "../utils/deepLink.js";
+import {
+  webAppRoutes,
+  safeUrlKeyboard,
+  isEmptyKeyboard,
+} from "../utils/deepLink.js";
 import { registerStaffHandlers } from "./staff.js";
 
 export function registerCallbacks(bot: Bot<BotContext>) {

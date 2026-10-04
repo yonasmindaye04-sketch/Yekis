@@ -17,7 +17,9 @@ import {
   botUsername,
   webAuthRoute,
   buildPublicWebAppUrl,
-  isPublicFrontendUrl,
+  canLinkToWeb,
+  safeWebUrl,
+  safeUrlKeyboard,
 } from "../utils/deepLink.js";
 import {
   issueTelegramLoginCode,
@@ -48,8 +50,14 @@ export function registerCommands(bot: Bot<BotContext>) {
 
     // One-tap path into the web app, carrying a single-use sign-in code so the
     // browser lands already authenticated.
+    //
+    // The button is only offered when Telegram will accept the URL. With a
+    // loopback/LAN/http FRONTEND_URL it will not, and because a rejected button
+    // URL fails the ENTIRE sendMessage call, adding it anyway means the member
+    // receives no welcome message at all — which is exactly the bug that made
+    // the bot look dead.
     const signIn = await mintWebSignIn(ctx);
-    if (signIn) {
+    if (signIn && canLinkToWeb()) {
       kb.url("🌐 Sign in on the web", signIn.link).row();
     }
 
@@ -70,37 +78,36 @@ export function registerCommands(bot: Bot<BotContext>) {
       .text("Settings", "menu:settings")
       .text("Help", "menu:help");
 
-    const welcomeMsg =
+const welcomeMsg =
       `**Welcome to Yekis Jobs, ${name}!**\n\n` +
       `You are signed in with Telegram${payload ? ` (via \`${payload}\`)` : ""}.\n\n` +
       `**What you can do:**\n` +
       `• **Clients:** Post jobs, review proposals, and fund secure escrow.\n` +
       `• **Freelancers:** Browse jobs, submit proposals, and get guaranteed payouts.\n\n` +
-      `Tap **"Sign in on the web"** to open Yekis in your browser — it signs you in automatically.`;
+      (canLinkToWeb()
+        ? `Tap **"Sign in on the web"** to open Yekis in your browser — it signs you in automatically.`
+        : `Use the buttons below, or take the sign-in code below to Yekis on the web.`);
 
     await ctx.reply(welcomeMsg, {
       reply_markup: kb,
       parse_mode: "Markdown",
     });
 
-// The code is also surfaced as text so a member on desktop can type it
-    // into the browser by hand when the button does not open for them.
+    // The code is also surfaced as text so a member can type it into the
+    // browser by hand. In local development that is the ONLY route, because
+    // Telegram refuses buttons pointing at localhost over http.
     if (signIn) {
-      // A loopback or LAN FRONTEND_URL resolves to the member's own phone, so
-      // the button will not work for them. Say so instead of letting them hit a
-      // connection error and conclude the bot is broken.
-      const reachable = isPublicFrontendUrl();
+      const reachable = canLinkToWeb();
       await ctx.reply(
         `Your one-time web sign-in code is \`${signIn.code}\`.\n\n` +
           (reachable
             ? `Tap **"Sign in on the web"** above, or type the code on the ` +
-              `Yekis sign-in page.`
-            : `Open Yekis in your browser and enter this code under ` +
-              `"Continue with Telegram".\n\n` +
-              `_Heads up: this bot is configured with ` +
-              `FRONTEND_URL=${env.FRONTEND_URL}, which is only reachable on ` +
-              `the machine running it. Set FRONTEND_URL to your public ` +
-              `https:// origin for the button to work from a phone._`) +
+              `Yekis sign-in page under "Continue with Telegram".`
+            : `Open **${env.FRONTEND_URL}** in your browser and enter this code ` +
+              `under "Continue with Telegram".\n\n` +
+              `_Telegram only accepts https links in buttons, so the one-tap ` +
+              `button is hidden while FRONTEND_URL=${env.FRONTEND_URL}. Set it ` +
+              `to a public https origin to enable it._`) +
           `\n\nIt works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
         { parse_mode: "Markdown" },
       );
@@ -131,13 +138,23 @@ export function registerCommands(bot: Bot<BotContext>) {
 
     const kb = new InlineKeyboard();
     const link = webAuthRoute(code);
-    kb.url("🌐 Open Yekis & sign in", link).row();
-    kb.text("New code", "auth:new_code");
+    // Only offer the button when Telegram will accept the URL — a rejected
+    // button URL fails the whole sendMessage and the member gets nothing.
+    if (canLinkToWeb()) {
+      kb.url("🌐 Open Yekis & sign in", link).row();
+      kb.text("New code", "auth:new_code");
+    }
 
     await ctx.reply(
       `**Your Yekis web sign-in code:** \`${code}\`\n\n` +
-        `Tap the button to sign in automatically, or type the code on the ` +
-        `Yekis sign-in page. It works once and expires in ` +
+        (canLinkToWeb()
+          ? `Tap the button to sign in automatically, or type the code on the ` +
+            `Yekis sign-in page.`
+          : `Open **${env.FRONTEND_URL}** in your browser and enter this code ` +
+            `under "Continue with Telegram".\n\n` +
+            `_Telegram only accepts https links in buttons, so the one-tap ` +
+            `button is hidden while FRONTEND_URL=${env.FRONTEND_URL}._`) +
+        `\n\nIt works once and expires in ` +
         `${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
       { reply_markup: kb, parse_mode: "Markdown" },
     );
@@ -267,10 +284,9 @@ export function registerCommands(bot: Bot<BotContext>) {
     }
 
     await ctx.reply(ctx.t("contract_list_prompt", { id: "" }), {
-      reply_markup: new InlineKeyboard().url(
-        "📄 View Contracts",
-        webAppRoutes.contract(""),
-      ),
+      reply_markup: safeUrlKeyboard([
+        { text: "📄 View Contracts", url: webAppRoutes.contract("") },
+      ]),
     });
   });
 
@@ -282,10 +298,9 @@ export function registerCommands(bot: Bot<BotContext>) {
     }
 
     await ctx.reply("Your disputes:", {
-      reply_markup: new InlineKeyboard().url(
-        "⚖️ View Disputes",
-        webAppRoutes.disputes(),
-      ),
+      reply_markup: safeUrlKeyboard([
+        { text: "⚖️ View Disputes", url: webAppRoutes.disputes() },
+      ]),
     });
   });
 
@@ -297,10 +312,9 @@ export function registerCommands(bot: Bot<BotContext>) {
     }
 
     await ctx.reply("Your proposals:", {
-      reply_markup: new InlineKeyboard().url(
-        "📝 View Proposals",
-        webAppRoutes.proposals(),
-      ),
+      reply_markup: safeUrlKeyboard([
+        { text: "📝 View Proposals", url: webAppRoutes.proposals() },
+      ]),
     });
   });
 
@@ -360,15 +374,19 @@ export function registerCommands(bot: Bot<BotContext>) {
       telegramUserId: ctx.session.telegramUserId,
     });
 
+    const link = safeWebUrl(webAuthRoute(code));
     await ctx.reply(
-      `**New code:** \`${code}\`\n\nTap to sign in on the web:`,
-      {
-        reply_markup: new InlineKeyboard().url(
-          "🌐 Open Yekis & sign in",
-          webAuthRoute(code),
-        ),
-        parse_mode: "Markdown",
-      },
+      link
+        ? `**New code:** \`${code}\`\n\nTap to sign in on the web:`
+        : `**New code:** \`${code}\`\n\n` +
+            `Open **${env.FRONTEND_URL}** in your browser and enter it under ` +
+            `"Continue with Telegram".`,
+      link
+        ? {
+            reply_markup: new InlineKeyboard().url("🌐 Open Yekis & sign in", link),
+            parse_mode: "Markdown",
+          }
+        : { parse_mode: "Markdown" },
     );
   });
 }

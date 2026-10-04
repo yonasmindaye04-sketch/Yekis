@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { createBot } from "../src/modules/bot/bot.service.js";
 import { prisma } from "../src/lib/prisma.js";
+import { env } from "../src/config/env.js";
 
 /**
  * Regression cover for the bot failing every update with
@@ -219,5 +220,126 @@ describe("Telegram bot update handling", () => {
     );
 
     expect(cap.errors).toEqual([]);
+  });
+});
+
+/**
+ * Telegram rejects an inline keyboard button URL that is not a public https
+ * origin:
+ *
+ *   400 Bad Request: inline keyboard button URL 'http://localhost:5173/?...' is
+ *   invalid: Wrong HTTP URL
+ *
+ * The rejection applies to the WHOLE sendMessage, so a single bad button means
+ * the member receives no message at all — which presented as a completely dead
+ * bot. Every button the bot renders must therefore be acceptable to Telegram.
+ */
+describe("Telegram bot inline keyboard URLs", () => {
+  const originalFrontendUrl = env.FRONTEND_URL;
+
+  afterAll(async () => {
+    (env as Record<string, unknown>).FRONTEND_URL = originalFrontendUrl;
+  });
+
+  /** Flattens every button URL out of a captured reply. */
+  function buttonUrls(payload: any): string[] {
+    const rows = payload?.reply_markup?.inline_keyboard ?? [];
+    return rows.flat().map((b: any) => b?.url).filter(Boolean) as string[];
+  }
+
+  async function captureReplies(frontendUrl: string, commands: string[]) {
+    (env as Record<string, unknown>).FRONTEND_URL = frontendUrl;
+    const bot = buildBot();
+    const urls: string[] = [];
+    const texts: string[] = [];
+
+    bot.api.config.use(async (prev: any, method: string, payload: any) => {
+      if (method === "sendMessage" || method === "editMessageText") {
+        texts.push(String(payload.text ?? ""));
+        urls.push(...buttonUrls(payload));
+      }
+      if (
+        method === "sendMessage" ||
+        method === "editMessageText" ||
+        method === "answerCallbackQuery"
+      ) {
+        return { ok: true, result: { message_id: texts.length } } as any;
+      }
+      return prev(method, payload);
+    });
+    bot.catch(async () => {});
+
+    let id = 5000;
+    for (const cmd of commands) {
+      await run(
+        bot,
+        messageUpdate(cmd, id++),
+      );
+    }
+    // Also exercise the callback paths that build keyboards.
+    for (const data of ["menu:contracts", "menu:disputes", "menu:main", "auth:new_code"]) {
+      await run(bot, callbackUpdate(data, id++));
+    }
+    return { urls, texts };
+  }
+
+  const COMMANDS = [
+    "/start", "/menu", "/login", "/contracts", "/disputes",
+    "/proposals", "/jobs", "/wallet", "/kyc", "/settings",
+  ];
+
+  it("emits no button URL Telegram would reject when FRONTEND_URL is localhost", async () => {
+    const { urls, texts } = await captureReplies(
+      "http://localhost:5173",
+      COMMANDS,
+    );
+
+    for (const url of urls) {
+      // This is precisely the check Telegram performs.
+      expect(url, `rejected URL: ${url}`).toMatch(/^https:\/\//);
+      expect(() => new URL(url)).not.toThrow();
+      const host = new URL(url).hostname.toLowerCase();
+      expect(["localhost", "127.0.0.1", "0.0.0.0"]).not.toContain(host);
+      expect(host).not.toMatch(/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/);
+    }
+
+    // The member must still be told how to sign in on the web.
+    expect(texts.join(" ")).toMatch(/[23456789A-Z]{8}/);
+  });
+
+  it("still emits the one-tap button when FRONTEND_URL is publicly reachable", async () => {
+    const { urls } = await captureReplies(
+      "https://app.yekis.et",
+      ["/start", "/login"],
+    );
+
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url).toMatch(/^https:\/\/app\.yekis\.et/);
+    }
+    expect(urls.some((u) => u.includes("tg_code="))).toBe(true);
+  });
+
+  it("never emits an http:// or localhost button under any configuration", async () => {
+    for (const frontendUrl of [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "https://localhost:5173",
+      "https://192.168.1.20:5173",
+      "http://192.168.1.20:5173",
+      "not-a-url",
+      "",
+    ]) {
+      const { urls } = await captureReplies(frontendUrl, ["/start", "/login"]);
+      for (const url of urls) {
+        expect(url.startsWith("https://"), `${frontendUrl} -> ${url}`).toBe(true);
+        const host = new URL(url).hostname.toLowerCase();
+        expect(
+          ["localhost", "127.0.0.1", "0.0.0.0"].includes(host) ||
+            /^192\.168\./.test(host),
+          `${frontendUrl} -> ${url}`,
+        ).toBe(false);
+      }
+    }
   });
 });

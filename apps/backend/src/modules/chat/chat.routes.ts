@@ -306,6 +306,34 @@ chatRouter.post(
 );
 
 chatRouter.post(
+  "/support",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = SupportRequestInput.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        details: parsed.error.flatten().fieldErrors,
+      });
+    }
+    try {
+      // createConversation auto-assigns the least-loaded support agent and fans
+      // the new ticket out to staff, so the desk picks it up immediately.
+      return res.status(201).json(
+        await createConversation({
+          userId: req.user!.id,
+          subject: parsed.data.subject,
+        }),
+      );
+    } catch (err) {
+      if (handleError(err, res)) return;
+      logger.error({ err }, "Failed to create support conversation");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+chatRouter.post(
   "/direct",
   requireAuth,
   async (req: AuthedRequest, res) => {

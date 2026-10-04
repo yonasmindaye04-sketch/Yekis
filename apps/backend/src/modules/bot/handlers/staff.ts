@@ -4,7 +4,7 @@ import { prisma } from "../../../lib/prisma.js";
 import { logger } from "../../../lib/logger.js";
 import { startScene } from "../middleware/sceneTimeout.middleware.js";
 import { env } from "../../../config/env.js";
-import { webAppRoutes } from "../utils/deepLink.js";
+import { webAppRoutes, safeUrlKeyboard } from "../utils/deepLink.js";
 import {
   formatKycQueueItem,
   formatTopupQueueItem,
@@ -228,8 +228,9 @@ async function showKycQueue(
       `Tier: ${kyc.tier} | Docs: ${kyc.documents.length}\n` +
       `Submitted: ${new Date(kyc.createdAt).toLocaleDateString()}`;
 
-    const kb = new InlineKeyboard()
-      .url(" View Evidence", webAppRoutes.staffKycReview(kyc.id))
+    const kb = safeUrlKeyboard([
+      { text: " View Evidence", url: webAppRoutes.staffKycReview(kyc.id) },
+    ])
       .text(" Approve", `staff:kyc:approve:${kyc.id}`)
       .text(" Reject", `staff:kyc:reject:${kyc.id}`)
       .row()
@@ -304,8 +305,9 @@ async function showTopupQueue(
       `Amount: ${topup.amountMinor / 100} ETB\n` +
       `Ref: ${topup.referenceNumber}`;
 
-    const kb = new InlineKeyboard()
-      .url(" View Receipt", webAppRoutes.staffTopupReview(topup.id))
+    const kb = safeUrlKeyboard([
+      { text: " View Receipt", url: webAppRoutes.staffTopupReview(topup.id) },
+    ])
       .text(" Approve", `staff:topup:approve:${topup.id}`)
       .text(" Reject", `staff:topup:reject:${topup.id}`)
       .row()
@@ -445,8 +447,9 @@ async function showMediationView(
   message += `Milestone: ${dispute.milestoneId ?? "—"}\n\n`;
   message += `Evidence: ${dispute.evidence.length} items\n`;
 
-  const kb = new InlineKeyboard()
-    .url(" View Evidence", webAppRoutes.staffDisputeMediation(disputeId))
+  const kb = safeUrlKeyboard([
+    { text: " View Evidence", url: webAppRoutes.staffDisputeMediation(disputeId) },
+  ])
     .text(" Propose Split", `staff:dispute:propose_split:${disputeId}`)
     .text(" Back", "staff:dispute_queue:0");
 

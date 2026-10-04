@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Bot,
   CheckCheck,
-  ExternalLink,
   FileText,
   Loader2,
   Paperclip,
@@ -16,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { YekisAvatar } from "./components/YekisAvatar";
+import { SecureAttachment } from "./components/SecureAttachment";
+import { getAttachmentLabel, isImageAttachment } from "./components/attachmentMeta";
 import {
   api,
   type ChatConversation,
@@ -35,26 +36,6 @@ const CIRCUMVENTION_REGEXES = [
   /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/,
   /\b(telegram|whatsapp|phone number|call me|dm me on|direct pay|wire me|pay off[- ]platform|cbe transfer directly)\b/i,
 ];
-
-function isImageAttachment(url: string | null | undefined): boolean {
-  if (!url) return false;
-  if (url.startsWith("data:image/")) return true;
-  return /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(url);
-}
-
-function getAttachmentLabel(url: string | null | undefined): string {
-  if (!url) return "Attachment";
-  if (url.startsWith("data:image/")) return "Image attachment";
-  const clean = url.split("?")[0];
-  const parts = clean.split("/");
-  const last = parts[parts.length - 1];
-  try {
-    const decoded = decodeURIComponent(last);
-    return decoded.replace(/^[a-f0-9-]+_?/, "") || "Attachment";
-  } catch {
-    return "Attachment";
-  }
-}
 
 interface ChatWorkspaceProps {
   userId?: string;

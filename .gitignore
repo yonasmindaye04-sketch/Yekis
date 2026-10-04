@@ -6,3 +6,6 @@ dist/
 apps/backend/src/**/*.js
 apps/backend/src/**/*.d.ts
 apps/backend/src/**/*.js.map
+
+# User-uploaded runtime data (chat attachments, evidence files). Never commit.
+apps/backend/uploads/
