@@ -1,6 +1,12 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-10-03
+Last validated: 2026-10-04
+
+> **Bot Markdown Parse Error Fix (2026-10-04):**
+> - **Root Cause**: All bot reply messages used parse_mode: "Markdown" (legacy) but were written with **double-asterisk bold** and backtick-code syntax, which belongs to MarkdownV2. Telegram's legacy Markdown parser cannot handle these tokens — it responded with 400: Can't find end of the entity starting at byte offset 265 on every /login and /start command.
+> - **Symptom**: The code was minted to the DB successfully but the sendMessage call threw, the global ot.catch caught it and replied "Something went wrong. Please try again." — every single time.
+> - **Fix**: Switched all hand-authored bot messages in commands.ts from parse_mode: "Markdown" to parse_mode: "HTML" using <b>, <code>, and <i> tags, which are unambiguous and safe. The /help command (which uses an i18n translation string) retains its own parse_mode.
+> - **Frontend Fix**: Removed a nested <form> inside the Telegram sign-in modal (which itself is inside the main auth <form>). Replaced with <div> + onKeyDown handler to fix the React hydration error <form> cannot appear as a descendant of <form>.
 
 > **Customer Support Chat â€” Native, Verified End to End (2026-10-03):**
 > - **Status**: support runs entirely on the platform's own engine. The Chatwoot third-party inbox built earlier today has been fully reverted (see CHANGELOG "Removed").
