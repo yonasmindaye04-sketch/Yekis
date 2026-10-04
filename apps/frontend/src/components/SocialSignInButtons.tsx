@@ -350,6 +350,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
   // Arriving from the bot's "Sign in on the web" button carries the code in the
   // URL, so the member never has to type it. Strip it from the address bar so
   // a refresh does not replay a spent code.
+  // On failure, open the modal so the user sees the error and has a path to retry.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("tg_code");
@@ -362,8 +363,39 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
       "",
       `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
     );
-    void submitTelegramCode(code);
+
+    // Pre-fill the code input so the user can see what was attempted
+    setCodeInput(code.toUpperCase());
+
+    const tryRedeem = async () => {
+      try {
+        await submitTelegramCode(code);
+      } catch {
+        // submitTelegramCode already sets the error state. Open the modal so
+        // the user sees the message and has a path to get a new code.
+        setShowTelegramModal(true);
+        setWidgetFailed(true);
+      }
+    };
+    void tryRedeem();
   }, [submitTelegramCode]);
+
+  // When the page is loaded with ?tg_auth in the URL (set by the bot's
+  // "Continue with Telegram" flow), auto-open the Telegram modal so the
+  // user immediately sees where to enter their code.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("tg_auth")) return;
+    params.delete("tg_auth");
+    const query = params.toString();
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+    );
+    setShowTelegramModal(true);
+    setWidgetFailed(true); // go straight to code-entry — most reliable path
+  }, []);
 
   const startApple = () =>
     handle("APPLE", async () => {

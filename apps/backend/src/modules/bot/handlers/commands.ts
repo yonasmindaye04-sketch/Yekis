@@ -41,6 +41,36 @@ export function registerCommands(bot: Bot<BotContext>) {
     const payload = ctx.match?.[0]?.trim();
     const name = ctx.from?.first_name || "there";
 
+    // When a member arrives via the web's "Continue with Telegram" button
+    // (?start=web_auth), they came explicitly to get a code. Reply immediately
+    // with the code rather than the general welcome so they can get back to the
+    // browser faster. Fall through to the standard welcome if we cannot mint one.
+    if (payload === "web_auth" && ctx.session.userId && ctx.session.telegramUserId) {
+      try {
+        const { code: authCode } = await issueTelegramLoginCode({
+          userId: ctx.session.userId,
+          telegramUserId: ctx.session.telegramUserId,
+        });
+        const link = webAuthRoute(authCode);
+        const kb = new InlineKeyboard();
+        if (canLinkToWeb()) {
+          kb.url("🌐 Sign in on the web", link).row();
+        }
+        await ctx.reply(
+          `**Your Yekis sign-in code:** \`${authCode}\`\n\n` +
+            (canLinkToWeb()
+              ? `Tap **"Sign in on the web"** to open Yekis in your browser — it signs you in automatically.`
+              : `Open **${env.FRONTEND_URL}** in your browser and enter this code under "Continue with Telegram".`) +
+            `\n\nIt works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
+          { reply_markup: kb, parse_mode: "Markdown" },
+        );
+        return;
+      } catch (err) {
+        logger.warn({ err }, "Failed to mint web_auth code, falling through to standard welcome");
+        // Fall through to standard /start welcome below
+      }
+    }
+
     if (!ctx.session.userId) {
       await replyLoginBlocked(ctx);
       return;
@@ -118,6 +148,15 @@ const welcomeMsg =
   bot.command("login", async (ctx) => {
     if (!ctx.session.userId) {
       await replyLoginBlocked(ctx);
+      return;
+    }
+
+    // telegramUserId is stored as 0 until authMiddleware populates it.
+    // Guard against that so BigInt(0) doesn't produce a bogus code record.
+    if (!ctx.session.telegramUserId) {
+      await ctx.reply(
+        "Could not identify your Telegram account. Please send /start and try again.",
+      );
       return;
     }
 
@@ -368,6 +407,12 @@ const welcomeMsg =
       await replyLoginBlocked(ctx);
       return;
     }
+    if (!ctx.session.telegramUserId) {
+      await ctx.reply(
+        "Could not identify your Telegram account. Please send /start and try again.",
+      );
+      return;
+    }
 
     const { code } = await issueTelegramLoginCode({
       userId: ctx.session.userId,
@@ -416,6 +461,8 @@ async function mintWebSignIn(
   ctx: BotContext,
 ): Promise<{ code: string; link: string } | null> {
   if (!env.FRONTEND_URL) return null;
+  // telegramUserId is stored as 0 until authMiddleware populates it.
+  if (!ctx.session.userId || !ctx.session.telegramUserId) return null;
   try {
     const { code } = await issueTelegramLoginCode({
       userId: ctx.session.userId!,

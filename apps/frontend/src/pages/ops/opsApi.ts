@@ -399,6 +399,16 @@ export const withUserDetail = (row: User, d: RawUserSummary): User => ({
   },
 });
 
+/** Machine-readable flags the backend writes into KycRecord.rejectionReason
+ *  while a record is still UNDER_REVIEW. Surfacing them is what enables the
+ *  Reject button and the "Duplicate identity" chip in the queue. */
+const KYC_FLAG = {
+  duplicate: "DUPLICATE_IDENTITY_FLAGGED_FOR_REVIEW",
+  faydaUnavailable: "FAYDA_UNAVAILABLE",
+  faydaRejected: "FAYDA_REJECTED",
+  faydaNotFound: "FAYDA_NOT_FOUND",
+} as const;
+
 const toKyc = (r: RawKycItem): KycItem => ({
   id: r.userId,
   email: r.user.email,
@@ -409,7 +419,10 @@ const toKyc = (r: RawKycItem): KycItem => ({
   pep: r.isPepMatch,
   faydaA: r.faydaVerificationAttempted,
   faydaS: r.faydaVerificationSucceeded,
-  dup: false,
+  /* Was hardcoded false, so a duplicate-identity case showed no flag and its
+     Reject button stayed permanently disabled. */
+  dup: r.rejectionReason?.startsWith(KYC_FLAG.duplicate) ?? false,
+  flag: r.status === "UNDER_REVIEW" ? r.rejectionReason : null,
   name: r.fullName ?? "",
   doc: r.documentNumber ?? "—",
   status: r.status,
@@ -812,12 +825,14 @@ export const opsListApi = {
       total: number;
       page: number;
       limit: number;
+      counts?: { pending: number; underReview: number; actionable: number };
     };
     return {
       rows: r.items.map(toKyc),
       total: r.total,
       page: r.page,
       pageSize: r.limit,
+      extra: r.counts ?? { pending: 0, underReview: r.total, actionable: r.total },
     };
   },
 

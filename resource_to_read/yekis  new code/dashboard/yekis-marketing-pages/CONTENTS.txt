@@ -1,0 +1,11 @@
+YEKIS — marketing pages bundle
+
+  yekis-stack.html
+  StackCategories.tsx
+  yekis-paths-hero.html
+  FloatingPathsHero.tsx
+
+yekis-stack.html        standalone preview: pinned card-stack category page
+StackCategories.tsx     drop-in React version of the stack (no deps)
+yekis-paths-hero.html   standalone preview: floating-paths hero (themes, pop hover)
+FloatingPathsHero.tsx   drop-in React version of the hero (no deps)

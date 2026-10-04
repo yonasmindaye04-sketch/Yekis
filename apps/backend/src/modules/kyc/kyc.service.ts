@@ -1,4 +1,4 @@
-import type { KycDocumentType } from "@marketplace/schemas";
+import type { KycDocumentType, KycStatus, KycTier } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
@@ -24,12 +24,36 @@ function monthsFromNow(months: number): Date {
 }
 
 /**
+ * Cache values to write when a record enters manual review.
+ *
+ * A user with prior verified standing keeps their public badge while a *new*
+ * application waits for a Compliance Officer — the cache tracks their actual
+ * standing, not the newest request. Only a first-time applicant (no
+ * highestVerifiedTier) genuinely has nothing to show, so only they regress.
+ */
+function cacheDataForPendingReview(kyc: { highestVerifiedTier: KycTier | null }) {
+  return kyc.highestVerifiedTier
+    ? {}
+    : { cachedKycStatus: "UNDER_REVIEW" as const };
+}
+
+/**
  * Step 1: a user submits a KYC document (ID, passport, selfie, etc).
- * On the first document for a user, this also kicks off Fayda verification.
- * If Fayda succeeds AND the resulting biometric ID isn't already attached to
- * another account, the user is auto-verified at Tier 1. Any failure —
- * Fayda API failure, or a dedup hit — routes to manual review instead of
- * silently failing, per the roadmap's "manual review fallback queue".
+ *
+ * Tier 1 policy: auto-verify only when Fayda actually answers affirmatively
+ * and the resulting biometric ID isn't already attached to another account.
+ * Everything else routes to manual review and alerts staff:
+ *
+ *  - Fayda UNAVAILABLE (down / timeout / 5xx) → UNDER_REVIEW. No evidence was
+ *    returned, so neither approving nor denying is defensible.
+ *  - Fayda REJECTED / NOT_FOUND → UNDER_REVIEW. A definitive non-match is not
+ *    ours to adjudicate; a Compliance Officer sees the reason.
+ *  - Dedup hit → UNDER_REVIEW, flagged. A stale or reused biometric ID must
+ *    not silently lock out a legitimate user.
+ *  - Resubmission after a prior rejection → reopened to UNDER_REVIEW.
+ *
+ * Every one of these paths calls notifyStaffOfEvent, which is what makes the
+ * case actually surface in the Ops console queue.
  */
 export async function submitKycDocument(params: {
   userId: string;
@@ -68,10 +92,57 @@ export async function submitKycDocument(params: {
     metadata: { documentType: params.documentType },
   });
 
+  // Persist the declared identity alongside the document. These two fields are
+  // what the review queue shows a Compliance Officer (name, Fayda number) and
+  // what Tier 2 PEP screening matches against; without this the queue renders
+  // a blank applicant name and screening has no legal name to check.
+  await prisma.kycRecord.update({
+    where: { id: kyc.id },
+    data: {
+      fullName: params.fullName,
+      documentNumber: params.documentNumber,
+    },
+  });
+
   // Only attempt Fayda verification once per record (on first meaningful
-  // document), not on every subsequent document upload.
+  // document), not on every subsequent document upload — a re-upload is fresh
+  // evidence for a human, not a fresh API call.
+  //
+  // The reopen branch is what makes resubmissions reviewable: without it a
+  // user who was REJECTED uploads a better document, the KycDocument row is
+  // created, the KycRecord keeps status=REJECTED, and the case never reaches
+  // the UNDER_REVIEW queue at all.
   if (kyc.faydaVerificationAttempted) {
-    return prisma.kycRecord.findUniqueOrThrow({ where: { id: kyc.id } });
+    if (kyc.status !== "REJECTED") {
+      return prisma.kycRecord.findUniqueOrThrow({ where: { id: kyc.id } });
+    }
+
+    const [reopened] = await prisma.$transaction([
+      prisma.kycRecord.update({
+        where: { id: kyc.id },
+        data: { status: "UNDER_REVIEW", rejectionReason: null },
+      }),
+      prisma.user.update({
+        where: { id: params.userId },
+        data: cacheDataForPendingReview(kyc),
+      }),
+    ]);
+
+    await recordAuditEvent({
+      userId: params.userId,
+      eventType: "KYC_DOCUMENT_RESUBMITTED",
+      entityType: "KycRecord",
+      entityId: kyc.id,
+      metadata: { documentType: params.documentType, previousStatus: kyc.status },
+    });
+
+    await notifyStaffOfEvent({
+      eventType: "kyc-resubmission-pending-review",
+      message: `User ${params.userId} resubmitted KYC evidence after rejection — manual review required.`,
+      metadata: { kycRecordId: kyc.id, targetUserId: params.userId },
+    });
+
+    return reopened;
   }
 
   const faydaResult = await verifyWithFayda({
@@ -88,20 +159,47 @@ export async function submitKycDocument(params: {
     metadata: {
       success: faydaResult.success,
       failureReason: faydaResult.failureReason,
+      failureKind: faydaResult.failureKind,
     },
   });
 
   if (!faydaResult.success) {
-    // Manual review fallback — do not block the user's application, just
-    // route a human into the loop.
-    await prisma.user.update({
-      where: { id: params.userId },
-      data: { cachedKycStatus: "UNDER_REVIEW" },
+    // Manual review fallback. An unavailable Fayda says nothing about this
+    // person, and a definitive non-match is not ours to adjudicate — neither
+    // auto-approving (no evidence was returned) nor leaving the record
+    // PENDING (nobody would be alerted that work is waiting). A human decides.
+    const failureKind = faydaResult.failureKind ?? "UNAVAILABLE";
+
+    await prisma.$transaction([
+      prisma.kycRecord.update({
+        where: { id: kyc.id },
+        data: {
+          status: "UNDER_REVIEW",
+          faydaVerificationAttempted: true,
+          faydaVerificationSucceeded: false,
+          rejectionReason: `FAYDA_${failureKind}: ${faydaResult.failureReason ?? "UNKNOWN"}`,
+        },
+      }),
+      prisma.user.update({
+        where: { id: params.userId },
+        data: cacheDataForPendingReview(kyc),
+      }),
+    ]);
+
+    await notifyStaffOfEvent({
+      eventType: "kyc-pending-review",
+      message:
+        `KYC Tier 1 submission from user ${params.userId} needs manual review` +
+        ` — Fayda ${failureKind === "UNAVAILABLE" ? "service unavailable" : `returned ${failureKind}`}.`,
+      metadata: {
+        kycRecordId: kyc.id,
+        targetUserId: params.userId,
+        failureKind,
+        failureReason: faydaResult.failureReason,
+      },
     });
-    return prisma.kycRecord.update({
-      where: { id: kyc.id },
-      data: { status: "UNDER_REVIEW", faydaVerificationAttempted: true },
-    });
+
+    return prisma.kycRecord.findUniqueOrThrow({ where: { id: kyc.id } });
   }
 
   // Fayda succeeded — check for duplicate accounts BEFORE auto-verifying.
@@ -124,18 +222,34 @@ export async function submitKycDocument(params: {
     // Route to manual review rather than auto-rejecting — a false positive
     // here (e.g. Fayda API returning a stale/reused ID) shouldn't silently
     // lock out a legitimate user.
-    await prisma.user.update({
-      where: { id: params.userId },
-      data: { cachedKycStatus: "UNDER_REVIEW" },
-    });
-    return prisma.kycRecord.update({
-      where: { id: kyc.id },
-      data: {
-        status: "UNDER_REVIEW",
-        faydaVerificationAttempted: true,
-        rejectionReason: "DUPLICATE_IDENTITY_FLAGGED_FOR_REVIEW",
+    const [flagged] = await prisma.$transaction([
+      prisma.kycRecord.update({
+        where: { id: kyc.id },
+        data: {
+          status: "UNDER_REVIEW",
+          faydaVerificationAttempted: true,
+          rejectionReason: "DUPLICATE_IDENTITY_FLAGGED_FOR_REVIEW",
+        },
+      }),
+      prisma.user.update({
+        where: { id: params.userId },
+        data: cacheDataForPendingReview(kyc),
+      }),
+    ]);
+
+    await notifyStaffOfEvent({
+      eventType: "kyc-duplicate-identity-pending-review",
+      message:
+        `User ${params.userId} submitted a Fayda identity already linked to user ` +
+        `${existingWithSameBiometric.id} — manual review required.`,
+      metadata: {
+        kycRecordId: kyc.id,
+        targetUserId: params.userId,
+        conflictingUserId: existingWithSameBiometric.id,
       },
     });
+
+    return flagged;
   }
 
   // Clean success path: auto-verify Tier 1.
@@ -389,7 +503,7 @@ export async function getReviewQueue(filters?: {
 
   // Audit finding fix: previously ignored page/limit/search entirely and
   // returned an unbounded result set.
-  const [total, items] = await Promise.all([
+  const [total, items, byStatus] = await Promise.all([
     prisma.kycRecord.count({ where }),
     prisma.kycRecord.findMany({
       where,
@@ -401,9 +515,27 @@ export async function getReviewQueue(filters?: {
       take: limit,
       skip: (page - 1) * limit,
     }),
+    // Unfiltered actionable split, so the console can explain why the sidebar
+    // badge (PENDING + UNDER_REVIEW) is larger than this page's row count.
+    prisma.kycRecord.groupBy({
+      by: ["status"],
+      where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },
+      _count: { _all: true },
+    }),
   ]);
 
-  return { items, total, page, limit };
+  const count = (status: KycStatus) =>
+    byStatus.find((g) => g.status === status)?._count._all ?? 0;
+  const pending = count("PENDING");
+  const underReview = count("UNDER_REVIEW");
+
+  return {
+    items,
+    total,
+    page,
+    limit,
+    counts: { pending, underReview, actionable: pending + underReview },
+  };
 }
 
 /**

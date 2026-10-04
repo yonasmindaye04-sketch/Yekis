@@ -48,6 +48,16 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
   );
   const { rows, total, loading, error, reload } = page;
 
+  /* Unfiltered actionable split from the server. The sidebar badge counts
+     PENDING + UNDER_REVIEW while this page defaults to UNDER_REVIEW, so
+     without this a reviewer sees badge 12 over a list of 8 and no
+     explanation. */
+  const counts = (page.extra ?? null) as {
+    pending: number;
+    underReview: number;
+    actionable: number;
+  } | null;
+
   /* Review history lives on its own route; load it for the open record. */
   const [history, setHistory] = useState<Record<string, KycItem["history"]>>({});
 
@@ -153,7 +163,11 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         right={
           <span className="pill p-amber" style={{ fontSize: 13 }}>
             <span className="pdot" />
-            {rows.filter((k) => k.status === "UNDER_REVIEW").length} pending review
+            {/* Was `rows.filter(k => k.status === "UNDER_REVIEW").length`, which
+                always equals rows.length under the default filter and 0 under
+                any other — it read "0 pending review" on a full VERIFIED page.
+                `total` is the server's search+filter-aware match count. */}
+            {total.toLocaleString()} {status === "UNDER_REVIEW" ? "pending review" : status ? `${status.toLowerCase().replace("_", " ")}` : "applications"}
           </span>
         }
       />
@@ -163,6 +177,20 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         <Kv k="PEP matches" v={String(rows.filter((k) => k.pep).length)} warn={rows.some((k) => k.pep)} />
         <Kv k="With documents" v={String(rows.filter((k) => k.docs.length > 0).length)} />
       </div>
+      {status === "UNDER_REVIEW" && counts && counts.pending > 0 ? (
+        <div className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
+          <b>{counts.actionable.toLocaleString()}</b> actionable in total —{" "}
+          <b>{counts.underReview.toLocaleString()}</b> awaiting review (shown below),{" "}
+          <b>{counts.pending.toLocaleString()}</b> submitted but not yet processed.{" "}
+          <button
+            className="btn btn-ghost"
+            style={{ marginLeft: 8 }}
+            onClick={() => setStatus("PENDING")}
+          >
+            Show awaiting processing
+          </button>
+        </div>
+      ) : null}
       <div className="card filters">
         <div className="f-search">
           <Search size={15} />
@@ -252,6 +280,13 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
               </div>
               <div className="sec-title" style={{ marginTop: 20 }}>Automated Checks</div>
               <ChecksRow faydaA={sel.faydaA} faydaS={sel.faydaS} pep={sel.pep} dup={sel.dup} />
+              {sel.flag && !sel.dup ? (
+                <div style={{ marginTop: 8 }}>
+                  <span className="check warn" style={{ fontSize: 12 }}>
+                    Routed to you: {sel.flag.replace(/[_-]/g, " ").toLowerCase()}
+                  </span>
+                </div>
+              ) : null}
               <div className="sec-title" style={{ marginTop: 20 }}>Submitted Evidence</div>
               <div className="doc-tiles">
                 {sel.docs.map((d, i) => (
@@ -287,7 +322,10 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                   ))}
                   <option value="custom">Custom reason…</option>
                 </select>
-                <button className="btn btn-red" disabled={busy || !(sel.pep || sel.dup)} onClick={() => void decide("REJECTED")}>
+                {/* Was `disabled={busy || !(sel.pep || sel.dup)}`, which meant a
+                    reviewer could only reject PEP and duplicate cases — a plain
+                    blurry-photo rejection was impossible from the queue. */}
+                <button className="btn btn-red" disabled={busy} onClick={() => void decide("REJECTED")}>
                   Reject
                 </button>
                 <button className="btn btn-amber" disabled={busy} onClick={() => void decide("CLEARER")}>

@@ -51,6 +51,21 @@ if (env.NODE_ENV === "production" && env.PEP_PROVIDER === "mock") {
   process.exit(1);
 }
 
+// FAYDA outage-simulation guard. This flag forces every Tier 1 verification
+// into manual review, so leaving it on in production silently converts the
+// entire customer base into pending KYC cases and stops the platform from
+// onboarding anyone. Structurally impossible to run production this way, the
+// same reasoning as the PEP guard above.
+if (env.NODE_ENV === "production" && env.FAYDA_SIMULATE_UNAVAILABLE) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "FATAL: FAYDA_SIMULATE_UNAVAILABLE is set in production. " +
+      "Every Tier 1 KYC submission would be forced into manual review and no user " +
+      "could ever be auto-verified. Unset it.",
+  );
+  process.exit(1);
+}
+
 const app = buildApp();
 
 const server = app.listen(env.PORT, async () => {

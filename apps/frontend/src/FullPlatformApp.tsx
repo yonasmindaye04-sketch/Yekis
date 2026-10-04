@@ -68,6 +68,7 @@ import { PageLoadSplash, ScrollEffects } from "./components/motion";
 import { initAnalytics, events } from "./analytics";
 import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
+import { TelegramAuthPage } from "./pages/TelegramAuthPage";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
@@ -96,7 +97,8 @@ type MarketingPage =
   | "404"
   | "thank-you-signup"
   | "thank-you-job-posted"
-  | "thank-you-contact";
+  | "thank-you-contact"
+  | "telegram_auth";
 
 const categoryLabels: Record<string, string> = {
   WEB_APP_DEVELOPMENT: "Web app development",
@@ -401,6 +403,11 @@ export function FullPlatformApp() {
         setAuthMode("reset-password");
         setShowLanding(false);
       }
+    }
+
+    // Telegram dedicated auth page (/auth/telegram)
+    if (window.location.pathname === "/auth/telegram") {
+      setMarketingPage("telegram_auth" as MarketingPage);
     }
   }, []);
 
@@ -846,6 +853,7 @@ export function FullPlatformApp() {
       "thank-you-signup": "Welcome to Yekis!",
       "thank-you-job-posted": "Job Posted — Yekis",
       "thank-you-contact": "Message Sent — Yekis",
+      telegram_auth: "Sign in with Telegram — Yekis",
     };
     document.title = pageTitles[marketingPage] || pageTitles.home;
 
@@ -905,6 +913,18 @@ export function FullPlatformApp() {
         <CookieBanner />
         <MobileCTA onStart={handleStart} />
       </>
+    );
+  }
+
+  if (marketingPage === "telegram_auth") {
+    return (
+      <TelegramAuthPage
+        onAuthed={() => {
+          if (authVisitRef.current) authVisitRef.current.completed = true;
+          void loadWorkspace().then(() => setShowLanding(false));
+        }}
+        botUsername={import.meta.env.VITE_TELEGRAM_BOT_USERNAME as string | undefined}
+      />
     );
   }
 

@@ -188,6 +188,16 @@ const EnvSchema = z.object({
   ESIGNET_PRIVATE_KEY_JWK_B64: z.string().optional(),
   ESIGNET_SCOPES: z.string().default("openid profile phone address"),
 
+  // Dev-only: force every Fayda verification to fail with UNAVAILABLE so the
+  // manual-review fallback queue can be exercised end-to-end without waiting
+  // for a real outage. Tier 1 then routes to UNDER_REVIEW exactly as it would
+  // if the Fayda API were genuinely down — never auto-verified.
+  // Must stay OFF in production: there is no "real" client behind this flag yet.
+  FAYDA_SIMULATE_UNAVAILABLE: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+
   // T2-D: VAT threshold alert — alert logged + TransactionFlag created when
   // PlatformOperatingAccount.accumulatedFeeMinor exceeds this value.
   // Ethiopian VAT applies at 500,000 ETB annual turnover (50,000,000 minor units).

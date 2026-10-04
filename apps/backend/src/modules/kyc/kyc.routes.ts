@@ -7,7 +7,7 @@ import {
   KycReviewDecisionInput,
 } from "@marketplace/schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import {
   submitKycDocument,
   upgradeToTier2,
@@ -146,10 +146,22 @@ kycRouter.post(
     const user = await prisma.user.findUnique({ where: { id: req.user!.id } });
     if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
+    const existingKyc = await prisma.kycRecord.findUnique({
+      where: { userId: req.user!.id },
+    });
+    // PEP screening matches on the legal name, so it must never be handed an
+    // email address — screening "user@example.com" against a PEP watchlist
+    // silently returns no match and defeats the AML control. The name captured
+    // at Tier 1 submission is the authoritative one.
+    const screeningName =
+      existingKyc?.fullName?.trim() ||
+      [user.firstName, user.lastName].filter(Boolean).join(" ") ||
+      "";
+
     try {
       const kyc = await upgradeToTier2({
         userId: req.user!.id,
-        fullName: `${user.email}`, // replace with real fullName field once profile module exists
+        fullName: screeningName,
         tin: parsed.data.tin,
         businessRegNumber: parsed.data.businessRegNumber,
       });
@@ -182,10 +194,16 @@ kycRouter.get("/status", requireAuth, async (req: AuthedRequest, res) => {
 
 // ---------- Compliance Officer / Admin routes ----------
 
+// All four staff routes below use requirePermission("kyc.review") rather than
+// requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"). The role list was the
+// pre-RBAC guard and omitted SUPER_ADMIN and COMPLIANCE_ADMIN, so those roles
+// saw the nav item (opsPerms.ts grants them kyc.review) and then got a 403.
+// The permission matrix is the single source of truth for this surface.
+
 kycRouter.get(
   "/review-queue",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("kyc.review"),
   async (req: AuthedRequest, res) => {
     const page = req.query.page
       ? parseInt(req.query.page as string)
@@ -206,7 +224,7 @@ kycRouter.get(
 kycRouter.get(
   "/documents/:documentId/url",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("kyc.review"),
   async (req: AuthedRequest, res) => {
     try {
       const result = await getDocumentViewUrl(req.params.documentId as string);
@@ -223,7 +241,7 @@ kycRouter.get(
 kycRouter.get(
   "/:targetUserId/history",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("kyc.review"),
   async (req: AuthedRequest, res) => {
     try {
       const history = await getReviewHistory(req.params.targetUserId as string);
@@ -240,7 +258,7 @@ kycRouter.get(
 kycRouter.post(
   "/:targetUserId/review",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("kyc.review"),
   async (req: AuthedRequest, res) => {
     const parsed = KycReviewDecisionInput.safeParse(req.body);
     if (!parsed.success) {

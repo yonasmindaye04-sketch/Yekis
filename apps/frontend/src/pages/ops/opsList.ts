@@ -15,6 +15,10 @@ export interface ListResult<T> {
   total: number;
   page: number;
   pageSize: number;
+  /** Optional passthrough for a page that needs extra server-side data
+   *  alongside its rows (e.g. the KYC queue's actionable-status split).
+   *  Typed as unknown so each page narrows it itself. */
+  extra?: unknown;
 }
 
 export interface ListFetchParams {
@@ -49,6 +53,8 @@ export interface ListPageState<T> {
   setPage: (p: number) => void;
   /** Bump to re-run the current query. */
   reload: () => void;
+  /** The fetcher's `extra` passthrough, if it supplied one. */
+  extra: unknown;
 }
 
 /**
@@ -149,6 +155,7 @@ export function useListPage<T>(
       setSearch,
       setPage,
       reload,
+      extra: live?.extra ?? null,
     }),
     [live, page, limit, loading, error, search, setSearch, reload],
   );

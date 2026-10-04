@@ -1,0 +1,8 @@
+YEKIS — Operations Console bundle (React 18 + TS + Vite conventions)
+
+  src/pages/ops/**          console source (shell, 15 pages, components, api, types)
+  src/styles/ops-console.css  scoped + theme-aware stylesheet
+  standalone-prototype/yekis-ops-console.html  zero-dependency HTML prototype
+
+Mount:  {page === "ops-console" && <OpsConsole onExit={...} />}
+See src/pages/ops/README.md for the NestJS endpoint contract.

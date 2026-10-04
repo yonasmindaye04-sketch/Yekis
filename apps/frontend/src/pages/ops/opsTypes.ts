@@ -297,6 +297,10 @@ export interface KycItem {
   faydaA: boolean;
   faydaS: boolean;
   dup: boolean;
+  /** Why the record was routed to a human, when the backend supplied a
+   *  machine-readable reason (Fayda unavailable / not found / duplicate
+   *  identity). Null when the case is awaiting a first decision. */
+  flag: string | null;
   name: string;
   doc: string;
   status: KycState;

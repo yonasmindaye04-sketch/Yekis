@@ -178,23 +178,40 @@ export function createBot(): Bot<BotContext> {
   // Auth middleware (attaches user, role, KYC to session)
   bot.use(authMiddleware);
 
-  // Error handler
+  // Error handler — log with full context so we know exactly what threw
   bot.catch(async (err) => {
     const ctx = err.ctx;
+    const update = ctx?.update;
+    const errorObj = err.error;
+    const errorName = errorObj instanceof Error ? errorObj.name : typeof errorObj;
+    const errorMessage = errorObj instanceof Error ? errorObj.message : String(errorObj);
+
     logger.error(
       {
-        err: err.error,
-        updateId: ctx?.update?.update_id,
-        method: (ctx as any)?.match,
+        errorName,
+        errorMessage,
+        updateId: update?.update_id,
+        updateType: update ? Object.keys(update).find((k) => k !== "update_id") : undefined,
+        command: update?.message?.text?.split(" ")[0] ?? undefined,
+        telegramUserId: ctx?.session?.telegramUserId || ctx?.from?.id,
+        userId: ctx?.session?.userId,
+        stack: errorObj instanceof Error ? errorObj.stack : undefined,
       },
-      `Error handling update ${ctx?.update?.update_id}`,
+      `Bot error in update ${update?.update_id}: [${errorName}] ${errorMessage}`,
     );
 
-    // Try to notify user
+    // Reply with the localised generic message. ctx.t() returns an empty string
+    // when i18n is not yet resolved, so fall back explicitly.
     try {
-      await ctx?.reply(ctx.t("errors_generic") || "Something went wrong. Please try again.");
-    } catch {
-      // Ignore notification errors
+      const msg =
+        (typeof ctx?.t === "function" ? ctx.t("errors_generic") : "") ||
+        "Something went wrong. Please try again.";
+      await ctx?.reply(msg);
+    } catch (replyErr) {
+      logger.warn(
+        { replyErr: replyErr instanceof Error ? replyErr.message : String(replyErr) },
+        "Failed to send error reply to user",
+      );
     }
   });
 
