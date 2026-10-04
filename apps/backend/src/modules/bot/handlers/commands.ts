@@ -57,12 +57,12 @@ export function registerCommands(bot: Bot<BotContext>) {
           kb.url("🌐 Sign in on the web", link).row();
         }
         await ctx.reply(
-          `**Your Yekis sign-in code:** \`${authCode}\`\n\n` +
+          `<b>Your Yekis sign-in code:</b> <code>${authCode}</code>\n\n` +
             (canLinkToWeb()
-              ? `Tap **"Sign in on the web"** to open Yekis in your browser — it signs you in automatically.`
-              : `Open **${env.FRONTEND_URL}** in your browser and enter this code under "Continue with Telegram".`) +
-            `\n\nIt works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
-          { reply_markup: kb, parse_mode: "Markdown" },
+              ? `Tap <b>"Sign in on the web"</b> to open Yekis in your browser — it signs you in automatically.`
+              : `Open ${env.FRONTEND_URL} in your browser and enter this code under "Continue with Telegram".`) +
+            `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+          { reply_markup: kb, parse_mode: "HTML" },
         );
         return;
       } catch (err) {
@@ -109,18 +109,18 @@ export function registerCommands(bot: Bot<BotContext>) {
       .text("Help", "menu:help");
 
 const welcomeMsg =
-      `**Welcome to Yekis Jobs, ${name}!**\n\n` +
-      `You are signed in with Telegram${payload ? ` (via \`${payload}\`)` : ""}.\n\n` +
-      `**What you can do:**\n` +
-      `• **Clients:** Post jobs, review proposals, and fund secure escrow.\n` +
-      `• **Freelancers:** Browse jobs, submit proposals, and get guaranteed payouts.\n\n` +
+      `<b>Welcome to Yekis Jobs, ${name}!</b>\n\n` +
+      `You are signed in with Telegram.\n\n` +
+      `<b>What you can do:</b>\n` +
+      `• <b>Clients:</b> Post jobs, review proposals, and fund secure escrow.\n` +
+      `• <b>Freelancers:</b> Browse jobs, submit proposals, and get guaranteed payouts.\n\n` +
       (canLinkToWeb()
-        ? `Tap **"Sign in on the web"** to open Yekis in your browser — it signs you in automatically.`
+        ? `Tap <b>"Sign in on the web"</b> to open Yekis in your browser — it signs you in automatically.`
         : `Use the buttons below, or take the sign-in code below to Yekis on the web.`);
 
     await ctx.reply(welcomeMsg, {
       reply_markup: kb,
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
     });
 
     // The code is also surfaced as text so a member can type it into the
@@ -129,17 +129,15 @@ const welcomeMsg =
     if (signIn) {
       const reachable = canLinkToWeb();
       await ctx.reply(
-        `Your one-time web sign-in code is \`${signIn.code}\`.\n\n` +
+        `Your one-time web sign-in code is <code>${signIn.code}</code>.\n\n` +
           (reachable
-            ? `Tap **"Sign in on the web"** above, or type the code on the ` +
+            ? `Tap <b>"Sign in on the web"</b> above, or type the code on the ` +
               `Yekis sign-in page under "Continue with Telegram".`
-            : `Open **${env.FRONTEND_URL}** in your browser and enter this code ` +
+            : `Open ${env.FRONTEND_URL} in your browser and enter this code ` +
               `under "Continue with Telegram".\n\n` +
-              `_Telegram only accepts https links in buttons, so the one-tap ` +
-              `button is hidden while FRONTEND_URL=${env.FRONTEND_URL}. Set it ` +
-              `to a public https origin to enable it._`) +
-          `\n\nIt works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
-        { parse_mode: "Markdown" },
+              `<i>Set FRONTEND_URL to a public https origin to enable one-tap sign-in.</i>`) +
+          `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+        { parse_mode: "HTML" },
       );
     }
   });
@@ -185,17 +183,12 @@ const welcomeMsg =
     }
 
     await ctx.reply(
-      `**Your Yekis web sign-in code:** \`${code}\`\n\n` +
+      `<b>Your Yekis web sign-in code:</b> <code>${code}</code>\n\n` +
         (canLinkToWeb()
-          ? `Tap the button to sign in automatically, or type the code on the ` +
-            `Yekis sign-in page.`
-          : `Open **${env.FRONTEND_URL}** in your browser and enter this code ` +
-            `under "Continue with Telegram".\n\n` +
-            `_Telegram only accepts https links in buttons, so the one-tap ` +
-            `button is hidden while FRONTEND_URL=${env.FRONTEND_URL}._`) +
-        `\n\nIt works once and expires in ` +
-        `${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.`,
-      { reply_markup: kb, parse_mode: "Markdown" },
+          ? `Tap the button to sign in automatically, or type the code on the Yekis sign-in page.`
+          : `Open ${env.FRONTEND_URL} in your browser and enter this code under "Continue with Telegram".`) +
+        `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+      { reply_markup: kb, parse_mode: "HTML" },
     );
   });
 
@@ -223,14 +216,14 @@ const welcomeMsg =
     }
 
     await ctx.reply(
-      `**Your Yekis account**\n\n` +
-        `Customer ID: \`${user.ucid}\`\n` +
+      `<b>Your Yekis account</b>\n\n` +
+        `Customer ID: <code>${user.ucid}</code>\n` +
         `Role: ${user.staffRole ?? user.role}\n` +
         `Email: ${user.email}\n` +
         `Telegram linked: ${user.telegramUserId ? "yes" : "no"}\n` +
         `Push notifications: ${user.telegramChatId ? "active" : "paused"}\n` +
         `KYC: ${user.kyc?.tier ?? "TIER_1"} / ${user.kyc?.status ?? "PENDING"}`,
-      { parse_mode: "Markdown" },
+      { parse_mode: "HTML" },
     );
   });
 
@@ -422,16 +415,16 @@ const welcomeMsg =
     const link = safeWebUrl(webAuthRoute(code));
     await ctx.reply(
       link
-        ? `**New code:** \`${code}\`\n\nTap to sign in on the web:`
-        : `**New code:** \`${code}\`\n\n` +
-            `Open **${env.FRONTEND_URL}** in your browser and enter it under ` +
+        ? `<b>New code:</b> <code>${code}</code>\n\nTap to sign in on the web:`
+        : `<b>New code:</b> <code>${code}</code>\n\n` +
+            `Open ${env.FRONTEND_URL} in your browser and enter it under ` +
             `"Continue with Telegram".`,
       link
         ? {
             reply_markup: new InlineKeyboard().url("🌐 Open Yekis & sign in", link),
-            parse_mode: "Markdown",
+            parse_mode: "HTML",
           }
-        : { parse_mode: "Markdown" },
+        : { parse_mode: "HTML" },
     );
   });
 }
@@ -445,7 +438,6 @@ async function replyLoginBlocked(ctx: BotContext) {
     ctx.session.loginBlocked ??
       "I could not sign you in automatically.\n\n" +
         "Please try /start again, or sign in on the web with Google, Apple, or your email and password.",
-    { parse_mode: "Markdown" },
   );
 }
 

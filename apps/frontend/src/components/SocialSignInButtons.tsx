@@ -756,16 +756,17 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
               </p>
             )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void submitTelegramCode(codeInput);
-              }}
-              style={{ display: "flex", gap: 8, width: "100%" }}
-            >
+            <div style={{ display: "flex", gap: 8, width: "100%" }}>
               <input
                 value={codeInput}
                 onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    void submitTelegramCode(codeInput);
+                  }
+                }}
                 placeholder="Enter code from the bot"
                 aria-label="Telegram sign-in code"
                 autoComplete="one-time-code"
@@ -785,7 +786,12 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                 }}
               />
               <button
-                type="submit"
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  void submitTelegramCode(codeInput);
+                }}
                 disabled={busy !== null || !codeInput.trim()}
                 style={{
                   padding: "10px 16px",
@@ -803,7 +809,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
               >
                 {busy === "TELEGRAM" ? "Verifying…" : "Sign in"}
               </button>
-            </form>
+            </div>
           </div>
         </div>
       )}
