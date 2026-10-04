@@ -8,6 +8,7 @@ import {
   InvalidJobStateError,
 } from "./jobs.service.js";
 import { createContractFromProposal } from "../contracts/contracts.service.js";
+import { notificationQueue } from "../../queue/queues.js";
 
 // === MAIN FUNCTIONS ===
 export class ProposalNotFoundError extends Error {}
@@ -57,6 +58,13 @@ export async function submitProposal(params: {
       entityType: "Proposal",
       entityId: proposal.id,
       metadata: { jobId: job.id },
+    });
+
+    await notificationQueue.add("proposal-received", {
+      userId: job.clientId,
+      type: "proposal-received",
+      message: `You received a new proposal for your job "${job.title}".`,
+      metadata: { jobId: job.id, proposalId: proposal.id },
     });
 
     return proposal;
@@ -132,6 +140,16 @@ export async function decideProposal(params: {
       entityType: "Proposal",
       entityId: proposal.id,
     });
+    
+    if (params.decision === "REJECTED") {
+      await notificationQueue.add("proposal-rejected", {
+        userId: proposal.freelancerId,
+        type: "proposal-rejected",
+        message: `Your proposal for the job "${proposal.job.title}" was declined.`,
+        metadata: { jobId: proposal.jobId, proposalId: proposal.id },
+      });
+    }
+    
     return updated;
   }
 
@@ -180,6 +198,13 @@ export async function decideProposal(params: {
     entityType: "Proposal",
     entityId: proposal.id,
     metadata: { jobId: proposal.jobId, freelancerId: proposal.freelancerId },
+  });
+
+  await notificationQueue.add("proposal-accepted", {
+    userId: proposal.freelancerId,
+    type: "proposal-accepted",
+    message: `Congratulations! Your proposal for "${proposal.job.title}" was accepted.`,
+    metadata: { jobId: proposal.jobId, proposalId: proposal.id },
   });
 
   // Contract generation is synchronous and part of the same logical

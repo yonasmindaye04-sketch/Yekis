@@ -7,6 +7,7 @@ import {
   generateServiceAgreementPdf,
   SERVICE_AGREEMENT_TEMPLATE_VERSION,
 } from "./serviceAgreement.template.js";
+import { notificationQueue } from "../../queue/queues.js";
 
 export class ContractNotFoundError extends Error {}
 export class NotContractPartyError extends Error {}
@@ -145,6 +146,7 @@ export async function acceptContract(userId: string, contractId: string) {
     data: isClient
       ? { clientAcceptedAt: new Date() }
       : { freelancerAcceptedAt: new Date() },
+    include: { job: { select: { title: true } } },
   });
 
   await recordAuditEvent({
@@ -163,9 +165,22 @@ export async function acceptContract(userId: string, contractId: string) {
       entityType: "Contract",
       entityId: contractId,
     });
-    // TODO (Escrow module): this is the trigger point to notify the client
-    // that escrow funding is now available — wire a notification here once
-    // the Notifications module exists.
+    
+    // Notify the client that escrow funding is now available
+    await notificationQueue.add("contract-executed", {
+      userId: updated.clientId,
+      type: "contract-executed",
+      message: `Your contract for "${updated.job.title}" is fully executed! You can now fund the first milestone.`,
+      metadata: { contractId },
+    });
+    
+    // Notify the freelancer as well
+    await notificationQueue.add("contract-executed", {
+      userId: updated.freelancerId,
+      type: "contract-executed",
+      message: `The contract for "${updated.job.title}" has been signed by both parties. Wait for the client to fund the first milestone before beginning work.`,
+      metadata: { contractId },
+    });
   }
 
   return { ...updated, fullyExecuted };

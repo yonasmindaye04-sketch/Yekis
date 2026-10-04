@@ -4,6 +4,7 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { randomInt } from "node:crypto";
 import { broadcastToConversation, sendToUser } from "../../lib/socket.js";
+import { notificationQueue } from "../../queue/queues.js";
 
 // === MAIN FUNCTIONS ===
 export class ConversationNotFoundError extends Error {}
@@ -489,6 +490,15 @@ export async function sendMessage(params: {
       sendToUser(p.userId, "chat:new_message", {
         conversationId: conversation.id,
         message: createdMessage,
+      });
+      
+      const senderName = createdMessage.sender.firstName || createdMessage.sender.displayName || "Someone";
+      const snippet = createdMessage.body.length > 50 ? createdMessage.body.slice(0, 50) + "..." : createdMessage.body;
+      void notificationQueue.add("new-message", {
+        userId: p.userId,
+        type: "new-message",
+        message: `New message from ${senderName}: "${snippet}"`,
+        metadata: { conversationId: conversation.id, messageId: createdMessage.id },
       });
     }
   }

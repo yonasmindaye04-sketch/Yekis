@@ -22,6 +22,9 @@ const CRITICAL_NOTIFICATION_TYPES = new Set([
   "dispute-raised",
   "dispute-resolved",
   "auto-release-warning",
+  "proposal-received",
+  "proposal-accepted",
+  "contract-executed",
 ]);
 
 import { sendPlatformMovementEmail } from "../../lib/email/email.service.js";
@@ -42,6 +45,16 @@ function formatNotificationTitle(type: string): string {
       return "Escrow Review Window Reminder";
     case "kyc-verified":
       return "Identity Verification Approved";
+    case "proposal-received":
+      return "New Job Proposal Received";
+    case "proposal-accepted":
+      return "Proposal Accepted!";
+    case "proposal-rejected":
+      return "Proposal Update";
+    case "contract-executed":
+      return "Contract Fully Executed";
+    case "new-message":
+      return "New Chat Message";
     default:
       return "Account Movement Update";
   }
