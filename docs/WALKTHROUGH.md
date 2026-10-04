@@ -8,6 +8,11 @@ Last validated: 2026-10-04
 > - **Fix**: Switched all hand-authored bot messages in commands.ts from parse_mode: "Markdown" to parse_mode: "HTML" using <b>, <code>, and <i> tags, which are unambiguous and safe. The /help command (which uses an i18n translation string) retains its own parse_mode.
 > - **Frontend Fix**: Removed a nested <form> inside the Telegram sign-in modal (which itself is inside the main auth <form>). Replaced with <div> + onKeyDown handler to fix the React hydration error <form> cannot appear as a descendant of <form>.
 
+> **Aggressive Notifications (2026-10-04):**
+> - Wired proposal-received, proposal-accepted, proposal-rejected, contract-executed, and 
+ew-message to the central 
+otificationQueue.
+> - Added proposal-received, proposal-accepted, and contract-executed to CRITICAL_NOTIFICATION_TYPES so they trigger SMS delivery in addition to Telegram, Email, and in-app alerts.
 > **Customer Support Chat — Native, Verified End to End (2026-10-03):**
 > - **Status**: support runs entirely on the platform's own engine. The Chatwoot third-party inbox built earlier today has been fully reverted (see CHANGELOG "Removed").
 > - **The bug that made it feel broken**: the public widget created a ticket, then every read and follow-up returned `401`, because `POST /api/v1/chat/guest` is unauthenticated while `GET/POST /api/v1/chat/conversations/:id/messages` required a session. Staff replies were stored but never shown to the visitor.
