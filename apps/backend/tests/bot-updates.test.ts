@@ -129,8 +129,11 @@ describe("Telegram bot update handling", () => {
 
     expect(cap.errors).toEqual([]);
     expect(cap.replies.join(" ")).toContain("Welcome to Yekis Jobs");
-    // A usable web sign-in code must be surfaced.
-    expect(cap.replies.join(" ")).toMatch(/`[23456789A-Z]{8}`/);
+    // A usable web sign-in code must be surfaced. The bot replies with
+    // parse_mode: "HTML", so the code is wrapped in <code>…</code> — it used to
+    // be Markdown backticks, and this assertion was missed by d66bc97 when the
+    // bot was converted to HTML.
+    expect(cap.replies.join(" ")).toMatch(/<code>[23456789A-Z]{8}<\/code>/);
 
     const row = await prisma.user.findUnique({
       where: { telegramUserId: BigInt(TG_ID) },

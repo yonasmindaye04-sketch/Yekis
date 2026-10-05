@@ -9,7 +9,11 @@ import {
   RequestGigRevisionInput,
   CreateGigReviewInput,
 } from "@marketplace/schemas";
-import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
+import {
+  requireAuth,
+  optionalAuth,
+  type AuthedRequest,
+} from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { prisma } from "../../lib/prisma.js";
@@ -20,6 +24,7 @@ import {
   getGigById,
   updateGig,
   setGigStatus,
+  moderateGigStatus,
   listMyGigs,
   createGigOrder,
   fundGigOrderFromWallet,
@@ -98,9 +103,16 @@ gigsRouter.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
   return res.json(await listMyGigs(req.user!.id));
 });
 
-gigsRouter.get("/:gigId", async (req, res) => {
+// optionalAuth rather than bare: a non-ACTIVE gig is readable by its owner so
+// the seller can preview a draft, but 404s for anonymous callers and strangers.
+gigsRouter.get("/:gigId", optionalAuth, async (req: AuthedRequest, res) => {
   try {
-    return res.json(await getGigById(req.params.gigId as string));
+    return res.json(
+      await getGigById(req.params.gigId as string, {
+        userId: req.user?.id ?? null,
+        staffRole: req.user?.staffRole ?? null,
+      }),
+    );
   } catch (err) {
     if (handleKnownErrors(err, res)) return;
     logger.error({ err }, "Gig fetch failed");
@@ -160,18 +172,21 @@ gigsRouter.patch(
   },
 );
 
+// Owner-driven: PAUSED and ARCHIVED only. ACTIVE/REJECTED are refused with a
+// 400 rather than a 403 — this is a contract detail, not a permissions problem,
+// and the allowed set is part of the published API.
 gigsRouter.post(
   "/:gigId/status",
   requireAuth,
   async (req: AuthedRequest, res) => {
     const status = req.body?.status;
-    if (
-      status !== "ACTIVE" &&
-      status !== "PAUSED" &&
-      status !== "ARCHIVED" &&
-      status !== "REJECTED"
-    ) {
-      return res.status(400).json({ error: "VALIDATION_ERROR" });
+    if (status !== "PAUSED" && status !== "ARCHIVED") {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        allowed: ["PAUSED", "ARCHIVED"],
+        message:
+          "Publishing and rejection are staff decisions. Use the staff moderation endpoint.",
+      });
     }
     try {
       const gig = await setGigStatus({
@@ -183,6 +198,48 @@ gigsRouter.post(
     } catch (err) {
       if (handleKnownErrors(err, res)) return;
       logger.error({ err }, "Gig status change failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// Staff moderation — the only route to ACTIVE.
+gigsRouter.post(
+  "/:gigId/moderation",
+  requireAuth,
+  requireStaffRole(
+    "COMPLIANCE_OFFICER",
+    "COMPLIANCE_ADMIN",
+    "ADMIN",
+    "OPERATIONS_ADMIN",
+    "SUPER_ADMIN",
+  ),
+  async (req: AuthedRequest, res) => {
+    const status = req.body?.status;
+    if (status !== "ACTIVE" && status !== "REJECTED") {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        allowed: ["ACTIVE", "REJECTED"],
+      });
+    }
+    const reason = typeof req.body?.reason === "string" ? req.body.reason : undefined;
+    if (status === "REJECTED" && (!reason || reason.trim().length < 10)) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        message: "A rejection needs a reason of at least 10 characters.",
+      });
+    }
+    try {
+      const gig = await moderateGigStatus({
+        staffUserId: req.user!.id,
+        gigId: req.params.gigId as string,
+        status,
+        reason,
+      });
+      return res.json(gig);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Gig moderation failed");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

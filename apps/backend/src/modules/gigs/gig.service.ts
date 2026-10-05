@@ -133,7 +133,9 @@ export async function searchGigs(query: GigSearchQuery) {
       const rows = await prisma.gig.findMany({
         where: {
           id: { in: ids },
-          status: query.status,
+          // Hard-coded, never caller-supplied: search is unauthenticated, so a
+          // request-controlled status filter would expose unpublished gigs.
+          status: "ACTIVE",
           ...(query.category ? { category: query.category } : {}),
         },
         include: {
@@ -153,7 +155,9 @@ export async function searchGigs(query: GigSearchQuery) {
   }
 
   const where = {
-    status: query.status,
+    // Hard-coded, never caller-supplied — see the note in the OpenSearch branch
+    // above. GigSearchQuery has no `status` field for the same reason.
+    status: "ACTIVE" as const,
     ...(query.category ? { category: query.category } : {}),
     ...(query.q
       ? {
@@ -184,7 +188,66 @@ export async function searchGigs(query: GigSearchQuery) {
   return { items, total, page: query.page, pageSize: query.pageSize };
 }
 
-export async function getGigById(gigId: string) {
+/**
+ * Staff moderation decision on a gig listing — the only path to ACTIVE.
+ *
+ * Split from the owner-driven setGigStatus so the audit trail records who
+ * published or rejected the gig. Deliberately available now, before the ops
+ * console moderation page (plan Phase 3): owners cannot self-publish, so
+ * without this endpoint every gig would sit in DRAFT forever.
+ */
+export async function moderateGigStatus(params: {
+  staffUserId: string;
+  gigId: string;
+  status: "ACTIVE" | "REJECTED" | "PAUSED" | "ARCHIVED";
+  reason?: string;
+}) {
+  const gig = await prisma.gig.findUnique({ where: { id: params.gigId } });
+  if (!gig) throw new GigNotFoundError();
+
+  const updated = await prisma.gig.update({
+    where: { id: params.gigId },
+    data: { status: params.status },
+  });
+
+  await recordAuditEvent({
+    userId: params.staffUserId,
+    eventType: "GIG_STATUS_CHANGED",
+    entityType: "Gig",
+    entityId: params.gigId,
+    metadata: {
+      status: params.status,
+      previousStatus: gig.status,
+      decidedByStaffId: params.staffUserId,
+      reason: params.reason,
+    },
+  });
+
+  // Keep the search index aligned with the visibility state, so an approved gig
+  // is discoverable immediately (indexGig is also called on create).
+  await indexGig(updated);
+
+  return updated;
+}
+
+/**
+ * Owner-driven status changes.
+ *
+ * ACTIVE and REJECTED are deliberately NOT owner-settable: publication is a
+ * staff moderation decision (GIG_MODEL_PLAN.md §8 decision 3), and letting a
+ * seller self-approve or self-reject defeats it. `status` is narrowed by the
+ * route's allow-list, and this guard re-checks so a future caller cannot widen
+ * it by passing a cast value straight to the service.
+ */
+const OWNER_SETTABLE_STATUS = ["PAUSED", "ARCHIVED"] as const;
+
+/**
+ * A gig is public only once ACTIVE. DRAFT / REJECTED / ARCHIVED listings stay
+ * visible to their owner (so they can edit or resubmit) and to staff, and are
+ * reported as not-found to everyone else — 404 rather than 403, because
+ * confirming that a draft id exists is itself a disclosure.
+ */
+export async function getGigById(gigId: string, viewer?: { userId?: string | null; staffRole?: string | null }) {
   const gig = await prisma.gig.findUnique({
     where: { id: gigId },
     include: {
@@ -201,6 +264,12 @@ export async function getGigById(gigId: string) {
     },
   });
   if (!gig) throw new GigNotFoundError();
+
+  if (gig.status !== "ACTIVE") {
+    const isOwner = !!viewer?.userId && viewer.userId === gig.freelancerId;
+    if (!isOwner && !viewer?.staffRole) throw new GigNotFoundError();
+  }
+
   return gig;
 }
 
@@ -248,6 +317,12 @@ export async function setGigStatus(params: {
   if (!gig) throw new GigNotFoundError();
   if (gig.freelancerId !== params.ownerId)
     throw new GigForbiddenError("Not your gig.");
+
+  if (!(OWNER_SETTABLE_STATUS as readonly string[]).includes(params.status)) {
+    throw new GigForbiddenError(
+      "Only PAUSED and ARCHIVED can be set by the gig owner. Publishing and rejection are staff decisions.",
+    );
+  }
 
   const updated = await prisma.gig.update({
     where: { id: params.gigId },

@@ -366,14 +366,23 @@ export type CreateGigInput = z.infer<typeof CreateGigInput>;
 export const UpdateGigInput = CreateGigInput.partial().omit({ packages: true });
 export type UpdateGigInput = z.infer<typeof UpdateGigInput>;
 
+/**
+ * Public gig discovery query.
+ *
+ * Deliberately has no `status` field. This schema parses an unauthenticated
+ * request, so accepting GigStatus here let any caller list DRAFT / REJECTED /
+ * ARCHIVED listings — including freelancerId, title and price — by passing
+ * `?status=DRAFT`. Public discovery has exactly one legal answer, ACTIVE,
+ * which searchGigs() now hard-codes rather than reading from the query.
+ * Staff needing other statuses should use an admin-scoped endpoint.
+ */
 export const GigSearchQuery = z.object({
   category: LaunchCategory.optional(),
   q: z.string().max(120).optional(),
   minPriceMinor: z.coerce.number().int().nonnegative().optional(),
   maxPriceMinor: z.coerce.number().int().nonnegative().optional(),
-  status: GigStatus.optional().default("ACTIVE"),
-  page: z.coerce.number().int().positive().default(1),
-  pageSize: z.coerce.number().int().positive().max(50).default(20),
+  page: z.coerce.number().positive().default(1),
+  pageSize: z.coerce.number().positive().max(50).default(20),
 });
 export type GigSearchQuery = z.infer<typeof GigSearchQuery>;
 
