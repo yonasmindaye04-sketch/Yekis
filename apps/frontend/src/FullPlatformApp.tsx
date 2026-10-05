@@ -68,15 +68,17 @@ import { PageLoadSplash, ScrollEffects } from "./components/motion";
 import { initAnalytics, events } from "./analytics";
 import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
+import { GigSellerDashboard } from "./GigSellerDashboard";
 import { TelegramAuthPage } from "./pages/TelegramAuthPage";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
-type PlatformRole = "CLIENT" | "FREELANCER" | "ADMIN" | "MEDIATOR";
+type PlatformRole = "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN" | "MEDIATOR";
 type View =
   | "overview"
   | "jobs"
   | "gigs"
+  | "my-gigs"
   | "contracts"
   | "wallet"
   | "chat"
@@ -815,10 +817,18 @@ export function FullPlatformApp() {
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
       { view: "profile" as View, iconKey: "profile", label: "Profile" },
     ];
+    // Freelancers and "both" accounts sell as well as buy, so they get a seller
+    // surface alongside the marketplace. Clients see the marketplace only.
+    const sellerNav =
+      platformRole === "FREELANCER" || platformRole === "BOTH"
+        ? [{ view: "my-gigs" as View, iconKey: "gigs", label: "My Gigs" }]
+        : [];
+
     return platformRole === "ADMIN" || platformRole === "MEDIATOR"
-      ? [...common, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
+      ? [...common, ...sellerNav, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
       : [
           ...common,
+          ...sellerNav,
           { view: "cases" as View, iconKey: "cases", label: "Disputes" },
           {
             view: "verification" as View,
@@ -2288,6 +2298,7 @@ export function FullPlatformApp() {
         )}
 
         {view === "gigs" && <GigMarketplace />}
+        {view === "my-gigs" && <GigSellerDashboard />}
 
         {view === "contracts" && (
           <section className="platform-content">

@@ -1501,6 +1501,27 @@ class ApiClient {
   async createGig(input: CreateGigPayload): Promise<Gig> {
     return this.request("/api/v1/gigs", { method: "POST", body: JSON.stringify(input) });
   }
+  /** The signed-in freelancer's own listings, including unpublished ones.
+   *  Backed by GET /gigs/mine — the only way to see a gig before it is ACTIVE. */
+  async listMyGigs(): Promise<Gig[]> {
+    return this.request("/api/v1/gigs/mine");
+  }
+  /** Edit an existing gig. Packages are immutable once created (see the gig
+   *  routes) — publish a new gig to change the tier structure. */
+  async updateGig(gigId: string, input: Partial<CreateGigPayload>): Promise<Gig> {
+    return this.request(`/api/v1/gigs/${gigId}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+  /** Owner-side status control. The backend accepts only PAUSED and ARCHIVED:
+   *  publishing and rejection are staff decisions (POST /gigs/:id/moderation). */
+  async setGigStatus(gigId: string, status: "PAUSED" | "ARCHIVED"): Promise<Gig> {
+    return this.request(`/api/v1/gigs/${gigId}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status }),
+    });
+  }
 
   async createGigOrder(packageId: string, requirementsAnswer?: Record<string, unknown>): Promise<GigOrder> {
     return this.request("/api/v1/gigs/orders", { method: "POST", body: JSON.stringify({ packageId, requirementsAnswer }) });
