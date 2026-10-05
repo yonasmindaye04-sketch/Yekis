@@ -154,7 +154,7 @@ export function App() {
   );
   const [mobilePhone, setMobilePhone] = useState("");
   const [mobilePassword, setMobilePassword] = useState("");
-  const [mobileRole, setMobileRole] = useState<"CLIENT" | "FREELANCER">(
+  const [mobileRole, setMobileRole] = useState<"CLIENT" | "FREELANCER" | "BOTH">(
     "FREELANCER",
   );
 
@@ -504,7 +504,11 @@ export function App() {
         });
         // Analytics: account created (role only — never the phone/email).
         events.signupCompleted(
-          mobileRole === "CLIENT" ? "client" : "freelancer",
+          mobileRole === "CLIENT"
+            ? "client"
+            : mobileRole === "BOTH"
+              ? "both"
+              : "freelancer",
         );
       }
 
@@ -1285,7 +1289,9 @@ export function App() {
                     <select
                       value={mobileRole}
                       onChange={(e) =>
-                        setMobileRole(e.target.value as "CLIENT" | "FREELANCER")
+                        setMobileRole(
+                          e.target.value as "CLIENT" | "FREELANCER" | "BOTH",
+                        )
                       }
                       style={{
                         padding: "10px",
@@ -1299,6 +1305,12 @@ export function App() {
                         Freelancer (Work & Earn)
                       </option>
                       <option value="CLIENT">Client (Hire & Pay Escrow)</option>
+                      {/* BOTH is a real UserRole and the backend already
+                          accepts it everywhere CLIENT or FREELANCER is
+                          required. It was unreachable from this form, so the
+                          dual-role code paths could never be exercised by a
+                          real signup. */}
+                      <option value="BOTH">Client & Freelancer (Both)</option>
                     </select>
                   </label>
                 )}

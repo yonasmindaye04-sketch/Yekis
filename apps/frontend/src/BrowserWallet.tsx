@@ -23,7 +23,10 @@ export function BrowserWallet({
   wallet: WalletResponse;
   topUps: TopUpRequest[];
   onChanged: () => Promise<void>;
-  role: "CLIENT" | "FREELANCER";
+  /* "BOTH" is a real UserRole: a dual-role account can hold a wallet as the
+     funding party on one contract while receiving payouts on another, so both
+     panels apply and neither may be keyed off `role === "FREELANCER"`. */
+  role: "CLIENT" | "FREELANCER" | "BOTH";
 }) {
   const [checkoutRail, setCheckoutRail] = useState<PaymentRail>("TELEBIRR");
   const [topUpRail, setTopUpRail] = useState<PaymentRail>("TELEBIRR");
@@ -36,7 +39,10 @@ export function BrowserWallet({
   const [messageIsError, setMessageIsError] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutIdentifier, setPayoutIdentifier] = useState("");
-  const [showTopUp, setShowTopUp] = useState(role === "CLIENT");
+  // Anyone who can fund escrow needs the top-up panel open by default, which
+  // now includes dual-role accounts. Defaulting this off for BOTH left them
+  // unable to add funds without first opening the panel.
+  const [showTopUp, setShowTopUp] = useState(role !== "FREELANCER");
   const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
 
   // Manual verification fallback when API call fails
@@ -235,16 +241,19 @@ export function BrowserWallet({
           <p className="eyebrow">Available balance</p>
           <strong>ETB {(wallet.balanceMinor / 100).toLocaleString()}</strong>
           <span>
-            {role === "CLIENT"
-              ? "Updated from approved top-ups. Deducted when contracts are funded."
-              : "Updated from released milestones and approved top-ups."}
+            {role === "FREELANCER"
+              ? "Updated from released milestones and approved top-ups."
+              : role === "BOTH"
+                ? "Funds escrow when you hire, and receives released milestones when you work."
+                : "Updated from approved top-ups. Deducted when contracts are funded."}
           </span>
         </div>
         <WalletCards size={36} />
       </section>
 
-      {/* Freelancer: Withdraw Earnings */}
-      {role === "FREELANCER" && (
+      {/* Payouts: anyone who can earn can withdraw. Dual-role accounts included —
+           previously this was hidden from them entirely. */}
+      {role !== "CLIENT" && (
         <section className="panel withdraw-panel">
           <div className="panel-heading">
             <div>

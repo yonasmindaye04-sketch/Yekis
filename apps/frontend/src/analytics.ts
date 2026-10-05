@@ -31,7 +31,8 @@ declare global {
 }
 
 type EventParams = Record<string, string | number | boolean>;
-export type UserType = "client" | "freelancer";
+/** "both" is the dual-role account (UserRole.BOTH), selectable at signup. */
+export type UserType = "client" | "freelancer" | "both";
 export type AuthFlow = "login" | "register" | "forgot-password" | "reset-password";
 
 /** True when a real measurement ID is configured via the environment. */

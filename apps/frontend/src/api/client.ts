@@ -1002,7 +1002,8 @@ class ApiClient {
     phone: string;
     password: string;
     languagePreference: "am" | "en";
-    role: "CLIENT" | "FREELANCER";
+    /** BOTH is a real UserRole (see the Prisma enum and RegisterInput). */
+    role: "CLIENT" | "FREELANCER" | "BOTH";
     dateOfBirth: string;
     consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
   }): Promise<{ id: string; ucid: string }> {

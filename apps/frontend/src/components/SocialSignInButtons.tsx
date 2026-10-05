@@ -90,7 +90,9 @@ interface Providers {
 
 export interface SocialSignInButtonsProps {
   onAuthed: () => void;
-  role?: "CLIENT" | "FREELANCER";
+  /* BOTH is selectable at signup and accepted by the OAuth/Telegram provisioning
+     paths, so it must be representable here too. */
+  role?: "CLIENT" | "FREELANCER" | "BOTH";
 }
 
 export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps) {

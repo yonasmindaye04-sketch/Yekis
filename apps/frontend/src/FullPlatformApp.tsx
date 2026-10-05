@@ -73,7 +73,47 @@ import { TelegramAuthPage } from "./pages/TelegramAuthPage";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
+/**
+ * ADMIN and MEDIATOR are staff: they never reach this workspace, because
+ * OpsConsole takes over the whole shell as soon as `user.staffRole` is set.
+ * They stay in the union so `capabilitiesFor` can narrow once, and every
+ * marketplace workspace then receives the narrower MarketplaceRole.
+ */
 type PlatformRole = "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN" | "MEDIATOR";
+
+/** What the marketplace workspaces accept (see MarketplaceRole). */
+type MarketplaceRole = Extract<PlatformRole, "CLIENT" | "FREELANCER" | "BOTH">;
+
+/**
+ * Capabilities, not roles.
+ *
+ * The backend treats BOTH as a first-class role: POST /jobs and proposals
+ * accept CLIENT or BOTH, gig publishing accepts FREELANCER or BOTH, and the
+ * ops dashboard counts BOTH in the client *and* freelancer tallies. Asking
+ * "what role is this?" therefore forced a BOTH account through every
+ * `role === "FREELANCER"` check as false, so the shell offered it nothing a
+ * freelancer can do — while the API would have accepted every call.
+ *
+ * Naming the capability instead makes the dual-role case fall out naturally
+ * and reads correctly at each use site: `canHire` is "may fund escrow", not
+ * "is a client".
+ */
+interface PlatformCapabilities {
+  /** May post jobs and be the hiring party on a contract. */
+  canHire: boolean;
+  /** May submit proposals, deliver milestones and publish gigs. */
+  canWork: boolean;
+  /** Staff land in the Operations Console before any of this renders. */
+  isStaff: boolean;
+}
+
+function capabilitiesFor(role: PlatformRole): PlatformCapabilities {
+  return {
+    canHire: role === "CLIENT" || role === "BOTH",
+    canWork: role === "FREELANCER" || role === "BOTH",
+    isStaff: role === "ADMIN" || role === "MEDIATOR",
+  };
+}
 type View =
   | "overview"
   | "jobs"
@@ -217,13 +257,17 @@ function MiniBarChart({
 
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
+  /* BOTH previously fell through to "Client", so a dual-role account saw
+     "Client workspace" in the shell while being able to do both. */
   return role === "FREELANCER"
     ? "Freelancer"
-    : role === "ADMIN"
-      ? "Operations"
-      : role === "MEDIATOR"
-        ? "Mediator"
-        : "Client";
+    : role === "BOTH"
+      ? "Client & Freelancer"
+      : role === "ADMIN"
+        ? "Operations"
+        : role === "MEDIATOR"
+          ? "Mediator"
+          : "Client";
 }
 
 const navIconMap: Record<string, React.ReactNode> = {
@@ -337,7 +381,9 @@ export function FullPlatformApp() {
   const [phone, setPhone] = useState("+251");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState<"CLIENT" | "FREELANCER">("CLIENT");
+  /* The auth form's role choice. BOTH is selectable — the backend accepts it in
+   RegisterInput and treats it as a client and a freelancer. */
+  const [role, setRole] = useState<"CLIENT" | "FREELANCER" | "BOTH">("CLIENT");
   const [dateOfBirth, setDateOfBirth] = useState("2000-01-01");
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -600,7 +646,9 @@ export function FullPlatformApp() {
       // (the abandonment effect's cleanup reads this flag on logout/exit).
       if (authVisitRef.current) authVisitRef.current.completed = true;
       if (authMode === "register") {
-        events.signupCompleted(role === "CLIENT" ? "client" : "freelancer");
+        events.signupCompleted(
+          role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
+        );
       } else {
         events.login("email");
       }
@@ -678,7 +726,12 @@ export function FullPlatformApp() {
   };
 
   const platformRole = (user?.role as PlatformRole) || "CLIENT";
-  const isFreelancer = platformRole === "FREELANCER";
+  const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
+  /* Staff are redirected into OpsConsole before render, so narrowing here is
+     safe and keeps every workspace prop free of impossible ADMIN values. */
+  const marketplaceRole: MarketplaceRole = isStaff
+    ? "CLIENT"
+    : (platformRole as MarketplaceRole);
 
   // === OVERVIEW DERIVED DATA (computed from already-loaded workspace state) ===
   const activeMilestones = useMemo(
@@ -806,8 +859,8 @@ export function FullPlatformApp() {
   };
 
   const navItems = useMemo(() => {
-    const jobsLabel = platformRole === "FREELANCER" ? "Find work" : "Jobs";
-    const jobsIconKey = platformRole === "FREELANCER" ? "find-work" : "jobs";
+    const jobsLabel = canWork ? (canHire ? "Find work / Post" : "Find work") : "Jobs";
+    const jobsIconKey = canWork ? "find-work" : "jobs";
     const common = [
       { view: "overview" as View, iconKey: "overview", label: "Overview" },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
@@ -817,14 +870,13 @@ export function FullPlatformApp() {
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
       { view: "profile" as View, iconKey: "profile", label: "Profile" },
     ];
-    // Freelancers and "both" accounts sell as well as buy, so they get a seller
-    // surface alongside the marketplace. Clients see the marketplace only.
-    const sellerNav =
-      platformRole === "FREELANCER" || platformRole === "BOTH"
-        ? [{ view: "my-gigs" as View, iconKey: "gigs", label: "My Gigs" }]
-        : [];
+    // Anyone who can work can also sell, so they get a seller surface alongside
+    // the marketplace. Hiring-only accounts see the marketplace alone.
+    const sellerNav = canWork
+      ? [{ view: "my-gigs" as View, iconKey: "gigs", label: "My Gigs" }]
+      : [];
 
-    return platformRole === "ADMIN" || platformRole === "MEDIATOR"
+    return isStaff
       ? [...common, ...sellerNav, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
       : [
           ...common,
@@ -1049,6 +1101,14 @@ export function FullPlatformApp() {
                 onClick={() => setRole("FREELANCER")}
               >
                 Freelancer
+              </button>
+              <button
+                type="button"
+                className={role === "BOTH" ? "selected" : ""}
+                onClick={() => setRole("BOTH")}
+                title="Hire talent and take on work with one account"
+              >
+                Both
               </button>
             </div>
           )}
@@ -1667,27 +1727,36 @@ export function FullPlatformApp() {
               <div>
                 <p className="eyebrow">Your work, in one view</p>
                 <h2>
-                  {platformRole === "FREELANCER"
-                    ? "Make your next move count."
-                    : platformRole === "CLIENT"
-                      ? "Turn your brief into progress."
-                      : "Keep every review moving."}
+                  {canHire && canWork
+                    ? "Hire and get hired."
+                    : canWork
+                      ? "Make your next move count."
+                      : canHire
+                        ? "Turn your brief into progress."
+                        : "Keep every review moving."}
                 </h2>
                 <p>
-                  {platformRole === "FREELANCER"
-                    ? "Find relevant work and keep delivery, verification, and payout status close at hand."
-                    : platformRole === "CLIENT"
-                      ? "Post a clear job, compare proposals, and fund milestones with confidence."
-                      : "Monitor receipts, identity checks, escrow, and open cases from one desk."}
+                  {canHire && canWork
+                    ? "Post a brief when you need work done, and take on projects when you have the capacity — both from one desk."
+                    : canWork
+                      ? "Find relevant work and keep delivery, verification, and payout status close at hand."
+                      : canHire
+                        ? "Post a clear job, compare proposals, and fund milestones with confidence."
+                        : "Monitor receipts, identity checks, escrow, and open cases from one desk."}
                 </p>
               </div>
-              {platformRole === "CLIENT" && (
+              {/* A dual-role account gets both calls to action; they lead to
+                  different forms on the same page, so one is not redundant. */}
+              {canHire && (
                 <button className="btn-primary" onClick={() => setView("jobs")}>
                   Post a job <Plus size={16} />
                 </button>
               )}
-              {platformRole === "FREELANCER" && (
-                <button className="btn-primary" onClick={() => setView("jobs")}>
+              {canWork && (
+                <button
+                  className={canHire ? "btn-secondary" : "btn-primary"}
+                  onClick={() => setView("jobs")}
+                >
                   Find work <Search size={16} />
                 </button>
               )}
@@ -1723,8 +1792,9 @@ export function FullPlatformApp() {
               </button>
             </div>
 
-            {/* Featured section - different for clients and freelancers */}
-            {isFreelancer ? (
+            {/* Recommended briefs — shown to anyone who can take work, which includes
+                dual-role accounts. */}
+            {canWork ? (
               <div className="featured-jobs-section" style={{ margin: "24px 0" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <div>
@@ -1919,8 +1989,7 @@ export function FullPlatformApp() {
                       className="metric-action"
                       onClick={() => setView("jobs")}
                     >
-                      {isFreelancer ? "Find work" : "View jobs"}{" "}
-                      <ArrowRight size={13} />
+                      {canWork ? "Find work" : "View jobs"} <ArrowRight size={13} />
                     </button>
                   </div>
                 )}
@@ -2167,27 +2236,30 @@ export function FullPlatformApp() {
                 <div className="panel-heading">
                   <h2>Next step</h2>
                 </div>
+                {/* Verification is only a step for someone who earns. Someone who can both
+                    hire and work needs funding first, because that is what
+                    blocks escrow — KYC is still required either way. */}
                 <div className="next-step">
                   <span className="step-number">1</span>
                   <div>
                     <strong>
-                      {platformRole === "FREELANCER"
-                        ? "Complete Fayda verification"
-                        : "Add funds to your wallet"}
+                      {canHire && canWork
+                        ? "Add funds to your wallet"
+                        : canWork
+                          ? "Complete Fayda verification"
+                          : "Add funds to your wallet"}
                     </strong>
                     <p>
-                      {platformRole === "FREELANCER"
-                        ? "Unlock payout access after manual review."
-                        : "Upload a Telebirr or CBE receipt for approval."}
+                      {canHire && canWork
+                        ? "Fund escrow before you hire. Verification unlocks your own payouts."
+                        : canWork
+                          ? "Unlock payout access after manual review."
+                          : "Upload a Telebirr or CBE receipt for approval."}
                     </p>
                   </div>
                   <button
                     onClick={() =>
-                      setView(
-                        platformRole === "FREELANCER"
-                          ? "verification"
-                          : "wallet",
-                      )
+                      setView(canWork && !canHire ? "verification" : "wallet")
                     }
                   >
                     Open
@@ -2203,16 +2275,22 @@ export function FullPlatformApp() {
             <div className="content-toolbar">
               <div>
                 <h2>
-                  {platformRole === "CLIENT" ? "Job postings" : "Find work"}
+                  {canHire && canWork
+                    ? "Find work and post a brief"
+                    : canHire
+                      ? "Job postings"
+                      : "Find work"}
                 </h2>
                 <p>
-                  {platformRole === "CLIENT"
-                    ? "Create a clear brief and manage the talent pipeline."
-                    : "Browse open opportunities across the marketplace."}
+                  {canHire && canWork
+                    ? "Take on open opportunities, or post a brief and manage your own talent pipeline."
+                    : canHire
+                      ? "Create a clear brief and manage the talent pipeline."
+                      : "Browse open opportunities across the marketplace."}
                 </p>
               </div>
             </div>
-            {platformRole === "CLIENT" && (
+            {canHire && (
               <form className="panel job-form" onSubmit={submitJob}>
                 <h3>New job brief</h3>
                 <div className="form-grid">
@@ -2290,7 +2368,7 @@ export function FullPlatformApp() {
               </form>
             )}
             <JobsWorkspace
-              role={platformRole as "CLIENT" | "FREELANCER"}
+              role={marketplaceRole}
               openJobs={jobs}
               onChanged={loadWorkspace}
             />
@@ -2311,10 +2389,7 @@ export function FullPlatformApp() {
                 </p>
               </div>
             </div>
-            <ContractsWorkspace
-              role={platformRole as "CLIENT" | "FREELANCER"}
-              onChanged={loadWorkspace}
-            />
+            <ContractsWorkspace userId={user.id} onChanged={loadWorkspace} />
           </section>
         )}
 
@@ -2324,7 +2399,7 @@ export function FullPlatformApp() {
               wallet={wallet}
               topUps={topUps}
               onChanged={loadWorkspace}
-              role={platformRole as "CLIENT" | "FREELANCER"}
+              role={marketplaceRole}
             />
           </section>
         )}
@@ -2334,7 +2409,7 @@ export function FullPlatformApp() {
             <ChatWorkspace
               user={user}
               userId={user.id}
-              role={platformRole as "CLIENT" | "FREELANCER"}
+              role={marketplaceRole === "BOTH" ? "FREELANCER" : marketplaceRole}
               onNavigateToContracts={() => setView("contracts")}
             />
           </section>

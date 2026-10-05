@@ -22,7 +22,19 @@ import {
 import { events } from "./analytics";
 
 // === INTERFACES & TYPES ===
-type MarketplaceRole = "CLIENT" | "FREELANCER";
+/**
+ * "BOTH" is a real backend role (UserRole), not a hypothetical: POST /jobs and
+ * proposals accept CLIENT or BOTH, and gig publishing accepts FREELANCER or
+ * BOTH. It belongs in this union so every consumer below is forced by the
+ * compiler to decide what a dual-role account sees, instead of the previous
+ * `as "CLIENT" | "FREELANCER"` cast, which passed "BOTH" through at runtime
+ * and made every `role === "CLIENT"` false *and* every
+ * `role === "FREELANCER"` false — so both decisive branches rendered nothing.
+ */
+type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
+
+const isHiring = (role: MarketplaceRole) => role === "CLIENT" || role === "BOTH";
+const isWorking = (role: MarketplaceRole) => role === "FREELANCER" || role === "BOTH";
 
 // === MAIN COMPONENT ===
 const money = (minor: number) => `ETB ${(minor / 100).toLocaleString()}`;
@@ -55,7 +67,9 @@ export function JobsWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
 
   const refresh = useCallback(async () => {
-    if (role === "CLIENT") {
+    // A dual-role account can hire *and* work, so it needs both datasets.
+    // Gating on `role === "CLIENT"` previously loaded only proposals for BOTH.
+    if (isHiring(role)) {
       const jobs = await api.getMyJobs();
       setOwnedJobs(jobs);
       const entries = await Promise.all(
@@ -64,7 +78,8 @@ export function JobsWorkspace({
         ),
       );
       setProposalsByJob(Object.fromEntries(entries));
-    } else {
+    }
+    if (isWorking(role)) {
       setMyProposals(await api.getMyProposals());
     }
   }, [role]);
@@ -149,19 +164,14 @@ export function JobsWorkspace({
     }
   };
 
-  if (role === "CLIENT") {
-    return (
-      <div className="workflow-stack">
-        {message && (
-          <p className="workflow-message">
-            <Check size={16} />
-            {message}
-          </p>
-        )}
-        {ownedJobs.length === 0 ? (
-          <p className="empty-state">Your published jobs will appear here.</p>
-        ) : (
-          ownedJobs.map((job) => (
+  // Hiring-side panel. A dual-role account gets this *and* the proposals list
+  // below, so it is a section rather than an early return.
+  const hiringPanel = isHiring(role) ? (
+    <>
+      {ownedJobs.length === 0 ? (
+        <p className="empty-state">Your published jobs will appear here.</p>
+      ) : (
+        ownedJobs.map((job) => (
             <article className="workflow-item" key={job.id}>
               <div className="workflow-item-head">
                 <div>
@@ -260,9 +270,8 @@ export function JobsWorkspace({
             </article>
           ))
         )}
-      </div>
-    );
-  }
+    </>
+  ) : null;
 
   const proposalByJob = new Map(
     myProposals.map((proposal) => [proposal.jobId, proposal]),
@@ -275,6 +284,7 @@ export function JobsWorkspace({
           {message}
         </p>
       )}
+      {hiringPanel}
       {myProposals.length > 0 && (
         <section className="panel compact-panel">
           <div className="panel-heading">
@@ -540,10 +550,14 @@ export function JobsWorkspace({
 }
 
 export function ContractsWorkspace({
-  role,
+  userId,
   onChanged,
 }: {
-  role: MarketplaceRole;
+  /* Role is deliberately NOT a prop here. Every action in this workspace keys
+     off the viewer's party-of-record on each contract, so accepting a
+     `MarketplaceRole` here would only invite reintroducing the role-guessing
+     this component was changed to eliminate. */
+  userId: string;
   onChanged: () => Promise<void>;
 }) {
   const [contracts, setContracts] = useState<Contract[]>([]);
@@ -632,13 +646,21 @@ export function ContractsWorkspace({
         </p>
       ) : (
         contracts.map((contract) => {
-          const acceptedByMe =
-            role === "CLIENT"
-              ? contract.clientAcceptedAt
-              : contract.freelancerAcceptedAt;
+          /* Which side of THIS contract the viewer is on. Role alone cannot
+             answer that: one account can be the client on one contract and the
+             freelancer on another, and a BOTH account genuinely is both. The
+             contract already carries both ids, so ask it directly. */
+          const viewerIsClient = contract.clientId === userId;
+          const viewerIsFreelancer = contract.freelancerId === userId;
+
+          const acceptedByMe = viewerIsClient
+            ? contract.clientAcceptedAt
+            : viewerIsFreelancer
+              ? contract.freelancerAcceptedAt
+              : null;
           const isCancelled = contract.status === "CANCELLED";
           const isCoolingOffEligible =
-            role === "CLIENT" &&
+            viewerIsClient &&
             contract.status === "ACTIVE" &&
             !!contract.cancellableUntil &&
             new Date(contract.cancellableUntil) > new Date() &&
@@ -680,7 +702,7 @@ export function ContractsWorkspace({
                         void act(async () => {
                           await api.acceptContract(contract.id);
                           events.contractSigned(
-                            role === "CLIENT" ? "client" : "freelancer",
+                            viewerIsClient ? "client" : "freelancer",
                           );
                         }, "Agreement accepted.")
                       }
@@ -722,11 +744,16 @@ export function ContractsWorkspace({
               </div>
               <div className="milestone-list">
                 {contract.milestones.map((milestone) => {
-                  const canDispute = !isCancelled && [
-                    "ESCROW_HELD",
-                    "WORK_IN_PROGRESS",
-                    "SUBMITTED_FOR_REVIEW",
-                  ].includes(milestone.escrowState);
+                  /* Either party may raise a dispute, so this needs no role check — only that
+                     the viewer is on the contract at all. */
+                  const canDispute =
+                    !isCancelled &&
+                    (viewerIsClient || viewerIsFreelancer) &&
+                    [
+                      "ESCROW_HELD",
+                      "WORK_IN_PROGRESS",
+                      "SUBMITTED_FOR_REVIEW",
+                    ].includes(milestone.escrowState);
                   return (
                     <div className="milestone-row" key={milestone.id}>
                       <div>
@@ -741,7 +768,7 @@ export function ContractsWorkspace({
                       </span>
                       <div className="workflow-actions">
                         {!isCancelled &&
-                          role === "CLIENT" &&
+                          viewerIsClient &&
                           contract.fullyExecuted &&
                           milestone.escrowState === "PAYMENT_PENDING" && (
                             <button
@@ -760,7 +787,7 @@ export function ContractsWorkspace({
                             </button>
                           )}
                         {!isCancelled &&
-                          role === "CLIENT" &&
+                          viewerIsClient &&
                           !contract.fullyExecuted &&
                           milestone.escrowState === "PAYMENT_PENDING" && (
                             <span className="status-note">
@@ -772,7 +799,7 @@ export function ContractsWorkspace({
                             Contract cancelled
                           </span>
                         )}
-                        {role === "FREELANCER" &&
+                        {viewerIsFreelancer &&
                           ["ESCROW_HELD", "WORK_IN_PROGRESS"].includes(
                             milestone.escrowState,
                           ) && (
@@ -789,7 +816,7 @@ export function ContractsWorkspace({
                               Submit delivery
                             </button>
                           )}
-                        {role === "CLIENT" &&
+                        {viewerIsClient &&
                           milestone.escrowState === "SUBMITTED_FOR_REVIEW" && (
                             <button
                               className="btn-primary"
