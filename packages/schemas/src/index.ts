@@ -335,6 +335,29 @@ export const MediatorResolutionInput = z
   });
 export type MediatorResolutionInput = z.infer<typeof MediatorResolutionInput>;
 
+/**
+ * F-05 — applying an external arbitration award.
+ *
+ * Previously this shape was redefined inline in dispute.routes.ts WITHOUT the
+ * PARTIAL_SPLIT refine that MediatorResolutionInput has. Two routes with the same
+ * contract disagreed, and the award route accepted `outcome: "PARTIAL_SPLIT"`
+ * with no `freelancerShareMinor`. The service then computed
+ * `clientShare = amountMinor - undefined` => NaN, so neither `NaN > 0` branch
+ * fired: the escrow was marked PARTIAL_REFUND and NOBODY was paid. One
+ * definition, exported from here, so the two routes cannot drift again.
+ */
+export const ArbitrationAwardInput = z
+  .object({
+    awardReferenceNumber: z.string().min(3).max(200),
+    outcome: DisputeResolutionOutcome,
+    recommendation: z.string().min(10).max(2000),
+    freelancerShareMinor: z.number().int().nonnegative().optional(),
+  })
+  .refine((data) => data.outcome !== "PARTIAL_SPLIT" || data.freelancerShareMinor !== undefined, {
+    message: "freelancerShareMinor is required when outcome is PARTIAL_SPLIT.",
+  });
+export type ArbitrationAwardInput = z.infer<typeof ArbitrationAwardInput>;
+
 // ---------- Gigs (Fiverr-style service packages) ----------
 // See docs/GIG_MODEL_PLAN.md. Amounts are integer minor units (ETB cents).
 

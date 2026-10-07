@@ -435,6 +435,27 @@ export async function resolveDispute(params: {
     where: { id: dispute.milestoneId },
   });
 
+  // F-05 — validate the PARTIAL_SPLIT share before the claim, so a malformed
+  // award is rejected while the dispute is still open and nothing has moved.
+  // Routed input is a `number | undefined`; here it must be a real integer
+  // inside the escrow amount, or the split is undefined and paying it would
+  // either lose money or create it.
+  let validatedFreelancerShare: number | undefined;
+  if (params.outcome === "PARTIAL_SPLIT") {
+    const share = params.freelancerShareMinor;
+    if (typeof share !== "number" || !Number.isInteger(share) || share < 0) {
+      throw new InvalidDisputeStageError(
+        "A PARTIAL_SPLIT resolution requires a non-negative integer freelancerShareMinor.",
+      );
+    }
+    if (share > milestone.amountMinor) {
+      throw new InvalidDisputeStageError(
+        "Freelancer share cannot exceed the milestone amount.",
+      );
+    }
+    validatedFreelancerShare = share;
+  }
+
   // F-04 — claim the dispute BEFORE any money moves. This is the same pattern
   // releaseMilestoneFunds uses for the milestone: a conditional updateMany
   // inside a transaction, so exactly one caller can flip the dispute to RESOLVED
@@ -495,12 +516,11 @@ export async function resolveDispute(params: {
       milestone.amountMinor,
     );
   } else {
-    const freelancerShare = params.freelancerShareMinor!;
-    if (freelancerShare > milestone.amountMinor) {
-      throw new InvalidDisputeStageError(
-        "Freelancer share cannot exceed the milestone amount.",
-      );
-    }
+    // F-05 — the share is validated above, BEFORE the claim and before any
+    // movement. `params.freelancerShareMinor!` used to be trusted, and a missing
+    // value produced `amountMinor - undefined` = NaN, so neither branch ran and
+    // the escrow was silently marked PARTIAL_REFUND with nobody paid.
+    const freelancerShare = validatedFreelancerShare!;
     const clientShare = milestone.amountMinor - freelancerShare;
     if (freelancerShare > 0) {
       await releaseMilestoneFunds(

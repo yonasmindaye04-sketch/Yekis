@@ -4,6 +4,7 @@ import {
   RaiseDisputeInput,
   SubmitEvidenceInput,
   MediatorResolutionInput,
+  ArbitrationAwardInput,
 } from "@marketplace/schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
@@ -262,16 +263,10 @@ disputesRouter.post(
 
 // T2-H: apply an external arbitration award (AACCSA reference required).
 // Staff-only; moves funds per the arbitrator's outcome.
-const ArbitrationAwardInput = z.object({
-  awardReferenceNumber: z.string().min(3),
-  outcome: z.enum([
-    "RELEASE_TO_FREELANCER",
-    "REFUND_TO_CLIENT",
-    "PARTIAL_SPLIT",
-  ]),
-  recommendation: z.string().min(5),
-  freelancerShareMinor: z.coerce.number().int().nonnegative().optional(),
-});
+//
+// F-05: the shape and the PARTIAL_SPLIT refine now come from
+// @marketplace/schemas, the same definition /resolve uses. The local copy here
+// lacked the refine, so this route accepted PARTIAL_SPLIT with no share.
 
 disputesRouter.post(
   "/:disputeId/arbitration-award",

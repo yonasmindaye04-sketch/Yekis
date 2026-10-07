@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { readFileSync } from "node:fs";
 import { prisma } from "../src/lib/prisma.js";
 import { env } from "../src/config/env.js";
 import {
@@ -345,6 +346,126 @@ describe("F-04 the refund path cannot credit an already-settled milestone", () =
 
     const after = await walletBalances();
     expect(after).toEqual(before);
+  });
+});
+
+describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
+  it("the shared schema requires the share, and the local copy is gone", async () => {
+    const { ArbitrationAwardInput } = await import("@marketplace/schemas");
+
+    // Missing share is rejected at the edge.
+    const missing = ArbitrationAwardInput.safeParse({
+      awardReferenceNumber: "AACCSA-1",
+      outcome: "PARTIAL_SPLIT",
+      recommendation: "Split the difference between the parties.",
+    });
+    expect(missing.success).toBe(false);
+
+    // A negative or fractional share is rejected.
+    for (const bad of [-1, 12.5]) {
+      const r = ArbitrationAwardInput.safeParse({
+        awardReferenceNumber: "AACCSA-1",
+        outcome: "PARTIAL_SPLIT",
+        recommendation: "Split the difference between the parties.",
+        freelancerShareMinor: bad,
+      });
+      expect(r.success, `share ${bad} should be rejected`).toBe(false);
+    }
+
+    // A valid one passes, and the other outcomes do not require a share.
+    expect(
+      ArbitrationAwardInput.safeParse({
+        awardReferenceNumber: "AACCSA-1",
+        outcome: "PARTIAL_SPLIT",
+        recommendation: "Split the difference between the parties.",
+        freelancerShareMinor: 40000,
+      }).success,
+    ).toBe(true);
+    expect(
+      ArbitrationAwardInput.safeParse({
+        awardReferenceNumber: "AACCSA-1",
+        outcome: "RELEASE_TO_FREELANCER",
+        recommendation: "Award to the freelancer outright.",
+      }).success,
+    ).toBe(true);
+
+    // The route must be using the shared definition, not a private copy.
+    const src = readFileSync(
+      new URL("../src/modules/disputes/dispute.routes.ts", import.meta.url),
+      "utf8",
+    );
+    expect(src).toContain("ArbitrationAwardInput,");
+    expect(src).not.toMatch(/const ArbitrationAwardInput\s*=\s*z\.object/);
+  });
+
+  it("a share-less PARTIAL_SPLIT is refused and pays nobody", async () => {
+    const { disputeId } = await seed("STAGE_3_MEDIATION");
+    const before = await walletBalances();
+
+    await expect(
+      resolveDispute({
+        staffUserId: STAFF.id,
+        disputeId,
+        outcome: "PARTIAL_SPLIT",
+        recommendation: "Split it somehow.",
+        // freelancerShareMinor omitted — the F-05 payload.
+      } as never),
+    ).rejects.toBeTruthy();
+
+    const after = await walletBalances();
+    expect(after).toEqual(before);
+
+    // And the dispute is still open, so a corrected award can be applied.
+    const dispute = await prisma.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+    });
+    expect(dispute.stage).toBe("STAGE_3_MEDIATION");
+    expect(dispute.resolvedAt).toBeNull();
+  });
+
+  it("an over-amount share is refused and pays nobody", async () => {
+    const { disputeId } = await seed("STAGE_3_MEDIATION");
+    const before = await walletBalances();
+
+    await expect(
+      resolveDispute({
+        staffUserId: STAFF.id,
+        disputeId,
+        outcome: "PARTIAL_SPLIT",
+        recommendation: "Give the freelancer more than is in escrow.",
+        freelancerShareMinor: 999999,
+      }),
+    ).rejects.toBeTruthy();
+
+    expect(await walletBalances()).toEqual(before);
+    const dispute = await prisma.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+    });
+    expect(dispute.stage).toBe("STAGE_3_MEDIATION");
+    expect(dispute.resolvedAt).toBeNull();
+  });
+
+  it("a valid PARTIAL_SPLIT pays both sides and conserves the total", async () => {
+    const { disputeId } = await seed("STAGE_3_MEDIATION");
+    const before = await walletBalances();
+
+    await resolveDispute({
+      staffUserId: STAFF.id,
+      disputeId,
+      outcome: "PARTIAL_SPLIT",
+      recommendation: "Split the difference equally.",
+      freelancerShareMinor: 50000,
+    });
+
+    const after = await walletBalances();
+    // 50000 to the freelancer less the 5% platform fee; 50000 to the client.
+    expect(after.freelancer - before.freelancer).toBe(47500);
+    expect(after.client - before.client).toBe(50000);
+
+    const milestone = await prisma.milestone.findUniqueOrThrow({
+      where: { id: ids.milestoneId! },
+    });
+    expect(milestone.escrowState).toBe("PARTIAL_REFUND");
   });
 });
 
