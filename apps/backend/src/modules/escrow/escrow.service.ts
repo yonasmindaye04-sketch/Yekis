@@ -720,39 +720,61 @@ export async function withdrawFromWallet(params: {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: params.userId },
   });
-  if (user.role === "CLIENT") {
-    const activeContractMilestone = await prisma.milestone.findFirst({
-      where: {
-        contract: { clientId: params.userId },
-        escrowState: {
-          in: [
-            "PAYMENT_PENDING",
-            "ESCROW_HELD",
-            "WORK_IN_PROGRESS",
-            "SUBMITTED_FOR_REVIEW",
-          ],
-        },
-      },
-      select: { id: true },
-    });
-    if (activeContractMilestone) {
-      throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have active contracts. Wait for all milestones to complete or be refunded.",
-      );
-    }
+  // F-22: the "money you are holding for other people" checks must not be gated
+// on the role string. They used to sit inside `if (user.role === "CLIENT")`, so
+// a BOTH account — which is free to hire — could accept a contract, have it
+// funded, and then withdraw the same balance while the work was in flight.
+  // A role is a statement about what someone does; escrow exposure is a fact
+  // about their contracts, and the query is what actually determines it.
+  //
+  // PAYMENT_PENDING is included deliberately: a client can cancel a funded or
+  // unfunded contract at any time, and only refunded money is really theirs.
+  const escrowExposureStates = [
+    "PAYMENT_PENDING",
+    "ESCROW_HELD",
+    "WORK_IN_PROGRESS",
+    "SUBMITTED_FOR_REVIEW",
+  ] as const;
 
-    const openDispute = await prisma.dispute.findFirst({
-      where: {
-        contract: { clientId: params.userId },
-        stage: { not: "RESOLVED" },
+  // Either side of a contract. A freelancer mid-delivery has escrow exposure
+  // as the payee, and withdrawing that money mid-milestone is exactly what the
+  // check exists to prevent.
+  const inFlightMilestone = await prisma.milestone.findFirst({
+    where: {
+      escrowState: { in: [...escrowExposureStates] },
+      contract: {
+        OR: [
+          { clientId: params.userId },
+          { freelancerId: params.userId },
+        ],
       },
-      select: { id: true },
-    });
-    if (openDispute) {
-      throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
-      );
-    }
+    },
+    select: { id: true },
+  });
+  if (inFlightMilestone) {
+    throw new ActiveContractWithdrawalBlockedError(
+      "You cannot withdraw while you have money tied up in an active contract. Wait for all milestones to complete or be refunded.",
+    );
+  }
+
+  // An open dispute on either side, for the same reason: the outcome decides
+  // who gets this money, so neither party may take it out while it is undecided.
+  const openDispute = await prisma.dispute.findFirst({
+    where: {
+      stage: { not: "RESOLVED" },
+      contract: {
+        OR: [
+          { clientId: params.userId },
+          { freelancerId: params.userId },
+        ],
+      },
+    },
+    select: { id: true },
+  });
+  if (openDispute) {
+    throw new ActiveContractWithdrawalBlockedError(
+      "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
+    );
   }
 
   if (user.isComplianceHeld) {
