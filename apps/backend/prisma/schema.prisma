@@ -199,9 +199,14 @@ model User {
   isComplianceHeld        Boolean    @default(false)
   complianceHeldAt        DateTime?
   complianceHeldReason    String?
-  circumventionAlertCount Int        @default(0)
+circumventionAlertCount Int        @default(0)
   isSuspended             Boolean    @default(false)
   sessionVersion          Int        @default(0)
+  // Synthetic identity created by the signed-out support widget. Never
+  // routable: no password, no session, no KYC tier it can act on. requireAuth
+  // refuses these outright so a guest row can never be used as a login even if
+  // a guest token ever leaked. See F-01.
+  isGuestContact          Boolean    @default(false)
   staffRole               StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
 
   cachedKycTier        KycTier?
@@ -285,6 +290,7 @@ model User {
   notificationSettings Json?
 
   @@index([faydaPsut])
+  @@index([isGuestContact])
 }
 
 model ConsentRecord {
@@ -707,6 +713,11 @@ model Conversation {
   creator         User     @relation("ConversationCreator", fields: [creatorId], references: [id])
   assignedStaffId String? // staff member who claimed/was assigned to this conversation
   assignedStaff   User?    @relation("ConversationAssignedStaff", fields: [assignedStaffId], references: [id])
+  // The address a signed-out visitor typed into the support widget. Contact
+  // metadata for staff only — deliberately NOT an account key. F-01: the old
+  // code used this address to look up (and upsert) a real User, which handed
+  // anyone who knew an email address a full session as that user.
+  contactEmail    String?
   subject         String
   status          String   @default("OPEN") // OPEN | CLOSED
   createdAt       DateTime @default(now())

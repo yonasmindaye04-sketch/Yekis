@@ -3,7 +3,10 @@ import type { NextFunction, Request, Response } from "express";
 import { jwtVerify } from "jose";
 import { env } from "../config/env.js";
 import { prisma } from "../lib/prisma.js";
-import { isGuestSupportToken } from "../modules/chat/guestSupportToken.js";
+import {
+  isGuestSupportToken,
+  verifyGuestSupportToken,
+} from "../modules/chat/guestSupportToken.js";
 import {
   AUTH_ERROR_CODES,
   isStrongMethod,
@@ -127,21 +130,46 @@ export async function requireAuth(
       .json({ error: "Missing or malformed Authorization header" });
   }
 
-  try {
+try {
     const token = header.slice("Bearer ".length);
     const { payload } = await jwtVerify(token, accessSecret);
     const id = payload.sub as string;
+
+    // F-01 defence in depth. A guest-support token is now signed with a
+    // different key, so it cannot verify here at all. This claim check is the
+    // belt to that braces: if a guest token is ever minted with the access key
+    // again, or the two keys are configured identically, a token carrying the
+    // guest discriminator is still refused rather than silently becoming a
+    // session.
+    if (isGuestSupportToken(payload as Record<string, unknown>)) {
+      return res
+        .status(401)
+        .json({ error: "Guest support tokens cannot be used as a session" });
+    }
 
     // Suspension re-check: JWTs are stateless with a 15m TTL — without this
     // DB lookup, a suspended user keeps FULL access until their token
     // expires. One indexed primary-key read per request is the price of
     // immediate enforcement.
+    //
+    // F-01 defence in depth #2: a guest identity is never a routable account,
+    // so requireAuth refuses it even if a token for one somehow verified.
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { isSuspended: true },
+      select: { isSuspended: true, isGuestContact: true },
     });
 
-    if (user?.isSuspended) {
+    if (!user) {
+      return res.status(401).json({ error: "Invalid or expired token" });
+    }
+
+    if (user.isGuestContact) {
+      return res.status(401).json({
+        error: "Guest contact accounts cannot authenticate as a member",
+      });
+    }
+
+    if (user.isSuspended) {
       return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
     }
 
@@ -191,39 +219,54 @@ export async function requireGuestChatAccess(
 
   try {
     const token = header.slice("Bearer ".length);
+    const requested = req.params.conversationId as string | undefined;
+
+    // F-01: the guest verifier accepts ONLY the dedicated guest key and ONLY a
+    // token whose conversationId matches this route. It runs first so a guest
+    // token is never even parsed as an access token.
+    if (requested) {
+      const guest = await verifyGuestSupportToken(token, requested);
+      if (guest) {
+        const user = await prisma.user.findUnique({
+          where: { id: guest.userId },
+          select: { isSuspended: true, isGuestContact: true },
+        });
+        if (!user || !user.isGuestContact) {
+          return res
+            .status(401)
+            .json({ error: "Invalid or expired token" });
+        }
+        if (user.isSuspended) {
+          return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+        }
+        applyGuestClaims(req, guest.userId, guest.conversationId);
+        return next();
+      }
+    }
+
     const { payload } = await jwtVerify(token, accessSecret);
     const id = payload.sub as string;
     if (!id) return res.status(401).json({ error: "Invalid or expired token" });
 
+    // A guest token must never fall through to the session path here.
     if (isGuestSupportToken(payload as Record<string, unknown>)) {
-      const scopedTo = payload.conversationId as string | undefined;
-      const requested = req.params.conversationId as string | undefined;
-
-      if (!scopedTo || !requested || scopedTo !== requested) {
-        return res.status(403).json({ error: "TOKEN_SCOPE_MISMATCH" });
-      }
-
-      // The guest is a real User (created with the ticket) and is a participant
-      // on the conversation, so chat.service's access rules allow exactly this.
-      const user = await prisma.user.findUnique({
-        where: { id },
-        select: { isSuspended: true },
-      });
-      if (!user) return res.status(401).json({ error: "Invalid or expired token" });
-      if (user.isSuspended) {
-        return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
-      }
-
-applyGuestClaims(req, id, scopedTo);
-      return next();
+      return res
+        .status(401)
+        .json({ error: "Guest support tokens cannot be used as a session" });
     }
 
-    // Regular session token — same suspension re-check as requireAuth.
+    // Regular session token — same checks as requireAuth.
     const user = await prisma.user.findUnique({
       where: { id },
-      select: { isSuspended: true },
+      select: { isSuspended: true, isGuestContact: true },
     });
-    if (user?.isSuspended) {
+    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
+    if (user.isGuestContact) {
+      return res.status(401).json({
+        error: "Guest contact accounts cannot authenticate as a member",
+      });
+    }
+    if (user.isSuspended) {
       return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
     }
 
@@ -235,17 +278,19 @@ applyGuestClaims(req, id, scopedTo);
 }
 
 /**
- * Accepts either a normal session token or a guest support token, WITHOUT
- * pinning the guest to a conversation.
+ * Accepts a normal session token ONLY, for endpoints that carry no conversation
+ * id in the path (currently attachment upload and attachment read).
  *
- * Used for endpoints a scoped guest legitimately needs but that carry no
- * conversation in the path — currently attachment upload. The guest is still a
- * real, server-side User id, so anything they create is attributed to them and
- * reachable only through the scoped routes. Per-conversation confinement is
- * enforced by `requireGuestChatAccess` on the message routes; do not use this
- * middleware where a `conversationId` is available.
+ * F-01: this used to be `requireAuthAllowingGuest`, which accepted a guest
+ * token with no conversation scoping at all. A guest token is now confined to
+ * the single conversation named in its `conversationId` claim, and there is no
+ * way to express that constraint on a route like `/chat/upload`. Rather than
+ * keep a loosely-scoped guest grant alive for two routes, guests are refused
+ * here: attachment upload for a signed-out visitor is a nice-to-have, whereas an
+ * unscoped guest token is the class of bug this batch exists to remove. Guests
+ * keep the support thread itself, via requireGuestChatAccess.
  */
-export async function requireAuthAllowingGuest(
+export async function requireMemberSession(
   req: AuthedRequest,
   res: Response,
   next: NextFunction,
@@ -263,19 +308,24 @@ export async function requireAuthAllowingGuest(
     const id = payload.sub as string;
     if (!id) return res.status(401).json({ error: "Invalid or expired token" });
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { isSuspended: true },
-    });
-    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
-    if (user.isSuspended) {
-      return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+    if (isGuestSupportToken(payload as Record<string, unknown>)) {
+      return res
+        .status(401)
+        .json({ error: "Guest support tokens cannot be used as a session" });
     }
 
-    if (isGuestSupportToken(payload as Record<string, unknown>)) {
-      // No role claims are honoured for guest tokens.
-      applyGuestClaims(req, id);
-      return next();
+    const user = await prisma.user.findUnique({
+      where: { id },
+      select: { isSuspended: true, isGuestContact: true },
+    });
+    if (!user) return res.status(401).json({ error: "Invalid or expired token" });
+    if (user.isGuestContact) {
+      return res.status(401).json({
+        error: "Guest contact accounts cannot authenticate as a member",
+      });
+    }
+    if (user.isSuspended) {
+      return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
     }
 
     applyAuthClaims(req, payload as Record<string, unknown>);
@@ -306,6 +356,14 @@ export async function optionalAuth(
   try {
     const token = header.slice("Bearer ".length);
     const { payload } = await jwtVerify(token, accessSecret);
+    // F-01: a guest token carries no member identity. optionalAuth must not
+    // promote it into req.user, because two routes use req.user to widen access
+    // (own-profile detail, and staff-tier gig inspection).
+    if (isGuestSupportToken(payload as Record<string, unknown>)) {
+      req.user = undefined;
+      req.auth = undefined;
+      return next();
+    }
     applyAuthClaims(req, payload as Record<string, unknown>);
   } catch {
     req.user = undefined;

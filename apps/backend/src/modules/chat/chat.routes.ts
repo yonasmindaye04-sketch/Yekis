@@ -30,7 +30,7 @@ import {
   authorizeAttachmentAccess,
 } from "./chat.service.js";
 import { issueGuestSupportToken } from "./guestSupportToken.js";
-import { requireGuestChatAccess, requireAuthAllowingGuest } from "../../middleware/auth.js";
+import { requireGuestChatAccess, requireMemberSession } from "../../middleware/auth.js";
 
 export const chatRouter = Router();
 
@@ -214,7 +214,7 @@ chatRouter.post(
 
 chatRouter.post(
   "/upload",
-  requireAuthAllowingGuest,
+  requireMemberSession,
   attachmentUploadLimiter,
   upload.single("file"),
   async (req: AuthedRequest, res) => {
@@ -244,7 +244,7 @@ chatRouter.post(
   },
 );
 
-chatRouter.get("/attachments/:key(*)", requireAuthAllowingGuest, async (req: AuthedRequest, res) => {
+chatRouter.get("/attachments/:key(*)", requireMemberSession, async (req: AuthedRequest, res) => {
   const rawKey = req.params.key as string;
   let key: string;
   try {

@@ -61,6 +61,9 @@ function validProd(overrides: Record<string, unknown> = {}) {
     STAFF_CONSOLE_URL: "https://console.yekis.com",
     TELEGRAM_POLLING_ENABLED: false,
     CBE_WEBHOOK_ENABLED: false,
+    // F-01: the guest-support signing key is part of a complete production config.
+    GUEST_SUPPORT_JWT_SECRET: "a-distinct-guest-support-signing-secret",
+    JWT_ACCESS_SECRET: "the-ordinary-access-token-signing-secret",
     ...overrides,
   };
 }

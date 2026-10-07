@@ -2,7 +2,7 @@
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
-import { randomInt } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 import { broadcastToConversation, broadcastToStaff, sendToUser } from "../../lib/socket.js";
 import { notificationQueue } from "../../queue/queues.js";
 
@@ -26,22 +26,34 @@ export async function createGuestConversation(params: {
   email?: string;
   body: string;
 }) {
-  const email = params.email?.trim().toLowerCase() ||
-    `guest-${Date.now()}-${randomInt(100000, 999999)}@guest.yekis.et`;
+  // F-01: the address a signed-out visitor types is CONTACT INFORMATION, not an
+  // account key. The previous code used it to upsert a User, so naming an
+  // existing member's email minted a guest token whose `sub` was that member's
+  // real id — full account takeover with no credentials. Never look up or
+  // upsert a User by this value again; it is stored on the conversation and
+  // read by staff only.
+  const contactEmail = params.email?.trim().toLowerCase() || null;
+  if (contactEmail && !contactEmail.includes("@")) {
+    throw new InvalidMessageError("Enter a valid email address.");
+  }
   const body = params.body.trim();
   if (body.length < 1 || body.length > 5000)
     throw new InvalidMessageError(
       "Message must be between 1 and 5,000 characters.",
     );
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: {
-      email,
+  // A synthetic, non-routable identity per conversation. `guest.invalid` is
+  // reserved by RFC 2606 and can never be a real deliverable mailbox, so it can
+  // never collide with — or be mistaken for — a member's address. Flagged
+  // isGuestContact so requireAuth refuses it as an identity.
+  const user = await prisma.user.create({
+    data: {
+      email: `guest+${randomBytes(16).toString("hex")}@guest.invalid`,
       phone: `+2519${String(randomInt(10000000, 99999999))}`,
       passwordHash: "guest-support-contact",
+      passwordSetAt: null,
       role: "CLIENT",
+      isGuestContact: true,
       kyc: { create: { tier: "TIER_1", status: "PENDING" } },
       wallet: { create: { balanceMinor: 0 } },
       consents: { create: [{ purpose: "support_contact", granted: true }] },
@@ -56,10 +68,11 @@ export async function createGuestConversation(params: {
     participantsToCreate.push({ userId: assignedStaff.id });
   }
 
-  const conversation = await prisma.conversation.create({
+const conversation = await prisma.conversation.create({
     data: {
       creatorId: user.id,
       subject: "Website support request",
+      contactEmail,
       assignedStaffId: assignedStaff?.id ?? null,
       participants: { create: participantsToCreate },
       messages: { create: { senderId: user.id, body } },
@@ -67,11 +80,11 @@ export async function createGuestConversation(params: {
     include: { assignedStaff: { select: STAFF_SELECT } },
   });
 
-  broadcastToStaff("chat:new_conversation", {
+broadcastToStaff("chat:new_conversation", {
     conversationId: conversation.id,
     subject: conversation.subject,
     status: conversation.status,
-    requesterEmail: email,
+    requesterEmail: contactEmail,
     assignedStaffId: conversation.assignedStaffId,
     preview: body,
     createdAt: conversation.createdAt,
@@ -80,8 +93,8 @@ export async function createGuestConversation(params: {
   // Notify all staff of new support inquiry
   void notifyStaffOfEvent({
     eventType: "SUPPORT_REQUEST_CREATED",
-    message: `New support request from ${email}: "${body.slice(0, 100)}"`,
-    metadata: { conversationId: conversation.id, email },
+    message: `New support request from ${contactEmail ?? "an anonymous visitor"}: "${body.slice(0, 100)}"`,
+    metadata: { conversationId: conversation.id, email: contactEmail },
   }).catch((err) => {
     // Non-blocking notification error
   });

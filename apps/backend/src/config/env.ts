@@ -35,6 +35,13 @@ const EnvSchema = z.object({
     .min(32, "JWT_REFRESH_SECRET must be at least 32 chars"),
   JWT_ACCESS_TTL: z.string().default("1h"),
   JWT_REFRESH_TTL: z.string().default("30d"),
+  // F-01: guest-support tokens are signed with a SEPARATE key so they cannot
+  // ever verify as an access token. Sharing JWT_ACCESS_SECRET is what turned
+  // a support ticket into an account takeover.
+  GUEST_SUPPORT_JWT_SECRET: z
+    .string()
+    .min(32, "GUEST_SUPPORT_JWT_SECRET must be at least 32 chars")
+    .optional(),
 
   OBJECT_STORE_ENDPOINT: z.string().min(1),
   OBJECT_STORE_BUCKET: z.string().min(1),
@@ -360,6 +367,17 @@ export function assertProductionSafety(
     if (!cfg.TELEGRAM_BOT_TOKEN) {
       violations.push(
         "TELEGRAM_BOT_TOKEN is required when NODE_ENV=production; the bot would otherwise start unauthorised.",
+      );
+    }
+    // F-01: without a distinct key, a guest-support token verifies against
+    // JWT_ACCESS_SECRET and becomes a full session. No silent fallback here.
+    if (!cfg.GUEST_SUPPORT_JWT_SECRET) {
+      violations.push(
+        "GUEST_SUPPORT_JWT_SECRET is required when NODE_ENV=production. Guest-support tokens must be signed with a key distinct from JWT_ACCESS_SECRET, otherwise a signed-out visitor who names an existing email can obtain a full session as that user.",
+      );
+    } else if (cfg.JWT_ACCESS_SECRET === cfg.GUEST_SUPPORT_JWT_SECRET) {
+      violations.push(
+        "GUEST_SUPPORT_JWT_SECRET must differ from JWT_ACCESS_SECRET. Sharing the key lets a guest-support token pass requireAuth.",
       );
     }
     if (!cfg.TELEGRAM_WEBHOOK_SECRET) {

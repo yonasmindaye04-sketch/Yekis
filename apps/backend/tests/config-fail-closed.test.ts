@@ -26,6 +26,10 @@ function validProd(overrides: Record<string, unknown> = {}) {
     STAFF_CONSOLE_URL: "https://console.yekis.com",
     TELEGRAM_POLLING_ENABLED: false,
     CBE_WEBHOOK_ENABLED: false,
+    // F-01: guest-support tokens are signed on their own key. Must be present
+    // and must differ from JWT_ACCESS_SECRET in production.
+    GUEST_SUPPORT_JWT_SECRET: "a-distinct-guest-support-signing-secret",
+    JWT_ACCESS_SECRET: "the-ordinary-access-token-signing-secret",
     ...overrides,
   };
 }
@@ -113,6 +117,22 @@ describe("T0.2 fail-closed production configuration", () => {
         FRONTEND_URL: "http://localhost:5173",
       }),
     ).toEqual([]);
+  });
+
+  it("F-01: refuses to start without GUEST_SUPPORT_JWT_SECRET", () => {
+    const v = assertProductionSafety(
+      validProd({ GUEST_SUPPORT_JWT_SECRET: undefined }),
+    );
+    expect(v.join(" ")).toMatch(/GUEST_SUPPORT_JWT_SECRET is required/);
+  });
+
+  it("F-01: refuses a guest key identical to the access key", () => {
+    // Sharing the key is the takeover: a guest token would verify as a session.
+    const shared = "the-ordinary-access-token-signing-secret";
+    const v = assertProductionSafety(
+      validProd({ GUEST_SUPPORT_JWT_SECRET: shared, JWT_ACCESS_SECRET: shared }),
+    );
+    expect(v.join(" ")).toMatch(/must differ from JWT_ACCESS_SECRET/);
   });
 
   it("reports every violation at once rather than only the first", () => {
