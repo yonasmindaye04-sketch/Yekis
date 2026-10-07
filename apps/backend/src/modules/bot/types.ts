@@ -8,8 +8,20 @@ export const SCENE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 export interface BotSession {
   version: number;
-  telegramUserId: number;
-  telegramChatId: number;
+  /**
+   * Telegram identifiers are stored as STRINGS, never numbers.
+   *
+   * grammY delivers `ctx.from.id` as a JS number and Prisma wants a BigInt;
+   * storing the intermediate as `number` is what created the H7 hazard. A
+   * number cannot represent every integer exactly above 2^53, and a BigInt
+   * throws when serialised. A decimal string is exact, JSON-native, and
+   * converts back with `BigInt(s)` at the boundary.
+   *
+   * Empty string means "not yet resolved" — do NOT use 0, which is falsy in
+   * the same places but reads like a real id.
+   */
+  telegramUserId: string;
+  telegramChatId: string;
   userId?: string;
   // Set when identity resolution deliberately refused to bind this Telegram
   // account (e.g. the synthetic address belongs to a password-owned account).

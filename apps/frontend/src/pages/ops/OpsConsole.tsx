@@ -47,6 +47,10 @@ import Overview from "./pages/Overview";
 import KycQueue from "./pages/KycQueue";
 import DisputeQueue from "./pages/DisputeQueue";
 import ReportsQueue from "./pages/ReportsQueue";
+import GigModeration from "./pages/GigModeration";
+import FeaturedTalent from "./pages/FeaturedTalent";
+import BotOperations from "./pages/BotOperations";
+import WithholdingReports from "./pages/WithholdingReports";
 import Receipts from "./pages/Receipts";
 import SupportDesk from "./pages/SupportDesk";
 import AuditLogs from "./pages/AuditLogs";
@@ -70,6 +74,10 @@ const PAGE_MAP: Record<OpsPageId, ComponentType<{ focusId?: string }>> = {
   risk: Risk,
   kyc: KycQueue,
   "reports-queue": ReportsQueue,
+  gigs: GigModeration,
+  featured: FeaturedTalent,
+  bot: BotOperations,
+  withholding: WithholdingReports,
   receipts: Receipts,
   ledger: Ledger,
   reconciliation: Reconciliation,
@@ -160,7 +168,14 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
     window.scrollTo(0, 0);
   }, []);
 
-  const toast = useCallback((msg: string) => {
+  /* Nav labels live in OPS_PAGES; expose a lookup so deep-link surfaces (the
+   notification bell) can name a destination without importing opsNav. */
+const pageLabel = useCallback(
+  (p: OpsPageId) => OPS_PAGES.find((i) => i.id === p)?.name ?? p,
+  [],
+);
+
+const toast = useCallback((msg: string) => {
     setToastMsg(msg);
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToastMsg(null), 3200);
@@ -193,8 +208,20 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
       refreshBadges: badges.reload,
       account: user ? { id: user.id, email, staffRole: user.staffRole, roleLabel } : null,
       can: perms.can,
+      pageLabel,
     }),
-    [navigate, viewer, paletteOpen, toast, badges.reload, user, email, roleLabel, perms.can],
+    [
+      navigate,
+      viewer,
+      paletteOpen,
+      toast,
+      badges.reload,
+      user,
+      email,
+      roleLabel,
+      perms.can,
+      pageLabel,
+    ],
   );
 
   const tipApi = useMemo<ChartTipApi>(

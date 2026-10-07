@@ -307,12 +307,13 @@ export function Empty({
   icon: Icon,
   children,
 }: {
-  icon: LucideIcon;
+  icon?: LucideIcon;
   children: ReactNode;
 }) {
+  const EmptyIcon = Icon ?? TriangleAlert;
   return (
     <div className="empty">
-      <Icon size={30} style={{ color: "var(--ops-text-3)" }} />
+      <EmptyIcon size={30} style={{ color: "var(--ops-text-3)" }} />
       <p style={{ marginTop: 10, fontWeight: 600 }}>{children}</p>
     </div>
   );

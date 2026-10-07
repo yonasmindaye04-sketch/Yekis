@@ -88,6 +88,25 @@ const EnvSchema = z.object({
     .or(z.literal("").transform(() => undefined)),
   TELEGRAM_WEBHOOK_URL: z.string().optional(),
   TELEGRAM_WEBHOOK_SECRET: z.string().optional(),
+  /**
+   * Which Telegram *environment* this process speaks to: dev, staging or prod.
+   *
+   * This is separate from NODE_ENV on purpose. The single most damaging
+   * misconfiguration available in this system is running the production bot
+   * token against a locally tweaked build — it makes the local code the
+   * authority for real members' money and KYC decisions. Long polling is
+   * therefore permitted ONLY when this is "dev" (see assertProductionSafety).
+   */
+  TELEGRAM_ENV: z.enum(["dev", "staging", "prod"]).optional(),
+  /**
+   * Explicit opt-in to long polling. Defaults to true only when
+   * TELEGRAM_ENV=dev (see resolvePolling). In staging/prod it must stay false,
+   * and assertProductionSafety refuses to boot if it is not.
+   */
+  TELEGRAM_POLLING_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
   // Per-call budget for Telegram Bot API requests. Node's fetch has no default
   // timeout, so an unreachable api.telegram.org (firewall DROP, dead route)
   // leaves the promise pending forever — which silently prevented the bot from
@@ -103,9 +122,70 @@ const EnvSchema = z.object({
   FACEBOOK_APP_ID: z.string().optional(),
   FACEBOOK_APP_SECRET: z.string().optional(),
   FRONTEND_URL: z.string().default("http://localhost:5173"),
+  /**
+   * Public https origin of THIS API, with no trailing path.
+   *
+   * Kept separate from FRONTEND_URL because they are different services and
+   * conflating them is how machine-to-machine callbacks end up pointing at a
+   * CDN or SPA host that cannot route them:
+   *
+   *   API_PUBLIC_URL   provider callbacks (Telebirr notify_url, CBE/MPESA
+   *                    return URLs). Required in production. Never a
+   *                    user-facing link.
+   *   FRONTEND_URL     user-facing redirects (payment return, reset-password
+   *                    email, bot "open the web app" buttons).
+   *
+   * Building a provider notify_url from FRONTEND_URL means money-confirming
+   * webhooks arrive at whatever serves the marketing site — and if that host
+   * ever changes, or a staging FRONTEND_URL is left in place, settlement breaks
+   * silently rather than loudly.
+   */
+  API_PUBLIC_URL: z.string().optional(),
+
+  /**
+   * Kill switch for the CBE webhook route.
+   *
+   * Defaults to FALSE: an unauthenticated-by-design money endpoint should have
+   * to be switched on deliberately. While off, the route answers 404 so it is
+   * indistinguishable from a route that does not exist.
+   */
+  CBE_WEBHOOK_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+
+  /**
+   * Public https origin of the staff console.
+   *
+   * Required in production. The bot's /staff command only ever shows queue
+   * COUNTS and links here, where MFA is enforced — a hardcoded fallback domain
+   * would send staff to a host nobody controls, which is either dead or, worse,
+   * attacker-registered.
+   */
+  STAFF_CONSOLE_URL: z.string().optional(),
   // Replay window for a signed Telegram credential. A captured initData
   // string is a bearer credential, so this must stay short: 15 minutes.
   TELEGRAM_INIT_DATA_MAX_AGE_SECONDS: z.coerce.number().int().positive().default(900),
+
+  // ── Hardening rollout flags (plan Section 6) ──
+  // Legacy bot-issued one-time sign-in code. Defaults OFF: the PKCE web-login
+  // flow is the replacement, and the code is a bearer credential.
+  LEGACY_TG_CODE_ENABLED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+  // Step-up enforcement on money movement. Starts false so the middleware can
+  // run in log-only mode and report what it WOULD have blocked, then flips true.
+  WITHDRAW_STEPUP_ENFORCED: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
+  // Hours a cooling-off lock is applied for after a sensitive account change.
+  COOLING_OFF_HOURS: z.coerce.number().int().positive().default(24),
+  // Current consent versions. A user who consented to an older version is
+  // re-prompted before sensitive actions.
+  TERMS_VERSION: z.string().default("1.0"),
+  PRIVACY_VERSION: z.string().default("1.0"),
 
   // Google OAuth & Social Auth
   GOOGLE_CLIENT_ID: z.string().optional(),
@@ -216,7 +296,13 @@ const EnvSchema = z.object({
   // Number of trusted proxy hops in front of the API (ngrok, nginx, ALB...).
   // Required for correct client IPs (rate limiting, audit logs) whenever the
   // API is not reached directly. Leave unset when running bare on localhost.
-  TRUST_PROXY: z.coerce.number().int().min(0).optional(),
+  //
+  // This is a HOP COUNT, not a boolean and not a CIDR list. Express walks
+  // X-Forwarded-For right-to-left for exactly this many hops; anything the
+  // client appends to the left of that point is discarded. Setting it too high
+  // lets a client forge its own IP and walk straight through every rate limit;
+  // setting it too low collapses all clients onto the proxy's address.
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).optional(),
 
   // OpenSearch (optional) — full-text search backend. Unset = search falls
   // back to the existing Postgres queries; no dependency is required to boot.
@@ -228,10 +314,171 @@ const parsed = EnvSchema.safeParse(process.env);
 if (!parsed.success) {
   // eslint-disable-next-line no-console
   console.error(
-    "❌ Invalid environment configuration:",
+    "Invalid environment configuration:",
     parsed.error.flatten().fieldErrors,
   );
   process.exit(1);
 }
 
-export const env = parsed.data;
+export type TelegramEnv = "dev" | "staging" | "prod";
+
+/**
+ * Fully resolved configuration.
+ *
+ * `TELEGRAM_ENV` falls back to NODE_ENV so an existing deployment is not broken
+ * by the new variable: production implies "prod", everything else implies "dev".
+ * `TELEGRAM_POLLING_ENABLED` defaults to true only for a dev Telegram
+ * environment, and assertProductionSafety refuses to boot if a non-dev
+ * environment has it turned on.
+ */
+export type Env = z.infer<typeof EnvSchema> & {
+  TELEGRAM_ENV: TelegramEnv;
+  TELEGRAM_POLLING_ENABLED: boolean;
+};
+
+/**
+ * Fail-closed production checks (plan T0.2).
+ *
+ * Kept as a pure function that RETURNS violations rather than exiting, so it
+ * can be unit tested without killing the test runner. `env.ts` calls it at
+ * import time and exits; tests call it with fabricated configs.
+ *
+ * Every rule here exists because the failure it prevents is silent: a missing
+ * webhook secret does not throw, it just makes the webhook endpoint
+ * unauthenticated; a non-https FRONTEND_URL does not throw, it just ships user
+ * credentials over cleartext to a Mini App that Telegram may still render.
+ */
+export function assertProductionSafety(
+  cfg: Partial<Env> & { NODE_ENV?: string; TELEGRAM_ENV?: TelegramEnv },
+): string[] {
+  const violations: string[] = [];
+  const isProd = cfg.NODE_ENV === "production";
+  const telegramEnv: TelegramEnv =
+    cfg.TELEGRAM_ENV ?? (isProd ? "prod" : "dev");
+
+  if (isProd) {
+    if (!cfg.TELEGRAM_BOT_TOKEN) {
+      violations.push(
+        "TELEGRAM_BOT_TOKEN is required when NODE_ENV=production; the bot would otherwise start unauthorised.",
+      );
+    }
+    if (!cfg.TELEGRAM_WEBHOOK_SECRET) {
+      violations.push(
+        "TELEGRAM_WEBHOOK_SECRET is required when NODE_ENV=production. Without it POST /api/v1/telegram/webhook accepts updates from anyone who learns the URL, which is a full account-takeover primitive.",
+      );
+    }
+    if (!cfg.TELEGRAM_WEBHOOK_URL) {
+      violations.push(
+        "TELEGRAM_WEBHOOK_URL is required when NODE_ENV=production. Production uses a webhook; without a URL the process would silently fall back to long polling.",
+      );
+    }
+    if (cfg.TELEGRAM_WEBHOOK_URL) {
+      try {
+        const webhookUrl = new URL(cfg.TELEGRAM_WEBHOOK_URL);
+        if (webhookUrl.protocol !== "https:" || /\s/.test(cfg.TELEGRAM_WEBHOOK_URL)) {
+          throw new Error("not a clean https URL");
+        }
+      } catch {
+        violations.push(
+          `TELEGRAM_WEBHOOK_URL must be a clean https URL in production (got ${cfg.TELEGRAM_WEBHOOK_URL}).`,
+        );
+      }
+    }
+    if (cfg.FRONTEND_URL && !/^https:\/\//i.test(cfg.FRONTEND_URL)) {
+      violations.push(
+        `FRONTEND_URL must be a public https origin in production (got ${cfg.FRONTEND_URL}). The Mini App and its tokens are otherwise exposed in cleartext.`,
+      );
+    }
+
+    // Provider callbacks must resolve to THIS service. A missing API_PUBLIC_URL
+    // previously meant the Telebirr notify_url was assembled from FRONTEND_URL,
+    // which points at the web app host — so settlement webhooks would be
+    // delivered somewhere that cannot process them.
+    if (!cfg.API_PUBLIC_URL) {
+      violations.push(
+        "API_PUBLIC_URL is required when NODE_ENV=production. Provider callbacks (Telebirr notify_url and any provider return URL) are built from it; deriving them from FRONTEND_URL delivers money-confirming webhooks to the web app host.",
+      );
+    } else if (!/^https:\/\//i.test(cfg.API_PUBLIC_URL)) {
+      violations.push(
+        `API_PUBLIC_URL must be an https origin in production (got ${cfg.API_PUBLIC_URL}).`,
+      );
+    }
+
+    // A configured secret behind a disabled route is a silent money black hole:
+    // the provider believes it has a live endpoint, retries, and every user
+    // top-up stays pending forever. Make the contradiction explicit at boot.
+    if (cfg.CBE_WEBHOOK_SECRET && cfg.CBE_WEBHOOK_ENABLED !== true) {
+      violations.push(
+        "CBE_WEBHOOK_SECRET is set but CBE_WEBHOOK_ENABLED is not true. The /api/v1/webhooks/cbe route answers 404 while the provider still believes it is live, so CBE top-ups would settle never. Set CBE_WEBHOOK_ENABLED=true, or remove the secret.",
+      );
+    }
+
+    // The symmetric contradiction: route on, nothing to verify against. The
+    // tempting "fix" in the field is to weaken verification, so refuse to boot
+    // instead.
+    if (cfg.CBE_WEBHOOK_ENABLED === true && !cfg.CBE_WEBHOOK_SECRET) {
+      violations.push(
+        "CBE_WEBHOOK_ENABLED is true but CBE_WEBHOOK_SECRET is not set. The route cannot verify any signature. Set the secret, or disable the route.",
+      );
+    }
+
+    // No hardcoded fallback for the staff console: the bot must never send staff
+    // to a domain this deployment does not control.
+    if (!cfg.STAFF_CONSOLE_URL) {
+      violations.push(
+        "STAFF_CONSOLE_URL is required when NODE_ENV=production. The bot's /staff command links to the console, where MFA is enforced; without it there is no safe link to emit.",
+      );
+    } else if (!/^https:\/\//i.test(cfg.STAFF_CONSOLE_URL)) {
+      violations.push(
+        `STAFF_CONSOLE_URL must be an https origin in production (got ${cfg.STAFF_CONSOLE_URL}).`,
+      );
+    }
+
+    if (telegramEnv !== "prod") {
+      violations.push(
+        `TELEGRAM_ENV is "${telegramEnv}" but NODE_ENV=production. Refusing to run a non-production Telegram environment against production traffic.`,
+      );
+    }
+  }
+
+  // Long polling is a DEVELOPMENT convenience. In staging/prod it competes with
+  // any webhook deployment for updates, and two consumers of the same
+  // getUpdates stream silently halve throughput.
+  if (cfg.TELEGRAM_POLLING_ENABLED === true && telegramEnv !== "dev") {
+    violations.push(
+      `TELEGRAM_POLLING_ENABLED is set but TELEGRAM_ENV="${telegramEnv}". Long polling is only permitted when TELEGRAM_ENV=dev.`,
+    );
+  }
+
+  return violations;
+}
+
+const resolvedTelegramEnv: TelegramEnv =
+  parsed.data.TELEGRAM_ENV ??
+  (parsed.data.NODE_ENV === "production" ? "prod" : "dev");
+
+const resolved: Env = {
+  ...(parsed.data as z.infer<typeof EnvSchema>),
+  TELEGRAM_ENV: resolvedTelegramEnv,
+  // Default: polling on in dev, off everywhere else. An explicit
+  // TELEGRAM_POLLING_ENABLED=true in a non-dev environment is caught above.
+  TELEGRAM_POLLING_ENABLED:
+    parsed.data.TELEGRAM_POLLING_ENABLED ?? resolvedTelegramEnv === "dev",
+};
+
+const violations = assertProductionSafety(resolved);
+if (violations.length > 0) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "\nRefusing to start: unsafe production configuration.\n",
+  );
+  for (const v of violations) {
+    // eslint-disable-next-line no-console
+    console.error(`   - ${v}`);
+  }
+  // eslint-disable-next-line no-console
+  console.error("");
+  process.exit(1);
+}
+
+export const env: Env = resolved;

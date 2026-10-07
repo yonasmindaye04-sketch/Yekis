@@ -29,6 +29,8 @@ export interface OpsUiApi {
   /** Whether the current role may open a page — shared so consumers do not
    *  each fetch the permission matrix. */
   can: (page: OpsPageId) => boolean;
+  /** Human name of a page, for labels such as a notification's destination. */
+  pageLabel: (page: OpsPageId) => string;
 }
 
 export const OpsUiContext = createContext<OpsUiApi>({
@@ -40,6 +42,7 @@ export const OpsUiContext = createContext<OpsUiApi>({
   refreshBadges: () => {},
   account: null,
   can: () => false,
+  pageLabel: (page) => page,
 });
 
 export const useOpsUi = () => useContext(OpsUiContext);

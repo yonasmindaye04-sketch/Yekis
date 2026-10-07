@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
+import { buildPublicWebAppUrl } from "../utils/deepLink.js";
 
 export function jobFiltersKeyboard(
   ctx: BotContext,
@@ -95,10 +96,23 @@ export function jobFiltersKeyboard(
   );
 
   // Open in Mini App
-  kb.row({
-    text: ctx.t("job_view_web"),
-    web_app: { url: `${ctx.t("frontend_url")}/jobs` },
-  });
+  //
+  // Built by the deepLink helper, not `ctx.t("frontend_url")`. That key does not
+  // exist in any locale file, and ctx.t falls through to returning the KEY ITSELF
+  // on a miss, so this button was shipping the literal relative URL
+  // "frontend_url/jobs" — which Telegram cannot open.
+  //
+  // buildPublicWebAppUrl returns null when FRONTEND_URL is not a public https
+  // origin (loopback, LAN, http), which is exactly the condition under which
+  // Telegram rejects a web_app button and fails the ENTIRE sendMessage. In that
+  // case the row is omitted rather than shipping a dead button.
+  const miniAppUrl = buildPublicWebAppUrl("/jobs");
+  if (miniAppUrl) {
+    kb.row({
+      text: ctx.t("job_view_web"),
+      web_app: { url: miniAppUrl },
+    });
+  }
 
   // Back to main
   kb.row({ text: ctx.t("back"), callback_data: "menu:main" });

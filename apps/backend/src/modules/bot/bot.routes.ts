@@ -23,7 +23,10 @@ router.post(
         env.TELEGRAM_WEBHOOK_SECRET &&
         secretToken !== env.TELEGRAM_WEBHOOK_SECRET
       ) {
-        logger.warn({ received: secretToken }, "Invalid webhook secret token");
+        logger.warn(
+          { secretProvided: typeof secretToken === "string" },
+          "Invalid webhook secret token",
+        );
         return res.status(401).json({ error: "Invalid secret token" });
       }
 

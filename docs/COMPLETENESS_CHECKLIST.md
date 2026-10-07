@@ -144,7 +144,7 @@ Last reviewed: 2026-08-15
 
 ## Marketing Site (Public)
 
-- [x] Escrow explainer and 4-step trust process
+- [x] Escrow explainer and 4-step trust process — rebuilt 2026-10-05 as a single-slogan stepper with one product screen per step (autoplaying tabs, keyboard-navigable, `inert` on inactive screens); the old pinned scroll board is gone
 - [x] Dual CTA hero section
 - [x] Transparent pricing and fees page
 - [x] FAQ accordion with deep-linking

@@ -34,6 +34,7 @@ export class InvalidEscrowStateError extends Error {}
 export class ContractNotFullyExecutedError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class ActiveContractWithdrawalBlockedError extends Error {}
+export class EscrowAdminHoldError extends Error {}
 /** Thrown when a concurrent release path (explicit accept / auto-release /
  * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
 export class MilestoneReleaseClaimLostError extends Error {
@@ -62,6 +63,15 @@ function warnDate(releaseAt: Date): Date {
   return d;
 }
 
+export async function assertEscrowNotHeld(milestoneId: string): Promise<void> {
+  const hold = await prisma.escrowHold.findFirst({
+    where: { milestoneId, active: true },
+    select: { reason: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (hold) throw new EscrowAdminHoldError(`Escrow is on administrative hold: ${hold.reason}`);
+}
+
 /**
  * Client funds a milestone. Requires the contract to be fully executed
  * (both parties digitally accepted — see contracts.service.ts) before any
@@ -79,6 +89,7 @@ export async function fundMilestone(params: {
   if (!milestone) throw new MilestoneNotFoundError();
   if (milestone.contract.clientId !== params.clientId)
     throw new NotContractPartyError();
+  await assertEscrowNotHeld(milestone.id);
 
   if (
     !milestone.contract.clientAcceptedAt ||
@@ -151,6 +162,7 @@ export async function fundMilestoneFromWallet(params: {
   if (!milestone) throw new MilestoneNotFoundError();
   if (milestone.contract.clientId !== params.clientId)
     throw new NotContractPartyError();
+  await assertEscrowNotHeld(milestone.id);
 
   if (
     !milestone.contract.clientAcceptedAt ||
@@ -289,6 +301,14 @@ export async function handlePaymentWebhook(params: {
       "Webhook received for unknown transaction — ignoring.",
     );
     return;
+  }
+
+  if (transaction.provider !== params.provider) {
+    logger.error(
+      { transactionId: transaction.id, expectedProvider: transaction.provider, receivedProvider: params.provider },
+      "Payment callback provider does not match the stored transaction — rejecting.",
+    );
+    throw new Error("PAYMENT_PROVIDER_MISMATCH");
   }
 
   if (transaction.status !== "PENDING") {
@@ -603,6 +623,7 @@ export async function releaseMilestoneFunds(
   freelancerId: string,
   amountMinor: number,
 ) {
+  await assertEscrowNotHeld(milestoneId);
   const freelancerKyc = await prisma.kycRecord.findUnique({
     where: { userId: freelancerId },
   });
@@ -624,6 +645,7 @@ export async function releaseMilestoneFunds(
         where: {
           id: milestoneId,
           escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
+          escrowHolds: { none: { active: true } },
         },
         data: { escrowState: "RELEASED", releasedAt: new Date() },
       });

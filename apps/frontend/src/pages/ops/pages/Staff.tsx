@@ -6,7 +6,7 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useMemo, useState } from "react";
-import { Check, RefreshCw, Shield } from "lucide-react";
+import { Check, RefreshCw, Shield, UserX, UserCheck } from "lucide-react";
 import { opsApi, opsListApi, useApi } from "../opsApi";
 import type { StaffMember, StaffRole } from "../opsTypes";
 import { useListPage } from "../opsList";
@@ -54,6 +54,16 @@ export default function StaffPage() {
     }
   };
 
+  const toggleStatus = async (s: StaffMember) => {
+    const suspended = !s.suspended;
+    const reason = suspended ? window.prompt("Reason for suspending this staff account:") : undefined;
+    if (suspended && (!reason || reason.trim().length < 5)) { toast("A suspension reason of at least 5 characters is required."); return; }
+    setBusy(true);
+    try { await opsApi.setStaffStatus(s.id, suspended, reason?.trim()); toast(suspended ? "Staff account suspended." : "Staff account reactivated."); reload(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Status update failed"); }
+    finally { setBusy(false); }
+  };
+
   const grants = (role: string, perm: string) => {
     const list = matrix.data?.roles?.[role];
     return Array.isArray(list) && (list.includes("*") || list.includes(perm));
@@ -99,9 +109,10 @@ export default function StaffPage() {
                   <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)}>Cancel</button>
                 </span>
               ) : (
-                <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(s.id); setDraft(s.staffRole); }}>
-                  Edit role
-                </button>
+                <span style={{ display: "flex", gap: 6 }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(s.id); setDraft(s.staffRole); }}>Edit role</button>
+                  <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void toggleStatus(s)}>{s.suspended ? <UserCheck size={12} /> : <UserX size={12} />} {s.suspended ? "Reactivate" : "Suspend"}</button>
+                </span>
               )}
             </td>
           </tr>

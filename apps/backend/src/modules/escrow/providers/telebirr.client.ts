@@ -6,6 +6,7 @@ import type {
   InitiatePaymentResult,
   PaymentProviderClient,
 } from "./paymentProvider.interface.js";
+import { PaymentProviderUnavailableError } from "./paymentProvider.interface.js";
 import { getFabricToken, invalidateFabricToken } from "./telebirr.token.js";
 import {
   createTimestamp,
@@ -44,14 +45,50 @@ function hasCredentials(): boolean {
 
 /**
  * Generates a unique merchant order ID.
- * Format: YKS-<unix_timestamp>-<6_char_random>
+ * Format: YKS<unix_timestamp><12 cryptographically-random hex chars>
  * This is stored as providerTransactionId and used as merch_order_id
  * in the Telebirr preOrder request.
  */
 function generateMerchOrderId(): string {
   const ts = Date.now();
-  const rand = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const rand = randomUUID().replace(/-/g, "").slice(0, 12).toUpperCase();
   return `YKS${ts}${rand}`;
+}
+
+function getNotifyUrl(): string {
+  if (!env.TELEBIRR_PUBLIC_KEY) {
+    throw new PaymentProviderUnavailableError(
+      "Telebirr callback verification is not configured: set TELEBIRR_PUBLIC_KEY.",
+    );
+  }
+
+  const notifyUrl = env.TELEBIRR_NOTIFY_URL ||
+    (env.API_PUBLIC_URL
+      ? `${env.API_PUBLIC_URL.replace(/\/+$/, "")}/api/v1/webhooks/telebirr`
+      : undefined);
+  if (!notifyUrl) {
+    throw new PaymentProviderUnavailableError(
+      "Telebirr callbacks are not configured: set TELEBIRR_NOTIFY_URL to the public API callback URL.",
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(notifyUrl);
+  } catch {
+    throw new PaymentProviderUnavailableError("TELEBIRR_NOTIFY_URL must be a valid absolute URL.");
+  }
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.pathname.replace(/\/+$/, "") !== "/api/v1/webhooks/telebirr" ||
+    parsed.username || parsed.password || parsed.search || parsed.hash ||
+    ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname.toLowerCase())
+  ) {
+    throw new PaymentProviderUnavailableError(
+      "TELEBIRR_NOTIFY_URL must be a public HTTPS URL ending in /api/v1/webhooks/telebirr, without credentials, query, or fragment.",
+    );
+  }
+  return parsed.toString();
 }
 
 // === MAIN EXPORT ===
@@ -59,6 +96,9 @@ function generateMerchOrderId(): string {
 export const telebirrClient: PaymentProviderClient = {
   async initiatePayment(params): Promise<InitiatePaymentResult> {
     if (!hasCredentials()) {
+      if (env.NODE_ENV === "production") {
+        throw new PaymentProviderUnavailableError("Telebirr payment is disabled in production until merchant credentials are configured.");
+      }
       logger.warn(
         "Telebirr credentials not configured — using mock payment initiation.",
       );
@@ -73,6 +113,7 @@ export const telebirrClient: PaymentProviderClient = {
 
     // 2. Generate unique order ID
     const merchOrderId = generateMerchOrderId();
+    const notifyUrl = getNotifyUrl();
 
     // 3. Convert amount from minor units (cents) to decimal string
     //    Telebirr expects amounts like "500.00", not integer cents.
@@ -99,9 +140,15 @@ export const telebirrClient: PaymentProviderClient = {
       method: "payment.preorder",
       version: "1.0",
       biz_content: {
-        notify_url:
-          env.TELEBIRR_NOTIFY_URL ||
-          `${env.FRONTEND_URL}/api/v1/webhooks/telebirr`,
+        // Built from API_PUBLIC_URL, never FRONTEND_URL. Telebirr POSTs the
+        // payment confirmation to this URL; FRONTEND_URL is the web app host,
+        // so deriving it from there delivered settlement webhooks to a service
+        // that cannot route them — and a stale or staging FRONTEND_URL breaks
+        // settlement silently rather than loudly.
+        //
+        // TELEBIRR_NOTIFY_URL still wins when explicitly set, for the rare case
+        // where the callback genuinely lives on a different host.
+        notify_url: notifyUrl,
         appid: env.TELEBIRR_MERCHANT_APP_ID,
         merch_code: env.TELEBIRR_MERCHANT_CODE,
         merch_order_id: merchOrderId,
@@ -110,6 +157,7 @@ export const telebirrClient: PaymentProviderClient = {
         total_amount: amountStr,
         trans_currency: params.currency,
         timeout_express: env.TELEBIRR_TIMEOUT_EXPRESS,
+        // A USER-FACING redirect, so FRONTEND_URL is correct here.
         redirect_url:
           env.TELEBIRR_REDIRECT_URL ||
           (env.FRONTEND_URL ? `${env.FRONTEND_URL}/wallet` : undefined),
@@ -268,6 +316,8 @@ export const telebirrClient: PaymentProviderClient = {
    */
   async queryPaymentStatus({ providerTransactionId }): Promise<{
     status: "SUCCESS" | "FAILED" | "PENDING";
+    amountMinor?: number;
+    currency?: string;
   } | null> {
     if (!hasCredentials()) {
       logger.warn(
@@ -332,6 +382,7 @@ export const telebirrClient: PaymentProviderClient = {
         trade_status?: string;
         trade_voucher?: string;
         total_amount?: string;
+        trans_currency?: string;
       };
     };
 
@@ -352,7 +403,15 @@ export const telebirrClient: PaymentProviderClient = {
       status = "FAILED";
     else status = "PENDING";
 
-    return { status };
+    const amountText = data.biz_content.total_amount;
+    const amountMinor = amountText && /^\d+(\.\d{1,2})?$/.test(amountText)
+      ? Math.round(Number(amountText) * 100)
+      : undefined;
+    return {
+      status,
+      ...(amountMinor !== undefined ? { amountMinor } : {}),
+      ...(data.biz_content.trans_currency ? { currency: data.biz_content.trans_currency } : {}),
+    };
   },
 
   /**
@@ -365,6 +424,9 @@ export const telebirrClient: PaymentProviderClient = {
     referenceId: string;
   }) {
     if (!hasCredentials()) {
+      if (env.NODE_ENV === "production") {
+        throw new PaymentProviderUnavailableError("Telebirr disbursement is disabled in production until merchant credentials are configured.");
+      }
       logger.warn(
         { recipientPhone: params.recipientPhone, amountMinor: params.amountMinor },
         "Telebirr credentials not configured — using simulated sandbox disbursement.",
@@ -476,11 +538,10 @@ export const telebirrClient: PaymentProviderClient = {
   async queryDisbursementStatus(params: {
     providerPayoutId: string;
   }) {
-    if (!hasCredentials()) {
-      return { status: "CONFIRMED" as const };
-    }
-    // Live query logic mirrors queryPaymentStatus for the disburse endpoint
-    return { status: "CONFIRMED" as const };
+    // No provider status-query API has been implemented/verified yet. Unknown
+    // must remain unknown; never fabricate payout confirmation.
+    logger.warn({ providerPayoutId: params.providerPayoutId }, "Telebirr disbursement status query is not implemented.");
+    return null;
   },
 };
 

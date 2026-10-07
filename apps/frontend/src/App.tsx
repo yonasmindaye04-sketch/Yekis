@@ -1,6 +1,7 @@
 // === IMPORTS ===
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTelegramMiniApp } from "./telegram/useTelegramMiniApp";
+import { getTelegramWebApp, reloadTelegramMiniApp } from "./telegram/webApp";
 import { initAnalytics, events } from "./analytics";
 import { CookieBanner } from "./CookieBanner";
 import {
@@ -438,8 +439,9 @@ export function App() {
 
     setTelegramAuthStatus("loading");
     try {
+      const freshInitData = getTelegramWebApp()?.initData || telegram.initData;
       const session = await api.loginWithTelegram(
-        telegram.initData,
+        freshInitData,
         selectedRole,
       );
       api.setSession(session);
@@ -470,7 +472,11 @@ export function App() {
           "Telegram signature mismatch: Ensure the TELEGRAM_BOT_TOKEN belongs to the exact bot opening this Mini App.",
         );
       } else {
-        setTelegramAuthError(`${msg}. Try again or use mobile sign in.`);
+        setTelegramAuthError(
+          msg.includes("STALE_AUTH_DATE")
+            ? "This Telegram session has expired. Reload the Mini App, then try Telegram Login again."
+            : `${msg}. Try again or use mobile sign in.`,
+        );
       }
     }
   };
@@ -1090,6 +1096,16 @@ export function App() {
               <p style={{ margin: "4px 0 0 0", lineHeight: 1.4 }}>
                 {telegramAuthError}
               </p>
+              {telegramAuthError.includes("expired") && telegram.isTelegram && (
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ marginTop: "10px", width: "100%" }}
+                  onClick={reloadTelegramMiniApp}
+                >
+                  Reload Telegram session
+                </button>
+              )}
             </div>
           )}
           {!showMobileLogin ? (
@@ -2259,14 +2275,18 @@ export function App() {
                       jobs.map((job) => (
                         <article className="job-platform-card" key={job.id}>
                           <div>
-                            <span className="status-pill">Open</span>
+                            <div className="job-card-topline">
+                              <span className="status-pill">Open</span>
+                              <span className="job-category-label">
+                                {job.category.replaceAll("_", " ")}
+                              </span>
+                            </div>
                             <h3>{job.title}</h3>
-                            <p>{job.description}</p>
-                            <small>
-                              Budget: ETB{" "}
-                              {(job.budgetMinMinor / 100).toLocaleString()} –{" "}
-                              {(job.budgetMaxMinor / 100).toLocaleString()}
-                            </small>
+                            <p className="job-card-description">{job.description}</p>
+                            <div className="job-card-meta">
+                              <span>ETB {(job.budgetMinMinor / 100).toLocaleString()} – {(job.budgetMaxMinor / 100).toLocaleString()}</span>
+                              <span>Due {new Date(job.deadline).toLocaleDateString()}</span>
+                            </div>
                           </div>
                           {role === "FREELANCER" && (
                             <button

@@ -51,6 +51,7 @@ export default function UsersPage() {
   /* Wallet balance and activity counters live on a separate summary route,
      so they load when the profile is opened rather than for every row. */
   const [detail, setDetail] = useState<User | null>(null);
+  const [detailRaw, setDetailRaw] = useState<Awaited<ReturnType<typeof opsApi.userDetail>> | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
 
@@ -62,6 +63,7 @@ export default function UsersPage() {
       setDetailErr(null);
       try {
         const raw = await opsApi.userDetail(id);
+        setDetailRaw(raw);
         const row = rows.find((u) => u.id === id);
         if (row) setDetail(withUserDetail(row, raw));
       } catch (e) {
@@ -76,6 +78,7 @@ export default function UsersPage() {
   const closeDetail = useCallback(() => {
     setDetailId(null);
     setDetail(null);
+    setDetailRaw(null);
     setDetailErr(null);
   }, []);
 
@@ -179,6 +182,12 @@ export default function UsersPage() {
               <ShieldAlert size={13} /> Force KYC re-review
             </button>
           </div>
+          {detailRaw ? <>
+            <div className="sec-title" style={{ marginTop: 22 }}>Recent support conversations</div>
+            {detailRaw.recentConversations.length ? detailRaw.recentConversations.map((c) => <div className="q-sub" key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{c.subject} · {c.status}</span><span>{dt(c.updatedAt)}</span></div>) : <div className="muted">No support conversations.</div>}
+            <div className="sec-title" style={{ marginTop: 22 }}>Recent account activity</div>
+            {detailRaw.recentAudit.length ? detailRaw.recentAudit.map((a) => <div className="q-sub" key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{a.eventType} · {a.entityType}</span><span>{dt(a.createdAt)}</span></div>) : <div className="muted">No audit activity recorded for this user.</div>}
+          </> : null}
           <div className="kbd-hint" style={{ marginTop: 8 }}>
             Suspension requires <span className="mono">users.suspend</span>; forcing re-review requires{" "}
             <span className="mono">kyc.review</span>. Both are enforced server-side and audited.

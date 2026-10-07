@@ -65,7 +65,7 @@ export function ChatWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Real-time socket states
-  const [, setIsConnected] = useState(realtimeSocket.isConnected);
+  const [isConnected, setIsConnected] = useState(realtimeSocket.isConnected);
   const [isRemoteTyping, setIsRemoteTyping] = useState(false);
   const typingTimerRef = useRef<number | null>(null);
 
@@ -125,11 +125,27 @@ export function ChatWorkspace({
     void loadConversations();
   }, []);
 
+  // A short visible-tab fallback keeps messages fresh while a WebSocket is
+  // reconnecting or a proxy does not support upgrades.
+  useEffect(() => {
+    if (isConnected) return;
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void api.getChatConversations().then(setConversations).catch(() => {});
+      if (activeConversationId) {
+        void api.getChatMessages(activeConversationId).then(setMessages).catch(() => {});
+      }
+    };
+    const timer = window.setInterval(refresh, 2000);
+    return () => window.clearInterval(timer);
+  }, [isConnected, activeConversationId]);
+
   // --- Global incoming message listener ---
   useEffect(() => {
     const unsubGlobal = realtimeSocket.on<{
       conversationId: string;
-      messageId: string;
+      id: string;
+      attachmentUrl?: string | null;
       body: string;
       senderId: string;
     }>("chat:new_message", (data) => {
@@ -340,7 +356,11 @@ export function ChatWorkspace({
         finalAttachmentUrl || undefined
       );
 
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) =>
+        prev.some((message) => message.id === newMsg.id)
+          ? prev
+          : [...prev, newMsg],
+      );
       if (!customText) setDraft("");
       setAttachmentUrl(null);
       setAttachedFile(null);

@@ -1,4 +1,8 @@
 // === INTERFACES & TYPES ===
+export class PaymentProviderUnavailableError extends Error {
+  readonly code = "PAYMENT_PROVIDER_UNAVAILABLE";
+}
+
 export interface InitiatePaymentResult {
   providerTransactionId: string;
   /** URL to redirect the client to, or null if the flow is purely
@@ -35,7 +39,11 @@ export interface PaymentProviderClient {
    */
   queryPaymentStatus?(params: {
     providerTransactionId: string;
-  }): Promise<{ status: "SUCCESS" | "FAILED" | "PENDING" } | null>;
+  }): Promise<{
+    status: "SUCCESS" | "FAILED" | "PENDING";
+    amountMinor?: number;
+    currency?: string;
+  } | null>;
 
   /**
    * B2C Disbursement (payout) to a freelancer's mobile wallet or bank account.
@@ -60,4 +68,3 @@ export interface InitiateDisbursementResult {
   status: "CONFIRMED" | "PROCESSING" | "FAILED";
   errorMessage?: string;
 }
-

@@ -25,20 +25,24 @@ export const notificationWorker = new Worker(
       [k: string]: unknown;
     };
 
-    // Real-time push over the WebSocket fan-out first — any connected device
-    // gets the event instantly; the persistence/SMS/Telegram paths below
-    // remain the durable record.
+    // Persist first so a client that immediately refreshes after the socket
+    // event can always find the notification in GET /notifications.
+    const notification = await processNotification({ userId, type: job.name, message, metadata });
+
+    // Real-time push immediately after persistence. External delivery (SMS,
+    // email and Telegram) is handled by processNotification without blocking
+    // this WebSocket path.
     try {
       sendToUser(userId, `notify:${job.name}`, {
         type: job.name,
         message,
+        notificationId: notification?.id,
+        createdAt: notification?.createdAt,
         ...metadata,
       });
     } catch (err) {
       logger.warn({ err, jobName: job.name }, "Real-time socket push failed");
     }
-
-    await processNotification({ userId, type: job.name, message, metadata });
   },
   { connection: redis },
 );

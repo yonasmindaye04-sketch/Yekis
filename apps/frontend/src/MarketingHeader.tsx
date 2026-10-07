@@ -1,4 +1,4 @@
-import { Sun, Moon, MessageCircle } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
 
 type MarketingHeaderProps = {
@@ -35,15 +35,6 @@ export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
         <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
       </nav>
       <div className="marketing-nav-right">
-        <a
-          href="https://t.me/yekis_channel"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="telegram-link"
-          aria-label="Yekis Telegram Channel"
-        >
-          <MessageCircle size={18} />
-        </a>
         <button
           className="theme-toggle"
           onClick={toggleTheme}

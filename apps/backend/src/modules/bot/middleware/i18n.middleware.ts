@@ -2,7 +2,11 @@ import { BotContext } from "../types.js";
 import { resolve } from "path";
 import * as fs from "fs";
 
-const localesDir = resolve(process.cwd(), "src/modules/bot/locales");
+const localeCandidates = [
+  resolve(process.cwd(), "src/modules/bot/locales"),
+  resolve(process.cwd(), "apps/backend/src/modules/bot/locales"),
+];
+const localesDir = localeCandidates.find((dir) => fs.existsSync(dir)) ?? localeCandidates[0]!;
 
 // Load JSON locales synchronously
 const locales: Record<string, Record<string, string>> = {};

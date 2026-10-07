@@ -6,11 +6,13 @@ import {
   createRedisSessionStorage,
   createInitialSessionData,
 } from "./utils/sessionStorage.js";
+import { sequentialize } from "@grammyjs/runner";
+import { dedupeMiddleware } from "./middleware/dedupe.middleware.js";
 import { authMiddleware } from "./middleware/auth.middleware.js";
 import { requireChatSession } from "./middleware/sessionGuard.middleware.js";
 import { rateLimitMiddleware } from "./middleware/rateLimit.middleware.js";
 import { sceneTimeoutMiddleware } from "./middleware/sceneTimeout.middleware.js";
-import { loggingMiddleware } from "./middleware/logging.middleware.js";
+import { loggingMiddleware, safeCommandName, hashUserId } from "./middleware/logging.middleware.js";
 import { i18nMiddleware } from "./middleware/i18n.middleware.js";
 import { BotContext } from "./types.js";
 import { registerCommands } from "./handlers/commands.js";
@@ -192,8 +194,11 @@ export function createBot(): Bot<BotContext> {
         errorMessage,
         updateId: update?.update_id,
         updateType: update ? Object.keys(update).find((k) => k !== "update_id") : undefined,
-        command: update?.message?.text?.split(" ")[0] ?? undefined,
-        telegramUserId: ctx?.session?.telegramUserId || ctx?.from?.id,
+        // Only a slash-command name is recorded, never the message body: free
+        // text carries one-time codes, the PKCE sid and pasted documents.
+        command: safeCommandName(update?.message?.text),
+        // Hashed so a log line cannot be used to enumerate members.
+        telegramUserHash: hashUserId(ctx?.session?.telegramUserId ?? ctx?.from?.id),
         userId: ctx?.session?.userId,
         stack: errorObj instanceof Error ? errorObj.stack : undefined,
       },
@@ -377,10 +382,35 @@ export async function startBot(): Promise<boolean> {
     logger.error({ err }, "Failed to configure bot API settings");
   }
 
-  if (env.NODE_ENV === "production" && env.TELEGRAM_WEBHOOK_URL) {
+  // A webhook is authoritative once it is registered. Polling is only used when
+  // TELEGRAM_POLLING_ENABLED resolved to true (which config/env.ts restricts to
+  // TELEGRAM_ENV=dev) and no webhook URL is configured.
+  const configuredWebhookUrl = env.TELEGRAM_WEBHOOK_URL?.trim();
+  let useWebhook = Boolean(configuredWebhookUrl) && !env.TELEGRAM_POLLING_ENABLED;
+
+  // ngrok prints values such as "https://public.ngrok.dev ->
+  // http://localhost:5173" in its terminal output. That entire string is not
+  // a URL, and Telegram rejects it. Never send malformed configuration to the
+  // Bot API; local development can safely fall back to polling.
+  if (configuredWebhookUrl) {
+    try {
+      const parsedWebhookUrl = new URL(configuredWebhookUrl);
+      if (parsedWebhookUrl.protocol !== "https:" || /\s/.test(configuredWebhookUrl)) {
+        throw new Error("webhook URL contains whitespace or is not HTTPS");
+      }
+    } catch (err) {
+      logger.error(
+        { error: err instanceof Error ? err.message : String(err) },
+        "Invalid TELEGRAM_WEBHOOK_URL; falling back to polling in development",
+      );
+      useWebhook = false;
+    }
+  }
+
+  if (useWebhook && configuredWebhookUrl) {
     // Production: Webhook mode
     const secretToken = env.TELEGRAM_WEBHOOK_SECRET;
-    await bot.api.setWebhook(env.TELEGRAM_WEBHOOK_URL, {
+    await bot.api.setWebhook(configuredWebhookUrl, {
       secret_token: secretToken,
       allowed_updates: [
         "message",
@@ -393,7 +423,7 @@ export async function startBot(): Promise<boolean> {
       ],
       drop_pending_updates: true,
     });
-    logger.info(`Bot webhook set to ${env.TELEGRAM_WEBHOOK_URL}`);
+    logger.info({ webhookUrl: configuredWebhookUrl }, "Bot webhook set");
   } else {
     try {
       // drop_pending_updates MUST stay false here. Any message a member sent

@@ -14,9 +14,6 @@ export default defineConfig({
     host: true, // binds to 0.0.0.0 for external and tunnel traffic
     port: 5173,
     allowedHosts: true, // Allow all ngrok and tunnel hostnames
-    hmr: {
-      clientPort: 443, // Connects WSS via ngrok HTTPS port 443 instead of failing on localhost
-    },
     headers: {
       'Access-Control-Allow-Origin': '*',
       'ngrok-skip-browser-warning': 'true',
@@ -27,6 +24,7 @@ export default defineConfig({
         target: 'http://localhost:4000',
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
     },
   },

@@ -77,6 +77,7 @@ export const OPS_NAV: OpsNavGroup[] = [
         icon: TriangleAlert,
         badge: (b) => b.reports,
       },
+      { id: "gigs", name: "Gig Moderation", icon: FileText },
       {
         id: "receipts",
         name: "Receipts",
@@ -103,6 +104,7 @@ export const OPS_NAV: OpsNavGroup[] = [
         icon: Scale,
         badge: (b) => b.recon,
       },
+      { id: "withholding", name: "Tax Reports", icon: FileText },
       { id: "ledger", name: "Ledger", icon: BookOpen },
       { id: "reports", name: "Reports", icon: BarChart3 },
     ],
@@ -112,6 +114,8 @@ export const OPS_NAV: OpsNavGroup[] = [
     items: [
       { id: "users", name: "Users", icon: Users },
       { id: "staff", name: "Staff & Roles", icon: Shield },
+      { id: "featured", name: "Featured Talent", icon: UserCheck },
+      { id: "bot", name: "Telegram Bot", icon: MessageSquare },
       { id: "audit", name: "Audit Logs", icon: FileText },
       {
         id: "monitoring",

@@ -119,6 +119,7 @@ async function handleTelebirrWebhook(
   const merchOrderId = String(payload.merch_order_id ?? "");
   const tradeStatus = String(payload.trade_status ?? "");
   const totalAmount = String(payload.total_amount ?? "");
+  const currency = String(payload.trans_currency ?? "");
 
   if (!merchOrderId) {
     logger.warn({ payload }, "Telebirr webhook missing merch_order_id.");
@@ -127,6 +128,31 @@ async function handleTelebirrWebhook(
 
   // 4. Map trade_status to our internal status
   const status = mapTelebirrStatus(tradeStatus);
+
+  // A valid provider signature is necessary but not sufficient: bind the
+  // signed event to the exact amount/currency we requested before any ledger
+  // or escrow state can move.
+  if (status === "SUCCESS") {
+    const escrowPayment = await prisma.paymentTransaction.findUnique({
+      where: { providerTransactionId: merchOrderId },
+      select: { provider: true, amountMinor: true },
+    });
+    const topUp = await prisma.walletTopUp.findUnique({
+      where: { providerTransactionId: merchOrderId },
+      select: { provider: true, amountMinor: true },
+    });
+    const expected = escrowPayment ?? topUp;
+    const callbackMinor = /^\d+(\.\d{1,2})?$/.test(totalAmount)
+      ? Math.round(Number(totalAmount) * 100)
+      : NaN;
+    if (
+      !expected || expected.provider !== "TELEBIRR" || currency !== "ETB" ||
+      !Number.isSafeInteger(callbackMinor) || callbackMinor !== expected.amountMinor
+    ) {
+      logger.error({ merchOrderId, currency, totalAmount }, "Telebirr success callback does not match a local ETB order — rejecting.");
+      return res.status(400).json({ code: -1, msg: "PAYMENT_DETAILS_MISMATCH" });
+    }
+  }
 
   logger.info(
     { merchOrderId, tradeStatus, totalAmount, status },

@@ -311,7 +311,9 @@ export async function loginWithOAuthProfile(
   }
 
   const { createAuthTokens } = await import("./auth.service.js");
-  const result = await createAuthTokens(user);
+  // A federated provider session is not a strong factor: it cannot authorise a
+  // withdrawal or an account change on its own.
+  const result = await createAuthTokens(user, ["oauth"]);
 
   await recordAuditEvent({
     userId: user.id,

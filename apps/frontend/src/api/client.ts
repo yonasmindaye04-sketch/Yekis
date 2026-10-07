@@ -246,6 +246,8 @@ export interface TransactionFlag {
 
 export interface WalletResponse {
   balanceMinor: number;
+  pendingMinor?: number;
+  availableMinor?: number;
 }
 
 export interface ChatConversation {
@@ -793,7 +795,7 @@ class ApiClient {
     });
   }
 
-  async createGuestSupport(email: string, body: string): Promise<{
+  async createGuestSupport(email: string | undefined, body: string): Promise<{
     id: string;
     subject: string;
     status: string;
@@ -801,7 +803,7 @@ class ApiClient {
     /** Scoped to this conversation only â€” see guestSupportToken.ts. */
     accessToken: string;
   }> {
-    return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ email, body }) });
+    return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ ...(email ? { email } : {}), body }) });
   }
 
   /** Reads a guest thread with the scoped token from createGuestSupport. */
@@ -837,10 +839,10 @@ class ApiClient {
     return this.request(`/api/v1/chat/conversations/${conversationId}/messages`);
   }
 
-  async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string): Promise<ChatMessage> {
+  async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string, internal = false): Promise<ChatMessage> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ body, attachmentUrl }),
+      body: JSON.stringify({ body, attachmentUrl, internal }),
     });
   }
 
@@ -902,12 +904,14 @@ class ApiClient {
     return this.request(`/api/v1/chat/conversations/${conversationId}/read`, { method: "POST" });
   }
 
-  async getStaffConversations(params?: { page?: number; pageSize?: number; search?: string; status?: string }): Promise<PaginatedResponse<StaffConversation>> {
+  async getStaffConversations(params?: { page?: number; pageSize?: number; search?: string; status?: string; assignment?: string; sort?: string }): Promise<PaginatedResponse<StaffConversation>> {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set("page", String(params.page));
     if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
     if (params?.search) searchParams.set("search", params.search);
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.assignment) searchParams.set("assignment", params.assignment);
+    if (params?.sort) searchParams.set("sort", params.sort);
     return this.request(`/api/v1/chat/admin/conversations?${searchParams.toString()}`);
   }
 
@@ -915,6 +919,12 @@ class ApiClient {
     return this.request(`/api/v1/chat/admin/conversations/${conversationId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    });
+  }
+
+  async claimConversation(conversationId: string): Promise<StaffConversation> {
+    return this.request(`/api/v1/chat/admin/conversations/${conversationId}/claim`, {
+      method: "POST",
     });
   }
 
@@ -1318,6 +1328,14 @@ class ApiClient {
   async refreshFeaturedCarousel(): Promise<unknown> {
     return this.request(`/api/v1/featured/staff/refresh`, { method: "POST" });
   }
+  async pinFeaturedUser(userId: string, category: string, notes?: string): Promise<unknown> {
+    return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
+  }
+  async getBotHealth(): Promise<unknown> { return this.request("/api/v1/telegram/health"); }
+  async getBotInfo(): Promise<unknown> { return this.request("/api/v1/telegram/info"); }
+  async deleteBotWebhook(): Promise<unknown> { return this.request("/api/v1/telegram/delete-webhook", { method: "POST" }); }
+  async startBotPolling(): Promise<unknown> { return this.request("/api/v1/telegram/start-polling", { method: "POST" }); }
+  async stopBot(): Promise<unknown> { return this.request("/api/v1/telegram/stop", { method: "POST" }); }
   
   // --- Reviews ---
   async submitReview(contractId: string, rating: number, comment: string): Promise<unknown> {
@@ -1420,6 +1438,23 @@ class ApiClient {
   async adminGetContract(contractId: string): Promise<unknown> {
     return this.request(`/api/v1/admin/contracts/${contractId}`);
   }
+  async setStaffStatus(userId: string, suspended: boolean, reason?: string): Promise<{ id: string; isSuspended: boolean; staffRole: string }> {
+    return this.request(`/api/v1/admin/staff/${userId}/status`, { method: "POST", body: JSON.stringify({ suspended, reason }) });
+  }
+  async adminListGigs(params?: { page?: number; limit?: number; q?: string; status?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    return this.request(`/api/v1/admin/gigs?${qs.toString()}`);
+  }
+  async adminModerateGig(gigId: string, status: "ACTIVE" | "REJECTED" | "PAUSED" | "ARCHIVED", reason?: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/gigs/${gigId}/moderation`, {
+      method: "POST",
+      body: JSON.stringify({ status, reason }),
+    });
+  }
 
   // --- Admin finance (Phase 3) ---
   async adminListPayments(params?: { page?: number; limit?: number; q?: string; status?: string; provider?: string }): Promise<unknown> {
@@ -1483,6 +1518,24 @@ class ApiClient {
   }
   async adminSystemHealth(): Promise<unknown> {
     return this.request("/api/v1/admin/monitoring/health");
+  }
+  async adminReleaseEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/release`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminHoldEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/hold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminUnholdEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/unhold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async getWithholdingReports(params?: { page?: number; limit?: number }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return this.request(`/api/v1/finance/withholding?${qs.toString()}`);
+  }
+  async fileWithholdingReport(reportId: string, eraReferenceNumber: string): Promise<unknown> {
+    return this.request(`/api/v1/finance/withholding/${reportId}/file`, { method: "POST", body: JSON.stringify({ eraReferenceNumber }) });
   }
 
   // --- Gigs (Fiverr-style service packages) ---

@@ -14,7 +14,9 @@
 .ops-root{
   --ops-bg:#f4f6fa; --ops-panel:#ffffff; --ops-border:#e4e8f0; --ops-border-soft:#eef1f6;
   --ops-text:#111a2e; --ops-text-2:#5b6779; --ops-text-3:#646e7b;
-  --ops-primary:#4f46e5; --ops-primary-soft:#eef0ff; --ops-primary-dark:#4338ca;
+  /* Brand accent matches the app-wide Yekis green (--color-primary in
+     index.css) so the console and the product read as one system. */
+  --ops-primary:#16a34a; --ops-primary-soft:#dcfce7; --ops-primary-dark:#15803d;
   --ops-green:#059669; --ops-amber:#d97706; --ops-red:#dc2626;
   --ops-blue:#2563eb; --ops-violet:#7c3aed; --ops-sky:#0284c7;
   --ops-head-bg:#fafbfd; --ops-row-hover:#f8f9fc; --ops-input:#f7f8fb; --ops-kv:#f8f9fc;
@@ -30,7 +32,7 @@
 :root[data-theme="dark"] .ops-root{
   --ops-bg:#0d1220; --ops-panel:#151b2c; --ops-border:#242c3f; --ops-border-soft:#1e2536;
   --ops-text:#eef2f8; --ops-text-2:#a7b1c2; --ops-text-3:#8492a6;
-  --ops-primary:#818cf8; --ops-primary-soft:rgba(99,102,241,.16); --ops-primary-dark:#a5b4fc;
+  --ops-primary:#22c55e; --ops-primary-soft:rgba(34,197,94,.16); --ops-primary-dark:#4ade80;
   --ops-green:#34d399; --ops-amber:#fbbf24; --ops-red:#f87171;
   --ops-blue:#60a5fa; --ops-violet:#a78bfa; --ops-sky:#38bdf8;
   --ops-head-bg:#121828; --ops-row-hover:#1a2133; --ops-input:#101625; --ops-kv:#121826;
@@ -75,7 +77,7 @@
 .ops-root .user-chip-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0;padding:0;border:0;background:transparent;cursor:pointer;text-align:left;border-radius:8px}
 .ops-root .user-chip-main:focus-visible{outline:2px solid var(--ops-primary);outline-offset:2px}
 .ops-root .user-chip-id{display:block;flex:1;min-width:0}
-.ops-root .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#818cf8,#4f46e5);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.ops-root .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#4ade80,#16a34a);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
 .ops-root .user-chip .nm{font-size:13px;font-weight:700;line-height:1.2}
 .ops-root .user-chip .em{font-size:11px;color:var(--ops-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
@@ -107,7 +109,7 @@
 .ops-root .page-title{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .ops-root .page-sub{font-size:13px;color:var(--ops-text-2);margin-top:3px}
 .ops-root .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;border-radius:9px;font-size:13px;font-weight:700;border:1px solid transparent;transition:all .15s;white-space:nowrap}
-.ops-root .btn-primary{background:var(--ops-primary);color:#fff;box-shadow:0 2px 8px rgba(79,70,229,.3)}
+.ops-root .btn-primary{background:var(--ops-primary);color:#fff;box-shadow:0 2px 8px rgba(22,163,74,.3)}
 .ops-root .btn-primary:hover{background:var(--ops-primary-dark)}
 .ops-root .btn-ghost{background:var(--ops-panel);border-color:var(--ops-border);color:var(--ops-text-2)}
 .ops-root .btn-ghost:hover{border-color:var(--ops-primary);color:var(--ops-primary)}
@@ -294,7 +296,7 @@
 .ops-root .ac-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 .ops-root .ac-count{font-size:12px;font-weight:800}
 .ops-root .ac-prog{height:6px;background:var(--ops-border-soft);border-radius:6px;margin:12px 0 5px;overflow:hidden}
-.ops-root .ac-prog-f{height:100%;background:linear-gradient(90deg,#4f46e5,#7c3aed);border-radius:6px;transition:width .5s var(--ops-spring)}
+.ops-root .ac-prog-f{height:100%;background:linear-gradient(90deg,#16a34a,#4ade80);border-radius:6px;transition:width .5s var(--ops-spring)}
 .ops-root .ac-prog-l{font-size:11px;color:var(--ops-text-3);font-weight:700;margin-bottom:14px}
 .ops-root .ac-item{display:flex;gap:12px;align-items:flex-start;padding:12px;border:1px solid var(--ops-border-soft);border-radius:10px;margin-bottom:8px;transition:all .15s;background:var(--ops-panel)}
 .ops-root .ac-item:hover{border-color:var(--ops-primary);box-shadow:var(--ops-shadow)}
@@ -366,6 +368,8 @@
 .ops-root .ev-b-head{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px;color:var(--ops-text-3);font-weight:700}
 .ops-root .ev-bubble.client .ev-b-head strong{color:var(--ops-blue)}
 .ops-root .ev-bubble.freelancer .ev-b-head strong{color:var(--ops-violet)}
+.ops-root .ev-bubble.internal{background:#fff7ed;border-color:#fed7aa}
+.ops-root .ev-bubble.internal .ev-b-head strong{color:#c2410c}
 .ops-root .ev-bubble p{font-size:13px;line-height:1.5}
 
 .ops-root .outcome-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
@@ -457,7 +461,7 @@
 .ops-root button.notif-row:focus-visible{outline:2px solid var(--ops-primary);outline-offset:-2px}
 .ops-root button.notif-row:disabled{cursor:default;opacity:.72}
 .ops-root .notif-meta{display:flex;align-items:center;gap:5px}
-.ops-root .notif-go{margin-left:auto;flex-shrink:0;color:var(--ops-primary)}
+.ops-root .notif-go{margin-left:auto;flex-shrink:0;display:inline-flex;align-items:center;gap:4px;color:var(--ops-primary);font-weight:700}
 .ops-root .notif-msg{font-size:12.5px;color:var(--ops-text);line-height:1.45}
 .ops-root .notif-meta{font-size:11px;color:var(--ops-text-3);margin-top:3px}
 .ops-root .notif-empty{padding:26px 16px;text-align:center;font-size:12.5px;color:var(--ops-text-2)}

@@ -183,12 +183,13 @@ export async function getDashboardSummary() {
     }),
     prisma.payoutTransaction.count({ where: { status: { in: ["PENDING", "PROCESSING"] } } }),
     prisma.dispute.count({ where: { stage: { not: "RESOLVED" } } }),
-    // Counts every record a reviewer still has to act on, not just PENDING.
-    // Signups land on PENDING (auth.service.ts) and only move to UNDER_REVIEW
-    // once Fayda fails or a tier upgrade is requested — counting PENDING alone
-    // showed a badge number that the KYC queue (which defaults to UNDER_REVIEW)
-    // could never account for.
-    prisma.kycRecord.count({ where: { status: { in: ["PENDING", "UNDER_REVIEW"] } } }),
+    // Only records a Compliance Officer can actually decide on. PENDING means
+    // "registered, never uploaded a document" — no evidence exists, so there
+    // is nothing to review. Counting it reported bare signups as pending KYC
+    // (128 users => 10 "pending KYC" whose documentNumber was null), and the
+    // review queue it was meant to mirror does not list them either. Keep this
+    // in lockstep with getReviewQueue's default filter.
+    prisma.kycRecord.count({ where: { status: "UNDER_REVIEW" } }),
     prisma.conversation.count({ where: { status: "OPEN" } }),
     prisma.paymentTransaction.count({ where: { status: "PENDING" } }),
     prisma.walletTopUp.count({ where: { status: "PENDING" } }),

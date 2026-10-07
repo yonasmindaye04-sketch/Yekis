@@ -391,8 +391,7 @@
 .marketing-header:not(.is-scrolled) .marketing-nav-center button,
 .marketing-header:not(.is-scrolled) .btn-ghost,
 .marketing-header:not(.is-scrolled) .marketing-brand strong,
-.marketing-header:not(.is-scrolled) .theme-toggle,
-.marketing-header:not(.is-scrolled) .telegram-link {
+.marketing-header:not(.is-scrolled) .theme-toggle {
   color: #f7faf9;
 }
 
@@ -401,8 +400,13 @@
   color: #d8f36b;
 }
 
-/* Light mode on the landing page: dark header text over the light hero */
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) {
+/* Light mode on the landing page: dark header text over the light hero.
+   Both landing shells must be matched — `.landing-page` is the older
+   LandingPage, `.yk-v2` is LandingPageV2. Scoping to only the former left
+   the V2 header stuck on the white-text rule above, invisible on the light
+   hero. */
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled),
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) {
   color: var(--color-text);
 }
 
@@ -410,12 +414,17 @@
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost,
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-brand strong,
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .theme-toggle,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .telegram-link {
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .btn-ghost,
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-brand strong,
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .theme-toggle {
   color: var(--color-text);
 }
 
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
+:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost:hover,
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
+:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
   color: var(--color-primary);
 }
 
@@ -428,8 +437,7 @@
 .marketing-header.is-scrolled .marketing-nav-center button,
 .marketing-header.is-scrolled .btn-ghost,
 .marketing-header.is-scrolled .marketing-brand strong,
-.marketing-header.is-scrolled .theme-toggle,
-.marketing-header.is-scrolled .telegram-link {
+.marketing-header.is-scrolled .theme-toggle {
   color: var(--color-text);
 }
 

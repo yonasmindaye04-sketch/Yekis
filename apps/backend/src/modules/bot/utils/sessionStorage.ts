@@ -2,6 +2,10 @@ import { StorageAdapter } from "grammy";
 import { BotSession, SESSION_VERSION } from "../types.js";
 import { redis } from "../../../lib/redis.js";
 import { logger } from "../../../lib/logger.js";
+// Side-effect import: installs the BigInt JSON patch so a session value can
+// never throw during serialisation and silently drop the write.
+import "../../../lib/json.js";
+import { safeStringify } from "../../../lib/json.js";
 
 const SESSION_TTL_SECONDS = 86400; // 24 hours
 const SESSION_KEY_PREFIX = "bot:session:";
@@ -13,8 +17,8 @@ function sessionKey(id: string): string {
 function createInitialSession(): BotSession {
   return {
     version: SESSION_VERSION,
-    telegramUserId: 0,
-    telegramChatId: 0,
+    telegramUserId: "",
+    telegramChatId: "",
     language: "en",
     notificationSettings: {
       jobs: true,
@@ -60,7 +64,7 @@ export function createRedisSessionStorage(): StorageAdapter<BotSession> {
         };
         await redis.set(
           sessionKey(key),
-          JSON.stringify(sessionWithVersion),
+          safeStringify(sessionWithVersion),
           "EX",
           SESSION_TTL_SECONDS,
         );

@@ -80,6 +80,21 @@ export const paymentReconcileWorker = new Worker(
 
         if (result.status === "PENDING") continue;
 
+        // Query status is only authoritative for settlement when the returned
+        // provider amount and currency match our persisted order. Unknown or
+        // malformed values remain pending for investigation; never infer them.
+        if (
+          result.status === "SUCCESS" &&
+          (result.amountMinor !== txn.amountMinor || result.currency !== "ETB")
+        ) {
+          logger.error(
+            { transactionId: txn.id, providerTransactionId: txn.providerTransactionId, expectedAmountMinor: txn.amountMinor, receivedAmountMinor: result.amountMinor, receivedCurrency: result.currency },
+            "Telebirr query result did not match the local order — leaving payment pending.",
+          );
+          unknown++;
+          continue;
+        }
+
         // Authoritative result — route through the same idempotent path as a
         // live webhook so state transitions, notifications, TMS checks and
         // audit events all behave identically regardless of which arrives.

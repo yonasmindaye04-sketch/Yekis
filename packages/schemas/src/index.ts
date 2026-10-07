@@ -211,6 +211,21 @@ export const SubmitTopUpInput = z.object({
 });
 export type SubmitTopUpInput = z.infer<typeof SubmitTopUpInput>;
 
+/**
+ * A user-initiated withdrawal from their platform wallet.
+ *
+ * `payoutAccountIdentifier` is still free-form here (phone or bank account) —
+ * the hardening plan's T2.4 replaces it with a reference to a stored
+ * PayoutMethod row so a withdrawal can only ever go to an account the user
+ * added earlier and which has finished its cooling-off period.
+ */
+export const WithdrawInput = z.object({
+  provider: PaymentProvider,
+  amountMinor: z.number().int().positive(),
+  payoutAccountIdentifier: z.string().min(4).max(100),
+});
+export type WithdrawInput = z.infer<typeof WithdrawInput>;
+
 export const TopUpReviewDecisionInput = z
   .object({
     decision: z.enum(["APPROVED", "REJECTED"]),

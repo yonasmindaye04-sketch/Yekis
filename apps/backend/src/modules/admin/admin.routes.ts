@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
+import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
@@ -38,6 +38,8 @@ import {
   PayoutNotFoundError,
   InvalidPayoutStateError,
 } from "./payoutAdmin.service.js";
+import { moderateGigStatus, GigNotFoundError } from "../gigs/gig.service.js";
+import { EscrowAdminHoldError, releaseMilestoneFunds } from "../escrow/escrow.service.js";
 
 /**
  * Staff-only platform administration surface. Everything here requires a
@@ -53,6 +55,143 @@ import {
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
+
+// ---------- Gig moderation ----------
+// The public gig API intentionally exposes only owner operations. This admin
+// queue gives staff a paginated review surface before a gig becomes ACTIVE.
+adminRouter.get(
+  "/gigs",
+  requirePermission("gigs.moderate"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const { page, limit, skip } = parsePagination(req.query as Record<string, unknown>);
+      const q = String(req.query.q ?? "").trim();
+      const status = String(req.query.status ?? "").trim();
+      const allowed = ["DRAFT", "ACTIVE", "PAUSED", "REJECTED", "ARCHIVED"];
+      const where: any = {};
+      if (allowed.includes(status)) where.status = status;
+      if (q) {
+        where.OR = [
+          { title: { contains: q, mode: "insensitive" } },
+          { freelancer: { email: { contains: q, mode: "insensitive" } } },
+          { freelancer: { displayName: { contains: q, mode: "insensitive" } } },
+        ];
+      }
+      const [total, items] = await Promise.all([
+        prisma.gig.count({ where }),
+        prisma.gig.findMany({
+          where,
+          orderBy: { updatedAt: "desc" },
+          skip,
+          take: limit,
+          include: {
+            freelancer: { select: { id: true, email: true, displayName: true, ucid: true } },
+            packages: { orderBy: { priceMinor: "asc" }, take: 3 },
+          },
+        }),
+      ]);
+      return res.json({ items, total, page, pageSize: limit });
+    } catch (err) {
+      logger.error({ err }, "Failed to list gig moderation queue");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/gigs/:gigId/moderation",
+  requireFreshAuth(300),
+  requirePermission("gigs.moderate"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z.object({
+      status: z.enum(["ACTIVE", "REJECTED", "PAUSED", "ARCHIVED"]),
+      reason: z.string().max(1000).optional(),
+    }).safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    if (parsed.data.status === "REJECTED" && (parsed.data.reason ?? "").trim().length < 10) {
+      return res.status(400).json({ error: "VALIDATION_ERROR", message: "A rejection reason of at least 10 characters is required." });
+    }
+    try {
+      return res.json(await moderateGigStatus({
+        staffUserId: req.user!.id,
+        gigId: String(req.params.gigId),
+        status: parsed.data.status,
+        reason: parsed.data.reason,
+      }));
+    } catch (err) {
+      if (err instanceof GigNotFoundError) return res.status(404).json({ error: "NOT_FOUND" });
+      logger.error({ err }, "Failed to moderate gig");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/escrows/:milestoneId/release",
+  requireFreshAuth(300),
+  requirePermission("escrow.release"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z.object({ reason: z.string().min(10).max(1000) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    try {
+      const milestone = await prisma.milestone.findUnique({ where: { id: String(req.params.milestoneId) }, select: { id: true, amountMinor: true, escrowState: true, contract: { select: { freelancerId: true } } } });
+      if (!milestone) return res.status(404).json({ error: "NOT_FOUND" });
+      if (!["SUBMITTED_FOR_REVIEW", "DISPUTED"].includes(milestone.escrowState)) return res.status(409).json({ error: "INVALID_STATE", message: `Cannot release milestone in state ${milestone.escrowState}.` });
+      await releaseMilestoneFunds(milestone.id, milestone.contract.freelancerId, milestone.amountMinor);
+      await recordAuditEvent({ userId: req.user!.id, eventType: "ADMIN_ESCROW_RELEASED", entityType: "Milestone", entityId: milestone.id, amountMinor: milestone.amountMinor, metadata: { reason: parsed.data.reason }, actorRole: req.user!.staffRole ?? null, previousState: { escrowState: milestone.escrowState }, newState: { escrowState: "RELEASED" }, requestId: String(req.id ?? ""), ipAddress: req.ip ?? null });
+      return res.json({ id: milestone.id, escrowState: "RELEASED" });
+    } catch (err) {
+      if (err instanceof EscrowAdminHoldError) return res.status(423).json({ error: "ESCROW_ADMIN_HOLD", message: err.message });
+      logger.error({ err }, "Failed to release escrow as admin");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/escrows/:milestoneId/hold",
+  requireFreshAuth(300),
+  requirePermission("escrow.freeze"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z.object({ reason: z.string().min(10).max(1000) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    const milestoneId = String(req.params.milestoneId);
+    try {
+      const milestone = await prisma.milestone.findUnique({ where: { id: milestoneId }, select: { id: true, escrowState: true } });
+      if (!milestone) return res.status(404).json({ error: "NOT_FOUND" });
+      const existing = await prisma.escrowHold.findFirst({ where: { milestoneId, active: true }, select: { id: true } });
+      if (existing) return res.status(409).json({ error: "ALREADY_ON_HOLD" });
+      const hold = await prisma.escrowHold.create({ data: { milestoneId, placedByStaffId: req.user!.id, reason: parsed.data.reason } });
+      await recordAuditEvent({ userId: req.user!.id, eventType: "ADMIN_ESCROW_HELD", entityType: "Milestone", entityId: milestoneId, metadata: { reason: parsed.data.reason }, actorRole: req.user!.staffRole ?? null, previousState: { escrowState: milestone.escrowState }, newState: { escrowHoldId: hold.id, active: true }, requestId: String(req.id ?? ""), ipAddress: req.ip ?? null });
+      return res.status(201).json(hold);
+    } catch (err) {
+      logger.error({ err }, "Failed to place escrow hold");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/escrows/:milestoneId/unhold",
+  requireFreshAuth(300),
+  requirePermission("escrow.freeze"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z.object({ reason: z.string().min(10).max(1000) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    const milestoneId = String(req.params.milestoneId);
+    try {
+      const updated = await prisma.escrowHold.updateMany({ where: { milestoneId, active: true }, data: { active: false, releasedByStaffId: req.user!.id, releasedAt: new Date(), releaseReason: parsed.data.reason } });
+      if (updated.count === 0) return res.status(404).json({ error: "ACTIVE_HOLD_NOT_FOUND" });
+      await recordAuditEvent({ userId: req.user!.id, eventType: "ADMIN_ESCROW_UNHELD", entityType: "Milestone", entityId: milestoneId, metadata: { reason: parsed.data.reason }, actorRole: req.user!.staffRole ?? null, newState: { active: false }, requestId: String(req.id ?? ""), ipAddress: req.ip ?? null });
+      return res.json({ id: milestoneId, active: false });
+    } catch (err) {
+      logger.error({ err }, "Failed to remove escrow hold");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 function parsePagination(query: Record<string, unknown>) {
   const page = Math.max(1, parseInt(String(query.page ?? "1")) || 1);
@@ -167,6 +306,7 @@ const SuspendInput = z.object({ reason: z.string().min(5).max(500) });
 
 adminRouter.post(
   "/users/:id/suspend",
+  requireFreshAuth(300),
   requirePermission("users.suspend"),
   async (req: AuthedRequest, res) => {
     const parsed = SuspendInput.safeParse(req.body);
@@ -217,6 +357,7 @@ adminRouter.post(
 
 adminRouter.post(
   "/users/:id/unsuspend",
+  requireFreshAuth(300),
   requirePermission("users.suspend"),
   async (req: AuthedRequest, res) => {
     try {
@@ -255,6 +396,7 @@ adminRouter.post(
 
 adminRouter.post(
   "/users/:id/force-kyc-rereview",
+  requireFreshAuth(300),
   requirePermission("kyc.review"),
   async (req: AuthedRequest, res) => {
     try {
@@ -356,6 +498,7 @@ const FULL_ACCESS_ROLES = new Set(["SUPER_ADMIN", "ADMIN"]);
 
 adminRouter.post(
   "/staff/:userId/role",
+  requireFreshAuth(300),
   requirePermission("admins.manage"),
   async (req: AuthedRequest, res) => {
     const parsed = SetStaffRoleInput.safeParse(req.body);
@@ -407,6 +550,8 @@ adminRouter.post(
         select: { id: true, email: true, staffRole: true },
       });
 
+      await prisma.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${targetUserId}`;
+
       await recordAuditEvent({
         userId: actorId,
         eventType: "STAFF_ROLE_CHANGED",
@@ -423,6 +568,33 @@ adminRouter.post(
       return res.json(updated);
     } catch (err) {
       logger.error({ err }, "Failed to update staff role");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+adminRouter.post(
+  "/staff/:userId/status",
+  requireFreshAuth(300),
+  requirePermission("admins.manage"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z.object({ suspended: z.boolean(), reason: z.string().min(5).max(500).optional() }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    const targetUserId = String(req.params.userId);
+    if (targetUserId === req.user!.id) return res.status(409).json({ error: "CANNOT_CHANGE_OWN_STATUS" });
+    try {
+      const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, staffRole: true, isSuspended: true } });
+      if (!target?.staffRole) return res.status(404).json({ error: "STAFF_NOT_FOUND" });
+      if (parsed.data.suspended && (target.staffRole === "ADMIN" || target.staffRole === "SUPER_ADMIN")) {
+        const activeFullAccess = await prisma.user.count({ where: { staffRole: { in: ["ADMIN", "SUPER_ADMIN"] }, isSuspended: false, id: { not: targetUserId } } });
+        if (activeFullAccess === 0) return res.status(409).json({ error: "CANNOT_SUSPEND_LAST_ADMIN" });
+      }
+      const updated = await prisma.user.update({ where: { id: targetUserId }, data: { isSuspended: parsed.data.suspended }, select: { id: true, isSuspended: true, staffRole: true } });
+      await prisma.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${targetUserId}`;
+      await recordAuditEvent({ userId: req.user!.id, eventType: parsed.data.suspended ? "STAFF_SUSPENDED" : "STAFF_UNSUSPENDED", entityType: "User", entityId: targetUserId, metadata: { reason: parsed.data.reason ?? null }, actorRole: req.user!.staffRole ?? null, previousState: { isSuspended: target.isSuspended }, newState: { isSuspended: updated.isSuspended } });
+      return res.json(updated);
+    } catch (err) {
+      logger.error({ err }, "Failed to update staff status");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },
@@ -565,6 +737,7 @@ adminRouter.get(
 
 adminRouter.post(
   "/payouts/:payoutId/settle",
+  requireFreshAuth(300),
   requirePermission("payouts.settle"),
   async (req: AuthedRequest, res) => {
     const parsed = z

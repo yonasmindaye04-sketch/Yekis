@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: marketplace_dev_only
       POSTGRES_DB: marketplace
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -37,8 +37,8 @@ services:
       MINIO_ROOT_USER: marketplace
       MINIO_ROOT_PASSWORD: marketplace_dev_only
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
+      - "127.0.0.1:9000:9000" # S3 API
+      - "127.0.0.1:9001:9001" # web console
     volumes:
       - miniodata:/data
 
@@ -55,7 +55,7 @@ services:
       DISABLE_SECURITY_PLUGIN: "true"
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "127.0.0.1:9200:9200"
     volumes:
       - opensearchdata:/usr/share/opensearch/data
 

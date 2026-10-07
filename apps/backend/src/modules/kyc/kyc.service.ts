@@ -484,9 +484,12 @@ export async function getReviewQueue(filters?: {
   const where: any = {};
   if (filters?.status) {
     where.status = filters.status;
-  } else {
-    where.status = "UNDER_REVIEW";
   }
+  // Deliberately no `else` coercing to UNDER_REVIEW. An absent status filter
+  // means "every status". It previously defaulted to UNDER_REVIEW, which made
+  // the console's "All statuses" option return byte-identical rows to the
+  // explicit UNDER_REVIEW filter — PENDING records were unreachable from the
+  // UI through any normal selection.
   const page = Math.max(1, filters?.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters?.limit ?? 25));
 
@@ -515,8 +518,10 @@ export async function getReviewQueue(filters?: {
       take: limit,
       skip: (page - 1) * limit,
     }),
-    // Unfiltered actionable split, so the console can explain why the sidebar
-    // badge (PENDING + UNDER_REVIEW) is larger than this page's row count.
+    // Two populations the console must not conflate:
+    //  - underReview: a document was submitted and a human must decide.
+    //  - pending: registered, never uploaded a document. There is no evidence
+    //    to review, so it is NOT actionable and must stay out of the KPI.
     prisma.kycRecord.groupBy({
       by: ["status"],
       where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },
@@ -526,15 +531,13 @@ export async function getReviewQueue(filters?: {
 
   const count = (status: KycStatus) =>
     byStatus.find((g) => g.status === status)?._count._all ?? 0;
-  const pending = count("PENDING");
-  const underReview = count("UNDER_REVIEW");
 
   return {
     items,
     total,
     page,
     limit,
-    counts: { pending, underReview, actionable: pending + underReview },
+    counts: { underReview: count("UNDER_REVIEW"), pending: count("PENDING") },
   };
 }
 

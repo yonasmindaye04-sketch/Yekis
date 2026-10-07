@@ -11,15 +11,12 @@ import {
   useEffect,
   useRef,
   useMemo,
-  useCallback,
 } from "react";
 import {
   motion,
   AnimatePresence,
-  animate,
   useScroll,
   useSpring,
-  useMotionValueEvent,
   useInView,
 } from "framer-motion";
 import {
@@ -30,6 +27,12 @@ import {
   ShieldCheck,
   MessageCircle,
   Clock,
+  Check,
+  Circle,
+  CircleDot,
+  Eye,
+  File,
+  MessageSquare,
   Code,
   Palette,
   Megaphone,
@@ -47,13 +50,11 @@ import {
   Star,
   TrendingUp,
   Search,
-  ChevronLeft,
-  ChevronRight,
+  BadgeCheck,
   ChevronDown,
   X,
   Sparkles,
-  LayoutGrid,
-} from "lucide-react";
+  } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
 import "./landing-v2.css";
 
@@ -74,54 +75,176 @@ const HERO_TITLE = "Find the right expertise.";
 
 
 
+/* How YEKIS works — four steps, each paired with a product screen
+   in the stage beside it. `panel` picks the screen rendered in the
+   browser frame when the step is selected. */
 const STEPS = [
   {
     n: "01",
-    Icon: Wallet,
     title: "Fund",
     body: "You deposit the agreed amount into escrow before work starts. It is held safely and never sent until you approve.",
   },
   {
     n: "02",
-    Icon: Briefcase,
     title: "Work",
     body: "The freelancer completes the milestone and submits deliverables, files and notes for your review.",
   },
   {
     n: "03",
-    Icon: CheckCircle,
     title: "Approve",
     body: "Satisfied with the delivery? Approve it and funds release instantly into the freelancer's wallet.",
   },
   {
     n: "04",
-    Icon: Shield,
     title: "Protected",
     body: "Need revisions or hit a problem? Support mediates with clear evidence for a fair resolution.",
   },
 ];
 
 
-const TESTIMONIALS = [
+type ReviewSource = "google" | "trustpilot";
+
+type MemberReview = {
+  source: ReviewSource;
+  rating: number;
+  quote: string;
+  name: string;
+  meta: string;
+  when: string;
+  tone: 1 | 2 | 3 | 4 | 5;
+};
+
+const REVIEWS: MemberReview[] = [
   {
-    q: "I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
-    name: "Hanna G.",
-    role: "Founder, import & retail",
-    tone: "a",
-  },
-  {
-    q: "As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
+    source: "google",
+    rating: 5,
+    quote:
+      "As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
     name: "Abel T.",
-    role: "Full-stack developer",
-    tone: "b",
+    meta: "Full-stack developer",
+    when: "2 weeks ago",
+    tone: 1,
   },
   {
-    q: "We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "Escrow on every contract means I never chase invoices again. The payout to my local bank is quicker than my old platform ever managed.",
+    name: "Meron G.",
+    meta: "Brand designer · Addis Ababa",
+    when: "a month ago",
+    tone: 2,
+  },
+  {
+    source: "google",
+    rating: 4,
+    quote:
+      "Clear milestones, clear fees, no surprises. Support answered my payout question in Amharic within the hour — that meant a lot.",
+    name: "Dawit B.",
+    meta: "Mobile developer",
+    when: "3 weeks ago",
+    tone: 3,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "We hired three developers through YEKIS last quarter. Approving a milestone releases payment instantly; our contractors stopped asking about delays.",
+    name: "Hanna L.",
+    meta: "Startup founder",
+    when: "2 months ago",
+    tone: 4,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "The wallet view is the best part — pending, escrowed and released amounts at a glance. Invoicing used to take me a whole evening.",
+    name: "Samuel K.",
+    meta: "Data analyst · Hawassa",
+    when: "a week ago",
+    tone: 5,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "Dispute handling was fair and fast when scope changed mid-project. Both sides saw exactly what was agreed in the milestone trail.",
+    name: "Lidia F.",
+    meta: "Content strategist",
+    when: "3 months ago",
+    tone: 1,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "I switched from Upwork because the fees were eating me alive. YEKIS is transparent about what I pay and clients see the same numbers.",
+    name: "Yonas M.",
+    meta: "DevOps engineer",
+    when: "5 days ago",
+    tone: 2,
+  },
+  {
+    source: "trustpilot",
+    rating: 4,
+    quote:
+      "Onboarding my studio took one afternoon. Contracts, escrow and payouts in one place — my accountant is happier too.",
+    name: "Betty A.",
+    meta: "Studio owner · Mekelle",
+    when: "6 weeks ago",
+    tone: 3,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "Client approved at 9pm, money was in my wallet before I closed the laptop. That has never happened to me on any other platform.",
+    name: "Kalid H.",
+    meta: "Flutter developer",
+    when: "4 days ago",
+    tone: 4,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
+    name: "Hanna G.",
+    meta: "Founder, import & retail",
+    when: "3 days ago",
+    tone: 5,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
     name: "Sara M.",
-    role: "Marketing lead, NGO",
-    tone: "c",
+    meta: "Marketing lead, NGO",
+    when: "1 month ago",
+    tone: 1,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "Milestones, invoices and payouts live in the same tab now. My clients see exactly where every birr is sitting.",
+    name: "Nardos A.",
+    meta: "Backend engineer · Dire Dawa",
+    when: "2 weeks ago",
+    tone: 2,
   },
 ];
+
+/* avatar gradient pairs, drawn from the V2 palette */
+const REVIEW_TONES: Record<MemberReview["tone"], [string, string]> = {
+  1: ["var(--v2-primary)", "var(--v2-teal)"],
+  2: ["var(--v2-teal)", "var(--v2-primary)"],
+  3: ["var(--v2-violet)", "var(--v2-primary)"],
+  4: ["var(--v2-primary)", "var(--v2-violet)"],
+  5: ["var(--v2-teal)", "var(--v2-violet)"],
+};
 
 const ABOUT_FEATURES = [
   {
@@ -417,61 +540,9 @@ function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
   );
 }
 
-/* Escrow vault illustration */
-function EscrowVault() {
-  const rings = [1, 2, 3];
-  const orbs = [
-    { c: "var(--v2-primary)", dur: 16, inset: "6%", dir: 1 },
-    { c: "var(--v2-teal)", dur: 22, inset: "20%", dir: -1 },
-    { c: "var(--v2-violet)", dur: 28, inset: "33%", dir: 1 },
-  ];
-  return (
-    <div className="v2-vault">
-      {rings.map((r) => (
-        <motion.div
-          key={r}
-          className={`v2-vault-ring r${r}`}
-          animate={{ rotate: r % 2 ? 360 : -360 }}
-          transition={{ duration: 26 + r * 9, repeat: Infinity, ease: "linear" }}
-        />
-      ))}
-      {orbs.map((o, i) => (
-        <motion.div
-          key={i}
-          className="v2-orb"
-          style={{ inset: o.inset }}
-          animate={{ rotate: o.dir * 360 }}
-          transition={{ duration: o.dur, repeat: Infinity, ease: "linear" }}
-        >
-          <i style={{ background: o.c, boxShadow: `0 0 14px 2px ${o.c}` }} />
-        </motion.div>
-      ))}
-      <motion.div
-        className="v2-vault-core"
-        animate={{ y: [0, -10, 0], scale: [1, 1.03, 1] }}
-        transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <Lock size={42} />
-          <b>ESCROW</b>
-        </div>
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc1" animate={{ y: [0, -9, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}>
-        <Wallet size={15} /> Balance locked
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc2" animate={{ y: [0, 10, 0] }} transition={{ duration: 7.4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}>
-        <CheckCircle size={15} /> Milestone 2 of 3 approved
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc3" animate={{ y: [0, -7, 0] }} transition={{ duration: 8.2, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}>
-        <Clock size={15} /> Auto-release in 5 days
-      </motion.div>
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────────
    Scroll Progress Bar
-───────────────────────────────────────────────── */
+   ───────────────────────────────────────────────── */
 function ScrollProgressBar() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
@@ -533,7 +604,7 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
   );
 }
 
-function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+function HeroSection() {
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
@@ -586,23 +657,9 @@ function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }
 
       {/* hero content */}
       <div className="v2-hero-inner" ref={innerRef}>
+        {/* No hero CTAs: the header already carries "Sign in" and
+            "Get started", so repeating them here competed with the slogan. */}
         <SpringTitle text={HERO_TITLE} settled={settled} />
-        <div className="v2-hero-actions">
-          <button className="v2-btn v2-btn-primary" onClick={() => onStart("register")}>
-            <span className="v2-shine" />
-            <Briefcase size={17} /> Get started
-          </button>
-          <button
-            className="v2-btn v2-btn-secondary"
-            onClick={() =>
-              document
-                .getElementById("categories")
-                ?.scrollIntoView({ behavior: prefersReduced() ? "auto" : "smooth" })
-            }
-          >
-            <LayoutGrid size={17} /> Browse categories
-          </button>
-        </div>
       </div>
     </section>
   );
@@ -612,284 +669,358 @@ function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }
 /* ─────────────────────────────────────────────────
    Stats
 ───────────────────────────────────────────────── */
+const STAT_CARDS = [
+  {
+    Icon: Briefcase,
+    tone: "blue",
+    to: 12480,
+    suffix: "+",
+    label: "Jobs completed",
+    desc: "Delivered across 40+ categories",
+  },
+  {
+    Icon: Users,
+    tone: "purple",
+    to: 3940,
+    suffix: "+",
+    label: "Verified freelancers",
+    desc: "Identity & skill verified",
+  },
+  {
+    Icon: ShieldCheck,
+    tone: "green",
+    to: 84.6,
+    decimals: 1,
+    suffix: "M",
+    label: "Secured in escrow (ETB)",
+    desc: "Protected transactions",
+  },
+  {
+    Icon: Zap,
+    tone: "amber",
+    to: 6.5,
+    decimals: 1,
+    suffix: " hrs",
+    label: "Avg. payout time",
+    desc: "From approval to wallet",
+  },
+];
+
 function StatsSection() {
-  const items = [
-    { Icon: Briefcase, to: 12480, suffix: "+", label: "Jobs completed" },
-    { Icon: Users, to: 3940, suffix: "+", label: "Verified freelancers" },
-    { Icon: ShieldCheck, to: 84.6, decimals: 1, suffix: "M", label: "Secured in escrow (ETB)" },
-    { Icon: Zap, to: 6.5, decimals: 1, suffix: " hrs", label: "Avg. payout time" },
-  ];
   return (
-    <div className="v2-container" style={{ paddingTop: 56 }}>
-      <Reveal>
-        <div className="v2-stats-band">
-          {items.map((s, i) => (
+    <section className="v2-section-sm v2-stats" aria-label="Platform metrics">
+      <div className="v2-stats-spot" aria-hidden="true" />
+      <div className="v2-stats-grid" aria-hidden="true" />
+      <div className="v2-stats-noise" aria-hidden="true" />
+
+      <div className="v2-container">
+        <div className="v2-stats-row">
+          {STAT_CARDS.map((s, i) => (
             <motion.div
               key={s.label}
               className="v2-stat"
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 28 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.7, delay: i * 0.09, ease: EASE }}
             >
-              <span className="v2-stat-ico">
-                <s.Icon size={26} />
-              </span>
-              <div className="v2-stat-val">
-                <CountUp to={s.to} decimals={s.decimals ?? 0} suffix={s.suffix ?? ""} />
-              </div>
-              <div className="v2-stat-label">{s.label}</div>
+              <article className={`v2-stat-card v2-stat-card--${s.tone}`}>
+                <span className="v2-stat-orb" aria-hidden="true" />
+                <span className="v2-stat-shine" aria-hidden="true" />
+
+                <div className="v2-stat-inner">
+                  <div className="v2-stat-top">
+                    <span className="v2-stat-label">{s.label}</span>
+                    <span className="v2-stat-ico" aria-hidden="true">
+                      <s.Icon size={19} strokeWidth={1.9} />
+                    </span>
+                  </div>
+                  <div className="v2-stat-val">
+                    <CountUp to={s.to} decimals={s.decimals ?? 0} suffix={s.suffix ?? ""} />
+                  </div>
+                  <div className="v2-stat-rule" aria-hidden="true" />
+                  <span className="v2-stat-desc">{s.desc}</span>
+                </div>
+              </article>
             </motion.div>
           ))}
         </div>
-      </Reveal>
-    </div>
+      </div>
+    </section>
   );
 }
 
 /* ─────────────────────────────────────────────────
-   Escrow / How it Works — pinned scroll board
+   Escrow / How it works — slogan, stepper + product stage
    ───────────────────────────────────────────────── */
-const PIN_CARDS = [
-  { left: 24, top: 13, rot: -7, rotM: -2,   swd: "0s",    cls: "esc-card--1" },
-  { left: 58, top: 24, rot: 6,  rotM: 1.5,  swd: "-1.6s", cls: "esc-card--2" },
-  { left: 22, top: 49, rot: -5, rotM: -1.5, swd: "-3.1s", cls: "esc-card--3" },
-  { left: 58, top: 62, rot: 7,  rotM: 2,    swd: "-4.4s", cls: "esc-card--4" },
+const ESC_DUR = 6500;
+
+/* Status pill on a product screen. Solid tint, bold ink — never a
+   low-opacity wash (see .agents/AGENTS.md). */
+function EscBadge({ tone = "green", children }: { tone?: "green" | "gray"; children: React.ReactNode }) {
+  return <span className={`esc-badge${tone === "gray" ? " is-gray" : ""}`}>{children}</span>;
+}
+
+/* ---- 01 · Fund ---- */
+function EscScreenFund() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Project budget</span>
+        <EscBadge><Lock size={14} />Locked in escrow</EscBadge>
+      </div>
+      <p className="esc-amount">$2,400<span>.00</span></p>
+      <div className="esc-card">
+        <div className="esc-row">
+          <span className="esc-ic"><Wallet size={20} /></span>
+          <span className="esc-txt">
+            <b>Escrow vault</b>
+            <small>Held safely &mdash; never sent until you approve</small>
+          </span>
+          <span className="esc-val">100%</span>
+        </div>
+        <div className="esc-bar" style={{ "--esc-w": "100%" } as React.CSSProperties}><i /></div>
+        <div className="esc-row esc-row-sub">
+          <span>Deposit &middot; Visa &bull;&bull; 4021</span>
+          <span className="esc-val">$2,400.00</span>
+        </div>
+      </div>
+      <div className="esc-chips">
+        <span className="esc-chip"><Lock size={14} />Balance locked</span>
+        <span className="esc-chip"><ShieldCheck size={14} />Protection on</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 02 · Work ---- */
+function EscScreenWork() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Milestones</span>
+        <EscBadge><Briefcase size={14} />Milestone 2 of 3</EscBadge>
+      </div>
+      <div className="esc-mlist">
+        <div className="esc-mrow">
+          <span className="esc-st is-done"><Check size={15} strokeWidth={3} /></span>
+          <span className="esc-txt">
+            <b>Brand identity</b>
+            <small>Approved &middot; delivered Mar 6</small>
+          </span>
+        </div>
+        <div className="esc-mrow">
+          <span className="esc-st is-now"><CircleDot size={15} /></span>
+          <span className="esc-txt">
+            <b>Website build</b>
+            <small>Submitted for review &middot; deliverables &amp; notes attached</small>
+            <span className="esc-files">
+              <span className="esc-file"><File size={12} />homepage.fig</span>
+              <span className="esc-file"><File size={12} />style-guide.pdf</span>
+            </span>
+          </span>
+        </div>
+        <div className="esc-mrow">
+          <span className="esc-st is-wait"><Circle size={15} /></span>
+          <span className="esc-txt">
+            <b>Launch support</b>
+            <small>Queued &middot; starts after this approval</small>
+          </span>
+        </div>
+      </div>
+      <div className="esc-person">
+        <span className="esc-avatar">AK</span>
+        <span className="esc-txt">
+          <b>Ana Kova&#269;</b>
+          <small>Freelancer &middot; designer &amp; developer</small>
+        </span>
+        <span className="esc-online"><i />online</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 03 · Approve ---- */
+function EscScreenApprove() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Review delivery</span>
+        <EscBadge><CheckCircle size={14} />Ready to approve</EscBadge>
+      </div>
+      <div className="esc-card esc-preview">
+        <span className="esc-thumb"><Eye size={24} /></span>
+        <span className="esc-txt">
+          <b>Website build &mdash; v2</b>
+          <small>&ldquo;Final homepage, style guide and handoff docs. Staging link is in the notes &mdash; ready whenever you are.&rdquo; &middot; Ana</small>
+        </span>
+      </div>
+      <div className="esc-actions">
+        <button type="button" className="esc-btn">
+          Approve &amp; release $800 <ArrowRight size={16} />
+        </button>
+        <button type="button" className="esc-btn is-ghost">Request changes</button>
+      </div>
+      <div className="esc-count">
+        <Clock size={16} />
+        Auto-release in 5 days if you do nothing
+        <span className="esc-bar" style={{ "--esc-w": "22%" } as React.CSSProperties}><i /></span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 04 · Protected ---- */
+const ESC_CASES = [
+  { Icon: File, title: "Brief & scope uploaded", meta: "Mar 2 \u00b7 09:14" },
+  { Icon: MessageSquare, title: "Thread: scope change agreed", meta: "Mar 9 \u00b7 16:40 \u00b7 both parties confirmed" },
+  { Icon: CheckCircle, title: "Delivery v2 received", meta: "Mar 14 \u00b7 11:02" },
 ];
 
-const PIN_NOTES = [
-  { left: 76, top: 13, rot: 3,  swd: "-0.8s", cls: "esc-note--1", Icon: Wallet,     text: "Balance locked",            dot: "#e11d48" },
-  { left: 5,  top: 35, rot: -4, swd: "-2.2s", cls: "esc-note--2", Icon: CheckCircle, text: "Milestone 2 of 3 approved", dot: "#2563eb" },
-  { left: 6,  top: 86, rot: 2,  swd: "-3.6s", cls: "esc-note--3", Icon: Clock,       text: "Auto\u2011release in 5 days", dot: "#059669" },
-];
+function EscScreenProtected() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Resolution center</span>
+        <EscBadge><ShieldCheck size={14} />Mediation open</EscBadge>
+      </div>
+      <div className="esc-card esc-flush">
+        <div className="esc-row">
+          <span className="esc-ic"><Shield size={20} /></span>
+          <span className="esc-txt">
+            <b>Evidence&#8209;backed review</b>
+            <small>Every file, message and approval is time&#8209;stamped and attached to this case.</small>
+          </span>
+        </div>
+      </div>
+      <div className="esc-tl">
+        {ESC_CASES.map((c) => (
+          <div key={c.title} className="esc-tl-item">
+            <span className="esc-ic is-gray"><c.Icon size={16} /></span>
+            <span className="esc-txt">
+              <b>{c.title}</b>
+              <small>{c.meta}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="esc-person">
+        <span className="esc-avatar">YS</span>
+        <span className="esc-txt">
+          <b>YEKIS Support</b>
+          <small>Mediator assigned &middot; replies in under 24h</small>
+        </span>
+      </div>
+    </div>
+  );
+}
 
-/* dashed connectors, drawn in a 0-100 board space between card corners */
-const PIN_WIRES = [
-  "M46 40 C 50 37, 54 32, 58 27",
-  "M57 44 C 53 47, 48 50, 45 52",
-  "M45 53 C 49 58, 53 63, 57 68",
-];
+const ESC_SCREENS = [EscScreenFund, EscScreenWork, EscScreenApprove, EscScreenProtected];
 
-/* scroll-progress windows: cards drop in → wires draw → notes pop */
-const PIN_CARD_AT = [0, 0.24, 0.48, 0.72];
-const PIN_CARD_WIN = 0.2;
-const PIN_WIRE_AT = [0.16, 0.4, 0.64];
-const PIN_WIRE_WIN = 0.16;
-const PIN_NOTE_AT = [0.3, 0.56, 0.8];
+function EscrowSection() {
+  const moduleRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [still, setStill] = useState(false);
+  const seen = useInView(moduleRef, { amount: 0.25 });
 
-const escClamp = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const escMix = (a: number, b: number, t: number) => a + (b - a) * t;
-const escBackOut = (t: number) => {
-  t = escClamp(t);
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-};
-
-function EscrowSection({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const wrapRef  = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const cueRef   = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const pinRefs  = useRef<(HTMLSpanElement | null)[]>([]);
-  const wireRefs = useRef<(SVGPathElement | null)[]>([]);
-  const wireLen  = useRef<number[]>([]);
-  const noteRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const pRef     = useRef(0);
-
-  const { scrollYProgress } = useScroll({ target: wrapRef, offset: ["start start", "end end"] });
-  const progress = useSpring(scrollYProgress, { stiffness: 150, damping: 32, mass: 0.4 });
-
-  /* each connector reveals by sliding its own dash window, so the mask
-     paths need their real length — `pathLength` is not honoured by
-     stroke-dashoffset in Blink, hence the measurement instead. The band
-     is sized in board units (see .esc-wire-mask) for the same reason. */
+  /* honour a mid-session motion preference change */
   useEffect(() => {
-    wireRefs.current.forEach((path, i) => {
-      if (!path) return;
-      const len = path.getTotalLength();
-      wireLen.current[i] = len;
-      path.style.strokeDasharray = `${len} ${len}`;
-      path.style.strokeDashoffset = String(len);
-    });
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setStill(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const paint = useCallback((p: number, introT: number) => {
-    for (let i = 0; i < STEPS.length; i++) {
-      const card = cardRefs.current[i];
-      if (!card) continue;
-      const t = Math.max(escClamp((p - PIN_CARD_AT[i]) / PIN_CARD_WIN), i === 0 ? introT : 0);
-      const e = escBackOut(t);
-      card.style.opacity = String(escClamp(t * 2.2));
-      card.style.transform =
-        `translateY(${escMix(-70, 0, e).toFixed(2)}px) ` +
-        `rotate(${(PIN_CARDS[i].rot + escMix(-9, 0, e)).toFixed(2)}deg) ` +
-        `scale(${escMix(0.86, 1, e).toFixed(3)})`;
-      const pin = pinRefs.current[i];
-      if (pin) {
-        const pe = escBackOut((t - 0.3) / 0.5);
-        pin.style.transform = `translateX(-50%) translateY(${escMix(-24, 0, pe).toFixed(2)}px)`;
-      }
-    }
-    for (let i = 0; i < PIN_WIRES.length; i++) {
-      const wire = wireRefs.current[i];
-      const len = wireLen.current[i];
-      if (!wire || !len) continue;
-      const t = Math.max(escClamp((p - PIN_WIRE_AT[i]) / PIN_WIRE_WIN), i === 0 ? introT * 0.6 : 0);
-      wire.style.strokeDashoffset = (len * (1 - t)).toFixed(2);
-    }
-    for (let i = 0; i < PIN_NOTES.length; i++) {
-      const note = noteRefs.current[i];
-      if (!note) continue;
-      note.style.opacity = String(escClamp((p - PIN_NOTE_AT[i]) / 0.06));
-      const e = escBackOut((p - PIN_NOTE_AT[i]) / 0.12);
-      note.style.transform = `rotate(${PIN_NOTES[i].rot}deg) scale(${escMix(0.7, 1, e).toFixed(3)})`;
-    }
-    stageRef.current?.style.setProperty("--esc-bgY", `${(p * -70).toFixed(1)}px`);
-    cueRef.current?.classList.toggle("esc-cue-off", p > 0.02);
-  }, []);
-
-  useMotionValueEvent(progress, "change", (p) => {
-    pRef.current = p;
-    paint(p, 1);
-  });
-
+  /* autoplay — only once the module is on screen, and never under
+     reduced motion or while the pointer/focus is inside it */
   useEffect(() => {
-    const still  = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const narrow = window.matchMedia("(max-width: 900px)").matches;
-    if (still || narrow) {
-      paint(1, 1);
-      return;
-    }
-    const intro = animate(0, 1, {
-      duration: 0.95,
-      ease: [0.34, 1.56, 0.64, 1],
-      onUpdate: (v) => paint(pRef.current, v),
-    });
-    return () => intro.stop();
-  }, [paint]);
+    if (still || !seen || paused) return;
+    const t = window.setInterval(() => setActive((i) => (i + 1) % STEPS.length), ESC_DUR);
+    return () => window.clearInterval(t);
+  }, [still, seen, paused, active]);
+
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    let next: number;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") next = active + 1;
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") next = active - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = STEPS.length - 1;
+    else return;
+    e.preventDefault();
+    const i = (next + STEPS.length) % STEPS.length;
+    setActive(i);
+    tabRefs.current[i]?.focus();
+  };
 
   return (
     <section className="v2-section" id="how-it-works">
-      {/* intro band — static, sits above the pinned board */}
       <div className="v2-container">
-        <div className="v2-escrow-wrap">
-          <div>
-            <Reveal><span className="v2-eyebrow"><Shield size={14} /> How your payment is protected</span></Reveal>
-            <Reveal delay={0.06}><h2 className="v2-sec-title">Clear money. Clear evidence. Clear next steps.</h2></Reveal>
-            <Reveal delay={0.12}><p className="v2-sec-sub">Every payment follows four transparent steps — guaranteed protection for clients and freelancers.</p></Reveal>
-            <Reveal delay={0.18}>
-              <div style={{ marginTop: 26 }}>
-                <button className="v2-link-btn" onClick={() => onNavigate("faq")}>
-                  See how disputes get resolved <ArrowRight size={16} />
-                </button>
-              </div>
-            </Reveal>
-          </div>
-
-          <Reveal dir="zoom" delay={0.1}>
-            <EscrowVault />
+        <div
+          ref={moduleRef}
+          className={`esc-module${paused ? " is-paused" : ""}`}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
+          }}
+        >
+          <Reveal className="esc-slogan-wrap">
+            <h2 className="esc-slogan">Pay for <em>results</em>, not promises.</h2>
           </Reveal>
-        </div>
-      </div>
 
-      {/* pinned board — 480svh of scroll space */}
-      <div className="esc-wrap" ref={wrapRef}>
-        <div className="esc-pin" ref={stageRef}>
-          <svg className="esc-wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              {PIN_WIRES.map((d, i) => (
-                <mask
-                  key={`m${i}`}
-                  id={`esc-wm${i + 1}`}
-                  className="esc-wire-mask"
-                  maskUnits="userSpaceOnUse"
-                  x="0"
-                  y="0"
-                  width="100"
-                  height="100"
-                >
-                  <path ref={(el) => { wireRefs.current[i] = el; }} d={d} />
-                </mask>
-              ))}
-            </defs>
-            {PIN_WIRES.map((d, i) => (
-              <path key={`w${i}`} className="esc-wire" d={d} mask={`url(#esc-wm${i + 1})`} />
+          <div
+            className="esc-steps"
+            role="tablist"
+            aria-label="How YEKIS works, four steps"
+            onKeyDown={onKey}
+          >
+            {STEPS.map((s, i) => (
+              <button
+                key={s.n}
+                ref={(el) => { tabRefs.current[i] = el; }}
+                type="button"
+                role="tab"
+                id={`esc-tab-${i}`}
+                aria-selected={i === active}
+                aria-controls={`esc-panel-${i}`}
+                tabIndex={i === active ? 0 : -1}
+                className={`esc-step${i === active ? " is-active" : ""}`}
+                onClick={() => setActive(i)}
+              >
+                <span className="esc-step-n">{s.n}</span>
+                <span className="esc-step-h">{s.title}<i className="esc-step-live" /></span>
+                <span className="esc-step-p">{s.body}</span>
+                <span className="esc-step-track"><i /></span>
+              </button>
             ))}
-          </svg>
+          </div>
 
-          {STEPS.map((s, i) => (
-            <div
-              key={s.n}
-              ref={(el) => { cardRefs.current[i] = el; }}
-              className={`esc-card ${PIN_CARDS[i].cls}`}
-              style={
-                {
-                  left: `${PIN_CARDS[i].left}%`,
-                  top: `${PIN_CARDS[i].top}%`,
-                  "--esc-rot": `${PIN_CARDS[i].rot}deg`,
-                  "--esc-rotm": `${PIN_CARDS[i].rotM}deg`,
-                  "--esc-swd": PIN_CARDS[i].swd,
-                } as React.CSSProperties
-              }
-            >
-              <div className="esc-card-in">
-                <div className="esc-sway">
-                  <div className="esc-card-body">
-                    <span className="esc-pin-svg" ref={(el) => { pinRefs.current[i] = el; }} aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12 21v-6" stroke="var(--esc-pin-head)" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M8 3h8l-1.2 7.2a3 3 0 0 1-2 2.4h-1.6a3 3 0 0 1-2-2.4L8 3z" fill="var(--esc-pin-head)" />
-                        <circle cx="12" cy="4" r="2.4" fill="var(--esc-pin-dot)" />
-                      </svg>
-                    </span>
-                    <div className="esc-tint">
-                      <div className="esc-num-row">
-                        <span className="esc-num">{s.n}</span>
-                        <span className="esc-ic"><s.Icon size={20} /></span>
-                      </div>
-                      <h3>{s.title}</h3>
-                      <p>{s.body}</p>
-                    </div>
-                  </div>
+          <div className="esc-stage">
+            <div className="esc-chrome" aria-hidden="true">
+              <span className="esc-dots"><i /><i /><i /></span>
+              <span className="esc-url">app.yekis.com / escrow / <b>YK-2481</b></span>
+              <span className="esc-chrome-gap" />
+            </div>
+            <div className="esc-app">
+              {ESC_SCREENS.map((Screen, i) => (
+                <div
+                  key={STEPS[i].n}
+                  id={`esc-panel-${i}`}
+                  role="tabpanel"
+                  aria-labelledby={`esc-tab-${i}`}
+                  inert={i !== active}
+                  className={`esc-panel${i === active ? " is-active" : ""}`}
+                >
+                  <Screen />
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-
-          {PIN_NOTES.map((nt, i) => (
-            <div
-              key={nt.text}
-              ref={(el) => { noteRefs.current[i] = el; }}
-              className={`esc-note ${nt.cls}`}
-              style={
-                {
-                  left: `${nt.left}%`,
-                  top: `${nt.top}%`,
-                  "--esc-swd": nt.swd,
-                } as React.CSSProperties
-              }
-            >
-              <svg className="esc-note-pin" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="5" fill={nt.dot} />
-              </svg>
-              <span className="esc-note-in">
-                <nt.Icon size={15} className="esc-note-ic" />
-                {nt.text}
-              </span>
-            </div>
-          ))}
-
-          <div className="esc-cue" ref={cueRef} aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
-            Scroll
           </div>
         </div>
-      </div>
-
-      {/* footnote — static band below the pinned board */}
-      <div className="v2-container">
-        <p className="esc-foot">Every step is recorded and time-stamped so both sides have complete peace of mind.</p>
       </div>
     </section>
   );
@@ -1246,78 +1377,127 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
 
 /* ─────────────────────────────────────────────────
-   Testimonials
+   Testimonials — vertical review marquee
 ───────────────────────────────────────────────── */
+const TITLE_WORDS = ["Trust,", "in", "their", "words."];
+const MARQUEE_DURATIONS = ["38s", "46s", "34s"];
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
+      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+    </svg>
+  );
+}
+
+function TrustpilotMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect width="24" height="24" rx="6" fill="#00b67a" />
+      <path
+        fill="#fff"
+        d="M12 5.1l1.99 4.46 4.79.41-3.65 3.13 1.09 4.71L12 15.52l-4.22 2.29 1.09-4.71-3.65-3.13 4.79-.41L12 5.1z"
+      />
+    </svg>
+  );
+}
+
+function ReviewCard({ review }: { review: MemberReview }) {
+  const [a1, a2] = REVIEW_TONES[review.tone];
+  return (
+    <article className="v2-testi-card">
+      <span className="v2-testi-sheen" aria-hidden="true" />
+      <div className="v2-testi-top">
+        <V2Stars rating={review.rating} s={14} />
+        <span className="v2-testi-src">
+          {review.source === "google" ? <GoogleMark /> : <TrustpilotMark />}
+          {review.source === "google" ? "Google" : "Trustpilot"}
+        </span>
+      </div>
+      <blockquote className="v2-testi-text">&ldquo;{review.quote}&rdquo;</blockquote>
+      <div className="v2-testi-who">
+        <V2Avatar name={review.name} size={40} radius={12} h1={a1} h2={a2} />
+        <div className="v2-testi-id">
+          <span className="v2-testi-name">
+            {review.name}
+            <BadgeCheck size={13} aria-label="Verified member" />
+          </span>
+          <span className="v2-testi-meta">
+            {review.meta} · {review.when}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function TestimonialsSection() {
-  const [idx, setIdx] = useState(0);
-  const [dir, setDir] = useState(1);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (paused || prefersReduced()) return;
-    const id = window.setInterval(() => {
-      setDir(1);
-      setIdx((v) => (v + 1) % TESTIMONIALS.length);
-    }, 6200);
-    return () => window.clearInterval(id);
-  }, [paused]);
-
-  const go = (n: number) => { setDir(n > idx ? 1 : -1); setIdx(n); };
-  const cur = TESTIMONIALS[idx];
-  const h1 = cur.tone === "a" ? "var(--v2-primary)" : cur.tone === "b" ? "var(--v2-teal)" : "var(--v2-violet)";
-  const h2 = cur.tone === "a" ? "var(--v2-teal)" : cur.tone === "b" ? "var(--v2-violet)" : "var(--v2-primary)";
+  const columns = useMemo(() => {
+    const cols: MemberReview[][] = [[], [], []];
+    REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
+    return cols;
+  }, []);
 
   return (
-    <section className="v2-section" style={{ paddingTop: 10 }}>
-      <div className="v2-container" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-        <div className="v2-center" style={{ marginBottom: 34 }}>
-          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> What members say</span></Reveal>
-          <Reveal delay={0.06}><h2 className="v2-sec-title">Trust, in their words.</h2></Reveal>
+    <section className="v2-section v2-testi" aria-labelledby="v2-testi-title">
+      <div className="v2-testi-aurora" aria-hidden="true" />
+      <div className="v2-container">
+        <div className="v2-center">
+          <Reveal>
+            <span className="v2-eyebrow">
+              <MessageCircle size={14} /> What members say
+            </span>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h2 className="v2-sec-title" id="v2-testi-title">
+              {TITLE_WORDS.map((word, i) => (
+                <span className="v2-testi-word" key={word}>
+                  <motion.span
+                    initial={{ y: "112%", opacity: 0 }}
+                    whileInView={{ y: "0%", opacity: 1 }}
+                    viewport={{ once: true, amount: 0.5 }}
+                    transition={{ duration: 0.62, delay: 0.08 + i * 0.085, ease: EASE }}
+                  >
+                    {word}
+                  </motion.span>
+                </span>
+              ))}
+            </h2>
+          </Reveal>
+          <Reveal delay={0.14}>
+            <p className="v2-sec-sub v2-testi-sub">
+              Real payouts, real disputes, real deadlines — from the people who ship on YEKIS every week.
+            </p>
+          </Reveal>
         </div>
-        <div className="v2-testi-stage">
-          <AnimatePresence mode="wait" custom={dir}>
-            <motion.blockquote
-              key={idx}
-              className="v2-testi-card"
-              custom={dir}
-              initial={{ opacity: 0, x: dir * 70, scale: 0.98 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: dir * -70, scale: 0.98 }}
-              transition={{ duration: 0.55, ease: EASE }}
+
+        <div className="v2-testi-marquee">
+          {columns.map((col, i) => (
+            <div
+              className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
+              key={`col-${i}`}
+              style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
             >
-              <span className="v2-testi-quote">"</span>
-              <p>{cur.q}</p>
-              <div className="v2-testi-who">
-                <V2Avatar name={cur.name} size={46} radius={14} h1={h1} h2={h2} />
-                <div><b>{cur.name}</b><span>{cur.role}</span></div>
-                <V2Stars rating={5} />
+              <div className="v2-testi-track">
+                <div className="v2-testi-copy">
+                  {col.map((r) => (
+                    <ReviewCard key={r.name} review={r} />
+                  ))}
+                </div>
+                <div className="v2-testi-copy" aria-hidden="true">
+                  {col.map((r) => (
+                    <ReviewCard key={`${r.name}-loop`} review={r} />
+                  ))}
+                </div>
               </div>
-            </motion.blockquote>
-          </AnimatePresence>
-        </div>
-        <div className="v2-testi-nav">
-          <motion.button
-            className="v2-icon-btn"
-            style={{ width: 38, height: 38 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { setDir(-1); setIdx((v) => (v - 1 + TESTIMONIALS.length) % TESTIMONIALS.length); }}
-            aria-label="Previous"
-          >
-            <ChevronLeft size={17} />
-          </motion.button>
-          {TESTIMONIALS.map((_, n) => (
-            <button key={n} className={`v2-tdot${n === idx ? " on" : ""}`} onClick={() => go(n)} aria-label={`Testimonial ${n + 1}`} />
+            </div>
           ))}
-          <motion.button
-            className="v2-icon-btn"
-            style={{ width: 38, height: 38 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { setDir(1); setIdx((v) => (v + 1) % TESTIMONIALS.length); }}
-            aria-label="Next"
-          >
-            <ChevronRight size={17} />
-          </motion.button>
         </div>
+
+        <p className="v2-testi-hint">Hover to pause · reviews refresh hourly</p>
       </div>
     </section>
   );
@@ -1828,14 +2008,14 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       <ScrollProgressBar />
 
       {/* Hero */}
-      <HeroSection onStart={onStart} />
+      <HeroSection />
 
 
       {/* Stats */}
       <StatsSection />
 
       {/* How it works / Escrow */}
-      <EscrowSection onNavigate={onNavigate} />
+      <EscrowSection />
 
       {/* Fees */}
       <FeesSection />

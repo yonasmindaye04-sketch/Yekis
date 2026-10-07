@@ -11,6 +11,7 @@ import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
+import { PaymentProviderUnavailableError } from "../escrow/providers/paymentProvider.interface.js";
 import {
   submitTopUp,
   getTopUpQueue,
@@ -116,6 +117,9 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
     });
     return res.json(result);
   } catch (err) {
+    if (err instanceof PaymentProviderUnavailableError) {
+      return res.status(503).json({ error: err.code, message: err.message });
+    }
     logger.error({ err }, "Top-up checkout initiation failed");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }

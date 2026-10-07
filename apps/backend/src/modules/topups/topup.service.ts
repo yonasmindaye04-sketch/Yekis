@@ -511,10 +511,11 @@ export async function handleTopUpWebhook(params: {
   }
 
   if (params.status === "FAILED") {
-    await prisma.walletTopUp.update({
-      where: { id: topUp.id },
+    const rejected = await prisma.walletTopUp.updateMany({
+      where: { id: topUp.id, status: "CHECKOUT_PENDING" },
       data: { status: "REJECTED", rejectionReason: "Payment failed at provider" },
     });
+    if (rejected.count === 0) return;
 
     await recordAuditEvent({
       userId: topUp.userId,
@@ -532,17 +533,22 @@ export async function handleTopUpWebhook(params: {
     return;
   }
 
-  // SUCCESS — atomically credit the wallet
-  await prisma.$transaction([
-    prisma.walletTopUp.update({
-      where: { id: topUp.id },
+  // SUCCESS — atomically claim the pending top-up and credit exactly once.
+  // Duplicate callbacks can arrive concurrently; the status predicate makes
+  // only one delivery the winner.
+  const credited = await prisma.$transaction(async (tx) => {
+    const claim = await tx.walletTopUp.updateMany({
+      where: { id: topUp.id, status: "CHECKOUT_PENDING" },
       data: { status: "APPROVED", reviewedAt: new Date() },
-    }),
-    prisma.wallet.update({
+    });
+    if (claim.count === 0) return false;
+    await tx.wallet.update({
       where: { id: topUp.walletId },
       data: { balanceMinor: { increment: topUp.amountMinor } },
-    }),
-  ]);
+    });
+    return true;
+  });
+  if (!credited) return;
 
   await recordAuditEvent({
     userId: topUp.userId,

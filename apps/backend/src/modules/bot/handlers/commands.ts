@@ -22,6 +22,8 @@ import {
   safeUrlKeyboard,
 } from "../utils/deepLink.js";
 import {
+  approveWebLogin,
+  denyWebLogin,
   issueTelegramLoginCode,
   TELEGRAM_CODE_TTL_SECONDS,
 } from "../../auth/telegram-code.service.js";

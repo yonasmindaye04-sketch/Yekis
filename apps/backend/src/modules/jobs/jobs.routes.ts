@@ -190,6 +190,14 @@ jobsRouter.post(
       }
 
       const jobId = req.params.jobId as string;
+      const job = await prisma.job.findUnique({
+        where: { id: jobId },
+        select: { id: true, status: true },
+      });
+      if (!job || job.status !== "OPEN") {
+        return res.status(404).json({ error: "JOB_NOT_FOUND" });
+      }
+
       const path = await uploadProposalAttachment({
         jobId,
         userId: req.user!.id,

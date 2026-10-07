@@ -74,6 +74,21 @@ export async function getUserSummary(userId: string) {
     },
   });
   if (!user) return null;
+  const [recentConversations, recentAudit] = await Promise.all([
+    prisma.conversation.findMany({
+      where: { creatorId: userId },
+      orderBy: { updatedAt: "desc" },
+      take: 8,
+      select: { id: true, subject: true, status: true, updatedAt: true },
+    }),
+    prisma.auditLog.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      select: { id: true, eventType: true, entityType: true, entityId: true, createdAt: true, actorRole: true },
+    }),
+  ]);
+
   return {
     user: {
       id: user.id,
@@ -106,6 +121,8 @@ export async function getUserSummary(userId: string) {
       gigsOwned: user._count.gigsOwned,
       gigOrders: user._count.gigOrders,
     },
+    recentConversations,
+    recentAudit,
   };
 }
 
