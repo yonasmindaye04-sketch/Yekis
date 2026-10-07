@@ -358,6 +358,43 @@ export const ArbitrationAwardInput = z
   });
 export type ArbitrationAwardInput = z.infer<typeof ArbitrationAwardInput>;
 
+// ---------- Portfolio ----------
+//
+// F-17: both schemas are `.strict()`. The routes used to pass the raw request
+// body straight into Prisma, which meant a caller could set `userId` (reassign
+// their own item to another account), `id`, `createdAt` or `updatedAt`. Unknown
+// keys are now rejected outright rather than silently stripped, so a client
+// sending a stale field gets told instead of getting a surprise.
+//
+// Lengths mirror the Prisma column widths (portfolio.prisma:815-818) so a value
+// that would be truncated by Postgres is rejected at the edge instead.
+
+const PortfolioUrl = z.string().url().max(500);
+
+/** Fields a client may set when creating a portfolio item. */
+export const CreatePortfolioItemInput = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(2000).optional(),
+    thumbnailUrl: PortfolioUrl.optional(),
+    projectUrl: PortfolioUrl.optional(),
+    displayOrder: z.number().int().optional(),
+  })
+  .strict();
+export type CreatePortfolioItemInput = z.infer<typeof CreatePortfolioItemInput>;
+
+/** Fields a client may change on an existing item. All optional; unknown keys rejected. */
+export const UpdatePortfolioItemInput = z
+  .object({
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).optional(),
+    thumbnailUrl: PortfolioUrl.optional(),
+    projectUrl: PortfolioUrl.optional(),
+    displayOrder: z.number().int().optional(),
+  })
+  .strict();
+export type UpdatePortfolioItemInput = z.infer<typeof UpdatePortfolioItemInput>;
+
 // ---------- Gigs (Fiverr-style service packages) ----------
 // See docs/GIG_MODEL_PLAN.md. Amounts are integer minor units (ETB cents).
 
