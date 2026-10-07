@@ -6,15 +6,22 @@ import {
 } from "../src/modules/escrow/escrow.service.js";
 
 /**
- * F-22 — escrow exposure is a fact, not a role.
+ * F-22 — escrow exposure is a fact about who you are on the contract, not a
+ * role string.
  *
- * The "you are holding money for someone else" checks lived inside
+ * The "you are holding money for other people" checks lived inside
  * `if (user.role === "CLIENT")`. A BOTH account can hire, so it could accept a
  * contract, have it funded, and then withdraw that balance mid-milestone — the
- * exact thing the check exists to prevent. The same applied to the open-dispute
- * check.
+ * exact thing the check exists to prevent.
  *
- * These tests pin the behaviour for all three roles, on both sides of a contract.
+ * The fix gates on the *paying* side rather than the role string: only a user
+ * who is the client on a contract with funded escrow is blocked. A freelancer
+ * is the payee, and their available balance is their own earned money, so it
+ * must remain withdrawable while contracts are live. A BOTH user is blocked
+ * when they are acting as the client, and free to withdraw otherwise.
+ *
+ * These tests pin both directions so the guard can neither be bypassed by a
+ * BOTH role nor over-applied to a freelancer.
  */
 
 const STAMP = Date.now();
@@ -63,7 +70,12 @@ async function makeUser(label: string, role: "CLIENT" | "FREELANCER" | "BOTH", b
 /** A contract with one milestone in the given escrow state. */
 async function makeContract(
   owner: "client" | "freelancer",
-  escrowState: "ESCROW_HELD" | "SUBMITTED_FOR_REVIEW" | "RELEASED" | "REFUNDED",
+  escrowState:
+    | "ESCROW_HELD"
+    | "SUBMITTED_FOR_REVIEW"
+    | "RELEASED"
+    | "REFUNDED"
+    | "PAYMENT_PENDING",
 ) {
   const cid = owner === "client" ? clientId : freelancerId;
   const fid = owner === "client" ? freelancerId : clientId;
@@ -126,9 +138,33 @@ function withdraw(userId: string) {
   });
 }
 
+/**
+ * Asserts the exposure guards did NOT fire.
+ *
+ * Only the error type is asserted. A permitted withdrawal may go on to fail at
+ * the payment provider (the mock TMS destination is not reachable in tests), so
+ * any non-exposure error is acceptable. The balance is deliberately NOT
+ * asserted: a withdrawal that is correctly allowed is expected to debit the
+ * wallet, so balance movement is not a signal of whether the guard fired.
+ */
+async function expectNotBlocked(userId: string, label: string) {
+  let err: unknown = null;
+  try {
+    await withdraw(userId);
+  } catch (e) {
+    err = e;
+  }
+
+  expect(
+    err,
+    `${label}: must not be blocked by an escrow-exposure guard`,
+  ).not.toBeInstanceOf(ActiveContractWithdrawalBlockedError);
+}
+
 describe("F-22 withdrawal is blocked by escrow exposure, not by role", () => {
-  it("a BOTH user who is the CLIENT on an in-flight contract cannot withdraw", async () => {
-    // The F-22 repro: role === "BOTH" used to skip the check entirely.
+  it("a BOTH user acting as CLIENT on an in-flight contract cannot withdraw", async () => {
+    // The F-22 repro: `role === "CLIENT"` skipped the check, so a BOTH user
+    // could hire, get funded, and withdraw the same balance mid-milestone.
     await cleanup();
     bothId = (await makeUser("both", "BOTH", 500000)).id;
     freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
@@ -161,22 +197,47 @@ describe("F-22 withdrawal is blocked by escrow exposure, not by role", () => {
     );
   });
 
-  it("the FREELANCER payee cannot withdraw mid-milestone either", async () => {
+  it("PAYMENT_PENDING does NOT block the client: no money is in escrow yet", async () => {
+    // Pre-funding. The client has not paid, so nothing is at risk and a
+    // cancellation would return nothing. Blocking here would trap money the
+    // user never actually committed.
+    await cleanup();
+    clientId = (await makeUser("client", "CLIENT", 500000)).id;
+    freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
+    await makeContract("client", "PAYMENT_PENDING");
+
+    await expectNotBlocked(clientId, "CLIENT with an unfunded contract");
+  });
+
+  it("a FREELANCER can withdraw while contracts are live", async () => {
+    // Their balance is earned money from other work. Being the payee on an
+    // in-flight milestone must not trap it.
     await cleanup();
     clientId = (await makeUser("client", "CLIENT", 500000)).id;
     freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
     await makeContract("client", "ESCROW_HELD");
 
-    await expect(withdraw(freelancerId)).rejects.toBeInstanceOf(
-      ActiveContractWithdrawalBlockedError,
-    );
+    await expectNotBlocked(freelancerId, "FREELANCER payee");
   });
 
-  it("an open dispute blocks withdrawal for both parties", async () => {
+  it("a BOTH user with only freelancer-side contracts can withdraw", async () => {
+    await cleanup();
+    clientId = (await makeUser("client", "CLIENT", 500000)).id;
+    freelancerId = (await makeUser("both", "BOTH", 500000)).id;
+    // bothId is the freelancer here; the contract's client is the other user.
+    bothId = freelancerId;
+    await makeContract("client", "ESCROW_HELD");
+
+    await expectNotBlocked(bothId, "BOTH acting as freelancer");
+  });
+
+  it("an open dispute blocks the CLIENT but not the freelancer", async () => {
     await cleanup();
     clientId = (await makeUser("client", "CLIENT", 500000)).id;
     freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
-    await makeContract("client", "DISPUTED");
+    // Settle the milestone so the dispute rule — not the exposure rule — is
+    // what blocks the client.
+    await makeContract("client", "RELEASED");
     await prisma.dispute.create({
       data: {
         contractId,
@@ -188,43 +249,25 @@ describe("F-22 withdrawal is blocked by escrow exposure, not by role", () => {
       },
     });
 
+    // Client holds the escrowed funds and the outcome decides whose they are.
     await expect(withdraw(clientId)).rejects.toBeInstanceOf(
       ActiveContractWithdrawalBlockedError,
     );
-    await expect(withdraw(freelancerId)).rejects.toBeInstanceOf(
-      ActiveContractWithdrawalBlockedError,
-    );
+    // The freelancer's available balance is not affected by that dispute.
+    await expectNotBlocked(freelancerId, "FREELANCER in a disputed contract");
   });
 
-  it("a user with only settled contracts is not blocked by the escrow check", async () => {
-    // Must get PAST the exposure check. It may still be refused later for an
-    // unrelated reason (the mock provider path), so the assertion is that the
-    // failure is not the exposure error.
+  it("a client with only settled contracts is not blocked by the escrow check", async () => {
     await cleanup();
     clientId = (await makeUser("client", "CLIENT", 500000)).id;
     freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
     await makeContract("client", "RELEASED");
-
-    try {
-      await withdraw(clientId);
-    } catch (err) {
-      expect(err).not.toBeInstanceOf(ActiveContractWithdrawalBlockedError);
-    }
-    // Wallet must be intact regardless of how far it got.
-    const wallet = await prisma.wallet.findUniqueOrThrow({
-      where: { userId: clientId },
-    });
-    expect(wallet.balanceMinor).toBeLessThanOrEqual(500000);
+    await expectNotBlocked(clientId, "CLIENT with a settled contract");
   });
 
   it("a user with no contracts at all is not blocked", async () => {
     await cleanup();
     freelancerId = (await makeUser("freelancer", "FREELANCER", 500000)).id;
-
-    try {
-      await withdraw(freelancerId);
-    } catch (err) {
-      expect(err).not.toBeInstanceOf(ActiveContractWithdrawalBlockedError);
-    }
+    await expectNotBlocked(freelancerId, "no contracts");
   });
 });

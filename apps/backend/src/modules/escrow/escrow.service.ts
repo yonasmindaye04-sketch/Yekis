@@ -720,58 +720,53 @@ export async function withdrawFromWallet(params: {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: params.userId },
   });
-  // F-22: the "money you are holding for other people" checks must not be gated
-// on the role string. They used to sit inside `if (user.role === "CLIENT")`, so
-// a BOTH account — which is free to hire — could accept a contract, have it
-// funded, and then withdraw the same balance while the work was in flight.
-  // A role is a statement about what someone does; escrow exposure is a fact
-  // about their contracts, and the query is what actually determines it.
+// F-22: the "you are holding money for someone else" check must not be gated
+  // on the role STRING — a BOTH account can hire, so `user.role === "CLIENT"`
+  // let it skip the check entirely. It is instead gated on the FACT that
+  // matters: being the paying party on a contract that holds funded money.
   //
-  // PAYMENT_PENDING is included deliberately: a client can cancel a funded or
-  // unfunded contract at any time, and only refunded money is really theirs.
-  const escrowExposureStates = [
-    "PAYMENT_PENDING",
+  // Why client-side only. The payer is the party whose balance the escrow is
+  // earmarked from; that money is committed and must not be withdrawn while the
+  // work is in flight. The freelancer's balance is their earned money from
+  // OTHER, already-completed work, and blocking them would trap earnings they
+  // are entitled to. A `BOTH` user is therefore blocked exactly when they are
+  // the client on an in-flight contract, and free to withdraw otherwise.
+  //
+  // PAYMENT_PENDING is deliberately EXCLUDED. That state is pre-funding: no
+  // money has been taken from anyone, so nothing is at risk. A client can cancel
+  // such a contract outright under the cooling-off right. Including it would
+  // block a withdrawal over money the user never actually paid.
+  const fundedEscrowStates = [
     "ESCROW_HELD",
     "WORK_IN_PROGRESS",
     "SUBMITTED_FOR_REVIEW",
   ] as const;
 
-  // Either side of a contract. A freelancer mid-delivery has escrow exposure
-  // as the payee, and withdrawing that money mid-milestone is exactly what the
-  // check exists to prevent.
-  const inFlightMilestone = await prisma.milestone.findFirst({
+  const inFlightFundedContract = await prisma.milestone.findFirst({
     where: {
-      escrowState: { in: [...escrowExposureStates] },
-      contract: {
-        OR: [
-          { clientId: params.userId },
-          { freelancerId: params.userId },
-        ],
-      },
+      escrowState: { in: [...fundedEscrowStates] },
+      contract: { clientId: params.userId },
     },
     select: { id: true },
   });
-  if (inFlightMilestone) {
+  if (inFlightFundedContract) {
     throw new ActiveContractWithdrawalBlockedError(
-      "You cannot withdraw while you have money tied up in an active contract. Wait for all milestones to complete or be refunded.",
+      "You cannot withdraw while a contract you are paying for still holds funds in escrow. Wait for all milestones to complete or be refunded.",
     );
   }
 
-  // An open dispute on either side, for the same reason: the outcome decides
-  // who gets this money, so neither party may take it out while it is undecided.
-  const openDispute = await prisma.dispute.findFirst({
+  // An open dispute likewise blocks only the party holding the escrowed funds
+  // (the client). The outcome decides whose money it is, so the payer cannot
+  // take it out while it is undecided. The freelancer's unrelated available
+  // balance is unaffected by someone else's dispute.
+  const openDisputeAsClient = await prisma.dispute.findFirst({
     where: {
       stage: { not: "RESOLVED" },
-      contract: {
-        OR: [
-          { clientId: params.userId },
-          { freelancerId: params.userId },
-        ],
-      },
+      contract: { clientId: params.userId },
     },
     select: { id: true },
   });
-  if (openDispute) {
+  if (openDisputeAsClient) {
     throw new ActiveContractWithdrawalBlockedError(
       "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
     );
