@@ -177,7 +177,7 @@ export async function sendPasswordResetEmail(
             <p style="font-size: 13px; color: #64748b;">This link and token will expire in 1 hour. If you did not make this request, you can safely ignore this email.</p>
           </div>
           <div class="footer">
-            © ${new Date().getFullYear()} Yekis Jobs • Ethiopia's Escrow-Protected Marketplace
+            © ${new Date().getFullYear()} Yekis Jobs • Ethiopia's freelance marketplace
           </div>
         </div>
       </body>
@@ -234,12 +234,12 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
         <div class="container">
           <div class="header">
             <span class="logo">Yekis</span>
-            <span class="badge">Escrow Receipt</span>
+            <span class="badge">Payment Receipt</span>
           </div>
           <div class="content">
             <h2 style="margin-top:0;">Payment Confirmation & Receipt</h2>
             <p>Hello ${recipient},</p>
-            <p>This email confirms that payment has been successfully secured in Yekis Escrow for the milestone delivery below:</p>
+            <p>This email confirms that Yekis is holding your payment for the milestone below, pending your approval:</p>
 
             <div class="meta-grid">
               <div class="meta-item">
@@ -276,14 +276,14 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
                   <td style="text-align: right; font-weight: 600;">ETB ${formattedAmount}</td>
                 </tr>
                 <tr class="total-row">
-                  <td>Total Escrow Protected</td>
+                  <td>Total held</td>
                   <td style="text-align: right;">ETB ${formattedAmount}</td>
                 </tr>
               </tbody>
             </table>
 
             <div class="escrow-callout">
-              🔒 <strong>Escrow Protection Active:</strong> These funds are locked securely in Yekis Escrow. They will only be released to the freelancer once the client reviews and approves the delivered work.
+              🔒 <strong>Funds held pending your approval:</strong> Yekis holds this amount until the work is delivered, and releases it only once the client reviews and approves the delivered work.
             </div>
           </div>
           <div class="footer">

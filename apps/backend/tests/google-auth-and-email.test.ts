@@ -53,7 +53,11 @@ describe("Transactional Email Service", () => {
     expect(lastEmail.subject).toContain("Receipt: Escrow Payment");
     expect(lastEmail.html).toContain("INV-2026-9901");
     expect(lastEmail.html).toContain("15,000");
-    expect(lastEmail.html).toContain("Escrow Protection Active");
+    // COPY: the receipt must not claim an escrow guarantee the platform does
+    // not yet have (the segregated NBE escrow account is still a Tier 3
+    // blocker). It states what actually happens instead.
+    expect(lastEmail.html).toContain("Funds held pending your approval");
+    expect(lastEmail.html).not.toContain("Escrow Protection Active");
   });
 
   it("dispatches platform movement alert email", async () => {

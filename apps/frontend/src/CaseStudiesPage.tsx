@@ -15,7 +15,7 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
         <section className="content-section">
           <h1>Real projects. Real results.</h1>
           <p className="hero-subtitle">
-            Case studies from verified, escrow-protected projects on Yekis.
+            Case studies from verified projects on Yekis.
           </p>
 
           <div className="case-study-grid" style={{ marginTop: "40px" }}>
@@ -40,7 +40,7 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
                   }}
                 >
                   Outcome summary placeholder. This is where the story of
-                  successful escrow-protected work will go.
+                  successful completed work will go.
                 </p>
                 <div
                   style={{

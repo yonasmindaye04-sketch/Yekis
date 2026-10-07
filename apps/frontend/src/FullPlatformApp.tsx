@@ -357,7 +357,7 @@ function AuthVisualAnimation() {
       <div className="auth-vis-trust">
         <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Escrow protected</span>
+          <span>Held until you approve</span>
         </div>
         <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -919,7 +919,7 @@ export function FullPlatformApp() {
 
     // Update document title per marketing page (Item 20: unique page titles)
     const pageTitles: Record<MarketingPage, string> = {
-      home: "Yekis — Ethiopia's Escrow-Protected Freelance Marketplace",
+      home: "Yekis — Ethiopia's Freelance Marketplace with milestone payments held until approval",
       faq: "FAQ — Yekis",
       fees: "Pricing & Fees — Yekis",
       privacy: "Privacy Policy — Yekis",
@@ -1604,7 +1604,7 @@ export function FullPlatformApp() {
                     Welcome to <strong>Yekis Jobs</strong>. By creating an account or using the platform, you agree to these fundamental marketplace standards:
                   </p>
                   <div>
-                    <strong style={{ color: "var(--color-text)" }}>1. Escrow Protection</strong>
+                    <strong style={{ color: "var(--color-text)" }}>1. Milestone payments</strong>
                     <p style={{ margin: "2px 0 0" }}>Clients deposit milestone funds into secure escrow before work begins. Funds are disbursed upon milestone approval.</p>
                   </div>
                   <div>

@@ -254,7 +254,7 @@ const ABOUT_FEATURES = [
   },
   {
     n: "02",
-    title: "Milestone escrow protection",
+    title: "Milestone payments",
     body: "Funds stay locked in escrow and only release when you inspect and approve each delivered milestone.",
   },
 ];
@@ -1514,7 +1514,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
           <div className="v2-about-panel">
             {/* Left: copy + highlights */}
             <div className="v2-about-content">
-              <span className="v2-about-eyebrow">Ethiopia's escrow-protected marketplace</span>
+              <span className="v2-about-eyebrow">Ethiopia's freelance marketplace</span>
 
               <h2 className="v2-about-title" id="v2-about-title">
                 Great work deserves
@@ -1725,7 +1725,7 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
         </p>
         <h2 id="ready-heading">Put your next project in motion.</h2>
         <p>
-          Post a job or join as a freelancer with full escrow protection from
+          Post a job or join as a freelancer with payment held until you approve the work, from
           start to finish.
         </p>
         <div className="v2-outro-actions">
@@ -1984,7 +1984,7 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
             url: "https://yekis.com",
             logo: "https://yekis.com/svgviewer-output.svg",
             description:
-              "Ethiopia's escrow-protected freelance marketplace. Post work, pay into escrow, get your result or your money back.",
+              "Ethiopia's freelance marketplace. Post work, pay on delivery, approve the result and release payment.",
             sameAs: ["https://t.me/yekis_channel", "https://t.me/yekis_group"],
             contactPoint: {
               "@type": "ContactPoint",
