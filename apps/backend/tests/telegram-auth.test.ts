@@ -394,7 +394,11 @@ describe("bot-side provisioning (legacy, pending removal)", () => {
     expect(user.passwordSetAt).toBeNull();
     expect(user.phone).toMatch(/^\+2510\d{6}$/);
     expect(user.kyc?.tier).toBe("TIER_1");
-    expect(user.kyc?.status).toBe("VERIFIED");
+    // F-02: provisioning from a Telegram identity is not verification. This
+    // used to assert VERIFIED, which is the whole defect — it meant every
+    // requireKycVerified gate passed for a bot signup with no document.
+    expect(user.kyc?.status).toBe("PENDING");
+    expect(user.kyc?.highestVerifiedTier ?? null).toBeNull();
   });
 
   it("does not downgrade on a repeat visit", async () => {

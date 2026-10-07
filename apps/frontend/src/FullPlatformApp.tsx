@@ -397,6 +397,10 @@ export function FullPlatformApp() {
   const [legalModal, setLegalModal] = useState<"terms" | "privacy" | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
+  // F-02: the job-post form renders its own error so a KYC refusal is visible
+  // and actionable, instead of vanishing.
+  const [jobError, setJobError] = useState("");
+  const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
@@ -717,8 +721,19 @@ export function FullPlatformApp() {
       setJobBudgetMax("");
       setJobDeadline("");
       await loadWorkspace();
+      setJobError("");
+      setJobErrorNextAction(null);
       setView("jobs");
     } catch (err) {
+      // F-02: this form had no error surface at all — a KYC 403 was silently
+      // discarded and the user saw nothing after tapping Publish.
+      const withAction = err as Error & { nextAction?: { type: string; path: string } };
+      setJobError(
+        withAction instanceof Error ? withAction.message : "Unable to publish job",
+      );
+      setJobErrorNextAction(
+        withAction?.nextAction?.type === "KYC" ? "verification" : null,
+      );
       setError(err instanceof Error ? err.message : "Unable to publish job");
     } finally {
       setIsLoading(false);
@@ -2358,6 +2373,23 @@ export function FullPlatformApp() {
                     />
                   </label>
                 </div>
+                {jobError && (
+                  <div className="form-error" style={{ marginTop: 14 }}>
+                    {jobError}
+                    {/* F-02: the KYC gate returns nextAction; offer the step
+                        instead of leaving the user at a dead end. */}
+                    {jobErrorNextAction === "verification" && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ marginTop: 10 }}
+                        onClick={() => setView("verification")}
+                      >
+                        Verify your identity
+                      </button>
+                    )}
+                  </div>
+                )}
                 <button
                   className="btn-primary"
                   style={{ marginTop: 18, width: "fit-content" }}

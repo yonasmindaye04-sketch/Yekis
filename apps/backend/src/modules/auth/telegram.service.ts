@@ -234,7 +234,12 @@ export async function resolveOrProvisionTelegramUser(
         languagePreference: profile.languagePreference,
         telegramUserId: telegram.id,
         telegramChatId: chatId,
-        kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+        // F-02: a federated account is NOT a verified account. This used to be
+        // created VERIFIED with no document ever uploaded, which satisfied
+        // requireKycVerified for the highest-volume sign-up path. New
+        // federated users verify like anyone else: submit a document, and the
+        // same Fayda/manual review flow applies.
+        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
         wallet: { create: { balanceMinor: 0 } },
         consents: {
           create: [
@@ -305,7 +310,8 @@ export async function registerTelegramUser(telegram: TgUser, role: string) {
         languagePreference: profile.languagePreference,
         telegramUserId: telegram.id,
         telegramChatId: telegramChatId(telegram.id),
-        kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+        // F-02: see the note at the other create site — PENDING, not VERIFIED.
+        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
         wallet: { create: { balanceMinor: 0 } },
         consents: {
           create: [

@@ -63,7 +63,10 @@ describe("Telegram bot-to-web sign-in codes", () => {
     expect(user.phone).toMatch(/^\+2510\d{6}$/);
     // The KYC relation must be returned so the bot can seed its session.
     expect(user.kyc?.tier).toBe("TIER_1");
-    expect(user.kyc?.status).toBe("VERIFIED");
+    // F-02: a bot-delivered identity is not a verified identity. Previously
+    // asserted VERIFIED, which let a Telegram signup satisfy every
+    // requireKycVerified gate without submitting a document.
+    expect(user.kyc?.status).toBe("PENDING");
   });
 
   it("resolves to the same account when the member returns", async () => {

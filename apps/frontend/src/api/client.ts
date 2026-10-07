@@ -584,14 +584,28 @@ class ApiClient {
       if (response.status === 429) {
         throw new Error("Too many requests. Please wait a moment before trying again.");
       }
-      let error: { message?: string; error?: string };
+      let error: {
+        message?: string;
+        error?: string;
+        // F-02: the KYC gate returns a machine-readable next step so the UI can
+        // offer "Verify your identity" instead of rendering a dead end.
+        nextAction?: { type: string; path: string };
+      };
       try {
         error = await response.json();
       } catch {
         const text = await response.text().catch(() => "");
         error = { error: text || `HTTP ${response.status}` };
       }
-      throw new Error(error.message || error.error || `HTTP ${response.status}`);
+      const thrown = new Error(
+        error.message || error.error || `HTTP ${response.status}`,
+      ) as Error & {
+        code?: string;
+        nextAction?: { type: string; path: string };
+      };
+      thrown.code = error.error;
+      if (error.nextAction) thrown.nextAction = error.nextAction;
+      throw thrown;
     }
 
     if (response.status === 204) {

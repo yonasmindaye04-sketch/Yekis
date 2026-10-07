@@ -266,7 +266,10 @@ export async function loginWithOAuthProfile(
             avatarUrl: profile.avatarUrl,
             role: userRole,
             languagePreference: "en",
-            kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+            // F-02: a Google/Apple/Facebook account is not a verified account.
+            // Creating this VERIFIED with no document defeated every
+            // requireKycVerified gate for the social sign-up path.
+            kyc: { create: { tier: "TIER_1", status: "PENDING" } },
             wallet: { create: { balanceMinor: 0 } },
             consents: {
               create: [
