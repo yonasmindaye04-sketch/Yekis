@@ -102,12 +102,31 @@ describe("1. API_PUBLIC_URL is required in production", () => {
 describe("1. provider callbacks are built from API_PUBLIC_URL", () => {
   it("telebirr.client.ts never builds notify_url from FRONTEND_URL", () => {
     const src = read("modules/escrow/providers/telebirr.client.ts");
+
+    // The intent of this test is that a settlement callback is addressed to the
+    // API, never to the web app host. It previously grepped the literal string
+    // "env.API_PUBLIC_URL" inside the window between `notify_url:` and
+    // `appid:`. That window moved when the value was extracted into
+    // getNotifyUrl(), so the grep no longer saw the derivation it was checking.
+    // Assert the data flow instead of its source spelling.
+
+    // 1. The helper that produces notify_url must derive from API_PUBLIC_URL
+    //    (or an explicit operator override) and must never mention FRONTEND_URL.
+    const helperStart = src.indexOf("function getNotifyUrl");
+    expect(helperStart).toBeGreaterThan(-1);
+    const helperEnd = src.indexOf("\n}", helperStart);
+    const helper = src.slice(helperStart, helperEnd);
+    expect(helper).toContain("env.API_PUBLIC_URL");
+    expect(helper).not.toContain("env.FRONTEND_URL");
+
+    // 2. The payload's notify_url must be that helper's value, and must not be
+    //    assembled from FRONTEND_URL anywhere in the request block.
     const notifyBlock = src.slice(
       src.indexOf("notify_url:"),
       src.indexOf("appid:"),
     );
-    expect(notifyBlock).toContain("env.API_PUBLIC_URL");
-    expect(notifyBlock).not.toContain("env.FRONTEND_URL");
+    expect(notifyBlock).toMatch(/notify_url:\s*notifyUrl/);
+    expect(notifyBlock).not.toContain("FRONTEND_URL");
   });
 
   it("still sends the USER back to FRONTEND_URL after paying", () => {
