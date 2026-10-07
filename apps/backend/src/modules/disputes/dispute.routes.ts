@@ -26,6 +26,8 @@ import {
   MilestoneNotFoundError,
   InvalidEscrowStateForDisputeError,
   DisputeAlreadyClaimedError,
+  DisputeAlreadyResolvedError,
+  MilestoneNotSettleableError,
 } from "./dispute.service.js";
 import { z } from "zod";
 
@@ -49,9 +51,18 @@ function handleKnownErrors(
   }
   if (
     err instanceof InvalidDisputeStageError ||
-    err instanceof InvalidEscrowStateForDisputeError
+    err instanceof InvalidEscrowStateForDisputeError ||
+    err instanceof MilestoneNotSettleableError
   ) {
     res.status(409).json({ error: "INVALID_STATE", message: err.message });
+    return true;
+  }
+  // F-04: already settled by someone else. A distinct code so the UI can say
+  // "this dispute is closed" rather than "try again".
+  if (err instanceof DisputeAlreadyResolvedError) {
+    res
+      .status(409)
+      .json({ error: "DISPUTE_ALREADY_RESOLVED", message: err.message });
     return true;
   }
   if (err instanceof DisputeAlreadyClaimedError) {

@@ -24,6 +24,31 @@ export class MilestoneNotFoundError extends Error {}
 export class InvalidEscrowStateForDisputeError extends Error {}
 export class MutualWithdrawalOutcomeMismatchError extends Error {}
 export class DisputeAlreadyClaimedError extends Error {}
+/**
+ * F-04 — the dispute was already resolved by someone else, either a concurrent
+ * resolution or an earlier one. Thrown BEFORE any money moves, so a losing
+ * caller cannot pay a party twice.
+ */
+export class DisputeAlreadyResolvedError extends Error {}
+/**
+ * F-04 — the milestone backing this dispute is not in a state that can still be
+ * settled (e.g. already RELEASED or REFUNDED). Without this guard a
+ * REFUND_TO_CLIENT award could credit a wallet for money that has already been
+ * released to the other party.
+ */
+export class MilestoneNotSettleableError extends Error {}
+
+/**
+ * F-04 — escrow states from which a dispute resolution can still move money.
+ * Deliberately excludes RELEASED and REFUNDED: those mean the money already
+ * went somewhere, and a second movement would duplicate it.
+ */
+const SETTLEABLE_ESCROW_STATES = [
+  "DISPUTED",
+  "SUBMITTED_FOR_REVIEW",
+  "ESCROW_HELD",
+  "WORK_IN_PROGRESS",
+] as const;
 
 const NEGOTIATION_WINDOW_DAYS = 7; // Stage 1 — matches the roadmap's dispute-flow design
 const MEDIATION_WINDOW_DAYS = 5; // Stage 3 target SLA (3-5 business days)
@@ -410,6 +435,53 @@ export async function resolveDispute(params: {
     where: { id: dispute.milestoneId },
   });
 
+  // F-04 — claim the dispute BEFORE any money moves. This is the same pattern
+  // releaseMilestoneFunds uses for the milestone: a conditional updateMany
+  // inside a transaction, so exactly one caller can flip the dispute to RESOLVED
+  // and the loser gets count=0 and throws before crediting anybody. Previously
+  // two concurrent resolutions both passed the stage check and both paid.
+  const claim = await prisma.dispute.updateMany({
+    where: {
+      id: dispute.id,
+      stage: { not: "RESOLVED" },
+      resolvedAt: null,
+    },
+    data: {
+      stage: "RESOLVED",
+      resolvedByStaffId: params.staffUserId,
+      resolutionOutcome: params.outcome,
+      mediatorRecommendation: params.recommendation,
+      freelancerShareMinor: params.freelancerShareMinor ?? null,
+      resolvedAt: new Date(),
+    },
+  });
+  if (claim.count === 0) {
+    throw new DisputeAlreadyResolvedError(
+      "This dispute has already been resolved.",
+    );
+  }
+
+  // F-04 — and the milestone must still hold the money. A dispute can reach a
+  // resolver while the milestone has already been released (auto-release, or a
+  // competing settlement), and paying out again duplicates funds.
+  if (!(SETTLEABLE_ESCROW_STATES as readonly string[]).includes(milestone.escrowState)) {
+    // Roll the claim back: nothing was paid, so the dispute must stay open.
+    await prisma.dispute.update({
+      where: { id: dispute.id },
+      data: {
+        stage: "STAGE_3_MEDIATION",
+        resolvedByStaffId: null,
+        resolutionOutcome: null,
+        mediatorRecommendation: null,
+        freelancerShareMinor: null,
+        resolvedAt: null,
+      },
+    });
+    throw new MilestoneNotSettleableError(
+      `Cannot settle a dispute: the milestone is already in state ${milestone.escrowState}.`,
+    );
+  }
+
   if (params.outcome === "RELEASE_TO_FREELANCER") {
     await releaseMilestoneFunds(
       milestone.id,
@@ -457,16 +529,10 @@ export async function resolveDispute(params: {
     }
   }
 
-  const resolved = await prisma.dispute.update({
+  // The claim above already wrote the resolution fields; re-read for the return
+  // value so callers get the persisted row.
+  const resolved = await prisma.dispute.findUniqueOrThrow({
     where: { id: dispute.id },
-    data: {
-      stage: "RESOLVED",
-      resolvedByStaffId: params.staffUserId,
-      resolutionOutcome: params.outcome,
-      mediatorRecommendation: params.recommendation,
-      freelancerShareMinor: params.freelancerShareMinor,
-      resolvedAt: new Date(),
-    },
   });
 
   await recordAuditEvent({
@@ -504,7 +570,15 @@ export async function escalateToArbitration(params: {
   disputeId: string;
 }) {
   const dispute = await getDisputeForParty(params.disputeId, params.userId);
-  if (dispute.stage !== "STAGE_3_MEDIATION" && dispute.stage !== "RESOLVED") {
+  // F-04 — only a dispute that is genuinely still open may be escalated. This
+  // edge used to accept RESOLVED, which let a settled dispute be pushed back
+  // to arbitration and then resolved (and paid) a second time.
+  if (dispute.stage === "RESOLVED" || dispute.resolvedAt) {
+    throw new InvalidDisputeStageError(
+      "Cannot escalate a resolved dispute to arbitration.",
+    );
+  }
+  if (dispute.stage !== "STAGE_3_MEDIATION") {
     throw new InvalidDisputeStageError(
       `Cannot escalate to arbitration from stage ${dispute.stage}.`,
     );
@@ -554,11 +628,29 @@ export async function applyArbitrationAward(params: {
       `Can only apply an award when stage is STAGE_4_ARBITRATION, current stage: ${dispute.stage}.`,
     );
   }
+  // F-04 — refuse an award on an already-resolved dispute before the stage
+  // rewind below can put it back in play.
+  if (dispute.resolvedAt || dispute.resolutionOutcome) {
+    throw new DisputeAlreadyResolvedError(
+      "This dispute has already been resolved; an award cannot be applied on top of it.",
+    );
+  }
 
-  await prisma.dispute.update({
-    where: { id: dispute.id },
+  // F-04 — the rewind is conditional, so a concurrent resolution that lands
+  // between the stage read and this write cannot be silently undone.
+  const rewind = await prisma.dispute.updateMany({
+    where: {
+      id: dispute.id,
+      stage: "STAGE_4_ARBITRATION",
+      resolvedAt: null,
+    },
     data: { stage: "STAGE_3_MEDIATION" },
   });
+  if (rewind.count === 0) {
+    throw new DisputeAlreadyResolvedError(
+      "This dispute was resolved before the award could be applied.",
+    );
+  }
 
   const resolved = await resolveDispute({
     staffUserId: params.staffUserId,

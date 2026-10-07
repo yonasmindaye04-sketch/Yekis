@@ -965,10 +965,26 @@ export async function refundMilestoneToClient(
   amountMinor: number,
 ) {
   await prisma.$transaction(async (tx) => {
-    await tx.milestone.update({
-      where: { id: milestoneId },
+    // F-04 — the state change is a CONDITIONAL claim, taken before the wallet
+    // is credited and inside the same transaction. Previously this was an
+    // unconditional update, so a refund could be issued for a milestone that
+    // had already been RELEASED, paying the client for money the freelancer
+    // had already received. A count of 0 means someone else settled it.
+    const claim = await tx.milestone.updateMany({
+      where: {
+        id: milestoneId,
+        escrowState: {
+          in: ["DISPUTED", "SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"],
+        },
+      },
       data: { escrowState: "REFUNDED" },
     });
+    if (claim.count === 0) {
+      throw new InvalidEscrowStateError(
+        "Cannot refund: the milestone is no longer in a refundable state.",
+      );
+    }
+
     await tx.wallet.update({
       where: { userId: clientId },
       data: { balanceMinor: { increment: amountMinor } },
