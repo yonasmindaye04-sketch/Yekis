@@ -41,11 +41,18 @@ async function cleanup() {
   // TransactionFlag row pointing at the user.
   await prisma.transactionFlag.deleteMany({ where: { userId: { in: users } } });
   await prisma.payoutTransaction.deleteMany({ where: { userId: { in: users } } });
-  await prisma.ledgerEntry.deleteMany({});
-  await prisma.ledgerJournal.deleteMany({});
-  await prisma.disputeEvidence.deleteMany({});
-  await prisma.dispute.deleteMany({ where: { contractId } });
+  // Scoped to this file's contract and wallets. An unscoped
+  // `ledgerEntry.deleteMany({})` here deleted the ledger for every other test
+  // file running in parallel, which made the full suite order-dependent.
   await prisma.milestone.deleteMany({ where: { contractId } });
+  await prisma.disputeEvidence.deleteMany({ where: { dispute: { contractId } } });
+  await prisma.dispute.deleteMany({ where: { contractId } });
+  await prisma.ledgerEntry.deleteMany({
+    where: { journal: { referenceType: { in: ["MILESTONE_RELEASE", "DISPUTE_REFUND"] }, idempotencyKey: { contains: contractId ?? "" } } },
+  });
+  await prisma.ledgerJournal.deleteMany({
+    where: { idempotencyKey: { contains: contractId ?? "" } },
+  });
   await prisma.contract.deleteMany({ where: { id: contractId } });
   await prisma.job.deleteMany({ where: { clientId: { in: users } } });
   await prisma.wallet.deleteMany({ where: { userId: { in: users } } });
@@ -238,14 +245,20 @@ describe("F-22 withdrawal is blocked by escrow exposure, not by role", () => {
     // Settle the milestone so the dispute rule — not the exposure rule — is
     // what blocks the client.
     await makeContract("client", "RELEASED");
-    await prisma.dispute.create({
+await prisma.dispute.create({
       data: {
-        contractId,
+        // `contract: { connect }` rather than a bare `contractId`. The
+        // Dispute table has a check constraint requiring exactly one of
+        // contractId / gigOrderId (confusingly named "Dispute_subject_check").
+        // A bare scalar FK can be silently dropped to NULL when the module
+        // variable is momentarily undefined, which then fails that constraint
+        // and breaks whichever suite runs alongside this one.
+        contract: { connect: { id: contractId } },
         milestoneId,
         category: "QUALITY_ISSUE",
         stage: "STAGE_1_NEGOTIATION",
         raisedByUserId: clientId,
-        description: "The delivered work does not meet the specification.",
+        description: "The delivered work does not meet the agreed specification.",
       },
     });
 

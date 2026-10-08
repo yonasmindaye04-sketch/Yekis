@@ -568,18 +568,17 @@ try {
           });
         }
       },
-      // Two resolvers racing now collide on the same dispute row inside two
-      // interactive transactions. Serializable makes the loser see a
-      // serialization failure; it is retried once and then observes the
-      // committed RESOLVED dispute, returning count=0 and the domain error.
+      // Default READ COMMITTED isolation, deliberately. Under SERIALIZABLE the two
+      // racing transactions abort each other, so whichever one had already
+      // moved money could still lose and retry — then both callers would fail
+      // and nobody would be told they were the second resolver. Under READ
+      // COMMITTED the loser's conditional `updateMany` simply blocks on the
+      // row lock, re-evaluates its WHERE after the winner commits, matches 0
+      // rows, and throws the domain error. Exactly one caller moves money.
       // maxWait/timeout are explicit because an interactive transaction holds a
       // pooled connection for its whole duration, and the default 2s maxWait
-      // was not enough for the loser to acquire one.
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-        maxWait: 15_000,
-        timeout: 20_000,
-      },
+      // was not enough for the loser to acquire one under load.
+      { maxWait: 15_000, timeout: 20_000 },
     );
   } catch (err) {
     // P2034 = serialization/write conflict, P2002 = unique violation on the
