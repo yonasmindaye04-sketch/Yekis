@@ -324,6 +324,84 @@ describe("F-04 a dispute can only be resolved once", () => {
   });
 });
 
+describe("F-04 the claim and the money movement are one transaction", () => {
+  it("a payout that throws leaves the dispute UNRESOLVED and moves no money", async () => {
+    const { disputeId, milestoneId } = await seed("STAGE_3_MEDIATION");
+    const before = await walletBalances();
+    const disputeBefore = await prisma.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+    });
+
+    // Force the payout step itself to fail, after the dispute has already been
+    // claimed. Removing the payee's wallet makes the credit inside the
+    // transaction throw a real error at the exact point money would move.
+    await prisma.wallet.deleteMany({ where: { userId: ids.freelancerId! } });
+
+    await expect(
+      resolveDispute({
+        staffUserId: STAFF.id,
+        disputeId,
+        outcome: "RELEASE_TO_FREELANCER",
+        recommendation: "Release.",
+      }),
+    ).rejects.toBeTruthy();
+
+    // The claim must have rolled back with the failed payout. Before this was
+    // one transaction, the claim auto-committed first and the dispute stayed
+    // RESOLVED with nobody paid.
+    const disputeAfter = await prisma.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+    });
+    expect(disputeAfter.stage, "dispute must not be left RESOLVED").toBe(
+      disputeBefore.stage,
+    );
+    expect(disputeAfter.resolvedAt, "dispute must not keep a resolution time").toBeNull();
+    expect(disputeAfter.resolvedByStaffId).toBeNull();
+    expect(disputeAfter.resolutionOutcome).toBeNull();
+
+    // The milestone must still hold the money, not be marked settled.
+    const milestoneAfter = await prisma.milestone.findUniqueOrThrow({
+      where: { id: milestoneId },
+    });
+    expect(milestoneAfter.escrowState).toBe("DISPUTED");
+
+    // And no ledger row may exist for the failed settlement.
+    expect(
+      await prisma.ledgerJournal.count({
+        where: { idempotencyKey: { contains: milestoneId } },
+      }),
+      "a failed payout must not leave ledger journals behind",
+    ).toBe(0);
+  });
+
+  it("a settled dispute that can no longer pay is left unresolved, not compensated", async () => {
+    // The milestone is released by a competing path, so the payout throws.
+    // The old code claimed the dispute, then hand-wrote a compensating
+    // `dispute.update` back to stage 3 — a non-atomic fix that a crash
+    // between the two writes would defeat entirely.
+    const { disputeId } = await seed("STAGE_3_MEDIATION");
+    await prisma.milestone.updateMany({
+      where: { id: ids.milestoneId! },
+      data: { escrowState: "RELEASED", releasedAt: new Date() },
+    });
+
+    await expect(
+      resolveDispute({
+        staffUserId: STAFF.id,
+        disputeId,
+        outcome: "REFUND_TO_CLIENT",
+        recommendation: "Refund.",
+      }),
+    ).rejects.toBeTruthy();
+
+    const disputeAfter = await prisma.dispute.findUniqueOrThrow({
+      where: { id: disputeId },
+    });
+    expect(disputeAfter.stage).toBe("STAGE_3_MEDIATION");
+    expect(disputeAfter.resolvedAt).toBeNull();
+  });
+});
+
 describe("F-04 the refund path cannot credit an already-settled milestone", () => {
   it("a REFUND_TO_CLIENT award after a RELEASE changes nothing", async () => {
     // Force the illegal ordering: milestone already RELEASED, dispute still at

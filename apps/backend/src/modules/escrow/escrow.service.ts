@@ -622,8 +622,25 @@ export async function releaseMilestoneFunds(
   milestoneId: string,
   freelancerId: string,
   amountMinor: number,
+  /**
+   * F-04 — compose into a caller's transaction.
+   *
+   * When `tx` is supplied the claim and the credits run inside that
+   * transaction, and a lost claim THROWS instead of being swallowed. Callers
+   * that must settle money and their own bookkeeping together (dispute
+   * resolution) depend on that: if the claim is lost the whole transaction
+   * rolls back, so the dispute cannot end up marked RESOLVED with no payout.
+   *
+   * Without `tx` the historical standalone behaviour is preserved: own
+   * transaction, log-and-return on a lost claim, then best-effort post-steps.
+   */
+  opts: { tx?: Prisma.TransactionClient } = {},
 ) {
-  await assertEscrowNotHeld(milestoneId);
+  const outerTx = opts.tx;
+
+  if (!outerTx) {
+    await assertEscrowNotHeld(milestoneId);
+  }
   const freelancerKyc = await prisma.kycRecord.findUnique({
     where: { userId: freelancerId },
   });
@@ -632,62 +649,70 @@ export async function releaseMilestoneFunds(
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  await prisma
-    .$transaction(async (tx) => {
-      // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
-      // release job firing simultaneously) can flip the milestone into
-      // RELEASED. Two entry states are legal here:
-      //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
-      //   DISPUTED             - staff resolution or arbitration award
-      // The loser gets count=0 and throws BEFORE any wallet credit,
-      // eliminating the historical double-payout race.
-      const claim = await tx.milestone.updateMany({
-        where: {
-          id: milestoneId,
-          escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
-          escrowHolds: { none: { active: true } },
-        },
-        data: { escrowState: "RELEASED", releasedAt: new Date() },
-      });
-
-      if (claim.count === 0) {
-        throw new MilestoneReleaseClaimLostError(milestoneId);
-      }
-
-      await tx.wallet.update({
-        where: { userId: freelancerId },
-        data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-      });
-
-      await tx.user.update({
-        where: { id: freelancerId },
-        data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-      });
-
-      // Platform-side ledger entries — without these, platform revenue and
-      // withholding remittance reports would permanently read zero.
-      await recordPlatformEarnings(tx, fees, milestoneId);
-
-      // Double-entry general ledger posting
-      await recordMilestoneReleaseLedger(tx, {
-        freelancerId,
-        milestoneId,
-        milestoneGrossMinor: amountMinor,
-        freelancerNetMinor: fees.freelancerNetMinor,
-        platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-        withholdingTaxMinor: fees.withholdingTaxMinor,
-      });
-    })
-    .catch((err) => {
-      if (err instanceof MilestoneReleaseClaimLostError) {
-        logger.info(
-          { milestoneId, freelancerId },
-          "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
-        );
-        return;
-      }
-      throw err;
+  const settle = async (tx: Prisma.TransactionClient) => {
+    // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
+    // release job firing simultaneously) can flip the milestone into
+    // RELEASED. Two entry states are legal here:
+    //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
+    //   DISPUTED             - staff resolution or arbitration award
+    // The loser gets count=0 and throws BEFORE any wallet credit,
+    // eliminating the historical double-payout race.
+    const claim = await tx.milestone.updateMany({
+      where: {
+        id: milestoneId,
+        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
+        escrowHolds: { none: { active: true } },
+      },
+      data: { escrowState: "RELEASED", releasedAt: new Date() },
     });
+
+    if (claim.count === 0) {
+      throw new MilestoneReleaseClaimLostError(milestoneId);
+    }
+
+    await tx.wallet.update({
+      where: { userId: freelancerId },
+      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    await tx.user.update({
+      where: { id: freelancerId },
+      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    // Platform-side ledger entries — without these, platform revenue and
+    // withholding remittance reports would permanently read zero.
+    await recordPlatformEarnings(tx, fees, milestoneId);
+
+    // Double-entry general ledger posting
+    await recordMilestoneReleaseLedger(tx, {
+      freelancerId,
+      milestoneId,
+      milestoneGrossMinor: amountMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
+      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      withholdingTaxMinor: fees.withholdingTaxMinor,
+    });
+  };
+
+  // Composed call: stay inside the caller's transaction, let a lost claim
+  // propagate so the caller rolls back, and skip the post-steps (the caller
+  // owns the surrounding lifecycle).
+  if (outerTx) {
+    await settle(outerTx);
+    return;
+  }
+
+  await prisma.$transaction(settle).catch((err) => {
+    if (err instanceof MilestoneReleaseClaimLostError) {
+      logger.info(
+        { milestoneId, freelancerId },
+        "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
+      );
+      return;
+    }
+    throw err;
+  });
 
   try {
     await checkVatThresholdAfterRelease(milestoneId);
@@ -980,8 +1005,12 @@ export async function refundMilestoneToClient(
   milestoneId: string,
   clientId: string,
   amountMinor: number,
+  /** F-04 — compose into a caller's transaction; see releaseMilestoneFunds. */
+  opts: { tx?: Prisma.TransactionClient } = {},
 ) {
-  await prisma.$transaction(async (tx) => {
+  const outerTx = opts.tx;
+
+  const refund = async (tx: Prisma.TransactionClient) => {
     // F-04 — the state change is a CONDITIONAL claim, taken before the wallet
     // is credited and inside the same transaction. Previously this was an
     // unconditional update, so a refund could be issued for a milestone that
@@ -1011,7 +1040,15 @@ export async function refundMilestoneToClient(
       milestoneId,
       amountMinor,
     });
-  });
+  };
+
+  // Composed call: the caller owns the transaction and the lifecycle.
+  if (outerTx) {
+    await refund(outerTx);
+    return;
+  }
+
+  await prisma.$transaction(refund);
 
   try {
     await checkAndUpdateContractCompletion(milestoneId);
