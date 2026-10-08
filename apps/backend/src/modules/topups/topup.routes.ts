@@ -3,7 +3,7 @@ import { Router } from "express";
 import multer from "multer";
 import {
   SubmitTopUpInput,
-  TopUpReviewDecisionInput,
+  TopUpRejectInput,
   FlagTopUpInput,
 } from "@marketplace/schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
@@ -250,10 +250,12 @@ topupsRouter.post(
   requireAuth,
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
-    const parsed = TopUpReviewDecisionInput.safeParse({
-      decision: "REJECTED",
-      ...req.body,
-    });
+    // The outcome of this endpoint is REJECTED by definition — it is decided by
+    // the URL, not the body. The previous
+    // `{ decision: "REJECTED", ...req.body }` spread AFTER the literal, so a
+    // body of `{ decision: "APPROVED" }` silently overrode it. TopUpRejectInput
+    // is strict, so `decision` is now refused with a 400 rather than trusted.
+    const parsed = TopUpRejectInput.safeParse(req.body);
     if (!parsed.success)
       return res
         .status(400)
@@ -263,7 +265,7 @@ topupsRouter.post(
       const result = await rejectTopUp({
         staffUserId: req.user!.id,
         topUpId: req.params.topUpId as string,
-        rejectionReason: parsed.data.rejectionReason!,
+        rejectionReason: parsed.data.rejectionReason,
       });
       return res.json(result);
     } catch (err) {

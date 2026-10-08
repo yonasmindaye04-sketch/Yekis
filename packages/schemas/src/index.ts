@@ -236,6 +236,17 @@ export const TopUpReviewDecisionInput = z
   });
 export type TopUpReviewDecisionInput = z.infer<typeof TopUpReviewDecisionInput>;
 
+// The reject ENDPOINT's own input. The outcome comes from the URL
+// (`POST /topups/:id/reject`), so the client has no say in it: `decision` is
+// rejected outright rather than trusted. This schema is `strict()` so a body
+// carrying `decision: "APPROVED"` cannot talk the endpoint into approving.
+export const TopUpRejectInput = z
+  .object({
+    rejectionReason: z.string().min(5).max(500),
+  })
+  .strict();
+export type TopUpRejectInput = z.infer<typeof TopUpRejectInput>;
+
 export const FlagTopUpInput = z.object({
   reason: z.string().min(10).max(1000),
 });
