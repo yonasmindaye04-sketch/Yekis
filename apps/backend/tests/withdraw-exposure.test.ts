@@ -35,29 +35,41 @@ let milestoneId: string;
 
 async function cleanup() {
   const users = [clientId, freelancerId, bothId].filter(Boolean);
-  if (!users.length) return;
-  await prisma.auditLog.deleteMany({ where: { userId: { in: users } } });
+  // Every filter below is keyed on `contractId`. Prisma treats
+  // `where: { contractId: undefined }` as an EMPTY filter, so running this
+  // before a contract exists (beforeAll, or between tests) deleted EVERY
+  // milestone and dispute in the shared test database — which is what made
+  // unrelated suites fail with "No Milestone found".
+  const contractFilter = contractId ? { contractId } : { id: "__no_such_contract__" };
+  const userFilter = users.length ? { in: users } : { in: ["__no_such_user__"] };
+  if (!users.length && !contractId) return;
+
+  await prisma.auditLog.deleteMany({ where: { userId: userFilter } });
   // A withdrawal attempt can trip the TMS wallet-mismatch rule and leave a
   // TransactionFlag row pointing at the user.
-  await prisma.transactionFlag.deleteMany({ where: { userId: { in: users } } });
-  await prisma.payoutTransaction.deleteMany({ where: { userId: { in: users } } });
+  await prisma.transactionFlag.deleteMany({ where: { userId: userFilter } });
+  await prisma.payoutTransaction.deleteMany({ where: { userId: userFilter } });
   // Scoped to this file's contract and wallets. An unscoped
   // `ledgerEntry.deleteMany({})` here deleted the ledger for every other test
   // file running in parallel, which made the full suite order-dependent.
-  await prisma.milestone.deleteMany({ where: { contractId } });
-  await prisma.disputeEvidence.deleteMany({ where: { dispute: { contractId } } });
-  await prisma.dispute.deleteMany({ where: { contractId } });
+  await prisma.milestone.deleteMany({ where: contractFilter });
+  await prisma.disputeEvidence.deleteMany({ where: { dispute: contractFilter } });
+  await prisma.dispute.deleteMany({ where: contractFilter });
   await prisma.ledgerEntry.deleteMany({
-    where: { journal: { referenceType: { in: ["MILESTONE_RELEASE", "DISPUTE_REFUND"] }, idempotencyKey: { contains: contractId ?? "" } } },
+    where: {
+      journal: {
+        idempotencyKey: { contains: contractId ?? "__no_such_contract__" },
+      },
+    },
   });
   await prisma.ledgerJournal.deleteMany({
-    where: { idempotencyKey: { contains: contractId ?? "" } },
+    where: { idempotencyKey: { contains: contractId ?? "__no_such_contract__" } },
   });
-  await prisma.contract.deleteMany({ where: { id: contractId } });
-  await prisma.job.deleteMany({ where: { clientId: { in: users } } });
-  await prisma.wallet.deleteMany({ where: { userId: { in: users } } });
-  await prisma.kycRecord.deleteMany({ where: { userId: { in: users } } });
-  await prisma.user.deleteMany({ where: { id: { in: users } } });
+  await prisma.contract.deleteMany({ where: { id: contractId ?? "__none__" } });
+  await prisma.job.deleteMany({ where: { clientId: userFilter } });
+  await prisma.wallet.deleteMany({ where: { userId: userFilter } });
+  await prisma.kycRecord.deleteMany({ where: { userId: userFilter } });
+  await prisma.user.deleteMany({ where: { id: userFilter } });
 }
 
 async function makeUser(label: string, role: "CLIENT" | "FREELANCER" | "BOTH", balance: number) {
