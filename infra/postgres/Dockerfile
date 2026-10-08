@@ -7,3 +7,4 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY init.sql /docker-entrypoint-initdb.d/10-init.sql
+COPY init-test-db.sql /docker-entrypoint-initdb.d/20-init-test-db.sql
