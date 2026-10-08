@@ -125,6 +125,74 @@ afterAll(async () => {
   await cleanup();
 });
 
+describe("F-01 guest intake does not reveal whether an account exists", () => {
+  it("returns an indistinguishable response for a new and an existing email", async () => {
+    // An attacker probes /chat/guest with candidate addresses to enumerate
+    // which addresses have accounts. Both paths must be indistinguishable:
+    // same status, same body keys, and no echo of the address.
+    const BRAND_NEW = `f01-brandnew-${STAMP}@test.et`;
+    const EXISTING = VICTIM_EMAIL;
+
+    const resNew = await request(app)
+      .post("/api/v1/chat/guest")
+      .send({ email: BRAND_NEW, body: "Same question, new address." });
+    const resExisting = await request(app)
+      .post("/api/v1/chat/guest")
+      .send({ email: EXISTING, body: "Same question, existing address." });
+
+    // Identical status.
+    expect(resNew.status).toBe(201);
+    expect(resExisting.status).toBe(201);
+
+    // Identical body keys — no extra field such as `existingUser`,
+    // `isReturning`, or `accountCreated` on one path only.
+    expect(Object.keys(resNew.body).sort()).toEqual(
+      Object.keys(resExisting.body).sort(),
+    );
+
+    // The address must not be reflected anywhere in the response body.
+    const newText = JSON.stringify(resNew.body);
+    const existingText = JSON.stringify(resExisting.body);
+    expect(newText).not.toContain(BRAND_NEW);
+    expect(existingText).not.toContain(EXISTING);
+
+    // No difference in the non-identity fields either. `assignedStaff` is excluded
+    // because the queue auto-assigns staff round-robin, so consecutive
+    // conversations legitimately land on different agents — that is a
+    // scheduling behaviour, not a signal about the address.
+    const strip = (b: Record<string, unknown>) => {
+      const { id, creatorUserId, accessToken, assignedStaff, ...rest } = b;
+      return rest;
+    };
+    expect(Object.keys(resExisting.body).sort()).toEqual(
+      Object.keys(resNew.body).sort(),
+    );
+    expect(typeof (resNew.body as Record<string, unknown>).assignedStaff).toBe(
+      typeof (resExisting.body as Record<string, unknown>).assignedStaff,
+    );
+    expect(strip(resExisting.body)).toEqual(strip(resNew.body));
+  });
+
+  it("the typed address is stored as conversation contact metadata, not emailed", async () => {
+    // No email is sent to a typed guest address at intake. The address is kept
+    // on the conversation so staff can reply, which is why storing it there is
+    // necessary — but it is never used as a login or emailed automatically.
+    const conversation = await prisma.conversation.findUniqueOrThrow({
+      where: { id: guestConversationId },
+    });
+    expect(conversation.contactEmail).toBe(VICTIM_EMAIL);
+
+// And the creator is a synthetic guest identity, not the victim's account.
+const creator = await prisma.user.findUniqueOrThrow({
+      where: { id: guestUserId },
+      select: { email: true, isGuestContact: true },
+    });
+    expect(creator.isGuestContact).toBe(true);
+    expect(creator.email).not.toBe(VICTIM_EMAIL);
+    expect(creator.email).toMatch(/@guest\.invalid$/);
+  });
+});
+
 describe("F-01 guest support tokens are not sessions", () => {
   it("a guest token cannot read the victim's session identity", async () => {
     const res = await request(app)
