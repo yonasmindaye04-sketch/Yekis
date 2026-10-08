@@ -31,8 +31,8 @@ export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
               <strong>Yekis</strong>
             </div>
             <p className="footer-desc">
-              Ethiopia's freelance marketplace. Post work, pay on delivery,
-              into escrow, and get your result — or your money back.
+              Ethiopia's freelance marketplace. Post work, fund a milestone, review the
+              result and release payment.
             </p>
           </div>
           <nav className="footer-col" aria-label="Platform">

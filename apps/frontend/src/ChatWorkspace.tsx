@@ -723,8 +723,8 @@ export function ChatWorkspace({
                     {activeConversation.isSupport
                       ? "Have questions about payments, disputes, or account verification? Our support team is here to help."
                       : role === "CLIENT"
-                      ? "Negotiate deliverables, discuss milestones, or clarify requirements with this freelancer. Payment is held until you approve the work."
-                      : "Discuss project details, propose milestones, and align with your client. Payment is held until you approve the work."}
+? "Negotiate deliverables, discuss milestones, or clarify requirements with this freelancer. Payment is held while you review the work."
+: "Discuss project details, propose milestones, and align with your client. Payment is released when you approve the work, or after the review window if you do not respond."}
                   </p>
                 </div>
               ) : (

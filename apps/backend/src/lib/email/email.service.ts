@@ -283,7 +283,7 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
             </table>
 
             <div class="escrow-callout">
-              🔒 <strong>Funds held pending your approval:</strong> Yekis holds this amount until the work is delivered, and releases it only once the client reviews and approves the delivered work.
+              🔒 <strong>How this payment is held:</strong> Yekis holds this amount until the milestone is delivered. It is released when you approve the delivered work, or automatically after ${env.AUTO_RELEASE_WINDOW_DAYS} days if you do not respond. If either party raises a dispute, the amount stays held until that dispute is resolved.
             </div>
           </div>
           <div class="footer">

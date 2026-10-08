@@ -8,6 +8,7 @@ import {
   sentEmailsLog,
 } from "../src/lib/email/email.service.js";
 import { prisma } from "../src/lib/prisma.js";
+import { env } from "../src/config/env.js";
 
 // NOTE: The "Google & Social Auth Service" suite was removed along with the
 // loginWithGoogle service itself — that flow was an authentication bypass
@@ -56,7 +57,12 @@ describe("Transactional Email Service", () => {
     // COPY: the receipt must not claim an escrow guarantee the platform does
     // not yet have (the segregated NBE escrow account is still a Tier 3
     // blocker). It states what actually happens instead.
-    expect(lastEmail.html).toContain("Funds held pending your approval");
+    expect(lastEmail.html).toContain("How this payment is held");
+    // The copy must not over-promise client-only approval, and the auto-release
+    // window must come from config rather than a hardcoded number.
+    expect(lastEmail.html).toContain(`${env.AUTO_RELEASE_WINDOW_DAYS} days`);
+    expect(lastEmail.html).toContain("dispute");
+    expect(lastEmail.html).not.toContain("only once the client reviews and approves");
     expect(lastEmail.html).not.toContain("Escrow Protection Active");
   });
 

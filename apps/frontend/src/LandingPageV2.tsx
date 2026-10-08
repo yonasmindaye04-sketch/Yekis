@@ -1725,8 +1725,9 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
         </p>
         <h2 id="ready-heading">Put your next project in motion.</h2>
         <p>
-          Post a job or join as a freelancer with payment held until you approve the work, from
-          start to finish.
+          Post a job or join as a freelancer. Fund a milestone, review the work, release
+          payment — automatically after the review window if nobody responds, and
+          held until a dispute is resolved if one is raised.
         </p>
         <div className="v2-outro-actions">
           <button
@@ -1984,7 +1985,7 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
             url: "https://yekis.com",
             logo: "https://yekis.com/svgviewer-output.svg",
             description:
-              "Ethiopia's freelance marketplace. Post work, pay on delivery, approve the result and release payment.",
+              "Ethiopia's freelance marketplace. Fund a milestone, review the work, release payment.",
             sameAs: ["https://t.me/yekis_channel", "https://t.me/yekis_group"],
             contactPoint: {
               "@type": "ContactPoint",
