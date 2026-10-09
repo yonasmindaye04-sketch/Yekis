@@ -49,18 +49,17 @@ const EnvSchema = z.object({
   OBJECT_STORE_SECRET_KEY: z.string().min(1),
 
   // ── Telebirr C2B Web Checkout credentials ──
-  // Gateway base URL (test vs production)
-  TELEBIRR_BASE_URL: z
-    .string()
-    .default(
-      "https://developerportal.ethiotelebirr.et:38443/apiaccess/payment/gateway",
-    ),
-  // Web checkout redirect base URL
-  TELEBIRR_WEB_BASE_URL: z
-    .string()
-    .default(
-      "https://developerportal.ethiotelebirr.et:38443/payment/web/paygate?",
-    ),
+  // Which Telebirr environment these credentials belong to. Required whenever
+  // ANY Telebirr credential is set, so a deployment can never be ambiguous
+  // about whether it is pointed at the test or the live gateway.
+  TELEBIRR_ENV: z.enum(["sandbox", "production"]).optional(),
+  // Gateway base URL. No schema default: the value is derived from
+  // TELEBIRR_ENV after parsing (see resolveTelebirrUrls). In production it
+  // must be supplied explicitly and must not be the developer-portal host —
+  // assertProductionSafety refuses to boot otherwise.
+  TELEBIRR_BASE_URL: z.string().optional(),
+  // Web checkout base URL. Same rules as TELEBIRR_BASE_URL.
+  TELEBIRR_WEB_BASE_URL: z.string().optional(),
   // Fabric App Key — sent as X-APP-Key header
   TELEBIRR_FABRIC_APP_ID: z.string().optional(),
   // Secret for obtaining the fabric token
@@ -329,6 +328,45 @@ if (!parsed.success) {
 
 export type TelegramEnv = "dev" | "staging" | "prod";
 
+/** Telebirr gateway environments. */
+export type TelebirrEnv = "sandbox" | "production";
+
+/**
+ * Telebirr's developer-portal host is their TEST environment. It must never
+ * appear in a production configuration: payments created against it are not
+ * real money movements.
+ */
+export const TELEBIRR_SANDBOX_HOST = "developerportal.ethiotelebirr.et";
+
+/** Sandbox gateway base URL (machine-to-machine API). */
+export const SANDBOX_TELEBIRR_BASE_URL =
+  `https://${TELEBIRR_SANDBOX_HOST}:38443/apiaccess/payment/gateway`;
+
+/** Sandbox web-checkout base URL (browser redirect). */
+export const SANDBOX_TELEBIRR_WEB_BASE_URL =
+  `https://${TELEBIRR_SANDBOX_HOST}:38443/payment/web/paygate?`;
+
+/**
+ * Any Telebirr credential being present means Telebirr is in use, which makes
+ * TELEBIRR_ENV mandatory. Without this a deployment could be pointed at the
+ * sandbox with no declaration, and nothing would object.
+ */
+export function telebirrIsConfigured(
+  cfg: Partial<Record<string, unknown>>,
+): boolean {
+  return [
+    "TELEBIRR_FABRIC_APP_ID",
+    "TELEBIRR_APP_SECRET",
+    "TELEBIRR_MERCHANT_APP_ID",
+    "TELEBIRR_MERCHANT_CODE",
+    "TELEBIRR_PRIVATE_KEY",
+    "TELEBIRR_PUBLIC_KEY",
+  ].some((key) => {
+    const value = cfg[key];
+    return typeof value === "string" && value.length > 0;
+  });
+}
+
 /**
  * Fully resolved configuration.
  *
@@ -340,6 +378,12 @@ export type TelegramEnv = "dev" | "staging" | "prod";
  */
 export type Env = z.infer<typeof EnvSchema> & {
   TELEGRAM_ENV: TelegramEnv;
+  TELEBIRR_ENV?: TelebirrEnv;
+  // Resolved from TELEBIRR_ENV (or an explicit override). In production these
+  // must have been supplied explicitly; assertProductionSafety enforces that
+  // and the process will not boot on the sandbox default.
+  TELEBIRR_BASE_URL: string;
+  TELEBIRR_WEB_BASE_URL: string;
   TELEGRAM_POLLING_ENABLED: boolean;
 };
 
@@ -356,7 +400,11 @@ export type Env = z.infer<typeof EnvSchema> & {
  * credentials over cleartext to a Mini App that Telegram may still render.
  */
 export function assertProductionSafety(
-  cfg: Partial<Env> & { NODE_ENV?: string; TELEGRAM_ENV?: TelegramEnv },
+  cfg: Partial<Env> & {
+    NODE_ENV?: string;
+    TELEGRAM_ENV?: TelegramEnv;
+    TELEBIRR_ENV?: TelebirrEnv;
+  },
 ): string[] {
   const violations: string[] = [];
   const isProd = cfg.NODE_ENV === "production";
@@ -457,6 +505,58 @@ export function assertProductionSafety(
         `TELEGRAM_ENV is "${telegramEnv}" but NODE_ENV=production. Refusing to run a non-production Telegram environment against production traffic.`,
       );
     }
+
+    // Telebirr: only checked when Telebirr is actually in use. A deployment
+    // that does not accept Telebirr payments is unaffected.
+    if (telebirrIsConfigured(cfg as Record<string, unknown>)) {
+      if (!cfg.TELEBIRR_ENV) {
+        violations.push(
+          "TELEBIRR_ENV is required when NODE_ENV=production because Telebirr credentials are set. Set it to production; sandbox is refused.",
+        );
+      } else if (cfg.TELEBIRR_ENV !== "production") {
+        violations.push(
+          `TELEBIRR_ENV is "${cfg.TELEBIRR_ENV}" but NODE_ENV=production. Refusing to run the Telebirr sandbox gateway against production traffic.`,
+        );
+      }
+
+      // Both URLs must be stated explicitly, and neither may be the test host.
+      // Previously both defaulted to developerportal.ethiotelebirr.et, so a
+      // production boot with no Telebirr overrides silently ran against the
+      // sandbox and every real top-up went nowhere.
+      const telebirrUrls: Array<[string, string | undefined]> = [
+        ["TELEBIRR_BASE_URL", cfg.TELEBIRR_BASE_URL],
+        ["TELEBIRR_WEB_BASE_URL", cfg.TELEBIRR_WEB_BASE_URL],
+      ];
+      for (const [name, value] of telebirrUrls) {
+        if (!value) {
+          violations.push(
+            `${name} must be set explicitly when NODE_ENV=production and Telebirr is configured. It has no default; there is no safe guess for a live Telebirr address.`,
+          );
+        } else if (value.includes(TELEBIRR_SANDBOX_HOST)) {
+          violations.push(
+            `${name} points at the Telebirr developer portal host "${TELEBIRR_SANDBOX_HOST}", which is the SANDBOX environment. In production that routes live traffic to the test gateway.`,
+          );
+        }
+      }
+
+      // Telebirr's RSA public key is what verifies the settlement webhook.
+      // Without it a settlement cannot be attributed to a genuine provider.
+      if (!cfg.TELEBIRR_PUBLIC_KEY) {
+        violations.push(
+          "TELEBIRR_PUBLIC_KEY is required when NODE_ENV=production and Telebirr is configured. Without Telebirr's public key the settlement webhook cannot be signature-verified.",
+        );
+      }
+      if (!cfg.TELEBIRR_MERCHANT_APP_ID) {
+        violations.push(
+          "TELEBIRR_MERCHANT_APP_ID is required when NODE_ENV=production and Telebirr is configured.",
+        );
+      }
+      if (!cfg.TELEBIRR_MERCHANT_CODE) {
+        violations.push(
+          "TELEBIRR_MERCHANT_CODE is required when NODE_ENV=production and Telebirr is configured.",
+        );
+      }
+    }
   }
 
   // Long polling is a DEVELOPMENT convenience. In staging/prod it competes with
@@ -471,6 +571,19 @@ export function assertProductionSafety(
   return violations;
 }
 
+// Telebirr is in use, so the deployment must declare which environment it is
+// pointed at. This is checked at load rather than only in production: an
+// undeclared sandbox pointer is ambiguous everywhere, not just at boot.
+if (telebirrIsConfigured(parsed.data as Record<string, unknown>) && !parsed.data.TELEBIRR_ENV) {
+  // eslint-disable-next-line no-console
+  console.error(
+    "Invalid environment configuration:\n" +
+      "   TELEBIRR_ENV is required because Telebirr credentials are set. " +
+      'Set TELEBIRR_ENV=sandbox or TELEBIRR_ENV=production. No credential value is shown.',
+  );
+  process.exit(1);
+}
+
 const resolvedTelegramEnv: TelegramEnv =
   parsed.data.TELEGRAM_ENV ??
   (parsed.data.NODE_ENV === "production" ? "prod" : "dev");
@@ -478,6 +591,18 @@ const resolvedTelegramEnv: TelegramEnv =
 const resolved: Env = {
   ...(parsed.data as z.infer<typeof EnvSchema>),
   TELEGRAM_ENV: resolvedTelegramEnv,
+  // Derived from TELEBIRR_ENV, never from NODE_ENV: a staging deployment can
+  // legitimately be sandbox, and a production deployment must state both its
+  // environment and its explicit URLs (enforced below).
+  //
+  // There is deliberately no default for the production case. If
+  // TELEBIRR_ENV=production and no URL is supplied, the sandbox host is used
+  // here and assertProductionSafety then refuses to boot — which is the
+  // intended outcome, not a silent test-gateway fallback.
+  TELEBIRR_BASE_URL:
+    parsed.data.TELEBIRR_BASE_URL ?? SANDBOX_TELEBIRR_BASE_URL,
+  TELEBIRR_WEB_BASE_URL:
+    parsed.data.TELEBIRR_WEB_BASE_URL ?? SANDBOX_TELEBIRR_WEB_BASE_URL,
   // Default: polling on in dev, off everywhere else. An explicit
   // TELEGRAM_POLLING_ENABLED=true in a non-dev environment is caught above.
   TELEGRAM_POLLING_ENABLED:

@@ -1,6 +1,12 @@
 // === IMPORTS ===
 import { randomUUID } from "node:crypto";
 import { env } from "../../../config/env.js";
+
+export {
+  SANDBOX_TELEBIRR_BASE_URL,
+  SANDBOX_TELEBIRR_WEB_BASE_URL,
+  TELEBIRR_SANDBOX_HOST,
+} from "../../../config/env.js";
 import { logger } from "../../../lib/logger.js";
 import type {
   InitiatePaymentResult,
@@ -55,6 +61,34 @@ function generateMerchOrderId(): string {
   return `YKS${ts}${rand}`;
 }
 
+export interface TelebirrUrlConfig {
+  API_PUBLIC_URL?: string;
+  FRONTEND_URL?: string;
+  TELEBIRR_NOTIFY_URL?: string;
+  TELEBIRR_REDIRECT_URL?: string;
+}
+
+/**
+ * The settlement callback Telebirr posts to. Built from API_PUBLIC_URL (this
+ * service), never from FRONTEND_URL (the web app host), so a money-confirming
+ * webhook is never delivered somewhere that cannot process it.
+ */
+export function deriveTelebirrNotifyUrl(cfg: TelebirrUrlConfig): string | undefined {
+  if (cfg.TELEBIRR_NOTIFY_URL) return cfg.TELEBIRR_NOTIFY_URL;
+  if (!cfg.API_PUBLIC_URL) return undefined;
+  return `${cfg.API_PUBLIC_URL.replace(/\/+$/, "")}/api/v1/webhooks/telebirr`;
+}
+
+/**
+ * Where the payer is sent after checkout. This is a browser redirect, so
+ * FRONTEND_URL is the correct origin here — the opposite of notify_url.
+ */
+export function deriveTelebirrRedirectUrl(cfg: TelebirrUrlConfig): string | undefined {
+  if (cfg.TELEBIRR_REDIRECT_URL) return cfg.TELEBIRR_REDIRECT_URL;
+  if (!cfg.FRONTEND_URL) return undefined;
+  return `${cfg.FRONTEND_URL}/wallet`;
+}
+
 function getNotifyUrl(): string {
   if (!env.TELEBIRR_PUBLIC_KEY) {
     throw new PaymentProviderUnavailableError(
@@ -62,10 +96,7 @@ function getNotifyUrl(): string {
     );
   }
 
-  const notifyUrl = env.TELEBIRR_NOTIFY_URL ||
-    (env.API_PUBLIC_URL
-      ? `${env.API_PUBLIC_URL.replace(/\/+$/, "")}/api/v1/webhooks/telebirr`
-      : undefined);
+const notifyUrl = deriveTelebirrNotifyUrl(env);
   if (!notifyUrl) {
     throw new PaymentProviderUnavailableError(
       "Telebirr callbacks are not configured: set TELEBIRR_NOTIFY_URL to the public API callback URL.",
@@ -158,9 +189,7 @@ export const telebirrClient: PaymentProviderClient = {
         trans_currency: params.currency,
         timeout_express: env.TELEBIRR_TIMEOUT_EXPRESS,
         // A USER-FACING redirect, so FRONTEND_URL is correct here.
-        redirect_url:
-          env.TELEBIRR_REDIRECT_URL ||
-          (env.FRONTEND_URL ? `${env.FRONTEND_URL}/wallet` : undefined),
+        redirect_url: deriveTelebirrRedirectUrl(env),
       },
       sign: "",
       sign_type: "SHA256WithRSA",

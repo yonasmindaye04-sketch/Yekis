@@ -110,16 +110,18 @@ describe("1. provider callbacks are built from API_PUBLIC_URL", () => {
     // getNotifyUrl(), so the grep no longer saw the derivation it was checking.
     // Assert the data flow instead of its source spelling.
 
-    // 1. The helper that produces notify_url must derive from API_PUBLIC_URL
-    //    (or an explicit operator override) and must never mention FRONTEND_URL.
-    const helperStart = src.indexOf("function getNotifyUrl");
+    // 1. deriveTelebirrNotifyUrl must derive from API_PUBLIC_URL (or an
+    //    explicit operator override) and must never mention FRONTEND_URL. The
+    //    derivation was extracted out of getNotifyUrl() into this helper, so
+    //    the assertions follow the data flow rather than a fixed call site.
+    const helperStart = src.indexOf("export function deriveTelebirrNotifyUrl");
     expect(helperStart).toBeGreaterThan(-1);
     const helperEnd = src.indexOf("\n}", helperStart);
     const helper = src.slice(helperStart, helperEnd);
-    expect(helper).toContain("env.API_PUBLIC_URL");
-    expect(helper).not.toContain("env.FRONTEND_URL");
+    expect(helper).toContain("API_PUBLIC_URL");
+    expect(helper).not.toContain("FRONTEND_URL");
 
-    // 2. The payload's notify_url must be that helper's value, and must not be
+    // 2. The payload's notify_url must come from that helper, and must not be
     //    assembled from FRONTEND_URL anywhere in the request block.
     const notifyBlock = src.slice(
       src.indexOf("notify_url:"),
@@ -136,7 +138,18 @@ describe("1. provider callbacks are built from API_PUBLIC_URL", () => {
       src.indexOf("redirect_url:"),
       src.indexOf("},\n      sign:"),
     );
-    expect(redirectBlock).toContain("env.FRONTEND_URL");
+    // The redirect derivation also moved into a helper, so assert the helper
+    // builds from FRONTEND_URL rather than grepping the inline payload.
+    expect(redirectBlock).toMatch(/redirect_url:\s*deriveTelebirrRedirectUrl/);
+    const redirectHelperStart = src.indexOf(
+      "export function deriveTelebirrRedirectUrl",
+    );
+    expect(redirectHelperStart).toBeGreaterThan(-1);
+    const redirectHelper = src.slice(
+      redirectHelperStart,
+      src.indexOf("\n}", redirectHelperStart),
+    );
+    expect(redirectHelper).toContain("FRONTEND_URL");
   });
 
   it("no provider client builds a callback from FRONTEND_URL", () => {
