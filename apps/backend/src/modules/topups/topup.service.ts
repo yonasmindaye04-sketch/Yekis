@@ -168,6 +168,12 @@ export async function approveTopUp(params: {
   if (!topUp) throw new TopUpNotFoundError();
   if (topUp.status !== "PENDING") throw new TopUpAlreadyResolvedError();
 
+  // Staff manual approval credits from an attached receipt rather than a
+  // provider callback, so a mock id is legitimate for a locally-created row
+  // outside production. In production the guard still applies: an approval must
+  // not mint money out of a simulated transaction.
+  assertTopUpIsCreditable({ providerTransactionId: topUp.providerTransactionId });
+
   await prisma.$transaction([
     prisma.walletTopUp.update({
       where: { id: topUp.id },
@@ -307,6 +313,66 @@ export async function getUserTopUps(userId: string) {
 // ---------- Automatic & Manual Multi-Provider Checkout Top-Up ----------
 
 export class TopUpCheckoutError extends Error {}
+
+/**
+ * Payment rails that automated checkout is wired up for.
+ *
+ * CBE Birr and M-Pesa have no approved merchant API, so their clients always
+ * throw PaymentProviderUnavailableError. Accepting them at the route and
+ * answering 503 described a misconfiguration; it is a product decision that
+ * the rail does not exist yet. Each rail can be enabled explicitly via its
+ * own env flag once an integration is genuinely live.
+ */
+export const ENABLED_CHECKOUT_PROVIDERS: ReadonlySet<PaymentProvider> = new Set(
+  [
+    "TELEBIRR",
+    ...(env.CBE_BIRR_CHECKOUT_ENABLED === true ? (["CBE_BIRR"] as const) : []),
+    ...(env.MPESA_CHECKOUT_ENABLED === true ? (["M_PESA"] as const) : []),
+  ] as PaymentProvider[],
+);
+
+/** True when this rail may start an automated checkout. */
+export function isCheckoutProviderEnabled(provider: string): boolean {
+  return ENABLED_CHECKOUT_PROVIDERS.has(provider as PaymentProvider);
+}
+
+/**
+ * A provider transaction id that this service invented rather than received
+ * from a payment provider.
+ *
+ * Only the unconfigured-provider path mints one: `mock-telebirr-<uuid>` from
+ * telebirr.client's hasCredentials()===false branch. Such an id proves nothing
+ * about money movement and must never credit a wallet in production.
+ */
+export function isSimulatedProviderTransactionId(
+  providerTransactionId: string | null | undefined,
+): boolean {
+  if (!providerTransactionId) return false;
+  return /^mock[-_]/i.test(providerTransactionId.trim());
+}
+
+export class SimulatedProviderTransactionError extends Error {}
+
+/**
+ * Single gate every top-up crediting path must call before crediting.
+ *
+ * In production a simulated transaction id is refused outright: there is no
+ * verified payment behind it. Outside production it is allowed, because the
+ * whole point of the mock path is local development.
+ */
+export function assertTopUpIsCreditable(params: {
+  providerTransactionId: string | null | undefined;
+  nodeEnv?: string;
+}): void {
+  const nodeEnv = params.nodeEnv ?? env.NODE_ENV;
+  if (nodeEnv !== "production") return;
+  if (isSimulatedProviderTransactionId(params.providerTransactionId)) {
+    throw new SimulatedProviderTransactionError(
+      "Refusing to credit a wallet from a simulated provider transaction in production. " +
+        "A mock-* transaction id is minted locally and is not evidence of a payment.",
+    );
+  }
+}
 
 const CHECKOUT_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
   TELEBIRR: telebirrClient,
@@ -532,6 +598,12 @@ export async function handleTopUpWebhook(params: {
 
     return;
   }
+
+  // A simulated transaction id is minted locally by the unconfigured-provider
+  // path and is not evidence that money moved. Refuse it before any credit.
+  // This is the single gate for every auto-credit path: the Telebirr webhook,
+  // the CBE webhook, and the reconciliation sweep all reach this function.
+  assertTopUpIsCreditable({ providerTransactionId: params.providerTransactionId });
 
   // SUCCESS — atomically claim the pending top-up and credit exactly once.
   // Duplicate callbacks can arrive concurrently; the status predicate makes

@@ -23,6 +23,7 @@ import {
   TopUpAlreadyResolvedError,
   getUserTopUps,
   initiateCheckoutTopUp,
+  isCheckoutProviderEnabled,
   handleTopUpWebhook,
   attachReceiptToTopUp,
 } from "./topup.service.js";
@@ -104,9 +105,16 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
   if (!amountMinor || typeof amountMinor !== "number" || amountMinor <= 0) {
     return res.status(400).json({ error: "INVALID_AMOUNT" });
   }
-  const allowedProviders = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
-  if (!allowedProviders.includes(provider)) {
+  const KNOWN_PROVIDERS = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+  if (!KNOWN_PROVIDERS.includes(provider)) {
     return res.status(400).json({ error: "UNSUPPORTED_PROVIDER" });
+  }
+  // Known-but-not-connected rails are refused here, before any provider call
+  // and before a WalletTopUp row exists. CBE Birr and M-Pesa have no approved
+  // merchant API; answering 503 "unavailable" implied a temporary outage
+  // rather than a rail that does not exist yet.
+  if (!isCheckoutProviderEnabled(provider)) {
+    return res.status(400).json({ error: "PROVIDER_NOT_AVAILABLE" });
   }
 
   try {

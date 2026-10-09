@@ -79,6 +79,20 @@ const EnvSchema = z.object({
   // Payment link expiry (Telebirr format, e.g. "120m")
   TELEBIRR_TIMEOUT_EXPRESS: z.string().default("120m"),
 
+  // Per-rail switches for automated checkout. Telebirr is the only connected
+  // rail, so it needs no flag. CBE Birr and M-Pesa have no approved merchant
+  // API; their clients always throw. These stay false so the route answers
+  // 400 PROVIDER_NOT_AVAILABLE rather than pretending a rail is temporarily
+  // down. Flip one only when the integration is genuinely live.
+  CBE_BIRR_CHECKOUT_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  MPESA_CHECKOUT_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   SMS_ETHIOPIA_API_KEY: z.string().optional(),
 
   TELEGRAM_BOT_TOKEN: z
