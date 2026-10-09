@@ -17,6 +17,7 @@
     "route-audit:baseline": "tsx scripts/route-audit.ts --write-baseline",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "db:check-fresh": "node ../../scripts/check-fresh-database.js",
     "prisma:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts"
   },
