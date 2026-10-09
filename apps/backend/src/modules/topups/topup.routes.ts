@@ -118,7 +118,7 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
     return res.json(result);
   } catch (err) {
     if (err instanceof PaymentProviderUnavailableError) {
-      return res.status(503).json({ error: err.code, message: err.message });
+      return res.status(503).json({ error: err.code });
     }
     logger.error({ err }, "Top-up checkout initiation failed");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
