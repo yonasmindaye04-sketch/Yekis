@@ -9,3 +9,9 @@ apps/backend/src/**/*.js.map
 
 # User-uploaded runtime data (chat attachments, evidence files). Never commit.
 apps/backend/uploads/
+
+backups/
+*.dump
+
+# test run output
+apps/backend/*report*.json
