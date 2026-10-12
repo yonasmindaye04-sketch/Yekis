@@ -33,3 +33,17 @@ for (const envPath of candidates) {
 // are needed: setupFiles do not run in the main process, and globalSetup does
 // not run inside workers.
 applyTestDatabaseEnv(process.env);
+
+// The API rate limiter is disabled for the suite. Every suite builds its own
+// app inside this one process, so the limiter's counters accumulate across
+// suites and whichever ran last received TOO_MANY_REQUESTS -- an
+// order-dependent failure rather than an assertion about the limiter.
+//
+// Set here explicitly rather than inferred from NODE_ENV, so the production
+// prohibition is enforced by assertProductionSafety instead of by a NODE_ENV
+// check that any environment could satisfy. tests/rate-limiter.test.ts sets it
+// back to false with its own keyPrefix and asserts the 429 behaviour.
+process.env.RATE_LIMIT_DISABLED = "true";
+// Distinct limiter keys for this process, so enabling the limiter in one suite
+// cannot disturb another.
+process.env.RATE_LIMIT_KEY_PREFIX = `vitest-${process.pid}-`;

@@ -75,14 +75,16 @@ export function buildApp() {
       max: env.NODE_ENV === "production" ? 2000 : 10000,
       standardHeaders: true,
       legacyHeaders: false,
-      // No custom store: express-rate-limit keeps counters in memory per process,
-      // which is what this app has always done. Under NODE_ENV=test the
-      // limiter is disabled outright, because every suite builds its own app
-      // and a process-lifetime counter accumulated across suites — a run that
-      // happened to execute many HTTP suites first starved the later ones into
-      // TOO_MANY_REQUESTS. The limiter is a production abuse control, not a
-      // test assertion; the suites that care about the limit test it directly.
-      skip: () => env.NODE_ENV === "test",
+      // RATE_LIMIT_DISABLED, not NODE_ENV. A bare NODE_ENV check would let any
+      // environment that happened to set NODE_ENV=test switch the abuse control
+      // off; the flag is explicit, defaults to false, and assertProductionSafety
+      // refuses it in production. tests/setup-env.ts is the only thing that sets
+      // it, because every suite builds its own app inside one process and the
+      // shared counter otherwise starves whichever suite runs last.
+      skip: () => env.RATE_LIMIT_DISABLED,
+      // Lets a suite that exercises the limiter isolate its counters.
+      keyGenerator: (req) =>
+        `${env.RATE_LIMIT_KEY_PREFIX}${req.ip ?? "unknown"}`,
       message: {
         error: "TOO_MANY_REQUESTS",
         message: "Too many requests, please try again in a moment.",

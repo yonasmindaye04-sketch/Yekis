@@ -93,6 +93,16 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // Disables the API rate limiter. See assertProductionSafety: refused in
+  // production. Set to true only by apps/backend/tests/setup-env.ts.
+  RATE_LIMIT_DISABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  // Prefix for limiter keys. A suite that exercises the limiter sets its own so
+  // its counters cannot collide with another suite's in the same process.
+  RATE_LIMIT_KEY_PREFIX: z.string().default(""),
+
   SMS_ETHIOPIA_API_KEY: z.string().optional(),
 
   TELEGRAM_BOT_TOKEN: z
@@ -504,6 +514,15 @@ export function assertProductionSafety(
 
     // No hardcoded fallback for the staff console: the bot must never send staff
     // to a domain this deployment does not control.
+    // Disabling the abuse control in production removes the only thing between
+    // the API and a request flood. The flag exists for the test suite, where
+    // many apps share one process.
+    if (cfg.RATE_LIMIT_DISABLED === true) {
+      violations.push(
+        "RATE_LIMIT_DISABLED is true but NODE_ENV=production. The API rate limiter is an abuse control and must stay enabled in production.",
+      );
+    }
+
     if (!cfg.STAFF_CONSOLE_URL) {
       violations.push(
         "STAFF_CONSOLE_URL is required when NODE_ENV=production. The bot's /staff command links to the console, where MFA is enforced; without it there is no safe link to emit.",
