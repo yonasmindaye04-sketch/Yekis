@@ -15,3 +15,22 @@ backups/
 
 # test run output
 apps/backend/*report*.json
+
+# ---- Batch 0.6: repository hygiene ----
+# Reference material that is not part of the application: a vendored oauth4webapi
+# library, an old copy of the starter backend, and business/legal .docx files.
+# Nothing in apps/ or packages/ imports from it (verified: no import, no tsconfig
+# path, no build script reference), so it is untracked. Files stay on disk.
+resource_to_read/
+
+# Microsoft Office lock files (~$...). Created when a .docx is open in Word and
+# committed by accident.
+~$*
+
+# Scratch files produced by editors, installers and test runs.
+*.tmp
+
+# One-off local scripts that embed real credentials. fix_env.js writes a
+# TELEBIRR_PRIVATE_KEY into .env, so it must never be tracked.
+apps/backend/fix_env.js
+apps/backend/test-webhook.js

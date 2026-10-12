@@ -64,9 +64,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Secret scan before anything else, so a committed credential is reported
+      # even if a later step is skipped. Prints file names and line numbers only.
+      - name: Secret scan
+        working-directory: .
+        run: node scripts/scan-secrets.js
+
       - name: Generate Prisma client
         run: pnpm exec prisma generate
 
+      # The suite must never touch a development database: it calls deleteMany(),
+      # and one unscoped filter deleted every Milestone row. The guard in
+      # tests/setup-env.ts refuses any database whose name lacks "_test", so the
+      # scratch database is created here and passed as DATABASE_URL_TEST.
+      - name: Create the test database
+        run: >-
+          PGPASSWORD=marketplace_dev_only psql -h localhost -p 5433 -U marketplace
+          -d marketplace -c "CREATE DATABASE marketplace_test;"
       - name: Apply database migrations
         run: pnpm exec prisma migrate deploy
 
@@ -119,8 +133,10 @@ jobs:
         env:
           NODE_ENV: test
           TELEGRAM_ENV: dev
-          DATABASE_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace
-          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace_test
+          DATABASE_URL_TEST: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace_test
+          REDIS_URL: redis://localhost:6379/1
+          REDIS_URL_TEST: redis://localhost:6379/1
           JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
           JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
           OBJECT_STORE_ENDPOINT: http://localhost:9000
@@ -128,6 +144,17 @@ jobs:
           OBJECT_STORE_ACCESS_KEY: ci
           OBJECT_STORE_SECRET_KEY: ci
           FRONTEND_URL: http://localhost:5173
+          GUEST_SUPPORT_JWT_SECRET: ci-guest-support-secret-distinct-32-chars
+
+      # `prisma migrate deploy` succeeding does not mean the schema is correct:
+      # a migration can omit an object schema.prisma declares, and that is
+      # invisible until something queries the missing table. LedgerAccount,
+      # LedgerJournal, LedgerEntry and PayoutTransaction were exactly that.
+      # Builds a scratch database from migrations alone and fails on any diff.
+      - name: Fresh-database migration check
+        run: pnpm run db:check-fresh
+        env:
+          FRESH_DB_ADMIN_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace
 
   frontend:
     name: Frontend type-check and build
