@@ -6,6 +6,7 @@ import {
   NotContractPartyError,
   CoolingOffExpiredError,
   ContractWorkAlreadyStartedError,
+  createContractFromProposal,
 } from "../src/modules/contracts/contracts.service.js";
 
 // Mock external services if needed
@@ -233,5 +234,102 @@ describe("Statutory 7-day Cooling-Off Cancellation (ECA Proclamation No. 1205/20
         contractId: contract.id,
       }),
     ).rejects.toThrow(ContractWorkAlreadyStartedError);
+  });
+});
+
+/**
+ * D-2 � what does the REAL acceptance path set cancellableUntil to?
+ *
+ * Every other test in this file hand-builds a Contract and supplies its own
+ * cancellableUntil, so none of them proves that the production path sets it at
+ * all. schema.prisma carries the comment
+ *
+ *   cancellableUntil DateTime? // set to createdAt + 7 days by
+ *                              createContractFromProposal()
+ *
+ * and the 7-day cooling-off right (ECA Proclamation No. 1205/2020) depends on
+ * it. This test creates a contract the way the application does and records
+ * what is actually stored.
+ *
+ * F-15 is NOT fixed here: this is a measurement, per the batch brief.
+ */
+describe("the real acceptance path and cancellableUntil (D-2 measurement)", () => {
+  it("records what createContractFromProposal actually stores", async () => {
+    const stamp = Date.now();
+
+    const client = await prisma.user.create({
+      data: {
+        email: `coolreal-client-${stamp}@test.et`,
+        phone: `+25190${Math.floor(1000000 + Math.random() * 8999999)}`,
+        passwordHash: "mockHash",
+        role: "CLIENT",
+      },
+    });
+    const freelancer = await prisma.user.create({
+      data: {
+        email: `coolreal-freelancer-${stamp}@test.et`,
+        phone: `+25190${Math.floor(1000000 + Math.random() * 8999999)}`,
+        passwordHash: "mockHash",
+        role: "FREELANCER",
+      },
+    });
+
+    const job = await prisma.job.create({
+      data: {
+        clientId: client.id,
+        title: `Cooling-off real path ${stamp}`,
+        category: "WEB_APP_DEVELOPMENT",
+        description:
+          "A description comfortably longer than the twenty character minimum required by the schema.",
+        budgetMinMinor: 100000,
+        budgetMaxMinor: 100000,
+        deadline: new Date(Date.now() + 86400000 * 30),
+        proposedMilestones: [],
+      },
+    });
+
+    const proposal = await prisma.proposal.create({
+      data: {
+        jobId: job.id,
+        freelancerId: freelancer.id,
+        coverLetter: "A cover letter long enough to satisfy the schema.",
+        quotedAmountMinor: 100000,
+        estimatedDays: 30,
+        milestoneBreakdown: [
+          {
+            title: "First milestone",
+            amount: { amountMinor: 100000, currency: "ETB" },
+            dueDate: new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 10),
+          },
+        ],
+        attachmentPaths: [],
+        status: "ACCEPTED",
+      },
+    });
+
+    const contract = await createContractFromProposal(proposal.id);
+
+    const fresh = await prisma.contract.findUniqueOrThrow({
+      where: { id: contract.id },
+    });
+
+    // THE MEASUREMENT. Expected per schema.prisma: createdAt + 7 days.
+    // Reported, not asserted, so a future fix to F-15 shows up as this value
+    // changing rather than as a silent test edit.
+    const ageMs = fresh.createdAt.getTime() - Date.now();
+    // eslint-disable-next-line no-console
+    console.log(
+      `[D-2] cancellableUntil=${String(fresh.cancellableUntil)} createdAt=${fresh.createdAt.toISOString()} ageSeconds=${Math.round(ageMs / 1000)}`,
+    );
+
+    // A cooling-off right that is never armed means cancelDuringCoolingOff
+    // always refuses. Assert that consequence, which is the real risk, and
+    // leave the missing assignment itself to the F-15 fix.
+    await expect(
+      cancelDuringCoolingOff({
+        userId: client.id,
+        contractId: contract.id,
+      }),
+    ).rejects.toThrow(CoolingOffExpiredError);
   });
 });

@@ -6,6 +6,28 @@ import { assertProductionSafety } from "../src/config/env.js";
 /**
  * Pre-Phase-1 audit, items 1-5.
  *
+ * TWO KINDS OF TEST LIVE HERE, AND THE DESCRIBE NAMES SAY WHICH.
+ *
+ *   describe("...")                   behavioural: calls assertProductionSafety,
+ *                                      queries the database, or otherwise
+ *                                      executes the rule. Real coverage.
+ *
+ *   describe("LOCK (source text) ...")  a LOCK: it reads a source file as TEXT
+ *                                      and asserts on its contents. It exists
+ *                                      so a known-bad pattern cannot be
+ *                                      reintroduced by a refactor that keeps
+ *                                      everything green.
+ *
+ * A lock does NOT prove the system behaves correctly -- it can pass while the
+ * feature is broken, and it fails on harmless renames. So a lock must never be
+ * counted as behavioural coverage in a report.
+ *
+ * Behavioural here: API_PUBLIC_URL enforcement, the CBE webhook
+ * secret/enabled pairing, the absence of the frontend_url locale key, and
+ * STAFF_CONSOLE_URL enforcement. Locks here: the notify_url and redirect_url
+ * derivation sites, Telegram message content, keyboard URL construction, and
+ * .env.example documentation.
+ *
  * These pin the RULES rather than the implementation, because the whole point
  * of each change is that a specific misconfiguration is now impossible:
  *   - a provider callback can never be built from FRONTEND_URL again;
@@ -99,7 +121,7 @@ describe("1. API_PUBLIC_URL is required in production", () => {
   });
 });
 
-describe("1. provider callbacks are built from API_PUBLIC_URL", () => {
+describe("LOCK (source text) — provider callbacks are built from API_PUBLIC_URL", () => {
   it("telebirr.client.ts never builds notify_url from FRONTEND_URL", () => {
     const src = read("modules/escrow/providers/telebirr.client.ts");
 
@@ -205,7 +227,7 @@ describe("2. CBE webhook secret requires an explicit enable", () => {
   });
 });
 
-describe("3. no KYC or receipt data in Telegram (C4)", () => {
+describe("LOCK (source text) — no KYC or receipt data in Telegram (C4)", () => {
   it("scenes/index.ts emits no /evidence/ link", () => {
     expect(code("modules/bot/scenes/index.ts")).not.toContain("/evidence/");
   });
@@ -233,7 +255,7 @@ describe("3. no KYC or receipt data in Telegram (C4)", () => {
   });
 });
 
-describe("4. no locale-derived URL in keyboards", () => {
+describe("LOCK (source text) — no locale-derived URL in keyboards", () => {
   it("no keyboard builds a URL from ctx.t(...)", () => {
     for (const file of ["modules/bot/keyboards/actions.ts", "modules/bot/keyboards/jobFilters.ts"]) {
       const offenders = codeLines(file).filter(
@@ -265,7 +287,7 @@ describe("4. no locale-derived URL in keyboards", () => {
   });
 });
 
-describe("5. staff console URL has no hardcoded fallback", () => {
+describe("LOCK (source text) — staff console URL has no hardcoded fallback", () => {
   it("refuses to boot in production without STAFF_CONSOLE_URL", () => {
     const v = assertProductionSafety(validProd({ STAFF_CONSOLE_URL: undefined }));
     expect(v.join(" ")).toMatch(/STAFF_CONSOLE_URL is required/);
@@ -291,7 +313,7 @@ describe("5. staff console URL has no hardcoded fallback", () => {
   });
 });
 
-describe("6. the new variables are documented in .env.example", () => {
+describe("LOCK (source text) — the new variables are documented in .env.example", () => {
   const example = readFileSync(resolve(process.cwd(), ".env.example"), "utf8");
 
   it("documents API_PUBLIC_URL", () => {
