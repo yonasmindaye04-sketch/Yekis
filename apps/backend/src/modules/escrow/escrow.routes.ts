@@ -213,6 +213,54 @@ escrowRouter.get(
   },
 );
 
+// The caller's own payout history.
+//
+// PayoutTransaction rows have always existed and are written on every
+// withdrawal, but there was no route that returned them to the user -- only the
+// staff console could see them. A freelancer who asked "did my money arrive?"
+// had no way to find out short of asking support, and the data they need for a
+// tax record was invisible.
+//
+// Strictly scoped to req.user.id: this is not the admin listing, which is a
+// separate route behind payouts.view.
+escrowRouter.get(
+  "/payouts",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const page = Math.max(1, parseInt(String(req.query.page)) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit)) || 20));
+
+    const [total, items] = await Promise.all([
+      prisma.payoutTransaction.count({ where: { userId: req.user!.id } }),
+      prisma.payoutTransaction.findMany({
+        where: { userId: req.user!.id },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+        select: {
+          id: true,
+          amountMinor: true,
+          feeMinor: true,
+          netAmountMinor: true,
+          provider: true,
+          status: true,
+          payoutAccountIdentifier: true,
+          errorMessage: true,
+          createdAt: true,
+          settledAt: true,
+        },
+      }),
+    ]);
+
+    return res.json({
+      items,
+      total,
+      page,
+      pageSize: limit,
+    });
+  },
+);
+
 escrowRouter.post(
     "/wallet/withdraw",
     requireAuth,

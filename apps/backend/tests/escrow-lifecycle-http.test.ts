@@ -94,8 +94,9 @@ async function cleanup() {
   const childFilter = { contractId: { in: ids } };
   const contractFilter = { id: { in: ids } };
 
-  await prisma.auditLog.deleteMany({ where: { userId: userFilter } });
+await prisma.auditLog.deleteMany({ where: { userId: userFilter } });
   await prisma.transactionFlag.deleteMany({ where: { userId: userFilter } });
+  await prisma.payoutTransaction.deleteMany({ where: { userId: userFilter } });
   await prisma.ledgerEntry.deleteMany({
     where: { journal: { idempotencyKey: { contains: "escrow-http-" } } },
   });
@@ -279,7 +280,7 @@ describe("the escrow lifecycle exists over HTTP", () => {
     expect(res.body.error).toBe("VALIDATION_ERROR");
   });
 
-  it("requires authentication on every route", async () => {
+it("requires authentication on every route", async () => {
     // Each of these returned 404 before this change; a route that does not
     // exist also "fails closed", so pinning the status proves they are mounted
     // AND protected rather than silently open.
@@ -288,10 +289,66 @@ describe("the escrow lifecycle exists over HTTP", () => {
       ["post", "/api/v1/escrow/fund-from-wallet"],
       ["post", "/api/v1/escrow/milestones/__x__/submit"],
       ["post", "/api/v1/escrow/milestones/__x__/accept"],
+      ["get", "/api/v1/escrow/payouts"],
     ];
     for (const [method, url] of cases) {
       const res = await request(escrowApp())[method as "get" | "post"](url);
       expect(res.status, `${method.toUpperCase()} ${url}`).toBe(401);
     }
+  });
+});
+
+describe("payout history is the user's own and no one else's", () => {
+  it("returns the caller's payouts and withholds another user's", async () => {
+    const walletFor = async (id: string) =>
+      (await prisma.wallet.findUniqueOrThrow({ where: { userId: id } })).id;
+
+    const mine = await prisma.payoutTransaction.create({
+      data: {
+        userId: freelancerId,
+        walletId: await walletFor(freelancerId),
+        amountMinor: 25000,
+        feeMinor: 125,
+        netAmountMinor: 24875,
+        provider: "TELEBIRR",
+        payoutAccountIdentifier: "+251900000001",
+        status: "CONFIRMED",
+        settledAt: new Date(),
+      },
+    });
+    // A different user's payout on the same rail. The listing must not leak it.
+    const theirs = await prisma.payoutTransaction.create({
+      data: {
+        userId: outsiderId,
+        walletId: await walletFor(outsiderId),
+        amountMinor: 99000,
+        feeMinor: 0,
+        netAmountMinor: 99000,
+        provider: "TELEBIRR",
+        payoutAccountIdentifier: "+251900000002",
+        status: "PROCESSING",
+      },
+    });
+
+    const res = await authed("get", "/api/v1/escrow/payouts", freelancerId, "FREELANCER");
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(1);
+    const ids = res.body.items.map((p: { id: string }) => p.id);
+    expect(ids).toContain(mine.id);
+    expect(ids).not.toContain(theirs.id);
+
+    // The fields a user needs for a receipt and a tax record.
+    const first = res.body.items.find((p: { id: string }) => p.id === mine.id);
+    expect(first.netAmountMinor).toBe(24875);
+    expect(first.feeMinor).toBe(125);
+    expect(first.provider).toBe("TELEBIRR");
+    expect(first.status).toBe("CONFIRMED");
+    expect(first.settledAt).not.toBeNull();
+  });
+
+  it("returns an empty list rather than erroring for a user with no payouts", async () => {
+    const res = await authed("get", "/api/v1/escrow/payouts", clientId, "CLIENT");
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.items)).toBe(true);
   });
 });
