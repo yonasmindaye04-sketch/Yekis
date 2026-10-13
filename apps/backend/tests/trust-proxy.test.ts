@@ -3,9 +3,10 @@ import express from "express";
 import request from "supertest";
 import { redis } from "../src/lib/redis.js";
 import { rateLimit } from "../src/lib/rateLimit.js";
+import { env } from "../src/config/env.js";
 
 /**
- * T0.5 — a client must not be able to choose its own rate-limit bucket by
+ * T0.5 �?" a client must not be able to choose its own rate-limit bucket by
  * forging X-Forwarded-For.
  *
  * Express computes `req.ip` by walking X-Forwarded-For from the RIGHT for
@@ -19,6 +20,22 @@ import { rateLimit } from "../src/lib/rateLimit.js";
  */
 
 const SCOPE = "t05-trust-proxy";
+
+/**
+ * src/lib/rateLimit.ts now honours RATE_LIMIT_DISABLED, which tests/setup-env.ts
+ * sets to true for the whole suite. These tests are specifically about the
+ * limiter refusing and permitting requests, so they need it live. Flipped here
+ * rather than in setup-env so the opt-in is visible at the point of use, and
+ * restored afterwards so no later suite inherits it.
+ */
+let originalDisabled: boolean;
+beforeAll(() => {
+  originalDisabled = env.RATE_LIMIT_DISABLED;
+  (env as Record<string, unknown>).RATE_LIMIT_DISABLED = false;
+});
+afterAll(() => {
+  (env as Record<string, unknown>).RATE_LIMIT_DISABLED = originalDisabled;
+});
 
 /** Builds a minimal app wired exactly like src/app.ts for trust proxy. */
 function appWith(name: string, limit: number, hops: number | undefined) {

@@ -2,6 +2,7 @@
 import type { NextFunction, Request, RequestHandler, Response } from "express";
 import { redis } from "./redis.js";
 import { logger } from "./logger.js";
+import { env } from "../config/env.js";
 
 // === INTERFACES & TYPES ===
 export interface RateLimitRule {
@@ -48,7 +49,7 @@ export async function consumeRateLimit(
   rule: RateLimitRule,
   ip: string,
 ): Promise<RateLimitResult> {
-  const key = `rl:${rule.scope}:${ip}`;
+  const key = `${env.RATE_LIMIT_KEY_PREFIX}rl:${rule.scope}:${ip}`;
   const current = await redis.incr(key);
   if (current === 1) {
     await redis.expire(key, rule.windowSec);
@@ -71,6 +72,20 @@ export async function consumeRateLimit(
  */
 export function rateLimit(rule: RateLimitRule): RequestHandler {
   return async (req: Request, res: Response, next: NextFunction) => {
+    // RATE_LIMIT_DISABLED gates this limiter too, not just the express-rate-limit
+    // in app.ts. It previously did not, which meant the flag did not actually
+    // disable rate limiting in tests: the auth limiters stayed live, keyed on
+    // `rl:<scope>:<ip>` in Redis with no test prefix, so counters survived
+    // between suites and between runs. That surfaced as an intermittent
+    // "Too many requests" in suites that have nothing to do with auth, depending
+    // on how many logins earlier suites had performed against the same counter.
+    //
+    // Read at request time, not at module load, so a suite that flips the flag
+    // (tests/rate-limiter.test.ts, tests/trust-proxy.test.ts) takes effect
+    // without reimporting the module.
+    if (env.RATE_LIMIT_DISABLED) {
+      return next();
+    }
     let result: RateLimitResult;
     try {
       result = await consumeRateLimit(rule, clientIp(req));
