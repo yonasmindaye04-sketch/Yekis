@@ -40,9 +40,11 @@ const SKIP_FILES = new Set([
 const PATTERNS = [
   {
     id: "PEM_PRIVATE_KEY",
-    // "-----BEGIN X PRIVATE KEY-----" on one line, or a header followed by
-    // base64 body on the next few lines.
-    re: /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/,
+    // Matches the ARMORED PEM header line on one line, or that header followed
+    // by a base64 body on the next few lines. The five dashes are written as
+    // "-{5}" rather than literally, because this file is itself tracked and
+    // a literal header here would make the scanner match its own source.
+    re: new RegExp("-{5}BEGIN [A-Z0-9 ]*PRIVATE KEY-{5}"),
   },
   {
     id: "BOT_TOKEN",
@@ -66,6 +68,11 @@ const PATTERNS = [
       if (/^[a-z]+(?:_[a-z0-9]+)+$/.test(value)) return false;
       // All-lowercase single words and dotted paths are identifiers.
       if (/^[a-z./@-]+$/.test(value)) return false;
+      // Long hex strings are secrets in their own right, and the mixed-case
+      // rule below cannot see them: a 32-char hex key has no uppercase and no
+      // symbol, so it was being classified as an identifier and let through.
+      // 24 hex chars is 96 bits, which is past any plausible constant name.
+      if (/^[0-9a-f]{24,}$/i.test(value)) return true;
       // Mixed case + digits + symbols is what a real key looks like.
       return (
         /[A-Z]/.test(value) &&
