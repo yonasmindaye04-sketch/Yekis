@@ -26,6 +26,7 @@ import {
   formatWalletCard,
 } from "../formatters/index.js";
 import { prisma } from "../../../lib/prisma.js";
+import { LaunchCategory } from "@prisma/client";
 import {
   webAppRoutes,
   safeUrlKeyboard,
@@ -51,7 +52,15 @@ async function getWalletSummary(userId: string) {
 
 async function renderJobs(ctx: BotContext, page: number, filters: Record<string, string>) {
   const where: any = { status: "OPEN" };
-  if (filters.category) where.category = filters.category;
+  // filters.category arrives verbatim from callback_data, which is user-supplied
+  // input: anyone can craft an update with jobs:filter:category:<anything>.
+  // Passing that straight into the query made Prisma throw
+  // PrismaClientValidationError ("Expected LaunchCategory") and the handler
+  // errored out for the whole session. Check it against the enum instead, and
+  // fall back to the unfiltered list when it does not match.
+  if (filters.category && (Object.values(LaunchCategory) as string[]).includes(filters.category)) {
+    where.category = filters.category;
+  }
   if (filters.budget && filters.budget !== "any") {
     const [min = 0, max] = filters.budget.split("_").map(Number);
     if (Number.isFinite(min) && min > 0) where.budgetMaxMinor = { gte: min * 100 };
