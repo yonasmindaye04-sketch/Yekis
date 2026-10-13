@@ -59,6 +59,7 @@ import { NotFoundPage } from "./NotFoundPage";
 import { ThankYouPage } from "./ThankYouPage";
 import { CaseStudiesPage } from "./CaseStudiesPage";
 import { CookieBanner } from "./CookieBanner";
+import { OnboardingTour } from "./OnboardingTour";
 import { MobileCTA } from "./MobileCTA";
 import { MarketingHeader } from "./MarketingHeader";
 import { MarketingFooter } from "./MarketingFooter";
@@ -741,6 +742,24 @@ export function FullPlatformApp() {
   };
 
   const platformRole = (user?.role as PlatformRole) || "CLIENT";
+
+  // Onboarding facts, built only from state this screen has actually loaded.
+  // The workspace fetches /auth/me, /wallet, open jobs and the caller's
+  // milestones; nothing here is inferred from a signal that means something
+  // else. `jobs` is deliberately NOT used as "has posted a job" -- it holds
+  // OPEN jobs, so any listing would make the step look complete for a user who
+  // has never posted anything. Steps needing data this screen does not load are
+  // left out of the tour rather than hardcoded to false, which would render a
+  // step the user could never tick off.
+  const tourFacts = useMemo(
+    () => ({
+      role: (user?.role as "CLIENT" | "FREELANCER" | "BOTH") || "CLIENT",
+      kycStatus: user?.kyc?.status ?? "PENDING",
+      walletBalanceMinor: wallet.balanceMinor ?? 0,
+      hasFundedMilestone: milestones.some((m) => m.escrowState !== "PAYMENT_PENDING"),
+    }),
+    [user?.role, user?.kyc?.status, wallet.balanceMinor, milestones],
+  );
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
      safe and keeps every workspace prop free of impossible ADMIN values. */
@@ -1699,6 +1718,10 @@ export function FullPlatformApp() {
       </aside>
 
       <main className="platform-main">
+        <OnboardingTour
+          facts={tourFacts}
+          onNavigate={(tab) => setView(tab as View)}
+        />
         <header className="platform-topbar">
           <div>
             <span className="eyebrow">{roleLabel(platformRole)} workspace</span>
