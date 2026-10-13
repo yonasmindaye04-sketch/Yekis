@@ -90,24 +90,20 @@ async function entry(journalId: string, accountId: string, debitMinor: number, c
 }
 
 describe("journal balancing", () => {
-  it("records exact amounts for a balanced journal", async () => {
+  it("accepts a balanced multi-line journal written as one statement", async () => {
     const debit = await account("ASSET", 0);
     const credit = await account("LIABILITY", 0);
     const j = await journal("balanced");
 
-    // Both lines in ONE transaction. A database-level balance trigger is
-    // deliberately NOT installed (see the migration header: a row-level
-    // trigger breaks legitimate multi-line postings, and a deferred one does not
-    // fire under Prisma's interactive transaction form). This test therefore
-    // asserts the totals a balanced journal holds, not that the database
-    // refuses an unbalanced one.
-    await prisma.$transaction(async (tx) => {
-      await tx.ledgerEntry.create({
-        data: { journalId: j.id, accountId: debit.id, debitMinor: 100000, creditMinor: 0, postedAt: new Date() },
-      });
-      await tx.ledgerEntry.create({
-        data: { journalId: j.id, accountId: credit.id, debitMinor: 0, creditMinor: 100000, postedAt: new Date() },
-      });
+    // ONE statement carrying both halves. This is the shape postJournalEntry
+    // uses, and the reason it buffers lines instead of inserting them one by
+    // one: the guard fires per statement, so a journal assembled from separate
+    // inserts would be rejected after its first line.
+    await prisma.ledgerEntry.createMany({
+      data: [
+        { journalId: j.id, accountId: debit.id, debitMinor: 100000, creditMinor: 0, postedAt: new Date() },
+        { journalId: j.id, accountId: credit.id, debitMinor: 0, creditMinor: 100000, postedAt: new Date() },
+      ],
     });
 
     const agg = await prisma.ledgerEntry.aggregate({
@@ -118,14 +114,84 @@ describe("journal balancing", () => {
     expect(agg._sum.creditMinor).toBe(100000);
   });
 
-  it("has no balance trigger installed, so this gap is visible rather than implied", async () => {
-    // If a future migration adds a working balance trigger, this test fails and
-    // must be replaced with assertions that it actually rejects.
-    const rows = await prisma.$queryRaw<{ tgname: string }[]>`
-      SELECT tgname FROM pg_trigger
-      WHERE tgrelid = to_regclass(${`"LedgerEntry"`})::oid AND NOT tgisinternal
-    `;
-    expect(rows).toHaveLength(0);
+  it("rejects a single unbalanced line with raw SQL, bypassing the service", async () => {
+    const a = await account("ASSET", 0);
+    const j = await journal("stray debit");
+
+    await expect(
+      prisma.$executeRaw`INSERT INTO "LedgerEntry" ("id","journalId","accountId","debitMinor","creditMinor","postedAt")
+        VALUES (gen_random_uuid()::text, ${j.id}, ${a.id}, 4200, 0, now())`,
+    ).rejects.toThrow(/unbalanced/i);
+  });
+
+  it("rejects a multi-row insert whose two lines do not cancel", async () => {
+    const debit = await account("ASSET", 0);
+    const credit = await account("LIABILITY", 0);
+    const j = await journal("mismatched pair");
+
+    await expect(
+      prisma.$executeRaw`
+        INSERT INTO "LedgerEntry" ("id","journalId","accountId","debitMinor","creditMinor","postedAt")
+        VALUES
+          (gen_random_uuid()::text, ${j.id}, ${debit.id},  5000, 0, now()),
+          (gen_random_uuid()::text, ${j.id}, ${credit.id}, 0, 4999, now())`,
+    ).rejects.toThrow(/unbalanced/i);
+  });
+
+  it("rejects deleting one leg of a balanced journal", async () => {
+    const debit = await account("ASSET", 0);
+    const credit = await account("LIABILITY", 0);
+    const j = await journal("then amputated");
+
+    await prisma.ledgerEntry.createMany({
+      data: [
+        { journalId: j.id, accountId: debit.id, debitMinor: 7000, creditMinor: 0, postedAt: new Date() },
+        { journalId: j.id, accountId: credit.id, debitMinor: 0, creditMinor: 7000, postedAt: new Date() },
+      ],
+    });
+    const rows = await prisma.ledgerEntry.findMany({ where: { journalId: j.id } });
+    const leg = rows.find((r) => r.creditMinor === 7000)!;
+
+    await expect(prisma.ledgerEntry.delete({ where: { id: leg.id } })).rejects.toThrow(/unbalanced/i);
+  });
+
+  it("rejects updating a line's amount out of balance", async () => {
+    const debit = await account("ASSET", 0);
+    const credit = await account("LIABILITY", 0);
+    const j = await journal("then edited");
+
+    await prisma.ledgerEntry.createMany({
+      data: [
+        { journalId: j.id, accountId: debit.id, debitMinor: 8000, creditMinor: 0, postedAt: new Date() },
+        { journalId: j.id, accountId: credit.id, debitMinor: 0, creditMinor: 8000, postedAt: new Date() },
+      ],
+    });
+    const rows = await prisma.ledgerEntry.findMany({ where: { journalId: j.id } });
+    const leg = rows.find((r) => r.creditMinor === 8000)!;
+
+    await expect(
+      prisma.ledgerEntry.update({ where: { id: leg.id }, data: { creditMinor: 8001 } }),
+    ).rejects.toThrow(/unbalanced/i);
+  });
+
+  it("still refuses a second, separate statement that unbalances an existing journal", async () => {
+    // The guard is not a one-shot check at creation: appending a stray debit
+    // after a balanced journal exists is also rejected.
+    const debit = await account("ASSET", 0);
+    const credit = await account("LIABILITY", 0);
+    const j = await journal("balanced then appended");
+
+    await prisma.ledgerEntry.createMany({
+      data: [
+        { journalId: j.id, accountId: debit.id, debitMinor: 9000, creditMinor: 0, postedAt: new Date() },
+        { journalId: j.id, accountId: credit.id, debitMinor: 0, creditMinor: 9000, postedAt: new Date() },
+      ],
+    });
+
+    await expect(
+      prisma.$executeRaw`INSERT INTO "LedgerEntry" ("id","journalId","accountId","debitMinor","creditMinor","postedAt")
+        VALUES (gen_random_uuid()::text, ${j.id}, ${credit.id}, 1, 0, now())`,
+    ).rejects.toThrow(/unbalanced/i);
   });
 });
 

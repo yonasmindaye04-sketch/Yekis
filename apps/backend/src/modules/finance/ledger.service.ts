@@ -161,6 +161,8 @@ export async function postJournalEntry(
     },
   });
 
+  const rows: Prisma.LedgerEntryCreateManyInput[] = [];
+
   for (const line of params.entries) {
     const debit = line.debitMinor ?? 0;
     const credit = line.creditMinor ?? 0;
@@ -208,15 +210,20 @@ export async function postJournalEntry(
       },
     });
 
-    await tx.ledgerEntry.create({
-      data: {
-        journalId: journal.id,
-        accountId: account.id,
-        debitMinor: debit,
-        creditMinor: credit,
-      },
+    // Buffered rather than inserted per line. The ledger_balance_guard trigger
+    // validates an entire journal per STATEMENT, which is what lets a valid
+    // multi-line posting satisfy debits == credits without a row-level trigger
+    // rejecting the first line. Posting line-by-line in separate statements
+    // would make every journal look unbalanced after its first insert.
+    rows.push({
+      journalId: journal.id,
+      accountId: account.id,
+      debitMinor: debit,
+      creditMinor: credit,
     });
   }
+
+  await tx.ledgerEntry.createMany({ data: rows });
 
   logger.info(
     {
