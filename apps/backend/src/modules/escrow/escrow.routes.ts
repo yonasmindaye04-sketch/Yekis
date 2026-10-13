@@ -105,9 +105,114 @@ function handleKnownErrors(
   return false;
 }
 
+// The milestone routes below were removed in Phase 0 ("baseline repair") while
+// the frontend calls for them were left in place, which left the escrow
+// lifecycle unreachable over HTTP: a contract could be signed, but no money
+// could enter escrow, no delivery could be submitted and no payment could be
+// released. acceptContract only records signatures and then tells the client
+// escrow funding "is now available" -- to an endpoint that did not exist.
+//
+// The service functions were left imported and unused, so they are re-exposed
+// here rather than rewritten. Auth is still delegated entirely to the service:
+// every one of them re-reads the milestone and checks the caller's party
+// position before touching money, and these handlers never make an
+// authorisation decision of their own.
+
 // Client funds a milestone. Requires at least Tier 1 (already required to
 // have a contract at all) — funding itself doesn't need Tier 2, only
 // withdrawal does.
+escrowRouter.post(
+  "/fund-from-wallet",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({ milestoneId: z.string().min(1) })
+      .safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+
+    try {
+      const milestone = await fundMilestoneFromWallet({
+        clientId: req.user!.id,
+        milestoneId: parsed.data.milestoneId,
+      });
+      return res.json(milestone);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to fund milestone from wallet");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// Freelancer submits the delivery for a funded milestone.
+escrowRouter.post(
+  "/milestones/:milestoneId/submit",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const milestone = await submitMilestone({
+        freelancerId: req.user!.id,
+        milestoneId: String(req.params.milestoneId),
+      });
+      return res.json(milestone);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to submit milestone delivery");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// Client accepts the delivery, which releases the funds to the freelancer.
+escrowRouter.post(
+  "/milestones/:milestoneId/accept",
+  requireAuth,
+  requireFreshAuth(300),
+  async (req: AuthedRequest, res) => {
+    try {
+      const milestone = await acceptMilestone({
+        clientId: req.user!.id,
+        milestoneId: String(req.params.milestoneId),
+      });
+      return res.json(milestone);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to accept milestone delivery");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// Milestones belonging to the caller, across every contract they are party to.
+escrowRouter.get(
+  "/milestones",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const milestones = await prisma.milestone.findMany({
+        where: {
+          contract: {
+            OR: [{ clientId: req.user!.id }, { freelancerId: req.user!.id }],
+          },
+        },
+        include: {
+          contract: {
+            select: { id: true, jobId: true, status: true },
+          },
+        },
+        orderBy: { dueDate: "asc" },
+      });
+      return res.json(milestones);
+    } catch (err) {
+      logger.error({ err }, "Failed to list milestones");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 escrowRouter.post(
     "/wallet/withdraw",
     requireAuth,
