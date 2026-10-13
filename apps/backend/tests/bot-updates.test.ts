@@ -253,7 +253,7 @@ describe("Telegram bot update handling", () => {
       "settings:lang:en", "settings:notif:jobs:off",
       "wallet:withdraw", "wallet:topup", "wallet:transactions", "wallet:history",
       "kyc:upload:id", "kyc:upload:selfie", "kyc:upload:tin", "kyc:upload:business",
-      "jobs:filter:clear", "jobs:page:1", "jobs:filter:category:web",
+      "jobs:filter:clear", "jobs:page:1", "jobs:filter:category:WEB_APP_DEVELOPMENT",
       "jobs:filter:budget:100", "jobs:filter:sort:new",
       "auth:new_code", "withdraw:confirm:yes", "withdraw:confirm:no",
       "topup:upload", "propose:confirm:yes", "proposal:accept:p1",
