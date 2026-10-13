@@ -4,7 +4,20 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    pool: "threads",
+    // "forks", not "threads". The threads pool crashes the whole run with
+    // 0xC0000005 (exit -1073741819) partway through, with no test summary
+    // printed -- an access violation in native code inside a worker thread.
+    // The native modules in play are argon2 0.41.1 and the Prisma query
+    // engine; bcrypt, sharp and canvas are not present. The exact culprit was
+    // not identified.
+    //
+    // It is not caused by any single suite: the crash point moved between runs
+    // (after dispute-single-resolution once, one file later the next time),
+    // and it appeared both before and after the ledger work in this branch.
+    // It IS pool-specific: with forks the same 38 files and 378 tests pass
+    // repeatedly. Forks give each file its own process, so a native fault is
+    // contained instead of taking the run down with it.
+    pool: "forks",
     testTimeout: 30000,
     hookTimeout: 30000,
     // Suites that import src/lib/prisma.js directly never load config/env.js,
