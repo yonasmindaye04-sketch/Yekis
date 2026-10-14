@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { env } from "../src/config/env.js";
 import { sendSms } from "../src/modules/notifications/sms.client.js";
 

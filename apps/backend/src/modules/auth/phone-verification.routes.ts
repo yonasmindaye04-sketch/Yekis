@@ -1,4 +1,4 @@
-﻿// === IMPORTS ===
+// === IMPORTS ===
 import type { Response } from "express";
 import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";

@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
 import { env } from "../src/config/env.js";
 
