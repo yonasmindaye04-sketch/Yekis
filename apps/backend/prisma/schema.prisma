@@ -1077,6 +1077,43 @@ model TelegramLoginCode {
   @@index([expiresAt])
 }
 
+/// SMS OTP challenges proving a User.phone belongs to the account holder.
+///
+/// User.phone is NOT NULL, unique, accepted as a login identifier and used as
+/// the payout destination for Telebirr and M-Pesa, so proving ownership of that
+/// number is a money-safety control, not just a contact detail.
+///
+/// Only the salted SHA-256 of the code is stored. Verified rows are kept, not
+/// deleted, so there is an audit trail of which number was ever proven; the
+/// stored hash is inert once the code expires.
+model PhoneVerificationCode {
+  id String @id @default(cuid())
+
+  /// Intentionally NOT a relation on User. Verification must be possible before
+  /// the account exists (registration) and for number recovery, so an FK would
+  /// block the primary flow.
+  userId String?
+
+  phone String
+  /// sha256(salt + ":" + code), hex. Unique so verification is one index hit.
+  codeHash String @unique
+  salt     String
+  /// Wrong guesses so far. Capped by the service.
+  attempts Int       @default(0)
+  expiresAt DateTime
+  verifiedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@index([userId])
+  // NOTE: "at most one outstanding challenge per phone" is enforced in
+  // phone-verification.service.ts inside a transaction, not by a partial unique
+  // index. Prisma 5.22 cannot express `@@unique(..., where:)`, and adding the
+  // index with raw SQL alone would make the migrated schema diverge from this
+  // file, which db:check-fresh compares.
+}
+
 // ---------- Gigs (Fiverr-style service packages) ----------
 // See docs/GIG_MODEL_PLAN.md for the full design. Gigs reuse the existing
 // EscrowState enum + calculateFees + Wallet + PlatformFeeCredit ledger so the
