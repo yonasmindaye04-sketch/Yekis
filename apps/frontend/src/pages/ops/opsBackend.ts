@@ -476,6 +476,13 @@ export type RawConversationPage = {
 };
 export interface RawChatMessage {
   id: string;
+  /**
+   * Present on the wire: ChatMessage.conversationId is a real column, and both
+   * `listMessages` and the `chat:message` broadcast return the raw Prisma row.
+   * SupportDesk filters on it before appending, so omitting it here was a type
+   * error rather than a runtime one -- the value was always there.
+   */
+  conversationId: string;
   body: string;
   attachmentUrl: string | null;
   origin?: string;
