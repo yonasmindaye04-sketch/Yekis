@@ -72,6 +72,8 @@ import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
 import { GigSellerDashboard } from "./GigSellerDashboard";
 import { TelegramAuthPage } from "./pages/TelegramAuthPage";
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
@@ -375,6 +377,7 @@ function AuthVisualAnimation() {
 }
 
 export function FullPlatformApp() {
+  const { t } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [showLanding, setShowLanding] = useState(true);
@@ -395,6 +398,17 @@ export function FullPlatformApp() {
    * button is not left permanently disabled.
    */
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  /**
+   * Onboarding-tour signals. `null` means "not known yet", which is
+   * deliberately different from 0: the tour hides a step it cannot evaluate, so
+   * an unanswered request produces no step rather than a step that says the user
+   * has done nothing.
+   */
+  const [myJobCount, setMyJobCount] = useState<number | null>(null);
+  const [myProposalCount, setMyProposalCount] = useState<number | null>(null);
+  const [profileCompleteness, setProfileCompleteness] = useState<number | null>(
+    null,
+  );
   // Granular PDPP consents (Master Design §12.2) — optional purposes default
   // unticked (no pre-ticked boxes); required purposes are implied by the
   // terms checkbox + mandatory kyc/financial literals sent on register.
@@ -533,22 +547,44 @@ export function FullPlatformApp() {
     if (authVisitRef.current) authVisitRef.current.flow = authMode;
   }, [authMode]);
 
-  const loadWorkspace = async () => {
-    const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] =
-      await Promise.allSettled([
-        api.getMe(),
-        api.getWallet(),
-        api.getJobs({ status: "OPEN" }),
-        api.getMilestones(),
-        api.getTopUpRequests(),
-      ]);
+const loadWorkspace = async () => {
+    const [
+      meResult,
+      walletResult,
+      jobsResult,
+      milestonesResult,
+      topUpsResult,
+      // Only for the onboarding tour. Without these three the tour can evaluate
+      // just half its steps, and it hides the rest rather than showing steps
+      // nobody can complete. They are additive and allSettled, so a failure here
+      // degrades the guide instead of breaking the workspace load.
+      myJobsResult,
+      myProposalsResult,
+      completenessResult,
+    ] = await Promise.allSettled([
+      api.getMe(),
+      api.getWallet(),
+      api.getJobs({ status: "OPEN" }),
+      api.getMilestones(),
+      api.getTopUpRequests(),
+      api.getMyJobs(),
+      api.getMyProposals(),
+      api.getProfileCompleteness(),
+    ]);
     if (meResult.status === "rejected") throw meResult.reason;
     setUser(meResult.value);
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
     if (milestonesResult.status === "fulfilled")
-      setMilestones(milestonesResult.value);
+    setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
+    // Left as-is when the call fails: the tour then hides the affected step,
+    // which is better than asserting the user has not done it.
+    if (myJobsResult.status === "fulfilled") setMyJobCount(myJobsResult.value.length);
+    if (myProposalsResult.status === "fulfilled")
+    setMyProposalCount(myProposalsResult.value.length);
+    if (completenessResult.status === "fulfilled")
+    setProfileCompleteness(completenessResult.value.profileCompleteness);
     setLastUpdatedAt(new Date());
   };
 
@@ -643,7 +679,7 @@ if (authMode === "register") {
       // support queue rather than a security control.
       if (/\+?251[1-9]\d{8}/.test(phone.replace(/\s/g, ""))) {
         setShowPhoneVerification(true);
-        setError(null);
+        setError("");
         return;
       }
       await api.register({
@@ -774,8 +810,25 @@ if (authMode === "register") {
       kycStatus: user?.kyc?.status ?? "PENDING",
       walletBalanceMinor: wallet.balanceMinor ?? 0,
       hasFundedMilestone: milestones.some((m) => m.escrowState !== "PAYMENT_PENDING"),
+      // undefined, not false, while the answer is unknown -- the tour drops any
+      // step whose predicate returns undefined.
+      hasPostedJob: myJobCount === null ? undefined : myJobCount > 0,
+      hasSubmittedProposal:
+      myProposalCount === null ? undefined : myProposalCount > 0,
+      // Completeness is a percentage. Anything below half-built still counts as
+      // unfinished; a bare account sitting at 0 is not "profile complete".
+      hasProfile:
+      profileCompleteness === null ? undefined : profileCompleteness >= 60,
     }),
-    [user?.role, user?.kyc?.status, wallet.balanceMinor, milestones],
+    [
+      user?.role,
+      user?.kyc?.status,
+      wallet.balanceMinor,
+      milestones,
+      myJobCount,
+      myProposalCount,
+      profileCompleteness,
+    ],
   );
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
@@ -910,14 +963,14 @@ if (authMode === "register") {
   };
 
   const navItems = useMemo(() => {
-    const jobsLabel = canWork ? (canHire ? "Find work / Post" : "Find work") : "Jobs";
+    const jobsLabel = canWork ? (canHire ? `${t.nav.findWork} / ${t.nav.postJob}` : t.nav.findWork) : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const common = [
-      { view: "overview" as View, iconKey: "overview", label: "Overview" },
+      { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
       { view: "gigs" as View, iconKey: "gigs", label: "Gigs" },
-      { view: "contracts" as View, iconKey: "contracts", label: "Contracts" },
-      { view: "wallet" as View, iconKey: "wallet", label: "Wallet" },
+      { view: "contracts" as View, iconKey: "contracts", label: t.nav.escrow },
+      { view: "wallet" as View, iconKey: "wallet", label: t.nav.wallet },
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
       { view: "profile" as View, iconKey: "profile", label: "Profile" },
     ];
@@ -932,14 +985,14 @@ if (authMode === "register") {
       : [
           ...common,
           ...sellerNav,
-          { view: "cases" as View, iconKey: "cases", label: "Disputes" },
+          { view: "cases" as View, iconKey: "cases", label: t.nav.disputes },
           {
             view: "verification" as View,
             iconKey: "verification",
-            label: "Verification",
+            label: t.nav.kyc,
           },
         ];
-  }, [platformRole]);
+  }, [platformRole, t]);
 
   if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;
 
@@ -1066,11 +1119,13 @@ if (authMode === "register") {
               setSuccessMessage("");
             }}
           >
-            <ArrowLeft size={17} /> Back to Yekis
+            <ArrowLeft size={17} /> {t.nav.backToHome}
           </button>
-          <button
-            type="button"
-            className="theme-toggle"
+          <div className="auth-header-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <LanguageSelector variant="dropdown" />
+            <button
+              type="button"
+              className="theme-toggle"
             onClick={toggleTheme}
             aria-label={
               theme === "light" ? "Switch to dark mode" : "Switch to light mode"
@@ -1089,7 +1144,8 @@ if (authMode === "register") {
             }}
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
+            </button>
+          </div>
         </div>
         <div className="platform-auth-art">
           <img
@@ -1740,7 +1796,7 @@ if (authMode === "register") {
           className="sidebar-settings"
           onClick={() => setView("settings")}
         >
-          <Settings size={16} /> <span className="nav-label">Settings</span>
+          <Settings size={16} /> <span className="nav-label">{t.nav.settings}</span>
         </button>
       </aside>
 
@@ -1763,6 +1819,7 @@ if (authMode === "register") {
             className="topbar-actions"
             style={{ display: "flex", alignItems: "center", gap: 10 }}
           >
+            <LanguageSelector variant="dropdown" />
             <button
               type="button"
               className="icon-button theme-toggle"
