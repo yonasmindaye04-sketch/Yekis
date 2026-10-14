@@ -32,51 +32,75 @@ export interface FaydaVerificationResult {
 }
 
 /**
- * STUB — Fayda ID API access is a Phase 0 blocking item (roadmap §Legal &
- * Compliance) still pending formal application approval. This function is
- * structured so that once real credentials and an API contract exist, only
- * this file needs to change — every caller (kyc.service.ts) already treats
- * this as an async black box returning FaydaVerificationResult.
+ * STUB — there is no Fayda server-to-server ID API integration in this file, and
+ * no credential that would change that. FAYDA_API_* does not exist.
  *
- * Until then: returns a deterministic mock result so the rest of the KYC
- * flow (manual review fallback, dedup, status transitions) can be built
- * and tested end-to-end against realistic data shapes.
+ * The previous version of this function returned
+ * `success: true` with `biometricId: mock-biometric-<documentNumber>` for any
+ * input. In production that silently approved every applicant while the audit
+ * trail recorded a clean Fayda verification, which is worse than an outage: it
+ * is a KYC system that cannot fail.
+ *
+ * It now fails closed. There is no code path here that can produce a real
+ * verification, so the honest result is UNAVAILABLE, which routes the applicant
+ * to manual review (see the failure-kind contract above) instead of approving
+ * them on the strength of a fabricated biometric id.
+ *
+ * The real biometric identity check is the eSignet OIDC flow in
+ * esignet.client.ts, which IS implemented. This function only covers the
+ * document-number lookup and stays a stub until Fayda publishes that contract.
  */
-
-// === MAIN FUNCTIONS ===
 export async function verifyWithFayda(params: {
   documentNumber: string;
   fullName: string;
   dateOfBirth: string;
 }): Promise<FaydaVerificationResult> {
-  logger.warn(
+  // Dev keeps the mock so the KYC flow stays testable end to end.
+  if (env.NODE_ENV !== "production") {
+    logger.warn(
+      { documentNumber: params.documentNumber },
+      "Fayda document lookup is a stub; using mock verification. Not for production.",
+    );
+
+    // Reserved test values, so both Tier 1 branches are reachable from the UI
+    // without editing code. Checked before the env flag so a forced outage is
+    // always reported as an outage, whatever the document number.
+    if (
+      env.FAYDA_SIMULATE_UNAVAILABLE ||
+      params.documentNumber === "FAYDA_TEST_FAIL"
+    ) {
+      return {
+        success: false,
+        failureKind: "UNAVAILABLE",
+        failureReason: "FAYDA_SERVICE_UNAVAILABLE",
+      };
+    }
+
+    if (params.documentNumber === "FAYDA_TEST_REJECT") {
+      return {
+        success: false,
+        failureKind: "NOT_FOUND",
+        failureReason: "IDENTITY_NOT_FOUND_AT_FAYDA",
+      };
+    }
+
+    return {
+      success: true,
+      biometricId: `mock-biometric-${params.documentNumber}`,
+      dateOfBirth: params.dateOfBirth,
+      fullName: params.fullName,
+    };
+  }
+
+  // Production. No integration exists, so nothing can be verified and nothing
+  // may be auto-approved. Manual review is the correct destination.
+  logger.error(
     { documentNumber: params.documentNumber },
-    "Fayda API integration not yet live — using mock verification. Do not deploy this to production.",
+    "Fayda document lookup is not integrated; refusing to auto-verify in production",
   );
-
-  // Reserved test values, so both Tier 1 branches are reachable from the UI
-  // without editing code. Checked before the env flag so a forced outage is
-  // always reported as an outage, whatever the document number.
-  if (env.FAYDA_SIMULATE_UNAVAILABLE || params.documentNumber === "FAYDA_TEST_FAIL") {
-    return {
-      success: false,
-      failureKind: "UNAVAILABLE",
-      failureReason: "FAYDA_SERVICE_UNAVAILABLE",
-    };
-  }
-
-  if (params.documentNumber === "FAYDA_TEST_REJECT") {
-    return {
-      success: false,
-      failureKind: "NOT_FOUND",
-      failureReason: "IDENTITY_NOT_FOUND_AT_FAYDA",
-    };
-  }
-
   return {
-    success: true,
-    biometricId: `mock-biometric-${params.documentNumber}`,
-    dateOfBirth: params.dateOfBirth,
-    fullName: params.fullName,
+    success: false,
+    failureKind: "UNAVAILABLE",
+    failureReason: "FAYDA_INTEGRATION_NOT_CONFIGURED",
   };
 }

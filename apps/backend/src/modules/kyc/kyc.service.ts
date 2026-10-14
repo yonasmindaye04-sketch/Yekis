@@ -4,7 +4,10 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { uploadKycDocument, getKycDocumentUrl } from "../../lib/objectStore.js";
 import { verifyWithFayda } from "./fayda.client.js";
-import { screenForPep } from "./pep.client.js";
+import {
+  screenForPep,
+  PepProviderUnavailableError,
+} from "./pep.client.js";
 import { logger } from "../../lib/logger.js";
 import { randomBytes } from "node:crypto";
 import { redis } from "../../lib/redis.js";
@@ -309,7 +312,37 @@ export async function upgradeToTier2(params: {
     );
   }
 
-  const pepResult = await screenForPep(params.fullName);
+  // The screening provider throws rather than returning a clean result when it is
+  // not configured in production. Left unhandled that would surface as a 500 and
+  // tell the applicant nothing. It must land in manual review instead: the TIN
+  // is still captured, the record is not advanced, and a Compliance Officer
+  // decides. pepScreenedAt is deliberately left null -- nobody was screened.
+  let pepResult: { isMatch: boolean };
+  try {
+    pepResult = await screenForPep(params.fullName);
+  } catch (err) {
+    if (!(err instanceof PepProviderUnavailableError)) throw err;
+    logger.error(
+      { userId: params.userId },
+      "PEP screening unavailable; routing Tier 2 request to manual review",
+    );
+    const pending = await prisma.kycRecord.update({
+      where: { id: kyc.id },
+      data: {
+        tin: params.tin,
+        businessRegNumber: params.businessRegNumber,
+        status: "UNDER_REVIEW",
+      },
+    });
+    await recordAuditEvent({
+      userId: params.userId,
+      eventType: "KYC_TIER_UPGRADE_REQUESTED",
+      entityType: "KycRecord",
+      entityId: kyc.id,
+      metadata: { tier: "TIER_2", pepScreening: "UNAVAILABLE" },
+    });
+    return pending;
+  }
 
   await recordAuditEvent({
     userId: params.userId,
@@ -327,9 +360,9 @@ export async function upgradeToTier2(params: {
       isPepMatch: pepResult.isMatch,
       pepScreenedAt: new Date(),
       // A PEP match forces Tier 3 enhanced review instead of a standard
-      // Tier 2 review — never silently approve a flagged user.
-      tier: pepResult.isMatch ? "TIER_3" : "TIER_2",
-      status: "UNDER_REVIEW",
+    // Tier 2 review — never silently approve a flagged user.
+    tier: pepResult.isMatch ? "TIER_3" : "TIER_2",
+    status: "UNDER_REVIEW",
     },
   });
 
