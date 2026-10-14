@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api, type TopUpRequest, type WalletResponse } from "./api/client";
 import { events } from "./analytics";
+import { stashPendingTopUp } from "./PaymentReturn";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -91,11 +92,15 @@ export function BrowserWallet({
     setMessage("");
     setCheckoutFallback(null);
     try {
-      const { redirectUrl } = await api.initiateCheckoutTopUp(
-        Math.round(amountNum * 100),
-        checkoutRail,
-      );
-      if (redirectUrl) {
+const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
+      Math.round(amountNum * 100),
+      checkoutRail,
+    );
+    // Stash the id before leaving. The provider does not reliably echo it back
+    // on the redirect, and without it the return page has no way to verify
+    // anything -- which is how it ended up asserting success unconditionally.
+    if (topUpId) stashPendingTopUp(topUpId);
+    if (redirectUrl) {
         const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } })?.Telegram?.WebApp;
         if (tg && typeof tg.openLink === "function") {
           tg.openLink(redirectUrl);

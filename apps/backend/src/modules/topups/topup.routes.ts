@@ -197,6 +197,42 @@ topupsRouter.post(
   },
 );
 
+// Status of one of the caller's own top-ups.
+//
+// The checkout return page needs to answer a single question -- did the money
+// actually arrive -- and there was no route that could answer it for one
+// transaction. It previously slept three seconds and then rendered "Payment
+// Complete" unconditionally, which told a user their money was in escrow when
+// nothing had confirmed it. That is the worst possible message to get wrong:
+// a user who believes they funded a milestone will start work that is not
+// protected.
+//
+// Scoped to req.user.id, so one user cannot poll another's payment status.
+topupsRouter.get("/:topUpId", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const topUp = await prisma.walletTopUp.findFirst({
+      where: { id: req.params.topUpId as string, userId: req.user!.id },
+      select: {
+        id: true,
+        amountMinor: true,
+        provider: true,
+        status: true,
+        providerTransactionId: true,
+        createdAt: true,
+      },
+    });
+    // 404 rather than 403: a top-up belonging to somebody else should be
+    // indistinguishable from one that does not exist.
+    if (!topUp) return res.status(404).json({ error: "NOT_FOUND" });
+
+    // Convenience for the caller: only APPROVED means the wallet was credited.
+    return res.json({ ...topUp, credited: topUp.status === "APPROVED" });
+  } catch (err) {
+    logger.error({ err }, "Failed to read top-up status");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
 // ---------- Staff-only ----------
 
 topupsRouter.get(

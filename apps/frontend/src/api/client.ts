@@ -1060,6 +1060,24 @@ class ApiClient {
     });
   }
 
+  /**
+   * Status of one of this user's own top-ups.
+   *
+   * `credited` is the only field that should decide whether the UI tells a user
+   * their money arrived. Everything else is detail for the copy.
+   */
+  async getTopUpStatus(topUpId: string): Promise<{
+    id: string;
+    amountMinor: number;
+    provider: string;
+    status: "PENDING" | "CHECKOUT_PENDING" | "APPROVED" | "REJECTED" | "FLAGGED";
+    providerTransactionId: string | null;
+    createdAt: string;
+    credited: boolean;
+  }> {
+    return this.request(`/api/v1/wallet/topups/${topUpId}`);
+  }
+
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
     const headers: Record<string, string> = {};
     if (this.accessToken) {
