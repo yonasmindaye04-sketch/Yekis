@@ -1034,6 +1034,38 @@ class ApiClient {
     return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
   }
 
+  /**
+   * Requests an SMS code for a phone number.
+   *
+   * Both verification endpoints are unauthenticated on purpose: the primary flow
+   * is registration, where the code is sent and checked before the account
+   * exists. Neither reveals whether a number is already registered.
+   *
+   * `devCode` is only ever present outside production, and is shown by the UI
+   * in that case so a developer can complete the flow without a handset.
+   */
+  async requestPhoneCode(phone: string): Promise<{
+    sent: boolean;
+    expiresAt: string;
+    retryAfterSec: number;
+    devCode?: string;
+  }> {
+    return this.request("/api/v1/auth/phone/code", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async verifyPhoneCode(
+    phone: string,
+    code: string,
+  ): Promise<{ verified: true }> {
+    return this.request("/api/v1/auth/phone/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    });
+  }
+
   // Wallet / Top-ups
   async getWallet(): Promise<WalletResponse> {
     return this.request("/api/v1/escrow/wallet");

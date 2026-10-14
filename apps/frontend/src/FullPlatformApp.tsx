@@ -16,6 +16,7 @@ import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
+import { PhoneVerification } from "./PhoneVerification";
 import {
   ContractsWorkspace,
   DisputesWorkspace,
@@ -388,6 +389,12 @@ export function FullPlatformApp() {
   const [dateOfBirth, setDateOfBirth] = useState("2000-01-01");
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  /**
+   * Opens the SMS confirmation step. Set when the user submits the register form
+   * with a usable Ethiopian number, and cleared on either outcome so the submit
+   * button is not left permanently disabled.
+   */
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
   // Granular PDPP consents (Master Design §12.2) — optional purposes default
   // unticked (no pre-ticked boxes); required purposes are implied by the
   // terms checkbox + mandatory kyc/financial literals sent on register.
@@ -628,8 +635,18 @@ export function FullPlatformApp() {
         setPassword("");
         return;
       }
-      if (authMode === "register") {
-        await api.register({
+if (authMode === "register") {
+      // Confirm the number before the account exists, which is why the backend
+      // endpoints are unauthenticated. A number we have not verified is the
+      // payout destination, so this is a money-safety step, not a nicety.
+      // Skip for now is always available: a hard gate with no escape hatch is a
+      // support queue rather than a security control.
+      if (/\+?251[1-9]\d{8}/.test(phone.replace(/\s/g, ""))) {
+        setShowPhoneVerification(true);
+        setError(null);
+        return;
+      }
+      await api.register({
           email,
           phone,
           password,
@@ -1516,9 +1533,19 @@ export function FullPlatformApp() {
               {successMessage}
             </div>
           )}
+          {authMode === "register" && showPhoneVerification && (
+            <PhoneVerification
+              phone={phone}
+              onVerified={() => setShowPhoneVerification(false)}
+              onSkip={() => setShowPhoneVerification(false)}
+            />
+          )}
           <button
             className="btn-primary wide"
-            disabled={isLoading || (authMode === "register" && !termsAccepted)}
+            disabled={
+              isLoading ||
+              (authMode === "register" && (!termsAccepted || showPhoneVerification))
+            }
             style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
