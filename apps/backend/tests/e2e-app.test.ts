@@ -322,3 +322,46 @@ describe("cross-cutting guarantees", () => {
     expect([401, 403]).toContain(after.status);
   });
 });
+describe("Fayda eSignet is reachable from a browser", () => {
+  /**
+   * esignet.client.ts has been a complete OIDC implementation all along -- PAR,
+   * private_key_jwt, nested JWE/JWS decryption -- with no frontend caller, so
+   * it was unreachable in practice. These pin that the endpoints exist and are
+   * guarded, which is the part that was silently broken.
+   *
+   * The happy path needs ESIGNET_* credentials and a live provider, so it is
+   * not exercised here; the redirect URL builder is unit-checked in the
+   * frontend instead.
+   */
+  it("POST /api/v1/kyc/fayda/initiate is mounted and requires auth", async () => {
+    const res = await request(app).post("/api/v1/kyc/fayda/initiate");
+    expect(res.status, `returned ${res.status}`).not.toBe(404);
+    expect(res.status).toBe(401);
+  });
+
+  it("POST /api/v1/kyc/fayda/callback is mounted and validates its body", async () => {
+    const id = await makeUser("esignet");
+    const token = await tokenFor(id, "CLIENT");
+    const res = await request(app)
+      .post("/api/v1/kyc/fayda/callback")
+      .set("Authorization", `Bearer ${token}`)
+      .send({});
+    expect(res.status, `returned ${res.status}`).not.toBe(404);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("VALIDATION_ERROR");
+  });
+
+  it("initiate answers a signed-in user without crashing when unconfigured", async () => {
+    const id = await makeUser("esignet-init");
+    const token = await tokenFor(id, "CLIENT");
+    const res = await request(app)
+      .post("/api/v1/kyc/fayda/initiate")
+      .set("Authorization", `Bearer ${token}`);
+    // No ESIGNET_CLIENT_ID in tests, so it takes the mock fallback and returns
+    // the pieces. A 500 here would mean the flow is broken rather than merely
+    // unconfigured.
+    expect(res.status, `returned ${res.status}: ${JSON.stringify(res.body)}`).toBe(200);
+    expect(res.body.authorizeUrl).toBeTruthy();
+    expect(res.body.state).toBeTruthy();
+  });
+});

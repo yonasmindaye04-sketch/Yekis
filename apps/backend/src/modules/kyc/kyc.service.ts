@@ -638,7 +638,12 @@ export async function initiateFaydaVerification(userId: string) {
       state,
       nonce,
     });
-    return { authorizeUrl, requestUri, state };
+    // clientId is returned because a Pushed Authorization Request is a two-step
+    // redirect: the browser has to send the user to
+    //   authorizeUrl?request_uri=<requestUri>&client_id=<clientId>
+    // Without it the frontend cannot build the redirect, and the flow simply
+    // was not callable from a browser. It is a public identifier.
+    return { authorizeUrl, requestUri, state, clientId: env.ESIGNET_CLIENT_ID };
   } else {
     // Mock fallback for local dev when eSignet is not configured
     return {

@@ -1066,6 +1066,58 @@ class ApiClient {
     });
   }
 
+  /**
+   * Starts the Fayda eSignet biometric check and returns the provider URL to
+   * send the user to.
+   *
+   * This is the only implemented identity path: esignet.client.ts does a real
+   * OIDC Pushed Authorization Request, exchanges the code, and decrypts the
+   * nested JWE/JWS. Until now nothing in the frontend called it, so the working
+   * integration was unreachable and the UI called a route that did not exist.
+   */
+  async initiateFaydaVerification(): Promise<{
+    /** Named authorizeUrl by the API, on both the real and the mock branch. */
+    authorizeUrl: string;
+    requestUri: string;
+    state: string;
+    /** Public OIDC client id. Needed to build the PAR redirect. */
+    clientId?: string;
+  }> {
+    return this.request("/api/v1/kyc/fayda/initiate", { method: "POST" });
+  }
+
+  /**
+   * Builds the browser redirect for a Pushed Authorization Request.
+   *
+   * A PAR is two steps by design: the request_uri is obtained server-side so the
+   * authorization parameters never travel in a URL the user could be tricked
+   * into sharing, and the browser then goes to the authorize endpoint carrying
+   * that reference. Returns null when the pieces needed to do so are missing,
+   * rather than a URL that would fail.
+   */
+  buildFaydaRedirectUrl(res: {
+    authorizeUrl: string;
+    requestUri: string;
+    clientId?: string;
+  }): string | null {
+    if (!res.requestUri || !res.clientId) return null;
+    const url = new URL(res.authorizeUrl);
+    url.searchParams.set("request_uri", res.requestUri);
+    url.searchParams.set("client_id", res.clientId);
+    return url.toString();
+  }
+
+  /** Completes the eSignet redirect. Call with the code and state Fayda returns. */
+  async completeFaydaVerification(
+    code: string,
+    state: string,
+  ): Promise<{ tier: string; status: string }> {
+    return this.request("/api/v1/kyc/fayda/callback", {
+      method: "POST",
+      body: JSON.stringify({ code, state }),
+    });
+  }
+
   // Wallet / Top-ups
   async getWallet(): Promise<WalletResponse> {
     return this.request("/api/v1/escrow/wallet");
