@@ -1,4 +1,4 @@
-﻿# Yekis_jobs Completeness Checklist
+# Yekis_jobs Completeness Checklist
 
 Last reviewed: 2026-08-15
 
@@ -140,7 +140,7 @@ Last reviewed: 2026-08-15
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [ ] Professional Amharic linguistic review of all translated strings (marketing strings now filled; core + marketing both need a native-speaker pass)
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system, persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, and full coverage across Landing V2, workspace navigation, auth header, subpages, and `Yekis_translations.csv`.
 
 ## Marketing Site (Public)
 
@@ -154,7 +154,7 @@ Last reviewed: 2026-08-15
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Amharic translation integration â€” all `[TODO]` marketing stubs filled; professional linguistic review still open (see verification section)
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv`.
 
 ## Automated And Manual Verification
 

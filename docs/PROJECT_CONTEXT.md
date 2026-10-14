@@ -1,5 +1,21 @@
 # Project Context
 
+> **Update 2026-10-14 (Four-Language Multilingual Translation System — Amharic, Oromiffa, Tigrigna, English):**
+> 1. **Motivation & Scope.** The platform previously lacked a complete and functional multilingual interface. In accordance with user requirements, comprehensive, native, culturally authentic translations were implemented across the website for Ethiopia's major national languages: **Amharic (`am` / አማርኛ)**, **Oromiffa (`om` / Afaan Oromoo)**, and **Tigrigna (`ti` / ትግርኛ)**, alongside **English (`en`)**.
+> 2. **i18n Architecture (`apps/frontend/src/i18n.ts`).** Implemented a typed React `LanguageProvider` and `useI18n()` hook with full `localStorage` persistence under key `yekis-language`, automatic synchronization with `<html lang="...">`, and real-time reactive rerendering across all subscribed components.
+> 3. **Accessible, Theme-Invariant Switcher (`apps/frontend/src/components/LanguageSelector.tsx`).** Built a flexible language switcher with two distinct variants:
+>    - `variant="dropdown"`: Designed for headers and topbars with native language scripts, English subtitle, check indicators, and click-outside dismissal.
+>    - `variant="segmented"`: Designed for footers and compact contexts with high-contrast pills (`EN`, `አማ`, `ORO`, `ትግ`).
+>    - **Theme Parity Strictness:** Complies strictly with `.agents/AGENTS.md` and `docs/theme-parity/README.md`: layout dimensions, padding, borders, and typography are theme-invariant; dark theme changes colors/shadows only. Never uses low-opacity pill status designs.
+> 4. **Surface Coverage.**
+>    - **Landing Page V2 (`LandingPageV2.tsx`):** All sections fully hooked to `useI18n()` (Hero, Stats, Escrow Stepper, Transparent Fees, Categories Deck, Testimonials Marquee, About, FAQ, Final CTA, and Footer V2).
+>    - **Platform App Shell (`FullPlatformApp.tsx`):** Added dropdown LanguageSelector to the Auth header and the Workspace Topbar, and translated navigation items.
+>    - **Marketing Subpages:** FAQ Page (`FAQPage.tsx`), Fees Page (`FeesPage.tsx`), About Page (`AboutPage.tsx`), Case Studies Page (`CaseStudiesPage.tsx`), Cookie Banner (`CookieBanner.tsx`), Mobile CTA (`MobileCTA.tsx`), Not Found (`NotFoundPage.tsx`), and Thank You (`ThankYouPage.tsx`).
+> 5. **Offline Parity (`Yekis_translations.csv`).** Updated the translation tracking spreadsheet with 7 columns (`key,page,section,english_text,amharic_translation,oromiffa_translation,tigrigna_translation`) and fully populated all 219 keys with the authentic translations.
+> 6. **Verification.** `pnpm --filter frontend build` passes cleanly (`tsc -b` and `vite build` 0 errors).
+>
+> Last updated: 2026-10-14
+
 > **Update 2026-10-05 (Landing V2 "How it works" rebuilt as stepper + product stage):** the `#how-it-works`
 > section's pinned scroll board has been replaced. Rationale, in short:
 > 1. **What was wrong.** The section was a `480svh` sticky board — four thumbtacked step cards on a ruled

@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import "./marketing.css";
 
 type NotFoundPageProps = {
@@ -6,6 +7,8 @@ type NotFoundPageProps = {
 };
 
 export function NotFoundPage({ onNavigate, onStart }: NotFoundPageProps) {
+  const { t } = useI18n();
+
   return (
     <div
       className="marketing-page"
@@ -26,17 +29,17 @@ export function NotFoundPage({ onNavigate, onStart }: NotFoundPageProps) {
           404
         </h1>
         <h2 style={{ marginBottom: "40px" }}>
-          This page doesn't exist — but great opportunities do.
+          {t.marketing["404"].subtitle}
         </h2>
         <div style={{ display: "flex", gap: "20px", justifyContent: "center" }}>
           <button className="btn-primary" onClick={() => onNavigate("home")}>
-            Go to Homepage
+            {t.marketing["404"].homeLink}
           </button>
           <button className="btn-secondary" onClick={() => onStart("register")}>
-            Browse Jobs
+            {t.marketing["404"].jobsLink}
           </button>
           <button className="btn-secondary" onClick={() => onStart("register")}>
-            Find Freelancers
+            {t.marketing.cta.findWork}
           </button>
         </div>
       </div>

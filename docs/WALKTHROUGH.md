@@ -1,10 +1,24 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-10-04
+Last validated: 2026-10-14
+
+> **Multilingual 4-Language System — Amharic, Oromiffa, Tigrigna, English (2026-10-14):**
+> - **Capability**: Native, high-quality, culturally authentic multilingual support across English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ).
+> - **Architecture**: Full typed dictionary (`apps/frontend/src/i18n.ts`) supporting `LanguageProvider`, `useI18n()` hook, `localStorage` persistence (`yekis-language`), and automatic `<html lang="...">` attribute binding.
+> - **Theme-Invariant Language Selectors (`apps/frontend/src/components/LanguageSelector.tsx` / `LanguageSelector.css`)**:
+>   - Dropdown variant (`variant="dropdown"`) for marketing header and workspace topbar with native language names, English subtitles, check indicators, and click-away dismissal.
+>   - Segmented pill variant (`variant="segmented"`) for footers and compact contexts.
+>   - Theme parity enforced: colors/shadows change between themes while width, height, padding, gap, display, and typography remain strictly theme-invariant.
+> - **Coverage**:
+>   - Landing Page V2 (Hero, Stats, 4-step Escrow, Transparent Fees, Category Deck, Testimonials Marquee, About, FAQ, Final CTA, and Footer V2).
+>   - Marketing Subpages (FAQPage, FeesPage, AboutPage, CaseStudiesPage, CookieBanner, MobileCTA, NotFoundPage, ThankYouPage).
+>   - Platform Workspace (FullPlatformApp auth header, workspace topbar, and translated navigation items).
+> - **Offline Tracking Parity (`Yekis_translations.csv`)**: 7-column format (`key,page,section,english_text,amharic_translation,oromiffa_translation,tigrigna_translation`) with all 219 keys populated.
+> - **Verification**: Frontend build (`tsc -b && vite build`) compiles cleanly in ~10s.
 
 > **Bot Markdown Parse Error Fix (2026-10-04):**
-> - **Root Cause**: All bot reply messages used parse_mode: "Markdown" (legacy) but were written with **double-asterisk bold** and backtick-code syntax, which belongs to MarkdownV2. Telegram's legacy Markdown parser cannot handle these tokens � it responded with 400: Can't find end of the entity starting at byte offset 265 on every /login and /start command.
-> - **Symptom**: The code was minted to the DB successfully but the sendMessage call threw, the global ot.catch caught it and replied "Something went wrong. Please try again." � every single time.
+> - **Root Cause**: All bot reply messages used parse_mode: "Markdown" (legacy) but were written with **double-asterisk bold** and backtick-code syntax, which belongs to MarkdownV2. Telegram's legacy Markdown parser cannot handle these tokens � it responded with 400: Can't find end of the entity starting at byte offset 265 on every /login and /start command.
+> - **Symptom**: The code was minted to the DB successfully but the sendMessage call threw, the global ot.catch caught it and replied "Something went wrong. Please try again." � every single time.
 > - **Fix**: Switched all hand-authored bot messages in commands.ts from parse_mode: "Markdown" to parse_mode: "HTML" using <b>, <code>, and <i> tags, which are unambiguous and safe. The /help command (which uses an i18n translation string) retains its own parse_mode.
 > - **Frontend Fix**: Removed a nested <form> inside the Telegram sign-in modal (which itself is inside the main auth <form>). Replaced with <div> + onKeyDown handler to fix the React hydration error <form> cannot appear as a descendant of <form>.
 

@@ -56,6 +56,8 @@ import {
   Sparkles,
   } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
 import "./landing-v2.css";
 
 /* ─────────────────────────────────────────────────
@@ -70,36 +72,6 @@ type LandingPageV2Props = {
    Constants
 ───────────────────────────────────────────────── */
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-const HERO_TITLE = "Find the right expertise.";
-
-
-
-/* How YEKIS works — four steps, each paired with a product screen
-   in the stage beside it. `panel` picks the screen rendered in the
-   browser frame when the step is selected. */
-const STEPS = [
-  {
-    n: "01",
-    title: "Fund",
-    body: "You deposit the agreed amount into escrow before work starts. It is held safely and never sent until you approve.",
-  },
-  {
-    n: "02",
-    title: "Work",
-    body: "The freelancer completes the milestone and submits deliverables, files and notes for your review.",
-  },
-  {
-    n: "03",
-    title: "Approve",
-    body: "Satisfied with the delivery? Approve it and funds release instantly into the freelancer's wallet.",
-  },
-  {
-    n: "04",
-    title: "Protected",
-    body: "Need revisions or hit a problem? Support mediates with clear evidence for a fair resolution.",
-  },
-];
 
 
 type ReviewSource = "google" | "trustpilot";
@@ -245,65 +217,6 @@ const REVIEW_TONES: Record<MemberReview["tone"], [string, string]> = {
   4: ["var(--v2-primary)", "var(--v2-violet)"],
   5: ["var(--v2-teal)", "var(--v2-violet)"],
 };
-
-const ABOUT_FEATURES = [
-  {
-    n: "01",
-    title: "Verified identities",
-    body: "Freelancers verify with the Ethiopian National ID (Fayda), so you always know exactly who you are hiring.",
-  },
-  {
-    n: "02",
-    title: "Milestone payments",
-    body: "Funds stay locked in escrow and only release when you inspect and approve each delivered milestone.",
-  },
-];
-
-const FAQS = [
-  {
-    cat: "Trusting the platform",
-    items: [
-      {
-        q: "Is my money actually safe?",
-        a: "Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond. If something's wrong, raise it before approving and the payment stays held while we help sort it out.",
-      },
-      {
-        q: "What if the freelancer disappears after I pay?",
-        a: "Your money is still sitting safely in escrow — it was never sent to them. If a freelancer goes silent, raise it with our team and we'll help resolve it, which can include a full refund.",
-      },
-      {
-        q: "What if we disagree about the work?",
-        a: "Most disagreements get sorted directly between you and the freelancer within a short window. If you can't agree, our team reviews both sides — the original brief, the delivered work and your messages — and decides: release, refund, or split fairly.",
-      },
-    ],
-  },
-  {
-    cat: "Getting started",
-    items: [
-      {
-        q: "Why do I need to verify my identity (KYC)?",
-        a: "It protects everyone. Verification is how we confirm the person you hire, or the client you work for, is really who they claim to be. Basic verification is quick and unlocks browsing and posting.",
-      },
-      {
-        q: "What are the fees?",
-        a: "Yekis takes a small percentage of each completed job, split between client and freelancer — never charged upfront, only when a payment actually releases.",
-      },
-    ],
-  },
-  {
-    cat: "Getting paid",
-    items: [
-      {
-        q: "When do I actually get paid?",
-        a: "The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to Telebirr or your bank account.",
-      },
-      {
-        q: "Is there a minimum withdrawal amount?",
-        a: "A small minimum applies per withdrawal to keep payment-rail costs sensible. The exact figure is shown in your wallet before you confirm.",
-      },
-    ],
-  },
-];
 
 /* ─────────────────────────────────────────────────
    Helpers
@@ -605,6 +518,7 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
 }
 
 function HeroSection() {
+  const { t } = useI18n();
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
@@ -659,7 +573,7 @@ function HeroSection() {
       <div className="v2-hero-inner" ref={innerRef}>
         {/* No hero CTAs: the header already carries "Sign in" and
             "Get started", so repeating them here competed with the slogan. */}
-        <SpringTitle text={HERO_TITLE} settled={settled} />
+        <SpringTitle text={t.marketing.hero.title} settled={settled} />
       </div>
     </section>
   );
@@ -669,44 +583,45 @@ function HeroSection() {
 /* ─────────────────────────────────────────────────
    Stats
 ───────────────────────────────────────────────── */
-const STAT_CARDS = [
-  {
-    Icon: Briefcase,
-    tone: "blue",
-    to: 12480,
-    suffix: "+",
-    label: "Jobs completed",
-    desc: "Delivered across 40+ categories",
-  },
-  {
-    Icon: Users,
-    tone: "purple",
-    to: 3940,
-    suffix: "+",
-    label: "Verified freelancers",
-    desc: "Identity & skill verified",
-  },
-  {
-    Icon: ShieldCheck,
-    tone: "green",
-    to: 84.6,
-    decimals: 1,
-    suffix: "M",
-    label: "Secured in escrow (ETB)",
-    desc: "Protected transactions",
-  },
-  {
-    Icon: Zap,
-    tone: "amber",
-    to: 6.5,
-    decimals: 1,
-    suffix: " hrs",
-    label: "Avg. payout time",
-    desc: "From approval to wallet",
-  },
-];
-
 function StatsSection() {
+  const { t } = useI18n();
+  const statCards = [
+    {
+      Icon: Briefcase,
+      tone: "blue" as const,
+      to: 12480,
+      suffix: "+",
+      label: t.marketing.stats.jobsCompleted,
+      desc: t.marketing.stats.jobsCompletedDesc,
+    },
+    {
+      Icon: Users,
+      tone: "purple" as const,
+      to: 3940,
+      suffix: "+",
+      label: t.marketing.stats.verifiedFreelancers,
+      desc: t.marketing.stats.verifiedFreelancersDesc,
+    },
+    {
+      Icon: ShieldCheck,
+      tone: "green" as const,
+      to: 84.6,
+      decimals: 1,
+      suffix: "M",
+      label: t.marketing.stats.securedEscrow,
+      desc: t.marketing.stats.securedEscrowDesc,
+    },
+    {
+      Icon: Zap,
+      tone: "amber" as const,
+      to: 6.5,
+      decimals: 1,
+      suffix: " hrs",
+      label: t.marketing.stats.avgPayout,
+      desc: t.marketing.stats.avgPayoutDesc,
+    },
+  ];
+
   return (
     <section className="v2-section-sm v2-stats" aria-label="Platform metrics">
       <div className="v2-stats-spot" aria-hidden="true" />
@@ -715,7 +630,7 @@ function StatsSection() {
 
       <div className="v2-container">
         <div className="v2-stats-row">
-          {STAT_CARDS.map((s, i) => (
+          {statCards.map((s, i) => (
             <motion.div
               key={s.label}
               className="v2-stat"
@@ -918,12 +833,20 @@ function EscScreenProtected() {
 const ESC_SCREENS = [EscScreenFund, EscScreenWork, EscScreenApprove, EscScreenProtected];
 
 function EscrowSection() {
+  const { t } = useI18n();
   const moduleRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [still, setStill] = useState(false);
   const seen = useInView(moduleRef, { amount: 0.25 });
+
+  const steps = [
+    { n: "01", title: t.marketing.escrow.step1Title, body: t.marketing.escrow.step1Desc },
+    { n: "02", title: t.marketing.escrow.step2Title, body: t.marketing.escrow.step2Desc },
+    { n: "03", title: t.marketing.escrow.step3Title, body: t.marketing.escrow.step3Desc },
+    { n: "04", title: t.marketing.escrow.step4Title, body: t.marketing.escrow.step4Desc },
+  ];
 
   /* honour a mid-session motion preference change */
   useEffect(() => {
@@ -938,19 +861,19 @@ function EscrowSection() {
      reduced motion or while the pointer/focus is inside it */
   useEffect(() => {
     if (still || !seen || paused) return;
-    const t = window.setInterval(() => setActive((i) => (i + 1) % STEPS.length), ESC_DUR);
-    return () => window.clearInterval(t);
-  }, [still, seen, paused, active]);
+    const interval = window.setInterval(() => setActive((i) => (i + 1) % steps.length), ESC_DUR);
+    return () => window.clearInterval(interval);
+  }, [still, seen, paused, active, steps.length]);
 
   const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
     let next: number;
     if (e.key === "ArrowDown" || e.key === "ArrowRight") next = active + 1;
     else if (e.key === "ArrowUp" || e.key === "ArrowLeft") next = active - 1;
     else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = STEPS.length - 1;
+    else if (e.key === "End") next = steps.length - 1;
     else return;
     e.preventDefault();
-    const i = (next + STEPS.length) % STEPS.length;
+    const i = (next + steps.length) % steps.length;
     setActive(i);
     tabRefs.current[i]?.focus();
   };
@@ -969,7 +892,7 @@ function EscrowSection() {
           }}
         >
           <Reveal className="esc-slogan-wrap">
-            <h2 className="esc-slogan">Pay for <em>results</em>, not promises.</h2>
+            <h2 className="esc-slogan">{t.marketing.escrow.slogan}</h2>
           </Reveal>
 
           <div
@@ -978,7 +901,7 @@ function EscrowSection() {
             aria-label="How YEKIS works, four steps"
             onKeyDown={onKey}
           >
-            {STEPS.map((s, i) => (
+            {steps.map((s, i) => (
               <button
                 key={s.n}
                 ref={(el) => { tabRefs.current[i] = el; }}
@@ -1008,7 +931,7 @@ function EscrowSection() {
             <div className="esc-app">
               {ESC_SCREENS.map((Screen, i) => (
                 <div
-                  key={STEPS[i].n}
+                  key={steps[i].n}
                   id={`esc-panel-${i}`}
                   role="tabpanel"
                   aria-labelledby={`esc-tab-${i}`}
@@ -1030,6 +953,7 @@ function EscrowSection() {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref, { once: true, amount: 0.35 });
   return (
@@ -1037,22 +961,22 @@ function FeesSection() {
       <div className="v2-container">
         <Reveal dir="zoom">
           <div className="v2-fees-card" ref={ref}>
-            <span className="v2-eyebrow"><TrendingUp size={14} /> Transparent fees</span>
-            <h2 className="v2-sec-title" style={{ maxWidth: 620 }}>One small percentage. Only when work pays out.</h2>
-            <p className="v2-sec-sub">Nothing is charged upfront. Fees are split between client and freelancer at the moment escrow releases.</p>
+            <span className="v2-eyebrow"><TrendingUp size={14} /> {t.marketing.fees.eyebrow}</span>
+            <h2 className="v2-sec-title" style={{ maxWidth: 620 }}>{t.marketing.fees.headline}</h2>
+            <p className="v2-sec-sub">{t.marketing.fees.subheadline}</p>
             <div className="v2-fee-bar">
               <motion.div className="v2-fee-seg a" initial={{ width: 0 }} animate={seen ? { width: "12%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}>5%</motion.div>
               <motion.div className="v2-fee-seg b" initial={{ width: 0 }} animate={seen ? { width: "16%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}>7%</motion.div>
-              <motion.div className="v2-fee-seg c" initial={{ width: 0 }} animate={seen ? { width: "72%" } : {}} transition={{ duration: 1.1, ease: EASE, delay: 0.42 }}>88% → talent</motion.div>
+              <motion.div className="v2-fee-seg c" initial={{ width: 0 }} animate={seen ? { width: "72%" } : {}} transition={{ duration: 1.1, ease: EASE, delay: 0.42 }}>88% → {t.marketing.fees.talentShare}</motion.div>
             </div>
             <div className="v2-fee-legend">
-              <span><i style={{ background: "var(--v2-teal)" }} />Client fee</span>
-              <span><i style={{ background: "var(--v2-violet)" }} />Freelancer fee</span>
-              <span><i style={{ background: "var(--v2-border2)" }} />Goes to the freelancer</span>
+              <span><i style={{ background: "var(--v2-teal)" }} />{t.marketing.fees.clientFee}</span>
+              <span><i style={{ background: "var(--v2-violet)" }} />{t.marketing.fees.freelancerFee}</span>
+              <span><i style={{ background: "var(--v2-border2)" }} />{t.marketing.fees.talentShare}</span>
             </div>
             <p style={{ marginTop: 20, color: "var(--v2-text2)", fontSize: 13.5 }}>
               <WalletCards size={15} style={{ verticalAlign: "text-bottom", marginRight: 7, color: "var(--v2-primary)" }} />
-              Deposits and withdrawals via Telebirr or CBE — no hidden wire charges.
+              {t.marketing.fees.note}
             </p>
           </div>
         </Reveal>
@@ -1062,69 +986,10 @@ function FeesSection() {
 }
 
 /* ─────────────────────────────────────────────────
-   Pinned scroll-stack deck data
-───────────────────────────────────────────────── */
-const DECK_CARDS = [
-  {
-    cardClass: "stk-card--1",
-    klass: "01 / Engineering",
-    titleL1: "Web & App",
-    titleL2: "Development",
-    roles: "148 open roles",
-    tag: "Full\u2011stack · Mobile · API",
-    Icon: Code,
-  },
-  {
-    cardClass: "stk-card--2",
-    klass: "02 / Design",
-    titleL1: "Graphic Design",
-    titleL2: "& Branding",
-    roles: "96 open roles",
-    tag: "Identity · Print · UI",
-    Icon: Palette,
-  },
-  {
-    cardClass: "stk-card--3",
-    klass: "03 / Marketing",
-    titleL1: "Digital",
-    titleL2: "Marketing",
-    roles: "74 open roles",
-    tag: "SEO · Social · Paid",
-    Icon: Megaphone,
-  },
-  {
-    cardClass: "stk-card--4",
-    klass: "04 / Content",
-    titleL1: "Content &",
-    titleL2: "Copywriting",
-    roles: "61 open roles",
-    tag: "Editorial · UX · Scripts",
-    Icon: PenTool,
-  },
-  {
-    cardClass: "stk-card--5",
-    klass: "05 / Language",
-    titleL1: "Amharic / English",
-    titleL2: "Translation",
-    roles: "53 open roles",
-    tag: "Localisation · Subtitling",
-    Icon: Languages,
-  },
-  {
-    cardClass: "stk-card--6",
-    klass: "06 / Data",
-    titleL1: "Data",
-    titleL2: "Processing",
-    roles: "88 open roles",
-    tag: "Annotation · ETL · QA",
-    Icon: Database,
-  },
-] as const;
-
-/* ─────────────────────────────────────────────────
    Categories — pinned scroll-stack deck
 ───────────────────────────────────────────────── */
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+  const { t } = useI18n();
   const wrapRef  = useRef<HTMLDivElement>(null);
   const pinRef   = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -1283,15 +1148,72 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     };
   }, []);
 
+  const deckCards = [
+    {
+      cardClass: "stk-card--1",
+      klass: t.marketing.categories.c1Class,
+      titleL1: t.marketing.categories.c1Title1,
+      titleL2: t.marketing.categories.c1Title2,
+      roles: t.marketing.categories.c1Roles,
+      tag: t.marketing.categories.c1Tag,
+      Icon: Code,
+    },
+    {
+      cardClass: "stk-card--2",
+      klass: t.marketing.categories.c2Class,
+      titleL1: t.marketing.categories.c2Title1,
+      titleL2: t.marketing.categories.c2Title2,
+      roles: t.marketing.categories.c2Roles,
+      tag: t.marketing.categories.c2Tag,
+      Icon: Palette,
+    },
+    {
+      cardClass: "stk-card--3",
+      klass: t.marketing.categories.c3Class,
+      titleL1: t.marketing.categories.c3Title1,
+      titleL2: t.marketing.categories.c3Title2,
+      roles: t.marketing.categories.c3Roles,
+      tag: t.marketing.categories.c3Tag,
+      Icon: Megaphone,
+    },
+    {
+      cardClass: "stk-card--4",
+      klass: t.marketing.categories.c4Class,
+      titleL1: t.marketing.categories.c4Title1,
+      titleL2: t.marketing.categories.c4Title2,
+      roles: t.marketing.categories.c4Roles,
+      tag: t.marketing.categories.c4Tag,
+      Icon: PenTool,
+    },
+    {
+      cardClass: "stk-card--5",
+      klass: t.marketing.categories.c5Class,
+      titleL1: t.marketing.categories.c5Title1,
+      titleL2: t.marketing.categories.c5Title2,
+      roles: t.marketing.categories.c5Roles,
+      tag: t.marketing.categories.c5Tag,
+      Icon: Languages,
+    },
+    {
+      cardClass: "stk-card--6",
+      klass: t.marketing.categories.c6Class,
+      titleL1: t.marketing.categories.c6Title1,
+      titleL2: t.marketing.categories.c6Title2,
+      roles: t.marketing.categories.c6Roles,
+      tag: t.marketing.categories.c6Tag,
+      Icon: Database,
+    },
+  ];
+
   return (
     <section className="v2-section" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
       {/* section header */}
       <div className="v2-container">
-        <Reveal><span className="v2-eyebrow"><Sparkles size={14} /> Browse by category</span></Reveal>
-        <Reveal delay={0.05}><h2 className="v2-sec-title">Find the right expertise.</h2></Reveal>
+        <Reveal><span className="v2-eyebrow"><Sparkles size={14} /> {t.marketing.categories.eyebrow}</span></Reveal>
+        <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
         <Reveal delay={0.1}>
           <p className="v2-sec-sub" style={{ marginBottom: 38 }}>
-            Six launch categories covering Ethiopia&rsquo;s most in-demand digital skills.
+            {t.marketing.categories.subtitle}
           </p>
         </Reveal>
       </div>
@@ -1300,11 +1222,11 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       <div className="stk-wrap" ref={wrapRef}>
         <div className="stk-pin" ref={pinRef}>
           <div className="stk-stage" ref={stageRef}>
-            {DECK_CARDS.map((card, i) => (
+            {deckCards.map((card, i) => (
               <div
                 key={card.cardClass}
                 className={`stk-card ${card.cardClass}`}
-                style={{ zIndex: DECK_CARDS.length - i }}
+                style={{ zIndex: deckCards.length - i }}
               >
                 {/* copy column */}
                 <div className="stk-col stk-copy">
@@ -1344,7 +1266,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
           {/* deck counter */}
           <div className="stk-count" ref={countRef}>
-            <b ref={curRef}>01</b> / {String(DECK_CARDS.length).padStart(2, "0")}
+            <b ref={curRef}>01</b> / {String(deckCards.length).padStart(2, "0")}
           </div>
 
           {/* scroll cue */}
@@ -1355,20 +1277,20 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
                 <path d="M12 5v14" /><path d="m19 12-7 7-7-7" />
               </svg>
             </span>
-            <span className="lbl">Scroll</span>
+            <span className="lbl">{t.marketing.categories.scrollCue}</span>
           </div>
         </div>
       </div>
 
       {/* outro — always-dark "Let's build." panel */}
       <div className="stk-flat stk-outro" ref={outroRef} role="complementary" aria-label="Call to action">
-        <h1 className="stk-rv"><span>Let&rsquo;s build.</span></h1>
+        <h1 className="stk-rv"><span>{t.marketing.categories.outroTitle}</span></h1>
         <p className="stk-outro-sub">
-          Post a role in minutes, or join the talent pool &mdash; Ethiopia&rsquo;s digital workforce is one deck away.
+          {t.marketing.categories.outroSubtitle}
         </p>
         <div className="stk-cta-row">
-          <button className="stk-outro-btn" onClick={() => onStart("register")}>Get started</button>
-          <button className="stk-outro-ghost" onClick={() => onStart("login")}>Sign in</button>
+          <button className="stk-outro-btn" onClick={() => onStart("register")}>{t.nav.getStarted}</button>
+          <button className="stk-outro-ghost" onClick={() => onStart("login")}>{t.nav.signIn}</button>
         </div>
       </div>
     </section>
@@ -1379,7 +1301,6 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 /* ─────────────────────────────────────────────────
    Testimonials — vertical review marquee
 ───────────────────────────────────────────────── */
-const TITLE_WORDS = ["Trust,", "in", "their", "words."];
 const MARQUEE_DURATIONS = ["38s", "46s", "34s"];
 
 function GoogleMark() {
@@ -1435,6 +1356,7 @@ function ReviewCard({ review }: { review: MemberReview }) {
 }
 
 function TestimonialsSection() {
+  const { t } = useI18n();
   const columns = useMemo(() => {
     const cols: MemberReview[][] = [[], [], []];
     REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
@@ -1448,28 +1370,17 @@ function TestimonialsSection() {
         <div className="v2-center">
           <Reveal>
             <span className="v2-eyebrow">
-              <MessageCircle size={14} /> What members say
+              <MessageCircle size={14} /> {t.marketing.testimonials.eyebrow}
             </span>
           </Reveal>
           <Reveal delay={0.06}>
             <h2 className="v2-sec-title" id="v2-testi-title">
-              {TITLE_WORDS.map((word, i) => (
-                <span className="v2-testi-word" key={word}>
-                  <motion.span
-                    initial={{ y: "112%", opacity: 0 }}
-                    whileInView={{ y: "0%", opacity: 1 }}
-                    viewport={{ once: true, amount: 0.5 }}
-                    transition={{ duration: 0.62, delay: 0.08 + i * 0.085, ease: EASE }}
-                  >
-                    {word}
-                  </motion.span>
-                </span>
-              ))}
+              {t.marketing.testimonials.title}
             </h2>
           </Reveal>
           <Reveal delay={0.14}>
             <p className="v2-sec-sub v2-testi-sub">
-              Real payouts, real disputes, real deadlines — from the people who ship on YEKIS every week.
+              {t.marketing.testimonials.subtitle}
             </p>
           </Reveal>
         </div>
@@ -1497,7 +1408,7 @@ function TestimonialsSection() {
           ))}
         </div>
 
-        <p className="v2-testi-hint">Hover to pause · reviews refresh hourly</p>
+        <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
       </div>
     </section>
   );
@@ -1507,6 +1418,13 @@ function TestimonialsSection() {
    About / Studio — editorial split layout
 ───────────────────────────────────────────────── */
 function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
+  const { t } = useI18n();
+  const aboutFeatures = [
+    { n: "01", title: t.marketing.about.feature1Title, body: t.marketing.about.feature1Desc },
+    { n: "02", title: t.marketing.about.feature2Title, body: t.marketing.about.feature2Desc },
+    { n: "03", title: t.marketing.about.feature3Title, body: t.marketing.about.feature3Desc },
+  ];
+
   return (
     <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title" style={{ paddingTop: 10 }}>
       <div className="v2-container">
@@ -1514,23 +1432,20 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
           <div className="v2-about-panel">
             {/* Left: copy + highlights */}
             <div className="v2-about-content">
-              <span className="v2-about-eyebrow">Ethiopia's freelance marketplace</span>
+              <span className="v2-about-eyebrow">{t.marketing.about.eyebrow}</span>
 
               <h2 className="v2-about-title" id="v2-about-title">
-                Great work deserves
+                {t.marketing.about.title1}
                 <br />
-                guaranteed payment.
+                {t.marketing.about.title2}
               </h2>
 
               <p className="v2-about-intro">
-                Yekis connects Ethiopian businesses with verified freelance talent —
-                and keeps every payment locked in escrow until the work is delivered
-                and approved. No chasing invoices, no awkward money conversations.
-                Just clear rules both sides can trust.
+                {t.marketing.about.intro}
               </p>
 
               <div className="v2-about-features">
-                {ABOUT_FEATURES.map((feature) => (
+                {aboutFeatures.map((feature) => (
                   <article className="v2-about-feature" key={feature.n}>
                     <span className="v2-about-feature-num" aria-hidden="true">{feature.n}</span>
                     <div>
@@ -1543,7 +1458,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 
               <button className="v2-btn v2-btn-primary v2-about-btn" onClick={() => onNavigate("about")}>
                 <span className="v2-shine" />
-                <span>More about Yekis</span>
+                <span>{t.marketing.about.btn}</span>
                 <ArrowUpRight size={16} className="v2-about-btn-arrow" />
               </button>
             </div>
@@ -1557,9 +1472,9 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
                 fetchPriority="high"
               />
               <div className="v2-about-visual-bar">
-                <span>Escrow</span>
-                <span>Fayda KYC</span>
-                <span>Mediation</span>
+                <span>{t.marketing.about.visualEscrow}</span>
+                <span>{t.marketing.about.visualKyc}</span>
+                <span>{t.marketing.about.visualMediation}</span>
               </div>
             </div>
           </div>
@@ -1573,27 +1488,54 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
    FAQ
 ───────────────────────────────────────────────── */
 function FAQSection() {
+  const { t } = useI18n();
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
+  const faqs = useMemo(() => [
+    {
+      cat: t.marketing.faq.trustTitle,
+      items: [
+        { q: t.marketing.faq.q1, a: t.marketing.faq.a1 },
+        { q: t.marketing.faq.q2, a: t.marketing.faq.a2 },
+        { q: t.marketing.faq.q3, a: t.marketing.faq.a3 },
+      ],
+    },
+    {
+      cat: t.marketing.faq.startTitle,
+      items: [
+        { q: t.marketing.faq.q5, a: t.marketing.faq.a5 },
+        { q: t.marketing.faq.q7, a: t.marketing.faq.a7 },
+        { q: t.marketing.faq.q8, a: t.marketing.faq.a8 },
+      ],
+    },
+    {
+      cat: t.marketing.faq.paidTitle,
+      items: [
+        { q: t.marketing.faq.q9, a: t.marketing.faq.a9 },
+        { q: t.marketing.faq.q11, a: t.marketing.faq.a11 },
+      ],
+    },
+  ], [t]);
+
   const groups = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    return FAQS.map((cat) => ({
+    return faqs.map((cat) => ({
       cat: cat.cat,
       items: cat.items.filter((it) => {
         if (!needle) return true;
         return `${it.q} ${it.a}`.toLowerCase().includes(needle);
       }),
     })).filter((g) => g.items.length > 0);
-  }, [q]);
+  }, [q, faqs]);
 
   return (
     <section className="v2-section" id="faq">
       <div className="v2-container">
         <div className="v2-center" style={{ marginBottom: 40 }}>
-          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> FAQ</span></Reveal>
-          <Reveal delay={0.06}><h2 className="v2-sec-title">Frequently asked questions</h2></Reveal>
-          <Reveal delay={0.12}><p className="v2-sec-sub" style={{ margin: "0 auto" }}>Straight answers about money, verification and disputes.</p></Reveal>
+          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> {t.marketing.faq.eyebrow}</span></Reveal>
+          <Reveal delay={0.06}><h2 className="v2-sec-title">{t.marketing.faq.title}</h2></Reveal>
+          <Reveal delay={0.12}><p className="v2-sec-sub" style={{ margin: "0 auto" }}>{t.marketing.faq.subtitle}</p></Reveal>
         </div>
 
         <Reveal>
@@ -1602,7 +1544,7 @@ function FAQSection() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search questions…"
+              placeholder={t.marketing.faq.searchPlaceholder}
               style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--v2-text)", fontSize: 14.5, fontFamily: "inherit" }}
             />
             <AnimatePresence>
@@ -1624,7 +1566,7 @@ function FAQSection() {
         <div style={{ maxWidth: 720, margin: "0 auto" }}>
           {groups.length === 0 ? (
             <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} style={{ padding: 34, textAlign: "center", color: "var(--v2-text2)", border: "1px dashed var(--v2-border)", borderRadius: 14, fontSize: 14.5 }}>
-              No question matches that. Try "escrow", "withdraw" or "KYC".
+              {t.marketing.faq.noResults}
             </motion.div>
           ) : (
             <AnimatePresence initial={false}>
@@ -1669,6 +1611,7 @@ function FAQSection() {
    Final CTA — pointer-tracked spotlight panel
 ───────────────────────────────────────────────── */
 function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLElement | null>(null);
 
   /* the spotlight gradient follows the pointer across the panel */
@@ -1721,13 +1664,11 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
       <div className="v2-outro-cta-inner">
         <p className="v2-outro-kicker">
           <Sparkles />
-          Ready to start?
+          {t.marketing.cta.eyebrow}
         </p>
-        <h2 id="ready-heading">Put your next project in motion.</h2>
+        <h2 id="ready-heading">{t.marketing.cta.title}</h2>
         <p>
-          Post a job or join as a freelancer. Fund a milestone, review the work, release
-          payment — automatically after the review window if nobody responds, and
-          held until a dispute is resolved if one is raised.
+          {t.marketing.cta.subtitle}
         </p>
         <div className="v2-outro-actions">
           <button
@@ -1736,14 +1677,14 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
           >
             <span className="v2-outro-shine" aria-hidden />
             <Briefcase />
-            <span>Post a job</span>
+            <span>{t.marketing.cta.postJob}</span>
           </button>
           <button
             className="v2-outro-btn v2-outro-btn-ghost"
             onClick={() => onStart("register")}
           >
             <Award />
-            <span>Find work</span>
+            <span>{t.marketing.cta.findWork}</span>
           </button>
         </div>
       </div>
@@ -1785,27 +1726,29 @@ function BackToTop() {
    Footer — frosted card over a panel, giant word below
 ───────────────────────────────────────────────── */
 function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const { t } = useI18n();
+
   const NAV_COLS = [
     {
-      heading: "Platform",
+      heading: t.marketing.footer.platform,
       links: [
-        { label: "FAQ", page: "faq" },
-        { label: "Fees", page: "fees" },
-        { label: "Case Studies", page: "case-studies" },
+        { label: t.marketing.footer.faq, page: "faq" },
+        { label: t.marketing.footer.fees, page: "fees" },
+        { label: t.marketing.footer.caseStudies, page: "case-studies" },
       ],
     },
     {
-      heading: "Company",
+      heading: t.marketing.footer.company,
       links: [
-        { label: "About Us", page: "about" },
-        { label: "Contact Support", href: "mailto:support@yekis.com" },
+        { label: t.marketing.footer.about, page: "about" },
+        { label: t.marketing.footer.contactSupport, href: "mailto:support@yekis.com" },
       ],
     },
     {
-      heading: "Legal",
+      heading: t.marketing.footer.legal,
       links: [
-        { label: "Privacy Policy", page: "privacy" },
-        { label: "Terms of Service", page: "terms" },
+        { label: t.marketing.footer.privacy, page: "privacy" },
+        { label: t.marketing.footer.terms, page: "terms" },
       ],
     },
   ];
@@ -1905,9 +1848,7 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
               <span>Yekis</span>
             </button>
             <p className="v2-footer-desc">
-              Yekis connects Ethiopia&rsquo;s digital talent with clients
-              worldwide &mdash; every contract escrow&#8209;protected, every
-              milestone evidenced, from first brief to final payout.
+              {t.marketing.footer.desc}
             </p>
             <nav className="v2-footer-social" aria-label="Social links">
               {SOCIAL.map(({ label, href, svg }) => (
@@ -1954,18 +1895,17 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
         <div className="v2-footer-base">
           <div className="v2-footer-meta">
             <p>
-              &copy; {year} Yekis &mdash; Addis Ababa &middot; Made for
-              Ethiopia&rsquo;s digital workforce.
+              &copy; {year} Yekis &mdash; Addis Ababa &middot; {t.marketing.footer.copyright}
             </p>
             <span className="v2-footer-escrow">
               <ShieldCheck />
-              Payments secured by Yekis Escrow
+              {t.marketing.footer.escrowNote}
             </span>
           </div>
           <div className="v2-footer-legal">
-            <span className="v2-footer-lang">EN / አማ</span>
-            <button onClick={() => onNavigate("privacy")}>Privacy Policy</button>
-            <button onClick={() => onNavigate("terms")}>Terms of Service</button>
+            <LanguageSelector variant="segmented" />
+            <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
+            <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
           </div>
         </div>
       </div>

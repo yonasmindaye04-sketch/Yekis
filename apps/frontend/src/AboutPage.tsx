@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import "./marketing.css";
 
 type AboutPageProps = {
@@ -6,17 +7,19 @@ type AboutPageProps = {
 };
 
 export function AboutPage({ onNavigate, onStart: _onStart }: AboutPageProps) {
+  const { t } = useI18n();
+
   return (
     <div className="marketing-page">
       <div className="marketing-container">
         <div className="marketing-breadcrumbs">
-          <button onClick={() => onNavigate("home")}>Home</button> &gt; About
+          <button onClick={() => onNavigate("home")}>{t.nav.home}</button> &gt; {t.nav.about}
         </div>
         <section className="content-section">
-          <h1>About Yekis</h1>
+          <h1>{t.marketing.about.title}</h1>
 
           <div className="glass-panel" style={{ marginTop: "40px" }}>
-            <h2>Our Mission</h2>
+            <h2>{t.marketing.about.missionTitle}</h2>
             <p
               style={{
                 fontSize: "20px",
@@ -25,23 +28,17 @@ export function AboutPage({ onNavigate, onStart: _onStart }: AboutPageProps) {
                 margin: "20px 0",
               }}
             >
-              "Yekis exists to give Ethiopian freelancers and their clients a
-              workspace where good work can happen without needing informal
-              trust or a lawyer."
+              &ldquo;{t.marketing.about.missionQuote}&rdquo;
             </p>
 
-            <h2 style={{ marginTop: "40px" }}>The Problem We Solve</h2>
+            <h2 style={{ marginTop: "40px" }}>{t.marketing.about.problemTitle}</h2>
             <p>
-              The trust gap in Ethiopian freelance work holds back incredible
-              talent. Clients fear paying upfront and receiving nothing.
-              Freelancers fear delivering work and never getting paid. Yekis
-              bridges this gap with milestone-based escrow, protecting both
-              sides.
+              {t.marketing.about.problemBody}
             </p>
           </div>
 
           <div style={{ marginTop: "60px" }}>
-            <h2>Our Team</h2>
+            <h2>{t.marketing.about.teamTitle}</h2>
             <div
               className="category-card"
               style={{ maxWidth: "300px", margin: "20px 0" }}
@@ -55,45 +52,50 @@ export function AboutPage({ onNavigate, onStart: _onStart }: AboutPageProps) {
                   marginBottom: "20px",
                 }}
               ></div>
-              {/* TODO: Add real photo */}
-              <h3>Placeholder Name</h3>
-              <p style={{ color: "var(--color-text-secondary)" }}>Founder</p>
+              <h3>Dawit Alemu</h3>
+              <p style={{ color: "var(--color-text-secondary)" }}>Founder &amp; Engineering</p>
             </div>
           </div>
 
           <div className="glass-panel" style={{ marginTop: "60px" }}>
-            <h2>Contact Information</h2>
-            <p>Email: hello@yekis.com</p>
-            <p>Phone: +251 900 000000</p>
+            <h2>{t.marketing.about.contactTitle}</h2>
+            <p>{t.marketing.about.email}</p>
+            <p>{t.marketing.about.phone}</p>
             <div style={{ marginTop: "20px" }}>
               <a
-                href="#"
+                href="https://t.me/yekis_channel"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   color: "var(--color-primary)",
                   marginRight: "20px",
                   textDecoration: "none",
                 }}
               >
-                Telegram Channel
+                {t.marketing.about.telegramChannel}
               </a>
               <a
-                href="#"
+                href="https://t.me/yekis_group"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   color: "var(--color-primary)",
                   marginRight: "20px",
                   textDecoration: "none",
                 }}
               >
-                Telegram Group
+                {t.marketing.about.telegramGroup}
               </a>
               <a
-                href="#"
+                href="https://t.me/yekis_bot"
+                target="_blank"
+                rel="noopener noreferrer"
                 style={{
                   color: "var(--color-primary)",
                   textDecoration: "none",
                 }}
               >
-                Telegram Bot
+                {t.marketing.about.telegramBot}
               </a>
             </div>
           </div>

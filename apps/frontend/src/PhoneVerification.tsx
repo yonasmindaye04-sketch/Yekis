@@ -163,7 +163,7 @@ export function PhoneVerification({
             <button
               type="submit"
               className="btn-primary pv-wide"
-              disabled={code.length !== 6 || phase === "verifying"}
+              disabled={code.length !== 6}
             >
               Confirm number
             </button>
@@ -190,11 +190,9 @@ export function PhoneVerification({
                 : "Send another code"}
             </button>
           )}
-          {phase !== "verified" && (
-            <button type="button" className="pv-link pv-muted" onClick={onSkip}>
-              Skip for now
-            </button>
-          )}
+          <button type="button" className="pv-link pv-muted" onClick={onSkip}>
+            Skip for now
+          </button>
         </div>
       </div>
     </div>

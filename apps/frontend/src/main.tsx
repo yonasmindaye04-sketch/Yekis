@@ -5,6 +5,7 @@ import "./index.css";
 import "./telegram/miniApp.css";
 import "./website-icons.css";
 import { ThemeProvider } from "./theme/ThemeContext";
+import { LanguageProvider } from "./i18n";
 import App from "./App.tsx";
 
 // === MAIN COMPONENT ===
@@ -55,9 +56,11 @@ class AppErrorBoundary extends Component<
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ThemeProvider>
-      <AppErrorBoundary>
-        <App />
-      </AppErrorBoundary>
+      <LanguageProvider>
+        <AppErrorBoundary>
+          <App />
+        </AppErrorBoundary>
+      </LanguageProvider>
     </ThemeProvider>
   </StrictMode>,
 );

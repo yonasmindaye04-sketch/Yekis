@@ -171,7 +171,7 @@ export const events = {
   // --- Marketing site engagement ---
   ctaClicked: (label: "hire" | "work") =>
     trackEvent("cta_clicked", { cta_label: label }),
-  languageChanged: (lang: "en" | "am") =>
+  languageChanged: (lang: "en" | "am" | "om" | "ti") =>
     trackEvent("language_changed", { language: lang }),
   faqExpanded: (question: string) =>
     trackEvent("faq_expanded", { question }),

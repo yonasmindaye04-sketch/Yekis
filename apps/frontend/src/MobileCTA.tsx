@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { Briefcase, Search } from "lucide-react";
+import { useI18n } from "./i18n";
 
 interface MobileCTAProps {
   onStart: (mode: "login" | "register") => void;
 }
 
 export function MobileCTA({ onStart }: MobileCTAProps) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
@@ -39,11 +41,11 @@ export function MobileCTA({ onStart }: MobileCTAProps) {
     <div className="mobile-cta-bar">
       <button className="mobile-cta-hire" onClick={() => onStart("register")}>
         <Briefcase size={16} />
-        Post a Job
+        {t.marketing.cta.postJob}
       </button>
       <button className="mobile-cta-work" onClick={() => onStart("register")}>
         <Search size={16} />
-        Find Work
+        {t.marketing.cta.findWork}
       </button>
     </div>
   );
