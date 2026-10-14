@@ -1,11 +1,10 @@
 // === IMPORTS ===
-import type { Response } from "express";
+import type { Response, Router } from "express";
 import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";
 import type { AuthedRequest } from "../../middleware/auth.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
-import { authRouter } from "./auth.routes.js";
 import {
   requestPhoneCode,
   verifyPhoneCode,
@@ -88,8 +87,8 @@ export function handlePhoneVerificationError(
   return false;
 }
 
-function registerPhoneVerificationRoutes() {
-  authRouter.post(
+export function registerPhoneVerificationRoutes(router: Router): void {
+  router.post(
     "/phone/code",
     phoneSendLimiter,
     async (req: AuthedRequest, res: Response) => {
@@ -122,7 +121,7 @@ function registerPhoneVerificationRoutes() {
     },
   );
 
-  authRouter.post(
+  router.post(
     "/phone/verify",
     phoneCheckLimiter,
     async (req: AuthedRequest, res: Response) => {
@@ -147,4 +146,3 @@ function registerPhoneVerificationRoutes() {
     },
   );
 }
-registerPhoneVerificationRoutes();

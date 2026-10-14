@@ -577,3 +577,18 @@ authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
   return res.json(user);
 });
+
+// Mounts POST /auth/phone/code and /auth/phone/verify onto authRouter.
+//
+// Two bugs fixed here at once, both caught by tests/e2e-app.test.ts.
+//
+// 1. The module was never imported, so its self-registration never ran and both
+//    endpoints 404'd in production -- while the service, the unit tests and the
+//    commit that added them all reported success. The unit tests called the
+//    service module directly and could not have seen it.
+// 2. Importing it for a side effect while it imports authRouter back created a
+//    cycle, and the registration then ran before authRouter was initialised
+//    ("Cannot read properties of undefined"). The router is therefore passed in
+//    explicitly rather than imported, which breaks the cycle by construction.
+import { registerPhoneVerificationRoutes } from "./phone-verification.routes.js";
+registerPhoneVerificationRoutes(authRouter);
