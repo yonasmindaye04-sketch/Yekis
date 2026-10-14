@@ -53,6 +53,19 @@ import { EscrowAdminHoldError, releaseMilestoneFunds } from "../escrow/escrow.se
  *   - RBAC: permission matrix, staff listing, role assignment
  */
 
+/**
+ * Raised inside the staff-status transaction when the target is the last active
+ * administrator. Carried out of the transaction so the route can answer 409
+ * rather than 500: refusing to suspend the last admin is correct behaviour, not
+ * a server fault.
+ */
+class LastActiveAdminError extends Error {
+  constructor() {
+    super("Cannot suspend the last active administrator.");
+    this.name = "LastActiveAdminError";
+  }
+}
+
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
 
@@ -578,22 +591,86 @@ adminRouter.post(
   requireFreshAuth(300),
   requirePermission("admins.manage"),
   async (req: AuthedRequest, res) => {
-    const parsed = z.object({ suspended: z.boolean(), reason: z.string().min(5).max(500).optional() }).safeParse(req.body);
+    // The reason is mandatory. It was `min(5).optional()`, which meant a staff
+    // account could be suspended with no explanation at all, or with a
+    // five-character one. Suspension cuts someone's access instantly; the record
+    // of why is the only thing that makes that reviewable later.
+    const parsed = z
+      .object({
+        suspended: z.boolean(),
+        reason: z
+          .string()
+          .trim()
+          .min(20, "Give at least 20 characters of context.")
+          .max(500),
+      })
+      .safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
     const targetUserId = String(req.params.userId);
     if (targetUserId === req.user!.id) return res.status(409).json({ error: "CANNOT_CHANGE_OWN_STATUS" });
     try {
       const target = await prisma.user.findUnique({ where: { id: targetUserId }, select: { id: true, staffRole: true, isSuspended: true } });
       if (!target?.staffRole) return res.status(404).json({ error: "STAFF_NOT_FOUND" });
-      if (parsed.data.suspended && (target.staffRole === "ADMIN" || target.staffRole === "SUPER_ADMIN")) {
-        const activeFullAccess = await prisma.user.count({ where: { staffRole: { in: ["ADMIN", "SUPER_ADMIN"] }, isSuspended: false, id: { not: targetUserId } } });
-        if (activeFullAccess === 0) return res.status(409).json({ error: "CANNOT_SUSPEND_LAST_ADMIN" });
-      }
-      const updated = await prisma.user.update({ where: { id: targetUserId }, data: { isSuspended: parsed.data.suspended }, select: { id: true, isSuspended: true, staffRole: true } });
-      await prisma.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${targetUserId}`;
-      await recordAuditEvent({ userId: req.user!.id, eventType: parsed.data.suspended ? "STAFF_SUSPENDED" : "STAFF_UNSUSPENDED", entityType: "User", entityId: targetUserId, metadata: { reason: parsed.data.reason ?? null }, actorRole: req.user!.staffRole ?? null, previousState: { isSuspended: target.isSuspended }, newState: { isSuspended: updated.isSuspended } });
+      // The last-admin guard, the status change and the session invalidation
+      // are now one transaction.
+      //
+      // They used to be three separate statements: count the remaining active
+      // admins, update the target, bump sessionVersion. Two concurrent requests
+      // could both read "one other admin", both pass the count, and both suspend
+      // -- leaving the platform with zero working admins and no obvious error.
+      // That is a lockout, not a race that resolves safely.
+      //
+      // Serializable isolation means the second transaction's count sees the
+      // first one's committed row, so the loser fails the check and 409s
+      // instead of taking the last admin down with it.
+      const updated = await prisma.$transaction(
+        async (tx) => {
+          if (parsed.data.suspended && (target.staffRole === "ADMIN" || target.staffRole === "SUPER_ADMIN")) {
+            // Lock the candidate set rather than just counting it.
+            //
+            // Serializable isolation alone proved NOT sufficient here: two
+            // concurrent suspensions of the last two admins both committed,
+            // because the count can be satisfied by an index-only scan, which
+            // takes no row-level predicate lock, so PostgreSQL's SSI never sees
+            // the read-write cycle. FOR UPDATE blocks the second transaction on
+            // the actual rows, so it re-reads the first one's committed state.
+            const locked = await tx.$queryRaw<{ id: string }[]>`
+              SELECT "id" FROM "User"
+               WHERE "staffRole" IN ('ADMIN', 'SUPER_ADMIN')
+                 AND "isSuspended" = false
+                 AND "id" <> ${targetUserId}
+               FOR UPDATE
+            `;
+            if (locked.length === 0) {
+              throw new LastActiveAdminError();
+            }
+          }
+
+          const row = await tx.user.update({
+            where: { id: targetUserId },
+            data: { isSuspended: parsed.data.suspended },
+            select: { id: true, isSuspended: true, staffRole: true },
+          });
+
+          // Revoking every live session for the target is the point of a
+          // suspension, so it must not be able to fail independently of the
+          // status change.
+          await tx.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${targetUserId}`;
+
+          return row;
+        },
+        { isolationLevel: "Serializable" },
+      );
+
+      await recordAuditEvent({ userId: req.user!.id, eventType: parsed.data.suspended ? "STAFF_SUSPENDED" : "STAFF_UNSUSPENDED", entityType: "User", entityId: targetUserId, metadata: { reason: parsed.data.reason }, actorRole: req.user!.staffRole ?? null, previousState: { isSuspended: target.isSuspended }, newState: { isSuspended: updated.isSuspended } });
       return res.json(updated);
     } catch (err) {
+      if (err instanceof LastActiveAdminError) {
+        return res.status(409).json({
+          error: "CANNOT_SUSPEND_LAST_ADMIN",
+          message: "This is the last active administrator. Promote another first.",
+        });
+      }
       logger.error({ err }, "Failed to update staff status");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
