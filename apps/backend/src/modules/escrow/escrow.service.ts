@@ -196,14 +196,46 @@ export async function fundMilestoneFromWallet(params: {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.wallet.update({
-      where: { userId: params.clientId },
+    /**
+     * The balance check above is only a fast-fail for a good error message. It
+     * is a bare read outside this transaction, so two concurrent fundings both
+     * observe the same balance, both pass, and both decrement -- charging the
+     * client twice for one milestone and driving the wallet negative, since
+     * Wallet.balanceMinor has no CHECK constraint to stop it.
+     *
+     * The debit is therefore conditional on the balance still being sufficient,
+     * evaluated by the same UPDATE that performs it. Exactly one concurrent
+     * request can win; the losers get count 0 and the whole transaction rolls
+     * back, so no partial escrow is created.
+     */
+    const debited = await tx.wallet.updateMany({
+      where: {
+        userId: params.clientId,
+        balanceMinor: { gte: fees.clientTotalChargeMinor },
+      },
       data: { balanceMinor: { decrement: fees.clientTotalChargeMinor } },
     });
-    await tx.milestone.update({
-      where: { id: milestone.id },
+    if (debited.count !== 1) {
+      throw new InsufficientBalanceError(
+        `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor} minor units.`,
+      );
+    }
+
+    /**
+     * Also claim the milestone. Without this, a second request that wins the
+     * wallet race would still flip an already-funded milestone, because
+     * escrowState was previously overwritten unconditionally.
+     */
+    const claimed = await tx.milestone.updateMany({
+      where: { id: milestone.id, escrowState: "PAYMENT_PENDING" },
       data: { escrowState: "ESCROW_HELD" },
     });
+    if (claimed.count !== 1) {
+      throw new InvalidEscrowStateError(
+        "This milestone is no longer awaiting payment.",
+      );
+    }
+
     await recordEscrowFundingLedger(tx, {
       clientId: params.clientId,
       milestoneId: milestone.id,

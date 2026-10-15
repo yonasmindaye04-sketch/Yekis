@@ -690,8 +690,29 @@ export async function completeFaydaCallback(params: {
     esignetSub = claims.sub;
     verifiedName = claims.name || "";
     verifiedDob = claims.birthdate || "";
+  } else if (env.NODE_ENV === "production") {
+    /**
+     * Refuse rather than fall through to the mock.
+     *
+     * The mock branch below fabricated a PSUT and a date of birth and then set
+     * the record to VERIFIED. ESIGNET_CLIENT_ID is optional and, unlike
+     * PEP_PROVIDER, had no production boot guard -- so a production deploy that
+     * simply omitted it exposed POST /kyc/fayda/callback to anyone who sent a
+     * valid `state` and an arbitrary `code`. The `code` was never validated on
+     * this path; only the state was.
+     *
+     * That is a self-service KYC bypass, and it is the same class of failure
+     * already fixed for the Fayda document lookup.
+     */
+    logger.error(
+      { userId },
+      "ESIGNET_CLIENT_ID is not configured; refusing to mark a production identity verified",
+    );
+    throw new Error(
+      "Fayda verification is not configured on this server. Escalate to Compliance rather than verifying automatically.",
+    );
   } else {
-    // Mock fallback
+    // Mock fallback, development only.
     esignetSub = `mock-psut-${userId}`;
     verifiedName = "Mock User";
     verifiedDob = "1990-01-01";
