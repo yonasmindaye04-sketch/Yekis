@@ -49,6 +49,22 @@ export function getUserAccountCode(userId: string): string {
   return `2100-USER-${userId}`;
 }
 
+/**
+ * Resolves which settlement asset account a provider's cash moves through.
+ *
+ * The `PaymentProvider` enum values are TELEBIRR, CHAPA, CBE_BIRR and M_PESA.
+ * Comparing against the literal "CBE" could never be true, so every CBE
+ * top-up and every CBE payout was posting against the Telebirr asset account —
+ * two different bank accounts collapsed into one ledger line. Match on the
+ * enum member, and default anything unrecognised to Telebirr rather than
+ * inventing a new account.
+ */
+export function resolveSettlementAssetAccount(provider: string | null | undefined) {
+  return provider === "CBE_BIRR"
+    ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
+    : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+}
+
 // === ERROR CLASSES ===
 export class UnbalancedJournalError extends Error {
   constructor(debits: number, credits: number) {
@@ -254,10 +270,7 @@ export async function recordWalletTopUpLedger(
     provider: string;
   },
 ) {
-  const assetAccount =
-    params.provider === "CBE"
-      ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
-      : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+  const assetAccount = resolveSettlementAssetAccount(params.provider);
 
   return postJournalEntry(tx, {
     idempotencyKey: `topup-${params.topUpId}`,
@@ -442,10 +455,7 @@ export async function recordWithdrawalDisbursementLedger(
     provider: string;
   },
 ) {
-  const assetAccount =
-    params.provider === "CBE"
-      ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
-      : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+  const assetAccount = resolveSettlementAssetAccount(params.provider);
 
   const entries: JournalEntryLine[] = [
     {

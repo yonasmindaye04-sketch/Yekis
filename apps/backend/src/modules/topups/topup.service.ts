@@ -8,6 +8,7 @@ import {
   getSignedObjectUrl,
 } from "../../lib/objectStore.js";
 import { notificationQueue } from "../../queue/queues.js";
+import { recordWalletTopUpLedger } from "../finance/ledger.service.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import { telebirrClient } from "../escrow/providers/telebirr.client.js";
@@ -174,20 +175,37 @@ export async function approveTopUp(params: {
   // not mint money out of a simulated transaction.
   assertTopUpIsCreditable({ providerTransactionId: topUp.providerTransactionId });
 
-  await prisma.$transaction([
-    prisma.walletTopUp.update({
-      where: { id: topUp.id },
+  // Claim-then-credit, not an unconditional write: two staff members clicking
+  // approve at the same time must not both credit the wallet. The status
+  // predicate makes exactly one of them the winner. Callback form (rather than
+  // the array form) because the journal must be in the SAME transaction as the
+  // balance — posted separately it can fail after the money is already spent.
+  const claimed = await prisma.$transaction(async (tx) => {
+    const claim = await tx.walletTopUp.updateMany({
+      where: { id: topUp.id, status: "PENDING" },
       data: {
         status: "APPROVED",
         reviewedByStaffId: params.staffUserId,
         reviewedAt: new Date(),
       },
-    }),
-    prisma.wallet.update({
+    });
+    if (claim.count === 0) return false;
+
+    await tx.wallet.update({
       where: { id: topUp.walletId },
       data: { balanceMinor: { increment: topUp.amountMinor } },
-    }),
-  ]);
+    });
+
+    await recordWalletTopUpLedger(tx, {
+      userId: topUp.userId,
+      topUpId: topUp.id,
+      amountMinor: topUp.amountMinor,
+      provider: topUp.provider,
+    });
+
+    return true;
+  });
+  if (!claimed) throw new TopUpAlreadyResolvedError();
 
   await recordAuditEvent({
     userId: params.staffUserId,
@@ -617,6 +635,18 @@ export async function handleTopUpWebhook(params: {
     await tx.wallet.update({
       where: { id: topUp.walletId },
       data: { balanceMinor: { increment: topUp.amountMinor } },
+    });
+    // Without this journal the cash arrives into the settlement account with
+    // no matching credit to the user's liability, so the settlement asset
+    // balance only ever falls (payouts) and the DB CHECK that forbids a
+    // negative asset aborts the first disbursement. auditLedgerIntegrity()
+    // still reported "balanced" because it only compares total debits to
+    // total credits — a whole missing flow is invisible to it.
+    await recordWalletTopUpLedger(tx, {
+      userId: topUp.userId,
+      topUpId: topUp.id,
+      amountMinor: topUp.amountMinor,
+      provider: topUp.provider,
     });
     return true;
   });
