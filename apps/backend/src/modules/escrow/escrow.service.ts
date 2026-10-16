@@ -35,6 +35,8 @@ export class ContractNotFullyExecutedError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class ActiveContractWithdrawalBlockedError extends Error {}
 export class EscrowAdminHoldError extends Error {}
+/** The payout destination (user.phone) has never been proven by SMS. */
+export class PhoneNotVerifiedError extends Error {}
 /** Thrown when a concurrent release path (explicit accept / auto-release /
  * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
 export class MilestoneReleaseClaimLostError extends Error {
@@ -777,6 +779,22 @@ export async function withdrawFromWallet(params: {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: params.userId },
   });
+
+  // The payout destination is `user.phone`. Sending bank money to a number the
+  // platform never proved the account holder controls means sending it to
+  // whoever that number belongs to — and the SMS OTP flow that would have
+  // caught that existed but wrote its result nowhere.
+  //
+  // Placed before every balance and contract check: an unverified destination
+  // invalidates the withdrawal itself, so there is nothing to weigh it against.
+  // Tier-2 KYC is not a substitute. KYC proves an identity document belongs to
+  // a person; it says nothing about whether that person's phone is their phone.
+  if (!user.phoneVerifiedAt) {
+    throw new PhoneNotVerifiedError(
+      "Verify your phone number before withdrawing. We send payouts to the number on your account, so we have to confirm it is yours.",
+    );
+  }
+
 // F-22: the "you are holding money for someone else" check must not be gated
   // on the role STRING — a BOTH account can hire, so `user.role === "CLIENT"`
   // let it skip the check entirely. It is instead gated on the FACT that

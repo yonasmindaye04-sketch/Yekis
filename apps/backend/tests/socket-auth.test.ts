@@ -64,13 +64,7 @@ async function makeUser(label: string, opts?: { staff?: string | null }) {
 }
 
 async function sessionFor(userId: string, staffRole: string | null) {
-  return createAuthTokens({
-    id: userId,
-    email: `ws-auth-${userId}@test.et`,
-    role: "CLIENT",
-    staffRole,
-    amr: ["pwd"],
-  });
+  return createAuthTokens({ id: userId, role: "CLIENT", ucid: null, staffRole }, ["pwd"]);
 }
 
 /**
@@ -187,13 +181,10 @@ describe("the WebSocket handshake enforces what HTTP enforces", () => {
     await started;
     // Minted for an id that was never in the database — the same state a
     // deleted account leaves behind, without fighting foreign keys to get it.
-    const ghost = await createAuthTokens({
-      id: `ghost-user-${STAMP}-does-not-exist`,
-      email: `ghost-${STAMP}@test.et`,
-      role: "CLIENT",
-      staffRole: null,
-      amr: ["pwd"],
-    });
+    const ghost = await createAuthTokens(
+      { id: `ghost-user-${STAMP}-does-not-exist`, role: "CLIENT", ucid: null },
+      ["pwd"],
+    );
 
     const after = await connect(ghost.accessToken);
     expect(after.closed).toBe(true);

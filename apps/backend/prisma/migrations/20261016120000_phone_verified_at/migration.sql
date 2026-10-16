@@ -1,0 +1,19 @@
+-- Record that the account holder proved control of User.phone.
+--
+-- WHY
+-- The previous migration added the OTP flow but left its result unreadable.
+-- PhoneVerificationCode.verifiedAt was written and nothing ever consumed it:
+-- there was no field on User recording the outcome, so "verified" was a fact
+-- about a row nobody queried.
+--
+-- The consequence was that the security property was advisory. An account
+-- registered with someone else's number -- which requires no credentials, only
+-- knowing the number -- reached the point of instructing a Telebirr or M-Pesa
+-- payout to that number. Payout instructions are read by the provider and by
+-- a human; neither has any way to know the platform never verified it.
+--
+-- NULL means "never verified". That is deliberately distinct from false so
+-- that "we asked and they did not finish" is not silently the same state as
+-- "we never asked", and so a re-verification after a number change is visible
+-- as a fresh timestamp.
+ALTER TABLE "User" ADD COLUMN "phoneVerifiedAt" TIMESTAMP(3);

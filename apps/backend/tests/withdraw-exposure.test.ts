@@ -79,6 +79,11 @@ async function makeUser(label: string, role: "CLIENT" | "FREELANCER" | "BOTH", b
       phone: `+2519${String(30000000 + Math.abs(label.charCodeAt(0)) * 100000 + (STAMP % 900))}`,
       passwordHash: "not-a-real-hash",
       role,
+      // The payout destination has to be proven before anyone can move money,
+      // so a user realistic enough to reach the escrow-exposure checks has a
+      // verified phone. Without this the phone gate fires first and these tests
+      // would pass for the wrong reason. The gate itself has its own suite.
+      phoneVerifiedAt: new Date(),
       kyc: { create: { tier: "TIER_2", status: "VERIFIED" } },
       wallet: { create: { balanceMinor: balance } },
     } as never,

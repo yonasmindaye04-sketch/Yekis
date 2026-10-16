@@ -10,6 +10,7 @@ import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 import type { AuthMethod } from "./auth-methods.js";
+import { hasRecentVerifiedCode } from "./phone-verification.service.js";
 
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
@@ -86,11 +87,17 @@ export async function registerUser(input: RegisterInput) {
 
   const passwordHash = await argon2.hash(input.password);
 
+  // The OTP was verified while the account did not exist yet, so this is where
+  // the proof attaches. Bounded by the code's own lifetime: a number proven
+  // weeks ago says nothing about who is registering now.
+  const phoneVerifiedAt = (await hasRecentVerifiedCode(input.phone)) ? new Date() : null;
+
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
         email: input.email,
         phone: input.phone,
+        phoneVerifiedAt,
         passwordHash,
         // Marks the account as password-owned: a later social sign-in that
         // merely matches this email must not be merged into it.

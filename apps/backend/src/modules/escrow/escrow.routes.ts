@@ -19,6 +19,7 @@ import {
   InsufficientBalanceError,
   ActiveContractWithdrawalBlockedError,
   EscrowAdminHoldError,
+  PhoneNotVerifiedError,
 } from "./escrow.service.js";
 import { WithdrawalHeldForReviewError } from "../tms/tms.service.js";
 
@@ -96,6 +97,17 @@ function handleKnownErrors(
   }
   if (err instanceof EscrowAdminHoldError) {
     res.status(423).json({ error: "ESCROW_ADMIN_HOLD", message: err.message });
+    return true;
+  }
+  if (err instanceof PhoneNotVerifiedError) {
+    // 403, not 422: nothing about the request is malformed, the account is
+    // simply not yet allowed to move money to a destination it has not proven.
+    res.status(403).json({
+      error: "PHONE_NOT_VERIFIED",
+      message: err.message,
+      // Where the client sends the user to fix it.
+      verifyAt: "/api/v1/auth/phone/code",
+    });
     return true;
   }
   if (err instanceof WithdrawalHeldForReviewError) {

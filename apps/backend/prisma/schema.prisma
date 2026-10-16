@@ -182,6 +182,10 @@ model User {
   ucid                    String     @unique @default(cuid()) // platform-wide Unique Customer ID
   email                   String     @unique
   phone                   String     @unique
+  /// Set when the account holder proved control of phone by SMS. phone is
+  /// the Telebirr / M-Pesa payout destination and the TMS identity check, so an
+  /// unverified value is someone else's number. NULL means never verified.
+  phoneVerifiedAt         DateTime?
   passwordHash            String
   // NULL while the account only ever authenticated via a federated provider
   // (Google / Apple / Facebook / Telegram sentinel accounts). Set the moment

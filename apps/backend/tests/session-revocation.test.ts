@@ -194,7 +194,7 @@ describe("logout revokes server-side, not just in the browser", () => {
   });
 
   it("lets a fresh session work after logout", async () => {
-    const first = await createAuthTokens({ id: userId, email: EMAIL, role: "CLIENT", amr: ["pwd"] });
+    const first = await createAuthTokens({ id: userId, role: "CLIENT", ucid: null }, ["pwd"]);
 
     await request(app)
       .post("/api/v1/auth/logout")

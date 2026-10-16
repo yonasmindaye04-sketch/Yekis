@@ -221,12 +221,60 @@ export async function verifyPhoneCode(params: {
     throw new PhoneCodeInvalidError("That code is not valid.");
   }
 
-  await prisma.phoneVerificationCode.update({
-    where: { id: row.id },
-    data: { verifiedAt: new Date(), attempts: { increment: 1 } },
+  const verifiedAt = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.phoneVerificationCode.update({
+      where: { id: row.id },
+      data: { verifiedAt, attempts: { increment: 1 } },
+    });
+
+    // Record the outcome on the account.
+    //
+    // Previously `verifiedAt` was written here and read by nothing, and User
+    // had no field for it at all — so the flow proved nothing about anything.
+    // `phone` is the Telebirr / M-Pesa payout destination and the TMS identity
+    // check, so an account could hold someone else's number all the way to
+    // instructing a real bank transfer.
+    //
+    // Only when there IS an account to mark. The primary case is registration,
+    // where the user does not exist yet; `registerUser` picks the proof up
+    // from this same row instead.
+    //
+    // Conditional on `phone` so a verification for one number can never mark a
+    // *different* number on the same account as verified. `normalizePhone`
+    // already ran on both sides, so this is an exact comparison.
+    if (params.userId) {
+      await tx.user.updateMany({
+        where: { id: params.userId, phone },
+        data: { phoneVerifiedAt: verifiedAt },
+      });
+    }
   });
 
   return { verified: true };
+}
+
+/**
+ * Whether a number was proven before this moment.
+ *
+ * Used by registration, where the code is verified while the account still does
+ * not exist. A code older than `maxAgeMs` no longer counts: proving control of
+ * a number weeks before creating the account says little about who is sitting
+ * at the keyboard now.
+ */
+export async function hasRecentVerifiedCode(
+  phone: string,
+  maxAgeMs = CODE_TTL_MS,
+): Promise<boolean> {
+  const row = await prisma.phoneVerificationCode.findFirst({
+    where: {
+      phone: normalizePhone(phone),
+      verifiedAt: { not: null, gte: new Date(now() - maxAgeMs) },
+    },
+    orderBy: { verifiedAt: "desc" },
+    select: { verifiedAt: true },
+  });
+  return row !== null;
 }
 
 /** Test/maintenance helper: clear outstanding challenges for a number. */
