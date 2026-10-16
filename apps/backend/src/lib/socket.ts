@@ -7,6 +7,7 @@ import { env } from "../config/env.js";
 import { logger } from "./logger.js";
 import { prisma } from "./prisma.js";
 import { isGuestSupportToken } from "../modules/chat/guestSupportToken.js";
+import { checkSessionIsUsable } from "../middleware/auth.js";
 
 // === TYPES ===
 interface AuthenticatedSocket extends WebSocket {
@@ -16,6 +17,8 @@ interface AuthenticatedSocket extends WebSocket {
   isGuest?: boolean;
   isAlive?: boolean;
   subscriptions?: Set<string>;
+  /** The session_version this socket connected with, re-checked each heartbeat. */
+  sessionVersion?: number;
 }
 
 export interface RealtimeEvent<T = unknown> {
@@ -58,7 +61,6 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
 
       const { payload } = await jwtVerify(token, secretKey);
       const userId = payload.sub as string;
-      const staffRole = payload.staffRole as string | undefined;
 
       if (!userId) {
         ws.close(4001, "Invalid token subject");
@@ -71,9 +73,37 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
       // forged staffRole on a guest token buys nothing.
       const isGuestToken = isGuestSupportToken(payload as Record<string, unknown>);
 
+      // A valid signature proves the token was issued by us. It says nothing
+      // about the account since. Suspension, revocation and demotion all
+      // happen server-side and none of them touch an already-issued token, so
+      // without this re-read a suspended user keeps a fully-authorised socket
+      // -- user channel, staff alerts, live chat -- until it happens to
+      // reconnect. Same checks as requireAuth, via the same helper, so the two
+      // front doors cannot drift.
+      const check = await checkSessionIsUsable(
+        userId,
+        (payload as Record<string, unknown>).session_version,
+      );
+      if (!check.ok) {
+        logger.warn(
+          { userId, reason: check.reason },
+          "WebSocket refused: session no longer usable",
+        );
+        ws.close(4003, check.reason);
+        return;
+      }
+
       ws.userId = userId;
-      ws.isStaff = isGuestToken ? false : !!staffRole;
+      // Staff comes from the DATABASE, not the token. The claim is a snapshot
+      // from up to a refresh ago, so a demoted staff member stayed `isStaff`
+      // for the life of the socket and kept the staff alert channel plus
+      // blanket read access to assigned support conversations.
+      ws.isStaff = isGuestToken ? false : check.staffRole !== null;
       ws.isGuest = isGuestToken;
+      // Carried so the heartbeat can re-check without re-parsing the token.
+      ws.sessionVersion = (payload as Record<string, unknown>).session_version as
+        | number
+        | undefined;
 
       // Register user socket
       if (!clientsByUserId.has(userId)) {
@@ -143,22 +173,7 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
     });
 
     ws.on("close", () => {
-      if (ws.userId) {
-        const userSockets = clientsByUserId.get(ws.userId);
-        if (userSockets) {
-          userSockets.delete(ws);
-          if (userSockets.size === 0) {
-            clientsByUserId.delete(ws.userId);
-          }
-        }
-      }
-
-      // Cleanup subscriptions
-      if (ws.subscriptions) {
-        for (const channel of ws.subscriptions) {
-          unsubscribeFromChannel(ws, channel);
-        }
-      }
+      deregisterSocket(ws);
     });
 
     ws.on("error", (err) => {
@@ -177,6 +192,25 @@ export function initWebSocketServer(server: HttpServer): WebSocketServer {
       }
       ws.isAlive = false;
       ws.ping();
+      // Re-check the account while we are already touching the socket. The
+      // connection-time read only covers suspensions that happened in the
+      // moment before the handshake; without this a user suspended mid-session
+      // keeps streaming until they happen to reload. Guest sockets are exempt:
+      // their identity is pinned to a conversation that the access check does
+      // not describe, and the conversation membership check below already
+      // fails closed.
+      if (!ws.isGuest && ws.userId) {
+        void checkSessionIsUsable(ws.userId, ws.sessionVersion).then((check) => {
+          if (!check.ok) {
+            logger.warn(
+              { userId: ws.userId, reason: check.reason },
+              "Closing WebSocket: session revoked after connect",
+            );
+            deregisterSocket(ws);
+            ws.close(4003, check.reason);
+          }
+        });
+      }
     });
   }, 30_000);
 
@@ -266,6 +300,31 @@ function subscribeToChannel(ws: AuthenticatedSocket, channel: string) {
   }
   channelSubscriptions.get(channel)!.add(ws);
   ws.subscriptions?.add(channel);
+}
+
+/**
+ * Removes a socket from every index it was registered in.
+ *
+ * Idempotent, and deliberately callable before `close()` — the heartbeat has
+ * to unregister a revoked socket immediately rather than waiting for the close
+ * event, and a revoked socket must stop receiving broadcasts in the meantime.
+ */
+function deregisterSocket(ws: AuthenticatedSocket) {
+  if (ws.userId) {
+    const userSockets = clientsByUserId.get(ws.userId);
+    if (userSockets) {
+      userSockets.delete(ws);
+      if (userSockets.size === 0) {
+        clientsByUserId.delete(ws.userId);
+      }
+    }
+  }
+
+  if (ws.subscriptions) {
+    for (const channel of [...ws.subscriptions]) {
+      unsubscribeFromChannel(ws, channel);
+    }
+  }
 }
 
 function unsubscribeFromChannel(ws: AuthenticatedSocket, channel: string) {

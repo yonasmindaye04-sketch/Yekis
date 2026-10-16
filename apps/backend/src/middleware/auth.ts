@@ -40,6 +40,59 @@ export interface AuthedRequest extends Request {
 
 // === MAIN FUNCTIONS ===
 
+export type SessionCheckFailure =
+  | { ok: false; reason: "UNKNOWN_USER" }
+  | { ok: false; reason: "GUEST_CONTACT" }
+  | { ok: false; reason: "SUSPENDED" }
+  | { ok: false; reason: "SESSION_REVOKED" };
+
+export type SessionCheck = SessionCheckFailure | { ok: true; staffRole: string | null };
+
+/**
+ * Re-reads the account and decides whether a still-unexpired token may be used.
+ *
+ * Transport-agnostic on purpose. HTTP has requireAuth, but the WebSocket
+ * handshake is a second front door onto the same API and it cannot call
+ * Express middleware. When the two disagree, the weaker one wins and the
+ * stronger one is theatre — which is exactly what happened: requireAuth
+ * re-checked suspension and sessionVersion on every request while
+ * `lib/socket.ts` verified the JWT signature and nothing else, so a suspended
+ * user kept a live socket with `staff:alerts` until it happened to reconnect.
+ *
+ * `staffRole` is returned from the DATABASE, never from the token. A JWT claim
+ * is a snapshot from up to a refresh ago, so demoting staff left them
+ * subscribed to the staff alert channel and able to watch any assigned support
+ * conversation for as long as the socket lived.
+ *
+ * Returns a discriminated result rather than an HTTP response so each caller
+ * can answer in its own idiom.
+ */
+export async function checkSessionIsUsable(
+  userId: string,
+  tokenSessionVersion: unknown,
+): Promise<SessionCheck> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { isSuspended: true, isGuestContact: true, staffRole: true },
+  });
+
+  if (!user) return { ok: false, reason: "UNKNOWN_USER" };
+  // Defence in depth: guest identities are never routable accounts.
+  if (user.isGuestContact) return { ok: false, reason: "GUEST_CONTACT" };
+  if (user.isSuspended) return { ok: false, reason: "SUSPENDED" };
+
+  if (typeof tokenSessionVersion === "number") {
+    const rows = await prisma.$queryRaw<Array<{ sessionVersion: number }>>`
+      SELECT "sessionVersion" FROM "User" WHERE id = ${userId}
+    `;
+    if (tokenSessionVersion !== (rows[0]?.sessionVersion ?? 0)) {
+      return { ok: false, reason: "SESSION_REVOKED" };
+    }
+  }
+
+  return { ok: true, staffRole: user.staffRole ?? null };
+}
+
 /**
  * Copies the verified JWT claims onto the request. Single place where token
  * shape is interpreted, so every middleware agrees on what `req.auth` means.
@@ -154,37 +207,26 @@ try {
     //
     // F-01 defence in depth #2: a guest identity is never a routable account,
     // so requireAuth refuses it even if a token for one somehow verified.
-    const user = await prisma.user.findUnique({
-      where: { id },
-      select: { isSuspended: true, isGuestContact: true },
-    });
+    //
+    // Shared with the WebSocket handshake via checkSessionIsUsable, so the two
+    // front doors cannot drift apart in what they refuse.
+    const check = await checkSessionIsUsable(
+      id,
+      (payload as Record<string, unknown>).session_version,
+    );
 
-    if (!user) {
-      return res.status(401).json({ error: "Invalid or expired token" });
-    }
-
-    if (user.isGuestContact) {
-      return res.status(401).json({
-        error: "Guest contact accounts cannot authenticate as a member",
-      });
-    }
-
-    if (user.isSuspended) {
-      return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
-    }
-
-    const tokenVersion = (payload as Record<string, unknown>).session_version;
-    if (typeof tokenVersion === "number" && user) {
-      try {
-        const rows = await prisma.$queryRaw<Array<{ sessionVersion: number }>>`
-          SELECT "sessionVersion" FROM "User" WHERE id = ${id}
-        `;
-        if (tokenVersion !== (rows[0]?.sessionVersion ?? 0)) {
+    if (!check.ok) {
+      switch (check.reason) {
+        case "UNKNOWN_USER":
+          return res.status(401).json({ error: "Invalid or expired token" });
+        case "GUEST_CONTACT":
+          return res.status(401).json({
+            error: "Guest contact accounts cannot authenticate as a member",
+          });
+        case "SUSPENDED":
+          return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+        case "SESSION_REVOKED":
           return res.status(401).json({ error: "SESSION_REVOKED" });
-        }
-      } catch {
-        // The session-version migration is additive and may be applied after
-        // the app starts. Do not make existing sessions unavailable mid-rollout.
       }
     }
 
