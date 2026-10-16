@@ -40,6 +40,34 @@ function calculateAge(dob: Date): number {
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
 }
 
+/**
+ * Revokes every live session for a user by bumping `sessionVersion`.
+ *
+ * Both access and refresh tokens carry the version they were minted at, and
+ * `requireAuth` / `refreshSession` compare it against the stored value. One
+ * increment therefore retires every outstanding token at once — access tokens
+ * on their next request, refresh tokens on their next refresh.
+ *
+ * This is the only revocation primitive in the system, and it is deliberately
+ * coarse: it cannot end one session without ending all of them. That is the
+ * right trade for a shared or suspected-compromised machine (a user clicking
+ * "log out" expects the next person at the keyboard to be logged out), but it
+ * does mean a logout on a phone also signs the user out of their laptop. A
+ * per-`sid` denylist would be the fix if per-device logout is ever needed.
+ */
+export async function revokeAllSessions(userId: string): Promise<number> {
+  const rows = await prisma.$executeRaw`
+    UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${userId}
+  `;
+  logger.info({ userId, rows }, "Revoked all sessions for user");
+  return rows;
+}
+
+/** Ends the caller's session. See `revokeAllSessions` for the semantics. */
+export async function logoutSession(userId: string): Promise<void> {
+  await revokeAllSessions(userId);
+}
+
 export async function registerUser(input: RegisterInput) {
   const dob = new Date(input.dateOfBirth);
 
@@ -401,6 +429,18 @@ export async function resetPassword(token: string, newPassword: string) {
       where: { id: resetRecord.userId },
       data: { passwordHash, passwordSetAt: new Date() },
     });
+
+    // Changing the password must kill every existing session.
+    //
+    // A reset is the documented remedy for "I think someone has my account".
+    // Without this bump the attacker's outstanding refresh token keeps minting
+    // access tokens for up to JWT_REFRESH_TTL (default 30 days) -- so completing
+    // the reset hands the account straight back to whoever triggered it, and
+    // the legitimate user has no way to evict them.
+    //
+    // Inside the transaction on purpose: a revocation that can fail separately
+    // from the password change is a revocation that can be skipped.
+    await tx.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${resetRecord.userId}`;
   });
 
   await recordAuditEvent({

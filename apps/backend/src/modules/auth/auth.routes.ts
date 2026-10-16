@@ -12,6 +12,7 @@ import {
   requestPasswordReset,
   resetPassword,
   refreshSession,
+  logoutSession,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
@@ -557,6 +558,16 @@ authRouter.post("/refresh", async (req, res) => {
     logger.error({ err }, "Unexpected error during session refresh");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
+});
+
+authRouter.post("/logout", requireAuth, async (req: AuthedRequest, res) => {
+  // Until this existed, "log out" was a client-side deletion of two
+  // localStorage keys. The tokens themselves stayed valid until they expired,
+  // so a token lifted from the machine — or from a shared browser's history —
+  // kept working for the remaining JWT_REFRESH_TTL (default 30 days). Bumping
+  // sessionVersion is what actually ends the session server-side.
+  await logoutSession(req.user!.id);
+  return res.status(200).json({ success: true });
 });
 
 authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
