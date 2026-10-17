@@ -57,28 +57,45 @@ const PATTERNS = [
     // snake_case ("access_secret", "fake_jwt_secret"), while real credentials
     // are named in SCREAMING_CASE. Matching case-insensitively flagged 25
     // ordinary identifiers, which trains people to ignore the scan.
-    re: /\b[A-Za-z0-9_]*(?:SECRET|TOKEN|PRIVATE_KEY|API_KEY|PASSWORD)[A-Za-z0-9_]*\s*[:=]\s*["']?([A-Za-z0-9+/=_\-]{16,})["']?/g,
+    re: /\b[A-Za-z0-9_]*(?:SECRET|TOKEN|PRIVATE_KEY|API_KEY|PASSWORD)[A-Za-z0-9_]*\s*[:=]\s*(["'`])(?<value>[^"'`]+)\1/g,
     isSecretValue: (value) => {
-      if (!/^[A-Za-z0-9+/=_\-]+$/.test(value)) return false; // not a bare literal
+      // A template literal is reported by its LITERAL PARTS, with the ${...}
+      // holes removed. This was the gap that let a real incident through: a
+      // test file assigned a hardcoded-looking credential as a template
+      // literal whose only variable part was Date.now(). The previous
+      // character class stopped at the backtick and the `$`, so the whole line
+      // was skipped -- while GitGuardian, which parses templates, flagged the
+      // commit as a generic password. A scanner that cannot see what an
+      // external tool can see is not a control, it is false confidence.
+      //
+      // Written without a literal example of the offending shape on purpose:
+      // this file is itself tracked, and an example inline here is a finding
+      // the scan reports against its own source. Same trap as the PEM header
+      // above.
+      const literal = value.replace(/\$\{[^}]*\}/g, "").replace(/\$\{.*/s, "");
+      if (literal.length === 0) return false; // fully interpolated: nothing literal
+      if (!/^[A-Za-z0-9+/=_\-!@#$%^&*().]+$/.test(literal)) return false;
       // Placeholders and references to configuration are not secrets.
-      if (/^(replace|changeme|your|example|placeholder|xxx|REDACTED|CHANGEME)/i.test(value)) {
+      if (/^(replace|changeme|your|example|placeholder|xxx|REDACTED|CHANGEME)/i.test(literal)) {
         return false;
       }
       // Lowercase-with-underscores is an identifier or a fixture name.
-      if (/^[a-z]+(?:_[a-z0-9]+)+$/.test(value)) return false;
+      if (/^[a-z]+(?:_[a-z0-9]+)+$/.test(literal)) return false;
       // All-lowercase single words and dotted paths are identifiers.
-      if (/^[a-z./@-]+$/.test(value)) return false;
+      if (/^[a-z./@-]+$/.test(literal)) return false;
+      // A path into this repo's own test helpers, not a credential.
+      if (/\.(test|spec)\.[a-z]+$/.test(literal)) return false;
       // Long hex strings are secrets in their own right, and the mixed-case
       // rule below cannot see them: a 32-char hex key has no uppercase and no
       // symbol, so it was being classified as an identifier and let through.
       // 24 hex chars is 96 bits, which is past any plausible constant name.
-      if (/^[0-9a-f]{24,}$/i.test(value)) return true;
+      if (/^[0-9a-f]{24,}$/i.test(literal)) return true;
       // Mixed case + digits + symbols is what a real key looks like.
       return (
-        /[A-Z]/.test(value) &&
-        /[a-z]/.test(value) &&
-        /[0-9]/.test(value) &&
-        /[+/=_\-]/.test(value)
+        /[A-Z]/.test(literal) &&
+        /[a-z]/.test(literal) &&
+        /[0-9]/.test(literal) &&
+        /[+/=_\-!@#$%^&*().]/.test(literal)
       );
     },
   },
@@ -86,6 +103,13 @@ const PATTERNS = [
 
 /** Patterns that are simply "does this line match", with no value inspection. */
 const SIMPLE_IDS = new Set(["PEM_PRIVATE_KEY", "BOT_TOKEN"]);
+
+/**
+ * A syntactically valid Telegram bot token, for the self-test. Assembled from
+ * parts so that writing this file does not plant a token-shaped string in the
+ * repository -- the same reason the PEM header above is built with "-{5}".
+ */
+const JWT_LIKE = `const BOT_TOKEN = "${"1".repeat(9)}:Aa${"B".repeat(33)}";`;
 
 /** Reads the allowlist; a missing file is an empty allowlist. */
 function loadAllowlist() {
@@ -145,7 +169,13 @@ function scanText(text, relativePath, allowlist) {
         const re = new RegExp(pattern.re.source, "g");
         let match;
         while ((match = re.exec(line)) !== null) {
-          if (!pattern.isSecretValue(match[1])) continue;
+          // Read the NAMED group, never a positional index. The pattern has two
+          // groups (quote, then value) and previously read group 1 while
+          // inspecting group 2's intent -- so it evaluated the quote character
+          // as if it were the secret and reported the tree clean while a real
+          // finding sat in a tracked test file. Named groups make that class of
+          // drift impossible.
+          if (!pattern.isSecretValue(match.groups?.value ?? "")) continue;
           findings.push({ file: relativePath, line: lineNo, id: pattern.id });
         }
         continue;
@@ -160,7 +190,73 @@ function scanText(text, relativePath, allowlist) {
   return isAllowed(relativePath, allowlist) ? [] : findings;
 }
 
+/**
+ * Self-test: proves each pattern fires on a known-bad line and stays quiet on a
+ * known-good one.
+ *
+ * WHY THIS EXISTS
+ * The ASSIGNED_SECRET pattern had two live defects that a green run could not
+ * reveal, because the tree was clean either way:
+ *   - its character class stopped at a backtick, so a template literal was
+ *     skipped entirely while GitGuardian, which parses templates, flagged the
+ *     commit;
+ *   - after the class was widened, the consumer still read group 1 (now the
+ *     quote character) instead of group 2, so the scanner evaluated a single
+ *     backtick as the secret and reported success.
+ * Both produced "clean". A scanner that cannot fail is a rubber stamp, so the
+ * patterns are now exercised against inputs with known answers.
+ */
+function selfTest() {
+  // Every fixture below is assembled from fragments rather than written out.
+  // This file is tracked, so a fixture written as a literal is itself a finding
+  // the scan reports against its own source -- the same trap as the PEM header
+  // at the top, and the reason that one is written with "-{5}".
+  const cases = [
+    // [line, shouldFire]
+    // Template literal: the shape that GitGuardian caught and this scan missed.
+    ["const " + "PASSWORD" + " = `" + "Sup3rSecret!" + "${STAMP}`;", true],
+    // Quoted bare literal, no interpolation.
+    ["const " + "PASSWORD" + " = '" + "Sup3rSecret!" + "9x2q'", true],
+    // A realistic third-party key shape.
+    ["const " + "STRIPE_API_KEY" + " = 'sk_" + "live_4eC39HqLyjWDarjtT1zdp7dc'", true],
+    // Bot token, assembled above.
+    [JWT_LIKE, true],
+
+    // Must NOT fire.
+    ["const apiSecret = process.env.JWT_ACCESS_SECRET;", false],
+    ["pass" + "word: 'Sup3rSecret!pass',", false],
+    // Fully interpolated: there is no literal to judge.
+    ["const " + "TOKEN_TTL" + " = `${A}${B}`;", false],
+    ["const " + "PASSWORD" + " = `replace-me-in-env`", false],
+    ["const " + "REDACTED_TOKEN" + " = 'REDACTED'", false],
+    ["const access_secret = env.SECRET", false],
+  ];
+
+  let failures = 0;
+  for (const [line, shouldFire] of cases) {
+    const fired = scanText(line, "self-test", []).length > 0;
+    if (fired !== shouldFire) {
+      failures += 1;
+      console.error(
+        `  self-test FAILED: expected ${shouldFire ? "a finding" : "no finding"} for: ` +
+          `${line.replace(/`/g, "").slice(0, 60)}`,
+      );
+    }
+  }
+
+  if (failures > 0) {
+    console.error(`Secret-scan self-test: ${failures} of ${cases.length} cases wrong.`);
+    return 1;
+  }
+  console.log(`Secret-scan self-test: ${cases.length} cases passed.`);
+  return 0;
+}
+
 function main() {
+  if (process.argv.includes("--self-test")) {
+    return selfTest();
+  }
+
   const allowlist = loadAllowlist();
 
   // The allowlist must not itself contain a real secret.

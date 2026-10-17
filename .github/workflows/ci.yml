@@ -64,6 +64,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The scanner's own patterns are exercised first. It has twice reported
+      # "clean" while being unable to match a shape GitGuardian matched, so a
+      # green scan is only meaningful if the scanner can still fail.
+      - name: Secret scan self-test
+        working-directory: .
+        run: node scripts/scan-secrets.js --self-test
+
       # Secret scan before anything else, so a committed credential is reported
       # even if a later step is skipped. Prints file names and line numbers only.
       - name: Secret scan

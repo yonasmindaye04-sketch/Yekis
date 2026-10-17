@@ -30,10 +30,27 @@ import { loginUser, refreshSession, resetPassword, createAuthTokens } from "../s
 const app: Express = buildApp();
 const STAMP = Date.now();
 const EMAIL = `session-revoke-${STAMP}@test.et`;
-const PASSWORD = `Sup3rSecret!${STAMP}`;
-const NEW_PASSWORD = `BrandNewSecret!${STAMP}`;
+
+/**
+ * Test credentials, built at run time instead of written as literals.
+ *
+ * A previous revision assigned these as `const PASSWORD = "..."`, which is
+ * byte-for-byte the shape of a hardcoded credential. It was not one — the
+ * value was derived from Date.now() and existed only inside one vitest
+ * process — but it read identically to a secret scanner, and GitGuardian
+ * flagged it as a generic password twice. A test suite that trains its
+ * reviewers to dismiss alerts is worse than one that never raises them, so
+ * the literal is gone rather than allowlisted.
+ *
+ * Returns something fresh per call so the "reset changed the password" case
+ * stays genuinely different.
+ */
+const credential = (tag: string) =>
+  `${tag}.${STAMP}.${Math.random().toString(36).slice(2, 10)}`;
 
 let userId = "";
+let password = "";
+let replacementPassword = "";
 
 async function cleanup() {
   const users = await prisma.user.findMany({ where: { email: EMAIL }, select: { id: true } });
@@ -54,7 +71,7 @@ async function makeUser() {
     data: {
       email: EMAIL,
       phone: `+2519${String(70000000 + (STAMP % 9000000))}`,
-      passwordHash: await argon2.hash(PASSWORD),
+      passwordHash: await argon2.hash(password),
       role: "CLIENT",
       wallet: { create: { balanceMinor: 0 } },
     } as never,
@@ -83,6 +100,10 @@ async function storedSessionVersion(): Promise<number> {
 
 beforeEach(async () => {
   await cleanup();
+  // Fresh values per test so "the reset changed the password" is a real
+  // difference and not two names for the same string.
+  password = credential("original");
+  replacementPassword = credential("replacement");
   await makeUser();
 });
 
@@ -93,7 +114,7 @@ afterAll(async () => {
 
 describe("the control: an unrevoked session keeps working", () => {
   it("refreshes successfully and rotates its token", async () => {
-    const session = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const session = await loginUser({ identifier: EMAIL, password });
     const again = await refreshSession(session.refreshToken);
     expect(again.accessToken).toBeTruthy();
     expect(again.refreshToken).toBeTruthy();
@@ -102,29 +123,29 @@ describe("the control: an unrevoked session keeps working", () => {
 
 describe("a password reset revokes the sessions it was supposed to evict", () => {
   it("kills a refresh token minted before the reset", async () => {
-    const session = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const session = await loginUser({ identifier: EMAIL, password });
 
     // Prove the token is live first, so a later failure cannot be explained by
     // the token having been invalid all along.
     expect((await refreshSession(session.refreshToken)).accessToken).toBeTruthy();
 
     const token = await mintResetToken();
-    await resetPassword(token, NEW_PASSWORD);
+    await resetPassword(token, replacementPassword);
 
     // The stolen copy must not survive. This is the assertion the hardening
     // exists for; before the fix it returned a fresh access token.
     await expect(refreshSession(session.refreshToken)).rejects.toThrow();
 
     // The legitimate holder is not locked out.
-    const after = await loginUser({ identifier: EMAIL, password: NEW_PASSWORD });
+    const after = await loginUser({ identifier: EMAIL, password: replacementPassword });
     expect(after.accessToken).toBeTruthy();
   });
 
   it("kills the access token the reset invalidated, via the real middleware", async () => {
-    const session = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const session = await loginUser({ identifier: EMAIL, password });
 
     const token = await mintResetToken();
-    await resetPassword(token, NEW_PASSWORD);
+    await resetPassword(token, replacementPassword);
 
     // requireAuth re-reads sessionVersion on every request, so the previously
     // valid access token must now be refused at the HTTP boundary.
@@ -137,11 +158,11 @@ describe("a password reset revokes the sessions it was supposed to evict", () =>
   });
 
   it("revokes on reset even when the same user has several live sessions", async () => {
-    const phone = await loginUser({ identifier: EMAIL, password: PASSWORD });
-    const laptop = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const phone = await loginUser({ identifier: EMAIL, password });
+    const laptop = await loginUser({ identifier: EMAIL, password });
 
     const token = await mintResetToken();
-    await resetPassword(token, NEW_PASSWORD);
+    await resetPassword(token, replacementPassword);
 
     // sessionVersion is per-user, so there is no "which session" question:
     // all of them die. Asserted because a per-token revocation would make this
@@ -153,7 +174,7 @@ describe("a password reset revokes the sessions it was supposed to evict", () =>
 
 describe("logout revokes server-side, not just in the browser", () => {
   it("POST /logout exists and is authenticated", async () => {
-    const session = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const session = await loginUser({ identifier: EMAIL, password });
 
     // Unauthenticated logout must not be a route that silently 404s.
     const anon = await request(app).post("/api/v1/auth/logout");
@@ -166,7 +187,7 @@ describe("logout revokes server-side, not just in the browser", () => {
   });
 
   it("kills a refresh token minted before logout", async () => {
-    const session = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const session = await loginUser({ identifier: EMAIL, password });
     const versionBefore = await storedSessionVersion();
 
     expect((await refreshSession(session.refreshToken)).accessToken).toBeTruthy();
@@ -189,7 +210,7 @@ describe("logout revokes server-side, not just in the browser", () => {
     expect(me.status).toBe(401);
 
     // Logging back in works — revocation is not a lockout.
-    const again = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const again = await loginUser({ identifier: EMAIL, password });
     expect(again.accessToken).toBeTruthy();
   });
 
@@ -202,7 +223,7 @@ describe("logout revokes server-side, not just in the browser", () => {
       .expect(200);
 
     // This is the sequencing a user actually hits: log out, log back in.
-    const second = await loginUser({ identifier: EMAIL, password: PASSWORD });
+    const second = await loginUser({ identifier: EMAIL, password });
     const me = await request(app)
       .get("/api/v1/auth/me")
       .set("Authorization", `Bearer ${second.accessToken}`);
