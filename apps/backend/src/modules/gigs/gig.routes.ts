@@ -11,11 +11,12 @@ import {
 } from "@marketplace/schemas";
 import {
   requireAuth,
+  requireFreshAuth,
   optionalAuth,
   type AuthedRequest,
 } from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import {
@@ -207,13 +208,15 @@ gigsRouter.post(
 gigsRouter.post(
   "/:gigId/moderation",
   requireAuth,
-  requireStaffRole(
-    "COMPLIANCE_OFFICER",
-    "COMPLIANCE_ADMIN",
-    "ADMIN",
-    "OPERATIONS_ADMIN",
-    "SUPER_ADMIN",
-  ),
+  // This is the only route to ACTIVE, and the role list granted it to
+  // COMPLIANCE_OFFICER, COMPLIANCE_ADMIN and OPERATIONS_ADMIN — none of which
+  // hold gigs.moderate in the matrix. A canonical copy exists at
+  // POST /api/v1/admin/gigs/:gigId/moderation, guarded by
+  // requireFreshAuth(300) + requirePermission("gigs.moderate"), which REFUSES
+  // exactly those roles. So the weaker guard was the one that worked, and this
+  // duplicate also had no step-up at all.
+  requireFreshAuth(300),
+  requirePermission("gigs.moderate"),
   async (req: AuthedRequest, res) => {
     const status = req.body?.status;
     if (status !== "ACTIVE" && status !== "REJECTED") {
@@ -273,6 +276,12 @@ gigsRouter.post(
 gigsRouter.post(
   "/orders/:orderId/fund",
   requireAuth,
+  // Debits the client's wallet into escrow. The milestone equivalent,
+  // POST /api/v1/escrow/fund-from-wallet-adjacent routes, and the milestone
+  // accept path both carry a step-up; without one here a session obtained
+  // purely from a stolen Telegram initData (weak `amr`, never a fresh
+  // credential) could move gig escrow.
+  requireFreshAuth(300),
   requireKycVerified("TIER_1"),
   async (req: AuthedRequest, res) => {
     try {
@@ -340,6 +349,10 @@ gigsRouter.post(
 gigsRouter.post(
   "/orders/:orderId/accept",
   requireAuth,
+  // Releases escrowed gig money to the freelancer. Same reasoning as /fund, and
+  // the milestone equivalent POST /api/v1/escrow/milestones/:id/accept already
+  // requires a step-up.
+  requireFreshAuth(300),
   async (req: AuthedRequest, res) => {
     try {
       const order = await acceptGigOrder({
@@ -486,12 +499,12 @@ gigsRouter.post(
 gigsRouter.post(
   "/disputes/:disputeId/resolve",
   requireAuth,
-  requireStaffRole(
-    "COMPLIANCE_OFFICER",
-    "COMPLIANCE_ADMIN",
-    "ADMIN",
-    "DISPUTE_MEDIATOR",
-  ),
+  // Settles a gig dispute, which moves escrowed money to one party or the
+  // other. The role list granted it to COMPLIANCE_OFFICER and COMPLIANCE_ADMIN,
+  // who hold disputes.mediate but not disputes.resolve — they can review and
+  // mediate gig disputes but should not decide who gets the money.
+  requirePermission("disputes.resolve"),
+  requireFreshAuth(300),
   async (req: AuthedRequest, res) => {
     const parsed = z
       .object({
