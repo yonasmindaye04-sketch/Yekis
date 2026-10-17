@@ -407,6 +407,22 @@ export async function recordMilestoneReleaseLedger(
  * Disputed milestone refunded to client wallet.
  * Debit:  LIABILITY (Escrow Pool)
  * Credit: LIABILITY (Client wallet account)
+ *
+ * The idempotency key is the milestone, and nothing else.
+ *
+ * This used to end in `-${Date.now()}`, which made the key unique per call by
+ * construction. The dedupe could therefore never fire, so the guard was
+ * decorative: any retry posted a second journal. The escrow-pool debit is what
+ * that duplicate corrupted -- relief for one refund obligation was recorded
+ * twice, understating the liability the platform still owed every other
+ * client.
+ *
+ * Keying on the milestone alone is correct because a milestone is refunded at
+ * most once. refundMilestoneToClient takes its state as a conditional claim on
+ * escrowState, so a second caller matches no rows and throws before reaching
+ * this function. PARTIAL_SPLIT calls it for the client's share only, against a
+ * milestone whose release journal is separately keyed `escrow-release-<id>`,
+ * so the two never collide.
  */
 export async function recordDisputeRefundLedger(
   tx: Prisma.TransactionClient,
@@ -417,7 +433,7 @@ export async function recordDisputeRefundLedger(
   },
 ) {
   return postJournalEntry(tx, {
-    idempotencyKey: `dispute-refund-${params.milestoneId}-${Date.now()}`,
+    idempotencyKey: `dispute-refund-${params.milestoneId}`,
     referenceType: "DISPUTE_REFUND",
     referenceId: params.milestoneId,
     description: `Dispute resolution refund to client wallet`,

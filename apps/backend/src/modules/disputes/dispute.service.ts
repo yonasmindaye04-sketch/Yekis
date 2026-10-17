@@ -13,6 +13,7 @@ import {
   refundMilestoneToClient,
 } from "../escrow/escrow.service.js";
 import { checkAndUpdateContractCompletion } from "../contracts/contracts.service.js";
+import { recordDisputeRefundLedger } from "../finance/ledger.service.js";
 import { uploadEvidenceBundle } from "../../lib/objectStore.js";
 import { logger } from "../../lib/logger.js";
 import { createHash } from "node:crypto";
@@ -560,6 +561,23 @@ try {
             await tx.wallet.update({
               where: { userId: contract.clientId },
               data: { balanceMinor: { increment: clientShare } },
+            });
+
+            // The freelancer's share went out through releaseMilestoneFunds,
+            // which posts a journal debiting the escrow pool. This branch used
+            // to credit the wallet and stop: the pool was debited for the
+            // freelancer's portion only, so the client's portion of the
+            // escrowed money was never relieved and 2000-LIABILITY-ESCROW kept
+            // carrying a liability that had been paid out. The books said the
+            // platform still owed every client their disputed money, forever.
+            //
+            // Together the two journals debit the pool by exactly
+            // freelancerShare + clientShare = milestone.amountMinor, matching
+            // the funding journal, so the milestone nets to zero.
+            await recordDisputeRefundLedger(tx, {
+              clientId: contract.clientId,
+              milestoneId: milestone.id,
+              amountMinor: clientShare,
             });
           }
           await tx.milestone.update({
