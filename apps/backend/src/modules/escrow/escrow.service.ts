@@ -884,44 +884,61 @@ export async function withdrawFromWallet(params: {
     );
   }
 
-  // Atomic conditional decrement: two concurrent withdrawals both pass the
-  // pre-check above, but only decrements that still leave balance >= 0
-  // succeed. A loser gets count=0 -> InsufficientBalanceError, so the wallet
-  // can never go negative under concurrency.
-  const debited = await prisma.wallet.updateMany({
-    where: { userId: params.userId, balanceMinor: { gte: params.amountMinor } },
-    data: { balanceMinor: { decrement: params.amountMinor } },
-  });
-
-  if (debited.count === 0) {
-    throw new InsufficientBalanceError(
-      "Requested amount exceeds wallet balance.",
-    );
-  }
-
-  await recordAuditEvent({
-    userId: params.userId,
-    eventType: "WALLET_WITHDRAWAL_INITIATED",
-    entityType: "Wallet",
-    entityId: wallet.id,
-    metadata: { amountMinor: params.amountMinor, provider: params.provider },
-  });
-
   // Telebirr B2C fee (0.5% standard cashout)
   const feeMinor = Math.round(params.amountMinor * 0.005);
   const netAmountMinor = params.amountMinor - feeMinor;
 
-  const payout = await prisma.payoutTransaction.create({
-    data: {
+  // The debit, the audit event and the payout row are ONE transaction.
+  //
+  // They were three separate auto-commit statements. A crash — or a throw from
+  // anything between them — left the money debited with no PayoutTransaction
+  // row at all: no provider reference, no status, nothing to reconcile against,
+  // and no way for finance to discover that the balance is wrong. The user
+  // sees a smaller wallet and no withdrawal.
+  //
+  // The provider call deliberately stays OUTSIDE. It is an external system
+  // that cannot participate in a database transaction, and calling it inside
+  // would hold a pooled connection open across a network round trip. What goes
+  // wrong if the process dies between the commit and the provider call is
+  // bounded: a PROCESSING payout with a provider reference exists, which is
+  // exactly the state the reconciliation sweep and staff settlement exist for.
+  const payout = await prisma.$transaction(async (tx) => {
+    // Atomic conditional decrement: two concurrent withdrawals both pass the
+    // pre-check above, but only decrements that still leave balance >= 0
+    // succeed. A loser gets count=0 -> InsufficientBalanceError, so the wallet
+    // can never go negative under concurrency.
+    const debited = await tx.wallet.updateMany({
+      where: { userId: params.userId, balanceMinor: { gte: params.amountMinor } },
+      data: { balanceMinor: { decrement: params.amountMinor } },
+    });
+
+    if (debited.count === 0) {
+      throw new InsufficientBalanceError(
+        "Requested amount exceeds wallet balance.",
+      );
+    }
+
+    await recordAuditEvent({
       userId: params.userId,
-      walletId: wallet.id,
-      amountMinor: params.amountMinor,
-      feeMinor,
-      netAmountMinor,
-      provider: params.provider,
-      payoutAccountIdentifier: params.payoutAccountIdentifier,
-      status: "PROCESSING",
-    },
+      eventType: "WALLET_WITHDRAWAL_INITIATED",
+      entityType: "Wallet",
+      entityId: wallet.id,
+      metadata: { amountMinor: params.amountMinor, provider: params.provider },
+      tx,
+    });
+
+    return tx.payoutTransaction.create({
+      data: {
+        userId: params.userId,
+        walletId: wallet.id,
+        amountMinor: params.amountMinor,
+        feeMinor,
+        netAmountMinor,
+        provider: params.provider,
+        payoutAccountIdentifier: params.payoutAccountIdentifier,
+        status: "PROCESSING",
+      },
+    });
   });
 
   const providerClient = getProviderClient(params.provider);
@@ -990,17 +1007,25 @@ export async function withdrawFromWallet(params: {
   }
 
   if (disbursementResult.status === "CONFIRMED") {
-    await prisma.payoutTransaction.update({
-      where: { id: payout.id },
-      data: {
-        status: "CONFIRMED",
-        providerPayoutId: disbursementResult.providerPayoutId,
-        settledAt: new Date(),
-      },
-    });
-
-    // Record double-entry general ledger entry
+    // The CONFIRMED state change and the disbursement journal are one
+    // transaction.
+    //
+    // They were sequential and the journal was NOT wrapped in a try/catch. A
+    // journal failure therefore propagated with the payout already marked
+    // CONFIRMED and the money already gone: the route returned 500, the user
+    // retried, and a SECOND disbursement went out while the first had landed.
+    // Now either both happen or the payout stays PROCESSING, which is a state
+    // staff and the reconciliation sweep can actually act on.
     await prisma.$transaction(async (tx) => {
+      await tx.payoutTransaction.update({
+        where: { id: payout.id },
+        data: {
+          status: "CONFIRMED",
+          providerPayoutId: disbursementResult.providerPayoutId,
+          settledAt: new Date(),
+        },
+      });
+
       await recordWithdrawalDisbursementLedger(tx, {
         userId: params.userId,
         payoutId: payout.id,

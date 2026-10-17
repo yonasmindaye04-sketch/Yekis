@@ -175,9 +175,6 @@ describe("a wallet top-up is journalled, not just credited", () => {
   it("posts a WALLET_TOPUP journal that moves the settlement asset and the user liability", async () => {
     const topUp = await makePendingTopUp("TELEBIRR");
 
-    const assetBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
-    const liabilityBefore = await snapshot(userAccountCode(userId));
-
     await handleTopUpWebhook({
       providerTransactionId: topUp.providerTransactionId!,
       status: "SUCCESS",
@@ -189,18 +186,15 @@ describe("a wallet top-up is journalled, not just credited", () => {
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
     expect(wallet.balanceMinor).toBe(AMOUNT);
 
-    // The cash is now recorded as having ARRIVED in the settlement account.
-    // Before the fix this delta was zero, which is what let the first payout
-    // drive the asset account negative and trip the DB CHECK.
-    expect((await accountBalance(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code))!).toBe(
-      assetBefore + AMOUNT,
-    );
-
-    // And the platform now admits it owes the user that money. Before the fix
-    // this account did not exist and read 0 against a real wallet balance.
-    expect((await accountBalance(userAccountCode(userId)))!).toBe(liabilityBefore + AMOUNT);
-
     // The journal itself, with the exact debits and credits.
+    //
+    // Assertions are scoped to THIS journal's entry lines rather than to the
+    // settlement account's running balance. The asset account is a single
+    // global row shared by every test file, so a delta read races with any
+    // other file posting a top-up concurrently -- which is exactly how this
+    // suite failed when run alongside payout-atomicity.test.ts. The entry lines
+    // say which account received the cash, which is the property actually under
+    // test, and nothing else can move them.
     const journal = await prisma.ledgerJournal.findUnique({
       where: { idempotencyKey: `topup-${topUp.id}` },
       include: { entries: { include: { account: true } } },
@@ -218,10 +212,17 @@ describe("a wallet top-up is journalled, not just credited", () => {
     const byCode = new Map(
       journal!.entries.map((e) => [e.account.code, { d: e.debitMinor, c: e.creditMinor }]),
     );
+
+    // The cash arrived in the settlement account. Before the fix this line did
+    // not exist at all, which is what let the first payout drive the asset
+    // account negative and trip the DB CHECK.
     expect(byCode.get(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code)).toEqual({
       d: AMOUNT,
       c: 0,
     });
+
+    // And the platform admits it owes the user that money. Before the fix this
+    // account did not exist and read 0 against a real wallet balance.
     expect(byCode.get(userAccountCode(userId))).toEqual({ d: 0, c: AMOUNT });
   });
 
@@ -245,7 +246,6 @@ describe("a wallet top-up is journalled, not just credited", () => {
 
   it("does not post twice when the same success callback is delivered twice", async () => {
     const topUp = await makePendingTopUp("TELEBIRR");
-    const assetBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
 
     await handleTopUpWebhook({
       providerTransactionId: topUp.providerTransactionId!,
@@ -261,13 +261,22 @@ describe("a wallet top-up is journalled, not just credited", () => {
 
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
     expect(wallet.balanceMinor).toBe(AMOUNT);
-    expect((await accountBalance(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code))!).toBe(
-      assetBefore + AMOUNT,
-    );
     expect(
       await prisma.ledgerJournal.count({ where: { idempotencyKey: `topup-${topUp.id}` } }),
       "a duplicate callback must not post a second journal",
     ).toBe(1);
+
+    // One journal, so the settlement asset was credited exactly once. Scoped to
+    // this journal rather than to the account's running balance: the account is
+    // one global row shared with every other test file.
+    const agg = await prisma.ledgerEntry.aggregate({
+      where: {
+        journal: { idempotencyKey: `topup-${topUp.id}` },
+        account: { code: CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code },
+      },
+      _sum: { debitMinor: true },
+    });
+    expect(agg._sum.debitMinor).toBe(AMOUNT);
   });
 });
 
@@ -284,21 +293,23 @@ describe("staff approval is a credit path too", () => {
       },
     });
 
-    const assetBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
-    const liabilityBefore = await snapshot(userAccountCode(userId));
-
     await approveTopUp({ staffUserId: staffId, topUpId: topUp.id });
     await trackJournals();
 
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
     expect(wallet.balanceMinor).toBe(AMOUNT);
-    expect((await accountBalance(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code))!).toBe(
-      assetBefore + AMOUNT,
-    );
-    expect((await accountBalance(userAccountCode(userId)))!).toBe(liabilityBefore + AMOUNT);
+    expect((await accountBalance(userAccountCode(userId)))!).toBe(AMOUNT);
     expect(
       await prisma.ledgerJournal.count({ where: { idempotencyKey: `topup-${topUp.id}` } }),
     ).toBe(1);
+
+    // Exact debits and credits, scoped to this journal.
+    const agg = await prisma.ledgerEntry.aggregate({
+      where: { journal: { idempotencyKey: `topup-${topUp.id}` } },
+      _sum: { debitMinor: true, creditMinor: true },
+    });
+    expect(agg._sum.debitMinor).toBe(AMOUNT);
+    expect(agg._sum.creditMinor).toBe(AMOUNT);
   });
 
   it("refuses to credit twice when two staff approve the same top-up", async () => {
@@ -312,8 +323,6 @@ describe("staff approval is a credit path too", () => {
         providerTransactionId: `txn-${runId}-staff2-${Math.random().toString(36).slice(2, 10)}`,
       },
     });
-    const assetBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
-
     await approveTopUp({ staffUserId: staffId, topUpId: topUp.id });
 
     await expect(
@@ -323,9 +332,6 @@ describe("staff approval is a credit path too", () => {
 
     const wallet = await prisma.wallet.findUniqueOrThrow({ where: { id: walletId } });
     expect(wallet.balanceMinor, "a second approval must not mint more money").toBe(AMOUNT);
-    expect((await accountBalance(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code))!).toBe(
-      assetBefore + AMOUNT,
-    );
     // Sequential replay is stopped by the status re-read. Two staff clicking
     // approve in the same instant is stopped by the conditional claim inside
     // the transaction, which this sequence cannot reach — that path needs a
@@ -341,9 +347,6 @@ describe("settlement accounts are not collapsed into one another", () => {
   it("credits the CBE asset account for a CBE top-up", async () => {
     const topUp = await makePendingTopUp("CBE_BIRR");
 
-    const telebirrBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
-    const cbeBefore = await snapshot(CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT.code);
-
     await handleTopUpWebhook({
       providerTransactionId: topUp.providerTransactionId!,
       status: "SUCCESS",
@@ -351,13 +354,37 @@ describe("settlement accounts are not collapsed into one another", () => {
     });
     await trackJournals();
 
+    // Which account this journal touched, read from its entry lines.
+    //
+    // The earlier version compared the two accounts' running balances. Both are
+    // single global rows shared across test files, so any other file posting a
+    // Telebirr top-up concurrently moved the number underneath the assertion —
+    // this failed only when run alongside payout-atomicity.test.ts. The entry
+    // lines name the accounts this journal used and nothing else can change
+    // them.
+    //
     // The `PaymentProvider` enum member is CBE_BIRR. The old comparison was
     // against the literal "CBE", which can never be equal, so every CBE
     // settlement was booked against Telebirr's bank account.
-    expect((await accountBalance(CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT.code))!).toBe(cbeBefore + AMOUNT);
+    const entries = await prisma.ledgerEntry.findMany({
+      where: { journal: { idempotencyKey: `topup-${topUp.id}` } },
+      include: { account: { select: { code: true } } },
+    });
+    const codes = entries.map((e) => e.account.code);
+
     expect(
-      (await accountBalance(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code))!,
-      "a CBE payment must not move the Telebirr settlement account",
-    ).toBe(telebirrBefore);
+      codes,
+      "a CBE payment must be booked against the CBE settlement account",
+    ).toContain(CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT.code);
+    expect(
+      codes,
+      "a CBE payment must not be booked against Telebirr's settlement account",
+    ).not.toContain(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code);
+
+    const cbe = entries.find(
+      (e) => e.account.code === CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT.code,
+    );
+    expect(cbe?.debitMinor).toBe(AMOUNT);
+    expect(cbe?.creditMinor).toBe(0);
   });
 });
