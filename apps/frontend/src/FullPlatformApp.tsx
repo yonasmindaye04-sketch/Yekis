@@ -377,7 +377,7 @@ function AuthVisualAnimation() {
 }
 
 export function FullPlatformApp() {
-  const { t } = useI18n();
+  const { language, setLanguage, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [showLanding, setShowLanding] = useState(true);
@@ -573,6 +573,9 @@ const loadWorkspace = async () => {
     ]);
     if (meResult.status === "rejected") throw meResult.reason;
     setUser(meResult.value);
+    if (meResult.value?.languagePreference && ["en", "am", "om", "ti"].includes(meResult.value.languagePreference)) {
+      setLanguage(meResult.value.languagePreference as any);
+    }
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
     if (milestonesResult.status === "fulfilled")
@@ -688,7 +691,7 @@ if (authMode === "register") {
           password,
           role,
           dateOfBirth,
-          languagePreference: "en",
+          languagePreference: language || "en",
           consents: {
             kycDataProcessing: true,
             financialDataProcessing: true,

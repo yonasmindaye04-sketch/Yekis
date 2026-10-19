@@ -389,7 +389,7 @@ export const translations = {
   },
 
   am: {
-    appName: "ሙያሎጂ (Yekis)",
+    appName: "ዬኪስ (Yekis)",
     tagline: "በኢትዮጵያ ህጋዊ የኤስክሮው ፍሪላንስ ገበያ",
     nav: {
       home: "መነሻ",
@@ -1127,7 +1127,7 @@ export const translations = {
   },
 
   ti: {
-    appName: "ሙያሎጂ (Yekis)",
+    appName: "ዬኪስ (Yekis)",
     tagline: "ኣብ ኢትዮጵያ ሕጋዊ ናይ ኤስክሮው ናጻ ስራሕቲ (ፍሪላንስ) ዕዳጋ",
     nav: {
       home: "መበገሲ",

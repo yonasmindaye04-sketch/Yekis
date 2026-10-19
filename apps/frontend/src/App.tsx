@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
 import { useTheme } from "./theme/ThemeContext";
+import { useI18n } from "./i18n";
 import "./telegram/miniApp.css";
 
 // === INTERFACES & TYPES ===
@@ -138,6 +139,7 @@ function normalizeEthiopianPhone(input: string): string {
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
+  const { language, setLanguage, t } = useI18n();
   const telegram = useTelegramMiniApp();
 
   const [telegramSession, setTelegramSession] =
@@ -318,6 +320,9 @@ export function App() {
       .getMe()
       .then((me) => {
         setUserProfile(me);
+        if (me.languagePreference && ["en", "am", "om", "ti"].includes(me.languagePreference)) {
+          setLanguage(me.languagePreference as any);
+        }
         const backendRole = me.role === "ADMIN" ? "ADMIN" : (me.role as Role);
         setRole(backendRole);
         window.localStorage.setItem("yekis-role", backendRole);
@@ -498,7 +503,7 @@ export function App() {
           email: dummyEmail,
           password: mobilePassword,
           role: mobileRole,
-          languagePreference: "en",
+          languagePreference: language || "en",
           dateOfBirth: "1995-01-01",
           consents: {
             kycDataProcessing: true,
