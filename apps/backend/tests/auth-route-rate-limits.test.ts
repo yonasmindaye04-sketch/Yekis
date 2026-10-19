@@ -22,6 +22,8 @@ import { createAuthTokens } from "../src/modules/auth/auth.service.js";
  */
 
 const STAMP = Date.now();
+/** Run-scoped, so a previous run's counters can never carry into this one. */
+const RUN_RANDOM = Math.floor(Math.random() * 0xffffff);
 let app: express.Express;
 let userId = "";
 
@@ -39,10 +41,20 @@ function build() {
 }
 
 /**
- * Each case uses a distinct IP so one test's traffic cannot exhaust another's
- * budget — the limiter is keyed per address, and a shared bucket would make one
- * route's exhaustion look like another's.
+ * Each case gets an address unique per case AND per run.
+ *
+ * The first version derived the address from the route name's length and the
+ * attempt count, which collided often enough to matter: the limiter is keyed by
+ * address and its counters live for the whole 15-minute window, so a collision
+ * (or anything left by an earlier run) meant a case started with part of its
+ * budget already spent. It failed roughly one run in four. A run-scoped random
+ * component removes both.
  */
+function ipFor(index: number): string {
+  return `198.18.${RUN_RANDOM % 256}.${index}.${(RUN_RANDOM >> 8) % 256}`;
+}
+
+/** Each call uses a distinct address per case. */
 function asIp(ip: string) {
   return { "X-Forwarded-For": ip, "Content-Type": "application/json" };
 }
@@ -94,70 +106,46 @@ async function isLimited(
 }
 
 describe("each unauthenticated credential endpoint has its own budget", () => {
-  const cases: Array<{
-    route: string;
-    body: unknown;
-    // High enough to exhaust the route's limit, low enough to stay quick. The
-    // point is that a limit EXISTS, not that it is the exact number.
-    attempts: number;
-    label: string;
-  }> = [
-    {
-      route: "/api/v1/auth/refresh",
-      body: { refreshToken: "x".repeat(40) },
-      attempts: 130,
-      label: "refresh",
-    },
-    {
-      route: "/api/v1/auth/oauth/google",
-      body: { idToken: "y".repeat(40), role: "CLIENT" },
-      attempts: 40,
-      label: "oauth/google",
-    },
-    {
-      route: "/api/v1/auth/oauth/apple",
-      body: { idToken: "y".repeat(40), role: "CLIENT" },
-      attempts: 40,
-      label: "oauth/apple",
-    },
-    {
-      route: "/api/v1/auth/oauth/facebook",
-      body: { accessToken: "z".repeat(40), role: "CLIENT" },
-      attempts: 40,
-      label: "oauth/facebook",
-    },
-    {
-      route: "/api/v1/auth/telegram",
-      body: { initData: "q".repeat(40) },
-      attempts: 50,
-      label: "telegram",
-    },
-    {
-      route: "/api/v1/auth/telegram/miniapp",
-      body: { initData: "q".repeat(40) },
-      attempts: 50,
-      label: "telegram/miniapp",
-    },
-    {
-      route: "/api/v1/auth/telegram/widget",
-      body: { initData: "q".repeat(40) },
-      attempts: 50,
-      label: "telegram/widget",
-    },
-    {
-      route: "/api/v1/auth/telegram/miniapp/register",
-      body: { initData: "q".repeat(40), phone: "+251911000000", role: "CLIENT" },
-      attempts: 20,
-      label: "telegram/miniapp/register",
-    },
-  ];
+/**
+ * Bodies chosen to be VALID JSON that fails the route's own Zod parse.
+ *
+ * The limiter runs as middleware, before the handler, so a request rejected by
+ * validation still consumes budget -- which is exactly what this file needs.
+ *
+ * The alternative, sending a well-formed idToken, made every request perform a
+ * real outbound call to Google/Apple/Facebook. That is the slow way to prove a
+ * counter increments: with enough attempts to clear the limit, the file started
+ * timing out at 30s roughly one run in four, while the assertion itself was
+ * never the problem.
+ *
+ * Malformed JSON is deliberately avoided: express.json() would reject it before
+ * the route's middleware runs, and nothing would be counted at all.
+ */
+const cases: Array<{
+  route: string;
+  body: unknown;
+  // Comfortably above the route's limit so the assertion cannot be satisfied by
+  // accident, and cheap enough to stay fast now that no network call happens.
+  attempts: number;
+}> = [
+  // refreshToken must be at least 20 characters; a short one is refused before
+  // any crypto or store access.
+  { route: "/api/v1/auth/refresh", body: { refreshToken: "short" }, attempts: 140 },
+  // idToken must be at least 20 characters.
+  { route: "/api/v1/auth/oauth/google", body: { idToken: "short" }, attempts: 40 },
+  { route: "/api/v1/auth/oauth/apple", body: { idToken: "short" }, attempts: 40 },
+  { route: "/api/v1/auth/oauth/facebook", body: { accessToken: "short" }, attempts: 40 },
+  // Telegram routes need well-formed payloads; an empty object is refused by
+  // the handler's own shape checks.
+  { route: "/api/v1/auth/telegram", body: {}, attempts: 50 },
+  { route: "/api/v1/auth/telegram/miniapp", body: {}, attempts: 50 },
+  { route: "/api/v1/auth/telegram/widget", body: {}, attempts: 50 },
+  { route: "/api/v1/auth/telegram/miniapp/register", body: {}, attempts: 20 },
+];
 
-  for (const c of cases) {
+  for (const [index, c] of cases.entries()) {
     it(`${c.route} refuses once its budget is spent`, async () => {
-      // A distinct IP per case: the limiter is keyed by address, so sharing one
-      // would let an earlier case exhaust a later case's budget and the failure
-      // would look like a pass.
-      const ip = `10.${10 + (c.route.length % 200)}.${c.route.length}.${c.attempts}`;
+      const ip = ipFor(index);
       const result = await isLimited(c.route, ip, c.body, c.attempts);
 
       expect(
