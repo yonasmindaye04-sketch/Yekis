@@ -224,6 +224,7 @@ export interface RawEscrow {
     providerTransactionId: string;
     status: string;
   }>;
+  escrowHolds: Array<{ id: string; reason: string; createdAt: string }>;
 }
 export interface RawPayout {
   id: string;
@@ -319,6 +320,8 @@ export interface RawUserSummary {
     gigsOwned: number;
     gigOrders: number;
   };
+  recentConversations: Array<{ id: string; subject: string; status: string; updatedAt: string }>;
+  recentAudit: Array<{ id: string; eventType: string; entityType: string; entityId: string; createdAt: string; actorRole: string | null }>;
 }
 export interface RawStaffRow {
   id: string;
@@ -473,8 +476,16 @@ export type RawConversationPage = {
 };
 export interface RawChatMessage {
   id: string;
+  /**
+   * Present on the wire: ChatMessage.conversationId is a real column, and both
+   * `listMessages` and the `chat:message` broadcast return the raw Prisma row.
+   * SupportDesk filters on it before appending, so omitting it here was a type
+   * error rather than a runtime one -- the value was always there.
+   */
+  conversationId: string;
   body: string;
   attachmentUrl: string | null;
+  origin?: string;
   createdAt: string;
   sender: {
     id: string;
@@ -503,4 +514,16 @@ export type RawAuditLogPage = PageLimit<RawAuditLog>;
 export interface RawPermissionMatrix {
   permissions: readonly string[];
   roles: Record<string, readonly string[]>;
+}
+
+export interface RawGigModeration {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+  freelancer: { id: string; email: string; displayName: string | null; ucid: string };
+  packages: Array<{ id: string; tier: string; priceMinor: number; deliveryDays: number }>;
 }

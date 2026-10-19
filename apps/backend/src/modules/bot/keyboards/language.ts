@@ -1,7 +1,10 @@
 import { InlineKeyboard } from "grammy";
 
-export function languageKeyboard(): InlineKeyboard {
+export function languageKeyboard(prefix = "lang"): InlineKeyboard {
   return new InlineKeyboard()
-    .text(" English", "lang:en")
-    .text(" አማርኛ", "lang:am");
+    .text("🇬🇧 English", `${prefix}:en`)
+    .text("🇪🇹 አማርኛ", `${prefix}:am`)
+    .row()
+    .text("🇪🇹 Afaan Oromoo", `${prefix}:om`)
+    .text("🇪🇹 ትግርኛ", `${prefix}:ti`);
 }

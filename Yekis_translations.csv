@@ -1,220 +1,220 @@
-key,page,section,english_text,amharic_translation
-header.nav.faq,Global,Header Navigation,FAQ,
-header.nav.fees,Global,Header Navigation,Fees,
-header.nav.about,Global,Header Navigation,About,
-header.nav.case_studies,Global,Header Navigation,Case Studies,
-header.cta.signin,Global,Header Navigation,Sign in,
-header.cta.get_started,Global,Header Navigation,Get started,
-hero.title,Landing Page,Hero,"Find the right expertise.",
-hero.btn.get_started,Landing Page,Hero,Get started,
-hero.btn.browse_categories,Landing Page,Hero,Browse categories,
-marquee.item1,Landing Page,Marquee Trust Rail,Milestone escrow,
-marquee.item2,Landing Page,Marquee Trust Rail,Fayda KYC,
-marquee.item3,Landing Page,Marquee Trust Rail,Telebirr · CBE Birr,
-marquee.item4,Landing Page,Marquee Trust Rail,Refund guarantee,
-marquee.item5,Landing Page,Marquee Trust Rail,Human mediation,
-marquee.item6,Landing Page,Marquee Trust Rail,Time-stamped evidence,
-marquee.item7,Landing Page,Marquee Trust Rail,Local wallet payouts,
-marquee.item8,Landing Page,Marquee Trust Rail,Amharic & English,
-stats.label1,Landing Page,Stats Band,Jobs completed,
-stats.label2,Landing Page,Stats Band,Verified freelancers,
-stats.label3,Landing Page,Stats Band,"Secured in escrow (ETB)",
-stats.label4,Landing Page,Stats Band,Avg. payout time,
-escrow.eyebrow,Landing Page,How It Works,How your payment is protected,
-escrow.title,Landing Page,How It Works,"Clear money. Clear evidence. Clear next steps.",
-escrow.sub,Landing Page,How It Works,Every payment follows four transparent steps — guaranteed protection for clients and freelancers.,
-escrow.link,Landing Page,How It Works,See how disputes get resolved,
-escrow.footnote,Landing Page,How It Works,Every step is recorded and time-stamped so both sides have complete peace of mind.,
-steps.01.title,Landing Page,How It Works — Steps,Fund,
-steps.01.body,Landing Page,How It Works — Steps,"You deposit the agreed amount into escrow before work starts. It is held safely and never sent until you approve.",
-steps.02.title,Landing Page,How It Works — Steps,Work,
-steps.02.body,Landing Page,How It Works — Steps,"The freelancer completes the milestone and submits deliverables, files and notes for your review.",
-steps.03.title,Landing Page,How It Works — Steps,Approve,
-steps.03.body,Landing Page,How It Works — Steps,Satisfied with the delivery? Approve it and funds release instantly into the freelancer's wallet.,
-steps.04.title,Landing Page,How It Works — Steps,Protected,
-steps.04.body,Landing Page,How It Works — Steps,Need revisions or hit a problem? Support mediates with clear evidence for a fair resolution.,
-fees.eyebrow,Landing Page,Fees Section,Transparent fees,
-fees.title,Landing Page,Fees Section,One small percentage. Only when work pays out.,
-fees.sub,Landing Page,Fees Section,Nothing is charged upfront. Fees are split between client and freelancer at the moment escrow releases.,
-fees.bar.client,Landing Page,Fees Section,Client fee,
-fees.bar.freelancer,Landing Page,Fees Section,Freelancer fee,
-fees.bar.talent,Landing Page,Fees Section,Goes to the freelancer,
-fees.note,Landing Page,Fees Section,Deposits and withdrawals via Telebirr or CBE — no hidden wire charges.,
-categories.eyebrow,Landing Page,Categories Deck,Browse by category,
-categories.title,Landing Page,Categories Deck,Find the right expertise.,
-categories.sub,Landing Page,Categories Deck,Six launch categories covering Ethiopia's most in-demand digital skills.,
-categories.scroll_cue,Landing Page,Categories Deck,Scroll,
-deck.card1.klass,Landing Page,Categories Deck — Card 1,01 / Engineering,
-deck.card1.title1,Landing Page,Categories Deck — Card 1,Web & App,
-deck.card1.title2,Landing Page,Categories Deck — Card 1,Development,
-deck.card1.roles,Landing Page,Categories Deck — Card 1,148 open roles,
-deck.card1.tag,Landing Page,Categories Deck — Card 1,Full-stack · Mobile · API,
-deck.card2.klass,Landing Page,Categories Deck — Card 2,02 / Design,
-deck.card2.title1,Landing Page,Categories Deck — Card 2,Graphic Design,
-deck.card2.title2,Landing Page,Categories Deck — Card 2,& Branding,
-deck.card2.roles,Landing Page,Categories Deck — Card 2,96 open roles,
-deck.card2.tag,Landing Page,Categories Deck — Card 2,Identity · Print · UI,
-deck.card3.klass,Landing Page,Categories Deck — Card 3,03 / Marketing,
-deck.card3.title1,Landing Page,Categories Deck — Card 3,Digital,
-deck.card3.title2,Landing Page,Categories Deck — Card 3,Marketing,
-deck.card3.roles,Landing Page,Categories Deck — Card 3,74 open roles,
-deck.card3.tag,Landing Page,Categories Deck — Card 3,SEO · Social · Paid,
-deck.card4.klass,Landing Page,Categories Deck — Card 4,04 / Content,
-deck.card4.title1,Landing Page,Categories Deck — Card 4,Content &,
-deck.card4.title2,Landing Page,Categories Deck — Card 4,Copywriting,
-deck.card4.roles,Landing Page,Categories Deck — Card 4,61 open roles,
-deck.card4.tag,Landing Page,Categories Deck — Card 4,Editorial · UX · Scripts,
-deck.card5.klass,Landing Page,Categories Deck — Card 5,05 / Language,
-deck.card5.title1,Landing Page,Categories Deck — Card 5,Amharic / English,
-deck.card5.title2,Landing Page,Categories Deck — Card 5,Translation,
-deck.card5.roles,Landing Page,Categories Deck — Card 5,53 open roles,
-deck.card5.tag,Landing Page,Categories Deck — Card 5,Localisation · Subtitling,
-deck.card6.klass,Landing Page,Categories Deck — Card 6,06 / Data,
-deck.card6.title1,Landing Page,Categories Deck — Card 6,Data,
-deck.card6.title2,Landing Page,Categories Deck — Card 6,Processing,
-deck.card6.roles,Landing Page,Categories Deck — Card 6,88 open roles,
-deck.card6.tag,Landing Page,Categories Deck — Card 6,Annotation · ETL · QA,
-outro.title,Landing Page,Categories Outro,Let's build.,
-outro.sub,Landing Page,Categories Outro,Post a role in minutes or join the talent pool — Ethiopia's digital workforce is one deck away.,
-outro.btn.get_started,Landing Page,Categories Outro,Get started,
-outro.btn.signin,Landing Page,Categories Outro,Sign in,
-testimonials.eyebrow,Landing Page,Testimonials,What members say,
-testimonials.title,Landing Page,Testimonials,"Trust, in their words.",
-testi.1.quote,Landing Page,Testimonials,"I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
-testi.1.name,Landing Page,Testimonials,Hanna G.,
-testi.1.role,Landing Page,Testimonials,"Founder, import & retail",
-testi.2.quote,Landing Page,Testimonials,"As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
-testi.2.name,Landing Page,Testimonials,Abel T.,
-testi.2.role,Landing Page,Testimonials,Full-stack developer,
-testi.3.quote,Landing Page,Testimonials,"We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
-testi.3.name,Landing Page,Testimonials,Sara M.,
-testi.3.role,Landing Page,Testimonials,"Marketing lead, NGO",
-about.eyebrow,Landing Page,About Section,Ethiopia's escrow-protected marketplace,
-about.title1,Landing Page,About Section,Great work deserves,
-about.title2,Landing Page,About Section,guaranteed payment.,
-about.intro,Landing Page,About Section,"Yekis connects Ethiopian businesses with verified freelance talent — and keeps every payment locked in escrow until the work is delivered and approved. No chasing invoices, no awkward money conversations. Just clear rules both sides can trust.",
-about.feature1.title,Landing Page,About Section,Verified identities,
-about.feature1.body,Landing Page,About Section,"Freelancers verify with the Ethiopian National ID (Fayda), so you always know exactly who you are hiring.",
-about.feature2.title,Landing Page,About Section,Milestone escrow protection,
-about.feature2.body,Landing Page,About Section,Funds stay locked in escrow and only release when you inspect and approve each delivered milestone.,
-about.btn,Landing Page,About Section,More about Yekis,
-about.visual_bar1,Landing Page,About Section,Escrow,
-about.visual_bar2,Landing Page,About Section,Fayda KYC,
-about.visual_bar3,Landing Page,About Section,Mediation,
-faq.eyebrow,Landing Page,FAQ Section,FAQ,
-faq.title,Landing Page,FAQ Section,Frequently asked questions,
-faq.sub,Landing Page,FAQ Section,Straight answers about money verification and disputes.,
-faq.search_placeholder,Landing Page,FAQ Section,Search questions…,
-faq.no_results,Landing Page,FAQ Section,"No question matches that. Try ""escrow"", ""withdraw"" or ""KYC"".",
-faq.cat1,Landing Page,FAQ Section,Trusting the platform,
-faq.cat1.q1,Landing Page,FAQ Section,Is my money actually safe?,
-faq.cat1.a1,Landing Page,FAQ Section,"Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond. If something's wrong, raise it before approving and the payment stays held while we help sort it out.",
-faq.cat1.q2,Landing Page,FAQ Section,What if the freelancer disappears after I pay?,
-faq.cat1.a2,Landing Page,FAQ Section,Your money is still sitting safely in escrow — it was never sent to them. If a freelancer goes silent raise it with our team and we'll help resolve it which can include a full refund.,
-faq.cat1.q3,Landing Page,FAQ Section,What if we disagree about the work?,
-faq.cat1.a3,Landing Page,FAQ Section,"Most disagreements get sorted directly between you and the freelancer within a short window. If you can't agree, our team reviews both sides — the original brief, the delivered work and your messages — and decides: release, refund, or split fairly.",
-faq.cat2,Landing Page,FAQ Section,Getting started,
-faq.cat2.q1,Landing Page,FAQ Section,Why do I need to verify my identity (KYC)?,
-faq.cat2.a1,Landing Page,FAQ Section,"It protects everyone. Verification is how we confirm the person you hire, or the client you work for, is really who they claim to be. Basic verification is quick and unlocks browsing and posting.",
-faq.cat2.q2,Landing Page,FAQ Section,What are the fees?,
-faq.cat2.a2,Landing Page,FAQ Section,"Yekis takes a small percentage of each completed job, split between client and freelancer — never charged upfront, only when a payment actually releases.",
-faq.cat3,Landing Page,FAQ Section,Getting paid,
-faq.cat3.q1,Landing Page,FAQ Section,When do I actually get paid?,
-faq.cat3.a1,Landing Page,FAQ Section,"The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to Telebirr or your bank account.",
-faq.cat3.q2,Landing Page,FAQ Section,Is there a minimum withdrawal amount?,
-faq.cat3.a2,Landing Page,FAQ Section,A small minimum applies per withdrawal to keep payment-rail costs sensible. The exact figure is shown in your wallet before you confirm.,
-cta.eyebrow,Landing Page,Final CTA,Ready to start?,
-cta.title,Landing Page,Final CTA,Put your next project in motion.,
-cta.sub,Landing Page,Final CTA,Post a job or join as a freelancer with full escrow protection from start to finish.,
-cta.btn.post_job,Landing Page,Final CTA,Post a job,
-cta.btn.find_work,Landing Page,Final CTA,Find work,
-footer.brand.desc,Landing Page,Footer,"Ethiopia's escrow-protected freelance marketplace. Post work, pay into escrow, and get your result — or your money back.",
-footer.col.platform,Landing Page,Footer,Platform,
-footer.link.faq,Landing Page,Footer,FAQ,
-footer.link.fees,Landing Page,Footer,Fees,
-footer.link.case_studies,Landing Page,Footer,Case Studies,
-footer.col.company,Landing Page,Footer,Company,
-footer.link.about,Landing Page,Footer,About Us,
-footer.link.contact,Landing Page,Footer,Contact Support,
-footer.col.legal,Landing Page,Footer,Legal,
-footer.link.privacy,Landing Page,Footer,Privacy Policy,
-footer.link.terms,Landing Page,Footer,Terms of Service,
-footer.social.telegram_channel,Landing Page,Footer,Telegram Channel,
-footer.social.community,Landing Page,Footer,Community,
-footer.social.bot,Landing Page,Footer,Yekis Bot,
-footer.social.email,Landing Page,Footer,Email Us,
-footer.copyright,Landing Page,Footer,© 2025 Yekis. All rights reserved.,
-footer.escrow_note,Landing Page,Footer,Payments secured by Yekis Escrow,
-footer.lang_toggle,Landing Page,Footer,EN / አማ,
-faqpage.title,FAQ Page,Page Header,Frequently Asked Questions,
-faqpage.breadcrumb,FAQ Page,Breadcrumbs,Home > FAQ,
-faqpage.cat1,FAQ Page,Category,Trusting the platform,
-faqpage.cat1.q1,FAQ Page,Question,Is my money actually safe?,
-faqpage.cat1.a1,FAQ Page,Answer,"Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond, which protects your freelancer's time too. If something's wrong, you can raise it before approving and your payment stays held while we help sort it out.",
-faqpage.cat1.q2,FAQ Page,Question,What if the freelancer just disappears after I pay?,
-faqpage.cat1.a2,FAQ Page,Answer,Your money is still sitting safely in escrow — it was never sent to them in the first place. If a freelancer goes silent raise it with our team and we'll help resolve it which can include a full refund.,
-faqpage.cat1.q3,FAQ Page,Question,What if we disagree about the work?,
-faqpage.cat1.a3,FAQ Page,Answer,"Most disagreements get sorted out directly between you and the freelancer, with a short window to talk it through. If you can't agree, our team reviews both sides — the original brief, the delivered work, and your messages — and makes a call: release the payment, refund it, or split it fairly. If either side still disagrees with that decision, there's a final formal step through an independent arbitration body — but the vast majority of cases never need to go that far.",
-faqpage.cat1.q4,FAQ Page,Question,Is my payment information safe?,
-faqpage.cat1.a4,FAQ Page,Answer,"Yes. We never see or store your card or account details directly — payments are handled through licensed providers (Telebirr and CBE), and all your data is protected under Ethiopian data protection law.",
-faqpage.cat2,FAQ Page,Category,Getting started,
-faqpage.cat2.q1,FAQ Page,Question,Why do I need to verify my identity (KYC)?,
-faqpage.cat2.a1,FAQ Page,Answer,"It protects everyone on the platform — it's how we make sure the person you're hiring, or the client you're working for, is really who they say they are. Basic verification is quick (a valid ID and a few details) and unlocks browsing and posting jobs. A slightly deeper verification step is required before withdrawing earnings, which protects freelancers' payouts from fraud.",
-faqpage.cat2.q2,FAQ Page,Question,How long does verification take?,
-faqpage.cat2.a2,FAQ Page,Answer,Most people are verified automatically within minutes. Occasionally we review manually which can take up to 48 hours — you'll get a notification the moment it's done.,
-faqpage.cat2.q3,FAQ Page,Question,What are the fees?,
-faqpage.cat2.a3,FAQ Page,Answer,"Yekis takes a small percentage of each completed job, split between the client and the freelancer — never charged upfront, only when a payment actually releases.",
-faqpage.cat2.link,FAQ Page,Inline Link,View fees page,
-faqpage.cat2.q4,FAQ Page,Question,Can I use Yekis in Amharic?,
-faqpage.cat2.a4,FAQ Page,Answer,Yes — switch languages anytime using the toggle in the top corner of any page.,
-faqpage.cat3,FAQ Page,Category,Getting paid,
-faqpage.cat3.q1,FAQ Page,Question,When do I actually get paid?,
-faqpage.cat3.a1,FAQ Page,Answer,"The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to your Telebirr or bank account.",
-faqpage.cat3.q2,FAQ Page,Question,Why can't I withdraw right away as a new freelancer?,
-faqpage.cat3.a2,FAQ Page,Answer,Withdrawals require a slightly deeper identity check than browsing or bidding does — it's a safeguard that protects your payout from being sent to the wrong place. It's a one-time step; once it's done you're set.,
-faqpage.cat3.q3,FAQ Page,Question,Is there a minimum before I can withdraw?,
-faqpage.cat3.a3,FAQ Page,Answer,[Amount to be confirmed — leave blank for now],
-feespage.breadcrumb,Fees Page,Breadcrumbs,Home > Fees,
-feespage.title,Fees Page,Page Header,Simple transparent pricing,
-feespage.sub,Fees Page,Page Header,You only pay when a job is successfully completed — never upfront.,
-feespage.panel_title,Fees Page,Platform Fees Panel,Platform Fees,
-feespage.fee_item1,Fees Page,Platform Fees List,Platform fee: [X%] of each completed milestone split between client and freelancer,
-feespage.fee_item2,Fees Page,Platform Fees List,No listing fees,
-feespage.fee_item3,Fees Page,Platform Fees List,No subscription fees,
-feespage.fee_item4,Fees Page,Platform Fees List,No hidden charges,
-feespage.fee_item5,Fees Page,Platform Fees List,"Withholding tax: 3% for TIN-verified freelancers, 30% for unverified (per ERCA regulation)",
-feespage.compare_title,Fees Page,Comparison Table,How we compare,
-feespage.table.col1,Fees Page,Comparison Table,Feature,
-feespage.table.col2,Fees Page,Comparison Table,Yekis,
-feespage.table.col3,Fees Page,Comparison Table,Informal Trust,
-feespage.table.col4,Fees Page,Comparison Table,Hiring a Lawyer,
-feespage.table.row1.feature,Fees Page,Comparison Table,Payment Protection,
-feespage.table.row1.yekis,Fees Page,Comparison Table,Escrow Held,
-feespage.table.row1.informal,Fees Page,Comparison Table,None,
-feespage.table.row1.lawyer,Fees Page,Comparison Table,High retainers,
-feespage.table.row2.feature,Fees Page,Comparison Table,Dispute Resolution,
-feespage.table.row2.yekis,Fees Page,Comparison Table,Included,
-feespage.table.row2.informal,Fees Page,Comparison Table,"""He said, she said""",
-feespage.table.row2.lawyer,Fees Page,Comparison Table,Expensive litigation,
-feespage.btn.faq,Fees Page,Buttons,Read more in our FAQ,
-feespage.btn.post,Fees Page,Buttons,Post a Job,
-feespage.btn.find,Fees Page,Buttons,Find Work,
-aboutpage.breadcrumb,About Page,Breadcrumbs,Home > About,
-aboutpage.title,About Page,Page Header,About Yekis,
-aboutpage.mission_title,About Page,Mission Section,Our Mission,
-aboutpage.mission_quote,About Page,Mission Section,"Yekis exists to give Ethiopian freelancers and their clients a workspace where good work can happen without needing informal trust or a lawyer.",
-aboutpage.problem_title,About Page,Problem Section,The Problem We Solve,
-aboutpage.problem_body,About Page,Problem Section,"The trust gap in Ethiopian freelance work holds back incredible talent. Clients fear paying upfront and receiving nothing. Freelancers fear delivering work and never getting paid. Yekis bridges this gap with milestone-based escrow, protecting both sides.",
-aboutpage.team_title,About Page,Team Section,Our Team,
-aboutpage.contact_title,About Page,Contact Section,Contact Information,
-aboutpage.contact_email,About Page,Contact Section,Email: hello@yekis.com,
-aboutpage.contact_phone,About Page,Contact Section,Phone: +251 900 000000,
-aboutpage.contact.telegram_channel,About Page,Contact Section,Telegram Channel,
-aboutpage.contact.telegram_group,About Page,Contact Section,Telegram Group,
-aboutpage.contact.telegram_bot,About Page,Contact Section,Telegram Bot,
-casestudies.breadcrumb,Case Studies Page,Breadcrumbs,Home > Case Studies,
-casestudies.title,Case Studies Page,Page Header,Real projects. Real results.,
-casestudies.sub,Case Studies Page,Page Header,"Case studies from verified, escrow-protected projects on Yekis.",
-casestudies.coming_soon,Case Studies Page,Card Badge,Coming Soon,
-casestudies.btn.faq,Case Studies Page,Buttons,Read FAQ,
-casestudies.btn.browse,Case Studies Page,Buttons,Browse Categories,
+key,page,section,english_text,amharic_translation,oromiffa_translation,tigrigna_translation
+header.nav.faq,Global,Header Navigation,FAQ,ጥያቄዎች,Gaaffilee,ሕቶታት
+header.nav.fees,Global,Header Navigation,Fees,የአገልግሎት ክፍያ,Kaffaltii,ክፍሊታት
+header.nav.about,Global,Header Navigation,About,ስለ እኛ,Waa'ee Keenya,ብዛዕባና
+header.nav.case_studies,Global,Header Navigation,Case Studies,የስኬት ታሪኮች,Milkaa'ina,ተመኩሮታት ዓወት
+header.cta.signin,Global,Header Navigation,Sign in,ግባ,Seeni,እቶ
+header.cta.get_started,Global,Header Navigation,Get started,ጀምር,Jalqabi,ጀምር
+hero.title,Landing Page,Hero,Find the right expertise.,ትክክለኛውን ባለሙያ ያግኙ።,Ogummaa fi dandeettii sirrii argadhaa.,ትኽክለኛ ክእለት ዘለዎም ሰብሞያ ርኸቡ።
+hero.btn.get_started,Landing Page,Hero,Get started,ጀምር,Jalqabi,ጀምር
+hero.btn.browse_categories,Landing Page,Hero,Browse categories,ዘርፎችን ያስሱ,Gosoota Sakatta'aa,ዓይነታት ስራሕ ርኣዩ
+marquee.item1,Landing Page,Marquee Trust Rail,Milestone escrow,የደረጃዎች ኤስክሮው ዋስትና,Qabsiisa sadarkaa hojii,ናይ ብርኪ ዕዮ ኤስክሮው
+marquee.item2,Landing Page,Marquee Trust Rail,Fayda KYC,የፋይዳ መታወቂያ,Eenyummaa Fayidaa,መንነት ፋይዳ
+marquee.item3,Landing Page,Marquee Trust Rail,Telebirr · CBE Birr,ቴሌብር · የኢትዮጵያ ንግድ ባንክ,Telebirr · Baankii Daldala Itoophiyaa,ቴሌብር · ንግዲ ባንኪ ኢትዮጵያ
+marquee.item4,Landing Page,Marquee Trust Rail,Refund guarantee,ሙሉ የገንዘብ ተመላሽ ዋስትና,Wabii maallaqa deebisuu,ዋሕስ ምምላስ ገንዘብ
+marquee.item5,Landing Page,Marquee Trust Rail,Human mediation,የሰው ባለሙያ እርቅ,Jaarsummaa namaa,ናይ ሰብ ሞያ ሽምግልና
+marquee.item6,Landing Page,Marquee Trust Rail,Time-stamped evidence,በሰዓት የተመዘገበ ማስረጃ,Ragaa yeroon galmaa'e,ብግዜ ዝተመዝገበ መርትዖ
+marquee.item7,Landing Page,Marquee Trust Rail,Local wallet payouts,በሀገር ውስጥ ዋሌት ክፍያ,Kaffaltii boorsaa naannoo,ናይ ውሽጢ ዓዲ ቦርሳ ክፍሊታት
+marquee.item8,Landing Page,Marquee Trust Rail,Amharic & English,አማርኛ፣ ኦሮምኛ እና ትግርኛ,"Afaan Oromoo, Amaaraa fi Tigriffa",ትግርኛ፣ ኣምሓርኛን ኦሮምኛን
+stats.label1,Landing Page,Stats Band,Jobs completed,የተጠናቀቁ ሥራዎች,Hojiiwwan xumuraman,ዝተዛዘሙ ስራሕቲ
+stats.label2,Landing Page,Stats Band,Verified freelancers,የተረጋገጡ ፍሪላንሰሮች,Hojjettoota bilisaa mirkanaa'an,ዝተረጋገጹ ናጻ ሰራሕተኛታት
+stats.label3,Landing Page,Stats Band,Secured in escrow (ETB),በኤስክሮው የተጠበቀ (በብር),Qabsiisa (escrow) keessatti kan eegame (ETB),ኣብ ኤስክሮው ዝተሓለወ (ብቕርሺ)
+stats.label4,Landing Page,Stats Band,Avg. payout time,አማካይ የክፍያ ጊዜ,Giddu-galeessa yeroo kaffaltii,ማእከላይ ናይ ክፍሊት ግዜ
+escrow.eyebrow,Landing Page,How It Works,How your payment is protected,ክፍያዎ እንዴት ጥበቃ ይደረግለታል,Kaffaltiin keessan akkamitti eegama,ክፍሊትኩም ብኸመይ ይሕሎ
+escrow.title,Landing Page,How It Works,Clear money. Clear evidence. Clear next steps.,ግልጽ ገንዘብ። ግልጽ ማስረጃ። ግልጽ እርምጃ።,Maallaqa ifa. Ragaa ifa. Tarkaanfii ifa.,ንጹር ገንዘብ። ንጹር መርትዖ። ንጹር ስጉምቲ።
+escrow.sub,Landing Page,How It Works,Every payment follows four transparent steps — guaranteed protection for clients and freelancers.,እያንዳንዱ ክፍያ አራት ግልጽ ደረጃዎችን ይከተላል — ለደንበኞችም ሆነ ለፍሪላንሰሮች የተረጋገጠ ጥበቃ።,Kaffaltiin hundi tarkaanfilee ifa ta'an afur hordofa — maamilaafi hojjettoota bilisaatiif eegumsa guutuu.,ነፍሲ ወከፍ ክፍሊት ኣርባዕተ ግሉጻት ደረጃታት ይስዕብ — ንዓማዊልን ንሰራሕተኛታትን ውሑስ ሓለዋ።
+escrow.link,Landing Page,How It Works,See how disputes get resolved,አለመግባባቶች እንዴት እንደሚፈቱ ይመልከቱ,Wal-dhabdeen akkamitti akka furamu ilaalaa,ناک ፍሕታት ብኸመይ ከምዝፍታሕ ርአዩ
+escrow.footnote,Landing Page,How It Works,Every step is recorded and time-stamped so both sides have complete peace of mind.,ሁለቱም ወገኖች ሙሉ እረፍት እንዲኖራቸው እያንዳንዱ እርምጃ በጊዜ ማህተም ይመዘገባል።,Gareewwan lamaanuu yaaddoo tokko malee akka hojjetaniif tarkaanfiin hundi sa'aatiin galmaa'a.,ክልቲኦም ወገናት ምሉእ ቅሳነት ክህልዎም ነፍሲ ወከፍ ስጉምቲ ብሰዓት ይምዝገብ።
+steps.01.title,Landing Page,How It Works — Steps,Fund,አስቀምጥ,Qabsiisi,ዓቚር
+steps.01.body,Landing Page,How It Works — Steps,You deposit the agreed amount into escrow before work starts. It is held safely and never sent until you approve.,ሥራ ከመጀመሩ በፊት የተስማሙበትን የገንዘብ መጠን በኤስክሮው ያስቀምጣሉ። እርስዎ እስካላጸደቁ ድረስ በደህንነት ተይዞ ይቆያል።,Hojiin jalqabamuu dura maallaqa waliigaltanii qabsiisa amansiisaa (escrow) keessa keessu. Hanga isin mirkaneessitanitti nageenyaan eegama.,ስራሕ ቅድሚ ምጅማሩ ነቲ ዝተሰማማዕኩምሉ መጠን ገንዘብ ኣብ ኤስክሮው ተቐምጥዎ። ንስኹም ክሳብ ዘየጽደቕኩምዎ ብውሑስ ይዕቀብ።
+steps.02.title,Landing Page,How It Works — Steps,Work,ሥራ,Hojjedhu,ስራሕ
+steps.02.body,Landing Page,How It Works — Steps,"The freelancer completes the milestone and submits deliverables, files and notes for your review.",ፍሪላንሰሩ የሥራ ምዕራፉን አጠናቆ የተዘጋጁ ፋይሎችን፣ ሰነዶችንና ማስታወሻዎችን ለግምገማ ያቀርባል።,"Hojjetaan bilisaa marsaa hojichaa xumuree bu'aa hojii, faayilootaa fi ibsa isaa gamaggamaaf dhiyeessa.",እቲ ሰራሕተኛ ነቲ ብርኪ ዕዮ ኣወዲኡ ዝተሰርሑ ሰነዳትን መብርህን ንግምገማ የቕርብ።
+steps.03.title,Landing Page,How It Works — Steps,Approve,አጽድቅ,Mirkaneessi,ኣጽድቕ
+steps.03.body,Landing Page,How It Works — Steps,Satisfied with the delivery? Approve it and funds release instantly into the freelancer's wallet.,በቀረበው ሥራ ረክተዋል? አጽድቁት፤ ክፍያው ወዲያውኑ ወደ ፍሪላንሰሩ ዋሌት ይለቀቃል።,"Hojichatti quuftaniittuu? Mirkaneessaa, maallaqni yeruma sana boorsaa hojjetaatti gadi lakkifama.",በቲ ዝተሰርሐ ስራሕ ዓጊብኩም ዲኹም? ኣጽድቕዎ፤ እቲ ገንዘብ ብኡንብኡ ናብ ቦርሳ እቲ ሰራሕተኛ ይልቀቕ።
+steps.04.title,Landing Page,How It Works — Steps,Protected,የተጠበቀ,Eegamaadha,ዝተሓለወ
+steps.04.body,Landing Page,How It Works — Steps,Need revisions or hit a problem? Support mediates with clear evidence for a fair resolution.,ማስተካከያ ይፈልጋሉ ወይስ ችግር ተፈጠረ? የእርቅ ቡድናችን ግልጽ ማስረጃዎችን መሠረት በማድረግ ፍትሃዊ መፍትሄ ይሰጣል።,Sirreeffamni barbaachisaa moo rakkoon uumame? Gareen jaarsummaa ragaa qabatamaadhaan haqa qabeessummaan fura.,ምዕራይ የድሊ ወይ ጸገም ኣጋጢምኩም? ናይ ሽምግልና ጋንታና ብግሉጽ መርትዖ ፍትሓዊ ፍታሕ ይህብ።
+fees.eyebrow,Landing Page,Fees Section,Transparent fees,ግልጽ የአገልግሎት ክፍያ,Kaffaltii ifa ta'e,ግሉጽ ኣከፋፍላ
+fees.title,Landing Page,Fees Section,One small percentage. Only when work pays out.,አነስተኛ መቶኛ። ሥራው ተጠናቆ ክፍያው ሲለቀቅ ብቻ።,Dhibbeentaa xiqqoo tokko. Yeroo hojiin kaffaltii argatu qofa.,ንእሽቶ ሚእታዊት። ስራሕ ተወዲኡ ክፍሊት ክልቀቕ ከሎ ጥራይ።
+fees.sub,Landing Page,Fees Section,Nothing is charged upfront. Fees are split between client and freelancer at the moment escrow releases.,ምንም አይነት ቅድመ ክፍያ አይኖርም። ኤስክሮው በሚለቀቅበት ቅጽበት ክፍያው በደንበኛውና በፍሪላንሰሩ መካከል ይጋራል።,Dursa kaffaltiin homtuu hin jiru. Yeroo qabsiisni gadi lakkifamu kaffaltiin maamilaa fi hojjetaa gidduutti qoodama.,ቅድመ-ክፍሊት ፈጺሙ የለን። ኤስክሮው ኣብ ዝልቀቐሉ ግዜ እቲ ክፍሊት ኣብ መንጎ ዓሚልን ሰራሕተኛን ይምቀል።
+fees.bar.client,Landing Page,Fees Section,Client fee,የደንበኛ ክፍያ,Kaffaltii maamilaa,ክፍሊት ዓሚል
+fees.bar.freelancer,Landing Page,Fees Section,Freelancer fee,የፍሪላንሰር ክፍያ,Kaffaltii hojjetaa,ክፍሊት ሰራሕተኛ
+fees.bar.talent,Landing Page,Fees Section,Goes to the freelancer,ለፍሪላንሰሩ የሚደርስ,Hojjetaaf kan kennamu,ንሰራሕተኛ ዝኸይድ
+fees.note,Landing Page,Fees Section,Deposits and withdrawals via Telebirr or CBE — no hidden wire charges.,ገንዘብ ማስገባትና ማውጣት በቴሌብር ወይም በኢትዮጵያ ንግድ ባንክ — ምንም የተደበቀ ክፍያ የለም።,Galchuufi baasuun Telebirr yookiin Baankii Daldala Itoophiyaatiin — kaffaltiin dhokataan hin jiru.,ምእታውን ምውጻእን ብቴሌብር ወይ ብንግዲ ባንኪ ኢትዮጵያ — ዝኾነ ሕቡእ ክፍሊት የለን።
+categories.eyebrow,Landing Page,Categories Deck,Browse by category,በዘርፍ ይፈልጉ,Gosaan sakatta'aa,ብዓይነት ድለዩ
+categories.title,Landing Page,Categories Deck,Find the right expertise.,ትክክለኛውን ባለሙያ ያግኙ።,Ogummaa fi dandeettii sirrii argadhaa.,ትኽክለኛ ክእለት ዘለዎም ሰብሞያ ርኸቡ።
+categories.sub,Landing Page,Categories Deck,Six launch categories covering Ethiopia's most in-demand digital skills.,በኢትዮጵያ በብዛት የሚፈለጉ የዲጂታል ክህሎቶችን ያካተቱ ስድስት ዘርፎች።,Dandeettiiwwan dijitaalaa Itoophiyaa keessatti barbaadaman jaha dhiyeessina.,ኣብ ኢትዮጵያ ዝያዳ ዝድለዩ ናይ ዲጂታል ክእለታት ዘጠቓልሉ ሽዱሽተ ዓውድታት።
+categories.scroll_cue,Landing Page,Categories Deck,Scroll,ወደ ታች ይሸብልሉ,Gadi siqaa,ናብ ታሕቲ ሸትት
+deck.card1.klass,Landing Page,Categories Deck — Card 1,01 / Engineering,01 / ኢንጂነሪንግ,01 / Injinariingii,01 / ኢንጂነሪንግ
+deck.card1.title1,Landing Page,Categories Deck — Card 1,Web & App,የዌብሳይትና,Misooma Weebsaayitii,ምምዕባል ዌብሳይትን
+deck.card1.title2,Landing Page,Categories Deck — Card 1,Development,መተግበሪያ ልማት,fi Moobaayilaa,መተግበሪን
+deck.card1.roles,Landing Page,Categories Deck — Card 1,148 open roles,148 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 148,148 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card1.tag,Landing Page,Categories Deck — Card 1,Full-stack · Mobile · API,Full-stack · Mobile · API,Full-stack · Mobile · API,Full-stack · Mobile · API
+deck.card2.klass,Landing Page,Categories Deck — Card 2,02 / Design,02 / ዲዛይን,02 / Dizaayinii,02 / ዲዛይን
+deck.card2.title1,Landing Page,Categories Deck — Card 2,Graphic Design,ግራፊክስ ዲዛይን,Dizaayinii Giraafiksii,ግራፊክ ዲዛይን
+deck.card2.title2,Landing Page,Categories Deck — Card 2,& Branding,እና ብራንዲንግ,fi Biraandiingii,ን ብራንዲንግን
+deck.card2.roles,Landing Page,Categories Deck — Card 2,96 open roles,96 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 96,96 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card2.tag,Landing Page,Categories Deck — Card 2,Identity · Print · UI,አርማ · ህትመት · ዩአይ,Asxaa · Maxxansa · UI,መለለዪ · ሕትመት · ዩአይ
+deck.card3.klass,Landing Page,Categories Deck — Card 3,03 / Marketing,03 / ማርኬቲንግ,03 / Gabaagurrummaa,03 / ማርኬቲንግ
+deck.card3.title1,Landing Page,Categories Deck — Card 3,Digital,ዲጂታል,Gabaagurrummaa,ዲጂታል
+deck.card3.title2,Landing Page,Categories Deck — Card 3,Marketing,ማርኬቲንግ,Daldala (Marketing),ማርኬቲንግ
+deck.card3.roles,Landing Page,Categories Deck — Card 3,74 open roles,74 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 74,74 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card3.tag,Landing Page,Categories Deck — Card 3,SEO · Social · Paid,ኤስኢኦ · ማህበራዊ ሚዲያ · ማስታወቂያ,SEO · Miidiyaa Hawaasaa · Beeksisa,ኤስኢኦ · ማሕበራዊ ሚድያ · መወዓውዒ
+deck.card4.klass,Landing Page,Categories Deck — Card 4,04 / Content,04 / ይዘት,04 / Qabiyyee,04 / ትሕዝቶ
+deck.card4.title1,Landing Page,Categories Deck — Card 4,Content &,የይዘት ጽሑፍና,Qophii Qabiyyee,ምድላው ትሕዝቶን
+deck.card4.title2,Landing Page,Categories Deck — Card 4,Copywriting,ኮፒራይቲንግ,fi Barreeffamaa,ጽሑፍን
+deck.card4.roles,Landing Page,Categories Deck — Card 4,61 open roles,61 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 61,61 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card4.tag,Landing Page,Categories Deck — Card 4,Editorial · UX · Scripts,ኤዲቶሪያል · ዩኤክስ · ስክሪፕት,Gulaallii · UX · Iskiriiptii,ኤዲቶርያል · ዩኤክስ · ስክሪፕት
+deck.card5.klass,Landing Page,Categories Deck — Card 5,05 / Language,05 / ቋንቋ,05 / Afaan,05 / ቋንቋ
+deck.card5.title1,Landing Page,Categories Deck — Card 5,Amharic / English,የቋንቋ ትርጉምና,Hiikkaa Afaanii,ትርጉም ቋንቋታትን
+deck.card5.title2,Landing Page,Categories Deck — Card 5,Translation,አካባቢያዊ ማድረግ,fi Hojii Qooqa,ምዝማድን
+deck.card5.roles,Landing Page,Categories Deck — Card 5,53 open roles,53 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 53,53 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card5.tag,Landing Page,Categories Deck — Card 5,Localisation · Subtitling,ትርጉም · የትርጉም ጽሑፍ,Hiikkaa · Sab-taayitilii,ትርጉም · ሳብታይትል
+deck.card6.klass,Landing Page,Categories Deck — Card 6,06 / Data,06 / ዳታ,06 / Daataa,06 / ዳታ
+deck.card6.title1,Landing Page,Categories Deck — Card 6,Data,የዳታ አያያዝና,Qindeessaa fi,ምምዕራይን
+deck.card6.title2,Landing Page,Categories Deck — Card 6,Processing,ማቀነባበር,Adeemsa Daataa,ምክፋልን ዳታ
+deck.card6.roles,Landing Page,Categories Deck — Card 6,88 open roles,88 ክፍት የሥራ ቦታዎች,Hojiiwwan banaa 88,88 ክፍቲ ናይ ስራሕ ቦታታት
+deck.card6.tag,Landing Page,Categories Deck — Card 6,Annotation · ETL · QA,ማብራሪያ · ኢቲኤል · የጥራት ቁጥጥር,Ibsa Daataa · ETL · Qulqullina,ኣኖተሽን · ኢቲኤል · ፅሬት ምቁጽጻር
+outro.title,Landing Page,Categories Outro,Let's build.,አብረን እንገንባ።,Haa ijaarru.,ብሓባር ንህነጽ።
+outro.sub,Landing Page,Categories Outro,Post a role in minutes or join the talent pool — Ethiopia's digital workforce is one deck away.,በደቂቃዎች ውስጥ ሥራ ይለጥፉ ወይም የባለሙያዎች ማህበረሰባችንን ይቀላቀሉ።,Daqiiqaa muraasa keessatti hojii maxxansaa yookiin miseensa hojjettoota dijitaalaa Itoophiyaa ta'aa.,ኣብ ውሽጢ ደቓይቕ ስራሕ ለጥፉ ወይ ድማ ናብ ማሕበረሰብ ሰብሞያ ተጸንበሩ።
+outro.btn.get_started,Landing Page,Categories Outro,Get started,ጀምር,Jalqabi,ጀምር
+outro.btn.signin,Landing Page,Categories Outro,Sign in,ግባ,Seeni,እቶ
+testimonials.eyebrow,Landing Page,Testimonials,What members say,አባላት ምን ይላሉ,Miseensonni maal jedhu,ኣባላት እንታይ ይብሉ
+testimonials.title,Landing Page,Testimonials,"Trust, in their words.",እምነት፣ በራሳቸው አንደበት።,Amantummaa jecha isaaniitiin.,ምትእምማን፣ ብቃል ባዕሎም።
+testi.1.quote,Landing Page,Testimonials,"I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",አርብ ዕለት በኤስክሮው ገንዘብ አስገባሁ፤ የመጀመሪያው ምዕራፍ ማክሰኞ ጸደቀ። ምንም አይነት ማሳደድ ወይም ስለ ገንዘብ መጨነቅ አልነበረም።,"Jimaata maallaqa qabsiisa (escrow) keessa kaa'e, marsaan jalqabaa Kibxata mirkanaa'e. Hordoffiin hin jiru, maallaqaaf wal-dhabdeen hin jiru.",ዓርቢ ኣብ ኤስክሮው ገንዘብ ኣቐሚጠ፤ እቲ ቀዳማይ ብርኪ ስራሕ ሰሉስ ጸዲቑ። ዝኾነ ምድላይ ወይ ዘይምቹእ ናይ ገንዘብ ዕላል ኣይነበረን።
+testi.1.name,Landing Page,Testimonials,Hanna G.,ሐና ገ.,Haannaa G.,ሃና ገ.
+testi.1.role,Landing Page,Testimonials,"Founder, import & retail",መሥራች፣ አስመጪና ቸርቻሪ,"Hundeessituu, alaa galchuu fi daldala",መስራቲት፣ ኣእታዊትን ቸርቻሪትን
+testi.2.quote,Landing Page,Testimonials,"As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",በባህር ዳር እንደምኖር ፍሪላንሰር ክፍያ ማግኘት ከባዱ ነገር ነበር። አሁን ግን ደንበኛው እንዳጸደቀ ገንዘቡ ወዲያውኑ ዋሌቴ ውስጥ ይገባል።,Akka hojjetaa bilisaa Baahir Daar keessa jiraatuutti kaffaltii argachuun baay'ee ulfaataa ture. Amma garuu akkuma maamilri mirkaneesseen maallaqni yeruma sana boorsaa kootti gala.,ኣብ ባህርዳር ከምዝነብር ናጻ ሰራሕተኛ ክፍሊት ምርካብ እቲ ዝኸበደ ክፍሊ እዩ ነይሩ። ሕጂ ግን ዓሚል ምስተቐበሎ ብኡንብኡ እቲ ገንዘብ ናብ ቦርሳይ ይኣቱ።
+testi.2.name,Landing Page,Testimonials,Abel T.,አቤል ተ.,Abeel T.,ኣቤል ተ.
+testi.2.role,Landing Page,Testimonials,Full-stack developer,ፉል-ስታክ ሶፍትዌር አልሚ,Misoomsituu Fuul-istaakii,ፉል-ስታክ ሶፍትዌር ኣማዕባሊ
+testi.3.quote,Landing Page,Testimonials,We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.,በሥራው ወሰን ላይ አንድ አለመግባባት ገጥሞን ነበር። የድጋፍ ሰጪው ቡድን መመሪያውንና መልዕክቶቹን ገምግሞ በሁለት ቀናት ውስጥ በፍትሃዊነት ፈታው።,Bal'ina hojii irratti wal-dhabdee tokko qabna turre. Gareen deeggarsaa qajeelfamaa fi ergaawwan ilaalee guyyoota lama keessatti haqa qabeessummaan fure.,ኣብ ናይቲ ስራሕ ደረጃ ሓደ ዘይምርድዳእ ነይሩና። ናይ ደገፍ ጋንታ ነቲ መምርሕን መልእኽትታትን መርሚሩ ኣብ ክልተ መዓልታት ብፍትሓዊ መንገዲ ፈቲሕዎ።
+testi.3.name,Landing Page,Testimonials,Sara M.,ሳራ መ.,Saaraa M.,ሳራ መ.
+testi.3.role,Landing Page,Testimonials,"Marketing lead, NGO",የማርኬቲንግ መሪ፣ መንግስታዊ ያልሆነ ድርጅት,"Hogganaa Maarketiingii, Dhaabbata Miti-Mootummaa",ሓላፊት ማርኬቲንግ፣ ዘይመንግስታዊ ትካል
+about.eyebrow,Landing Page,About Section,Ethiopia's escrow-protected marketplace,በኢትዮጵያ የታመነ የፍሪላንስ ገበያ,Gabaa hojii bilisaa Itoophiyaa,ናይ ኢትዮጵያ ናጻ ስራሕቲ (ፍሪላንስ) ዕዳጋ
+about.title1,Landing Page,About Section,Great work deserves,ጥሩ ሥራ የተረጋገጠ,Hojiin gaariin kaffaltii,ጽቡቕ ስራሕ ውሑስ
+about.title2,Landing Page,About Section,guaranteed payment.,ክፍያ ይገባዋል።,mirkanaa'aa qabaachuu qaba.,ክፍሊት ይግብኦ እዩ።
+about.intro,Landing Page,About Section,"Yekis connects Ethiopian businesses with verified freelance talent — and keeps every payment locked in escrow until the work is delivered and approved. No chasing invoices, no awkward money conversations. Just clear rules both sides can trust.",ዬኪስ የኢትዮጵያ ንግዶችን ከተረጋገጡ የፍሪላንስ ባለሙያዎች ጋር ያገናኛል — ሥራው ተጠናቆ እስኪጸድቅ ድረስ እያንዳንዱን ክፍያ በኤስክሮው ይጠብቃል። ደረሰኝ ማሳደድ የለም፣ ስለ ገንዘብ መጨነቅ የለም። ሁለቱም ወገኖች የሚተማመኑባቸው ግልጽ ደንቦች ብቻ።,"Yekis daldaloota Itoophiyaa ogeessota bilisaa mirkanaa'an waliin walqunnamsiisa — hamma hojiin dhiyaatee mirkanaa'utti kaffaltii hunda qabsiisa amansiisaa (escrow) keessatti eega. Nagahee hordofuun hin jiru, maallaqaaf cinqamuun hin jiru. Seerota ifa ta'an gama lamaanuu itti amanan qofa.",ዬኪስ ንንግዲ ትካላት ኢትዮጵያ ምስ ዝተረጋገጹ ናይ ፍሪላንስ ሰብሞያ የራኽብ — እቲ ስራሕ ቀሪቡ ክሳብ ዝጸድቕ ድማ ንነፍሲ ወከፍ ክፍሊት ኣብ ኤስክሮው ውሑስ ገይሩ ይዕቅቦ። ደረሰኝ ምድላይ የለን፣ ብዛዕባ ገንዘብ ጭንቀት የለን። ክልቲኦም ወገናት ዝተኣማመኑሎም ግሉጻት ሕግታት ጥራይ።
+about.feature1.title,Landing Page,About Section,Verified identities,የተረጋገጠ ማንነት,Eenyummaa mirkanaa'e,ዝተረጋገጸ መንነት
+about.feature1.body,Landing Page,About Section,"Freelancers verify with the Ethiopian National ID (Fayda), so you always know exactly who you are hiring.",ፍሪላንሰሮች በኢትዮጵያ ብሔራዊ መታወቂያ (ፋይዳ) የተረጋገጡ ናቸው፤ ስለዚህ ማንን እንደሚቀጥሩ በትክክል ያውቃሉ።,"Hojjettoonni bilisaa Waraqaa Eenyummaa Biyyooleessaa (Fayidaa) tiin kan mirkanaa'aniidha, kanaaf eenyuun akka qacartan beektu.",ናጻ ሰራሕተኛታት ብናይ ኢትዮጵያ ሃገራዊ መንነት (ፋይዳ) ዝተረጋገጹ እዮም፤ ስለዚ ንመን ከም ትቖጽሩ ብልክዕ ትፈልጡ።
+about.feature2.title,Landing Page,About Section,Milestone escrow protection,የደረጃ በደረጃ ኤስክሮው ጥበቃ,Eegumsa qabsiisa sadarkaa hojii,ናይ ብርኪ ዕዮ ኤስክሮው ሓለዋ
+about.feature2.body,Landing Page,About Section,Funds stay locked in escrow and only release when you inspect and approve each delivered milestone.,ገንዘብ በኤስክሮው ተቆልፎ የሚቆይ ሲሆን እያንዳንዱን የተጠናቀቀ የሥራ ምዕራፍ መርምረው ሲያጸድቁ ብቻ ይለቀቃል።,"Maallaqni qabsiisa keessatti hidhamee tura, kan gadi lakkifamus yeroo isin marsaa hojichaa qorattanii mirkaneessitan qofa.",ገንዘብ ኣብ ኤስክሮው ተዓጽዩ ይጸንሕ፣ ዝልቀቕ ድማ ነፍሲ ወከፍ ዝቐረበ ብርኪ ዕዮ መርሚርኩም ምስ ኣጽደቕኩምዎ ጥራይ እዩ።
+about.btn,Landing Page,About Section,More about Yekis,ስለ ዬኪስ የበለጠ ይወቁ,Waa'ee Yekis dabalataan,ብዛዕባ ዬኪስ ዝያዳ ፈልጡ
+about.visual_bar1,Landing Page,About Section,Escrow,ኤስክሮው,Qabsiisa (Escrow),ኤስክሮው
+about.visual_bar2,Landing Page,About Section,Fayda KYC,የፋይዳ መታወቂያ,Eenyummaa Fayidaa,መንነት ፋይዳ
+about.visual_bar3,Landing Page,About Section,Mediation,እርቅና ዳኝነት,Jaarsummaa fi Araara,ዕርቅን ሽምግልናን
+faq.eyebrow,Landing Page,FAQ Section,FAQ,ጥያቄዎች,Gaaffilee,ሕቶታት
+faq.title,Landing Page,FAQ Section,Frequently asked questions,በተደጋጋሚ የሚጠየቁ ጥያቄዎች,Gaaffilee Yeroo Baay'ee Gaafataman,ብተደጋጋሚ ዝሕተቱ ሕቶታት
+faq.sub,Landing Page,FAQ Section,Straight answers about money verification and disputes.,ስለ ገንዘብ ደህንነት፣ ማንነት ማረጋገጫና አለመግባባት አፈታት ቀጥተኛ መልሶች።,"Nageenya maallaqaa, mirkaneessa eenyummaa fi furmaata falmii ilaalchisee deebii kallattii.",ብዛዕባ ውሕስነት ገንዘብ፣ ምርግጋጽ መንነትን ምፍታሕ ክርክርን ቀጥታዊ መልስታት።
+faq.search_placeholder,Landing Page,FAQ Section,Search questions…,ጥያቄዎችን ይፈልጉ…,Gaaffilee barbaadaa…,ሕቶታት ድለዩ…
+faq.no_results,Landing Page,FAQ Section,"No question matches that. Try ""escrow"", ""withdraw"" or ""KYC"".","ከዚያ ጋር የሚዛመድ ጥያቄ የለም። ""ኤስክሮው""፣ ""ማውጣት"" ወይም ""ማንነት"" ብለው ይሞክሩ።","Gaaffiin sanaan walsimu hin jiru. ""qabsiisa"", ""baasuu"" yookiin ""KYC"" jedhaa yaalaa.","ምስኡ ዝመሳሰል ሕቶ የለን። ""ኤስክሮው""፣ ""ምውጻእ"" ወይ ""KYC"" ኢልኩም ፈትኑ።"
+faq.cat1,Landing Page,FAQ Section,Trusting the platform,የፕላትፎርሙ ደህንነት,Amansiisummaa wlta'aa,ውሕስነት መድረኽ
+faq.cat1.q1,Landing Page,FAQ Section,Is my money actually safe?,ገንዘቤ በእርግጥ ደህንነቱ የተጠበቀ ነው?,Maallaqni koo dhuguma nageenyaan jiraa?,ገንዘበይ ብሓቂ ውሑስ ድዩ?
+faq.cat1.a1,Landing Page,FAQ Section,"Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond. If something's wrong, raise it before approving and the payment stays held while we help sort it out.",አዎ። ለስራ ገንዘብ ሲያስገቡ ክፍያዎ ወደ ኤስክሮው ይገባል — ከዬኪስ የስራ ማስኬጃ ገንዘብ ተለይቶ ይቀመጣል እንጂ በቀጥታ ለፍሪላንሰሩ አይሄድም። የሚለቀቀው እርስዎ ስራውን ሲያጸድቁ ወይም ምላሽ ካልሰጡ ከ5 ቀናት በኋላ በራስ-ሰር ነው። ችግር ካለ ከማጽደቅዎ በፊት ቅሬታ ያቅርቡ፤ እኛ እስክንፈታው ድረስ ክፍያው ተይዞ ይቆያል።,"Eeyyee. Yeroo hojiif maallaqa galchitan, kaffaltiin keessan qabsiisa amansiisaa (escrow) keessa gala — maallaqa sochii Yekis irraa addatti qabama malee kallattiin gara hojjetaatti hin darbu. Kan gadi lakkifamu yeroo isin hojicha mirkaneessitan, yookiin yoo deebii hin kennin guyyoota 5 booda ofumaan. Rakkoon yoo jiraate osoo hin mirkaneessin dura beeksisaa, hamma furmaata argatutti maallaqni qabamee tura.",እወ። ንስራሕ ገንዘብ ክተእትዉ ከለኹም ክፍሊትኩም ናብ ኤስክሮው እዩ ዝኣቱ — ካብ ናይ ዬኪስ ናይ ስራሕ ማስኬጃ ተፈልዩ ይቕመጥ እምበር ብቐጥታ ናብቲ ሰራሕተኛ ኣይከይድን። ዝልቀቕ ንስኹም ነቲ ስራሕ ምስ ኣጽደቕኩምዎ ወይ መልሲ እንተዘይሂብኩም ድሕሪ 5 መዓልታት ብባዕሉ እዩ። ጸገም እንተሃልዩ ቅድሚ ምጽዳቕኩም ጥርዓን ኣቕርቡ፤ ንሕና ክሳብ ንፈትሖ እቲ ገንዘብ ተታሒዙ ይጸንሕ።
+faq.cat1.q2,Landing Page,FAQ Section,What if the freelancer disappears after I pay?,ክፍያ ከፈጸምኩ በኋላ ፍሪላንሰሩ ቢሰወርስ?,Kaffaltii ergan raawwadhee booda hojjetaan yoo badehoo?,ክፍሊት ምስ ፈጸምኩ እቲ ሰራሕተኛ ድምጹ እንተኣጥፊኡኸ?
+faq.cat1.a2,Landing Page,FAQ Section,Your money is still sitting safely in escrow — it was never sent to them. If a freelancer goes silent raise it with our team and we'll help resolve it which can include a full refund.,ገንዘብዎ አሁንም በደህንነት በኤስክሮው ውስጥ ይገኛል — መጀመሪያውኑም ለነሱ አልተላከም። ፍሪላንሰሩ ምላሽ ካቆመ ለቡድናችን ያሳውቁ፤ ሙሉ ገንዘብ ተመላሽ ማድረግን ጨምሮ መፍትሄ እንሰጣለን።,"Maallaqni keessan ammayyuu qabsiisa amansiisaa (escrow) keessatti nageenyaan jira — duraanuu gara isaaniitti hin ergamne. Hojjetaan yoo deebii dhabe, garee keenya beeksisaa, guutummaatti deebisuu dabalatee furmaata itti kennina.",ገንዘብኩም ሕጂ’ውን ብውሑስ ኣብ ኤስክሮው ኣሎ — ካብ መጀመርታኡ ናብኦም ኣይተላእከን። እቲ ሰራሕተኛ ድምጺ እንተኣጥፊኡ ንጋንታና ሓብሩ፤ ምሉእ ገንዘብ ምምላስ ሓዊሱ ፍታሕ ክንረኽበሉ ኢና።
+faq.cat1.q3,Landing Page,FAQ Section,What if we disagree about the work?,በስራው ላይ ባንስማማስ?,Hojicha irratti yoo walii galuu baannehoo?,ኣብቲ ዝተሰርሐ ስራሕ እንተዘይተሰማሚዕናኸ?
+faq.cat1.a3,Landing Page,FAQ Section,"Most disagreements get sorted directly between you and the freelancer within a short window. If you can't agree, our team reviews both sides — the original brief, the delivered work and your messages — and decides: release, refund, or split fairly.",አብዛኞቹ አለመግባባቶች በእርስዎና በፍሪላንሰሩ መካከል በአጭር ጊዜ ውስጥ በቀጥታ ይፈታሉ። መስማማት ካልቻላችሁ ቡድናችን የሁለቱንም ወገን — የመጀመሪያውን የሥራ መመሪያ፣ የቀረበውን ሥራና መልዕክቶችን — ገምግሞ ፍትሃዊ ውሳኔ ይሰጣል፡ ክፍያውን መልቀቅ፣ መመለስ፣ ወይም በፍትሃዊነት መካፈል።,"Waldhabdeen baay'een isin fi hojjetaa gidduutti yeroo gabaabaa keessatti kallattiin furama. Yoo walii galuu dadhabdan, gareen keenya gama lamaanuu — qajeelfama jalqabaa, hojii dhiyaatee fi ergaawwan — gamaaggamuun murtoo kenna: gadi lakkisuu, deebisuu, yookiin haqa qabeessummaan qooduu.",መብዛሕትኡ ዘይምርድዳእ ኣብ መንጎኹምን ኣብ መንጎ እቲ ሰራሕተኛን ኣብ ሓጺር ግዜ ብቐጥታ ይፍታሕ። ክትሰማምዑ እንተዘይክኢልኩም ጋንታና ንኽልቲኡ ወገን — ነቲ ናይ መጀመርታ መምርሒ ስራሕ፣ ዝቐረበ ስራሕን መልእኽትታትን — መርሚሩ ውሳነ ይህብ፡ ክፍሊት ምልቃቕ፣ ምምላስ፣ ወይ ብፍትሓዊ መንገዲ ምምቃል ይኸውን።
+faq.cat2,Landing Page,FAQ Section,Getting started,አጀማመር,Jalqabuu,ምጅማር
+faq.cat2.q1,Landing Page,FAQ Section,Why do I need to verify my identity (KYC)?,ማንነቴን (KYC) ማረጋገጥ ለምን አስፈለገኝ?,Eenyummaa koo (KYC) maaliif mirkaneessuun na barbaachise?,መንነተይ (KYC) ምጽራይ ስለምንታይ ኣድለየኒ?
+faq.cat2.a1,Landing Page,FAQ Section,"It protects everyone. Verification is how we confirm the person you hire, or the client you work for, is really who they claim to be. Basic verification is quick and unlocks browsing and posting.",ሁሉንም ሰው ይጠብቃል። ማረጋገጫ የምትቀጥሩት ሰው ወይም የምትሰሩለት ደንበኛ በትክክል እውነተኛ ማንነቱን የምናረጋግጥበት መንገድ ነው። መሠረታዊ ማረጋገጫ ፈጣን ሲሆን ስራዎችን ማየትና መለጠፍ ያስችላል።,"Hundumaa eega. Eenyummaa mirkaneessuun nama qacartan yookiin maamila hojjettaniif eenyummaa isaanii kan ittiin mirkaneessinudha. Mirkaneessi bu'uuraa ariifataadha, hojii ilaaluu fi maxxansuuf banaadha.",ንኹሉ ሰብ ይሕሉ እዩ። ምጽራይ መንነት እቲ ትቖጽርዎ ሰብ ወይ ትሰርሕሉ ዓሚል ብሓቂ መንነቱ ዝረጋገጸሉ መገዲ እዩ። መሰረታዊ ምጽራይ ቅልጡፍ ኮይኑ ስራሕቲ ንምርኣይን ንምልጣፍን የኽእል።
+faq.cat2.q2,Landing Page,FAQ Section,What are the fees?,የአገልግሎት ክፍያው ስንት ነው?,Kaffaltiin tajaajilaa hammamidha?,ናይ ኣገልግሎት ክፍሊት ክንደይ እዩ?
+faq.cat2.a2,Landing Page,FAQ Section,"Yekis takes a small percentage of each completed job, split between client and freelancer — never charged upfront, only when a payment actually releases.",ዬኪስ ከተጠናቀቀ እያንዳንዱ ሥራ አነስተኛ መቶኛ ብቻ ይወስዳል፣ ይህም በደንበኛውና በፍሪላንሰሩ መካከል ይካፈላል — ምንም አይነት ቅድመ ክፍያ አይጠየቅም፣ ክፍያው በትክክል ሲለቀቅ ብቻ ነው።,"Yekis hojii xumurame hunda irraa dhibbeentaa xiqqoo qofa fudhata, kunis maamilaa fi hojjetaa gidduutti qoodama — dursee hin kaffalamu, yeroo kaffaltiin gadi lakkifamu qofa.",ዬኪስ ካብ ዝተወድአ ነፍሲ ወከፍ ስራሕ ንእሽቶ ሚእታዊት ጥራይ ይወስድ፣ እዚ ድማ ኣብ መንጎ ዓሚልን ሰራሕተኛን ይምቀል — ቅድመ ክፍሊት ፈጺሙ ኣይሕተትንም፣ ክፍሊት ብትኽክል ክልቀቕ ከሎ ጥራይ እዩ።
+faq.cat3,Landing Page,FAQ Section,Getting paid,ክፍያ መቀበል,Kaffaltii argachuu,ክፍሊት ምርካብ
+faq.cat3.q1,Landing Page,FAQ Section,When do I actually get paid?,ክፍያዬን በትክክል መቼ ነው የማገኘው?,Kaffaltii koo yoomin argadha?,ክፍሊተይ ብትኽክል መዓስ እየ ዝረክብ?
+faq.cat3.a1,Landing Page,FAQ Section,"The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to Telebirr or your bank account.",ደንበኛው ሥራዎን እንዳጸደቀ (ወይም ከ5 ቀናት የራስ-ሰር መልቀቂያ ጊዜ በኋላ) ገንዘቡ ወዲያውኑ ወደ ዬኪስ ዋሌትዎ ይተላለፋል። ከዚያም ወደ ቴሌብር ወይም የባንክ ሂሳብዎ ማውጣት ይችላሉ።,"Akkuma maamilri hojii keessan mirkaneesseen (yookiin guyyoota 5 ofiin gadi lakkifamu booda), maallaqni yeruma sana boorsaa Yekis keessanitti darba. Achirraa gara Telebirr yookiin herrega baankii keessaniitti baafachuu dandeessu.",ዓሚል ስራሕኩም ምስተቐበሎን ምስ ኣጽደቖን (ወይ ድሕሪ 5 መዓልታት ብባዕሉ ዝልቀቐሉ ግዜ) እቲ ገንዘብ ብኡንብኡ ናብ ናይ ዬኪስ ቦርሳኹም ይኣቱ። ካብኡ ናብ ቴሌብር ወይ ናብ ናይ ባንኪ ሕሳብኩም ከተውጽእዎ ትኽእሉ።
+faq.cat3.q2,Landing Page,FAQ Section,Is there a minimum withdrawal amount?,ዝቅተኛ የማውጣት መጠን አለ?,Hangi maallaqa baasuuf murtaa'e xiqqaan jiraa?,ዝተወሰነ ዝተሓተ ናይ ምውጻእ መጠን ኣሎ ድዩ?
+faq.cat3.a2,Landing Page,FAQ Section,A small minimum applies per withdrawal to keep payment-rail costs sensible. The exact figure is shown in your wallet before you confirm.,የክፍያ መስመር ወጪዎችን ምክንያታዊ ለማድረግ በእያንዳንዱ ማውጣት ላይ አነስተኛ ገደብ አለ። ትክክለኛው መጠን ከማረጋገጥዎ በፊት በዋሌትዎ ውስጥ ይታያል።,Baasii sarara kaffaltii qusachuuf kaffaltii baafachuu tokkoon tokkoon irratti hangi xiqqaan ni jiraata. Hangi sirrii ta'e osoo hin mirkaneessin dura boorsaa keessan keessatti mul'ata.,ናይ ክፍሊት መስመር ወጻኢታት ንምቑጣብ ኣብ ነፍሲ ወከፍ ምውጻእ ንእሽቶ ገደብ ኣሎ። እቲ ትኽክለኛ መጠን ቅድሚ ምጽዳቕኩም ኣብ ውሽጢ ቦርሳኹም ይርአ።
+cta.eyebrow,Landing Page,Final CTA,Ready to start?,ለመጀመር ዝግጁ ነዎት?,Jalqabuuf qophiidhaa?,ክትጅምሩ ድሉዋት ዲኹም?
+cta.title,Landing Page,Final CTA,Put your next project in motion.,ቀጣዩን ፕሮጀክትዎን አሁኑኑ ያስጀምሩ።,Pirojektii keessan isa itti aanu hojiitti galchaa.,ቀጻሊ ፕሮጀክትኩም ሕጂ ኣበራብሩ።
+cta.sub,Landing Page,Final CTA,Post a job or join as a freelancer with full escrow protection from start to finish.,ከመጀመሪያ እስከ መጨረሻ ሙሉ የኤስክሮው ጥበቃ በማግኘት ሥራ ይልቀቁ ወይም እንደ ፍሪላንሰር ይቀላቀሉ።,Jalqabaa hanga dhumaatti eegumsa qabsiisa (escrow) guutuudhaan hojii maxxansaa yookiin akka hojjetaa bilisaatti miseensa ta'aa.,ካብ መጀመርታ ክሳብ መወዳእታ ብምሉእ ናይ ኤስክሮው ሓለዋ ስራሕ ለጥፉ ወይ ድማ ከም ናጻ ሰራሕተኛ ተጸንበሩ።
+cta.btn.post_job,Landing Page,Final CTA,Post a job,ስራ ልልቀቅ,Hojii Maxxansi,ስራሕ ለጥፉ
+cta.btn.find_work,Landing Page,Final CTA,Find work,ስራ ፈልግ,Hojii Barbaadi,ስራሕ ድለዩ
+footer.brand.desc,Landing Page,Footer,"Ethiopia's escrow-protected freelance marketplace. Post work, pay into escrow, and get your result — or your money back.",በኢትዮጵያ ህጋዊ የኤስክሮው ፍሪላንስ ገበያ። ስራ ይልቀቁ፣ የደረጃ ክፍያ ያስቀምጡ፣ ውጤቱን ገምግመው ክፍያውን ይልቀቁ።,"Gabaa hojii bilisaa Itoophiyaa qabsiisaan (escrow) eegame. Hojii maxxansaa, qabsiisa maallaqaa qabaa, bu'aa qoradhaa kaffaltii gadi lakkisaa.",ኣብ ኢትዮጵያ ሕጋዊ ናይ ኤስክሮው ፍሪላንስ ዕዳጋ። ስራሕ ለጥፉ፣ ገንዘብ ኣብ ኤስክሮው ዓቕሩ፣ ውጽኢት መርሚርኩም ክፍሊት ልቐቑ።
+footer.col.platform,Landing Page,Footer,Platform,ፕላትፎርም,Wlta'aa (Platform),መድረኽ
+footer.link.faq,Landing Page,Footer,FAQ,ጥያቄዎች,Gaaffilee,ሕቶታት
+footer.link.fees,Landing Page,Footer,Fees,የአገልግሎት ክፍያ,Kaffaltii,ክፍሊታት
+footer.link.case_studies,Landing Page,Footer,Case Studies,የስኬት ታሪኮች,Milkaa'ina,ተመኩሮታት ዓወት
+footer.col.company,Landing Page,Footer,Company,ኩባንያ,Dhaabbata,ትካል
+footer.link.about,Landing Page,Footer,About Us,ስለ እኛ,Waa'ee Keenya,ብዛዕባና
+footer.link.contact,Landing Page,Footer,Contact Support,ድጋፍ ሰጪን ያግኙ,Deeggarsa Qunnamaa,ንደገፍ ሰብሞያ ርኸቡ
+footer.col.legal,Landing Page,Footer,Legal,ህጋዊ,Seera,ሕጋዊ
+footer.link.privacy,Landing Page,Footer,Privacy Policy,የግልነት ፖሊሲ,Imaammata Mateenyaa,ናይ ብሕትውና ፖሊሲ
+footer.link.terms,Landing Page,Footer,Terms of Service,የአገልግሎት መመሪያ,Waliigaltee Tajaajilaa,ናይ ኣገልግሎት ውዕል
+footer.social.telegram_channel,Landing Page,Footer,Telegram Channel,የቴሌግራም ቻናል,Chaanalii Telegiraamaa,ናይ ቴሌግራም ቻናል
+footer.social.community,Landing Page,Footer,Community,ማህበረሰብ,Hawaasa,ማሕበረሰብ
+footer.social.bot,Landing Page,Footer,Yekis Bot,የዬኪስ ቦት,Boottii Yekis,ናይ ዬኪስ ቦት
+footer.social.email,Landing Page,Footer,Email Us,ኢሜይል ይላኩልን,Imeeyilii Nuuf Ergaa,ኢመይል ስደዱልና
+footer.copyright,Landing Page,Footer,© 2025 Yekis. All rights reserved.,© 2026 ዬኪስ። መብቱ በህግ የተጠበቀ ነው።,© 2026 Yekis. Mirgi hunduu seeraan eegamaadha.,© 2026 ዬኪስ። ኩሉ መሰላት ብሕጊ ዝተሓለወ እዩ።
+footer.escrow_note,Landing Page,Footer,Payments secured by Yekis Escrow,ክፍያዎች በዬኪስ ኤስክሮው የተጠበቁ ናቸው,Kaffaltiin Qabsiisa Yekis tiin eegamaadha,ክፍሊታት ብናይ ዬኪስ ኤስክሮው ዝተሓለዉ እዮም
+footer.lang_toggle,Landing Page,Footer,EN / አማ,EN / አማ / ORO / ትግ,EN / አማ / ORO / ትግ,EN / አማ / ORO / ትግ
+faqpage.title,FAQ Page,Page Header,Frequently Asked Questions,በተደጋጋሚ የሚጠየቁ ጥያቄዎች,Gaaffilee Yeroo Baay'ee Gaafataman,ብተደጋጋሚ ዝሕተቱ ሕቶታት
+faqpage.breadcrumb,FAQ Page,Breadcrumbs,Home > FAQ,መነሻ > ጥያቄዎች,Fuula Dura > Gaaffilee,መበገሲ > ሕቶታት
+faqpage.cat1,FAQ Page,Category,Trusting the platform,የፕላትፎርሙ ደህንነት,Amansiisummaa wlta'aa,ውሕስነት መድረኽ
+faqpage.cat1.q1,FAQ Page,Question,Is my money actually safe?,ገንዘቤ በእርግጥ ደህንነቱ የተጠበቀ ነው?,Maallaqni koo dhuguma nageenyaan jiraa?,ገንዘበይ ብሓቂ ውሑስ ድዩ?
+faqpage.cat1.a1,FAQ Page,Answer,"Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond, which protects your freelancer's time too. If something's wrong, you can raise it before approving and your payment stays held while we help sort it out.",አዎ። ለስራ ገንዘብ ሲያስገቡ ክፍያዎ ወደ ኤስክሮው ይገባል — ከዬኪስ የስራ ማስኬጃ ገንዘብ ተለይቶ ይቀመጣል እንጂ በቀጥታ ለፍሪላንሰሩ አይሄድም። የሚለቀቀው እርስዎ ስራውን ሲያጸድቁ ወይም ምላሽ ካልሰጡ ከ5 ቀናት በኋላ በራስ-ሰር ነው። ችግር ካለ ከማጽደቅዎ በፊት ቅሬታ ያቅርቡ፤ እኛ እስክንፈታው ድረስ ክፍያው ተይዞ ይቆያል።,"Eeyyee. Yeroo hojiif maallaqa galchitan, kaffaltiin keessan qabsiisa amansiisaa (escrow) keessa gala — maallaqa sochii Yekis irraa addatti qabama malee kallattiin gara hojjetaatti hin darbu. Kan gadi lakkifamu yeroo isin hojicha mirkaneessitan, yookiin yoo deebii hin kennin guyyoota 5 booda ofumaan. Rakkoon yoo jiraate osoo hin mirkaneessin dura beeksisaa, hamma furmaata argatutti maallaqni qabamee tura.",እወ። ንስራሕ ገንዘብ ክተእትዉ ከለኹም ክፍሊትኩም ናብ ኤስክሮው እዩ ዝኣቱ — ካብ ናይ ዬኪስ ናይ ስራሕ ማስኬጃ ተፈልዩ ይቕመጥ እምበር ብቐጥታ ናብቲ ሰራሕተኛ ኣይከይድን። ዝልቀቕ ንስኹም ነቲ ስራሕ ምስ ኣጽደቕኩምዎ ወይ መልሲ እንተዘይሂብኩም ድሕሪ 5 መዓልታት ብባዕሉ እዩ። ጸገም እንተሃልዩ ቅድሚ ምጽዳቕኩም ጥርዓን ኣቕርቡ፤ ንሕና ክሳብ ንፈትሖ እቲ ገንዘብ ተታሒዙ ይጸንሕ።
+faqpage.cat1.q2,FAQ Page,Question,What if the freelancer just disappears after I pay?,ክፍያ ከፈጸምኩ በኋላ ፍሪላንሰሩ ቢሰወርስ?,Kaffaltii ergan raawwadhee booda hojjetaan yoo badehoo?,ክፍሊት ምስ ፈጸምኩ እቲ ሰራሕተኛ ድምጹ እንተኣጥፊኡኸ?
+faqpage.cat1.a2,FAQ Page,Answer,Your money is still sitting safely in escrow — it was never sent to them in the first place. If a freelancer goes silent raise it with our team and we'll help resolve it which can include a full refund.,ገንዘብዎ አሁንም በደህንነት በኤስክሮው ውስጥ ይገኛል — መጀመሪያውኑም ለነሱ አልተላከም። ፍሪላንሰሩ ምላሽ ካቆመ ለቡድናችን ያሳውቁ፤ ሙሉ ገንዘብ ተመላሽ ማድረግን ጨምሮ መፍትሄ እንሰጣለን።,"Maallaqni keessan ammayyuu qabsiisa amansiisaa (escrow) keessatti nageenyaan jira — duraanuu gara isaaniitti hin ergamne. Hojjetaan yoo deebii dhabe, garee keenya beeksisaa, guutummaatti deebisuu dabalatee furmaata itti kennina.",ገንዘብኩም ሕጂ’ውን ብውሑስ ኣብ ኤስክሮው ኣሎ — ካብ መጀመርታኡ ናብኦም ኣይተላእከን። እቲ ሰራሕተኛ ድምጺ እንተኣጥፊኡ ንጋንታና ሓብሩ፤ ምሉእ ገንዘብ ምምላስ ሓዊሱ ፍታሕ ክንረኽበሉ ኢና።
+faqpage.cat1.q3,FAQ Page,Question,What if we disagree about the work?,በስራው ላይ ባንስማማስ?,Hojicha irratti yoo walii galuu baannehoo?,ኣብቲ ዝተሰርሐ ስራሕ እንተዘይተሰማሚዕናኸ?
+faqpage.cat1.a3,FAQ Page,Answer,"Most disagreements get sorted out directly between you and the freelancer, with a short window to talk it through. If you can't agree, our team reviews both sides — the original brief, the delivered work, and your messages — and makes a call: release the payment, refund it, or split it fairly. If either side still disagrees with that decision, there's a final formal step through an independent arbitration body — but the vast majority of cases never need to go that far.",አብዛኞቹ አለመግባባቶች በእርስዎና በፍሪላንሰሩ መካከል በአጭር ጊዜ ውስጥ በቀጥታ ይፈታሉ። መስማማት ካልቻላችሁ ቡድናችን የሁለቱንም ወገን — የመጀመሪያውን የሥራ መመሪያ፣ የቀረበውን ሥራና መልዕክቶችን — ገምግሞ ፍትሃዊ ውሳኔ ይሰጣል፡ ክፍያውን መልቀቅ፣ መመለስ፣ ወይም በፍትሃዊነት መካፈል።,"Waldhabdeen baay'een isin fi hojjetaa gidduutti yeroo gabaabaa keessatti kallattiin furama. Yoo walii galuu dadhabdan, gareen keenya gama lamaanuu — qajeelfama jalqabaa, hojii dhiyaatee fi ergaawwan — gamaaggamuun murtoo kenna: gadi lakkisuu, deebisuu, yookiin haqa qabeessummaan qooduu.",መብዛሕትኡ ዘይምርድዳእ ኣብ መንጎኹምን ኣብ መንጎ እቲ ሰራሕተኛን ኣብ ሓጺር ግዜ ብቐጥታ ይፍታሕ። ክትሰማምዑ እንተዘይክኢልኩም ጋንታና ንኽልቲኡ ወገን — ነቲ ናይ መጀመርታ መምርሒ ስራሕ፣ ዝቐረበ ስራሕን መልእኽትታትን — መርሚሩ ውሳነ ይህብ፡ ክፍሊት ምልቃቕ፣ ምምላስ፣ ወይ ብፍትሓዊ መንገዲ ምምቃል ይኸውን።
+faqpage.cat1.q4,FAQ Page,Question,Is my payment information safe?,የክፍያ መረጃዬ ደህንነቱ የተጠበቀ ነው?,Odeeffannoon kaffaltii koo eegamaadhaa?,ናይ ክፍሊት ሓበሬታይ ውሑስ ድዩ?
+faqpage.cat1.a4,FAQ Page,Answer,"Yes. We never see or store your card or account details directly — payments are handled through licensed providers (Telebirr and CBE), and all your data is protected under Ethiopian data protection law.",አዎ። የካርድ ወይም የባንክ መረጃዎን በቀጥታ ፈጽሞ አናይም ወይም አናስቀምጥም — ክፍያዎች የሚከናወኑት ፈቃድ ባላቸው ተቋማት (ቴሌብር እና ንግድ ባንክ) ሲሆን መረጃዎ በኢትዮጵያ የዳታ ጥበቃ ህግ የተጠበቀ ነው።,"Eeyyee. Odeeffannoo kaardii yookiin herrega baankii keessanii kallattiin hin arginu, hin kuusnus — kaffaltiin dhiyeessitoota eeyyama qabaniin (Telebirr fi CBE) kan raawwatamu yoo ta'u, seera eegumsa daataa Itoophiyaatiin eegamaadha.",እወ። ናይ ካርድ ወይ ባንኪ ሓበሬታኹም ብቐጥታ ፈጺምና ኣይንርእዮን ወይ ኣይንዕቅቦን — ክፍሊታት ብፍቓድ ዘለዎም ትካላት (ቴሌብርን ንግዲ ባንክን) ዝፍጸም ኮይኑ ብናይ ኢትዮጵያ ናይ ዳታ ሓለዋ ሕጊ ዝተሓለወ እዩ።
+faqpage.cat2,FAQ Page,Category,Getting started,አጀማመር,Jalqabuu,ምጅማር
+faqpage.cat2.q1,FAQ Page,Question,Why do I need to verify my identity (KYC)?,ማንነቴን (KYC) ማረጋገጥ ለምን አስፈለገኝ?,Eenyummaa koo (KYC) maaliif mirkaneessuun na barbaachise?,መንነተይ (KYC) ምጽራይ ስለምንታይ ኣድለየኒ?
+faqpage.cat2.a1,FAQ Page,Answer,"It protects everyone on the platform — it's how we make sure the person you're hiring, or the client you're working for, is really who they say they are. Basic verification is quick (a valid ID and a few details) and unlocks browsing and posting jobs. A slightly deeper verification step is required before withdrawing earnings, which protects freelancers' payouts from fraud.",ሁሉንም ሰው ይጠብቃል። ማረጋገጫ የምትቀጥሩት ሰው ወይም የምትሰሩለት ደንበኛ በትክክል እውነተኛ ማንነቱን የምናረጋግጥበት መንገድ ነው። መሠረታዊ ማረጋገጫ ፈጣን ሲሆን ስራዎችን ማየትና መለጠፍ ያስችላል።,"Hundumaa eega. Eenyummaa mirkaneessuun nama qacartan yookiin maamila hojjettaniif eenyummaa isaanii kan ittiin mirkaneessinudha. Mirkaneessi bu'uuraa ariifataadha, hojii ilaaluu fi maxxansuuf banaadha.",ንኹሉ ሰብ ይሕሉ እዩ። ምጽራይ መንነት እቲ ትቖጽርዎ ሰብ ወይ ትሰርሕሉ ዓሚል ብሓቂ መንነቱ ዝረጋገጸሉ መገዲ እዩ። መሰረታዊ ምጽራይ ቅልጡፍ ኮይኑ ስራሕቲ ንምርኣይን ንምልጣፍን የኽእል።
+faqpage.cat2.q2,FAQ Page,Question,How long does verification take?,ማረጋገጫው ምን ያህል ጊዜ ይወስዳል?,Mirkaneessi eenyummaa yeroo hammamii fudhata?,እቲ ምጽራይ ክንደይ ግዜ ይወስድ?
+faqpage.cat2.a2,FAQ Page,Answer,Most people are verified automatically within minutes. Occasionally we review manually which can take up to 48 hours — you'll get a notification the moment it's done.,አብዛኛው ሰው በደቂቃዎች ውስጥ በራስ-ሰር ይረጋገጣል። አልፎ አልፎ በእጅ የምንገመግመው እስከ 48 ሰዓታት ሊወስድ ይችላል — ልክ እንደተጠናቀቀ ማሳወቂያ ይደርስዎታል።,Namoonni hedduun daqiiqaa muraasa keessatti ofumaan mirkanaa'u. Darbee darbee harkaatiin gamaaggamuun hanga sa'aatii 48 fudhachuu danda'a — akkuma xumurameen beeksisni isiniif ergama.,መብዛሕትኡ ሰብ ኣብ ውሽጢ ደቓይቕ ብባዕሉ ይረጋገጽ። ሓሓሊፉ ብኢድ እንምርምሮ ክሳብ 48 ሰዓታት ክወስድ ይኽእል — ምስተወድአ ብኡንብኡ መልእኽቲ ይበጽሓኩም።
+faqpage.cat2.q3,FAQ Page,Question,What are the fees?,የአገልግሎት ክፍያው ስንት ነው?,Kaffaltiin tajaajilaa hammamidha?,ናይ ኣገልግሎት ክፍሊት ክንደይ እዩ?
+faqpage.cat2.a3,FAQ Page,Answer,"Yekis takes a small percentage of each completed job, split between the client and the freelancer — never charged upfront, only when a payment actually releases.",ዬኪስ ከተጠናቀቀ እያንዳንዱ ሥራ አነስተኛ መቶኛ ብቻ ይወስዳል፣ ይህም በደንበኛውና በፍሪላንሰሩ መካከል ይካፈላል — ምንም አይነት ቅድመ ክፍያ አይጠየቅም፣ ክፍያው በትክክል ሲለቀቅ ብቻ ነው።,"Yekis hojii xumurame hunda irraa dhibbeentaa xiqqoo qofa fudhata, kunis maamilaa fi hojjetaa gidduutti qoodama — dursee hin kaffalamu, yeroo kaffaltiin gadi lakkifamu qofa.",ዬኪስ ካብ ዝተወድአ ነፍሲ ወከፍ ስራሕ ንእሽቶ ሚእታዊት ጥራይ ይወስድ፣ እዚ ድማ ኣብ መንጎ ዓሚልን ሰራሕተኛን ይምቀል — ቅድመ ክፍሊት ፈጺሙ ኣይሕተትንም፣ ክፍሊት ብትኽክል ክልቀቕ ከሎ ጥራይ እዩ።
+faqpage.cat2.link,FAQ Page,Inline Link,View fees page,የዋጋ ገጹን ይመልከቱ,Fuula kaffaltii ilaalaa,ናይ ክፍሊት ገጽ ርኣዩ
+faqpage.cat2.q4,FAQ Page,Question,Can I use Yekis in Amharic?,ዬኪስን በአማርኛ፣ በኦሮምኛ ወይም በትግርኛ መጠቀም እችላለሁ?,"Yekis afaan Oromoo, Amaaraa yookiin Tigrigna tiin fayyadamuu nan danda'aa?",ዬኪስ ብትግርኛ፣ ብኦሮምኛ ወይ ብኣምሓርኛ ክጥቀመሉ ይኽእል ድየ?
+faqpage.cat2.a4,FAQ Page,Answer,Yes — switch languages anytime using the toggle in the top corner of any page.,አዎ — በማንኛውም ገጽ ራስጌ ወይም ግርጌ የሚገኘውን የቋንቋ መምረጫ በመጠቀም በማንኛውም ጊዜ ቋንቋ መቀየር ይችላሉ።,Eeyyee — sarara gubbaa yookiin jala fuula kamiyyuu irratti filannoo afaanii fayyadamuun yeroo barbaaddan afaan jijjiiruu dandeessu.,እወ — ኣብ ዝኾነ ገጽ ኣብ ላዕሊ ወይ ኣብ ታሕቲ ዘሎ መምረጺ ቋንቋ ብምጥቃም ኣብ ዝደለኹምዎ ግዜ ቋንቋ ክትቅይሩ ትኽእሉ።
+faqpage.cat3,FAQ Page,Category,Getting paid,ክፍያ መቀበል,Kaffaltii argachuu,ክፍሊት ምርካብ
+faqpage.cat3.q1,FAQ Page,Question,When do I actually get paid?,ክፍያዬን በትክክል መቼ ነው የማገኘው?,Kaffaltii koo yoomin argadha?,ክፍሊተይ ብትኽክል መዓስ እየ ዝረክብ?
+faqpage.cat3.a1,FAQ Page,Answer,"The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to your Telebirr or bank account.",ደንበኛው ሥራዎን እንዳጸደቀ (ወይም ከ5 ቀናት የራስ-ሰር መልቀቂያ ጊዜ በኋላ) ገንዘቡ ወዲያውኑ ወደ ዬኪስ ዋሌትዎ ይተላለፋል። ከዚያም ወደ ቴሌብር ወይም የባንክ ሂሳብዎ ማውጣት ይችላሉ።,"Akkuma maamilri hojii keessan mirkaneesseen (yookiin guyyoota 5 ofiin gadi lakkifamu booda), maallaqni yeruma sana boorsaa Yekis keessanitti darba. Achirraa gara Telebirr yookiin herrega baankii keessaniitti baafachuu dandeessu.",ዓሚል ስራሕኩም ምስተቐበሎን ምስ ኣጽደቖን (ወይ ድሕሪ 5 መዓልታት ብባዕሉ ዝልቀቐሉ ግዜ) እቲ ገንዘብ ብኡንብኡ ናብ ናይ ዬኪስ ቦርሳኹም ይኣቱ። ካብኡ ናብ ቴሌብር ወይ ናብ ናይ ባንኪ ሕሳብኩም ከተውጽእዎ ትኽእሉ።
+faqpage.cat3.q2,FAQ Page,Question,Why can't I withdraw right away as a new freelancer?,እንደ አዲስ ፍሪላንሰር ለምን ወዲያውኑ ማውጣት አልችልም?,Akka hojjetaa haaraatti maaliif battaluma sanatti maallaqa baafachuu hin danda'u?,ከም ሓድሽ ሰራሕተኛ ስለምንታይ ብኡንብኡ ከውጽእ ዘይክእል?
+faqpage.cat3.a2,FAQ Page,Answer,Withdrawals require a slightly deeper identity check than browsing or bidding does — it's a safeguard that protects your payout from being sent to the wrong place. It's a one-time step; once it's done you're set.,ገንዘብ ማውጣት ከመመልከት ወይም ከመጫረት የበለጠ የማንነት ማረጋገጫ ይፈልጋል — ይህም ክፍያዎ ወደ ተሳሳተ ቦታ እንዳይላክ የሚከላከል ነው። ይህ የአንድ ጊዜ ሂደት ነው፤ አንዴ ከተጠናቀቀ ዝግጁ ነዎት።,Maallaqa baasuun qorannoo eenyummaa bal'aa barbaada — kunis kaffaltiin keessan bakka dogoggoraatti akka hin ergamne eega. Adeemsa yeroo tokkoo qofadha; erga xumuramee qophiidha.,ገንዘብ ምውጻእ ካብ ምርኣይ ወይ ምውድዳር ንላዕሊ ናይ መንነት ምጽራይ ይሓትት — እዚ ድማ ክፍሊትኩም ናብ ካልእ ዘይሕጋዊ ቦታ ከይከይድ ዝከላኸል እዩ። ሓደ ግዜ ጥራይ ዝግበር መስርሕ እዩ፤ ሓንሳብ ምስ ተወድአ ድሉው ኢኹም።
+faqpage.cat3.q3,FAQ Page,Question,Is there a minimum before I can withdraw?,ዝቅተኛ የማውጣት መጠን አለ?,Hangi maallaqa baasuuf murtaa'e xiqqaan jiraa?,ዝተወሰነ ዝተሓተ ናይ ምውጻእ መጠን ኣሎ ድዩ?
+faqpage.cat3.a3,FAQ Page,Answer,[Amount to be confirmed — leave blank for now],የክፍያ መስመር ወጪዎችን ምክንያታዊ ለማድረግ በእያንዳንዱ ማውጣት ላይ አነስተኛ ገደብ አለ። ትክክለኛው መጠን ከማረጋገጥዎ በፊት በዋሌትዎ ውስጥ ይታያል።,Baasii sarara kaffaltii qusachuuf kaffaltii baafachuu tokkoon tokkoon irratti hangi xiqqaan ni jiraata. Hangi sirrii ta'e osoo hin mirkaneessin dura boorsaa keessan keessatti mul'ata.,ናይ ክፍሊት መስመር ወጻኢታት ንምቑጣብ ኣብ ነፍሲ ወከፍ ምውጻእ ንእሽቶ ገደብ ኣሎ። እቲ ትኽክለኛ መጠን ቅድሚ ምጽዳቕኩም ኣብ ውሽጢ ቦርሳኹም ይርአ።
+feespage.breadcrumb,Fees Page,Breadcrumbs,Home > Fees,መነሻ > የአገልግሎት ክፍያ,Fuula Dura > Kaffaltii,መበገሲ > ክፍሊት
+feespage.title,Fees Page,Page Header,Simple transparent pricing,ግልጽ የዋጋ አወጣጥ,Gatii Ifaa fi Haqa Qabeessa,ግሉጽ ናይ ዋጋ ኣሰራርሓ
+feespage.sub,Fees Page,Page Header,You only pay when a job is successfully completed — never upfront.,ምንም አይነት ቅድመ ክፍያ አይኖርም። ኤስክሮው በሚለቀቅበት ቅጽበት ክፍያው በደንበኛውና በፍሪላንሰሩ መካከል ይጋራል።,Dursa kaffaltiin homtuu hin jiru. Yeroo qabsiisni gadi lakkifamu kaffaltiin maamilaa fi hojjetaa gidduutti qoodama.,ቅድመ-ክፍሊት ፈጺሙ የለን። ኤስክሮው ኣብ ዝልቀቐሉ ግዜ እቲ ክፍሊት ኣብ መንጎ ዓሚልን ሰራሕተኛን ይምቀል።
+feespage.panel_title,Fees Page,Platform Fees Panel,Platform Fees,የፕላትፎርም የአገልግሎት ክፍያዎች,Kaffaltii Tajaajila Wlta'aa,ክፍሊታት ኣገልግሎት መድረኽ
+feespage.fee_item1,Fees Page,Platform Fees List,Platform fee: [X%] of each completed milestone split between client and freelancer,የአገልግሎት ክፍያ፡ 5% በእያንዳንዱ የተጠናቀቀ ምዕራፍ፣ በደንበኛና በፍሪላንሰር የሚካፈል,Kaffaltii tajaajilaa: 5% marsaa xumurame hundarraa maamilaafi hojjetaa gidduutti qoodama,ናይ ኣገልግሎት ክፍሊት፡ 5% ኣብ ነፍሲ ወከፍ ዝተዛዘመ ብርኪ ዕዮ፣ ኣብ መንጎ ዓሚልን ሰራሕተኛን ይምቀል
+feespage.fee_item2,Fees Page,Platform Fees List,No listing fees,የሥራ መለጠፊያ ክፍያ የለም,Kaffaltiin hojii tarreessuu hin jiru,ናይ ምልጣፍ ክፍሊት የለን
+feespage.fee_item3,Fees Page,Platform Fees List,No subscription fees,የምዝገባ ክፍያ የለም,Kaffaltiin miseensummaa hin jiru,ናይ ምዝገባ ክፍሊት የለን
+feespage.fee_item4,Fees Page,Platform Fees List,No hidden charges,ምንም ድብቅ ክፍያ የለም,Kaffaltiin dhokataan tokkollee hin jiru,ዝኾነ ሕቡእ ክፍሊት የለን
+feespage.fee_item5,Fees Page,Platform Fees List,"Withholding tax: 3% for TIN-verified freelancers, 30% for unverified (per ERCA regulation)",የተያዘ ግብር (Withholding Tax)፡ ለተረጋገጠ TIN 3%፣ ላልተረጋገጠ 30% (በገቢዎች መመሪያ መሠረት),"Gibira qabamu: TIN mirkanaa'eef 3%, kan hin mirkanoofneef 30% (akka dambii ERCAtti)",ካብ ምንጪ ዝቑረጽ ግብሪ፡ ንዝተረጋገጸ TIN 3%፣ ንዘይተረጋገጸ 30% (ብመሰረት መምርሒ ERCA)
+feespage.compare_title,Fees Page,Comparison Table,How we compare,ከሌሎች ጋር እንዴት እንደምንነፃፀር,Akkamitti wal-bira qabna,ምስ ካልኦት ክነጻጸር ከሎ
+feespage.table.col1,Fees Page,Comparison Table,Feature,ባህሪ,Amala,ባህሪ
+feespage.table.col2,Fees Page,Comparison Table,Yekis,ዬኪስ,Yekis,ዬኪስ
+feespage.table.col3,Fees Page,Comparison Table,Informal Trust,ያልተረጋገጠ መተማመን,Amanuu al-idilee,ዘይውሑስ ምትእምማን
+feespage.table.col4,Fees Page,Comparison Table,Hiring a Lawyer,ጠበቃ መቅጠር,Abukaatoo qacaruu,ጠበቓ ምቑጻር
+feespage.table.row1.feature,Fees Page,Comparison Table,Payment Protection,የክፍያ ዋስትና,Eegumsa kaffaltii,ሓለዋ ክፍሊት
+feespage.table.row1.yekis,Fees Page,Comparison Table,Escrow Held,በኤስክሮው የተጠበቀ,Qabsiisaan kan eegame,ብኤስክሮው ዝተሓለወ
+feespage.table.row1.informal,Fees Page,Comparison Table,None,ምንም የለም,Homtuu hin jiru,ዋላ ሓደ የለን
+feespage.table.row1.lawyer,Fees Page,Comparison Table,High retainers,ከፍተኛ ቅድመ ክፍያ,Kaffaltii dursoo olaanaa,ክቡር ቅድመ-ክፍሊት
+feespage.table.row2.feature,Fees Page,Comparison Table,Dispute Resolution,የክርክር መፍቻ,Furmaata falmii,ምፍታሕ ክርክር
+feespage.table.row2.yekis,Fees Page,Comparison Table,Included,የተካተተ,Kan dabalate,ዝተኻተተ
+feespage.table.row2.informal,Fees Page,Comparison Table,"""He said, she said""","""የእርስ በርስ ጭቅጭቅ""","""Wal-dhabdee afaanii""","""ናይ ቃል ባእሲ"""
+feespage.table.row2.lawyer,Fees Page,Comparison Table,Expensive litigation,ውድ የፍርድ ቤት ክስ,Mana murtii baasii qabu,ክቡር ናይ ቤት ፍርዲ ክሲ
+feespage.btn.faq,Fees Page,Buttons,Read more in our FAQ,በጥያቄዎቻችን ውስጥ የበለጠ ያንብቡ,Gaaffilee keenya keessatti dabalataan dubbisaa,ኣብ ሕቶታትና ዝያዳ ኣንብቡ
+feespage.btn.post,Fees Page,Buttons,Post a Job,ስራ ልልቀቅ,Hojii Maxxansi,ስራሕ ለጥፉ
+feespage.btn.find,Fees Page,Buttons,Find Work,ስራ ፈልግ,Hojii Barbaadi,ስራሕ ድለዩ
+aboutpage.breadcrumb,About Page,Breadcrumbs,Home > About,መነሻ > ስለ እኛ,Fuula Dura > Waa'ee Keenya,መበገሲ > ብዛዕባና
+aboutpage.title,About Page,Page Header,About Yekis,ስለ ዬኪስ,Waa'ee Yekis,ብዛዕባ ዬኪስ
+aboutpage.mission_title,About Page,Mission Section,Our Mission,የእኛ ተልዕኮ,Ergama Keenya,ተልእኾና
+aboutpage.mission_quote,About Page,Mission Section,Yekis exists to give Ethiopian freelancers and their clients a workspace where good work can happen without needing informal trust or a lawyer.,ዬኪስ የተፈጠረው ለኢትዮጵያ ፍሪላንሰሮችና ደንበኞቻቸው ያለ ያልተረጋገጠ መተማመን ወይም ጠበቃ ጥሩ ሥራ የሚከናወንበትን የሥራ ቦታ ለመስጠት ነው።,Yekis kan uumame hojjettoota bilisaa Itoophiyaa fi maamiltoota isaaniitiif bakka hojii amantummaa al-idilee yookiin abukaatoo malee hojiin gaariin itti hojjetamu kennuufi.,ዬኪስ ዝተመስረተ ንኢትዮጵያውያን ናጻ ሰራሕተኛታትን ዓማዊሎምን ብዘይ ዘይውሑስ ምትእምማን ወይ ጠበቓ ጽቡቕ ስራሕ ዝፍጸመሉ ናይ ስራሕ ቦታ ንምሃብ እዩ።
+aboutpage.problem_title,About Page,Problem Section,The Problem We Solve,የምንፈታው ችግር,Rakkoo Nuti Furru,ንሕና ንፈትሖ ጸገም
+aboutpage.problem_body,About Page,Problem Section,"The trust gap in Ethiopian freelance work holds back incredible talent. Clients fear paying upfront and receiving nothing. Freelancers fear delivering work and never getting paid. Yekis bridges this gap with milestone-based escrow, protecting both sides.",በኢትዮጵያ የፍሪላንስ ሥራ ውስጥ ያለው የእምነት ክፍተት ምርጥ ችሎታ ያላቸውን ባለሙያዎች ወደ ኋላ አስቀርቷል። ደንበኞች ገንዘብ አስቀድመው ከፍለው ምንም ላያገኙ እንደሚችሉ ይሰጋሉ። ፍሪላንሰሮች ደግሞ ሰርተው ክፍያ ላያገኙ እንደሚችሉ ይፈራሉ። ዬኪስ በኤስክሮው አማካኝነት የሁለቱንም ወገን ደህንነት ይጠብቃል።,Hojii bilisaa Itoophiyaa keessatti hanqinni amantaa dandeettii ajaa'ibaa duubatti hambiseera. Maamiltoonni dursanii kaffalanii homaa dhabuu sodaatu. Hojjettoonni hojjetanii kaffaltii dhabuu sodaatu. Yekis qabsiisa amansiisaa (escrow) tiin qaamolee lamaanuu eega.,ኣብ ኢትዮጵያ ዘሎ ናይ ምትእምማን ክፍተት ንንፉዓት ሰብሞያ ንድሕሪት ሒዝዎም ጸኒሑ እዩ። ዓማዊል ኣቐዲሞም ከፊሎም ዋላ ሓደ ከይረኽቡ ይፈርሁ። ሰራሕተኛታት ሰሪሖም ክፍሊት ከይስእኑ ይሰግኡ። ዬኪስ ብኤስክሮው ኣቢሉ ንክልቲኡ ወገን ውሑስ ይገብር።
+aboutpage.team_title,About Page,Team Section,Our Team,የእኛ ቡድን,Garee Keenya,ጋንታና
+aboutpage.contact_title,About Page,Contact Section,Contact Information,የመገናኛ አድራሻ,Odeeffannoo Qunnamtii,ናይ ርክብ ሓበሬታ
+aboutpage.contact_email,About Page,Contact Section,Email: hello@yekis.com,ኢሜይል: support@yekis.com,Imeeyilii: support@yekis.com,ኢመይል: support@yekis.com
+aboutpage.contact_phone,About Page,Contact Section,Phone: +251 900 000000,ስልክ: +251 910 011 818,Bilbila: +251 910 011 818,ስልኪ: +251 910 011 818
+aboutpage.contact.telegram_channel,About Page,Contact Section,Telegram Channel,የቴሌግራም ቻናል,Chaanalii Telegiraamaa,ናይ ቴሌግራም ቻናል
+aboutpage.contact.telegram_group,About Page,Contact Section,Telegram Group,የቴሌግራም ግሩፕ,Garee Telegiraamaa,ናይ ቴሌግራም ጉጅለ
+aboutpage.contact.telegram_bot,About Page,Contact Section,Telegram Bot,የዬኪስ ቦት,Boottii Yekis,ናይ ዬኪስ ቦት
+casestudies.breadcrumb,Case Studies Page,Breadcrumbs,Home > Case Studies,መነሻ > የስራ ታሪኮች,Fuula Dura > Milkaa'ina,መበገሲ > ዓወታት
+casestudies.title,Case Studies Page,Page Header,Real projects. Real results.,እውነተኛ ፕሮጀክቶች። እውነተኛ ውጤቶች።,Pirojektoota Dhugaa. Bu'aa Dhugaa.,ናይ ሓቂ ፕሮጀክትታት። ናይ ሓቂ ውጽኢታት።
+casestudies.sub,Case Studies Page,Page Header,"Case studies from verified, escrow-protected projects on Yekis.",በዬኪስ በኤስክሮው ዋስትና ከተከናወኑ ፕሮጀክቶች የተገኙ የስኬት ታሪኮች።,Pirojektoota mirkanaa'anii fi qabsiisa Yekis tiin raawwataman irraa seenaa milkaa'inaa.,ብናይ ዬኪስ ኤስክሮው ውሕስነት ካብ ዝተሰርሑ ፕሮጀክትታት ዝተረኽቡ ተመኩሮታት ዓወት።
+casestudies.coming_soon,Case Studies Page,Card Badge,Coming Soon,በቅርቡ ይጠብቁ,Dhiyootti Eegaa,ኣብ ቀረባ እዋን
+casestudies.btn.faq,Case Studies Page,Buttons,Read FAQ,ጥያቄዎችን ያንብቡ,Gaaffilee Dubbisaa,ሕቶታት ኣንብቡ
+casestudies.btn.browse,Case Studies Page,Buttons,Browse Categories,ዘርፎችን ያስሱ,Gosoota Sakatta'aa,ዓይነታት ስራሕ ርኣዩ

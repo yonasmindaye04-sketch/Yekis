@@ -21,8 +21,9 @@ import {
 } from "lucide-react";
 import { dts, opsApi, opsListApi } from "../opsApi";
 import { api } from "../../../api/client";
-import { SecureAttachmentLink } from "../../../components/SecureAttachment";
-import { getAttachmentLabel } from "../../../components/attachmentMeta";
+import { realtimeSocket } from "../../../api/socket";
+import { SecureAttachment } from "../../../components/SecureAttachment";
+import { getAttachmentLabel, isImageAttachment } from "../../../components/attachmentMeta";
 import { useListPage } from "../opsList";
 import type { RawChatMessage, RawConversation } from "../opsBackend";
 import {
@@ -43,20 +44,24 @@ const waitHours = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_60
 export default function SupportDesk() {
   const toast = useToast();
   const [scope, setScope] = useState("OPEN");
+  const [assignment, setAssignment] = useState("");
+  const [sort, setSort] = useState("newest");
   const [selected, setSelected] = useState<string | null>(null);
 
   const list = useListPage<RawConversation>(
-    (p) => opsListApi.conversations({ ...p, status: scope }),
+    (p) => opsListApi.conversations({ ...p, status: scope, assignment, sort }),
     25,
-    [scope],
+    [scope, assignment, sort],
   );
   const {
     rows, total, page, pages, loading, error, search, setSearch, setPage, reload,
   } = list;
 
   const [messages, setMessages] = useState<RawChatMessage[]>([]);
+  const [socketLive, setSocketLive] = useState(realtimeSocket.isConnected);
   const [msgLoading, setMsgLoading] = useState(false);
   const [reply, setReply] = useState("");
+  const [internal, setInternal] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -88,6 +93,51 @@ export default function SupportDesk() {
     endRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length]);
 
+  // Keep the queue and the open thread live while staff are working. The
+  // private user event catches newly assigned/unread cases; the conversation
+  // channel catches messages after a staff member claims a case.
+  useEffect(() => {
+    realtimeSocket.connect();
+    const offStatus = realtimeSocket.onStatusChange(setSocketLive);
+    const offPrivate = realtimeSocket.on<RawChatMessage & { conversationId: string }>(
+      "chat:new_message",
+      (message) => {
+        reload();
+        if (message.conversationId === selected) void loadMessages(selected);
+      },
+    );
+    const offNewConversation = realtimeSocket.on("chat:new_conversation", () => reload());
+    return () => { offPrivate(); offStatus(); offNewConversation(); };
+  }, [reload, selected, loadMessages]);
+
+  useEffect(() => {
+    if (socketLive) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      reload();
+      if (selected) void loadMessages(selected);
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [socketLive, selected, reload, loadMessages]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const channel = `conversation:${selected}`;
+    realtimeSocket.subscribe(channel);
+    const offThread = realtimeSocket.on<RawChatMessage>("chat:message", (message) => {
+      if (message.conversationId !== selected) return;
+      setMessages((current) =>
+        current.some((entry) => entry.id === message.id)
+          ? current
+          : [...current, message],
+      );
+    });
+    return () => {
+      realtimeSocket.unsubscribe(channel);
+      offThread();
+    };
+  }, [selected]);
+
   const send = async () => {
     if (!selected || (!reply.trim() && !file) || busy) return;
     setBusy(true);
@@ -98,8 +148,10 @@ export default function SupportDesk() {
         attachmentUrl = up.url;
       }
       const body = reply.trim() || `[attachment] ${file?.name ?? "file"}`;
-      await opsApi.sendChatMessage(selected, body, attachmentUrl);
+      if (internal) await opsApi.sendInternalChatMessage(selected, body, attachmentUrl);
+      else await opsApi.sendChatMessage(selected, body, attachmentUrl);
       setReply("");
+      setInternal(false);
       setFile(null);
       await loadMessages(selected);
       reload();
@@ -120,6 +172,20 @@ export default function SupportDesk() {
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not change status");
+    }
+  };
+
+  const claim = async () => {
+    if (!selected || busy) return;
+    setBusy(true);
+    try {
+      await opsApi.claimConversation(selected);
+      toast("Conversation claimed.");
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Could not claim conversation");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -161,6 +227,20 @@ export default function SupportDesk() {
           options={["OPEN", "CLOSED"]}
           allLabel="All statuses"
           label="Conversation status"
+        />
+        <FilterSelect
+          value={assignment}
+          onChange={setAssignment}
+          options={["UNASSIGNED", "MINE"]}
+          allLabel="All assignments"
+          label="Conversation assignment"
+        />
+        <FilterSelect
+          value={sort}
+          onChange={setSort}
+          options={["newest", "oldest", "waiting"]}
+          allLabel="Sort by"
+          label="Conversation sort"
         />
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
@@ -223,15 +303,22 @@ export default function SupportDesk() {
                     {active.assignedStaff ? `assigned to ${active.assignedStaff.name}` : "unassigned"}
                   </div>
                 </div>
-                {active.status === "OPEN" ? (
-                  <button className="btn btn-ghost btn-sm" onClick={() => void setStatus("CLOSED")}>
-                    <CheckCheck size={13} /> Close
-                  </button>
-                ) : (
-                  <button className="btn btn-ghost btn-sm" onClick={() => void setStatus("OPEN")}>
-                    <RotateCcw size={13} /> Reopen
-                  </button>
-                )}
+                <div style={{ display: "flex", gap: 8 }}>
+                  {!active.assignedStaff ? (
+                    <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void claim()}>
+                      Claim
+                    </button>
+                  ) : null}
+                  {active.status === "OPEN" ? (
+                    <button className="btn btn-ghost btn-sm" onClick={() => void setStatus("CLOSED")}>
+                      <CheckCheck size={13} /> Close
+                    </button>
+                  ) : (
+                    <button className="btn btn-ghost btn-sm" onClick={() => void setStatus("OPEN")}>
+                      <RotateCcw size={13} /> Reopen
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -245,7 +332,7 @@ export default function SupportDesk() {
                   messages.map((m) => {
                     const fromStaff = Boolean(m.sender.staffRole);
                     return (
-                      <div className={`ev-bubble ${fromStaff ? "freelancer" : "client"}`} key={m.id}>
+                      <div className={`ev-bubble ${m.origin === "STAFF_INTERNAL" ? "internal" : fromStaff ? "freelancer" : "client"}`} key={m.id}>
                         <div className="ev-b-head">
                           <strong>
                             {fromStaff ? "Staff" : (m.sender.displayName ?? m.sender.email)}
@@ -254,10 +341,11 @@ export default function SupportDesk() {
                         </div>
                         <p>{m.body}</p>
                         {m.attachmentUrl ? (
-                          <SecureAttachmentLink
+                          <SecureAttachment
                             url={m.attachmentUrl}
                             token={api.getToken()}
                             label={getAttachmentLabel(m.attachmentUrl)}
+                            isImage={isImageAttachment(m.attachmentUrl)}
                           />
                         ) : null}
                       </div>
@@ -289,6 +377,9 @@ export default function SupportDesk() {
                   <Send size={13} /> {busy ? "Sending…" : "Send"}
                 </button>
               </div>
+              <label style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 8, fontSize: 12, color: "var(--ops-text-2)" }}>
+                <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} /> Internal note (staff only)
+              </label>
               {file ? (
                 <div style={{ fontSize: 12, color: "var(--ops-text-2)", marginTop: 6 }}>
                   Attaching: {file.name}

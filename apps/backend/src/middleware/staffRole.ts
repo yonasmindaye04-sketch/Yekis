@@ -17,7 +17,13 @@ export function requireStaffRole(
       select: { staffRole: true },
     });
 
-    if (!user?.staffRole || !allowedRoles.includes(user.staffRole)) {
+    // ADMIN and SUPER_ADMIN are full-access roles.  Several older route
+    // declarations list only ADMIN (or a domain specialist role); treating
+    // these two roles as exact-match exceptions keeps the backend aligned with
+    // the canonical permission matrix and prevents a full-access account from
+    // seeing a sidebar item but receiving a 403 from the action behind it.
+    const hasFullAccess = user?.staffRole === "ADMIN" || user?.staffRole === "SUPER_ADMIN";
+    if (!user?.staffRole || (!hasFullAccess && !allowedRoles.includes(user.staffRole))) {
       return res
         .status(403)
         .json({ error: "STAFF_ROLE_REQUIRED", required: allowedRoles });

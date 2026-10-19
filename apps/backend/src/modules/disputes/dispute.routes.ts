@@ -4,9 +4,10 @@ import {
   RaiseDisputeInput,
   SubmitEvidenceInput,
   MediatorResolutionInput,
+  ArbitrationAwardInput,
 } from "@marketplace/schemas";
-import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
+import { requirePermission } from "../admin/permissions.js";
 import { logger } from "../../lib/logger.js";
 import {
   raiseDispute,
@@ -26,6 +27,8 @@ import {
   MilestoneNotFoundError,
   InvalidEscrowStateForDisputeError,
   DisputeAlreadyClaimedError,
+  DisputeAlreadyResolvedError,
+  MilestoneNotSettleableError,
 } from "./dispute.service.js";
 import { z } from "zod";
 
@@ -49,9 +52,18 @@ function handleKnownErrors(
   }
   if (
     err instanceof InvalidDisputeStageError ||
-    err instanceof InvalidEscrowStateForDisputeError
+    err instanceof InvalidEscrowStateForDisputeError ||
+    err instanceof MilestoneNotSettleableError
   ) {
     res.status(409).json({ error: "INVALID_STATE", message: err.message });
+    return true;
+  }
+  // F-04: already settled by someone else. A distinct code so the UI can say
+  // "this dispute is closed" rather than "try again".
+  if (err instanceof DisputeAlreadyResolvedError) {
+    res
+      .status(409)
+      .json({ error: "DISPUTE_ALREADY_RESOLVED", message: err.message });
     return true;
   }
   if (err instanceof DisputeAlreadyClaimedError) {
@@ -70,7 +82,11 @@ function handleKnownErrors(
 disputesRouter.get(
   "/staff/queue",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "SUPER_ADMIN", "DISPUTE_MEDIATOR"),
+  // Was requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN",
+  // "SUPER_ADMIN", "DISPUTE_MEDIATOR"). Behaviour is identical — every one of
+  // those roles holds disputes.view — but the matrix is now the single source
+  // of truth, so adding a role cannot silently widen or narrow this surface.
+  requirePermission("disputes.view"),
   async (req: AuthedRequest, res) => {
     const page = req.query.page
       ? parseInt(req.query.page as string)
@@ -200,7 +216,17 @@ disputesRouter.post(
 disputesRouter.post(
   "/:disputeId/resolve",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "SUPER_ADMIN", "DISPUTE_MEDIATOR"),
+  // Releases escrow or refunds the client. The role list here included
+  // COMPLIANCE_OFFICER and COMPLIANCE_ADMIN, who the matrix deliberately does
+  // NOT give disputes.resolve — compliance staff can review and mediate, not
+  // decide who gets the money. A permission key is used so the matrix, not
+  // this route, defines the boundary.
+  requirePermission("disputes.resolve"),
+  // Step-up: this moves money out of escrow on one request. Without it a
+  // session obtained purely from a stolen Telegram initData — which carries a
+  // weak `amr` and never counts as a fresh credential — could settle a dispute
+  // and pay out.
+  requireFreshAuth(300),
   async (req: AuthedRequest, res) => {
     const parsed = MediatorResolutionInput.safeParse(req.body);
     if (!parsed.success) {
@@ -233,7 +259,9 @@ disputesRouter.post(
 disputesRouter.post(
   "/:disputeId/claim",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "SUPER_ADMIN", "DISPUTE_MEDIATOR"),
+  // Mediator assignment, not settlement. disputes.mediate is held by exactly
+  // the roles the old list allowed, so this is behaviour-preserving.
+  requirePermission("disputes.mediate"),
   async (req: AuthedRequest, res) => {
     try {
       const result = await claimDisputeAsMediator({
@@ -251,21 +279,21 @@ disputesRouter.post(
 
 // T2-H: apply an external arbitration award (AACCSA reference required).
 // Staff-only; moves funds per the arbitrator's outcome.
-const ArbitrationAwardInput = z.object({
-  awardReferenceNumber: z.string().min(3),
-  outcome: z.enum([
-    "RELEASE_TO_FREELANCER",
-    "REFUND_TO_CLIENT",
-    "PARTIAL_SPLIT",
-  ]),
-  recommendation: z.string().min(5),
-  freelancerShareMinor: z.coerce.number().int().nonnegative().optional(),
-});
+//
+// F-05: the shape and the PARTIAL_SPLIT refine now come from
+// @marketplace/schemas, the same definition /resolve uses. The local copy here
+// lacked the refine, so this route accepted PARTIAL_SPLIT with no share.
 
 disputesRouter.post(
   "/:disputeId/arbitration-award",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "COMPLIANCE_ADMIN", "ADMIN", "SUPER_ADMIN", "DISPUTE_MEDIATOR"),
+  // Moves escrow exactly like /resolve, so it is gated identically. It was the
+  // same role list, which granted the power to roles the matrix gives
+  // disputes.mediate but not disputes.resolve — and it rewinds
+  // STAGE_4_ARBITRATION back to STAGE_3 before settling, so it was the
+  // higher-risk of the two.
+  requirePermission("disputes.resolve"),
+  requireFreshAuth(300),
   async (req: AuthedRequest, res) => {
     const parsed = ArbitrationAwardInput.safeParse(req.body);
     if (!parsed.success) {

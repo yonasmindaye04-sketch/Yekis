@@ -12,18 +12,24 @@ import {
   requestPasswordReset,
   resetPassword,
   refreshSession,
+  logoutSession,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
-import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
+import { env } from "../../config/env.js";
+import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
 import {
   loginWithTelegram,
+  resolveOrProvisionTelegramUser,
+  registerTelegramUser,
+  buildAuthResponse,
   linkTelegramToUser,
   unlinkTelegramFromUser,
   TelegramAuthError,
   TelegramNotConfiguredError,
   TelegramAccountConflictError,
 } from "./telegram.service.js";
+import type { AuthMethod } from "./auth-methods.js";
 import { AccountLinkRequiredError } from "./identity.js";
 import {
   redeemTelegramLoginCode,
@@ -42,7 +48,91 @@ import { z } from "zod";
 
 export const authRouter = Router();
 
-authRouter.post("/register", async (req, res) => {
+const registrationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REGISTRATIONS" },
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_LOGIN_ATTEMPTS" },
+});
+
+const passwordResetRequestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_RESET_REQUESTS" },
+});
+
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_RESET_ATTEMPTS" },
+});
+
+/**
+ * Limits for the remaining unauthenticated credential endpoints.
+ *
+ * /register, /login and the reset routes already had their own limiters, which
+ * left the rest of the unauthenticated surface with only the shared per-IP API
+ * limiter in app.ts — 2000 requests per 15 minutes, which is an availability
+ * budget, not an abuse control.
+ *
+ * These are the endpoints where an unauthenticated caller causes real work:
+ *   - /oauth/* verifies a provider-signed idToken over the network on every
+ *     request, so it is an amplification vector against us and the provider.
+ *   - /telegram* and /telegram/miniapp* mint a session from an HMAC-verified
+ *     payload; a flood is a flood of account/session creation.
+ *   - /refresh is called by every client, so its budget is generous, but
+ *     without a limit a stolen refresh token can be ground against the store.
+ *
+ * Thresholds are deliberately generous relative to real traffic. These exist to
+ * stop a flood, not to inconvenience a user who refreshes a few times.
+ */
+const oauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_OAUTH_ATTEMPTS" },
+});
+
+const telegramLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_TELEGRAM_LOGIN_ATTEMPTS" },
+});
+
+// Account creation from the Mini App, so tighter than plain sign-in.
+const telegramRegisterLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REGISTRATIONS" },
+});
+
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REFRESH_ATTEMPTS" },
+});
+
+authRouter.post("/register", registrationLimiter, async (req, res) => {
   const parsed = RegisterInput.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -69,7 +159,7 @@ authRouter.post("/register", async (req, res) => {
   }
 });
 
-authRouter.post("/login", async (req, res) => {
+authRouter.post("/login", loginLimiter, async (req, res) => {
   const parsed = LoginInput.safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -89,77 +179,150 @@ authRouter.post("/login", async (req, res) => {
   }
 });
 
-authRouter.post("/telegram", async (req, res) => {
-  let initData = "";
-  if (typeof req.body?.initData === "string") {
-    initData = req.body.initData;
-  } else if (req.body && typeof req.body === "object" && req.body.hash) {
-    const params = new URLSearchParams();
-    for (const [k, v] of Object.entries(req.body)) {
-      if (k !== "role" && v !== undefined && v !== null) {
-        params.set(k, String(v));
-      }
-    }
-    initData = params.toString();
+import {
+  verifyMiniAppInitData,
+  verifyLoginWidget,
+  NeedsOnboardingError,
+  AuthError,
+} from "./telegram.service.js";
+
+/**
+ * LEGACY compatibility entry point. Retained because the frontend's
+ * `loginWithTelegram()` still posts here from both the Mini App shell
+ * (`initData` string) and the Login Widget (flat object). New work goes to
+ * /telegram/miniapp, /telegram/widget or /telegram/web-login.
+ *
+ * The verifier is chosen by payload SHAPE — a URL-encoded string is Mini App
+ * initData, a flat object is a Login Widget payload. Never try one and fall
+ * back to the other: a payload that fails its own scheme's check must be
+ * rejected, not retried against the other algorithm.
+ */
+authRouter.post("/telegram", telegramLoginLimiter, async (req, res) => {
+  const payload = req.body;
+  if (!payload || typeof payload !== "object") {
+    return res.status(400).json({ error: "MISSING_PAYLOAD" });
   }
-  const role = typeof req.body?.role === "string" ? req.body.role : undefined;
-  if (!initData) return res.status(400).json({ error: "MISSING_INIT_DATA" });
+  if (!env.TELEGRAM_BOT_TOKEN) {
+    return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
+  }
 
   try {
-    return res.json(await loginWithTelegram(initData, role));
+    let telegram;
+    let method: AuthMethod;
+    if (typeof payload.initData === "string") {
+      telegram = verifyMiniAppInitData(
+        payload.initData,
+        env.TELEGRAM_BOT_TOKEN,
+        env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS,
+      );
+      method = "tg_miniapp";
+    } else if (payload.hash) {
+      telegram = verifyLoginWidget(payload, env.TELEGRAM_BOT_TOKEN);
+      method = "tg_widget";
+    } else {
+      return res.status(400).json({ error: "INVALID_PAYLOAD" });
+    }
+
+    // `role` is honoured ONLY when provisioning a brand-new account; an
+    // existing member's role is never rewritten from a client-supplied value.
+    const user = await resolveOrProvisionTelegramUser(telegram, {
+      role: payload.role,
+    });
+    return res.json(await buildAuthResponse(user, telegram, method));
   } catch (err) {
-    if (err instanceof TelegramNotConfiguredError)
-      return res
-        .status(503)
-        .json({ error: "TELEGRAM_NOT_CONFIGURED", message: err.message });
-    if (err instanceof TelegramAuthError)
-      return res
-        .status(401)
-        .json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
-    if (err instanceof AccountLinkRequiredError)
-      return res
-        .status(409)
-        .json({ error: "ACCOUNT_LINK_REQUIRED", message: err.message });
+    if (err instanceof AccountLinkRequiredError) {
+      return res.status(409).json({ error: "ACCOUNT_LINK_REQUIRED", message: err.message });
+    }
+    if (err instanceof AuthError) {
+      return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
+    }
     logger.error({ err }, "Unexpected error during Telegram login");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
 
-// Binding Telegram to an account that already exists under a different
-// identity (password signup, Google, Apple) cannot be done on an email match:
-// Telegram discloses no email. It requires a live session for the account
-// being linked PLUS a freshly signed Telegram credential.
+authRouter.post("/telegram/miniapp", telegramLoginLimiter, async (req, res) => {
+  const { initData } = req.body;
+  if (!initData || typeof initData !== "string") return res.status(400).json({ error: "MISSING_INIT_DATA" });
+  if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
 
-const TelegramCredentialInput = z.object({ initData: z.string().min(1) });
-
-authRouter.post("/telegram/link", requireAuth, async (req: AuthedRequest, res) => {
-  const parsed = TelegramCredentialInput.safeParse(req.body);
-  if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
-  }
   try {
-    return res.json(await linkTelegramToUser(req.user!.id, parsed.data.initData));
+    const telegram = verifyMiniAppInitData(initData, env.TELEGRAM_BOT_TOKEN);
+    return res.json(await loginWithTelegram(telegram));
   } catch (err) {
-    if (err instanceof TelegramNotConfiguredError)
-      return res
-        .status(503)
-        .json({ error: "TELEGRAM_NOT_CONFIGURED", message: err.message });
-    if (err instanceof TelegramAuthError)
-      return res
-        .status(401)
-        .json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
-    if (err instanceof TelegramAccountConflictError)
-      return res
-        .status(409)
-        .json({ error: "TELEGRAM_ALREADY_LINKED", message: err.message });
+    if (err instanceof NeedsOnboardingError) return res.status(409).json({ error: "NEEDS_ONBOARDING", message: err.message });
+    if (err instanceof AuthError) return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
+    if (err instanceof AccountLinkRequiredError) return res.status(409).json({ error: "ACCOUNT_LINK_REQUIRED", message: err.message });
+    logger.error({ err }, "Unexpected error during Mini App login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/telegram/miniapp/register", telegramRegisterLimiter, async (req, res) => {
+  const { initData, role, termsVersion } = req.body;
+  if (!initData || typeof initData !== "string") return res.status(400).json({ error: "MISSING_INIT_DATA" });
+  if (!role || (role !== "CLIENT" && role !== "FREELANCER")) return res.status(400).json({ error: "INVALID_ROLE" });
+  if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
+
+  try {
+    const telegram = verifyMiniAppInitData(initData, env.TELEGRAM_BOT_TOKEN, 600); // 10 min max age for registration
+    return res.json(await registerTelegramUser(telegram, role));
+  } catch (err) {
+    if (err instanceof AuthError) return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
+    logger.error({ err }, "Unexpected error during Mini App registration");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/telegram/widget", telegramLoginLimiter, async (req, res) => {
+  const payload = req.body;
+  if (!payload || typeof payload !== "object" || !payload.hash) return res.status(400).json({ error: "MISSING_WIDGET_DATA" });
+  if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
+
+  try {
+    const telegram = verifyLoginWidget(payload, env.TELEGRAM_BOT_TOKEN);
+    return res.json(await loginWithTelegram(telegram, "tg_widget"));
+  } catch (err) {
+    if (err instanceof NeedsOnboardingError) return res.status(409).json({ error: "NEEDS_ONBOARDING", message: err.message });
+    if (err instanceof AuthError) return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
+    if (err instanceof AccountLinkRequiredError) return res.status(409).json({ error: "ACCOUNT_LINK_REQUIRED", message: err.message });
+    logger.error({ err }, "Unexpected error during Telegram widget login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/telegram/link", requireAuth, requireFreshAuth(300), async (req: AuthedRequest, res) => {
+  const payload = req.body;
+  if (!payload || typeof payload !== "object") return res.status(400).json({ error: "MISSING_PAYLOAD" });
+  if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
+
+  try {
+    let telegram;
+    if (payload.initData) {
+      telegram = verifyMiniAppInitData(payload.initData, env.TELEGRAM_BOT_TOKEN, 300);
+    } else if (payload.hash) {
+      telegram = verifyLoginWidget(payload, env.TELEGRAM_BOT_TOKEN, 300);
+    } else {
+      return res.status(400).json({ error: "INVALID_PAYLOAD" });
+    }
+    
+    return res.json(await linkTelegramToUser(req.user!.id, telegram));
+  } catch (err) {
+    if (err instanceof AuthError) return res.status(401).json({ error: "TELEGRAM_AUTH_FAILED", message: err.message });
+    if (err instanceof TelegramAccountConflictError) return res.status(409).json({ error: "TELEGRAM_ALREADY_LINKED", message: err.message });
     logger.error({ err }, "Unexpected error while linking Telegram account");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
 
-authRouter.delete("/telegram/link", requireAuth, async (req: AuthedRequest, res) => {
+authRouter.delete("/telegram/link", requireAuth, requireFreshAuth(300), async (req: AuthedRequest, res) => {
+  // Enforce that Telegram isn't the ONLY credential before unlinking
+  const userDetails = await prisma.user.findUnique({ where: { id: req.user!.id }, select: { passwordSetAt: true, email: true, emailVerified: true } });
+  const hasOtherCredential = !!userDetails?.passwordSetAt || !!userDetails?.emailVerified;
+  if (!hasOtherCredential) {
+    return res.status(400).json({ error: "CANNOT_UNLINK_ONLY_CREDENTIAL", message: "Set a password or verify your email before unlinking Telegram." });
+  }
+
   try {
     return res.json(await unlinkTelegramFromUser(req.user!.id));
   } catch (err) {
@@ -167,6 +330,7 @@ authRouter.delete("/telegram/link", requireAuth, async (req: AuthedRequest, res)
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
+
 
 // Redeems the one-time code the bot mints via /login. This is the path that
 // works when the Login Widget cannot render — the domain is not registered
@@ -188,15 +352,14 @@ const telegramCodeLimiter = rateLimit({
   },
 });
 
+/**
+ * Redeems the one-time code the bot mints via /login. Legacy path, kept alive
+ * until the PKCE web-login flow is proven; see telegram-code.service.ts.
+ */
 authRouter.post("/telegram/code", telegramCodeLimiter, async (req, res) => {
-  const parsed = z
-    .object({ code: z.string().min(4).max(32) })
-    .safeParse(req.body);
-
+  const parsed = z.object({ code: z.string().min(1).max(64) }).safeParse(req.body);
   if (!parsed.success) {
-    return res
-      .status(400)
-      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    return res.status(400).json({ error: "VALIDATION_ERROR" });
   }
 
   try {
@@ -206,6 +369,44 @@ authRouter.post("/telegram/code", telegramCodeLimiter, async (req, res) => {
       return res.status(401).json({ error: "INVALID_CODE", message: err.message });
     }
     logger.error({ err }, "Unexpected error redeeming Telegram login code");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+import { startWebLogin, getWebLoginStatus, redeemWebLogin } from "./telegram-code.service.js";
+
+authRouter.post("/telegram/web-login/start", telegramCodeLimiter, async (req, res) => {
+  const parsed = z.object({ challenge: z.string().min(20).max(100) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR" });
+
+  try {
+    return res.json(await startWebLogin(parsed.data.challenge, req.ip || "0.0.0.0", req.get("User-Agent") || "Unknown"));
+  } catch (err) {
+    logger.error({ err }, "Error starting web login");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.get("/telegram/web-login/:sid/status", async (req, res) => {
+  const sid = req.params.sid;
+  if (!sid) return res.status(400).json({ error: "MISSING_SID" });
+  try {
+    return res.json(await getWebLoginStatus(sid));
+  } catch (err) {
+    logger.error({ err }, "Error getting web login status");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
+authRouter.post("/telegram/web-login/redeem", telegramCodeLimiter, async (req, res) => {
+  const parsed = z.object({ sid: z.string().min(10), verifier: z.string().min(20).max(200) }).safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "VALIDATION_ERROR" });
+
+  try {
+    return res.json(await redeemWebLogin(parsed.data.sid, parsed.data.verifier));
+  } catch (err: any) {
+    if (err.name === "AuthError") return res.status(401).json({ error: "AUTH_FAILED", message: err.message });
+    logger.error({ err }, "Error redeeming web login");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
@@ -225,7 +426,7 @@ authRouter.get("/oauth/providers", (_req, res) => {
   return res.json(getOAuthProviderAvailability());
 });
 
-authRouter.post("/oauth/google", async (req, res) => {
+authRouter.post("/oauth/google", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({
       idToken: z.string().min(20),
@@ -262,7 +463,7 @@ authRouter.post("/oauth/google", async (req, res) => {
   }
 });
 
-authRouter.post("/oauth/apple", async (req, res) => {
+authRouter.post("/oauth/apple", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({
       idToken: z.string().min(20),
@@ -306,7 +507,7 @@ authRouter.post("/oauth/apple", async (req, res) => {
   }
 });
 
-authRouter.post("/oauth/facebook", async (req, res) => {
+authRouter.post("/oauth/facebook", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({ accessToken: z.string().min(10) })
     .safeParse(req.body);
@@ -340,7 +541,7 @@ authRouter.post("/oauth/facebook", async (req, res) => {
   }
 });
 
-authRouter.post("/reset-password-request", async (req, res) => {
+authRouter.post("/reset-password-request", passwordResetRequestLimiter, async (req, res) => {
   const parsed = z.object({ email: z.string().email() }).safeParse(req.body);
   if (!parsed.success) {
     return res
@@ -358,7 +559,7 @@ authRouter.post("/reset-password-request", async (req, res) => {
   }
 });
 
-authRouter.post("/reset-password", async (req, res) => {
+authRouter.post("/reset-password", passwordResetLimiter, async (req, res) => {
   const parsed = z
     .object({ token: z.string(), newPassword: z.string().min(10) })
     .safeParse(req.body);
@@ -388,7 +589,7 @@ authRouter.post("/reset-password", async (req, res) => {
  * previously the refresh token was issued at login but had no consumer, so
  * every user was silently logged out every JWT_ACCESS_TTL (default 15m).
  */
-authRouter.post("/refresh", async (req, res) => {
+authRouter.post("/refresh", refreshLimiter, async (req, res) => {
   const parsed = z
     .object({ refreshToken: z.string().min(20) })
     .safeParse(req.body);
@@ -411,6 +612,16 @@ authRouter.post("/refresh", async (req, res) => {
   }
 });
 
+authRouter.post("/logout", requireAuth, async (req: AuthedRequest, res) => {
+  // Until this existed, "log out" was a client-side deletion of two
+  // localStorage keys. The tokens themselves stayed valid until they expired,
+  // so a token lifted from the machine — or from a shared browser's history —
+  // kept working for the remaining JWT_REFRESH_TTL (default 30 days). Bumping
+  // sessionVersion is what actually ends the session server-side.
+  await logoutSession(req.user!.id);
+  return res.status(200).json({ success: true });
+});
+
 authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   const user = await prisma.user.findUnique({
     where: { id: req.user!.id },
@@ -429,3 +640,18 @@ authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
   return res.json(user);
 });
+
+// Mounts POST /auth/phone/code and /auth/phone/verify onto authRouter.
+//
+// Two bugs fixed here at once, both caught by tests/e2e-app.test.ts.
+//
+// 1. The module was never imported, so its self-registration never ran and both
+//    endpoints 404'd in production -- while the service, the unit tests and the
+//    commit that added them all reported success. The unit tests called the
+//    service module directly and could not have seen it.
+// 2. Importing it for a side effect while it imports authRouter back created a
+//    cycle, and the registration then ran before authRouter was initialised
+//    ("Cannot read properties of undefined"). The router is therefore passed in
+//    explicitly rather than imported, which breaks the cycle by construction.
+import { registerPhoneVerificationRoutes } from "./phone-verification.routes.js";
+registerPhoneVerificationRoutes(authRouter);

@@ -30,16 +30,37 @@ export function requireKycVerified(
     });
 
     if (!kyc || kyc.status !== "VERIFIED") {
+      // F-02: a bare 403 told the user only that they were blocked. It carries
+      // a machine-readable next step so the frontend can offer the action
+      // instead of rendering a dead end.
       return res.status(403).json({
         error: "KYC_NOT_VERIFIED",
         message: "This action requires a verified account.",
+        nextAction: {
+          type: "KYC",
+          path: "/verification",
+          reason: !kyc
+            ? "NOT_STARTED"
+            : kyc.status === "UNDER_REVIEW"
+              ? "UNDER_REVIEW"
+              : kyc.status === "REJECTED"
+                ? "REJECTED"
+                : "NOT_STARTED",
+        },
       });
     }
 
     if (tierOrder[kyc.tier] < tierOrder[requiredTier]) {
+      // Same for a tier shortfall: say what to do, and why it matters.
       return res.status(403).json({
         error: "KYC_TIER_INSUFFICIENT",
         message: `This action requires ${requiredTier}, current tier is ${kyc.tier}.`,
+        nextAction: {
+          type: "KYC",
+          path: "/verification",
+          requiredTier,
+          currentTier: kyc.tier,
+        },
       });
     }
 

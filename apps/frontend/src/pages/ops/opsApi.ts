@@ -80,6 +80,7 @@ import type {
   RawContractDetail,
   RawContractRow,
   RawConversationPage,
+  RawGigModeration,
   RawDashboardSummary,
   RawDisputeItem,
   RawEscrow,
@@ -321,6 +322,7 @@ const toEscrow = (r: RawEscrow): Escrow => ({
   fl: nameOf(r.contract.freelancer),
   rail: r.paymentTransactions[0]?.provider ?? "—",
   created: r.createdAt,
+  held: r.escrowHolds.length > 0,
 });
 
 const toRecon = (r: RawReconRow): ReconRow => ({
@@ -694,6 +696,8 @@ type ListFilters = ListFetchParams & {
   recStatus?: string;
   referenceType?: string;
   flagType?: string;
+  assignment?: string;
+  sort?: string;
 };
 
 /**
@@ -825,14 +829,14 @@ export const opsListApi = {
       total: number;
       page: number;
       limit: number;
-      counts?: { pending: number; underReview: number; actionable: number };
+      counts?: { underReview: number; pending: number };
     };
     return {
       rows: r.items.map(toKyc),
       total: r.total,
       page: r.page,
       pageSize: r.limit,
-      extra: r.counts ?? { pending: 0, underReview: r.total, actionable: r.total },
+      extra: r.counts ?? { underReview: r.total, pending: 0 },
     };
   },
 
@@ -877,13 +881,25 @@ export const opsListApi = {
   },
 
   /** Staff support queue. */
-  conversations: async ({ page, limit, q, status }: ListFilters) => {
+  conversations: async ({ page, limit, q, status, assignment, sort }: ListFilters) => {
     const r = (await api.getStaffConversations({
       page,
       pageSize: limit,
       search: q || undefined,
       status: status || "OPEN",
+      assignment: assignment || undefined,
+      sort: sort || "newest",
     })) as RawConversationPage;
+    return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
+  },
+
+  gigs: async ({ page, limit, q, status }: ListFilters) => {
+    const r = (await api.adminListGigs({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+    })) as { items: RawGigModeration[]; total: number; page: number; pageSize: number };
     return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
@@ -941,6 +957,9 @@ export const opsApi = {
       providerPayoutId: body.ref,
       failureReason: body.reason,
     }),
+  releaseEscrow: (id: string, reason: string) => api.adminReleaseEscrow(id, reason),
+  holdEscrow: (id: string, reason: string) => api.adminHoldEscrow(id, reason),
+  unholdEscrow: (id: string, reason: string) => api.adminUnholdEscrow(id, reason),
 
   escrows: async () => (await rEscrows()).items.map(toEscrow),
   reconciliation: async () => (await rRecon()).items.map(toRecon),
@@ -962,6 +981,7 @@ export const opsApi = {
     ),
   /** `null` demotes the account back to a regular user. */
   setStaffRole: (id: string, role: StaffRole | null) => api.setStaffRole(id, role),
+  setStaffStatus: (id: string, suspended: boolean, reason?: string) => api.setStaffStatus(id, suspended, reason),
 
   reports: () => loadReports(),
   riskFlags: async () => (await rFlags()).items.map(toRiskFlag),
@@ -1047,13 +1067,26 @@ export const opsApi = {
   topUpQueue: (status = "PENDING") => rTopUps(status).then((r) => r.items),
 
   conversations: (status: "OPEN" | "ALL") => rConversations(status),
+  moderateGig: (id: string, status: "ACTIVE" | "REJECTED" | "PAUSED" | "ARCHIVED", reason?: string) =>
+    api.adminModerateGig(id, status, reason),
   chatMessages: (id: string) => api.getChatMessages(id) as Promise<RawChatMessage[]>,
   sendChatMessage: (id: string, body: string, attachmentUrl?: string) =>
     api.sendChatMessage(id, body, attachmentUrl),
+  sendInternalChatMessage: (id: string, body: string, attachmentUrl?: string) =>
+    api.sendChatMessage(id, body, attachmentUrl, true),
   uploadChatAttachment: (file: File) => api.uploadChatAttachment(file),
   setConversationStatus: (id: string, status: "OPEN" | "CLOSED") =>
     api.setConversationStatus(id, status),
+  claimConversation: (id: string) => api.claimConversation(id),
   refreshFeaturedCarousel: () => api.refreshFeaturedCarousel(),
+  pinFeaturedUser: (userId: string, category: string, notes?: string) => api.pinFeaturedUser(userId, category, notes),
+  botHealth: () => api.getBotHealth(),
+  botInfo: () => api.getBotInfo(),
+  deleteBotWebhook: () => api.deleteBotWebhook(),
+  startBotPolling: () => api.startBotPolling(),
+  stopBot: () => api.stopBot(),
+  withholdingReports: (params?: { page?: number; limit?: number }) => api.getWithholdingReports(params),
+  fileWithholdingReport: (id: string, ref: string) => api.fileWithholdingReport(id, ref),
 };
 
 /* ── tiny data hook ───────────────────────────────────────────────────── */

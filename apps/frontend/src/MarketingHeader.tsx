@@ -1,5 +1,7 @@
-import { Sun, Moon, MessageCircle } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
 
 type MarketingHeaderProps = {
   onNavigate: (page: string) => void;
@@ -8,6 +10,7 @@ type MarketingHeaderProps = {
 
 export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
   const { theme, toggleTheme } = useTheme();
+  const { t } = useI18n();
 
   return (
     <header className="marketing-header">
@@ -29,21 +32,13 @@ export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
         </a>
       </div>
       <nav className="marketing-nav-center">
-        <button onClick={() => onNavigate("faq")}>FAQ</button>
-        <button onClick={() => onNavigate("fees")}>Fees</button>
-        <button onClick={() => onNavigate("about")}>About</button>
-        <button onClick={() => onNavigate("case-studies")}>Case Studies</button>
+        <button onClick={() => onNavigate("faq")}>{t.nav.faq}</button>
+        <button onClick={() => onNavigate("fees")}>{t.nav.fees}</button>
+        <button onClick={() => onNavigate("about")}>{t.nav.about}</button>
+        <button onClick={() => onNavigate("case-studies")}>{t.nav.caseStudies}</button>
       </nav>
       <div className="marketing-nav-right">
-        <a
-          href="https://t.me/yekis_channel"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="telegram-link"
-          aria-label="Yekis Telegram Channel"
-        >
-          <MessageCircle size={18} />
-        </a>
+        <LanguageSelector variant="dropdown" />
         <button
           className="theme-toggle"
           onClick={toggleTheme}
@@ -54,10 +49,10 @@ export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
           {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
         </button>
         <button className="btn-ghost" onClick={() => onStart("login")}>
-          Sign in
+          {t.nav.signIn}
         </button>
         <button className="btn-primary" onClick={() => onStart("register")}>
-          Get started
+          {t.nav.getStarted}
         </button>
       </div>
     </header>

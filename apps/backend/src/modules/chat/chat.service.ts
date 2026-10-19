@@ -2,8 +2,8 @@
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
-import { randomInt } from "node:crypto";
-import { broadcastToConversation, sendToUser } from "../../lib/socket.js";
+import { randomBytes, randomInt } from "node:crypto";
+import { broadcastToConversation, broadcastToStaff, sendToUser } from "../../lib/socket.js";
 import { notificationQueue } from "../../queue/queues.js";
 
 // === MAIN FUNCTIONS ===
@@ -23,26 +23,37 @@ const USER_CARD_SELECT = {
 };
 
 export async function createGuestConversation(params: {
-  email: string;
+  email?: string;
   body: string;
 }) {
-  const email = params.email.trim().toLowerCase();
-  const body = params.body.trim();
-  if (!email.includes("@"))
+  // F-01: the address a signed-out visitor types is CONTACT INFORMATION, not an
+  // account key. The previous code used it to upsert a User, so naming an
+  // existing member's email minted a guest token whose `sub` was that member's
+  // real id — full account takeover with no credentials. Never look up or
+  // upsert a User by this value again; it is stored on the conversation and
+  // read by staff only.
+  const contactEmail = params.email?.trim().toLowerCase() || null;
+  if (contactEmail && !contactEmail.includes("@")) {
     throw new InvalidMessageError("Enter a valid email address.");
+  }
+  const body = params.body.trim();
   if (body.length < 1 || body.length > 5000)
     throw new InvalidMessageError(
       "Message must be between 1 and 5,000 characters.",
     );
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: {
-      email,
+  // A synthetic, non-routable identity per conversation. `guest.invalid` is
+  // reserved by RFC 2606 and can never be a real deliverable mailbox, so it can
+  // never collide with — or be mistaken for — a member's address. Flagged
+  // isGuestContact so requireAuth refuses it as an identity.
+  const user = await prisma.user.create({
+    data: {
+      email: `guest+${randomBytes(16).toString("hex")}@guest.invalid`,
       phone: `+2519${String(randomInt(10000000, 99999999))}`,
       passwordHash: "guest-support-contact",
+      passwordSetAt: null,
       role: "CLIENT",
+      isGuestContact: true,
       kyc: { create: { tier: "TIER_1", status: "PENDING" } },
       wallet: { create: { balanceMinor: 0 } },
       consents: { create: [{ purpose: "support_contact", granted: true }] },
@@ -57,10 +68,11 @@ export async function createGuestConversation(params: {
     participantsToCreate.push({ userId: assignedStaff.id });
   }
 
-  const conversation = await prisma.conversation.create({
+const conversation = await prisma.conversation.create({
     data: {
       creatorId: user.id,
       subject: "Website support request",
+      contactEmail,
       assignedStaffId: assignedStaff?.id ?? null,
       participants: { create: participantsToCreate },
       messages: { create: { senderId: user.id, body } },
@@ -68,11 +80,21 @@ export async function createGuestConversation(params: {
     include: { assignedStaff: { select: STAFF_SELECT } },
   });
 
+broadcastToStaff("chat:new_conversation", {
+    conversationId: conversation.id,
+    subject: conversation.subject,
+    status: conversation.status,
+    requesterEmail: contactEmail,
+    assignedStaffId: conversation.assignedStaffId,
+    preview: body,
+    createdAt: conversation.createdAt,
+  });
+
   // Notify all staff of new support inquiry
   void notifyStaffOfEvent({
     eventType: "SUPPORT_REQUEST_CREATED",
-    message: `New support request from ${email}: "${body.slice(0, 100)}"`,
-    metadata: { conversationId: conversation.id, email },
+    message: `New support request from ${contactEmail ?? "an anonymous visitor"}: "${body.slice(0, 100)}"`,
+    metadata: { conversationId: conversation.id, email: contactEmail },
   }).catch((err) => {
     // Non-blocking notification error
   });
@@ -137,7 +159,7 @@ async function getConversationAccess(conversationId: string, userId: string) {
     include: {
       participants: {
         where: { userId },
-        select: { id: true, lastReadAt: true },
+        select: { id: true, userId: true, lastReadAt: true },
       },
       assignedStaff: { select: STAFF_SELECT },
     },
@@ -184,10 +206,30 @@ export async function createConversation(params: {
       creatorId: params.userId,
       subject,
       assignedStaffId: assignedStaff?.id ?? null,
-      participants: { create: { userId: params.userId } },
+      participants: {
+        create: [
+          { userId: params.userId },
+          ...(assignedStaff ? [{ userId: assignedStaff.id }] : []),
+        ],
+      },
     },
     include: { assignedStaff: { select: STAFF_SELECT } },
   });
+
+  broadcastToStaff("chat:new_conversation", {
+    conversationId: conversation.id,
+    subject: conversation.subject,
+    status: conversation.status,
+    requesterId: params.userId,
+    assignedStaffId: conversation.assignedStaffId,
+    createdAt: conversation.createdAt,
+  });
+
+  void notifyStaffOfEvent({
+    eventType: "SUPPORT_REQUEST_CREATED",
+    message: `New support request: "${subject}"`,
+    metadata: { conversationId: conversation.id, userId: params.userId },
+  }).catch(() => undefined);
 
   await recordAuditEvent({
     userId: params.userId,
@@ -389,9 +431,9 @@ export async function listMessages(params: {
   conversationId: string;
   userId: string;
 }) {
-  await getConversationAccess(params.conversationId, params.userId);
+  const { isStaff } = await getConversationAccess(params.conversationId, params.userId);
   return prisma.chatMessage.findMany({
-    where: { conversationId: params.conversationId },
+    where: { conversationId: params.conversationId, ...(isStaff ? {} : { origin: "INTERNAL" }) },
     include: {
       sender: {
         select: {
@@ -415,6 +457,7 @@ export async function sendMessage(params: {
   userId: string;
   body: string;
   attachmentUrl?: string;
+  internal?: boolean;
 }) {
   const body = params.body.trim();
   if (body.length < 1 || body.length > 5000)
@@ -425,11 +468,31 @@ export async function sendMessage(params: {
     params.conversationId,
     params.userId,
   );
+  const origin = params.internal && isStaff ? "STAFF_INTERNAL" : "INTERNAL";
 
-  await prisma.$transaction(async (tx) => {
+  const createdMessageId = await prisma.$transaction(async (tx) => {
+    if (
+      conversation.assignedStaffId &&
+      !conversation.participants.some(
+        (p: { userId: string }) => p.userId === conversation.assignedStaffId,
+      )
+    ) {
+      await tx.conversationParticipant.upsert({
+        where: {
+          conversationId_userId: {
+            conversationId: conversation.id,
+            userId: conversation.assignedStaffId,
+          },
+        },
+        create: { conversationId: conversation.id, userId: conversation.assignedStaffId },
+        update: {},
+      });
+    }
     if (
       isStaff &&
-      !conversation.participants.find((p: { id: string }) => p.id)
+      !conversation.participants.some(
+        (p: { userId: string }) => p.userId === params.userId,
+      )
     ) {
       await tx.conversationParticipant.upsert({
         where: {
@@ -442,7 +505,7 @@ export async function sendMessage(params: {
         update: {},
       });
     }
-    await tx.chatMessage.create({
+    const created = await tx.chatMessage.create({
       data: {
         conversationId: conversation.id,
         senderId: params.userId,
@@ -450,17 +513,18 @@ export async function sendMessage(params: {
         ...(params.attachmentUrl
           ? { attachmentUrl: params.attachmentUrl }
           : {}),
+        origin,
       },
     });
     await tx.conversation.update({
       where: { id: conversation.id },
       data: { updatedAt: new Date() },
     });
+    return created.id;
   });
 
-  const createdMessage = await prisma.chatMessage.findFirstOrThrow({
-    where: { conversationId: conversation.id, senderId: params.userId },
-    orderBy: { createdAt: "desc" },
+  const createdMessage = await prisma.chatMessage.findUniqueOrThrow({
+    where: { id: createdMessageId },
     include: {
       sender: {
         select: {
@@ -483,13 +547,13 @@ export async function sendMessage(params: {
   // Real-time push notification to other participants' private user socket channels
   const allParticipants = await prisma.conversationParticipant.findMany({
     where: { conversationId: conversation.id },
-    select: { userId: true },
+    include: { user: { select: { staffRole: true } } },
   });
   for (const p of allParticipants) {
-    if (p.userId !== params.userId) {
+    if (p.userId !== params.userId && (origin !== "STAFF_INTERNAL" || p.user.staffRole)) {
       sendToUser(p.userId, "chat:new_message", {
+        ...createdMessage,
         conversationId: conversation.id,
-        message: createdMessage,
       });
       
       const senderName = createdMessage.sender.firstName || createdMessage.sender.displayName || "Someone";
@@ -835,6 +899,8 @@ export async function listStaffConversations(params?: {
   search?: string;
   status?: string;
   staffId?: string;
+  assignment?: string;
+  sort?: string;
 }) {
   const page = Math.max(1, params?.page || 1);
   const limit = Math.max(1, Math.min(100, params?.limit || 20));
@@ -849,6 +915,12 @@ export async function listStaffConversations(params?: {
 
   // If a staffId is provided, only show that staff member's conversations
   if (params?.staffId) {
+    where.assignedStaffId = params.staffId;
+  }
+
+  if (params?.assignment === "unassigned") {
+    where.assignedStaffId = null;
+  } else if (params?.assignment === "mine" && params.staffId) {
     where.assignedStaffId = params.staffId;
   }
 
@@ -872,7 +944,12 @@ export async function listStaffConversations(params?: {
           select: { body: true, createdAt: true },
         },
       },
-      orderBy: { updatedAt: "asc" },
+      orderBy:
+        params?.sort === "oldest"
+          ? { updatedAt: "asc" }
+          : params?.sort === "waiting"
+            ? { createdAt: "asc" }
+            : { updatedAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),

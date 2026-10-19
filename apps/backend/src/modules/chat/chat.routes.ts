@@ -30,7 +30,7 @@ import {
   authorizeAttachmentAccess,
 } from "./chat.service.js";
 import { issueGuestSupportToken } from "./guestSupportToken.js";
-import { requireGuestChatAccess, requireAuthAllowingGuest } from "../../middleware/auth.js";
+import { requireGuestChatAccess, requireMemberSession } from "../../middleware/auth.js";
 
 export const chatRouter = Router();
 
@@ -78,9 +78,10 @@ const DirectConversationInput = z.object({
 const MessageInput = z.object({
   body: z.string().min(1).max(5000),
   attachmentUrl: z.string().optional(),
+  internal: z.boolean().optional(),
 });
 const GuestInput = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
   body: z.string().min(1).max(5000),
 });
 
@@ -200,6 +201,7 @@ chatRouter.post(
           userId: req.user!.id,
           body: parsed.data.body,
           attachmentUrl: parsed.data.attachmentUrl,
+          internal: parsed.data.internal,
         }),
       );
     } catch (err) {
@@ -212,7 +214,7 @@ chatRouter.post(
 
 chatRouter.post(
   "/upload",
-  requireAuthAllowingGuest,
+  requireMemberSession,
   attachmentUploadLimiter,
   upload.single("file"),
   async (req: AuthedRequest, res) => {
@@ -242,7 +244,7 @@ chatRouter.post(
   },
 );
 
-chatRouter.get("/attachments/:key(*)", requireAuthAllowingGuest, async (req: AuthedRequest, res) => {
+chatRouter.get("/attachments/:key(*)", requireMemberSession, async (req: AuthedRequest, res) => {
   const rawKey = req.params.key as string;
   let key: string;
   try {
@@ -435,6 +437,8 @@ chatRouter.get(
         : undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
+      const assignment = req.query.assignment as string | undefined;
+      const sort = req.query.sort as string | undefined;
       // Full staff can see all queues or filter; others see their own assigned
       const isFullStaff = [
         "ADMIN",
@@ -445,8 +449,9 @@ chatRouter.get(
       const staffId = isFullStaff
         ? (req.query.staffId as string | undefined)
         : req.user!.id;
+      const effectiveStaffId = assignment === "mine" ? req.user!.id : staffId;
       return res.json(
-        await listStaffConversations({ page, limit, search, status, staffId }),
+        await listStaffConversations({ page, limit, search, status, staffId: effectiveStaffId, assignment, sort }),
       );
     } catch (err) {
       logger.error({ err }, "Failed to list staff chat queue");

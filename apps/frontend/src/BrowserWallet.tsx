@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { api, type TopUpRequest, type WalletResponse } from "./api/client";
 import { events } from "./analytics";
+import { stashPendingTopUp } from "./PaymentReturn";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -49,7 +50,6 @@ export function BrowserWallet({
   const [checkoutFallback, setCheckoutFallback] = useState<{
     amount: string;
     provider: PaymentRail;
-    reason: string;
   } | null>(null);
 
   // Manual attachment on existing checkout
@@ -92,11 +92,15 @@ export function BrowserWallet({
     setMessage("");
     setCheckoutFallback(null);
     try {
-      const { redirectUrl } = await api.initiateCheckoutTopUp(
-        Math.round(amountNum * 100),
-        checkoutRail,
-      );
-      if (redirectUrl) {
+const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
+      Math.round(amountNum * 100),
+      checkoutRail,
+    );
+    // Stash the id before leaving. The provider does not reliably echo it back
+    // on the redirect, and without it the return page has no way to verify
+    // anything -- which is how it ended up asserting success unconditionally.
+    if (topUpId) stashPendingTopUp(topUpId);
+    if (redirectUrl) {
         const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } })?.Telegram?.WebApp;
         if (tg && typeof tg.openLink === "function") {
           tg.openLink(redirectUrl);
@@ -111,12 +115,15 @@ export function BrowserWallet({
         }, 1500);
       }
     } catch (err) {
-      const errText = err instanceof Error ? err.message : "Payment gateway request failed";
-      setError(`Automated checkout failed: ${errText}`);
+      // Provider/config details are for operators, never the wallet UI. The
+      // checkout endpoint may fail after an upstream order was created, so
+      // don't claim that no payment was started or encourage blind retries.
+      setError(
+        "Automatic checkout couldn’t be completed. Check Recent top-ups before trying again, or choose manual transfer.",
+      );
       setCheckoutFallback({
         amount: amount.trim(),
         provider: checkoutRail,
-        reason: errText,
       });
     } finally {
       setIsSubmitting(false);
@@ -463,16 +470,12 @@ export function BrowserWallet({
                   </button>
                   <button
                     type="button"
+                    disabled
+                    title="CBE Birr automated checkout is not connected yet."
                     className={
-                      checkoutRail === "CBE_BIRR"
-                        ? "payment-account selected"
-                        : "payment-account"
+                      "payment-account"
                     }
-                    onClick={() => {
-                      setCheckoutRail("CBE_BIRR");
-                      setCheckoutFallback(null);
-                    }}
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
+                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
                   >
                     <img
                       src="/payment/cbe payment.jpg"
@@ -486,21 +489,17 @@ export function BrowserWallet({
                     />
                     <div className="payment-account-text" style={{ textAlign: "center" }}>
                       <strong>CBE Birr</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Bank gateway</span>
+                      <span style={{ fontSize: "0.72rem" }}>Coming later</span>
                     </div>
                   </button>
                   <button
                     type="button"
+                    disabled
+                    title="M-Pesa automated checkout is not connected yet."
                     className={
-                      checkoutRail === "M_PESA"
-                        ? "payment-account selected"
-                        : "payment-account"
+                      "payment-account"
                     }
-                    onClick={() => {
-                      setCheckoutRail("M_PESA");
-                      setCheckoutFallback(null);
-                    }}
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
+                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
                   >
                     <img
                       src="/payment/mpesa.svg"
@@ -514,7 +513,7 @@ export function BrowserWallet({
                     />
                     <div className="payment-account-text" style={{ textAlign: "center" }}>
                       <strong>M-Pesa</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Safaricom STK</span>
+                      <span style={{ fontSize: "0.72rem" }}>Coming later</span>
                     </div>
                   </button>
                 </div>
@@ -549,7 +548,7 @@ export function BrowserWallet({
                           Automated Gateway Issue — Manual Verification Available
                         </strong>
                         <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                          The automated gateway for {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} is temporarily unreachable. You don't have to wait or suffer! Switch to manual verification to transfer directly and submit your receipt for prompt staff credit.
+                          Automatic {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} checkout could not be completed. Check Recent top-ups before retrying so you don’t accidentally pay twice. You can also use manual verification and submit your receipt.
                         </p>
                       </div>
                     </div>

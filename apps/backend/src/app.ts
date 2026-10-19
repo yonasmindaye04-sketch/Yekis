@@ -1,4 +1,8 @@
 ﻿// === IMPORTS ===
+// Side-effect import: makes BigInt survive JSON.stringify, so a Prisma row
+// holding `telegramUserId` cannot turn into a 500 (or a silently dropped
+// response) the moment a handler returns it. Defined once in lib/json.ts.
+import "./lib/json.js";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -30,23 +34,23 @@ import { env } from "./config/env.js";
 export function buildApp() {
   const app = express();
 
-  // Behind a reverse proxy (ngrok in dev, nginx/ALB in prod) Express must be
-  // told how many hops to trust, otherwise req.ip is the proxy's IP â€” which
+  // Behind a reverse proxy (cloudflared in dev, nginx/ALB in prod) Express must be
+  // told how many hops to trust, otherwise req.ip is the proxy's IP — which
   // breaks rate limiting (all users share one bucket) and audit attribution.
-  // Set TRUST_PROXY=1 for ngrok; unset it when running directly on localhost.
-  if (env.TRUST_PROXY !== undefined) {
-    app.set("trust proxy", env.TRUST_PROXY);
+  //
+  // TRUST_PROXY_HOPS is a COUNT. Express then walks X-Forwarded-For
+  // right-to-left that many times and ignores anything further left. Set it
+  // too high and a client can prepend forged addresses to choose its own rate
+  // limit bucket; too low and every client collapses onto the proxy address.
+  // Unset means "no proxy in front", which is correct for bare localhost.
+  if (env.TRUST_PROXY_HOPS !== undefined) {
+    app.set("trust proxy", env.TRUST_PROXY_HOPS);
   }
 
-  app.use(
-    helmet({
-      contentSecurityPolicy: false,
-      crossOriginEmbedderPolicy: false,
-      crossOriginResourcePolicy: false,
-      frameguard: false,
-    }),
-  );
-  app.use(cors()); // tighten to your actual frontend origin(s) before production
+  app.use(helmet());
+  // Keep browser access explicit so future cookie-based flows cannot silently
+  // become cross-origin readable.
+  app.use(cors({ origin: env.FRONTEND_URL, credentials: false }));
   app.use(pinoHttp({ logger })); // doesn't touch the body, safe to run before the raw-body webhook routes
 
   // Payment webhooks MUST be mounted before express.json() â€” their routes
@@ -71,6 +75,16 @@ export function buildApp() {
       max: env.NODE_ENV === "production" ? 2000 : 10000,
       standardHeaders: true,
       legacyHeaders: false,
+      // RATE_LIMIT_DISABLED, not NODE_ENV. A bare NODE_ENV check would let any
+      // environment that happened to set NODE_ENV=test switch the abuse control
+      // off; the flag is explicit, defaults to false, and assertProductionSafety
+      // refuses it in production. tests/setup-env.ts is the only thing that sets
+      // it, because every suite builds its own app inside one process and the
+      // shared counter otherwise starves whichever suite runs last.
+      skip: () => env.RATE_LIMIT_DISABLED,
+      // Lets a suite that exercises the limiter isolate its counters.
+      keyGenerator: (req) =>
+        `${env.RATE_LIMIT_KEY_PREFIX}${req.ip ?? "unknown"}`,
       message: {
         error: "TOO_MANY_REQUESTS",
         message: "Too many requests, please try again in a moment.",
@@ -118,8 +132,11 @@ export function buildApp() {
       logger.error({ err, path: req.path }, "Unhandled error");
       res.status(500).json({ 
         error: "INTERNAL_ERROR",
-        message: err.message,
-        stack: env.NODE_ENV === "development" ? err.stack : undefined 
+        message:
+          env.NODE_ENV === "development"
+            ? err.message
+            : "An unexpected error occurred.",
+        stack: env.NODE_ENV === "development" ? err.stack : undefined,
       });
     },
   );

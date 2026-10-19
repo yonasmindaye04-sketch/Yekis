@@ -1,4 +1,4 @@
-﻿
+
 // === INTERFACES & TYPES ===
 export interface TelegramAuthResponse {
   accessToken: string;
@@ -246,6 +246,8 @@ export interface TransactionFlag {
 
 export interface WalletResponse {
   balanceMinor: number;
+  pendingMinor?: number;
+  availableMinor?: number;
 }
 
 export interface ChatConversation {
@@ -582,14 +584,28 @@ class ApiClient {
       if (response.status === 429) {
         throw new Error("Too many requests. Please wait a moment before trying again.");
       }
-      let error: { message?: string; error?: string };
+      let error: {
+        message?: string;
+        error?: string;
+        // F-02: the KYC gate returns a machine-readable next step so the UI can
+        // offer "Verify your identity" instead of rendering a dead end.
+        nextAction?: { type: string; path: string };
+      };
       try {
         error = await response.json();
       } catch {
         const text = await response.text().catch(() => "");
         error = { error: text || `HTTP ${response.status}` };
       }
-      throw new Error(error.message || error.error || `HTTP ${response.status}`);
+      const thrown = new Error(
+        error.message || error.error || `HTTP ${response.status}`,
+      ) as Error & {
+        code?: string;
+        nextAction?: { type: string; path: string };
+      };
+      thrown.code = error.error;
+      if (error.nextAction) thrown.nextAction = error.nextAction;
+      throw thrown;
     }
 
     if (response.status === 204) {
@@ -793,7 +809,7 @@ class ApiClient {
     });
   }
 
-  async createGuestSupport(email: string, body: string): Promise<{
+  async createGuestSupport(email: string | undefined, body: string): Promise<{
     id: string;
     subject: string;
     status: string;
@@ -801,7 +817,7 @@ class ApiClient {
     /** Scoped to this conversation only â€” see guestSupportToken.ts. */
     accessToken: string;
   }> {
-    return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ email, body }) });
+    return this.request("/api/v1/chat/guest", { method: "POST", body: JSON.stringify({ ...(email ? { email } : {}), body }) });
   }
 
   /** Reads a guest thread with the scoped token from createGuestSupport. */
@@ -837,10 +853,10 @@ class ApiClient {
     return this.request(`/api/v1/chat/conversations/${conversationId}/messages`);
   }
 
-  async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string): Promise<ChatMessage> {
+  async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string, internal = false): Promise<ChatMessage> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ body, attachmentUrl }),
+      body: JSON.stringify({ body, attachmentUrl, internal }),
     });
   }
 
@@ -902,12 +918,14 @@ class ApiClient {
     return this.request(`/api/v1/chat/conversations/${conversationId}/read`, { method: "POST" });
   }
 
-  async getStaffConversations(params?: { page?: number; pageSize?: number; search?: string; status?: string }): Promise<PaginatedResponse<StaffConversation>> {
+  async getStaffConversations(params?: { page?: number; pageSize?: number; search?: string; status?: string; assignment?: string; sort?: string }): Promise<PaginatedResponse<StaffConversation>> {
     const searchParams = new URLSearchParams();
     if (params?.page) searchParams.set("page", String(params.page));
     if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
     if (params?.search) searchParams.set("search", params.search);
     if (params?.status) searchParams.set("status", params.status);
+    if (params?.assignment) searchParams.set("assignment", params.assignment);
+    if (params?.sort) searchParams.set("sort", params.sort);
     return this.request(`/api/v1/chat/admin/conversations?${searchParams.toString()}`);
   }
 
@@ -915,6 +933,12 @@ class ApiClient {
     return this.request(`/api/v1/chat/admin/conversations/${conversationId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    });
+  }
+
+  async claimConversation(conversationId: string): Promise<StaffConversation> {
+    return this.request(`/api/v1/chat/admin/conversations/${conversationId}/claim`, {
+      method: "POST",
     });
   }
 
@@ -1010,6 +1034,90 @@ class ApiClient {
     return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
   }
 
+  /**
+   * Requests an SMS code for a phone number.
+   *
+   * Both verification endpoints are unauthenticated on purpose: the primary flow
+   * is registration, where the code is sent and checked before the account
+   * exists. Neither reveals whether a number is already registered.
+   *
+   * `devCode` is only ever present outside production, and is shown by the UI
+   * in that case so a developer can complete the flow without a handset.
+   */
+  async requestPhoneCode(phone: string): Promise<{
+    sent: boolean;
+    expiresAt: string;
+    retryAfterSec: number;
+    devCode?: string;
+  }> {
+    return this.request("/api/v1/auth/phone/code", {
+      method: "POST",
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async verifyPhoneCode(
+    phone: string,
+    code: string,
+  ): Promise<{ verified: true }> {
+    return this.request("/api/v1/auth/phone/verify", {
+      method: "POST",
+      body: JSON.stringify({ phone, code }),
+    });
+  }
+
+  /**
+   * Starts the Fayda eSignet biometric check and returns the provider URL to
+   * send the user to.
+   *
+   * This is the only implemented identity path: esignet.client.ts does a real
+   * OIDC Pushed Authorization Request, exchanges the code, and decrypts the
+   * nested JWE/JWS. Until now nothing in the frontend called it, so the working
+   * integration was unreachable and the UI called a route that did not exist.
+   */
+  async initiateFaydaVerification(): Promise<{
+    /** Named authorizeUrl by the API, on both the real and the mock branch. */
+    authorizeUrl: string;
+    requestUri: string;
+    state: string;
+    /** Public OIDC client id. Needed to build the PAR redirect. */
+    clientId?: string;
+  }> {
+    return this.request("/api/v1/kyc/fayda/initiate", { method: "POST" });
+  }
+
+  /**
+   * Builds the browser redirect for a Pushed Authorization Request.
+   *
+   * A PAR is two steps by design: the request_uri is obtained server-side so the
+   * authorization parameters never travel in a URL the user could be tricked
+   * into sharing, and the browser then goes to the authorize endpoint carrying
+   * that reference. Returns null when the pieces needed to do so are missing,
+   * rather than a URL that would fail.
+   */
+  buildFaydaRedirectUrl(res: {
+    authorizeUrl: string;
+    requestUri: string;
+    clientId?: string;
+  }): string | null {
+    if (!res.requestUri || !res.clientId) return null;
+    const url = new URL(res.authorizeUrl);
+    url.searchParams.set("request_uri", res.requestUri);
+    url.searchParams.set("client_id", res.clientId);
+    return url.toString();
+  }
+
+  /** Completes the eSignet redirect. Call with the code and state Fayda returns. */
+  async completeFaydaVerification(
+    code: string,
+    state: string,
+  ): Promise<{ tier: string; status: string }> {
+    return this.request("/api/v1/kyc/fayda/callback", {
+      method: "POST",
+      body: JSON.stringify({ code, state }),
+    });
+  }
+
   // Wallet / Top-ups
   async getWallet(): Promise<WalletResponse> {
     return this.request("/api/v1/escrow/wallet");
@@ -1034,6 +1142,24 @@ class ApiClient {
     return this.request(`/api/v1/wallet/topups/checkout/${topUpId}/simulate-success`, {
       method: "POST",
     });
+  }
+
+  /**
+   * Status of one of this user's own top-ups.
+   *
+   * `credited` is the only field that should decide whether the UI tells a user
+   * their money arrived. Everything else is detail for the copy.
+   */
+  async getTopUpStatus(topUpId: string): Promise<{
+    id: string;
+    amountMinor: number;
+    provider: string;
+    status: "PENDING" | "CHECKOUT_PENDING" | "APPROVED" | "REJECTED" | "FLAGGED";
+    providerTransactionId: string | null;
+    createdAt: string;
+    credited: boolean;
+  }> {
+    return this.request(`/api/v1/wallet/topups/${topUpId}`);
   }
 
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
@@ -1318,6 +1444,14 @@ class ApiClient {
   async refreshFeaturedCarousel(): Promise<unknown> {
     return this.request(`/api/v1/featured/staff/refresh`, { method: "POST" });
   }
+  async pinFeaturedUser(userId: string, category: string, notes?: string): Promise<unknown> {
+    return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });
+  }
+  async getBotHealth(): Promise<unknown> { return this.request("/api/v1/telegram/health"); }
+  async getBotInfo(): Promise<unknown> { return this.request("/api/v1/telegram/info"); }
+  async deleteBotWebhook(): Promise<unknown> { return this.request("/api/v1/telegram/delete-webhook", { method: "POST" }); }
+  async startBotPolling(): Promise<unknown> { return this.request("/api/v1/telegram/start-polling", { method: "POST" }); }
+  async stopBot(): Promise<unknown> { return this.request("/api/v1/telegram/stop", { method: "POST" }); }
   
   // --- Reviews ---
   async submitReview(contractId: string, rating: number, comment: string): Promise<unknown> {
@@ -1334,21 +1468,49 @@ class ApiClient {
   }
 
   // --- Portfolio ---
+  //
+  // These four called /api/v1/portfolios/... (plural) against a router mounted
+  // at /api/v1/portfolio (singular), so every one of them was a 404. The shapes
+  // were wrong too, not just the paths: the writes are JSON against
+  // CreatePortfolioItemInput / UpdatePortfolioItemInput, while createPortfolioItem
+  // was posting multipart FormData. Fixing only the path would have traded a 404
+  // for a 400 VALIDATION_ERROR.
+  //
+  // The collection is "me" for writes and "users/:id/portfolio" for reads,
+  // because reads are another user's public portfolio and writes are necessarily
+  // the caller's own.
   async getPortfolio(userId: string): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${userId}`);
+    return this.request(`/api/v1/portfolio/users/${userId}/portfolio`);
   }
-  async createPortfolioItem(data: FormData): Promise<unknown> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, { method: "POST", headers, body: data });
-    if (!response.ok) { const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" })); throw new Error(error.message || error.error || `HTTP ${response.status}`); }
-    return response.json();
+  async createPortfolioItem(data: {
+    title: string;
+    description?: string;
+    thumbnailUrl?: string;
+    projectUrl?: string;
+    displayOrder?: number;
+  }): Promise<unknown> {
+    return this.request(`/api/v1/portfolio/me`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
-  async updatePortfolioItem(itemId: string, data: unknown): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
+  async updatePortfolioItem(
+    itemId: string,
+    data: {
+      title?: string;
+      description?: string;
+      thumbnailUrl?: string;
+      projectUrl?: string;
+      displayOrder?: number;
+    },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/portfolio/me/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
   async deletePortfolioItem(itemId: string): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${itemId}`, { method: "DELETE" });
+    return this.request(`/api/v1/portfolio/me/${itemId}`, { method: "DELETE" });
   }
 
   // --- Staff Profile Reports ---
@@ -1420,6 +1582,23 @@ class ApiClient {
   async adminGetContract(contractId: string): Promise<unknown> {
     return this.request(`/api/v1/admin/contracts/${contractId}`);
   }
+  async setStaffStatus(userId: string, suspended: boolean, reason?: string): Promise<{ id: string; isSuspended: boolean; staffRole: string }> {
+    return this.request(`/api/v1/admin/staff/${userId}/status`, { method: "POST", body: JSON.stringify({ suspended, reason }) });
+  }
+  async adminListGigs(params?: { page?: number; limit?: number; q?: string; status?: string }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.q) qs.set("q", params.q);
+    if (params?.status) qs.set("status", params.status);
+    return this.request(`/api/v1/admin/gigs?${qs.toString()}`);
+  }
+  async adminModerateGig(gigId: string, status: "ACTIVE" | "REJECTED" | "PAUSED" | "ARCHIVED", reason?: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/gigs/${gigId}/moderation`, {
+      method: "POST",
+      body: JSON.stringify({ status, reason }),
+    });
+  }
 
   // --- Admin finance (Phase 3) ---
   async adminListPayments(params?: { page?: number; limit?: number; q?: string; status?: string; provider?: string }): Promise<unknown> {
@@ -1483,6 +1662,24 @@ class ApiClient {
   }
   async adminSystemHealth(): Promise<unknown> {
     return this.request("/api/v1/admin/monitoring/health");
+  }
+  async adminReleaseEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/release`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminHoldEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/hold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async adminUnholdEscrow(milestoneId: string, reason: string): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/unhold`, { method: "POST", body: JSON.stringify({ reason }) });
+  }
+  async getWithholdingReports(params?: { page?: number; limit?: number }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    return this.request(`/api/v1/finance/withholding?${qs.toString()}`);
+  }
+  async fileWithholdingReport(reportId: string, eraReferenceNumber: string): Promise<unknown> {
+    return this.request(`/api/v1/finance/withholding/${reportId}/file`, { method: "POST", body: JSON.stringify({ eraReferenceNumber }) });
   }
 
   // --- Gigs (Fiverr-style service packages) ---

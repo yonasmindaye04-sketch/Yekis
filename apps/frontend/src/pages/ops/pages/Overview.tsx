@@ -28,10 +28,12 @@ import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
 import { useOpsUi } from "../opsUiContext";
 import type { OpsPageId } from "../opsNav";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const ESC_C: Record<string, string> = {
   ESCROW_HELD: "#0284c7",
-  WORK_IN_PROGRESS: "#4f46e5",
+  WORK_IN_PROGRESS: "#16a34a",
   SUBMITTED_FOR_REVIEW: "#d97706",
   DISPUTED: "#dc2626",
   RELEASED: "#059669",
@@ -44,7 +46,7 @@ const actTone = (a: string): [string, typeof Wallet] =>
       ? ["#dc2626", XCircle]
       : a.includes("ESCROW")
         ? ["#0284c7", DollarSign]
-        : ["#4f46e5", Activity];
+        : ["#16a34a", Activity];
 
 export default function Overview() {
   const ui = useOpsUi();
@@ -97,16 +99,16 @@ export default function Overview() {
         title="Command Center"
         sub={`Platform health, financial controls and staff review queues · updated ${dts(data.health.checkedAt)}`}
         right={
-          <button className="btn btn-ghost" onClick={reload}>
+          <Button variant="outline" onClick={reload}>
             <RefreshCw size={14} /> Refresh
-          </button>
+          </Button>
         }
       />
 
       {/* Stat cards carry no trend or sparkline: the backend exposes aggregate
           totals only, with no time-series endpoint to derive a real trend from. */}
       <div className="grid g4" style={{ marginBottom: 16 }}>
-        <StatCard label="Total Users" value={m.totalUsers.toLocaleString()} icon={Users} color="#4f46e5" />
+        <StatCard label="Total Users" value={m.totalUsers.toLocaleString()} icon={Users} color="#16a34a" />
         <StatCard label="Active Contracts" value={String(m.activeContracts)} icon={Briefcase} color="#2563eb" />
         <StatCard label="Funds in Escrow" value={fmt(m.fundsInEscrowMinor)} icon={DollarSign} color="#059669" />
         <StatCard label="Pending Payouts" value={String(m.pendingPayouts)} icon={Wallet} color="#d97706" />
@@ -126,28 +128,28 @@ export default function Overview() {
       />
 
       <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div className="sec-title">
             <BarChart3 size={16} /> Transaction Volume — last 14 days{" "}
             <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
               ETB millions / day
             </span>
           </div>
-          <AreaChart labels={data.series.volume14.labels} values={data.series.volume14.values} color="#4f46e5" />
+          <AreaChart labels={data.series.volume14.labels} values={data.series.volume14.values} color="#16a34a" />
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Derived from the most recent 100 payment records — earlier days fall away as volume grows.
           </div>
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">
             <DollarSign size={16} /> Escrow by State
           </div>
           {escSegs.length ? <Donut segs={escSegs} centerSub="in escrow" /> : <Empty icon={DollarSign}>No escrow rows.</Empty>}
-        </div>
+        </Card>
       </div>
 
       <div className="grid gc-1-1" style={{ marginBottom: 16 }}>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div className="sec-title">
             <Wallet size={16} /> Payouts vs Refunds — weekly
           </div>
@@ -162,8 +164,8 @@ export default function Overview() {
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Weekly buckets from the most recent 100 payouts and escrow records.
           </div>
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">
             <Activity size={16} /> Review Workload — open items per queue
           </div>
@@ -171,16 +173,16 @@ export default function Overview() {
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Bars are relative to the busiest queue — rebalance staff where the bar is longest.
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="grid gc-2-1">
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div className="sec-title" style={{ marginBottom: 0 }}>Recent Activity</div>
-            <button className="btn btn-ghost btn-sm" onClick={() => ui.navigate("audit")}>
+            <Button variant="ghost" size="sm" onClick={() => ui.navigate("audit")}>
               View all
-            </button>
+            </Button>
           </div>
           {data.activity.map((a, i) => {
             const [fg, Icon] = actTone(a.a);
@@ -199,8 +201,8 @@ export default function Overview() {
               </div>
             );
           })}
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">Work Queues</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {qa.map(([pg, l, n, Icon, c]) => (
@@ -215,7 +217,7 @@ export default function Overview() {
               </button>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

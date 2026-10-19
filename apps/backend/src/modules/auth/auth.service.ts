@@ -4,10 +4,13 @@ import { SignJWT, jwtVerify } from "jose";
 import { randomBytes, createHash } from "crypto";
 import type { RegisterInput, LoginInput } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
+import type { AuthMethod } from "./auth-methods.js";
+import { hasRecentVerifiedCode } from "./phone-verification.service.js";
 
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
@@ -18,9 +21,52 @@ export class DuplicateUserError extends Error {}
 export class InvalidCredentialsError extends Error {}
 export class InvalidTokenError extends Error {}
 
+async function getSessionVersion(userId: string): Promise<number> {
+  try {
+    const rows = await prisma.$queryRaw<Array<{ sessionVersion: number }>>(
+      Prisma.sql`SELECT "sessionVersion" FROM "User" WHERE id = ${userId}`,
+    );
+    return rows[0]?.sessionVersion ?? 0;
+  } catch (err) {
+    // The additive migration may be applied after the application starts.
+    // Keep authentication available during that rollout; once the column is
+    // present, the version check is enforced normally.
+    logger.warn({ err }, "Session-version column unavailable; using version 0");
+    return 0;
+  }
+}
+
 function calculateAge(dob: Date): number {
   const diff = Date.now() - dob.getTime();
   return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+}
+
+/**
+ * Revokes every live session for a user by bumping `sessionVersion`.
+ *
+ * Both access and refresh tokens carry the version they were minted at, and
+ * `requireAuth` / `refreshSession` compare it against the stored value. One
+ * increment therefore retires every outstanding token at once — access tokens
+ * on their next request, refresh tokens on their next refresh.
+ *
+ * This is the only revocation primitive in the system, and it is deliberately
+ * coarse: it cannot end one session without ending all of them. That is the
+ * right trade for a shared or suspected-compromised machine (a user clicking
+ * "log out" expects the next person at the keyboard to be logged out), but it
+ * does mean a logout on a phone also signs the user out of their laptop. A
+ * per-`sid` denylist would be the fix if per-device logout is ever needed.
+ */
+export async function revokeAllSessions(userId: string): Promise<number> {
+  const rows = await prisma.$executeRaw`
+    UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${userId}
+  `;
+  logger.info({ userId, rows }, "Revoked all sessions for user");
+  return rows;
+}
+
+/** Ends the caller's session. See `revokeAllSessions` for the semantics. */
+export async function logoutSession(userId: string): Promise<void> {
+  await revokeAllSessions(userId);
 }
 
 export async function registerUser(input: RegisterInput) {
@@ -41,11 +87,17 @@ export async function registerUser(input: RegisterInput) {
 
   const passwordHash = await argon2.hash(input.password);
 
+  // The OTP was verified while the account did not exist yet, so this is where
+  // the proof attaches. Bounded by the code's own lifetime: a number proven
+  // weeks ago says nothing about who is registering now.
+  const phoneVerifiedAt = (await hasRecentVerifiedCode(input.phone)) ? new Date() : null;
+
   const user = await prisma.$transaction(async (tx) => {
     const created = await tx.user.create({
       data: {
         email: input.email,
         phone: input.phone,
+        phoneVerifiedAt,
         passwordHash,
         // Marks the account as password-owned: a later social sign-in that
         // merely matches this email must not be merged into it.
@@ -94,29 +146,60 @@ export async function registerUser(input: RegisterInput) {
   return user;
 }
 
+/**
+ * Mints an access/refresh pair.
+ *
+ * `auth_time` is the Unix time of the last moment a credential was actually
+ * presented or proven — NOT the time this token was signed. Step-up checks read
+ * `auth_time` and must never read `iat`: `iat` moves forward on every silent
+ * refresh, so an `iat`-based check would happily pass a session whose owner
+ * last typed a password an hour ago and merely left a tab open.
+ *
+ * `amr` records which methods were exercised in that one credential event.
+ * Both claims are copied VERBATIM by refreshSession, so refreshing never counts
+ * as re-authentication.
+ *
+ * `carryOver` is supplied only by refreshSession. Omitting it is what makes
+ * this a credential event, which resets auth_time to now.
+ */
 export async function createAuthTokens(
   user: {
     id: string;
     role: string;
     ucid: string | null;
     staffRole?: string | null;
+    sessionVersion?: number;
   },
-  originalIat?: number
+  amr: AuthMethod[],
+  carryOver?: { authTime?: number; sessionIat?: number },
 ) {
+  const now = Math.floor(Date.now() / 1000);
+  const authTime = carryOver?.authTime ?? now;
+  const sessionIat = carryOver?.sessionIat ?? now;
+  const sid = randomBytes(16).toString("base64url");
+  const sessionVersion = await getSessionVersion(user.id);
+
   const accessToken = await new SignJWT({
     role: user.role,
     staffRole: user.staffRole ?? null,
+    session_version: sessionVersion,
+    sid,
+    auth_time: authTime,
+    amr,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
+    .setIssuedAt(now)
     .setExpirationTime(env.JWT_ACCESS_TTL)
     .sign(accessSecret);
 
-  const iat = originalIat ?? Math.floor(Date.now() / 1000);
-
-  const refreshToken = await new SignJWT({ iat })
+  // The refresh token carries the SAME auth_time/amr so a rotation chain cannot
+  // launder a weak factor into a strong-looking session. Its `iat` is the
+  // session start, which is what the absolute max-age check below reads.
+  const refreshToken = await new SignJWT({ sid, auth_time: authTime, amr, session_version: sessionVersion })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
+    .setIssuedAt(sessionIat)
     .setExpirationTime(env.JWT_REFRESH_TTL)
     .sign(refreshSecret);
 
@@ -191,7 +274,7 @@ export async function loginUser(input: LoginInput) {
     throw new InvalidCredentialsError();
   }
 
-  const result = await createAuthTokens(user);
+  const result = await createAuthTokens(user, ["pwd"]);
 
   await recordAuditEvent({
     userId: user.id,
@@ -216,18 +299,42 @@ export async function loginUser(input: LoginInput) {
 export async function refreshSession(refreshToken: string) {
   let userId: string;
   let originalIat: number | undefined;
+  let carriedAuthTime: number | undefined;
+  let carriedAmr: AuthMethod[] = [];
+  let sessionVersion: number | undefined;
   try {
     const { payload } = await jwtVerify(refreshToken, refreshSecret);
     if (typeof payload.sub !== "string") throw new Error("missing sub");
     userId = payload.sub;
     originalIat = payload.iat as number | undefined;
+    carriedAuthTime =
+      typeof payload.auth_time === "number" ? payload.auth_time : undefined;
+    carriedAmr = Array.isArray(payload.amr)
+      ? (payload.amr as AuthMethod[])
+      : [];
+    sessionVersion = typeof payload.session_version === "number" ? payload.session_version : undefined;
   } catch {
     throw new InvalidTokenError("Refresh token is invalid or expired.");
+  }
+
+  // A token minted before auth_time existed has no credential timestamp. We do
+  // NOT fall back to `iat` — that would let a 30-day-old session look freshly
+  // authenticated. The session stays usable; step-up simply demands a real
+  // sign-in, which is the fail-closed outcome.
+  if (carriedAuthTime === undefined) {
+    logger.warn(
+      { userId },
+      "Refresh token predates auth_time claims; step-up will require re-authentication",
+    );
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user || user.isSuspended) {
     throw new InvalidTokenError("Session is no longer valid.");
+  }
+
+  if (sessionVersion !== undefined && sessionVersion !== await getSessionVersion(user.id)) {
+    throw new InvalidTokenError("Session has been revoked. Please log in again.");
   }
 
   if (originalIat) {
@@ -238,7 +345,12 @@ export async function refreshSession(refreshToken: string) {
     }
   }
 
-  const result = await createAuthTokens(user, originalIat);
+  // Rotation re-signs with auth_time and amr copied UNCHANGED: refreshing is
+  // not re-authentication.
+  const result = await createAuthTokens(user, carriedAmr, {
+    authTime: carriedAuthTime,
+    sessionIat: originalIat,
+  });
 
   await recordAuditEvent({
     userId: user.id,
@@ -264,7 +376,7 @@ export async function requestPasswordReset(email: string) {
   // Expire in 1 hour
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-  await prisma.passwordResetToken.create({
+  const resetRow = await prisma.passwordResetToken.create({
     data: {
       userId: user.id,
       tokenHash,
@@ -280,14 +392,38 @@ export async function requestPasswordReset(email: string) {
   });
 
   // Dispatch branded transactional email with password reset link and token
+  let delivered = false;
   try {
-    await sendPasswordResetEmail({
+    const result = await sendPasswordResetEmail({
       email,
       name: user.displayName || user.firstName || undefined,
       token,
     });
+    delivered = result.success;
+    if (!delivered) {
+      logger.error(
+        { userId: user.id },
+        "Password reset email was not delivered - invalidating the token",
+      );
+    }
   } catch (err) {
-    console.error("Failed to transmit password reset email:", err);
+    // The logger, not console.error. console.error bypasses pino redaction
+    // entirely, so whatever the transport attached to the error went to stdout
+    // unscrubbed.
+    logger.error({ err, userId: user.id }, "Failed to transmit password reset email");
+  }
+
+  if (!delivered) {
+    // A token nobody received is not a helpful artefact, it is a live
+    // credential sitting in the database for an hour. The user simply requests
+    // another. This deliberately does NOT throw: the route answers every request
+    // with the same success shape, and turning a delivery failure into an error
+    // would turn this endpoint into an account-enumeration oracle.
+    await prisma.passwordResetToken
+      .delete({ where: { id: resetRow.id } })
+      .catch((err: unknown) => {
+        logger.error({ err, userId: user.id }, "Failed to invalidate undelivered reset token");
+      });
   }
 }
 
@@ -306,15 +442,36 @@ export async function resetPassword(token: string, newPassword: string) {
   const passwordHash = await argon2.hash(newPassword);
 
   await prisma.$transaction(async (tx) => {
+    // Conditionally claim the bearer token before changing the password. Only
+    // one concurrent request can observe count === 1.
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: {
+        id: resetRecord.id,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      data: { used: true },
+    });
+    if (claimed.count !== 1) {
+      throw new InvalidTokenError("Invalid or expired reset token");
+    }
+
     await tx.user.update({
       where: { id: resetRecord.userId },
       data: { passwordHash, passwordSetAt: new Date() },
     });
 
-    await tx.passwordResetToken.update({
-      where: { id: resetRecord.id },
-      data: { used: true },
-    });
+    // Changing the password must kill every existing session.
+    //
+    // A reset is the documented remedy for "I think someone has my account".
+    // Without this bump the attacker's outstanding refresh token keeps minting
+    // access tokens for up to JWT_REFRESH_TTL (default 30 days) -- so completing
+    // the reset hands the account straight back to whoever triggered it, and
+    // the legitimate user has no way to evict them.
+    //
+    // Inside the transaction on purpose: a revocation that can fail separately
+    // from the password change is a revocation that can be skipped.
+    await tx.$executeRaw`UPDATE "User" SET "sessionVersion" = "sessionVersion" + 1 WHERE id = ${resetRecord.userId}`;
   });
 
   await recordAuditEvent({

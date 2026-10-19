@@ -1,7 +1,8 @@
-import { describe, it, expect, afterAll } from "vitest";
+import { describe, it, expect, afterAll, beforeEach } from "vitest";
 import { createBot } from "../src/modules/bot/bot.service.js";
 import { prisma } from "../src/lib/prisma.js";
 import { env } from "../src/config/env.js";
+import { scopedDelete } from "./helpers/scopedDelete.js";
 
 /**
  * Regression cover for the bot failing every update with
@@ -116,10 +117,94 @@ const run = (bot: any, update: any) =>
 let uid = 1000;
 const nextId = () => ++uid;
 
-describe("Telegram bot update handling", () => {
-  afterAll(async () => {
-    await prisma.$disconnect();
+/**
+ * The bot does NOT auto-provision (auth.middleware.ts: "C5: Strict Onboarding
+ * - Do not auto-provision here"). A member must already exist or the bot answers
+ * "You are not registered. Please sign in via the web."
+ *
+ * These tests therefore need a real member row for TG_ID. It used to be left
+ * behind in the DEVELOPMENT database by earlier manual runs, so the suite only
+ * passed when pointed at a database that already contained this exact Telegram
+ * id — a hidden dependency that made it order- and run-dependent. It now seeds
+ * its own member, so a clean database behaves identically.
+ */
+async function seedMember() {
+  await prisma.user.create({
+    data: {
+      email: `telegram+${TG_ID}@yekis.local`,
+      telegramUserId: BigInt(TG_ID),
+      phone: `+25190${String(TG_ID).slice(-8)}`,
+      passwordHash: "not-a-real-hash",
+      role: "FREELANCER",
+      firstName: "Tester",
+      kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+      wallet: { create: { balanceMinor: 0 } },
+    } as never,
   });
+}
+
+/**
+ * Child rows created for the seeded member. Deleted before the user itself
+ * because KycRecord/Wallet reference it with ON DELETE RESTRICT.
+ */
+async function removeMemberChildren(userId: string) {
+  const children: Array<[string, Parameters<typeof scopedDelete>[0]]> = [
+    ["telegramLoginCode", prisma.telegramLoginCode],
+    ["notification", prisma.notification],
+    ["auditLog", prisma.auditLog],
+    ["transactionFlag", prisma.transactionFlag],
+    ["consentRecord", prisma.consentRecord],
+    ["conversationParticipant", prisma.conversationParticipant],
+    ["featuredLog", prisma.featuredLog],
+    ["portfolioItem", prisma.portfolioItem],
+    ["userSkill", prisma.userSkill],
+    ["passwordResetToken", prisma.passwordResetToken],
+    ["walletTopUp", prisma.walletTopUp],
+    ["payoutTransaction", prisma.payoutTransaction],
+    ["kycRecord", prisma.kycRecord],
+    ["wallet", prisma.wallet],
+  ];
+  for (const [name, delegate] of children) {
+    await scopedDelete(delegate as never, { userId }, `bot-updates ${name}`);
+  }
+}
+
+async function removeMember() {
+  const existing = await prisma.user.findUnique({
+    where: { telegramUserId: BigInt(TG_ID) },
+    select: { id: true },
+  });
+  if (existing) {
+    await removeMemberChildren(existing.id);
+    await scopedDelete(prisma.user, { id: existing.id }, "bot-updates user");
+  }
+  // The legacy email identity is a fallback lookup in the same middleware.
+  const legacy = await prisma.user.findUnique({
+    where: { email: `telegram+${TG_ID}@yekis.local` },
+    select: { id: true },
+  });
+  if (legacy) {
+    await removeMemberChildren(legacy.id);
+    await scopedDelete(prisma.user, { id: legacy.id }, "bot-updates user");
+  }
+}
+
+// File-level, not inside a describe: BOTH suites below drive the bot as this
+// member, and grammY derives the session key from the chat, so the row must
+// exist before either one runs.
+beforeEach(async () => {
+  // Each test starts from the same clean state: exactly one member, and no
+  // sign-in code or session rows carried over from the previous test.
+  await removeMember();
+  await seedMember();
+});
+
+afterAll(async () => {
+  await removeMember();
+  await prisma.$disconnect();
+});
+
+describe("Telegram bot update handling", () => {
 
   it("answers /start and provisions the member", async () => {
     const bot = buildBot();
@@ -168,7 +253,7 @@ describe("Telegram bot update handling", () => {
       "settings:lang:en", "settings:notif:jobs:off",
       "wallet:withdraw", "wallet:topup", "wallet:transactions", "wallet:history",
       "kyc:upload:id", "kyc:upload:selfie", "kyc:upload:tin", "kyc:upload:business",
-      "jobs:filter:clear", "jobs:page:1", "jobs:filter:category:web",
+      "jobs:filter:clear", "jobs:page:1", "jobs:filter:category:WEB_APP_DEVELOPMENT",
       "jobs:filter:budget:100", "jobs:filter:sort:new",
       "auth:new_code", "withdraw:confirm:yes", "withdraw:confirm:no",
       "topup:upload", "propose:confirm:yes", "proposal:accept:p1",

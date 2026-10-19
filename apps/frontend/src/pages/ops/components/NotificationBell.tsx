@@ -16,9 +16,10 @@ import { opsTargetFor } from "../../../api/notificationTargets";
 import { dts } from "../opsApi";
 import { useOpsUi } from "../opsUiContext";
 import type { OpsPageId } from "../opsPerms";
+import { realtimeSocket } from "../../../api/socket";
 
 export default function NotificationBell() {
-  const { navigate, toast, can } = useOpsUi();
+  const { navigate, toast, can, pageLabel } = useOpsUi();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -50,6 +51,16 @@ export default function NotificationBell() {
       alive = false;
     };
   }, []);
+
+  // Notification jobs push through the authenticated socket as soon as the
+  // durable queue worker processes them. Refresh the bell immediately instead
+  // of waiting for the user to reopen the console or reload the page.
+  useEffect(() => {
+    const off = realtimeSocket.onAny(({ event }) => {
+      if (event.startsWith("notify:")) void load();
+    });
+    return off;
+  }, [load]);
 
   /* Click-away + Escape dismissal. */
   useEffect(() => {
@@ -165,7 +176,12 @@ export default function NotificationBell() {
                     <div className="notif-msg">{n.message}</div>
                     <div className="notif-meta">
                       {n.type.replace(/_/g, " ")} · {dts(n.createdAt)}
-                      {reachable ? <CornerDownRight size={11} className="notif-go" /> : null}
+                      {reachable ? (
+                        <span className="notif-go">
+                          <CornerDownRight size={11} />
+                          {pageLabel(t.page as OpsPageId)}
+                        </span>
+                      ) : null}
                     </div>
                   </button>
                 );

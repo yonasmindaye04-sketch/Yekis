@@ -38,6 +38,8 @@ import {
   useToast,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const OUTCOMES: { id: DisputeOutcome; label: string }[] = [
   { id: "RELEASE_TO_FREELANCER", label: "Release to Freelancer" },
@@ -172,7 +174,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         <Banner tone="b-red" icon={Clock} strong="SLA breach detected." rest="At least one dispute exceeded its mediation deadline — resolve it first." />
       ) : null}
 
-      <div className="card filters" style={{ marginBottom: 16 }}>
+      <Card className="card filters" style={{ marginBottom: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -188,15 +190,15 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
           allLabel="All stages"
           label="Dispute stage"
         />
-        <button className="btn btn-ghost" onClick={reload}>Refresh</button>
-      </div>
+        <Button variant="outline" onClick={reload}>Refresh</Button>
+      </Card>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+            <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={Scale}>No active disputes in this view.</Empty>
-            </div>
+            </Card>
           ) : (
             rows.map((d) => (
               <button
@@ -333,9 +335,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 onChange={(e) => setRec(e.target.value)}
               />
               <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <button className="btn btn-primary" disabled={!outcome || busy} onClick={() => void resolve()}>
+                <Button disabled={!outcome || busy} onClick={() => void resolve()}>
                   Confirm Final Resolution
-                </button>
+                </Button>
                 <span className="kbd-hint">
                   {outcome ? `Outcome: ${outcome.replace(/_/g, " ")}` : "Select an outcome to preview the settlement math"}
                 </span>

@@ -92,7 +92,7 @@ export async function processNotification(params: {
 
   const isCritical = CRITICAL_NOTIFICATION_TYPES.has(params.type);
 
-  const results = await Promise.allSettled([
+  void Promise.allSettled([
     isCritical
       ? sendSms({ phone: user.phone, message: params.message })
       : Promise.resolve({ sent: false }),
@@ -106,27 +106,29 @@ export async function processNotification(params: {
           eventType: params.type,
         })
       : Promise.resolve({ success: true }),
-  ]);
-
-  if (
-    isCritical &&
-    results[0].status === "fulfilled" &&
-    (results[0].value as { sent?: boolean })?.sent
-  ) {
-    await prisma.notification.update({
-      where: { id: notification.id },
-      data: { smsSentAt: new Date() },
-    });
-  }
-
-  for (const result of results) {
-    if (result.status === "rejected") {
-      logger.error(
-        { reason: result.reason, notificationId: notification.id },
-        "Notification delivery channel failed",
-      );
+  ]).then(async (results) => {
+    if (
+      isCritical &&
+      results[0].status === "fulfilled" &&
+      (results[0].value as { sent?: boolean })?.sent
+    ) {
+      await prisma.notification.update({
+        where: { id: notification.id },
+        data: { smsSentAt: new Date() },
+      });
     }
-  }
+
+    for (const result of results) {
+      if (result.status === "rejected") {
+        logger.error(
+          { reason: result.reason, notificationId: notification.id },
+          "Notification delivery channel failed",
+        );
+      }
+    }
+  }).catch((err) => {
+    logger.error({ err, notificationId: notification.id }, "Notification delivery processing failed");
+  });
 
   return notification;
 }

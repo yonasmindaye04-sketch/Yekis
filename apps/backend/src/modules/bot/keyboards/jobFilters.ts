@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
+import { buildPublicWebAppUrl } from "../utils/deepLink.js";
 
 export function jobFiltersKeyboard(
   ctx: BotContext,
@@ -89,16 +90,27 @@ export function jobFiltersKeyboard(
 
   // Pagination
   kb.row(
-    { text: ctx.t("back"), callback_data: `jobs:page:${page - 1}` },
+    page > 0
+      ? { text: ctx.t("back"), callback_data: `jobs:page:${page - 1}` }
+      : { text: ctx.t("back"), callback_data: "menu:main" },
     { text: `${page + 1}`, callback_data: "noop" },
     { text: ctx.t("next"), callback_data: `jobs:page:${page + 1}` },
   );
 
   // Open in Mini App
-  kb.row({
-    text: ctx.t("job_view_web"),
-    web_app: { url: `${ctx.t("frontend_url")}/jobs` },
-  });
+  //
+  // See the note in keyboards/actions.ts: the locale key "frontend_url" does not
+  // exist, and ctx.t returns the key itself on a miss, so this produced the
+  // literal relative URL "frontend_url/jobs". Built from env via the deepLink
+  // helper instead, and omitted entirely when the origin is not a public https
+  // one (Telegram rejects such a button and fails the whole message).
+  const miniAppUrl = buildPublicWebAppUrl("/jobs");
+  if (miniAppUrl) {
+    kb.row({
+      text: ctx.t("job_view_web"),
+      web_app: { url: miniAppUrl },
+    });
+  }
 
   // Back to main
   kb.row({ text: ctx.t("back"), callback_data: "menu:main" });

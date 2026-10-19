@@ -1,27 +1,185 @@
-# GitHub Actions CI workflow for backend and frontend lint, type-check, and tests
 name: CI
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+
+# Cancel superseded runs on the same ref instead of queueing them.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  verify:
+    name: Type-check, test, route audit
+    runs-on: ubuntu-latest
+
+    # The backend suite talks to a real Postgres (Prisma) and a real Redis
+    # (sessions, rate limits). Unit-mocking both would leave the two stores
+    # most likely to disagree untested, so they run as service containers.
+    # Note the ports match docker-compose.yml: Postgres is published on 5433
+    # locally to avoid colliding with a system Postgres.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: marketplace
+          POSTGRES_PASSWORD: marketplace_dev_only
+          POSTGRES_DB: marketplace
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U marketplace"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: apps/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The scanner's own patterns are exercised first. It has twice reported
+      # "clean" while being unable to match a shape GitGuardian matched, so a
+      # green scan is only meaningful if the scanner can still fail.
+      - name: Secret scan self-test
+        working-directory: .
+        run: node scripts/scan-secrets.js --self-test
+
+      # Secret scan before anything else, so a committed credential is reported
+      # even if a later step is skipped. Prints file names and line numbers only.
+      - name: Secret scan
+        working-directory: .
+        run: node scripts/scan-secrets.js
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # The suite must never touch a development database: it calls deleteMany(),
+      # and one unscoped filter deleted every Milestone row. The guard in
+      # tests/setup-env.ts refuses any database whose name lacks "_test", so the
+      # scratch database is created here and passed as DATABASE_URL_TEST.
+      - name: Create the test database
+        run: >-
+          PGPASSWORD=marketplace_dev_only psql -h localhost -p 5433 -U marketplace
+          -d marketplace -c "CREATE DATABASE marketplace_test;"
+      - name: Apply database migrations
+        run: pnpm exec prisma migrate deploy
+
+      # ── Fail-closed configuration (T0.2) ──
+      # These are deliberately NOT the production values. NODE_ENV=production
+      # makes env.ts enforce the Telegram/FRONTEND_URL rules, so if any of them
+      # are required but unwired, the app refuses to import and this step fails.
+      # A placeholder token is fine: the bot is never started in CI.
+      - name: Type-check
+        run: pnpm run type-check
+        env:
+          NODE_ENV: production
+          TELEGRAM_ENV: prod
+          DATABASE_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+          JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+          OBJECT_STORE_ENDPOINT: http://localhost:9000
+          OBJECT_STORE_BUCKET: ci
+          OBJECT_STORE_ACCESS_KEY: ci
+          OBJECT_STORE_SECRET_KEY: ci
+          TELEGRAM_BOT_TOKEN: "000000000:CIplaceholderCIplaceholderCIplaceholder"
+          TELEGRAM_WEBHOOK_SECRET: ci-webhook-secret
+          TELEGRAM_WEBHOOK_URL: https://example.invalid/api/v1/telegram/webhook
+          FRONTEND_URL: https://example.invalid
+          PEP_PROVIDER: real
+          TRUST_PROXY_HOPS: "1"
+
+      - name: Route audit gate (T0.1)
+        run: pnpm run route-audit:check
+        env:
+          NODE_ENV: production
+          TELEGRAM_ENV: prod
+          DATABASE_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace
+          REDIS_URL: redis://localhost:6379
+          JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+          JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+          OBJECT_STORE_ENDPOINT: http://localhost:9000
+          OBJECT_STORE_BUCKET: ci
+          OBJECT_STORE_ACCESS_KEY: ci
+          OBJECT_STORE_SECRET_KEY: ci
+          TELEGRAM_BOT_TOKEN: "000000000:CIplaceholderCIplaceholderCIplaceholder"
+          TELEGRAM_WEBHOOK_SECRET: ci-webhook-secret
+          TELEGRAM_WEBHOOK_URL: https://example.invalid/api/v1/telegram/webhook
+          FRONTEND_URL: https://example.invalid
+          PEP_PROVIDER: real
+
+      - name: Test
+        run: pnpm test
+        env:
+          NODE_ENV: test
+          TELEGRAM_ENV: dev
+          DATABASE_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace_test
+          DATABASE_URL_TEST: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace_test
+          REDIS_URL: redis://localhost:6379/1
+          REDIS_URL_TEST: redis://localhost:6379/1
+          JWT_ACCESS_SECRET: ci-access-secret-at-least-32-characters-long
+          JWT_REFRESH_SECRET: ci-refresh-secret-at-least-32-characters-long
+          OBJECT_STORE_ENDPOINT: http://localhost:9000
+          OBJECT_STORE_BUCKET: ci
+          OBJECT_STORE_ACCESS_KEY: ci
+          OBJECT_STORE_SECRET_KEY: ci
+          FRONTEND_URL: http://localhost:5173
+          GUEST_SUPPORT_JWT_SECRET: ci-guest-support-secret-distinct-32-chars
+
+      # `prisma migrate deploy` succeeding does not mean the schema is correct:
+      # a migration can omit an object schema.prisma declares, and that is
+      # invisible until something queries the missing table. LedgerAccount,
+      # LedgerJournal, LedgerEntry and PayoutTransaction were exactly that.
+      # Builds a scratch database from migrations alone and fails on any diff.
+      - name: Fresh-database migration check
+        run: pnpm run db:check-fresh
+        env:
+          FRESH_DB_ADMIN_URL: postgresql://marketplace:marketplace_dev_only@localhost:5433/marketplace
+
+  frontend:
+    name: Frontend type-check and build
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./
+        working-directory: apps/frontend
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
         with:
-          node-version: '20'
-      - name: Install dependencies
-        run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Type Check
-        run: npm run type-check
-      - name: Test
-        run: npm test
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # `tsc -b` is the type-check; `vite build` is the bundling check. The
+      # frontend has no test runner yet (Phase 6 / T6.5 territory), so this job
+      # deliberately does not pretend to have test coverage.
+      - run: pnpm run build

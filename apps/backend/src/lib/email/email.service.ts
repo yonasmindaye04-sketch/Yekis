@@ -116,21 +116,55 @@ export async function sendEmail(
     }
   }
 
-  // Development / fallback logging
-  logger.warn(
-    { to, subject },
-    "SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS) - email NOT delivered, logged to console only.",
-  );
-  // eslint-disable-next-line no-console
-  console.log(
-    `\n================== 📧 [DEV - NOT SENT] EMAIL ==================`,
-  );
-  console.log(`To: ${to}`);
-  console.log(`Subject: ${subject}`);
-  console.log(`Body:\n${text}`);
-  console.log(`============================================================\n`);
+  // Development / fallback logging.
+  //
+  // The body is printed ONLY on a developer machine. This used to be an
+  // unconditional console.log, and the password-reset email's body contains the
+  // reset URL — a live bearer credential that sets the account password for
+  // anyone who holds it, valid for an hour. Two problems with printing it
+  // anywhere else:
+  //
+  //   - console.log bypasses the pino redaction in lib/logger.ts entirely. That
+  //     logger scrubs `token` keys and every string argument; none of it runs
+  //     here, so a misconfigured staging box writes real reset tokens to
+  //     whatever collects stdout.
+  //   - it reported success for a message that was never sent, so
+  //     requestPasswordReset believed the user had a mail. It had not.
+  //
+  // Development only is the correct blast radius: a local developer needs to
+  // read the token out of their own terminal to test the flow, and that token
+  // is theirs.
+  const isDevelopment = env.NODE_ENV === "development";
 
-  return { success: true, messageId: `mock-${Date.now()}` };
+  if (isDevelopment) {
+    logger.warn(
+      { to, subject },
+      "SMTP not configured - email NOT delivered, printed to console for local development only.",
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n================== 📧 [DEV - NOT SENT] EMAIL ==================`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(`To: ${to}`);
+    // eslint-disable-next-line no-console
+    console.log(`Subject: ${subject}`);
+    // eslint-disable-next-line no-console
+    console.log(`Body:\n${text}`);
+    // eslint-disable-next-line no-console
+    console.log(`============================================================\n`);
+
+    return { success: true, messageId: `mock-${Date.now()}` };
+  }
+
+  // Not development and not configured: this is a misconfiguration, not a dev
+  // affordance. Report failure so the caller can invalidate the undelivered
+  // token instead of leaving a valid credential nobody can receive.
+  logger.error(
+    { to, subject },
+    "SMTP is not configured and this is not a development environment - email NOT delivered.",
+  );
+  return { success: false };
 }
 
 /**
@@ -177,7 +211,7 @@ export async function sendPasswordResetEmail(
             <p style="font-size: 13px; color: #64748b;">This link and token will expire in 1 hour. If you did not make this request, you can safely ignore this email.</p>
           </div>
           <div class="footer">
-            © ${new Date().getFullYear()} Yekis Jobs • Ethiopia's Escrow-Protected Marketplace
+            © ${new Date().getFullYear()} Yekis Jobs • Ethiopia's freelance marketplace
           </div>
         </div>
       </body>
@@ -234,12 +268,12 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
         <div class="container">
           <div class="header">
             <span class="logo">Yekis</span>
-            <span class="badge">Escrow Receipt</span>
+            <span class="badge">Payment Receipt</span>
           </div>
           <div class="content">
             <h2 style="margin-top:0;">Payment Confirmation & Receipt</h2>
             <p>Hello ${recipient},</p>
-            <p>This email confirms that payment has been successfully secured in Yekis Escrow for the milestone delivery below:</p>
+            <p>This email confirms that Yekis is holding your payment for the milestone below, pending your approval:</p>
 
             <div class="meta-grid">
               <div class="meta-item">
@@ -276,14 +310,14 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
                   <td style="text-align: right; font-weight: 600;">ETB ${formattedAmount}</td>
                 </tr>
                 <tr class="total-row">
-                  <td>Total Escrow Protected</td>
+                  <td>Total held</td>
                   <td style="text-align: right;">ETB ${formattedAmount}</td>
                 </tr>
               </tbody>
             </table>
 
             <div class="escrow-callout">
-              🔒 <strong>Escrow Protection Active:</strong> These funds are locked securely in Yekis Escrow. They will only be released to the freelancer once the client reviews and approves the delivered work.
+              🔒 <strong>How this payment is held:</strong> Yekis holds this amount until the milestone is delivered. It is released when you approve the delivered work, or automatically after ${env.AUTO_RELEASE_WINDOW_DAYS} days if you do not respond. If either party raises a dispute, the amount stays held until that dispute is resolved.
             </div>
           </div>
           <div class="footer">

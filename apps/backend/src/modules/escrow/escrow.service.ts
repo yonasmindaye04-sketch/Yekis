@@ -34,6 +34,9 @@ export class InvalidEscrowStateError extends Error {}
 export class ContractNotFullyExecutedError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class ActiveContractWithdrawalBlockedError extends Error {}
+export class EscrowAdminHoldError extends Error {}
+/** The payout destination (user.phone) has never been proven by SMS. */
+export class PhoneNotVerifiedError extends Error {}
 /** Thrown when a concurrent release path (explicit accept / auto-release /
  * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
 export class MilestoneReleaseClaimLostError extends Error {
@@ -62,6 +65,15 @@ function warnDate(releaseAt: Date): Date {
   return d;
 }
 
+export async function assertEscrowNotHeld(milestoneId: string): Promise<void> {
+  const hold = await prisma.escrowHold.findFirst({
+    where: { milestoneId, active: true },
+    select: { reason: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (hold) throw new EscrowAdminHoldError(`Escrow is on administrative hold: ${hold.reason}`);
+}
+
 /**
  * Client funds a milestone. Requires the contract to be fully executed
  * (both parties digitally accepted — see contracts.service.ts) before any
@@ -79,6 +91,7 @@ export async function fundMilestone(params: {
   if (!milestone) throw new MilestoneNotFoundError();
   if (milestone.contract.clientId !== params.clientId)
     throw new NotContractPartyError();
+  await assertEscrowNotHeld(milestone.id);
 
   if (
     !milestone.contract.clientAcceptedAt ||
@@ -151,6 +164,7 @@ export async function fundMilestoneFromWallet(params: {
   if (!milestone) throw new MilestoneNotFoundError();
   if (milestone.contract.clientId !== params.clientId)
     throw new NotContractPartyError();
+  await assertEscrowNotHeld(milestone.id);
 
   if (
     !milestone.contract.clientAcceptedAt ||
@@ -184,14 +198,46 @@ export async function fundMilestoneFromWallet(params: {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.wallet.update({
-      where: { userId: params.clientId },
+    /**
+     * The balance check above is only a fast-fail for a good error message. It
+     * is a bare read outside this transaction, so two concurrent fundings both
+     * observe the same balance, both pass, and both decrement -- charging the
+     * client twice for one milestone and driving the wallet negative, since
+     * Wallet.balanceMinor has no CHECK constraint to stop it.
+     *
+     * The debit is therefore conditional on the balance still being sufficient,
+     * evaluated by the same UPDATE that performs it. Exactly one concurrent
+     * request can win; the losers get count 0 and the whole transaction rolls
+     * back, so no partial escrow is created.
+     */
+    const debited = await tx.wallet.updateMany({
+      where: {
+        userId: params.clientId,
+        balanceMinor: { gte: fees.clientTotalChargeMinor },
+      },
       data: { balanceMinor: { decrement: fees.clientTotalChargeMinor } },
     });
-    await tx.milestone.update({
-      where: { id: milestone.id },
+    if (debited.count !== 1) {
+      throw new InsufficientBalanceError(
+        `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor} minor units.`,
+      );
+    }
+
+    /**
+     * Also claim the milestone. Without this, a second request that wins the
+     * wallet race would still flip an already-funded milestone, because
+     * escrowState was previously overwritten unconditionally.
+     */
+    const claimed = await tx.milestone.updateMany({
+      where: { id: milestone.id, escrowState: "PAYMENT_PENDING" },
       data: { escrowState: "ESCROW_HELD" },
     });
+    if (claimed.count !== 1) {
+      throw new InvalidEscrowStateError(
+        "This milestone is no longer awaiting payment.",
+      );
+    }
+
     await recordEscrowFundingLedger(tx, {
       clientId: params.clientId,
       milestoneId: milestone.id,
@@ -291,6 +337,14 @@ export async function handlePaymentWebhook(params: {
     return;
   }
 
+  if (transaction.provider !== params.provider) {
+    logger.error(
+      { transactionId: transaction.id, expectedProvider: transaction.provider, receivedProvider: params.provider },
+      "Payment callback provider does not match the stored transaction — rejecting.",
+    );
+    throw new Error("PAYMENT_PROVIDER_MISMATCH");
+  }
+
   if (transaction.status !== "PENDING") {
     logger.info(
       { transactionId: transaction.id },
@@ -324,10 +378,74 @@ export async function handlePaymentWebhook(params: {
       return "FAILED" as const;
     }
 
-    await tx.milestone.update({
-      where: { id: transaction.milestoneId },
+    // The money DID arrive — the provider says so and the transaction row now
+    // records that. But it must not be parked in escrow on a milestone that is
+    // no longer fundable.
+    //
+    // This write used to be unconditional, so a late SUCCESS callback could
+    // move a milestone to ESCROW_HELD whatever state it was in. The concrete
+    // case: a client cancels during the cooling-off window, which marks the
+    // contract CANCELLED and deliberately leaves the milestone in
+    // PAYMENT_PENDING — the payment they had already started then succeeds. The
+    // old code locked it in escrow on a cancelled contract, where no accept,
+    // dispute or refund path can ever reach it. The client's money, held, with
+    // no route out.
+    //
+    // Both predicates are needed and neither is sufficient alone:
+    //   - escrowState alone does not help, because cooling-off cancellation
+    //     LEAVES the milestone in PAYMENT_PENDING. The contract predicate is the
+    //     one that actually stops this case.
+    //   - contract status alone does not help, because a milestone can reach a
+    //     settled state on an ACTIVE contract.
+    const funded = await tx.milestone.updateMany({
+      where: {
+        id: transaction.milestoneId,
+        escrowState: "PAYMENT_PENDING",
+        // Only a live contract can hold funds.
+        contract: { status: "ACTIVE" },
+      },
       data: { escrowState: "ESCROW_HELD" },
     });
+
+    if (funded.count === 0) {
+      // The money is real and recorded on the transaction; the milestone is not
+      // in a state to hold it. Refusing silently would leave a known payment
+      // that nobody has been told about, so it is raised for a human to return.
+      // NOT auto-refunded: the platform should not move money on a webhook
+      // whose destination is in doubt, and this is the path a duplicate or
+      // out-of-order delivery would take.
+      await recordAuditEvent({
+        userId: transaction.milestone.contract.clientId,
+        eventType: "ESCROW_FUNDING_ORPHANED",
+        entityType: "Milestone",
+        entityId: transaction.milestoneId,
+        amountMinor: transaction.amountMinor,
+        metadata: {
+          transactionId: transaction.id,
+          provider: params.provider,
+          observedEscrowState: transaction.milestone.escrowState,
+          contractStatus: transaction.milestone.contract.status,
+        },
+      });
+
+      await tx.transactionFlag.create({
+        data: {
+          userId: transaction.milestone.contract.clientId,
+          type: "STAFF_FLAGGED",
+          status: "PENDING_REVIEW",
+          details: {
+            transactionId: transaction.id,
+            milestoneId: transaction.milestoneId,
+            amountMinor: transaction.amountMinor,
+            observedEscrowState: transaction.milestone.escrowState,
+            contractStatus: transaction.milestone.contract.status,
+          },
+          relatedEntityId: transaction.id,
+        },
+      });
+
+      return "ORPHANED" as const;
+    }
 
     await tx.user.update({
       where: { id: transaction.milestone.contract.clientId },
@@ -346,6 +464,32 @@ export async function handlePaymentWebhook(params: {
   }
 
   if (outcome === "FAILED") {
+    return;
+  }
+
+  if (outcome === "ORPHANED") {
+    // Money received, not placed, not notified as funded. The transaction row
+    // says SUCCESS and the flag says a human must return it; do NOT also send
+    // the freelancer a "your milestone is funded" notification, because no
+    // escrow exists for them to be paid from.
+    logger.error(
+      { transactionId: params.providerTransactionId, amountMinor: transaction.amountMinor },
+      "Payment succeeded for a milestone that is not in a fundable state - flagged for staff, funds NOT placed in escrow.",
+    );
+    await notifyStaffOfEvent({
+      eventType: "PAYMENT_RECEIVED_FOR_UNFUNDABLE_MILESTONE",
+      message:
+        `A payment of ${transaction.amountMinor} minor units succeeded ` +
+        `(${params.provider}) for milestone ${transaction.milestoneId}, which is in state ` +
+        `${transaction.milestone.escrowState} on a ${transaction.milestone.contract.status} contract. ` +
+        "The funds were received but NOT placed in escrow and must be returned manually.",
+      metadata: {
+        transactionId: transaction.id,
+        milestoneId: transaction.milestoneId,
+        amountMinor: transaction.amountMinor,
+        provider: params.provider,
+      },
+    });
     return;
   }
 
@@ -602,7 +746,25 @@ export async function releaseMilestoneFunds(
   milestoneId: string,
   freelancerId: string,
   amountMinor: number,
+  /**
+   * F-04 — compose into a caller's transaction.
+   *
+   * When `tx` is supplied the claim and the credits run inside that
+   * transaction, and a lost claim THROWS instead of being swallowed. Callers
+   * that must settle money and their own bookkeeping together (dispute
+   * resolution) depend on that: if the claim is lost the whole transaction
+   * rolls back, so the dispute cannot end up marked RESOLVED with no payout.
+   *
+   * Without `tx` the historical standalone behaviour is preserved: own
+   * transaction, log-and-return on a lost claim, then best-effort post-steps.
+   */
+  opts: { tx?: Prisma.TransactionClient } = {},
 ) {
+  const outerTx = opts.tx;
+
+  if (!outerTx) {
+    await assertEscrowNotHeld(milestoneId);
+  }
   const freelancerKyc = await prisma.kycRecord.findUnique({
     where: { userId: freelancerId },
   });
@@ -611,61 +773,70 @@ export async function releaseMilestoneFunds(
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  await prisma
-    .$transaction(async (tx) => {
-      // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
-      // release job firing simultaneously) can flip the milestone into
-      // RELEASED. Two entry states are legal here:
-      //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
-      //   DISPUTED             - staff resolution or arbitration award
-      // The loser gets count=0 and throws BEFORE any wallet credit,
-      // eliminating the historical double-payout race.
-      const claim = await tx.milestone.updateMany({
-        where: {
-          id: milestoneId,
-          escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
-        },
-        data: { escrowState: "RELEASED", releasedAt: new Date() },
-      });
-
-      if (claim.count === 0) {
-        throw new MilestoneReleaseClaimLostError(milestoneId);
-      }
-
-      await tx.wallet.update({
-        where: { userId: freelancerId },
-        data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-      });
-
-      await tx.user.update({
-        where: { id: freelancerId },
-        data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-      });
-
-      // Platform-side ledger entries — without these, platform revenue and
-      // withholding remittance reports would permanently read zero.
-      await recordPlatformEarnings(tx, fees, milestoneId);
-
-      // Double-entry general ledger posting
-      await recordMilestoneReleaseLedger(tx, {
-        freelancerId,
-        milestoneId,
-        milestoneGrossMinor: amountMinor,
-        freelancerNetMinor: fees.freelancerNetMinor,
-        platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-        withholdingTaxMinor: fees.withholdingTaxMinor,
-      });
-    })
-    .catch((err) => {
-      if (err instanceof MilestoneReleaseClaimLostError) {
-        logger.info(
-          { milestoneId, freelancerId },
-          "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
-        );
-        return;
-      }
-      throw err;
+  const settle = async (tx: Prisma.TransactionClient) => {
+    // Atomic claim: exactly ONE concurrent caller (manual accept vs auto-
+    // release job firing simultaneously) can flip the milestone into
+    // RELEASED. Two entry states are legal here:
+    //   SUBMITTED_FOR_REVIEW - normal accept / auto-release timeout
+    //   DISPUTED             - staff resolution or arbitration award
+    // The loser gets count=0 and throws BEFORE any wallet credit,
+    // eliminating the historical double-payout race.
+    const claim = await tx.milestone.updateMany({
+      where: {
+        id: milestoneId,
+        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
+        escrowHolds: { none: { active: true } },
+      },
+      data: { escrowState: "RELEASED", releasedAt: new Date() },
     });
+
+    if (claim.count === 0) {
+      throw new MilestoneReleaseClaimLostError(milestoneId);
+    }
+
+    await tx.wallet.update({
+      where: { userId: freelancerId },
+      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    await tx.user.update({
+      where: { id: freelancerId },
+      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    // Platform-side ledger entries — without these, platform revenue and
+    // withholding remittance reports would permanently read zero.
+    await recordPlatformEarnings(tx, fees, milestoneId);
+
+    // Double-entry general ledger posting
+    await recordMilestoneReleaseLedger(tx, {
+      freelancerId,
+      milestoneId,
+      milestoneGrossMinor: amountMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
+      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      withholdingTaxMinor: fees.withholdingTaxMinor,
+    });
+  };
+
+  // Composed call: stay inside the caller's transaction, let a lost claim
+  // propagate so the caller rolls back, and skip the post-steps (the caller
+  // owns the surrounding lifecycle).
+  if (outerTx) {
+    await settle(outerTx);
+    return;
+  }
+
+  await prisma.$transaction(settle).catch((err) => {
+    if (err instanceof MilestoneReleaseClaimLostError) {
+      logger.info(
+        { milestoneId, freelancerId },
+        "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
+      );
+      return;
+    }
+    throw err;
+  });
 
   try {
     await checkVatThresholdAfterRelease(milestoneId);
@@ -698,39 +869,72 @@ export async function withdrawFromWallet(params: {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: params.userId },
   });
-  if (user.role === "CLIENT") {
-    const activeContractMilestone = await prisma.milestone.findFirst({
-      where: {
-        contract: { clientId: params.userId },
-        escrowState: {
-          in: [
-            "PAYMENT_PENDING",
-            "ESCROW_HELD",
-            "WORK_IN_PROGRESS",
-            "SUBMITTED_FOR_REVIEW",
-          ],
-        },
-      },
-      select: { id: true },
-    });
-    if (activeContractMilestone) {
-      throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have active contracts. Wait for all milestones to complete or be refunded.",
-      );
-    }
 
-    const openDispute = await prisma.dispute.findFirst({
-      where: {
-        contract: { clientId: params.userId },
-        stage: { not: "RESOLVED" },
-      },
-      select: { id: true },
-    });
-    if (openDispute) {
-      throw new ActiveContractWithdrawalBlockedError(
-        "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
-      );
-    }
+  // The payout destination is `user.phone`. Sending bank money to a number the
+  // platform never proved the account holder controls means sending it to
+  // whoever that number belongs to — and the SMS OTP flow that would have
+  // caught that existed but wrote its result nowhere.
+  //
+  // Placed before every balance and contract check: an unverified destination
+  // invalidates the withdrawal itself, so there is nothing to weigh it against.
+  // Tier-2 KYC is not a substitute. KYC proves an identity document belongs to
+  // a person; it says nothing about whether that person's phone is their phone.
+  if (!user.phoneVerifiedAt) {
+    throw new PhoneNotVerifiedError(
+      "Verify your phone number before withdrawing. We send payouts to the number on your account, so we have to confirm it is yours.",
+    );
+  }
+
+// F-22: the "you are holding money for someone else" check must not be gated
+  // on the role STRING — a BOTH account can hire, so `user.role === "CLIENT"`
+  // let it skip the check entirely. It is instead gated on the FACT that
+  // matters: being the paying party on a contract that holds funded money.
+  //
+  // Why client-side only. The payer is the party whose balance the escrow is
+  // earmarked from; that money is committed and must not be withdrawn while the
+  // work is in flight. The freelancer's balance is their earned money from
+  // OTHER, already-completed work, and blocking them would trap earnings they
+  // are entitled to. A `BOTH` user is therefore blocked exactly when they are
+  // the client on an in-flight contract, and free to withdraw otherwise.
+  //
+  // PAYMENT_PENDING is deliberately EXCLUDED. That state is pre-funding: no
+  // money has been taken from anyone, so nothing is at risk. A client can cancel
+  // such a contract outright under the cooling-off right. Including it would
+  // block a withdrawal over money the user never actually paid.
+  const fundedEscrowStates = [
+    "ESCROW_HELD",
+    "WORK_IN_PROGRESS",
+    "SUBMITTED_FOR_REVIEW",
+  ] as const;
+
+  const inFlightFundedContract = await prisma.milestone.findFirst({
+    where: {
+      escrowState: { in: [...fundedEscrowStates] },
+      contract: { clientId: params.userId },
+    },
+    select: { id: true },
+  });
+  if (inFlightFundedContract) {
+    throw new ActiveContractWithdrawalBlockedError(
+      "You cannot withdraw while a contract you are paying for still holds funds in escrow. Wait for all milestones to complete or be refunded.",
+    );
+  }
+
+  // An open dispute likewise blocks only the party holding the escrowed funds
+  // (the client). The outcome decides whose money it is, so the payer cannot
+  // take it out while it is undecided. The freelancer's unrelated available
+  // balance is unaffected by someone else's dispute.
+  const openDisputeAsClient = await prisma.dispute.findFirst({
+    where: {
+      stage: { not: "RESOLVED" },
+      contract: { clientId: params.userId },
+    },
+    select: { id: true },
+  });
+  if (openDisputeAsClient) {
+    throw new ActiveContractWithdrawalBlockedError(
+      "You cannot withdraw while you have an open dispute. Wait for the dispute to be resolved.",
+    );
   }
 
   if (user.isComplianceHeld) {
@@ -770,44 +974,61 @@ export async function withdrawFromWallet(params: {
     );
   }
 
-  // Atomic conditional decrement: two concurrent withdrawals both pass the
-  // pre-check above, but only decrements that still leave balance >= 0
-  // succeed. A loser gets count=0 -> InsufficientBalanceError, so the wallet
-  // can never go negative under concurrency.
-  const debited = await prisma.wallet.updateMany({
-    where: { userId: params.userId, balanceMinor: { gte: params.amountMinor } },
-    data: { balanceMinor: { decrement: params.amountMinor } },
-  });
-
-  if (debited.count === 0) {
-    throw new InsufficientBalanceError(
-      "Requested amount exceeds wallet balance.",
-    );
-  }
-
-  await recordAuditEvent({
-    userId: params.userId,
-    eventType: "WALLET_WITHDRAWAL_INITIATED",
-    entityType: "Wallet",
-    entityId: wallet.id,
-    metadata: { amountMinor: params.amountMinor, provider: params.provider },
-  });
-
   // Telebirr B2C fee (0.5% standard cashout)
   const feeMinor = Math.round(params.amountMinor * 0.005);
   const netAmountMinor = params.amountMinor - feeMinor;
 
-  const payout = await prisma.payoutTransaction.create({
-    data: {
+  // The debit, the audit event and the payout row are ONE transaction.
+  //
+  // They were three separate auto-commit statements. A crash — or a throw from
+  // anything between them — left the money debited with no PayoutTransaction
+  // row at all: no provider reference, no status, nothing to reconcile against,
+  // and no way for finance to discover that the balance is wrong. The user
+  // sees a smaller wallet and no withdrawal.
+  //
+  // The provider call deliberately stays OUTSIDE. It is an external system
+  // that cannot participate in a database transaction, and calling it inside
+  // would hold a pooled connection open across a network round trip. What goes
+  // wrong if the process dies between the commit and the provider call is
+  // bounded: a PROCESSING payout with a provider reference exists, which is
+  // exactly the state the reconciliation sweep and staff settlement exist for.
+  const payout = await prisma.$transaction(async (tx) => {
+    // Atomic conditional decrement: two concurrent withdrawals both pass the
+    // pre-check above, but only decrements that still leave balance >= 0
+    // succeed. A loser gets count=0 -> InsufficientBalanceError, so the wallet
+    // can never go negative under concurrency.
+    const debited = await tx.wallet.updateMany({
+      where: { userId: params.userId, balanceMinor: { gte: params.amountMinor } },
+      data: { balanceMinor: { decrement: params.amountMinor } },
+    });
+
+    if (debited.count === 0) {
+      throw new InsufficientBalanceError(
+        "Requested amount exceeds wallet balance.",
+      );
+    }
+
+    await recordAuditEvent({
       userId: params.userId,
-      walletId: wallet.id,
-      amountMinor: params.amountMinor,
-      feeMinor,
-      netAmountMinor,
-      provider: params.provider,
-      payoutAccountIdentifier: params.payoutAccountIdentifier,
-      status: "PROCESSING",
-    },
+      eventType: "WALLET_WITHDRAWAL_INITIATED",
+      entityType: "Wallet",
+      entityId: wallet.id,
+      metadata: { amountMinor: params.amountMinor, provider: params.provider },
+      tx,
+    });
+
+    return tx.payoutTransaction.create({
+      data: {
+        userId: params.userId,
+        walletId: wallet.id,
+        amountMinor: params.amountMinor,
+        feeMinor,
+        netAmountMinor,
+        provider: params.provider,
+        payoutAccountIdentifier: params.payoutAccountIdentifier,
+        status: "PROCESSING",
+      },
+    });
   });
 
   const providerClient = getProviderClient(params.provider);
@@ -876,17 +1097,25 @@ export async function withdrawFromWallet(params: {
   }
 
   if (disbursementResult.status === "CONFIRMED") {
-    await prisma.payoutTransaction.update({
-      where: { id: payout.id },
-      data: {
-        status: "CONFIRMED",
-        providerPayoutId: disbursementResult.providerPayoutId,
-        settledAt: new Date(),
-      },
-    });
-
-    // Record double-entry general ledger entry
+    // The CONFIRMED state change and the disbursement journal are one
+    // transaction.
+    //
+    // They were sequential and the journal was NOT wrapped in a try/catch. A
+    // journal failure therefore propagated with the payout already marked
+    // CONFIRMED and the money already gone: the route returned 500, the user
+    // retried, and a SECOND disbursement went out while the first had landed.
+    // Now either both happen or the payout stays PROCESSING, which is a state
+    // staff and the reconciliation sweep can actually act on.
     await prisma.$transaction(async (tx) => {
+      await tx.payoutTransaction.update({
+        where: { id: payout.id },
+        data: {
+          status: "CONFIRMED",
+          providerPayoutId: disbursementResult.providerPayoutId,
+          settledAt: new Date(),
+        },
+      });
+
       await recordWithdrawalDisbursementLedger(tx, {
         userId: params.userId,
         payoutId: payout.id,
@@ -941,12 +1170,32 @@ export async function refundMilestoneToClient(
   milestoneId: string,
   clientId: string,
   amountMinor: number,
+  /** F-04 — compose into a caller's transaction; see releaseMilestoneFunds. */
+  opts: { tx?: Prisma.TransactionClient } = {},
 ) {
-  await prisma.$transaction(async (tx) => {
-    await tx.milestone.update({
-      where: { id: milestoneId },
+  const outerTx = opts.tx;
+
+  const refund = async (tx: Prisma.TransactionClient) => {
+    // F-04 — the state change is a CONDITIONAL claim, taken before the wallet
+    // is credited and inside the same transaction. Previously this was an
+    // unconditional update, so a refund could be issued for a milestone that
+    // had already been RELEASED, paying the client for money the freelancer
+    // had already received. A count of 0 means someone else settled it.
+    const claim = await tx.milestone.updateMany({
+      where: {
+        id: milestoneId,
+        escrowState: {
+          in: ["DISPUTED", "SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"],
+        },
+      },
       data: { escrowState: "REFUNDED" },
     });
+    if (claim.count === 0) {
+      throw new InvalidEscrowStateError(
+        "Cannot refund: the milestone is no longer in a refundable state.",
+      );
+    }
+
     await tx.wallet.update({
       where: { userId: clientId },
       data: { balanceMinor: { increment: amountMinor } },
@@ -956,7 +1205,15 @@ export async function refundMilestoneToClient(
       milestoneId,
       amountMinor,
     });
-  });
+  };
+
+  // Composed call: the caller owns the transaction and the lifecycle.
+  if (outerTx) {
+    await refund(outerTx);
+    return;
+  }
+
+  await prisma.$transaction(refund);
 
   try {
     await checkAndUpdateContractCompletion(milestoneId);

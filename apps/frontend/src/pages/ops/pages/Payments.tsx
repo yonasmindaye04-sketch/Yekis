@@ -12,6 +12,8 @@ import { dts, fmt, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { PAYMENT_STATUSES, RAILS } from "../opsConst";
 import type { Payment } from "../opsTypes";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Empty,
   ErrorBox,
@@ -44,7 +46,7 @@ export default function Payments() {
         title="Payments"
         sub="Inbound client funding transactions across Telebirr & CBE Birr rails"
       />
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -55,10 +57,10 @@ export default function Payments() {
         </div>
         <FilterSelect value={status} onChange={setStatus} options={PAYMENT_STATUSES} allLabel="Any status" label="Payment status" />
         <FilterSelect value={provider} onChange={setProvider} options={RAILS} allLabel="Any rail" label="Provider" humanise={false} />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["Provider TX ID", "Contract", "Client", "Provider", "Status", "Amount", "Created"]}
         foot={

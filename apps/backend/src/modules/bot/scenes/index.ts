@@ -437,8 +437,23 @@ async function staffKycReviewScene(
   message += `Tier: ${kyc.tier}\n`;
   message += `Documents: ${kyc.documents.length}\n`;
 
-  for (const doc of kyc.documents) {
-    message += `\n ${doc.documentType}: ${env.FRONTEND_URL}/evidence/${doc.storagePath}`;
+  // C4: NO document content, storage keys or links in Telegram.
+  //
+  // This previously emitted `${FRONTEND_URL}/evidence/${doc.storagePath}`, which
+  // was wrong three times over:
+  //   1. it leaked the raw object-store key into a chat;
+  //   2. `/evidence/*` is served by NOTHING — no backend route, no frontend
+  //      route — so the link was dead;
+  //   3. Telegram chats are not an access-control boundary: the message is
+  //      forwardable and readable by anyone in the chat.
+  //
+  // Documents are reviewed in the staff console, behind MFA, via
+  // GET /api/v1/kyc/documents/:documentId/url which mints a 5-minute presigned
+  // URL on demand. The bot states only that documents exist.
+  if (kyc.documents.length > 0) {
+    message +=
+      `\n<i>Document images are not shown here. Review them in the staff console, ` +
+      `which requires MFA.</i>`;
   }
 
   await ctx.reply(message, {
@@ -514,7 +529,11 @@ async function staffTopupReviewScene(
     `User: ${userName} (${topup.user.ucid})\n` +
     `Amount: ${topup.amountMinor / 100} ETB\n` +
     `Reference: ${topup.referenceNumber}\n` +
-    `Receipt: ${env.FRONTEND_URL}/evidence/${topup.receiptImagePath}`;
+    // C4: same rule as the KYC scene — no receipt path in Telegram. A payment
+    // receipt image is evidence of a money movement and was previously exposed
+    // as a raw storage key in a forwardable chat message. It is reviewed in the
+    // staff console, behind MFA.
+    `<i>Receipt image available in the staff console (MFA required).</i>`;
 
   await ctx.reply(message, {
     reply_markup: {

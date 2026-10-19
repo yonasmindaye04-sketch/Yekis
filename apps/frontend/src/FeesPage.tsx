@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import "./marketing.css";
 
 type FeesPageProps = {
@@ -6,20 +7,22 @@ type FeesPageProps = {
 };
 
 export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
+  const { t } = useI18n();
+
   return (
     <div className="marketing-page">
       <div className="marketing-container">
         <div className="marketing-breadcrumbs">
-          <button onClick={() => onNavigate("home")}>Home</button> &gt; Fees
+          <button onClick={() => onNavigate("home")}>{t.nav.home}</button> &gt; {t.nav.fees}
         </div>
         <section className="content-section">
-          <h1>Simple, transparent pricing</h1>
+          <h1>{t.marketing.fees.title}</h1>
           <p className="hero-subtitle" style={{ marginBottom: "40px" }}>
-            You only pay when a job is successfully completed — never upfront.
+            {t.marketing.fees.subheadline}
           </p>
 
           <div className="glass-panel">
-            <h2>Platform Fees</h2>
+            <h2>{t.marketing.fees.panelTitle}</h2>
             <ul
               style={{
                 listStyleType: "disc",
@@ -27,22 +30,16 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                 color: "var(--color-text)",
               }}
             >
-              <li>
-                Platform fee: [TODO: X%] of each completed milestone, split
-                between client and freelancer
-              </li>
-              <li>No listing fees</li>
-              <li>No subscription fees</li>
-              <li>No hidden charges</li>
-              <li>
-                Withholding tax: 3% for TIN-verified freelancers, 30% for
-                unverified (per ERCA regulation)
-              </li>
+              <li>{t.marketing.fees.feeItem1}</li>
+              <li>{t.marketing.fees.feeItem2}</li>
+              <li>{t.marketing.fees.feeItem3}</li>
+              <li>{t.marketing.fees.feeItem4}</li>
+              <li>{t.marketing.fees.feeItem5}</li>
             </ul>
           </div>
 
           <div style={{ marginTop: "60px" }}>
-            <h2>How we compare</h2>
+            <h2>{t.marketing.fees.compareTitle}</h2>
             <div style={{ overflowX: "auto", marginTop: "20px" }}>
               <table
                 style={{
@@ -54,41 +51,41 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                 <thead>
                   <tr style={{ borderBottom: "2px solid var(--color-border)" }}>
                     <th style={{ padding: "16px", color: "var(--color-text)" }}>
-                      Feature
+                      {t.marketing.fees.featureCol}
                     </th>
                     <th
                       style={{ padding: "16px", color: "var(--color-primary)" }}
                     >
-                      Yekis
+                      {t.marketing.fees.yekisCol}
                     </th>
                     <th style={{ padding: "16px", color: "var(--color-text)" }}>
-                      Informal Trust
+                      {t.marketing.fees.informalCol}
                     </th>
                     <th style={{ padding: "16px", color: "var(--color-text)" }}>
-                      Hiring a Lawyer
+                      {t.marketing.fees.lawyerCol}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "16px" }}>Payment Protection</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row1Feature}</td>
                     <td
                       style={{ padding: "16px", color: "var(--color-primary)" }}
                     >
-                      Escrow Held
+                      {t.marketing.fees.row1Yekis}
                     </td>
-                    <td style={{ padding: "16px" }}>None</td>
-                    <td style={{ padding: "16px" }}>High retainers</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row1Informal}</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row1Lawyer}</td>
                   </tr>
                   <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                    <td style={{ padding: "16px" }}>Dispute Resolution</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row2Feature}</td>
                     <td
                       style={{ padding: "16px", color: "var(--color-primary)" }}
                     >
-                      Included
+                      {t.marketing.fees.row2Yekis}
                     </td>
-                    <td style={{ padding: "16px" }}>"He said, she said"</td>
-                    <td style={{ padding: "16px" }}>Expensive litigation</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row2Informal}</td>
+                    <td style={{ padding: "16px" }}>{t.marketing.fees.row2Lawyer}</td>
                   </tr>
                 </tbody>
               </table>
@@ -97,7 +94,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
           <div style={{ marginTop: "40px", textAlign: "center" }}>
             <button className="btn-secondary" onClick={() => onNavigate("faq")}>
-              Read more in our FAQ
+              {t.marketing.fees.readFaq}
             </button>
           </div>
 
@@ -107,13 +104,13 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               onClick={() => onStart("register")}
               style={{ marginRight: "20px" }}
             >
-              Post a Job
+              {t.marketing.cta.postJob}
             </button>
             <button
               className="btn-secondary"
               onClick={() => onStart("register")}
             >
-              Find Work
+              {t.marketing.cta.findWork}
             </button>
           </div>
         </section>

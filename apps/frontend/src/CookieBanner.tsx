@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Shield, X } from "lucide-react";
 import { initAnalytics } from "./analytics";
+import { useI18n } from "./i18n";
 import "./CookieBanner.css";
 
 interface ConsentState {
@@ -11,6 +12,7 @@ interface ConsentState {
 }
 
 export function CookieBanner() {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [analytics, setAnalytics] = useState(false);
@@ -49,10 +51,9 @@ export function CookieBanner() {
             <Shield size={20} />
           </div>
           <div>
-            <h3>Your privacy matters</h3>
+            <h3>{t.marketing.cookie.title}</h3>
             <p>
-              We use cookies to improve your experience. Some are necessary for
-              the site to work; others help us understand how you use Yekis.
+              {t.marketing.cookie.description}
             </p>
           </div>
           <button
@@ -68,7 +69,7 @@ export function CookieBanner() {
           <div className="cookie-details">
             <div className="cookie-category">
               <div className="cookie-category-header">
-                <strong>Essential cookies</strong>
+                <strong>{t.marketing.cookie.essential}</strong>
                 <span className="cookie-always-on">Always on</span>
               </div>
               <p>
@@ -78,7 +79,7 @@ export function CookieBanner() {
             </div>
             <div className="cookie-category">
               <div className="cookie-category-header">
-                <strong>Analytics</strong>
+                <strong>{t.marketing.cookie.analytics}</strong>
                 <label className="cookie-toggle">
                   <input
                     type="checkbox"
@@ -95,7 +96,7 @@ export function CookieBanner() {
             </div>
             <div className="cookie-category">
               <div className="cookie-category-header">
-                <strong>Marketing</strong>
+                <strong>{t.marketing.cookie.marketing}</strong>
                 <label className="cookie-toggle">
                   <input
                     type="checkbox"
@@ -119,7 +120,7 @@ export function CookieBanner() {
               className="cookie-btn-details"
               onClick={() => setShowDetails(true)}
             >
-              Manage preferences
+              {t.marketing.cookie.manage}
             </button>
           )}
           {showDetails && (
@@ -127,14 +128,14 @@ export function CookieBanner() {
               className="cookie-btn-save"
               onClick={() => saveConsent(analytics, marketing)}
             >
-              Save preferences
+              {t.marketing.cookie.save}
             </button>
           )}
           <button
             className="cookie-btn-accept"
             onClick={() => saveConsent(true, true)}
           >
-            Accept all
+            {t.marketing.cookie.acceptAll}
           </button>
         </div>
       </div>

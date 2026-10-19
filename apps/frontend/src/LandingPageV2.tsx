@@ -11,15 +11,12 @@ import {
   useEffect,
   useRef,
   useMemo,
-  useCallback,
 } from "react";
 import {
   motion,
   AnimatePresence,
-  animate,
   useScroll,
   useSpring,
-  useMotionValueEvent,
   useInView,
 } from "framer-motion";
 import {
@@ -30,6 +27,12 @@ import {
   ShieldCheck,
   MessageCircle,
   Clock,
+  Check,
+  Circle,
+  CircleDot,
+  Eye,
+  File,
+  MessageSquare,
   Code,
   Palette,
   Megaphone,
@@ -46,15 +49,13 @@ import {
   Zap,
   Star,
   TrendingUp,
-  Search,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  X,
+  BadgeCheck,
   Sparkles,
-  LayoutGrid,
-} from "lucide-react";
+  } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
+import { events } from "./analytics";
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
 import "./landing-v2.css";
 
 /* ─────────────────────────────────────────────────
@@ -70,117 +71,150 @@ type LandingPageV2Props = {
 ───────────────────────────────────────────────── */
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
 
-const HERO_TITLE = "Find the right expertise.";
 
+type ReviewSource = "google" | "trustpilot";
 
+type MemberReview = {
+  source: ReviewSource;
+  rating: number;
+  quote: string;
+  name: string;
+  meta: string;
+  when: string;
+  tone: 1 | 2 | 3 | 4 | 5;
+};
 
-const STEPS = [
+const REVIEWS: MemberReview[] = [
   {
-    n: "01",
-    Icon: Wallet,
-    title: "Fund",
-    body: "You deposit the agreed amount into escrow before work starts. It is held safely and never sent until you approve.",
-  },
-  {
-    n: "02",
-    Icon: Briefcase,
-    title: "Work",
-    body: "The freelancer completes the milestone and submits deliverables, files and notes for your review.",
-  },
-  {
-    n: "03",
-    Icon: CheckCircle,
-    title: "Approve",
-    body: "Satisfied with the delivery? Approve it and funds release instantly into the freelancer's wallet.",
-  },
-  {
-    n: "04",
-    Icon: Shield,
-    title: "Protected",
-    body: "Need revisions or hit a problem? Support mediates with clear evidence for a fair resolution.",
-  },
-];
-
-
-const TESTIMONIALS = [
-  {
-    q: "I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
-    name: "Hanna G.",
-    role: "Founder, import & retail",
-    tone: "a",
-  },
-  {
-    q: "As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
+    source: "google",
+    rating: 5,
+    quote:
+      "As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
     name: "Abel T.",
-    role: "Full-stack developer",
-    tone: "b",
+    meta: "Full-stack developer",
+    when: "2 weeks ago",
+    tone: 1,
   },
   {
-    q: "We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "Escrow on every contract means I never chase invoices again. The payout to my local bank is quicker than my old platform ever managed.",
+    name: "Meron G.",
+    meta: "Brand designer · Addis Ababa",
+    when: "a month ago",
+    tone: 2,
+  },
+  {
+    source: "google",
+    rating: 4,
+    quote:
+      "Clear milestones, clear fees, no surprises. Support answered my payout question in Amharic within the hour — that meant a lot.",
+    name: "Dawit B.",
+    meta: "Mobile developer",
+    when: "3 weeks ago",
+    tone: 3,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "We hired three developers through YEKIS last quarter. Approving a milestone releases payment instantly; our contractors stopped asking about delays.",
+    name: "Hanna L.",
+    meta: "Startup founder",
+    when: "2 months ago",
+    tone: 4,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "The wallet view is the best part — pending, escrowed and released amounts at a glance. Invoicing used to take me a whole evening.",
+    name: "Samuel K.",
+    meta: "Data analyst · Hawassa",
+    when: "a week ago",
+    tone: 5,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "Dispute handling was fair and fast when scope changed mid-project. Both sides saw exactly what was agreed in the milestone trail.",
+    name: "Lidia F.",
+    meta: "Content strategist",
+    when: "3 months ago",
+    tone: 1,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "I switched from Upwork because the fees were eating me alive. YEKIS is transparent about what I pay and clients see the same numbers.",
+    name: "Yonas M.",
+    meta: "DevOps engineer",
+    when: "5 days ago",
+    tone: 2,
+  },
+  {
+    source: "trustpilot",
+    rating: 4,
+    quote:
+      "Onboarding my studio took one afternoon. Contracts, escrow and payouts in one place — my accountant is happier too.",
+    name: "Betty A.",
+    meta: "Studio owner · Mekelle",
+    when: "6 weeks ago",
+    tone: 3,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "Client approved at 9pm, money was in my wallet before I closed the laptop. That has never happened to me on any other platform.",
+    name: "Kalid H.",
+    meta: "Flutter developer",
+    when: "4 days ago",
+    tone: 4,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
+    name: "Hanna G.",
+    meta: "Founder, import & retail",
+    when: "3 days ago",
+    tone: 5,
+  },
+  {
+    source: "trustpilot",
+    rating: 5,
+    quote:
+      "We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
     name: "Sara M.",
-    role: "Marketing lead, NGO",
-    tone: "c",
+    meta: "Marketing lead, NGO",
+    when: "1 month ago",
+    tone: 1,
+  },
+  {
+    source: "google",
+    rating: 5,
+    quote:
+      "Milestones, invoices and payouts live in the same tab now. My clients see exactly where every birr is sitting.",
+    name: "Nardos A.",
+    meta: "Backend engineer · Dire Dawa",
+    when: "2 weeks ago",
+    tone: 2,
   },
 ];
 
-const ABOUT_FEATURES = [
-  {
-    n: "01",
-    title: "Verified identities",
-    body: "Freelancers verify with the Ethiopian National ID (Fayda), so you always know exactly who you are hiring.",
-  },
-  {
-    n: "02",
-    title: "Milestone escrow protection",
-    body: "Funds stay locked in escrow and only release when you inspect and approve each delivered milestone.",
-  },
-];
-
-const FAQS = [
-  {
-    cat: "Trusting the platform",
-    items: [
-      {
-        q: "Is my money actually safe?",
-        a: "Yes. When you fund a job, your payment goes into escrow — held separately from Yekis's own operating funds — not directly to the freelancer. It only releases when you approve the work, or automatically after 5 days if you don't respond. If something's wrong, raise it before approving and the payment stays held while we help sort it out.",
-      },
-      {
-        q: "What if the freelancer disappears after I pay?",
-        a: "Your money is still sitting safely in escrow — it was never sent to them. If a freelancer goes silent, raise it with our team and we'll help resolve it, which can include a full refund.",
-      },
-      {
-        q: "What if we disagree about the work?",
-        a: "Most disagreements get sorted directly between you and the freelancer within a short window. If you can't agree, our team reviews both sides — the original brief, the delivered work and your messages — and decides: release, refund, or split fairly.",
-      },
-    ],
-  },
-  {
-    cat: "Getting started",
-    items: [
-      {
-        q: "Why do I need to verify my identity (KYC)?",
-        a: "It protects everyone. Verification is how we confirm the person you hire, or the client you work for, is really who they claim to be. Basic verification is quick and unlocks browsing and posting.",
-      },
-      {
-        q: "What are the fees?",
-        a: "Yekis takes a small percentage of each completed job, split between client and freelancer — never charged upfront, only when a payment actually releases.",
-      },
-    ],
-  },
-  {
-    cat: "Getting paid",
-    items: [
-      {
-        q: "When do I actually get paid?",
-        a: "The moment a client approves your work (or after the 5-day auto-release window), funds move into your Yekis wallet immediately. From there you can withdraw to Telebirr or your bank account.",
-      },
-      {
-        q: "Is there a minimum withdrawal amount?",
-        a: "A small minimum applies per withdrawal to keep payment-rail costs sensible. The exact figure is shown in your wallet before you confirm.",
-      },
-    ],
-  },
-];
+/* avatar gradient pairs, drawn from the V2 palette */
+const REVIEW_TONES: Record<MemberReview["tone"], [string, string]> = {
+  1: ["var(--v2-primary)", "var(--v2-teal)"],
+  2: ["var(--v2-teal)", "var(--v2-primary)"],
+  3: ["var(--v2-violet)", "var(--v2-primary)"],
+  4: ["var(--v2-primary)", "var(--v2-violet)"],
+  5: ["var(--v2-teal)", "var(--v2-violet)"],
+};
 
 /* ─────────────────────────────────────────────────
    Helpers
@@ -417,61 +451,9 @@ function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
   );
 }
 
-/* Escrow vault illustration */
-function EscrowVault() {
-  const rings = [1, 2, 3];
-  const orbs = [
-    { c: "var(--v2-primary)", dur: 16, inset: "6%", dir: 1 },
-    { c: "var(--v2-teal)", dur: 22, inset: "20%", dir: -1 },
-    { c: "var(--v2-violet)", dur: 28, inset: "33%", dir: 1 },
-  ];
-  return (
-    <div className="v2-vault">
-      {rings.map((r) => (
-        <motion.div
-          key={r}
-          className={`v2-vault-ring r${r}`}
-          animate={{ rotate: r % 2 ? 360 : -360 }}
-          transition={{ duration: 26 + r * 9, repeat: Infinity, ease: "linear" }}
-        />
-      ))}
-      {orbs.map((o, i) => (
-        <motion.div
-          key={i}
-          className="v2-orb"
-          style={{ inset: o.inset }}
-          animate={{ rotate: o.dir * 360 }}
-          transition={{ duration: o.dur, repeat: Infinity, ease: "linear" }}
-        >
-          <i style={{ background: o.c, boxShadow: `0 0 14px 2px ${o.c}` }} />
-        </motion.div>
-      ))}
-      <motion.div
-        className="v2-vault-core"
-        animate={{ y: [0, -10, 0], scale: [1, 1.03, 1] }}
-        transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <Lock size={42} />
-          <b>ESCROW</b>
-        </div>
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc1" animate={{ y: [0, -9, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}>
-        <Wallet size={15} /> Balance locked
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc2" animate={{ y: [0, 10, 0] }} transition={{ duration: 7.4, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}>
-        <CheckCircle size={15} /> Milestone 2 of 3 approved
-      </motion.div>
-      <motion.div className="v2-vault-chip v2-vc3" animate={{ y: [0, -7, 0] }} transition={{ duration: 8.2, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}>
-        <Clock size={15} /> Auto-release in 5 days
-      </motion.div>
-    </div>
-  );
-}
-
 /* ─────────────────────────────────────────────────
    Scroll Progress Bar
-───────────────────────────────────────────────── */
+   ───────────────────────────────────────────────── */
 function ScrollProgressBar() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
@@ -533,7 +515,8 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
   );
 }
 
-function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+function HeroSection() {
+  const { t } = useI18n();
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
@@ -586,23 +569,9 @@ function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }
 
       {/* hero content */}
       <div className="v2-hero-inner" ref={innerRef}>
-        <SpringTitle text={HERO_TITLE} settled={settled} />
-        <div className="v2-hero-actions">
-          <button className="v2-btn v2-btn-primary" onClick={() => onStart("register")}>
-            <span className="v2-shine" />
-            <Briefcase size={17} /> Get started
-          </button>
-          <button
-            className="v2-btn v2-btn-secondary"
-            onClick={() =>
-              document
-                .getElementById("categories")
-                ?.scrollIntoView({ behavior: prefersReduced() ? "auto" : "smooth" })
-            }
-          >
-            <LayoutGrid size={17} /> Browse categories
-          </button>
-        </div>
+        {/* No hero CTAs: the header already carries "Sign in" and
+            "Get started", so repeating them here competed with the slogan. */}
+        <SpringTitle text={t.marketing.hero.title} settled={settled} />
       </div>
     </section>
   );
@@ -613,283 +582,366 @@ function HeroSection({ onStart }: { onStart: (m: "login" | "register") => void }
    Stats
 ───────────────────────────────────────────────── */
 function StatsSection() {
-  const items = [
-    { Icon: Briefcase, to: 12480, suffix: "+", label: "Jobs completed" },
-    { Icon: Users, to: 3940, suffix: "+", label: "Verified freelancers" },
-    { Icon: ShieldCheck, to: 84.6, decimals: 1, suffix: "M", label: "Secured in escrow (ETB)" },
-    { Icon: Zap, to: 6.5, decimals: 1, suffix: " hrs", label: "Avg. payout time" },
+  const { t } = useI18n();
+  const statCards = [
+    {
+      Icon: Briefcase,
+      tone: "blue" as const,
+      to: 12480,
+      suffix: "+",
+      label: t.marketing.stats.jobsCompleted,
+      desc: t.marketing.stats.jobsCompletedDesc,
+    },
+    {
+      Icon: Users,
+      tone: "purple" as const,
+      to: 3940,
+      suffix: "+",
+      label: t.marketing.stats.verifiedFreelancers,
+      desc: t.marketing.stats.verifiedFreelancersDesc,
+    },
+    {
+      Icon: ShieldCheck,
+      tone: "green" as const,
+      to: 84.6,
+      decimals: 1,
+      suffix: "M",
+      label: t.marketing.stats.securedEscrow,
+      desc: t.marketing.stats.securedEscrowDesc,
+    },
+    {
+      Icon: Zap,
+      tone: "amber" as const,
+      to: 6.5,
+      decimals: 1,
+      suffix: " hrs",
+      label: t.marketing.stats.avgPayout,
+      desc: t.marketing.stats.avgPayoutDesc,
+    },
   ];
+
   return (
-    <div className="v2-container" style={{ paddingTop: 56 }}>
-      <Reveal>
-        <div className="v2-stats-band">
-          {items.map((s, i) => (
+    <section className="v2-section-sm v2-stats" aria-label="Platform metrics">
+      <div className="v2-stats-spot" aria-hidden="true" />
+      <div className="v2-stats-grid" aria-hidden="true" />
+      <div className="v2-stats-noise" aria-hidden="true" />
+
+      <div className="v2-container">
+        <div className="v2-stats-row">
+          {statCards.map((s, i) => (
             <motion.div
               key={s.label}
               className="v2-stat"
-              initial={{ opacity: 0, y: 24 }}
+              initial={{ opacity: 0, y: 28 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
-              transition={{ duration: 0.6, delay: i * 0.08, ease: EASE }}
+              viewport={{ once: true, amount: 0.35 }}
+              transition={{ duration: 0.7, delay: i * 0.09, ease: EASE }}
             >
-              <span className="v2-stat-ico">
-                <s.Icon size={26} />
-              </span>
-              <div className="v2-stat-val">
-                <CountUp to={s.to} decimals={s.decimals ?? 0} suffix={s.suffix ?? ""} />
-              </div>
-              <div className="v2-stat-label">{s.label}</div>
+              <article className={`v2-stat-card v2-stat-card--${s.tone}`}>
+                <span className="v2-stat-orb" aria-hidden="true" />
+                <span className="v2-stat-shine" aria-hidden="true" />
+
+                <div className="v2-stat-inner">
+                  <div className="v2-stat-top">
+                    <span className="v2-stat-label">{s.label}</span>
+                    <span className="v2-stat-ico" aria-hidden="true">
+                      <s.Icon size={19} strokeWidth={1.9} />
+                    </span>
+                  </div>
+                  <div className="v2-stat-val">
+                    <CountUp to={s.to} decimals={s.decimals ?? 0} suffix={s.suffix ?? ""} />
+                  </div>
+                  <div className="v2-stat-rule" aria-hidden="true" />
+                  <span className="v2-stat-desc">{s.desc}</span>
+                </div>
+              </article>
             </motion.div>
           ))}
         </div>
-      </Reveal>
-    </div>
+      </div>
+    </section>
   );
 }
 
 /* ─────────────────────────────────────────────────
-   Escrow / How it Works — pinned scroll board
+   Escrow / How it works — slogan, stepper + product stage
    ───────────────────────────────────────────────── */
-const PIN_CARDS = [
-  { left: 24, top: 13, rot: -7, rotM: -2,   swd: "0s",    cls: "esc-card--1" },
-  { left: 58, top: 24, rot: 6,  rotM: 1.5,  swd: "-1.6s", cls: "esc-card--2" },
-  { left: 22, top: 49, rot: -5, rotM: -1.5, swd: "-3.1s", cls: "esc-card--3" },
-  { left: 58, top: 62, rot: 7,  rotM: 2,    swd: "-4.4s", cls: "esc-card--4" },
+const ESC_DUR = 6500;
+
+/* Status pill on a product screen. Solid tint, bold ink — never a
+   low-opacity wash (see .agents/AGENTS.md). */
+function EscBadge({ tone = "green", children }: { tone?: "green" | "gray"; children: React.ReactNode }) {
+  return <span className={`esc-badge${tone === "gray" ? " is-gray" : ""}`}>{children}</span>;
+}
+
+/* ---- 01 · Fund ---- */
+function EscScreenFund() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Project budget</span>
+        <EscBadge><Lock size={14} />Locked in escrow</EscBadge>
+      </div>
+      <p className="esc-amount">$2,400<span>.00</span></p>
+      <div className="esc-card">
+        <div className="esc-row">
+          <span className="esc-ic"><Wallet size={20} /></span>
+          <span className="esc-txt">
+            <b>Escrow vault</b>
+            <small>Held safely &mdash; never sent until you approve</small>
+          </span>
+          <span className="esc-val">100%</span>
+        </div>
+        <div className="esc-bar" style={{ "--esc-w": "100%" } as React.CSSProperties}><i /></div>
+        <div className="esc-row esc-row-sub">
+          <span>Deposit &middot; Visa &bull;&bull; 4021</span>
+          <span className="esc-val">$2,400.00</span>
+        </div>
+      </div>
+      <div className="esc-chips">
+        <span className="esc-chip"><Lock size={14} />Balance locked</span>
+        <span className="esc-chip"><ShieldCheck size={14} />Protection on</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 02 · Work ---- */
+function EscScreenWork() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Milestones</span>
+        <EscBadge><Briefcase size={14} />Milestone 2 of 3</EscBadge>
+      </div>
+      <div className="esc-mlist">
+        <div className="esc-mrow">
+          <span className="esc-st is-done"><Check size={15} strokeWidth={3} /></span>
+          <span className="esc-txt">
+            <b>Brand identity</b>
+            <small>Approved &middot; delivered Mar 6</small>
+          </span>
+        </div>
+        <div className="esc-mrow">
+          <span className="esc-st is-now"><CircleDot size={15} /></span>
+          <span className="esc-txt">
+            <b>Website build</b>
+            <small>Submitted for review &middot; deliverables &amp; notes attached</small>
+            <span className="esc-files">
+              <span className="esc-file"><File size={12} />homepage.fig</span>
+              <span className="esc-file"><File size={12} />style-guide.pdf</span>
+            </span>
+          </span>
+        </div>
+        <div className="esc-mrow">
+          <span className="esc-st is-wait"><Circle size={15} /></span>
+          <span className="esc-txt">
+            <b>Launch support</b>
+            <small>Queued &middot; starts after this approval</small>
+          </span>
+        </div>
+      </div>
+      <div className="esc-person">
+        <span className="esc-avatar">AK</span>
+        <span className="esc-txt">
+          <b>Ana Kova&#269;</b>
+          <small>Freelancer &middot; designer &amp; developer</small>
+        </span>
+        <span className="esc-online"><i />online</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 03 · Approve ---- */
+function EscScreenApprove() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Review delivery</span>
+        <EscBadge><CheckCircle size={14} />Ready to approve</EscBadge>
+      </div>
+      <div className="esc-card esc-preview">
+        <span className="esc-thumb"><Eye size={24} /></span>
+        <span className="esc-txt">
+          <b>Website build &mdash; v2</b>
+          <small>&ldquo;Final homepage, style guide and handoff docs. Staging link is in the notes &mdash; ready whenever you are.&rdquo; &middot; Ana</small>
+        </span>
+      </div>
+      <div className="esc-actions">
+        <button type="button" className="esc-btn">
+          Approve &amp; release $800 <ArrowRight size={16} />
+        </button>
+        <button type="button" className="esc-btn is-ghost">Request changes</button>
+      </div>
+      <div className="esc-count">
+        <Clock size={16} />
+        Auto-release in 5 days if you do nothing
+        <span className="esc-bar" style={{ "--esc-w": "22%" } as React.CSSProperties}><i /></span>
+      </div>
+    </div>
+  );
+}
+
+/* ---- 04 · Protected ---- */
+const ESC_CASES = [
+  { Icon: File, title: "Brief & scope uploaded", meta: "Mar 2 \u00b7 09:14" },
+  { Icon: MessageSquare, title: "Thread: scope change agreed", meta: "Mar 9 \u00b7 16:40 \u00b7 both parties confirmed" },
+  { Icon: CheckCircle, title: "Delivery v2 received", meta: "Mar 14 \u00b7 11:02" },
 ];
 
-const PIN_NOTES = [
-  { left: 76, top: 13, rot: 3,  swd: "-0.8s", cls: "esc-note--1", Icon: Wallet,     text: "Balance locked",            dot: "#e11d48" },
-  { left: 5,  top: 35, rot: -4, swd: "-2.2s", cls: "esc-note--2", Icon: CheckCircle, text: "Milestone 2 of 3 approved", dot: "#2563eb" },
-  { left: 6,  top: 86, rot: 2,  swd: "-3.6s", cls: "esc-note--3", Icon: Clock,       text: "Auto\u2011release in 5 days", dot: "#059669" },
-];
+function EscScreenProtected() {
+  return (
+    <div className="esc-p">
+      <div className="esc-p-head">
+        <span className="esc-p-label">Resolution center</span>
+        <EscBadge><ShieldCheck size={14} />Mediation open</EscBadge>
+      </div>
+      <div className="esc-card esc-flush">
+        <div className="esc-row">
+          <span className="esc-ic"><Shield size={20} /></span>
+          <span className="esc-txt">
+            <b>Evidence&#8209;backed review</b>
+            <small>Every file, message and approval is time&#8209;stamped and attached to this case.</small>
+          </span>
+        </div>
+      </div>
+      <div className="esc-tl">
+        {ESC_CASES.map((c) => (
+          <div key={c.title} className="esc-tl-item">
+            <span className="esc-ic is-gray"><c.Icon size={16} /></span>
+            <span className="esc-txt">
+              <b>{c.title}</b>
+              <small>{c.meta}</small>
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="esc-person">
+        <span className="esc-avatar">YS</span>
+        <span className="esc-txt">
+          <b>YEKIS Support</b>
+          <small>Mediator assigned &middot; replies in under 24h</small>
+        </span>
+      </div>
+    </div>
+  );
+}
 
-/* dashed connectors, drawn in a 0-100 board space between card corners */
-const PIN_WIRES = [
-  "M46 40 C 50 37, 54 32, 58 27",
-  "M57 44 C 53 47, 48 50, 45 52",
-  "M45 53 C 49 58, 53 63, 57 68",
-];
+const ESC_SCREENS = [EscScreenFund, EscScreenWork, EscScreenApprove, EscScreenProtected];
 
-/* scroll-progress windows: cards drop in → wires draw → notes pop */
-const PIN_CARD_AT = [0, 0.24, 0.48, 0.72];
-const PIN_CARD_WIN = 0.2;
-const PIN_WIRE_AT = [0.16, 0.4, 0.64];
-const PIN_WIRE_WIN = 0.16;
-const PIN_NOTE_AT = [0.3, 0.56, 0.8];
+function EscrowSection() {
+  const { t } = useI18n();
+  const moduleRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [still, setStill] = useState(false);
+  const seen = useInView(moduleRef, { amount: 0.25 });
 
-const escClamp = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v);
-const escMix = (a: number, b: number, t: number) => a + (b - a) * t;
-const escBackOut = (t: number) => {
-  t = escClamp(t);
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-};
+  const steps = [
+    { n: "01", title: t.marketing.escrow.step1Title, body: t.marketing.escrow.step1Desc },
+    { n: "02", title: t.marketing.escrow.step2Title, body: t.marketing.escrow.step2Desc },
+    { n: "03", title: t.marketing.escrow.step3Title, body: t.marketing.escrow.step3Desc },
+    { n: "04", title: t.marketing.escrow.step4Title, body: t.marketing.escrow.step4Desc },
+  ];
 
-function EscrowSection({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const wrapRef  = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const cueRef   = useRef<HTMLDivElement>(null);
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const pinRefs  = useRef<(HTMLSpanElement | null)[]>([]);
-  const wireRefs = useRef<(SVGPathElement | null)[]>([]);
-  const wireLen  = useRef<number[]>([]);
-  const noteRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const pRef     = useRef(0);
-
-  const { scrollYProgress } = useScroll({ target: wrapRef, offset: ["start start", "end end"] });
-  const progress = useSpring(scrollYProgress, { stiffness: 150, damping: 32, mass: 0.4 });
-
-  /* each connector reveals by sliding its own dash window, so the mask
-     paths need their real length — `pathLength` is not honoured by
-     stroke-dashoffset in Blink, hence the measurement instead. The band
-     is sized in board units (see .esc-wire-mask) for the same reason. */
+  /* honour a mid-session motion preference change */
   useEffect(() => {
-    wireRefs.current.forEach((path, i) => {
-      if (!path) return;
-      const len = path.getTotalLength();
-      wireLen.current[i] = len;
-      path.style.strokeDasharray = `${len} ${len}`;
-      path.style.strokeDashoffset = String(len);
-    });
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync = () => setStill(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
   }, []);
 
-  const paint = useCallback((p: number, introT: number) => {
-    for (let i = 0; i < STEPS.length; i++) {
-      const card = cardRefs.current[i];
-      if (!card) continue;
-      const t = Math.max(escClamp((p - PIN_CARD_AT[i]) / PIN_CARD_WIN), i === 0 ? introT : 0);
-      const e = escBackOut(t);
-      card.style.opacity = String(escClamp(t * 2.2));
-      card.style.transform =
-        `translateY(${escMix(-70, 0, e).toFixed(2)}px) ` +
-        `rotate(${(PIN_CARDS[i].rot + escMix(-9, 0, e)).toFixed(2)}deg) ` +
-        `scale(${escMix(0.86, 1, e).toFixed(3)})`;
-      const pin = pinRefs.current[i];
-      if (pin) {
-        const pe = escBackOut((t - 0.3) / 0.5);
-        pin.style.transform = `translateX(-50%) translateY(${escMix(-24, 0, pe).toFixed(2)}px)`;
-      }
-    }
-    for (let i = 0; i < PIN_WIRES.length; i++) {
-      const wire = wireRefs.current[i];
-      const len = wireLen.current[i];
-      if (!wire || !len) continue;
-      const t = Math.max(escClamp((p - PIN_WIRE_AT[i]) / PIN_WIRE_WIN), i === 0 ? introT * 0.6 : 0);
-      wire.style.strokeDashoffset = (len * (1 - t)).toFixed(2);
-    }
-    for (let i = 0; i < PIN_NOTES.length; i++) {
-      const note = noteRefs.current[i];
-      if (!note) continue;
-      note.style.opacity = String(escClamp((p - PIN_NOTE_AT[i]) / 0.06));
-      const e = escBackOut((p - PIN_NOTE_AT[i]) / 0.12);
-      note.style.transform = `rotate(${PIN_NOTES[i].rot}deg) scale(${escMix(0.7, 1, e).toFixed(3)})`;
-    }
-    stageRef.current?.style.setProperty("--esc-bgY", `${(p * -70).toFixed(1)}px`);
-    cueRef.current?.classList.toggle("esc-cue-off", p > 0.02);
-  }, []);
-
-  useMotionValueEvent(progress, "change", (p) => {
-    pRef.current = p;
-    paint(p, 1);
-  });
-
+  /* autoplay — only once the module is on screen, and never under
+     reduced motion or while the pointer/focus is inside it */
   useEffect(() => {
-    const still  = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const narrow = window.matchMedia("(max-width: 900px)").matches;
-    if (still || narrow) {
-      paint(1, 1);
-      return;
-    }
-    const intro = animate(0, 1, {
-      duration: 0.95,
-      ease: [0.34, 1.56, 0.64, 1],
-      onUpdate: (v) => paint(pRef.current, v),
-    });
-    return () => intro.stop();
-  }, [paint]);
+    if (still || !seen || paused) return;
+    const interval = window.setInterval(() => setActive((i) => (i + 1) % steps.length), ESC_DUR);
+    return () => window.clearInterval(interval);
+  }, [still, seen, paused, active, steps.length]);
+
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    let next: number;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") next = active + 1;
+    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") next = active - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = steps.length - 1;
+    else return;
+    e.preventDefault();
+    const i = (next + steps.length) % steps.length;
+    setActive(i);
+    tabRefs.current[i]?.focus();
+  };
 
   return (
     <section className="v2-section" id="how-it-works">
-      {/* intro band — static, sits above the pinned board */}
       <div className="v2-container">
-        <div className="v2-escrow-wrap">
-          <div>
-            <Reveal><span className="v2-eyebrow"><Shield size={14} /> How your payment is protected</span></Reveal>
-            <Reveal delay={0.06}><h2 className="v2-sec-title">Clear money. Clear evidence. Clear next steps.</h2></Reveal>
-            <Reveal delay={0.12}><p className="v2-sec-sub">Every payment follows four transparent steps — guaranteed protection for clients and freelancers.</p></Reveal>
-            <Reveal delay={0.18}>
-              <div style={{ marginTop: 26 }}>
-                <button className="v2-link-btn" onClick={() => onNavigate("faq")}>
-                  See how disputes get resolved <ArrowRight size={16} />
-                </button>
-              </div>
-            </Reveal>
-          </div>
-
-          <Reveal dir="zoom" delay={0.1}>
-            <EscrowVault />
+        <div
+          ref={moduleRef}
+          className={`esc-module${paused ? " is-paused" : ""}`}
+          onMouseEnter={() => setPaused(true)}
+          onMouseLeave={() => setPaused(false)}
+          onFocus={() => setPaused(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
+          }}
+        >
+          <Reveal className="esc-slogan-wrap">
+            <h2 className="esc-slogan">{t.marketing.escrow.slogan}</h2>
           </Reveal>
-        </div>
-      </div>
 
-      {/* pinned board — 480svh of scroll space */}
-      <div className="esc-wrap" ref={wrapRef}>
-        <div className="esc-pin" ref={stageRef}>
-          <svg className="esc-wires" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              {PIN_WIRES.map((d, i) => (
-                <mask
-                  key={`m${i}`}
-                  id={`esc-wm${i + 1}`}
-                  className="esc-wire-mask"
-                  maskUnits="userSpaceOnUse"
-                  x="0"
-                  y="0"
-                  width="100"
-                  height="100"
-                >
-                  <path ref={(el) => { wireRefs.current[i] = el; }} d={d} />
-                </mask>
-              ))}
-            </defs>
-            {PIN_WIRES.map((d, i) => (
-              <path key={`w${i}`} className="esc-wire" d={d} mask={`url(#esc-wm${i + 1})`} />
+          <div
+            className="esc-steps"
+            role="tablist"
+            aria-label="How YEKIS works, four steps"
+            onKeyDown={onKey}
+          >
+            {steps.map((s, i) => (
+              <button
+                key={s.n}
+                ref={(el) => { tabRefs.current[i] = el; }}
+                type="button"
+                role="tab"
+                id={`esc-tab-${i}`}
+                aria-selected={i === active}
+                aria-controls={`esc-panel-${i}`}
+                tabIndex={i === active ? 0 : -1}
+                className={`esc-step${i === active ? " is-active" : ""}`}
+                onClick={() => setActive(i)}
+              >
+                <span className="esc-step-n">{s.n}</span>
+                <span className="esc-step-h">{s.title}<i className="esc-step-live" /></span>
+                <span className="esc-step-p">{s.body}</span>
+                <span className="esc-step-track"><i /></span>
+              </button>
             ))}
-          </svg>
+          </div>
 
-          {STEPS.map((s, i) => (
-            <div
-              key={s.n}
-              ref={(el) => { cardRefs.current[i] = el; }}
-              className={`esc-card ${PIN_CARDS[i].cls}`}
-              style={
-                {
-                  left: `${PIN_CARDS[i].left}%`,
-                  top: `${PIN_CARDS[i].top}%`,
-                  "--esc-rot": `${PIN_CARDS[i].rot}deg`,
-                  "--esc-rotm": `${PIN_CARDS[i].rotM}deg`,
-                  "--esc-swd": PIN_CARDS[i].swd,
-                } as React.CSSProperties
-              }
-            >
-              <div className="esc-card-in">
-                <div className="esc-sway">
-                  <div className="esc-card-body">
-                    <span className="esc-pin-svg" ref={(el) => { pinRefs.current[i] = el; }} aria-hidden="true">
-                      <svg viewBox="0 0 24 24">
-                        <path d="M12 21v-6" stroke="var(--esc-pin-head)" strokeWidth="2" strokeLinecap="round" />
-                        <path d="M8 3h8l-1.2 7.2a3 3 0 0 1-2 2.4h-1.6a3 3 0 0 1-2-2.4L8 3z" fill="var(--esc-pin-head)" />
-                        <circle cx="12" cy="4" r="2.4" fill="var(--esc-pin-dot)" />
-                      </svg>
-                    </span>
-                    <div className="esc-tint">
-                      <div className="esc-num-row">
-                        <span className="esc-num">{s.n}</span>
-                        <span className="esc-ic"><s.Icon size={20} /></span>
-                      </div>
-                      <h3>{s.title}</h3>
-                      <p>{s.body}</p>
-                    </div>
-                  </div>
+          <div className="esc-stage">
+            <div className="esc-chrome" aria-hidden="true">
+              <span className="esc-dots"><i /><i /><i /></span>
+              <span className="esc-url">app.yekis.com / escrow / <b>YK-2481</b></span>
+              <span className="esc-chrome-gap" />
+            </div>
+            <div className="esc-app">
+              {ESC_SCREENS.map((Screen, i) => (
+                <div
+                  key={steps[i].n}
+                  id={`esc-panel-${i}`}
+                  role="tabpanel"
+                  aria-labelledby={`esc-tab-${i}`}
+                  inert={i !== active}
+                  className={`esc-panel${i === active ? " is-active" : ""}`}
+                >
+                  <Screen />
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-
-          {PIN_NOTES.map((nt, i) => (
-            <div
-              key={nt.text}
-              ref={(el) => { noteRefs.current[i] = el; }}
-              className={`esc-note ${nt.cls}`}
-              style={
-                {
-                  left: `${nt.left}%`,
-                  top: `${nt.top}%`,
-                  "--esc-swd": nt.swd,
-                } as React.CSSProperties
-              }
-            >
-              <svg className="esc-note-pin" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="5" fill={nt.dot} />
-              </svg>
-              <span className="esc-note-in">
-                <nt.Icon size={15} className="esc-note-ic" />
-                {nt.text}
-              </span>
-            </div>
-          ))}
-
-          <div className="esc-cue" ref={cueRef} aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path d="M12 5v14" /><path d="m19 12-7 7-7-7" /></svg>
-            Scroll
           </div>
         </div>
-      </div>
-
-      {/* footnote — static band below the pinned board */}
-      <div className="v2-container">
-        <p className="esc-foot">Every step is recorded and time-stamped so both sides have complete peace of mind.</p>
       </div>
     </section>
   );
@@ -899,6 +951,7 @@ function EscrowSection({ onNavigate }: { onNavigate: (p: string) => void }) {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
+  const { t } = useI18n();
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref, { once: true, amount: 0.35 });
   return (
@@ -906,22 +959,22 @@ function FeesSection() {
       <div className="v2-container">
         <Reveal dir="zoom">
           <div className="v2-fees-card" ref={ref}>
-            <span className="v2-eyebrow"><TrendingUp size={14} /> Transparent fees</span>
-            <h2 className="v2-sec-title" style={{ maxWidth: 620 }}>One small percentage. Only when work pays out.</h2>
-            <p className="v2-sec-sub">Nothing is charged upfront. Fees are split between client and freelancer at the moment escrow releases.</p>
+            <span className="v2-eyebrow"><TrendingUp size={14} /> {t.marketing.fees.eyebrow}</span>
+            <h2 className="v2-sec-title" style={{ maxWidth: 620 }}>{t.marketing.fees.headline}</h2>
+            <p className="v2-sec-sub">{t.marketing.fees.subheadline}</p>
             <div className="v2-fee-bar">
               <motion.div className="v2-fee-seg a" initial={{ width: 0 }} animate={seen ? { width: "12%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}>5%</motion.div>
               <motion.div className="v2-fee-seg b" initial={{ width: 0 }} animate={seen ? { width: "16%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}>7%</motion.div>
-              <motion.div className="v2-fee-seg c" initial={{ width: 0 }} animate={seen ? { width: "72%" } : {}} transition={{ duration: 1.1, ease: EASE, delay: 0.42 }}>88% → talent</motion.div>
+              <motion.div className="v2-fee-seg c" initial={{ width: 0 }} animate={seen ? { width: "72%" } : {}} transition={{ duration: 1.1, ease: EASE, delay: 0.42 }}>88% → {t.marketing.fees.talentShare}</motion.div>
             </div>
             <div className="v2-fee-legend">
-              <span><i style={{ background: "var(--v2-teal)" }} />Client fee</span>
-              <span><i style={{ background: "var(--v2-violet)" }} />Freelancer fee</span>
-              <span><i style={{ background: "var(--v2-border2)" }} />Goes to the freelancer</span>
+              <span><i style={{ background: "var(--v2-teal)" }} />{t.marketing.fees.clientFee}</span>
+              <span><i style={{ background: "var(--v2-violet)" }} />{t.marketing.fees.freelancerFee}</span>
+              <span><i style={{ background: "var(--v2-border2)" }} />{t.marketing.fees.talentShare}</span>
             </div>
             <p style={{ marginTop: 20, color: "var(--v2-text2)", fontSize: 13.5 }}>
               <WalletCards size={15} style={{ verticalAlign: "text-bottom", marginRight: 7, color: "var(--v2-primary)" }} />
-              Deposits and withdrawals via Telebirr or CBE — no hidden wire charges.
+              {t.marketing.fees.note}
             </p>
           </div>
         </Reveal>
@@ -931,69 +984,10 @@ function FeesSection() {
 }
 
 /* ─────────────────────────────────────────────────
-   Pinned scroll-stack deck data
-───────────────────────────────────────────────── */
-const DECK_CARDS = [
-  {
-    cardClass: "stk-card--1",
-    klass: "01 / Engineering",
-    titleL1: "Web & App",
-    titleL2: "Development",
-    roles: "148 open roles",
-    tag: "Full\u2011stack · Mobile · API",
-    Icon: Code,
-  },
-  {
-    cardClass: "stk-card--2",
-    klass: "02 / Design",
-    titleL1: "Graphic Design",
-    titleL2: "& Branding",
-    roles: "96 open roles",
-    tag: "Identity · Print · UI",
-    Icon: Palette,
-  },
-  {
-    cardClass: "stk-card--3",
-    klass: "03 / Marketing",
-    titleL1: "Digital",
-    titleL2: "Marketing",
-    roles: "74 open roles",
-    tag: "SEO · Social · Paid",
-    Icon: Megaphone,
-  },
-  {
-    cardClass: "stk-card--4",
-    klass: "04 / Content",
-    titleL1: "Content &",
-    titleL2: "Copywriting",
-    roles: "61 open roles",
-    tag: "Editorial · UX · Scripts",
-    Icon: PenTool,
-  },
-  {
-    cardClass: "stk-card--5",
-    klass: "05 / Language",
-    titleL1: "Amharic / English",
-    titleL2: "Translation",
-    roles: "53 open roles",
-    tag: "Localisation · Subtitling",
-    Icon: Languages,
-  },
-  {
-    cardClass: "stk-card--6",
-    klass: "06 / Data",
-    titleL1: "Data",
-    titleL2: "Processing",
-    roles: "88 open roles",
-    tag: "Annotation · ETL · QA",
-    Icon: Database,
-  },
-] as const;
-
-/* ─────────────────────────────────────────────────
    Categories — pinned scroll-stack deck
 ───────────────────────────────────────────────── */
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+  const { t } = useI18n();
   const wrapRef  = useRef<HTMLDivElement>(null);
   const pinRef   = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -1152,15 +1146,72 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     };
   }, []);
 
+  const deckCards = [
+    {
+      cardClass: "stk-card--1",
+      klass: t.marketing.categories.c1Class,
+      titleL1: t.marketing.categories.c1Title1,
+      titleL2: t.marketing.categories.c1Title2,
+      roles: t.marketing.categories.c1Roles,
+      tag: t.marketing.categories.c1Tag,
+      Icon: Code,
+    },
+    {
+      cardClass: "stk-card--2",
+      klass: t.marketing.categories.c2Class,
+      titleL1: t.marketing.categories.c2Title1,
+      titleL2: t.marketing.categories.c2Title2,
+      roles: t.marketing.categories.c2Roles,
+      tag: t.marketing.categories.c2Tag,
+      Icon: Palette,
+    },
+    {
+      cardClass: "stk-card--3",
+      klass: t.marketing.categories.c3Class,
+      titleL1: t.marketing.categories.c3Title1,
+      titleL2: t.marketing.categories.c3Title2,
+      roles: t.marketing.categories.c3Roles,
+      tag: t.marketing.categories.c3Tag,
+      Icon: Megaphone,
+    },
+    {
+      cardClass: "stk-card--4",
+      klass: t.marketing.categories.c4Class,
+      titleL1: t.marketing.categories.c4Title1,
+      titleL2: t.marketing.categories.c4Title2,
+      roles: t.marketing.categories.c4Roles,
+      tag: t.marketing.categories.c4Tag,
+      Icon: PenTool,
+    },
+    {
+      cardClass: "stk-card--5",
+      klass: t.marketing.categories.c5Class,
+      titleL1: t.marketing.categories.c5Title1,
+      titleL2: t.marketing.categories.c5Title2,
+      roles: t.marketing.categories.c5Roles,
+      tag: t.marketing.categories.c5Tag,
+      Icon: Languages,
+    },
+    {
+      cardClass: "stk-card--6",
+      klass: t.marketing.categories.c6Class,
+      titleL1: t.marketing.categories.c6Title1,
+      titleL2: t.marketing.categories.c6Title2,
+      roles: t.marketing.categories.c6Roles,
+      tag: t.marketing.categories.c6Tag,
+      Icon: Database,
+    },
+  ];
+
   return (
     <section className="v2-section" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
       {/* section header */}
       <div className="v2-container">
-        <Reveal><span className="v2-eyebrow"><Sparkles size={14} /> Browse by category</span></Reveal>
-        <Reveal delay={0.05}><h2 className="v2-sec-title">Find the right expertise.</h2></Reveal>
+        <Reveal><span className="v2-eyebrow"><Sparkles size={14} /> {t.marketing.categories.eyebrow}</span></Reveal>
+        <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
         <Reveal delay={0.1}>
           <p className="v2-sec-sub" style={{ marginBottom: 38 }}>
-            Six launch categories covering Ethiopia&rsquo;s most in-demand digital skills.
+            {t.marketing.categories.subtitle}
           </p>
         </Reveal>
       </div>
@@ -1169,11 +1220,11 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       <div className="stk-wrap" ref={wrapRef}>
         <div className="stk-pin" ref={pinRef}>
           <div className="stk-stage" ref={stageRef}>
-            {DECK_CARDS.map((card, i) => (
+            {deckCards.map((card, i) => (
               <div
                 key={card.cardClass}
                 className={`stk-card ${card.cardClass}`}
-                style={{ zIndex: DECK_CARDS.length - i }}
+                style={{ zIndex: deckCards.length - i }}
               >
                 {/* copy column */}
                 <div className="stk-col stk-copy">
@@ -1213,7 +1264,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
           {/* deck counter */}
           <div className="stk-count" ref={countRef}>
-            <b ref={curRef}>01</b> / {String(DECK_CARDS.length).padStart(2, "0")}
+            <b ref={curRef}>01</b> / {String(deckCards.length).padStart(2, "0")}
           </div>
 
           {/* scroll cue */}
@@ -1224,20 +1275,20 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
                 <path d="M12 5v14" /><path d="m19 12-7 7-7-7" />
               </svg>
             </span>
-            <span className="lbl">Scroll</span>
+            <span className="lbl">{t.marketing.categories.scrollCue}</span>
           </div>
         </div>
       </div>
 
       {/* outro — always-dark "Let's build." panel */}
       <div className="stk-flat stk-outro" ref={outroRef} role="complementary" aria-label="Call to action">
-        <h1 className="stk-rv"><span>Let&rsquo;s build.</span></h1>
+        <h1 className="stk-rv"><span>{t.marketing.categories.outroTitle}</span></h1>
         <p className="stk-outro-sub">
-          Post a role in minutes, or join the talent pool &mdash; Ethiopia&rsquo;s digital workforce is one deck away.
+          {t.marketing.categories.outroSubtitle}
         </p>
         <div className="stk-cta-row">
-          <button className="stk-outro-btn" onClick={() => onStart("register")}>Get started</button>
-          <button className="stk-outro-ghost" onClick={() => onStart("login")}>Sign in</button>
+          <button className="stk-outro-btn" onClick={() => onStart("register")}>{t.nav.getStarted}</button>
+          <button className="stk-outro-ghost" onClick={() => onStart("login")}>{t.nav.signIn}</button>
         </div>
       </div>
     </section>
@@ -1246,78 +1297,116 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
 
 /* ─────────────────────────────────────────────────
-   Testimonials
+   Testimonials — vertical review marquee
 ───────────────────────────────────────────────── */
+const MARQUEE_DURATIONS = ["38s", "46s", "34s"];
+
+function GoogleMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
+      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
+    </svg>
+  );
+}
+
+function TrustpilotMark() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect width="24" height="24" rx="6" fill="#00b67a" />
+      <path
+        fill="#fff"
+        d="M12 5.1l1.99 4.46 4.79.41-3.65 3.13 1.09 4.71L12 15.52l-4.22 2.29 1.09-4.71-3.65-3.13 4.79-.41L12 5.1z"
+      />
+    </svg>
+  );
+}
+
+function ReviewCard({ review }: { review: MemberReview }) {
+  const [a1, a2] = REVIEW_TONES[review.tone];
+  return (
+    <article className="v2-testi-card">
+      <span className="v2-testi-sheen" aria-hidden="true" />
+      <div className="v2-testi-top">
+        <V2Stars rating={review.rating} s={14} />
+        <span className="v2-testi-src">
+          {review.source === "google" ? <GoogleMark /> : <TrustpilotMark />}
+          {review.source === "google" ? "Google" : "Trustpilot"}
+        </span>
+      </div>
+      <blockquote className="v2-testi-text">&ldquo;{review.quote}&rdquo;</blockquote>
+      <div className="v2-testi-who">
+        <V2Avatar name={review.name} size={40} radius={12} h1={a1} h2={a2} />
+        <div className="v2-testi-id">
+          <span className="v2-testi-name">
+            {review.name}
+            <BadgeCheck size={13} aria-label="Verified member" />
+          </span>
+          <span className="v2-testi-meta">
+            {review.meta} · {review.when}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function TestimonialsSection() {
-  const [idx, setIdx] = useState(0);
-  const [dir, setDir] = useState(1);
-  const [paused, setPaused] = useState(false);
-
-  useEffect(() => {
-    if (paused || prefersReduced()) return;
-    const id = window.setInterval(() => {
-      setDir(1);
-      setIdx((v) => (v + 1) % TESTIMONIALS.length);
-    }, 6200);
-    return () => window.clearInterval(id);
-  }, [paused]);
-
-  const go = (n: number) => { setDir(n > idx ? 1 : -1); setIdx(n); };
-  const cur = TESTIMONIALS[idx];
-  const h1 = cur.tone === "a" ? "var(--v2-primary)" : cur.tone === "b" ? "var(--v2-teal)" : "var(--v2-violet)";
-  const h2 = cur.tone === "a" ? "var(--v2-teal)" : cur.tone === "b" ? "var(--v2-violet)" : "var(--v2-primary)";
+  const { t } = useI18n();
+  const columns = useMemo(() => {
+    const cols: MemberReview[][] = [[], [], []];
+    REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
+    return cols;
+  }, []);
 
   return (
-    <section className="v2-section" style={{ paddingTop: 10 }}>
-      <div className="v2-container" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
-        <div className="v2-center" style={{ marginBottom: 34 }}>
-          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> What members say</span></Reveal>
-          <Reveal delay={0.06}><h2 className="v2-sec-title">Trust, in their words.</h2></Reveal>
+    <section className="v2-section v2-testi" aria-labelledby="v2-testi-title">
+      <div className="v2-testi-aurora" aria-hidden="true" />
+      <div className="v2-container">
+        <div className="v2-center">
+          <Reveal>
+            <span className="v2-eyebrow">
+              <MessageCircle size={14} /> {t.marketing.testimonials.eyebrow}
+            </span>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h2 className="v2-sec-title" id="v2-testi-title">
+              {t.marketing.testimonials.title}
+            </h2>
+          </Reveal>
+          <Reveal delay={0.14}>
+            <p className="v2-sec-sub v2-testi-sub">
+              {t.marketing.testimonials.subtitle}
+            </p>
+          </Reveal>
         </div>
-        <div className="v2-testi-stage">
-          <AnimatePresence mode="wait" custom={dir}>
-            <motion.blockquote
-              key={idx}
-              className="v2-testi-card"
-              custom={dir}
-              initial={{ opacity: 0, x: dir * 70, scale: 0.98 }}
-              animate={{ opacity: 1, x: 0, scale: 1 }}
-              exit={{ opacity: 0, x: dir * -70, scale: 0.98 }}
-              transition={{ duration: 0.55, ease: EASE }}
+
+        <div className="v2-testi-marquee">
+          {columns.map((col, i) => (
+            <div
+              className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
+              key={`col-${i}`}
+              style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
             >
-              <span className="v2-testi-quote">"</span>
-              <p>{cur.q}</p>
-              <div className="v2-testi-who">
-                <V2Avatar name={cur.name} size={46} radius={14} h1={h1} h2={h2} />
-                <div><b>{cur.name}</b><span>{cur.role}</span></div>
-                <V2Stars rating={5} />
+              <div className="v2-testi-track">
+                <div className="v2-testi-copy">
+                  {col.map((r) => (
+                    <ReviewCard key={r.name} review={r} />
+                  ))}
+                </div>
+                <div className="v2-testi-copy" aria-hidden="true">
+                  {col.map((r) => (
+                    <ReviewCard key={`${r.name}-loop`} review={r} />
+                  ))}
+                </div>
               </div>
-            </motion.blockquote>
-          </AnimatePresence>
-        </div>
-        <div className="v2-testi-nav">
-          <motion.button
-            className="v2-icon-btn"
-            style={{ width: 38, height: 38 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { setDir(-1); setIdx((v) => (v - 1 + TESTIMONIALS.length) % TESTIMONIALS.length); }}
-            aria-label="Previous"
-          >
-            <ChevronLeft size={17} />
-          </motion.button>
-          {TESTIMONIALS.map((_, n) => (
-            <button key={n} className={`v2-tdot${n === idx ? " on" : ""}`} onClick={() => go(n)} aria-label={`Testimonial ${n + 1}`} />
+            </div>
           ))}
-          <motion.button
-            className="v2-icon-btn"
-            style={{ width: 38, height: 38 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => { setDir(1); setIdx((v) => (v + 1) % TESTIMONIALS.length); }}
-            aria-label="Next"
-          >
-            <ChevronRight size={17} />
-          </motion.button>
         </div>
+
+        <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
       </div>
     </section>
   );
@@ -1327,6 +1416,13 @@ function TestimonialsSection() {
    About / Studio — editorial split layout
 ───────────────────────────────────────────────── */
 function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
+  const { t } = useI18n();
+  const aboutFeatures = [
+    { n: "01", title: t.marketing.about.feature1Title, body: t.marketing.about.feature1Desc },
+    { n: "02", title: t.marketing.about.feature2Title, body: t.marketing.about.feature2Desc },
+    { n: "03", title: t.marketing.about.feature3Title, body: t.marketing.about.feature3Desc },
+  ];
+
   return (
     <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title" style={{ paddingTop: 10 }}>
       <div className="v2-container">
@@ -1334,23 +1430,20 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
           <div className="v2-about-panel">
             {/* Left: copy + highlights */}
             <div className="v2-about-content">
-              <span className="v2-about-eyebrow">Ethiopia's escrow-protected marketplace</span>
+              <span className="v2-about-eyebrow">{t.marketing.about.eyebrow}</span>
 
               <h2 className="v2-about-title" id="v2-about-title">
-                Great work deserves
+                {t.marketing.about.title1}
                 <br />
-                guaranteed payment.
+                {t.marketing.about.title2}
               </h2>
 
               <p className="v2-about-intro">
-                Yekis connects Ethiopian businesses with verified freelance talent —
-                and keeps every payment locked in escrow until the work is delivered
-                and approved. No chasing invoices, no awkward money conversations.
-                Just clear rules both sides can trust.
+                {t.marketing.about.intro}
               </p>
 
               <div className="v2-about-features">
-                {ABOUT_FEATURES.map((feature) => (
+                {aboutFeatures.map((feature) => (
                   <article className="v2-about-feature" key={feature.n}>
                     <span className="v2-about-feature-num" aria-hidden="true">{feature.n}</span>
                     <div>
@@ -1363,7 +1456,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 
               <button className="v2-btn v2-btn-primary v2-about-btn" onClick={() => onNavigate("about")}>
                 <span className="v2-shine" />
-                <span>More about Yekis</span>
+                <span>{t.marketing.about.btn}</span>
                 <ArrowUpRight size={16} className="v2-about-btn-arrow" />
               </button>
             </div>
@@ -1377,9 +1470,9 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
                 fetchPriority="high"
               />
               <div className="v2-about-visual-bar">
-                <span>Escrow</span>
-                <span>Fayda KYC</span>
-                <span>Mediation</span>
+                <span>{t.marketing.about.visualEscrow}</span>
+                <span>{t.marketing.about.visualKyc}</span>
+                <span>{t.marketing.about.visualMediation}</span>
               </div>
             </div>
           </div>
@@ -1392,92 +1485,284 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 /* ─────────────────────────────────────────────────
    FAQ
 ───────────────────────────────────────────────── */
-function FAQSection() {
-  const [openKey, setOpenKey] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
+  const { t } = useI18n();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  const groups = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return FAQS.map((cat) => ({
-      cat: cat.cat,
-      items: cat.items.filter((it) => {
+  /* rows are flattened on the way in so one index drives the whole list —
+     the open state, the --i stagger and the filter all key off it */
+  const rows = useMemo(() => {
+    const groups = [
+      {
+        cat: t.marketing.faq.trustTitle,
+        items: [
+          { q: t.marketing.faq.q1, a: t.marketing.faq.a1 },
+          { q: t.marketing.faq.q2, a: t.marketing.faq.a2 },
+          { q: t.marketing.faq.q3, a: t.marketing.faq.a3 },
+        ],
+      },
+      {
+        cat: t.marketing.faq.startTitle,
+        items: [
+          { q: t.marketing.faq.q5, a: t.marketing.faq.a5 },
+          { q: t.marketing.faq.q7, a: t.marketing.faq.a7, link: "fees" },
+          { q: t.marketing.faq.q8, a: t.marketing.faq.a8 },
+        ],
+      },
+      {
+        cat: t.marketing.faq.paidTitle,
+        items: [
+          { q: t.marketing.faq.q9, a: t.marketing.faq.a9 },
+          { q: t.marketing.faq.q11, a: t.marketing.faq.a11 },
+        ],
+      },
+    ];
+    const out: {
+      key: string;
+      g: number;
+      cat?: string;
+      q?: string;
+      a?: string;
+      link?: string;
+    }[] = [];
+    groups.forEach((g, gi) => {
+      out.push({ key: `cat-${gi}`, g: gi, cat: g.cat });
+      g.items.forEach((it, ii) => {
+        out.push({ key: `q-${gi}-${ii}`, g: gi, q: it.q, a: it.a, link: it.link });
+      });
+    });
+    return out;
+  }, [t]);
+
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+  /* bumping this remounts the list, which replays the staggered entrance
+     exactly like the reference does by resetting li.style.animation */
+  const [tick, setTick] = useState(0);
+
+  const needle = query.trim().toLowerCase();
+  const matched = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (r.cat) return false;
         if (!needle) return true;
-        return `${it.q} ${it.a}`.toLowerCase().includes(needle);
+        return `${r.q} ${r.a}`.toLowerCase().includes(needle);
       }),
-    })).filter((g) => g.items.length > 0);
-  }, [q]);
+    [rows, needle]
+  );
+  /* a category marker only rides along while its group still has a hit */
+  const visible = useMemo(() => {
+    const live = new Set(matched.map((r) => r.g));
+    return rows.filter((r) => (r.cat ? live.has(r.g) : matched.includes(r)));
+  }, [rows, matched]);
+  const shown = matched.length;
+
+  /* open the first question once the entrance settles */
+  useEffect(() => {
+    const first = rows.find((r) => !r.cat);
+    if (!first) return;
+    const id = window.setTimeout(
+      () => setOpenKey(first.key),
+      prefersReduced() ? 0 : 1150
+    );
+    return () => window.clearTimeout(id);
+  }, [rows]);
+
+  /* "/" focuses the filter from anywhere on the page */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing =
+        el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* gentle pointer parallax, lerped in a rAF loop like the reference */
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || prefersReduced()) return;
+    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+    const onMove = (e: PointerEvent) => {
+      tx = e.clientX / window.innerWidth - 0.5;
+      ty = e.clientY / window.innerHeight - 0.5;
+    };
+    const loop = () => {
+      cx += (tx - cx) * 0.06;
+      cy += (ty - cy) * 0.06;
+      el.style.setProperty("--mx", cx.toFixed(4));
+      el.style.setProperty("--my", cy.toFixed(4));
+      raf = requestAnimationFrame(loop);
+    };
+    window.addEventListener("pointermove", onMove);
+    raf = requestAnimationFrame(loop);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const toggle = (key: string, question: string) => {
+    if (openKey !== key) events.faqExpanded(question);
+    setOpenKey(openKey === key ? null : key);
+  };
+
+  /* every visible non-category row, numbered for the entrance stagger */
+  let i = 0;
 
   return (
-    <section className="v2-section" id="faq">
-      <div className="v2-container">
-        <div className="v2-center" style={{ marginBottom: 40 }}>
-          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> FAQ</span></Reveal>
-          <Reveal delay={0.06}><h2 className="v2-sec-title">Frequently asked questions</h2></Reveal>
-          <Reveal delay={0.12}><p className="v2-sec-sub" style={{ margin: "0 auto" }}>Straight answers about money, verification and disputes.</p></Reveal>
+    <section className="v2-faq" id="faq" ref={sectionRef} aria-labelledby="v2-faq-title">
+      {/* ambient motion layer */}
+      <div className="v2-faq-blobs" aria-hidden="true">
+        <span className="v2-faq-blob b1" />
+        <span className="v2-faq-blob b2" />
+        <span className="v2-faq-blob b3" />
+      </div>
+
+      <div className="v2-faq-leaves" aria-hidden="true">
+        <span className="v2-faq-leaf l1">
+          <svg width="22" height="30" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".55" />
+            <path d="M12 6V27" stroke="var(--v2-primary-ink)" strokeWidth="1.2" opacity=".6" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l2">
+          <svg width="16" height="22" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".45" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l3">
+          <svg width="20" height="27" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".35" />
+            <path d="M12 6V27" stroke="var(--v2-bg2)" strokeWidth="1.1" opacity=".5" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l4">
+          <svg width="14" height="19" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".4" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l5">
+          <svg width="18" height="25" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".45" />
+            <path d="M12 6V27" stroke="var(--v2-primary-ink)" strokeWidth="1.1" opacity=".55" />
+          </svg>
+        </span>
+      </div>
+
+      <div className="v2-faq-card">
+        {/* LEFT : search + wordmark */}
+        <div className="v2-faq-left">
+          <div className="v2-faq-searchrow">
+            <svg className="v2-faq-lens" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.2" cy="10.2" r="7.2" />
+              <line x1="15.6" y1="15.6" x2="21.5" y2="21.5" />
+            </svg>
+            <label className="v2-faq-search">
+              <input
+                ref={inputRef}
+                type="search"
+                placeholder={t.marketing.faq.searchPlaceholder}
+                aria-label={t.marketing.faq.searchPlaceholder}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setTick((n) => n + 1);
+                }}
+              />
+              <kbd>/</kbd>
+            </label>
+          </div>
+
+          <h2 className="v2-faq-title" id="v2-faq-title">
+            <span>F</span>
+            <span>A</span>
+            <span>Q</span>
+            <span className="v2-faq-dot" aria-hidden="true" />
+          </h2>
+
+          <p className="v2-faq-tag">{t.marketing.faq.subtitle}</p>
+
+          {/* arc divider */}
+          <div className="v2-faq-arcwrap" aria-hidden="true">
+            <svg viewBox="0 0 200 620" preserveAspectRatio="none">
+              <motion.path
+                d="M8 6 C 196 150, 196 470, 8 614"
+                initial={{ pathLength: prefersReduced() ? 1 : 0 }}
+                whileInView={{ pathLength: 1 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 1.6, delay: 0.5, ease: EASE }}
+              />
+            </svg>
+            <span className="v2-faq-arcdot" />
+          </div>
         </div>
 
-        <Reveal>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", borderRadius: 14, background: "var(--v2-surface)", border: "1px solid var(--v2-border)", marginBottom: 24, maxWidth: 640, margin: "0 auto 24px" }}>
-            <Search size={17} color="var(--v2-text2)" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search questions…"
-              style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--v2-text)", fontSize: 14.5, fontFamily: "inherit" }}
-            />
-            <AnimatePresence>
-              {q && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.7 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.7 }}
-                  onClick={() => setQ("")}
-                  style={{ background: "none", border: "none", cursor: "pointer", display: "grid", placeItems: "center", color: "var(--v2-text2)" }}
-                >
-                  <X size={16} />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        </Reveal>
-
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {groups.length === 0 ? (
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} style={{ padding: 34, textAlign: "center", color: "var(--v2-text2)", border: "1px dashed var(--v2-border)", borderRadius: 14, fontSize: 14.5 }}>
-              No question matches that. Try "escrow", "withdraw" or "KYC".
-            </motion.div>
+        {/* RIGHT : questions */}
+        <div className="v2-faq-right">
+          {shown === 0 ? (
+            <p className="v2-faq-empty" aria-live="polite">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21v-8M12 13c0-4 3-7 7-7 0 4-3 7-7 7ZM12 13c0-4-3-7-7-7 0 4 3 7 7 7Z" />
+              </svg>
+              <br />
+              {t.marketing.faq.noResults}
+            </p>
           ) : (
-            <AnimatePresence initial={false}>
-              {groups.map((g) => (
-                <motion.div key={g.cat} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4, ease: EASE }} layout style={{ marginBottom: 30 }}>
-                  <h3 style={{ fontSize: 14, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--v2-primary)", marginBottom: 14, fontWeight: 700 }}>{g.cat}</h3>
-                  {g.items.map((it) => {
-                    const isOpen = openKey === it.q;
-                    return (
-                      <div key={it.q} style={{ borderBottom: "1px solid var(--v2-border)" }}>
-                        <button
-                          onClick={() => setOpenKey(isOpen ? null : it.q)}
-                          aria-expanded={isOpen}
-                          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "19px 4px", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: isOpen ? "var(--v2-primary)" : "var(--v2-text)", fontSize: 16, fontWeight: 600, fontFamily: "var(--v2-font-head)", transition: "color 0.3s" }}
-                        >
-                          <span>{it.q}</span>
-                          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.35 }} style={{ display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: 9, background: isOpen ? "var(--v2-primary)" : "var(--v2-surface)", color: isOpen ? "var(--v2-primary-ink)" : "var(--v2-text2)", border: `1px solid ${isOpen ? "transparent" : "var(--v2-border)"}`, flexShrink: 0 }}>
-                            <ChevronDown size={15} />
-                          </motion.span>
-                        </button>
-                        <AnimatePresence initial={false}>
-                          {isOpen && (
-                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.42, ease: EASE }} style={{ overflow: "hidden" }}>
-                              <p style={{ padding: "0 4px 22px", fontSize: 14.8, lineHeight: 1.72, color: "var(--v2-text2)" }}>{it.a}</p>
-                            </motion.div>
+            <ul className="v2-faq-list" key={tick}>
+              {visible.map((r) => {
+                if (r.cat) {
+                  return (
+                    <li key={r.key} className="v2-faq-cat" style={{ ["--i" as string]: i++ }}>
+                      <span className="v2-faq-catname">{r.cat}</span>
+                    </li>
+                  );
+                }
+                const isOpen = openKey === r.key;
+                return (
+                  <li
+                    key={r.key}
+                    className={isOpen ? "open" : ""}
+                    style={{ ["--i" as string]: i++ }}
+                  >
+                    <button
+                      className="v2-faq-q"
+                      aria-expanded={isOpen}
+                      onClick={() => toggle(r.key!, r.q!)}
+                    >
+                      <span>{r.q}</span>
+                      <span className="v2-faq-chip">
+                        <svg viewBox="0 0 14 14" aria-hidden="true">
+                          <path d="M7 2v10M3 8.5 7 12l4-3.5" />
+                        </svg>
+                      </span>
+                    </button>
+                    <div className="v2-faq-a">
+                      <div>
+                        <p>
+                          {r.a}
+                          {r.link === "fees" && (
+                            <button
+                              className="v2-faq-link"
+                              onClick={() => onNavigate("fees")}
+                            >
+                              {t.marketing.faq.viewFees}
+                            </button>
                           )}
-                        </AnimatePresence>
+                        </p>
                       </div>
-                    );
-                  })}
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>
@@ -1489,6 +1774,7 @@ function FAQSection() {
    Final CTA — pointer-tracked spotlight panel
 ───────────────────────────────────────────────── */
 function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => void }) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLElement | null>(null);
 
   /* the spotlight gradient follows the pointer across the panel */
@@ -1541,12 +1827,11 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
       <div className="v2-outro-cta-inner">
         <p className="v2-outro-kicker">
           <Sparkles />
-          Ready to start?
+          {t.marketing.cta.eyebrow}
         </p>
-        <h2 id="ready-heading">Put your next project in motion.</h2>
+        <h2 id="ready-heading">{t.marketing.cta.title}</h2>
         <p>
-          Post a job or join as a freelancer with full escrow protection from
-          start to finish.
+          {t.marketing.cta.subtitle}
         </p>
         <div className="v2-outro-actions">
           <button
@@ -1555,14 +1840,14 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
           >
             <span className="v2-outro-shine" aria-hidden />
             <Briefcase />
-            <span>Post a job</span>
+            <span>{t.marketing.cta.postJob}</span>
           </button>
           <button
             className="v2-outro-btn v2-outro-btn-ghost"
             onClick={() => onStart("register")}
           >
             <Award />
-            <span>Find work</span>
+            <span>{t.marketing.cta.findWork}</span>
           </button>
         </div>
       </div>
@@ -1604,27 +1889,29 @@ function BackToTop() {
    Footer — frosted card over a panel, giant word below
 ───────────────────────────────────────────────── */
 function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
+  const { t } = useI18n();
+
   const NAV_COLS = [
     {
-      heading: "Platform",
+      heading: t.marketing.footer.platform,
       links: [
-        { label: "FAQ", page: "faq" },
-        { label: "Fees", page: "fees" },
-        { label: "Case Studies", page: "case-studies" },
+        { label: t.marketing.footer.faq, page: "faq" },
+        { label: t.marketing.footer.fees, page: "fees" },
+        { label: t.marketing.footer.caseStudies, page: "case-studies" },
       ],
     },
     {
-      heading: "Company",
+      heading: t.marketing.footer.company,
       links: [
-        { label: "About Us", page: "about" },
-        { label: "Contact Support", href: "mailto:support@yekis.com" },
+        { label: t.marketing.footer.about, page: "about" },
+        { label: t.marketing.footer.contactSupport, href: "mailto:support@yekis.com" },
       ],
     },
     {
-      heading: "Legal",
+      heading: t.marketing.footer.legal,
       links: [
-        { label: "Privacy Policy", page: "privacy" },
-        { label: "Terms of Service", page: "terms" },
+        { label: t.marketing.footer.privacy, page: "privacy" },
+        { label: t.marketing.footer.terms, page: "terms" },
       ],
     },
   ];
@@ -1724,9 +2011,7 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
               <span>Yekis</span>
             </button>
             <p className="v2-footer-desc">
-              Yekis connects Ethiopia&rsquo;s digital talent with clients
-              worldwide &mdash; every contract escrow&#8209;protected, every
-              milestone evidenced, from first brief to final payout.
+              {t.marketing.footer.desc}
             </p>
             <nav className="v2-footer-social" aria-label="Social links">
               {SOCIAL.map(({ label, href, svg }) => (
@@ -1773,18 +2058,17 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
         <div className="v2-footer-base">
           <div className="v2-footer-meta">
             <p>
-              &copy; {year} Yekis &mdash; Addis Ababa &middot; Made for
-              Ethiopia&rsquo;s digital workforce.
+              &copy; {year} Yekis &mdash; Addis Ababa &middot; {t.marketing.footer.copyright}
             </p>
             <span className="v2-footer-escrow">
               <ShieldCheck />
-              Payments secured by Yekis Escrow
+              {t.marketing.footer.escrowNote}
             </span>
           </div>
           <div className="v2-footer-legal">
-            <span className="v2-footer-lang">EN / አማ</span>
-            <button onClick={() => onNavigate("privacy")}>Privacy Policy</button>
-            <button onClick={() => onNavigate("terms")}>Terms of Service</button>
+            <LanguageSelector variant="segmented" />
+            <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
+            <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
           </div>
         </div>
       </div>
@@ -1804,7 +2088,7 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
             url: "https://yekis.com",
             logo: "https://yekis.com/svgviewer-output.svg",
             description:
-              "Ethiopia's escrow-protected freelance marketplace. Post work, pay into escrow, get your result or your money back.",
+              "Ethiopia's freelance marketplace. Fund a milestone, review the work, release payment.",
             sameAs: ["https://t.me/yekis_channel", "https://t.me/yekis_group"],
             contactPoint: {
               "@type": "ContactPoint",
@@ -1828,14 +2112,14 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       <ScrollProgressBar />
 
       {/* Hero */}
-      <HeroSection onStart={onStart} />
+      <HeroSection />
 
 
       {/* Stats */}
       <StatsSection />
 
       {/* How it works / Escrow */}
-      <EscrowSection onNavigate={onNavigate} />
+      <EscrowSection />
 
       {/* Fees */}
       <FeesSection />
@@ -1850,7 +2134,7 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       <AboutSection onNavigate={onNavigate} />
 
       {/* FAQ */}
-      <FAQSection />
+      <FAQSection onNavigate={onNavigate} />
 
       {/* Final CTA */}
       <FinalCTASection onStart={onStart} />

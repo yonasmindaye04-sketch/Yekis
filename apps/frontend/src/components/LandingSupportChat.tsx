@@ -4,8 +4,8 @@
 // pages. Lives in components/ so any landing variant (LandingPage, LandingPageV2)
 // can mount the same guest-support flow.
 //
-// Guest flow: greeting -> ask for email -> create the guest support ticket ->
-// stay connected to that thread.
+// Guest flow: greeting -> create a scoped support ticket with the first message
+// -> stay connected to that thread without requiring an account or email.
 //
 // The ticket endpoint hands back a token scoped to that ONE conversation, which
 // is what makes this a real two-way conversation rather than a dead end: the
@@ -36,7 +36,7 @@ type Bubble = {
   attachmentUrl?: string;
 };
 
-type ChatStep = "initial" | "asking_email" | "submitted";
+type ChatStep = "initial" | "submitted";
 
 const GREETING: Bubble = {
   id: "greeting",
@@ -44,20 +44,9 @@ const GREETING: Bubble = {
   sender: "agent",
 };
 
-const ASK_EMAIL: Bubble = {
-  id: "ask-email",
-  text: "Thanks for reaching out! Please provide your email address so our team can get back to you.",
-  sender: "agent",
-};
-
-const NEEDS_VALID_EMAIL: Bubble = {
-  id: "needs-valid-email",
-  text: "Please enter a valid email address so we can reply to you.",
-  sender: "agent",
-};
-
 /** Fallback poll interval when the socket is unavailable. */
-const POLL_MS = 5000;
+const POLL_MS = 1500;
+const GUEST_SESSION_KEY = "yekis-guest-support-session";
 
 /**
  * Reads the `sub` claim from a JWT without verifying it.
@@ -132,11 +121,7 @@ export function LandingSupportChat() {
   const syncThread = useCallback(async (conversationId: string, token: string) => {
     const serverMessages: ChatMessage[] = await api.getGuestChatMessages(conversationId, token);
 
-    setMessages((prev) => {
-      // Preserve the scripted onboarding bubbles, then append the real thread.
-      const scripted = prev.filter((m) =>
-        ["greeting", "ask-email", "needs-valid-email"].includes(m.id),
-      );
+    setMessages(() => {
       const real: Bubble[] = serverMessages.map((m) => ({
         id: m.id,
         text: m.body,
@@ -145,7 +130,7 @@ export function LandingSupportChat() {
         sender: m.senderId === guestUserIdRef.current ? "user" : "agent",
         ...(m.attachmentUrl ? { attachmentUrl: m.attachmentUrl } : {}),
       }));
-      return [...scripted, ...real];
+      return [GREETING, ...real];
     });
   }, []);
 
@@ -183,6 +168,33 @@ export function LandingSupportChat() {
     [syncThread],
   );
 
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(GUEST_SESSION_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        conversationId?: string;
+        token?: string;
+        assignedStaff?: { id: string; name: string } | null;
+      };
+      if (!saved.conversationId || !saved.token) return;
+      guestUserIdRef.current = readTokenSubject(saved.token);
+      setGuestConversationId(saved.conversationId);
+      setGuestToken(saved.token);
+      setAssignedStaff(saved.assignedStaff ?? null);
+      setChatStep("submitted");
+      void syncThread(saved.conversationId, saved.token).catch(() => {
+        sessionStorage.removeItem(GUEST_SESSION_KEY);
+        setGuestConversationId(null);
+        setGuestToken(null);
+        setChatStep("initial");
+      });
+      startLiveUpdates(saved.conversationId, saved.token);
+    } catch {
+      sessionStorage.removeItem(GUEST_SESSION_KEY);
+    }
+  }, [startLiveUpdates, syncThread]);
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
     setAttachedFile(file);
@@ -198,58 +210,63 @@ export function LandingSupportChat() {
     // reason guest attachments were silently dropped.
     const pendingFile = attachedFile;
 
-    // Read before the state update so the first user message is still
-    // available when the ticket is created below.
-    const firstUserMessage =
-      messages.find((message) => message.sender === "user")?.text ||
-      "Support request";
-
-    setMessages((prev) => [...prev, { id: `${Date.now()}`, text, sender: "user" }]);
+    const optimisticId = `optimistic-${Date.now()}`;
+    setMessages((prev) => [...prev, { id: optimisticId, text, sender: "user" }]);
     setInputText("");
     setAttachedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
 
     if (chatStep === "initial") {
-      // Brief beat so the reply reads as a conversation, not a form error.
-      window.setTimeout(() => {
-        setMessages((prev) => [...prev, ASK_EMAIL]);
-        setChatStep("asking_email");
-      }, 600);
-      return;
-    }
-
-    if (chatStep === "asking_email") {
-      if (!text.includes("@")) {
-        setMessages((prev) => [...prev, NEEDS_VALID_EMAIL]);
-        return;
-      }
-
       setSending(true);
       try {
-        const result = await api.createGuestSupport(text, firstUserMessage);
+        // A visitor can start immediately without creating an account or
+        // supplying an email. The backend creates a scoped guest identity;
+        // they can continue receiving staff replies in this same window.
+        const result = await api.createGuestSupport(undefined, text);
         if (result?.id) setGuestConversationId(result.id);
         if (result?.accessToken) setGuestToken(result.accessToken);
         if (result?.accessToken) {
           guestUserIdRef.current = readTokenSubject(result.accessToken);
         }
         if (result?.assignedStaff) setAssignedStaff(result.assignedStaff);
-
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: "ticket-created",
-            text: result?.assignedStaff
-              ? `Thanks! Your ticket is with our support desk and ${result.assignedStaff.name} has been notified. You can add more detail here and we'll reply in this window.`
-              : "Thanks! Your inquiry is with our support team. You can add more detail here and we'll reply in this window.",
-            sender: "agent",
-          },
-        ]);
+        sessionStorage.setItem(GUEST_SESSION_KEY, JSON.stringify({
+          conversationId: result.id,
+          token: result.accessToken,
+          assignedStaff: result.assignedStaff ?? null,
+        }));
         setChatStep("submitted");
 
         if (result?.id && result?.accessToken) {
+          // The ticket endpoint creates the conversation before a guest token
+          // exists, so the first attachment is sent as an authenticated
+          // follow-up message after the scoped token is issued.
+          if (pendingFile) {
+            try {
+              const upload = await api.uploadGuestChatAttachment(
+                pendingFile,
+                result.accessToken,
+              );
+              await api.sendGuestChatMessage(
+                result.id,
+                result.accessToken,
+                `Attached file: ${pendingFile.name}`,
+                upload.url,
+              );
+            } catch {
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: "attachment-error",
+                  text: "Your support request was sent, but the attachment could not be uploaded. Please try attaching it again.",
+                  sender: "agent",
+                },
+              ]);
+            }
+          }
+
           // Establish the live connection and load the authoritative thread.
           startLiveUpdates(result.id, result.accessToken);
-          void syncThread(result.id, result.accessToken).catch(() => {
+          await syncThread(result.id, result.accessToken).catch(() => {
             setMessages((prev) => [
               ...prev,
               {
@@ -261,6 +278,7 @@ export function LandingSupportChat() {
           });
         }
       } catch (err) {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
         setMessages((prev) => [
           ...prev,
           {
@@ -297,7 +315,9 @@ export function LandingSupportChat() {
           text,
           attachmentUrl,
         );
+        await syncThread(guestConversationId, guestToken);
       } catch (err) {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
         setMessages((prev) => [
           ...prev,
           {
@@ -326,14 +346,11 @@ export function LandingSupportChat() {
     return () => window.clearInterval(id);
   }, [chatStep, guestConversationId, guestToken, live, syncThread]);
 
-  const placeholder =
-    chatStep === "asking_email"
-      ? "Your email address to connect..."
-      : chatStep === "submitted"
-        ? "Send another follow-up message..."
-        : attachedFile
-          ? `📎 ${attachedFile.name}`
-          : "Type your message...";
+  const placeholder = chatStep === "submitted"
+    ? "Send another message..."
+    : attachedFile
+      ? `📎 ${attachedFile.name}`
+      : "Type your message...";
 
   const headerSubtitle = assignedStaff
     ? `You're talking to ${assignedStaff.name}`
@@ -396,7 +413,7 @@ export function LandingSupportChat() {
               accept="image/*,.pdf,.doc,.docx"
             />
             <input
-              type={chatStep === "asking_email" ? "email" : "text"}
+              type="text"
               value={inputText}
               onChange={(event) => setInputText(event.target.value)}
               onKeyDown={(event) => {

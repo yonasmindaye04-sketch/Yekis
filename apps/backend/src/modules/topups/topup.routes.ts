@@ -3,14 +3,18 @@ import { Router } from "express";
 import multer from "multer";
 import {
   SubmitTopUpInput,
-  TopUpReviewDecisionInput,
+  TopUpRejectInput,
   FlagTopUpInput,
+  AmountMinor,
+  PaymentProvider,
 } from "@marketplace/schemas";
+import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
+import { PaymentProviderUnavailableError } from "../escrow/providers/paymentProvider.interface.js";
 import {
   submitTopUp,
   getTopUpQueue,
@@ -22,6 +26,7 @@ import {
   TopUpAlreadyResolvedError,
   getUserTopUps,
   initiateCheckoutTopUp,
+  isCheckoutProviderEnabled,
   handleTopUpWebhook,
   attachReceiptToTopUp,
 } from "./topup.service.js";
@@ -98,24 +103,67 @@ topupsRouter.post(
   },
 );
 
+const KNOWN_PROVIDERS = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+
+/**
+ * Hosted-checkout amount validation.
+ *
+ * Deliberately validates the amount ONLY. The provider is left to the
+ * KNOWN_PROVIDERS check in the handler, because that check's error codes are
+ * part of this route's contract:
+ *
+ *   - the schema's PaymentProvider enum is TELEBIRR/CBE_BIRR/M_PESA, while the
+ *     Prisma enum also contains CHAPA. Constraining the provider here turned a
+ *     CHAPA request into VALIDATION_ERROR, where the route has always answered
+ *     UNSUPPORTED_PROVIDER. An existing suite asserts that code.
+ *
+ * So: schema for what the schema should own (a value the database can hold),
+ * handler for the provider policy.
+ */
+const CheckoutTopUpAmount = z.object({
+  amountMinor: AmountMinor.positive(),
+});
+
 topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
-  const { amountMinor, provider } = req.body;
-  if (!amountMinor || typeof amountMinor !== "number" || amountMinor <= 0) {
-    return res.status(400).json({ error: "INVALID_AMOUNT" });
+  // A schema, not hand-rolled checks. The previous guard was
+  // `typeof amountMinor !== "number" || amountMinor <= 0`, which accepted
+  // 100.5 — a value that cannot be written to an Int column, so it reached
+  // initiateCheckoutTopUp, created a provider order, and then failed at the
+  // database. Nothing anywhere in the money chain declared a maximum either,
+  // so a value above Int32 did the same at a larger scale.
+  const parsed = CheckoutTopUpAmount.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
   }
-  const allowedProviders = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
-  if (!allowedProviders.includes(provider)) {
+  const { amountMinor } = parsed.data;
+  const provider = (req.body?.provider ?? "") as string;
+  const KNOWN_PROVIDERS = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+  if (!KNOWN_PROVIDERS.includes(provider)) {
     return res.status(400).json({ error: "UNSUPPORTED_PROVIDER" });
+  }
+  // Known-but-not-connected rails are refused here, before any provider call
+  // and before a WalletTopUp row exists. CBE Birr and M-Pesa have no approved
+  // merchant API; answering 503 "unavailable" implied a temporary outage
+  // rather than a rail that does not exist yet.
+  if (!isCheckoutProviderEnabled(provider)) {
+    return res.status(400).json({ error: "PROVIDER_NOT_AVAILABLE" });
   }
 
   try {
     const result = await initiateCheckoutTopUp({
       userId: req.user!.id,
       amountMinor,
-      provider,
+      // Narrowed by the KNOWN_PROVIDERS membership check above, which runs
+      // before this point and is the only way to get here.
+      provider: provider as PaymentProvider,
     });
     return res.json(result);
   } catch (err) {
+    if (err instanceof PaymentProviderUnavailableError) {
+      return res.status(503).json({ error: err.code });
+    }
     logger.error({ err }, "Top-up checkout initiation failed");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
@@ -185,6 +233,42 @@ topupsRouter.post(
   },
 );
 
+// Status of one of the caller's own top-ups.
+//
+// The checkout return page needs to answer a single question -- did the money
+// actually arrive -- and there was no route that could answer it for one
+// transaction. It previously slept three seconds and then rendered "Payment
+// Complete" unconditionally, which told a user their money was in escrow when
+// nothing had confirmed it. That is the worst possible message to get wrong:
+// a user who believes they funded a milestone will start work that is not
+// protected.
+//
+// Scoped to req.user.id, so one user cannot poll another's payment status.
+topupsRouter.get("/:topUpId", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const topUp = await prisma.walletTopUp.findFirst({
+      where: { id: req.params.topUpId as string, userId: req.user!.id },
+      select: {
+        id: true,
+        amountMinor: true,
+        provider: true,
+        status: true,
+        providerTransactionId: true,
+        createdAt: true,
+      },
+    });
+    // 404 rather than 403: a top-up belonging to somebody else should be
+    // indistinguishable from one that does not exist.
+    if (!topUp) return res.status(404).json({ error: "NOT_FOUND" });
+
+    // Convenience for the caller: only APPROVED means the wallet was credited.
+    return res.json({ ...topUp, credited: topUp.status === "APPROVED" });
+  } catch (err) {
+    logger.error({ err }, "Failed to read top-up status");
+    return res.status(500).json({ error: "INTERNAL_ERROR" });
+  }
+});
+
 // ---------- Staff-only ----------
 
 topupsRouter.get(
@@ -246,10 +330,12 @@ topupsRouter.post(
   requireAuth,
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
-    const parsed = TopUpReviewDecisionInput.safeParse({
-      decision: "REJECTED",
-      ...req.body,
-    });
+    // The outcome of this endpoint is REJECTED by definition — it is decided by
+    // the URL, not the body. The previous
+    // `{ decision: "REJECTED", ...req.body }` spread AFTER the literal, so a
+    // body of `{ decision: "APPROVED" }` silently overrode it. TopUpRejectInput
+    // is strict, so `decision` is now refused with a 400 rather than trusted.
+    const parsed = TopUpRejectInput.safeParse(req.body);
     if (!parsed.success)
       return res
         .status(400)
@@ -259,7 +345,7 @@ topupsRouter.post(
       const result = await rejectTopUp({
         staffUserId: req.user!.id,
         topUpId: req.params.topUpId as string,
-        rejectionReason: parsed.data.rejectionReason!,
+        rejectionReason: parsed.data.rejectionReason,
       });
       return res.json(result);
     } catch (err) {

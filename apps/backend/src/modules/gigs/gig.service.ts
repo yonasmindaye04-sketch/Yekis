@@ -425,20 +425,36 @@ export async function fundGigOrderFromWallet(params: {
     );
   }
 
-  await prisma.$transaction([
-    prisma.wallet.update({
-      where: { userId: params.clientId },
+  await prisma.$transaction(async (tx) => {
+    /**
+     * Same race as escrow funding, and the same fix: the balance read above is
+     * outside the transaction, so it cannot decide anything. The debit carries
+     * its own `gte` guard so the database is the arbiter and exactly one of two
+     * concurrent fundings can win. The order is claimed in the same
+     * transaction, so a loser cannot mark an already-funded order as held.
+     */
+    const debited = await tx.wallet.updateMany({
+      where: {
+        userId: params.clientId,
+        balanceMinor: { gte: fees.clientTotalChargeMinor },
+      },
       data: { balanceMinor: { decrement: fees.clientTotalChargeMinor } },
-    }),
-    prisma.gigOrder.update({
+    });
+    if (debited.count !== 1) {
+      throw new GigInsufficientBalanceError(
+        `Insufficient wallet balance. Required: ${fees.clientTotalChargeMinor}.`,
+      );
+    }
+
+    await tx.gigOrder.update({
       where: { id: order.id },
       data: {
         totalChargeMinor: fees.clientTotalChargeMinor,
         escrowState: "ESCROW_HELD",
         status: "ESCROW_HELD",
       },
-    }),
-  ]);
+    });
+  });
 
   await recordAuditEvent({
     userId: params.clientId,

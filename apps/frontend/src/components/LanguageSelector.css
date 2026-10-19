@@ -1,0 +1,190 @@
+/* Base styles for LanguageSelector - theme invariant layout */
+.yk-lang-dropdown-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.yk-lang-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-bg, #ffffff);
+  color: var(--color-text, #1f2937);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.yk-lang-trigger:hover {
+  background: var(--color-bg-hover, #f3f4f6);
+  border-color: var(--color-border-hover, #d1d5db);
+}
+
+.yk-lang-icon {
+  flex-shrink: 0;
+  color: var(--color-primary, #059669);
+}
+
+.yk-lang-trigger-label {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.yk-lang-chevron {
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.yk-lang-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.yk-lang-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 175px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: 10px;
+  background: var(--color-bg-elevated, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.yk-lang-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.12s ease;
+}
+
+.yk-lang-option:hover {
+  background: var(--color-bg-hover, #f3f4f6);
+}
+
+.yk-lang-option.is-selected {
+  background: var(--color-primary-light, rgba(5, 150, 105, 0.12));
+}
+
+.yk-lang-names {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.yk-lang-native {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text, #111827);
+}
+
+.yk-lang-english {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.yk-lang-check {
+  color: var(--color-primary, #059669);
+  flex-shrink: 0;
+}
+
+/* Segmented layout */
+.yk-lang-segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--color-bg-muted, #f3f4f6);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.yk-lang-segmented-btn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary, #4b5563);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.yk-lang-segmented-btn:hover {
+  color: var(--color-text, #111827);
+}
+
+.yk-lang-segmented-btn.is-active {
+  background: var(--color-primary, #059669);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+/* Dark mode theme color adjustments - layout properties are untouched */
+:root[data-theme="dark"] .yk-lang-trigger {
+  background: var(--color-bg-elevated, #1f293d);
+  border-color: var(--color-border, #374151);
+  color: var(--color-text, #f9fafb);
+}
+
+:root[data-theme="dark"] .yk-lang-trigger:hover {
+  background: var(--color-bg-hover, #283548);
+  border-color: var(--color-border-hover, #4b5563);
+}
+
+:root[data-theme="dark"] .yk-lang-menu {
+  background: var(--color-bg-elevated, #1a2234);
+  border-color: var(--color-border, #334155);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="dark"] .yk-lang-option:hover {
+  background: var(--color-bg-hover, #243046);
+}
+
+:root[data-theme="dark"] .yk-lang-option.is-selected {
+  background: var(--color-primary-light, rgba(16, 185, 129, 0.2));
+}
+
+:root[data-theme="dark"] .yk-lang-native {
+  color: var(--color-text, #f9fafb);
+}
+
+:root[data-theme="dark"] .yk-lang-english {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+:root[data-theme="dark"] .yk-lang-segmented {
+  background: var(--color-bg-elevated, #1e293b);
+  border-color: var(--color-border, #334155);
+}
+
+:root[data-theme="dark"] .yk-lang-segmented-btn {
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+:root[data-theme="dark"] .yk-lang-segmented-btn:hover {
+  color: var(--color-text, #f8fafc);
+}
+
+:root[data-theme="dark"] .yk-lang-segmented-btn.is-active {
+  background: var(--color-primary, #10b981);
+  color: #ffffff;
+}

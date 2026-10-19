@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import "./marketing.css";
 
 type CaseStudiesPageProps = {
@@ -5,23 +6,24 @@ type CaseStudiesPageProps = {
 };
 
 export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
+  const { t } = useI18n();
+
   return (
     <div className="marketing-page">
       <div className="marketing-container">
         <div className="marketing-breadcrumbs">
-          <button onClick={() => onNavigate("home")}>Home</button> &gt; Case
-          Studies
+          <button onClick={() => onNavigate("home")}>{t.nav.home}</button> &gt; {t.nav.caseStudies}
         </div>
         <section className="content-section">
-          <h1>Real projects. Real results.</h1>
+          <h1>{t.marketing.caseStudies.title}</h1>
           <p className="hero-subtitle">
-            Case studies from verified, escrow-protected projects on Yekis.
+            {t.marketing.caseStudies.subtitle}
           </p>
 
           <div className="case-study-grid" style={{ marginTop: "40px" }}>
             {[1, 2, 3].map((i) => (
               <div key={i} className="card">
-                <span className="placeholder-badge">Coming Soon</span>
+                <span className="placeholder-badge">{t.marketing.caseStudies.comingSoon}</span>
                 <div
                   style={{
                     color: "var(--color-primary)",
@@ -30,17 +32,16 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
                     fontWeight: 600,
                   }}
                 >
-                  Category Placeholder
+                  {t.marketing.categories.c1Title1} {t.marketing.categories.c1Title2}
                 </div>
-                <h3>Project Title Placeholder</h3>
+                <h3>{t.marketing.caseStudies.title} #{i}</h3>
                 <p
                   style={{
                     margin: "15px 0",
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  Outcome summary placeholder. This is where the story of
-                  successful escrow-protected work will go.
+                  {t.marketing.testimonials.t1Quote}
                 </p>
                 <div
                   style={{
@@ -50,10 +51,10 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
                   }}
                 >
                   <div style={{ fontSize: "14px", marginBottom: "5px" }}>
-                    <strong>Budget:</strong> [ETB Range]
+                    <strong>Budget:</strong> 45,000 ETB
                   </div>
                   <div style={{ fontSize: "14px", marginBottom: "15px" }}>
-                    <strong>Timeline:</strong> [Duration]
+                    <strong>Timeline:</strong> 3 weeks
                   </div>
                   <div
                     style={{
@@ -62,22 +63,8 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
                       fontSize: "14px",
                     }}
                   >
-                    "Client quote placeholder..."
+                    &ldquo;{t.marketing.testimonials.t2Quote}&rdquo;
                   </div>
-                </div>
-                <div
-                  style={{
-                    marginTop: "20px",
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <button
-                    className="btn-secondary"
-                    style={{ padding: "8px 16px", fontSize: "12px" }}
-                  >
-                    Share
-                  </button>
                 </div>
               </div>
             ))}
@@ -89,13 +76,13 @@ export function CaseStudiesPage({ onNavigate }: CaseStudiesPageProps) {
               onClick={() => onNavigate("faq")}
               style={{ marginRight: "20px" }}
             >
-              Read FAQ
+              {t.marketing.caseStudies.readFaq}
             </button>
             <button
               className="btn-secondary"
               onClick={() => onNavigate("home")}
             >
-              Browse Categories
+              {t.marketing.caseStudies.browseCategories}
             </button>
           </div>
         </section>

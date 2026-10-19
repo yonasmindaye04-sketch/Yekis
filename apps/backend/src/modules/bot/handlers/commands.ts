@@ -22,6 +22,8 @@ import {
   safeUrlKeyboard,
 } from "../utils/deepLink.js";
 import {
+  approveWebLogin,
+  denyWebLogin,
   issueTelegramLoginCode,
   TELEGRAM_CODE_TTL_SECONDS,
 } from "../../auth/telegram-code.service.js";
@@ -223,6 +225,34 @@ const welcomeMsg =
         `Telegram linked: ${user.telegramUserId ? "yes" : "no"}\n` +
         `Push notifications: ${user.telegramChatId ? "active" : "paused"}\n` +
         `KYC: ${user.kyc?.tier ?? "TIER_1"} / ${user.kyc?.status ?? "PENDING"}`,
+      { parse_mode: "HTML" },
+    );
+  });
+
+  // ── /link ───────────────────────────────────────────────────────────────
+  // During local dev the public origin is a Cloudflare Tunnel whose hostname
+  // changes on every run, so "what is the Mini App URL right now?" has to be
+  // answerable without opening BotFather. This always reports the CURRENT
+  // FRONTEND_URL — the exact same value the chat menu button and every
+  // /start Mini App button were built from on this boot.
+  bot.command("link", async (ctx) => {
+    const miniAppUrl = buildPublicWebAppUrl("/");
+    if (!miniAppUrl) {
+      await ctx.reply(
+        "No public web app URL is configured yet.\n\n" +
+          "Start the app with <code>pnpm dev:tunnel</code> (Cloudflare Tunnel), or set " +
+          "<code>FRONTEND_URL</code> to a public https origin, then run /link again.",
+        { parse_mode: "HTML" },
+      );
+      return;
+    }
+    await ctx.reply(
+      `<b>Current Yekis Mini App link</b>\n\n` +
+        `<code>${miniAppUrl}</code>\n\n` +
+        "Open the Mini App from the chat menu button (the button under the " +
+        "message box) or the <b>Open Yekis Jobs</b> button — they always use " +
+        "this current link. The bot updates them automatically each time the " +
+        "server starts, so you never need to change the link in BotFather.",
       { parse_mode: "HTML" },
     );
   });

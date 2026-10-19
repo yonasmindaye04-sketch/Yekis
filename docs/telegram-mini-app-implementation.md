@@ -93,9 +93,9 @@ Implementation requirements:
 4. Configure the menu button behavior so users can open the Mini App from the bot.
    - Use `Menu Button` or `Open App` depending on the BotFather UI.
    - Set a friendly title like `Yekis_jobs`, `Open App`, or `Escrow`.
-5. Use the same public ngrok URL for both the Main App and menu button entry point during local testing.
+5. Use the same public Cloudflare Tunnel URL for both the Main App and menu button entry point during local testing.
    - This is required when `Same-Origin Restriction` is enabled and the WebApp origin must match.
-   - Example: `https://drown-bodacious-yard.ngrok-free.dev`
+   - Example: `https://<random>.trycloudflare.com`
    - Both the Main App URL and the menu button URL should use this same HTTPS URL.
 6. Store the bot token securely as `TELEGRAM_BOT_TOKEN` in backend environment variables.
 7. Never expose the bot token to frontend code.
@@ -105,13 +105,13 @@ Recommended environment variables:
 ```env
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
-TELEGRAM_MINI_APP_URL=https://<your-ngrok-subdomain>.ngrok-free.dev
-TELEGRAM_ALLOWED_ORIGINS=https://<your-ngrok-subdomain>.ngrok-free.dev
+TELEGRAM_MINI_APP_URL=https://<your-tunnel>.trycloudflare.com
+TELEGRAM_ALLOWED_ORIGINS=https://<your-tunnel>.trycloudflare.com
 ```
 
 ### BotFather field guidance
 
-- `Main App` URL: `https://<your-ngrok-subdomain>.ngrok-free.dev`
+- `Main App` URL: `https://<your-tunnel>.trycloudflare.com`
 - `Menu Button` / `Open App` URL: same as the Main App URL
 - `Menu Button` label: `Yekis_jobs`, `Open App`, or a brief product name
 - Launch mode: `Fullsize` is recommended for the Mini App experience
@@ -374,41 +374,43 @@ selfieWithId
    pnpm run dev:frontend
    ```
 
-3. Start ngrok on the frontend port.
+3. Start a Cloudflare Tunnel on the frontend port.
 
    ```powershell
-   ngrok http 5173
+   pnpm run tunnel:cloudflare
+   # or: cloudflared tunnel --url http://localhost:5173
    ```
 
-4. Copy the public HTTPS ngrok URL from the ngrok output.
-   - Example: `https://drown-bodacious-yard.ngrok-free.dev`
+4. Copy the public HTTPS Cloudflare Tunnel URL from the cloudflared output.
+   - Example: `https://<random>.trycloudflare.com`
 
-5. In BotFather, set the `Main App` URL to the ngrok URL.
-6. In BotFather, set the menu button / open app URL to the same ngrok URL.
+5. In BotFather, set the `Main App` URL to the Cloudflare Tunnel URL.
+6. In BotFather, set the menu button / open app URL to the same Cloudflare Tunnel URL.
    - Use a friendly title such as `Yekis_jobs`, `Escrow`, or `Open App`.
 
 7. If `Same-Origin Restriction` is enabled, ensure both URLs use the same origin.
 8. Set backend CORS to allow the tunnel origin during testing.
-   - Example: `https://drown-bodacious-yard.ngrok-free.dev`
+   - Example: `https://<random>.trycloudflare.com`
 
 9. Use real Telegram launch data for authentication tests.
 10. Keep the bot token secret and only configured in backend env variables.
 
-### ngrok troubleshooting
+### Cloudflare Tunnel troubleshooting
 
-- If ngrok returns an error because the public domain is already in use, stop the existing tunnel and start a new one.
+- If cloudflared is not found, install it from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/ and ensure it is on PATH.
+- Quick tunnels (`*.trycloudflare.com`) are ephemeral: the URL changes every run. Update BotFather + FRONTEND_URL each time.
 - If the frontend cannot reach `/api`, verify that the Vite proxy is running, and that the backend is available on `http://localhost:4000`.
-- Do not run a second ngrok tunnel for the backend when using this setup.
+- Do not run a second tunnel for the backend when using this setup; the Vite proxy forwards `/api` to localhost:4000.
 
 ### Recommended local command sequence
 
 ```powershell
 pnpm run dev:backend
-pnpm --dir apps/frontend dev
-ngrok http 5173
+pnpm run dev:frontend
+pnpm run tunnel:cloudflare
 ```
 
-Then set BotFather URLs to the ngrok HTTPS URL and test from Telegram.
+Then set BotFather URLs to the Cloudflare Tunnel HTTPS URL and test from Telegram.
 
 ## 15.1 Current Progress
 
@@ -416,11 +418,11 @@ The current implementation has completed these Telegram Mini App setup and local
 
 - Added `apps/frontend/vite.config.ts` proxy configuration to forward `/api` requests to `http://localhost:4000`.
 - Updated `apps/frontend/src/api/client.ts` and `apps/frontend/src/api/telegramAuth.ts` to default `VITE_API_BASE_URL` to `""`, enabling relative `/api` requests through the Vite proxy.
-- Confirmed local Telegram Mini App testing can use a single ngrok tunnel to `5173`.
-- Confirmed BotFather `Main App` and menu button URLs should point to the same public ngrok URL.
+- Confirmed local Telegram Mini App testing can use a single Cloudflare Tunnel to `5173`.
+- Confirmed BotFather `Main App` and menu button URLs should point to the same public Cloudflare Tunnel URL.
 - Confirmed `Same-Origin Restriction` should remain enabled for safe WebApp SDK usage.
-- Confirmed the frontend tunnels through ngrok while the backend continues to run on `localhost:4000`.
-- Added Vite `allowedHosts` entries for `*.ngrok-free.dev` and `*.ngrok.io`, so ngrok Host headers are accepted during local testing.
+- Confirmed the frontend tunnels through Cloudflare while the backend continues to run on `localhost:4000`.
+- Vite `allowedHosts` is set to `true`, so Cloudflare Tunnel (`*.trycloudflare.com`) Host headers are accepted during local testing.
 - Added the wallet-funded escrow path used by the Mini App's `Fund with Approved Balance` action.
 - Added the missing authenticated milestone listing route used by the Mini App.
 - Added separate private object storage paths for payment receipts instead of classifying receipts as KYC documents.

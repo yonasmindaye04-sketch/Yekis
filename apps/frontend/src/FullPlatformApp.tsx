@@ -16,6 +16,7 @@ import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
+import { PhoneVerification } from "./PhoneVerification";
 import {
   ContractsWorkspace,
   DisputesWorkspace,
@@ -59,6 +60,7 @@ import { NotFoundPage } from "./NotFoundPage";
 import { ThankYouPage } from "./ThankYouPage";
 import { CaseStudiesPage } from "./CaseStudiesPage";
 import { CookieBanner } from "./CookieBanner";
+import { OnboardingTour } from "./OnboardingTour";
 import { MobileCTA } from "./MobileCTA";
 import { MarketingHeader } from "./MarketingHeader";
 import { MarketingFooter } from "./MarketingFooter";
@@ -70,6 +72,8 @@ import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
 import { GigSellerDashboard } from "./GigSellerDashboard";
 import { TelegramAuthPage } from "./pages/TelegramAuthPage";
+import { useI18n } from "./i18n";
+import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
 
 // === INTERFACES & TYPES ===
@@ -357,7 +361,7 @@ function AuthVisualAnimation() {
       <div className="auth-vis-trust">
         <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Escrow protected</span>
+          <span>Held while you review</span>
         </div>
         <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
@@ -373,6 +377,7 @@ function AuthVisualAnimation() {
 }
 
 export function FullPlatformApp() {
+  const { language, setLanguage, t } = useI18n();
   const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [showLanding, setShowLanding] = useState(true);
@@ -387,6 +392,23 @@ export function FullPlatformApp() {
   const [dateOfBirth, setDateOfBirth] = useState("2000-01-01");
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
+  /**
+   * Opens the SMS confirmation step. Set when the user submits the register form
+   * with a usable Ethiopian number, and cleared on either outcome so the submit
+   * button is not left permanently disabled.
+   */
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  /**
+   * Onboarding-tour signals. `null` means "not known yet", which is
+   * deliberately different from 0: the tour hides a step it cannot evaluate, so
+   * an unanswered request produces no step rather than a step that says the user
+   * has done nothing.
+   */
+  const [myJobCount, setMyJobCount] = useState<number | null>(null);
+  const [myProposalCount, setMyProposalCount] = useState<number | null>(null);
+  const [profileCompleteness, setProfileCompleteness] = useState<number | null>(
+    null,
+  );
   // Granular PDPP consents (Master Design §12.2) — optional purposes default
   // unticked (no pre-ticked boxes); required purposes are implied by the
   // terms checkbox + mandatory kyc/financial literals sent on register.
@@ -397,6 +419,10 @@ export function FullPlatformApp() {
   const [legalModal, setLegalModal] = useState<"terms" | "privacy" | null>(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [error, setError] = useState("");
+  // F-02: the job-post form renders its own error so a KYC refusal is visible
+  // and actionable, instead of vanishing.
+  const [jobError, setJobError] = useState("");
+  const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
@@ -521,22 +547,47 @@ export function FullPlatformApp() {
     if (authVisitRef.current) authVisitRef.current.flow = authMode;
   }, [authMode]);
 
-  const loadWorkspace = async () => {
-    const [meResult, walletResult, jobsResult, milestonesResult, topUpsResult] =
-      await Promise.allSettled([
-        api.getMe(),
-        api.getWallet(),
-        api.getJobs({ status: "OPEN" }),
-        api.getMilestones(),
-        api.getTopUpRequests(),
-      ]);
+const loadWorkspace = async () => {
+    const [
+      meResult,
+      walletResult,
+      jobsResult,
+      milestonesResult,
+      topUpsResult,
+      // Only for the onboarding tour. Without these three the tour can evaluate
+      // just half its steps, and it hides the rest rather than showing steps
+      // nobody can complete. They are additive and allSettled, so a failure here
+      // degrades the guide instead of breaking the workspace load.
+      myJobsResult,
+      myProposalsResult,
+      completenessResult,
+    ] = await Promise.allSettled([
+      api.getMe(),
+      api.getWallet(),
+      api.getJobs({ status: "OPEN" }),
+      api.getMilestones(),
+      api.getTopUpRequests(),
+      api.getMyJobs(),
+      api.getMyProposals(),
+      api.getProfileCompleteness(),
+    ]);
     if (meResult.status === "rejected") throw meResult.reason;
     setUser(meResult.value);
+    if (meResult.value?.languagePreference && ["en", "am", "om", "ti"].includes(meResult.value.languagePreference)) {
+      setLanguage(meResult.value.languagePreference as any);
+    }
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
     if (milestonesResult.status === "fulfilled")
-      setMilestones(milestonesResult.value);
+    setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
+    // Left as-is when the call fails: the tour then hides the affected step,
+    // which is better than asserting the user has not done it.
+    if (myJobsResult.status === "fulfilled") setMyJobCount(myJobsResult.value.length);
+    if (myProposalsResult.status === "fulfilled")
+    setMyProposalCount(myProposalsResult.value.length);
+    if (completenessResult.status === "fulfilled")
+    setProfileCompleteness(completenessResult.value.profileCompleteness);
     setLastUpdatedAt(new Date());
   };
 
@@ -623,14 +674,24 @@ export function FullPlatformApp() {
         setPassword("");
         return;
       }
-      if (authMode === "register") {
-        await api.register({
+if (authMode === "register") {
+      // Confirm the number before the account exists, which is why the backend
+      // endpoints are unauthenticated. A number we have not verified is the
+      // payout destination, so this is a money-safety step, not a nicety.
+      // Skip for now is always available: a hard gate with no escape hatch is a
+      // support queue rather than a security control.
+      if (/\+?251[1-9]\d{8}/.test(phone.replace(/\s/g, ""))) {
+        setShowPhoneVerification(true);
+        setError("");
+        return;
+      }
+      await api.register({
           email,
           phone,
           password,
           role,
           dateOfBirth,
-          languagePreference: "en",
+          languagePreference: language || "en",
           consents: {
             kycDataProcessing: true,
             financialDataProcessing: true,
@@ -717,8 +778,19 @@ export function FullPlatformApp() {
       setJobBudgetMax("");
       setJobDeadline("");
       await loadWorkspace();
+      setJobError("");
+      setJobErrorNextAction(null);
       setView("jobs");
     } catch (err) {
+      // F-02: this form had no error surface at all — a KYC 403 was silently
+      // discarded and the user saw nothing after tapping Publish.
+      const withAction = err as Error & { nextAction?: { type: string; path: string } };
+      setJobError(
+        withAction instanceof Error ? withAction.message : "Unable to publish job",
+      );
+      setJobErrorNextAction(
+        withAction?.nextAction?.type === "KYC" ? "verification" : null,
+      );
       setError(err instanceof Error ? err.message : "Unable to publish job");
     } finally {
       setIsLoading(false);
@@ -726,6 +798,41 @@ export function FullPlatformApp() {
   };
 
   const platformRole = (user?.role as PlatformRole) || "CLIENT";
+
+  // Onboarding facts, built only from state this screen has actually loaded.
+  // The workspace fetches /auth/me, /wallet, open jobs and the caller's
+  // milestones; nothing here is inferred from a signal that means something
+  // else. `jobs` is deliberately NOT used as "has posted a job" -- it holds
+  // OPEN jobs, so any listing would make the step look complete for a user who
+  // has never posted anything. Steps needing data this screen does not load are
+  // left out of the tour rather than hardcoded to false, which would render a
+  // step the user could never tick off.
+  const tourFacts = useMemo(
+    () => ({
+      role: (user?.role as "CLIENT" | "FREELANCER" | "BOTH") || "CLIENT",
+      kycStatus: user?.kyc?.status ?? "PENDING",
+      walletBalanceMinor: wallet.balanceMinor ?? 0,
+      hasFundedMilestone: milestones.some((m) => m.escrowState !== "PAYMENT_PENDING"),
+      // undefined, not false, while the answer is unknown -- the tour drops any
+      // step whose predicate returns undefined.
+      hasPostedJob: myJobCount === null ? undefined : myJobCount > 0,
+      hasSubmittedProposal:
+      myProposalCount === null ? undefined : myProposalCount > 0,
+      // Completeness is a percentage. Anything below half-built still counts as
+      // unfinished; a bare account sitting at 0 is not "profile complete".
+      hasProfile:
+      profileCompleteness === null ? undefined : profileCompleteness >= 60,
+    }),
+    [
+      user?.role,
+      user?.kyc?.status,
+      wallet.balanceMinor,
+      milestones,
+      myJobCount,
+      myProposalCount,
+      profileCompleteness,
+    ],
+  );
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
      safe and keeps every workspace prop free of impossible ADMIN values. */
@@ -859,14 +966,14 @@ export function FullPlatformApp() {
   };
 
   const navItems = useMemo(() => {
-    const jobsLabel = canWork ? (canHire ? "Find work / Post" : "Find work") : "Jobs";
+    const jobsLabel = canWork ? (canHire ? `${t.nav.findWork} / ${t.nav.postJob}` : t.nav.findWork) : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const common = [
-      { view: "overview" as View, iconKey: "overview", label: "Overview" },
+      { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
       { view: "gigs" as View, iconKey: "gigs", label: "Gigs" },
-      { view: "contracts" as View, iconKey: "contracts", label: "Contracts" },
-      { view: "wallet" as View, iconKey: "wallet", label: "Wallet" },
+      { view: "contracts" as View, iconKey: "contracts", label: t.nav.escrow },
+      { view: "wallet" as View, iconKey: "wallet", label: t.nav.wallet },
       { view: "chat" as View, iconKey: "chat", label: "Chat" },
       { view: "profile" as View, iconKey: "profile", label: "Profile" },
     ];
@@ -881,14 +988,14 @@ export function FullPlatformApp() {
       : [
           ...common,
           ...sellerNav,
-          { view: "cases" as View, iconKey: "cases", label: "Disputes" },
+          { view: "cases" as View, iconKey: "cases", label: t.nav.disputes },
           {
             view: "verification" as View,
             iconKey: "verification",
-            label: "Verification",
+            label: t.nav.kyc,
           },
         ];
-  }, [platformRole]);
+  }, [platformRole, t]);
 
   if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;
 
@@ -904,7 +1011,7 @@ export function FullPlatformApp() {
 
     // Update document title per marketing page (Item 20: unique page titles)
     const pageTitles: Record<MarketingPage, string> = {
-      home: "Yekis — Ethiopia's Escrow-Protected Freelance Marketplace",
+      home: "Yekis — Ethiopia's Freelance Marketplace with milestone payments held until approval",
       faq: "FAQ — Yekis",
       fees: "Pricing & Fees — Yekis",
       privacy: "Privacy Policy — Yekis",
@@ -1015,11 +1122,13 @@ export function FullPlatformApp() {
               setSuccessMessage("");
             }}
           >
-            <ArrowLeft size={17} /> Back to Yekis
+            <ArrowLeft size={17} /> {t.nav.backToHome}
           </button>
-          <button
-            type="button"
-            className="theme-toggle"
+          <div className="auth-header-actions" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <LanguageSelector variant="dropdown" />
+            <button
+              type="button"
+              className="theme-toggle"
             onClick={toggleTheme}
             aria-label={
               theme === "light" ? "Switch to dark mode" : "Switch to light mode"
@@ -1038,7 +1147,8 @@ export function FullPlatformApp() {
             }}
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-          </button>
+            </button>
+          </div>
         </div>
         <div className="platform-auth-art">
           <img
@@ -1482,9 +1592,19 @@ export function FullPlatformApp() {
               {successMessage}
             </div>
           )}
+          {authMode === "register" && showPhoneVerification && (
+            <PhoneVerification
+              phone={phone}
+              onVerified={() => setShowPhoneVerification(false)}
+              onSkip={() => setShowPhoneVerification(false)}
+            />
+          )}
           <button
             className="btn-primary wide"
-            disabled={isLoading || (authMode === "register" && !termsAccepted)}
+            disabled={
+              isLoading ||
+              (authMode === "register" && (!termsAccepted || showPhoneVerification))
+            }
             style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
@@ -1679,11 +1799,15 @@ export function FullPlatformApp() {
           className="sidebar-settings"
           onClick={() => setView("settings")}
         >
-          <Settings size={16} /> <span className="nav-label">Settings</span>
+          <Settings size={16} /> <span className="nav-label">{t.nav.settings}</span>
         </button>
       </aside>
 
       <main className="platform-main">
+        <OnboardingTour
+          facts={tourFacts}
+          onNavigate={(tab) => setView(tab as View)}
+        />
         <header className="platform-topbar">
           <div>
             <span className="eyebrow">{roleLabel(platformRole)} workspace</span>
@@ -1698,6 +1822,7 @@ export function FullPlatformApp() {
             className="topbar-actions"
             style={{ display: "flex", alignItems: "center", gap: 10 }}
           >
+            <LanguageSelector variant="dropdown" />
             <button
               type="button"
               className="icon-button theme-toggle"
@@ -2358,6 +2483,23 @@ export function FullPlatformApp() {
                     />
                   </label>
                 </div>
+                {jobError && (
+                  <div className="form-error" style={{ marginTop: 14 }}>
+                    {jobError}
+                    {/* F-02: the KYC gate returns nextAction; offer the step
+                        instead of leaving the user at a dead end. */}
+                    {jobErrorNextAction === "verification" && (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ marginTop: 10 }}
+                        onClick={() => setView("verification")}
+                      >
+                        Verify your identity
+                      </button>
+                    )}
+                  </div>
+                )}
                 <button
                   className="btn-primary"
                   style={{ marginTop: 18, width: "fit-content" }}

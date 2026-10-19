@@ -25,6 +25,8 @@ import {
   useToast,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const KYC_REASONS = [
   "Photo is unclear, blurry, or cropped. Please re-upload a clear image.",
@@ -48,24 +50,32 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
   );
   const { rows, total, loading, error, reload } = page;
 
-  /* Unfiltered actionable split from the server. The sidebar badge counts
-     PENDING + UNDER_REVIEW while this page defaults to UNDER_REVIEW, so
-     without this a reviewer sees badge 12 over a list of 8 and no
-     explanation. */
+  /* Status split from the server. `underReview` is real review work;
+     `pending` is users who registered but never uploaded a document, so
+     there is nothing for a reviewer to act on and the sidebar KPI excludes
+     them. Shown so an empty queue is explained rather than mysterious. */
   const counts = (page.extra ?? null) as {
-    pending: number;
     underReview: number;
-    actionable: number;
+    pending: number;
   } | null;
 
   /* Review history lives on its own route; load it for the open record. */
   const [history, setHistory] = useState<Record<string, KycItem["history"]>>({});
 
   const sel = rows.find((k) => k.id === selId) ?? null;
-  /* The queue renders only the selected record's detail, with its history
-     merged in once the history route has answered. */
-  const list = useMemo(
-    () => (sel ? [{ ...sel, history: history[sel.id] ?? sel.history }] : []),
+
+  /* History arrives from its own route, so merge it back onto the record the
+     DETAIL pane renders.
+
+     It must not be merged onto the list. The list column previously rendered
+     an array built from `sel` alone, which meant it held zero cards until
+     something was selected — and nothing could be selected because there were
+     no cards to click. The queue was therefore permanently empty for every
+     status, filter and date, while the stat tiles (which read `rows`/`total`)
+     still showed real numbers. The list column renders `rows`; hotkeys
+     navigate `rows`. */
+  const detail = useMemo(
+    () => (sel ? { ...sel, history: history[sel.id] ?? sel.history } : null),
     [sel, history],
   );
 
@@ -133,14 +143,14 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
   useHotkeys(
     useCallback(
       (e: KeyboardEvent) => {
-        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !list.length) return;
-        const idx = list.findIndex((k) => k.id === selId);
-        if (e.key === "ArrowDown" && idx >= 0 && idx < list.length - 1) { e.preventDefault(); setSelId(list[idx + 1].id); }
-        if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); setSelId(list[idx - 1].id); }
+        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !rows.length) return;
+        const idx = rows.findIndex((k) => k.id === selId);
+        if (e.key === "ArrowDown" && idx >= 0 && idx < rows.length - 1) { e.preventDefault(); setSelId(rows[idx + 1].id); }
+        if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); setSelId(rows[idx - 1].id); }
         if ((e.key === "a" || e.key === "A") && sel) { e.preventDefault(); void decide("VERIFIED"); }
         if ((e.key === "r" || e.key === "R") && sel) { e.preventDefault(); document.getElementById("kyc-reason")?.focus(); }
       },
-      [list, selId, sel, decide, ui.viewerOpen, ui.paletteOpen],
+      [rows, selId, sel, decide, ui.viewerOpen, ui.paletteOpen],
     ),
   );
 
@@ -177,21 +187,22 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         <Kv k="PEP matches" v={String(rows.filter((k) => k.pep).length)} warn={rows.some((k) => k.pep)} />
         <Kv k="With documents" v={String(rows.filter((k) => k.docs.length > 0).length)} />
       </div>
-      {status === "UNDER_REVIEW" && counts && counts.pending > 0 ? (
-        <div className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
-          <b>{counts.actionable.toLocaleString()}</b> actionable in total —{" "}
-          <b>{counts.underReview.toLocaleString()}</b> awaiting review (shown below),{" "}
-          <b>{counts.pending.toLocaleString()}</b> submitted but not yet processed.{" "}
-          <button
-            className="btn btn-ghost"
-            style={{ marginLeft: 8 }}
-            onClick={() => setStatus("PENDING")}
-          >
-            Show awaiting processing
-          </button>
-        </div>
+      {status === "UNDER_REVIEW" && counts ? (
+        <Card className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
+          <b>{counts.underReview.toLocaleString()}</b> awaiting review (shown below).{" "}
+          {counts.pending > 0 ? (
+            <>
+              A further <b>{counts.pending.toLocaleString()}</b> registered users have not
+              uploaded a document, so there is nothing to review — they are not counted
+              as pending KYC.{" "}
+            </>
+          ) : null}
+          <Button variant="outline" size="sm" style={{ marginLeft: 8 }} onClick={() => { setStatus(""); setSelId(null); }}>
+            Show all statuses
+          </Button>
+        </Card>
       ) : null}
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -210,19 +221,19 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           allLabel="All statuses"
           label="KYC status"
         />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       <div className="queue-wrap">
         <div className="queue-list">
-          {list.length === 0 ? (
-            <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+          {rows.length === 0 ? (
+            <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={ShieldCheck}>No KYC applications in this view.</Empty>
-            </div>
+            </Card>
           ) : (
-            list.map((k) => (
+            rows.map((k) => (
               <button
                 key={k.id}
                 className={`q-card ${selId === k.id ? "selected" : ""}`}
@@ -255,50 +266,50 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           />
         </div>
 
-        {sel ? (
-          <div className="queue-detail card">
+        {detail ? (
+          <Card className="queue-detail card">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>Identity Review</h3>
-                <Pill s={sel.status} />
+                <Pill s={detail.status} />
               </div>
               <div className="qd-meta">
-                User: {sel.email} · UCID <span className="mono">{sel.ucid}</span> · {sel.name}
+                User: {detail.email} · UCID <span className="mono">{detail.ucid}</span> · {detail.name}
               </div>
             </div>
             <div className="qd-body">
               <div className="sec-title" style={{ marginTop: 0 }}>Extracted Information</div>
               <div className="info-grid">
-                <div className="kv"><div className="kv-k">Tier Request</div><div className="kv-v" style={{ fontSize: 14 }}>{sel.tier.replace("_", " ")}</div></div>
-                <div className="kv"><div className="kv-k">Fayda Number</div><div className="kv-v mono" style={{ fontSize: 14 }}>{sel.doc}</div></div>
-                {sel.tier !== "TIER_1" ? (
+                <div className="kv"><div className="kv-k">Tier Request</div><div className="kv-v" style={{ fontSize: 14 }}>{detail.tier.replace("_", " ")}</div></div>
+                <div className="kv"><div className="kv-k">Fayda Number</div><div className="kv-v mono" style={{ fontSize: 14 }}>{detail.doc}</div></div>
+                {detail.tier !== "TIER_1" ? (
                   <>
-                    <div className="kv"><div className="kv-k">TIN</div><div className="kv-v mono" style={{ fontSize: 14 }}>{sel.tin ?? "—"}</div></div>
-                    <div className="kv"><div className="kv-k">Business Reg</div><div className="kv-v mono" style={{ fontSize: 14 }}>{sel.biz ?? "—"}</div></div>
+                    <div className="kv"><div className="kv-k">TIN</div><div className="kv-v mono" style={{ fontSize: 14 }}>{detail.tin ?? "—"}</div></div>
+                    <div className="kv"><div className="kv-k">Business Reg</div><div className="kv-v mono" style={{ fontSize: 14 }}>{detail.biz ?? "—"}</div></div>
                   </>
                 ) : null}
               </div>
               <div className="sec-title" style={{ marginTop: 20 }}>Automated Checks</div>
-              <ChecksRow faydaA={sel.faydaA} faydaS={sel.faydaS} pep={sel.pep} dup={sel.dup} />
-              {sel.flag && !sel.dup ? (
+              <ChecksRow faydaA={detail.faydaA} faydaS={detail.faydaS} pep={detail.pep} dup={detail.dup} />
+              {detail.flag && !detail.dup ? (
                 <div style={{ marginTop: 8 }}>
                   <span className="check warn" style={{ fontSize: 12 }}>
-                    Routed to you: {sel.flag.replace(/[_-]/g, " ").toLowerCase()}
+                    Routed to you: {detail.flag.replace(/[_-]/g, " ").toLowerCase()}
                   </span>
                 </div>
               ) : null}
               <div className="sec-title" style={{ marginTop: 20 }}>Submitted Evidence</div>
               <div className="doc-tiles">
-                {sel.docs.map((d, i) => (
+                {detail.docs.map((d, i) => (
                   <button className="doc-tile" key={d.k} onClick={() => openDocs(i)}>
                     <Eye size={14} /> {d.t}
                   </button>
                 ))}
               </div>
-              {sel.history.length ? (
+              {detail.history.length ? (
                 <>
                   <div className="sec-title" style={{ marginTop: 20 }}>Review History</div>
-                  {sel.history.map((h, i) => (
+                  {detail.history.map((h, i) => (
                     <div className="hist-item" key={i}>
                       <b>{h.d}</b> by <span className="mono">{h.by}</span> · {dt(h.at)}
                       {h.reason ? <div className="hist-reason">Reason: {h.reason}</div> : null}
@@ -325,18 +336,18 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 {/* Was `disabled={busy || !(sel.pep || sel.dup)}`, which meant a
                     reviewer could only reject PEP and duplicate cases — a plain
                     blurry-photo rejection was impossible from the queue. */}
-                <button className="btn btn-red" disabled={busy} onClick={() => void decide("REJECTED")}>
+                <Button variant="destructive" disabled={busy} onClick={() => void decide("REJECTED")}>
                   Reject
-                </button>
-                <button className="btn btn-amber" disabled={busy} onClick={() => void decide("CLEARER")}>
+                </Button>
+                <Button variant="outline" disabled={busy} onClick={() => void decide("CLEARER")}>
                   Ask for Clearer Photo
-                </button>
-                <button className="btn btn-green" disabled={busy} title="Press A" onClick={() => void decide("VERIFIED")}>
+                </Button>
+                <Button disabled={busy} title="Press A" onClick={() => void decide("VERIFIED")}>
                   <Check size={15} /> Approve{" "}
                   <span className="kbd" style={{ background: "rgba(255,255,255,.25)", borderColor: "rgba(255,255,255,.4)", color: "#fff" }}>
                     A
                   </span>
-                </button>
+                </Button>
               </div>
               {reason === "custom" ? (
                 <div style={{ marginTop: 10 }}>
@@ -349,9 +360,9 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 <span className="kbd">Esc</span> close viewer
               </div>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="queue-detail card">
+          <Card className="queue-detail card">
             <div className="empty-detail">
               <UserCheck size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a record to review.</p>
@@ -359,7 +370,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate the queue
               </span>
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </div>

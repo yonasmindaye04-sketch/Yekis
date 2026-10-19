@@ -1,5 +1,85 @@
 # Project Context
 
+> **Update 2026-10-17 (Telegram Bot Multilingual Support & Translation Quality Audit):**
+> 1. **Motivation & Scope.** Following frontend multilingual integration, an audit revealed the Telegram bot had severe translation quality issues in Amharic, 81 missing translation keys causing raw key strings to be sent to users, no Afaan Oromoo or Tigrigna support, and push notifications bypassing translation via an identity stub.
+> 2. **Translation Quality Overhaul.** Corrected critical machine-translation artifacts in Amharic (`apps/backend/src/modules/bot/locales/am.json`), such as translating "accepted" as "ተቀብሯል" ("buried" -> "ተቀባይነት አግኝቷል"), "queue" as "ወርደት" ("humiliation" -> "ወረፋ"), "mediation/negotiation" as "ማሳቀፍ" ("hugging" -> "እርቅ እና ሽምግልና"), "close" as "ይዝቱ" ("threaten" -> "ዝጋ"), and corrupted session timeout copy.
+> 3. **4-Language Bot Parity.** Added complete Afaan Oromoo (`om.json`) and Tigrigna (`ti.json`) locale files to the bot. All 4 languages (`en`, `am`, `om`, `ti`) now feature exact 100% key parity across 243 keys.
+> 4. **Bot Infrastructure & Push Notifications.**
+>    - Extended `types.ts` bot locale union and `i18n.middleware.ts` to synchronously load and serve all 4 languages.
+>    - Rewired `notifications.ts` outbound push alerts with `getBotTranslation()`, ensuring users receive real localized notifications instead of raw string keys.
+>    - Upgraded language switcher inline keyboards (`language.ts`, `mainMenu.ts`) and callback handlers (`callbacks.ts`) to persist language preferences to the database (`User.languagePreference`).
+> 5. **Frontend Consistency.** Fixed remaining brand name references (`appName: "ዬኪስ (Yekis)"`) in Amharic and Tigrigna, and synchronized user registration language preference with the currently active UI language.
+> 6. **Verification.** 100% key parity across all 314 frontend keys and 243 bot keys; zero TypeScript errors (`tsc --noEmit` exits 0 for frontend and backend); all bot integration tests pass (`tests/bot-updates.test.ts` and `tests/bot-deeplinks.test.ts`).
+>
+> Last updated: 2026-10-17
+
+> **Update 2026-10-14 (Four-Language Multilingual Translation System — Amharic, Oromiffa, Tigrigna, English):**
+> 1. **Motivation & Scope.** The platform previously lacked a complete and functional multilingual interface. In accordance with user requirements, comprehensive, native, culturally authentic translations were implemented across the website for Ethiopia's major national languages: **Amharic (`am` / አማርኛ)**, **Oromiffa (`om` / Afaan Oromoo)**, and **Tigrigna (`ti` / ትግርኛ)**, alongside **English (`en`)**.
+> 2. **i18n Architecture (`apps/frontend/src/i18n.ts`).** Implemented a typed React `LanguageProvider` and `useI18n()` hook with full `localStorage` persistence under key `yekis-language`, automatic synchronization with `<html lang="...">`, and real-time reactive rerendering across all subscribed components.
+> 3. **Accessible, Theme-Invariant Switcher (`apps/frontend/src/components/LanguageSelector.tsx`).** Built a flexible language switcher with two distinct variants:
+>    - `variant="dropdown"`: Designed for headers and topbars with native language scripts, English subtitle, check indicators, and click-outside dismissal.
+>    - `variant="segmented"`: Designed for footers and compact contexts with high-contrast pills (`EN`, `አማ`, `ORO`, `ትግ`).
+>    - **Theme Parity Strictness:** Complies strictly with `.agents/AGENTS.md` and `docs/theme-parity/README.md`: layout dimensions, padding, borders, and typography are theme-invariant; dark theme changes colors/shadows only. Never uses low-opacity pill status designs.
+> 4. **Surface Coverage.**
+>    - **Landing Page V2 (`LandingPageV2.tsx`):** All sections fully hooked to `useI18n()` (Hero, Stats, Escrow Stepper, Transparent Fees, Categories Deck, Testimonials Marquee, About, FAQ, Final CTA, and Footer V2).
+>    - **Platform App Shell (`FullPlatformApp.tsx`):** Added dropdown LanguageSelector to the Auth header and the Workspace Topbar, and translated navigation items.
+>    - **Marketing Subpages:** FAQ Page (`FAQPage.tsx`), Fees Page (`FeesPage.tsx`), About Page (`AboutPage.tsx`), Case Studies Page (`CaseStudiesPage.tsx`), Cookie Banner (`CookieBanner.tsx`), Mobile CTA (`MobileCTA.tsx`), Not Found (`NotFoundPage.tsx`), and Thank You (`ThankYouPage.tsx`).
+> 5. **Offline Parity (`Yekis_translations.csv`).** Updated the translation tracking spreadsheet with 7 columns (`key,page,section,english_text,amharic_translation,oromiffa_translation,tigrigna_translation`) and fully populated all 219 keys with the authentic translations.
+> 6. **Verification.** `pnpm --filter frontend build` passes cleanly (`tsc -b` and `vite build` 0 errors).
+>
+> Last updated: 2026-10-14
+
+> **Update 2026-10-05 (Landing V2 "How it works" rebuilt as stepper + product stage):** the `#how-it-works`
+> section's pinned scroll board has been replaced. Rationale, in short:
+> 1. **What was wrong.** The section was a `480svh` sticky board — four thumbtacked step cards on a ruled
+>    sheet, three dash-masked connectors, three margin status notes, a scroll cue. It carried **eight**
+>    accent hues (lime / teal / green / violet tints plus rose / blue / emerald / violet thumbtacks) and
+>    three separate status pills, and it cost ~5 screens of scroll to say four sentences. Worse, the only
+>    legible thing in it was the step copy; nothing showed the product.
+> 2. **What it is now.** One grid module (`.esc-module`): a single centred slogan — *"Pay for **results**,
+>    not promises."* — spanning the full width, then a four-step stepper beside a browser frame that holds
+>    one **light, high-legibility product screen per step**: budget in escrow, the milestone list with
+>    attached files, the delivery review with release actions and the auto-release meter, and the
+>    resolution centre with its evidence timeline. The step copy is unchanged.
+> 3. **Copy that was cut, on purpose.** The eyebrow ("How your payment is protected"), the old headline
+>    ("Clear money. Clear evidence. Clear next steps."), the sub-paragraph, the "See how disputes get
+>    resolved" FAQ link and the trust footnote are all gone — the slogan replaces them. Consequence to be
+>    aware of: `EscrowSection` no longer takes `onNavigate`, and the FAQ cross-link from this section is
+>    no longer there. Put one back if the FAQ funnel matters more than the single-slogan rule.
+> 4. **One accent, not eight.** Neutral charcoal + white + a single brand green (`--esc-ac: #22c55e`,
+>    `--esc-ac-deep: #16a34a`). Note this is the project's documented **brand emerald** pair — `#22c55e`
+>    dark / `#16a34a` light — not the `--v2-primary` lime (`#d8f36b`) that the scroll bar, eyebrow and
+>    footer CTA use. Both are established brand values here, so the section reads as deliberate; if the
+>    lime/green contrast ever looks off-brand, `--esc-ac` is the single token to repoint.
+> 5. **The dark frame is theme-invariant on purpose.** `.esc-stage` is charcoal and `.esc-app` is a light
+>    screen in *both* themes. That is not a parity violation — the frame is a screenshot of the product,
+>    and the light screen is exactly what keeps the section readable in dark mode (on paper, a dark frame
+>    reads as an intentional device mockup). Only the stepper follows the theme, via the existing
+>    `--v2-*` tokens. The block's single `:root[data-theme="light"]` rule reassigns one **colour**,
+>    `--esc-ac` → `#15803d` so the numbers and the slogan hold up on paper.
+> 6. **Scroll-driven animation → a 6.5s autoplay.** The board's whole reason for existing was scroll
+>    choreography. The replacement is `useInView`-gated, `6.5s` per step, disabled under
+>    `prefers-reduced-motion`, and paused on pointer-enter **or** focus-within so the progress bar under the
+>    active step freezes in step with the timer (`.esc-module.is-paused` → `animation-play-state: paused`).
+>    The section is now roughly one screen tall instead of five.
+> 7. **Accessibility went up, not down.** `role="tablist"` / `tab` / `tabpanel` with `aria-selected`,
+>    `aria-controls`, `aria-labelledby`, roving `tabIndex` and Arrow/Home/End keys. Inactive panels are
+>    `inert`, which is what keeps their decorative buttons (e.g. "Approve & release $800") out of the tab
+>    order — they are mockups of the product, not live controls.
+> 8. **Stage height is a max, not a fit.** The four panels are stacked and absolutely positioned, so
+>    `.esc-stage { min-height }` must clear the tallest one (`02 · Work`): `590px` desktop, `660px` under
+>    `600px`. `560px` was the first guess and clipped `02 · Work` by 9px on desktop and 11px on mobile.
+>    If a panel's copy grows, that number has to grow with it.
+> 9. **Responsive keeps the copy.** `1040px` → stepper 2-up above the stage; `600px` → single column with a
+>    tightened stepper (smaller number chip, tighter padding, `13px` body) rather than hiding the step
+>    descriptions, which would have dropped the section's only real text on mobile.
+> 10. **Verification.** `tsc -b` and `vite build` exit 0. Checked in headless Chrome against the
+>     production build — all four screens at 1600 / 900 / 390px in both themes, no panel clipping and no
+>     horizontal overflow. Note ESLint cannot be run repo-wide (its config references `no-unassigned-vars`,
+>     absent from the installed plugin); this is pre-existing and unrelated.
+>
+Last updated: 2026-10-05
+
 > **Update 2026-10-03 (Operations Console v2):** The staff dashboard was consolidated into a single console at `apps/frontend/src/pages/ops/` (shell + 18 pages + shared components + one scoped stylesheet), retiring `StaffDashboard.tsx` and eight `Admin*Page.tsx` components. It mounts from `FullPlatformApp.tsx` for any account carrying a `staffRole`. `opsApi.ts` adapts the console onto the existing backend rather than being a second API client (the console was authored against a planned `/admin/*` surface that does not exist); `opsPerms.ts` derives nav visibility from `GET /admin/permissions/matrix`. Support inbox, receipt review, audit log, admins and permissions, and profile moderation were carried over. Three API client methods that pointed at non-existent routes were corrected, list pages now search/filter/page server-side, and `--ops-text-3` was retuned in both themes to clear WCAG AA.
 Last updated: 2026-10-03
 
@@ -12,6 +92,37 @@ Last updated: 2026-10-03
 > until there is real ticket volume to calibrate them against. A third-party agent inbox,
 > microservices and the wider integration/data-warehouse stack were considered and rejected as
 > disproportionate for a Node monolith at this stage.
+>
+> **Update 2026-10-05 (Marketing header: light-mode fix + Telegram button removed):**
+> 1. The Light-Mode Header Bug: the marketing header was **invisible on `LandingPageV2` in light mode** — nav links, the "Sign in" ghost button, the "YEKIS" wordmark and the theme toggle all rendered white-on-cream. The light-mode override in `marketing.css` was scoped to `body:has(.landing-page)`, but `LandingPageV2` renders `<div className="yk-v2">`, not `.landing-page` — that class belongs to the older `LandingPage.tsx`. The selector never matched, so the header fell through to the unscrolled rule `color: #f7faf9` (white, intended for a dark hero). Added `body:has(.yk-v2)` to all three light-mode header rules. **This only ever affected `LandingPageV2`**; the older `LandingPage` light-mode header was already correct, which is why the bug survived. Note the header's white-text default is *correct* on the dark hero — only light mode was broken.
+> 2. Telegram Button Removed: the `MessageCircle` link to `t.me/yekis_channel` that sat immediately before the theme toggle is gone from `MarketingHeader.tsx`, and the now-dead `.telegram-link` selectors were stripped from all header colour rules. The channel is still reachable from the footer social row and the floating support widget, so no route to Telegram was lost.
+> 3. **Header Geometry Is Unchanged.** A size increase was applied in the same session and then fully reverted — it was never requested and made the header read oversized against the hero. The proportions that ship are the originals: 20px vertical padding (`--space-5`), 36px logo, 18px wordmark (`1.125rem`), 15px nav links (`0.9375rem`), `--space-1` nav gaps, 44px theme toggle, and the "Get started" button inheriting the shared `.btn-primary` treatment. `marketing.css` now has **no geometry diff** for the header — only the light-mode selector fix and the dead-selector cleanup.
+> 4. Theme Parity Held: this change is colour/selectors only. The light-mode override changes `color` alone, and the header's geometry is identical in both themes by construction.
+> 5. Verification: `npx vite build` exits 0. The light-mode result was **not** visually confirmed in a browser; the fix is a selector-match correction, and it should be re-checked in both themes and in both scrolled/unscrolled states since the header has four colour states in total.
+>
+> **Update 2026-10-05 (Landing V2 escrow board loosened to fill its area):**
+> 1. What Was Wrong: the four pinned step cards were clamped to `clamp(240px, 23vw, 320px)` and positioned at `left` 22–58%, so on a wide viewport they clustered in the middle third of the `100svh` board and left both side margins dead. The three pinned status notes sat at `left` 5/6/76%, two of them jammed against the left edge.
+> 2. Cards Now Fill the Area: width is `clamp(260px, 30vw, 460px)` — the cap scales with the viewport instead of pinning at 320px. Card internals were loosened to match the wider box: `.esc-card-body` padding `14px → 17px`, `.esc-tint` padding `18px → 22px`, `.esc-num` `2.6rem → 3rem`, `h3` `1.22rem → 1.3rem`, `p` `0.83rem → 0.88rem` with `line-height 1.55 → 1.6`.
+> 3. Repositioned: `PIN_CARDS` moved to `left` 9 / 52 / 9 / 52 and `top` 9 / 22 / 50 / 64 (was 24 / 58 / 22 / 58 and 13 / 24 / 49 / 62), widening the spread in both axes. Card tilts were also toned down slightly (peak `rot` `7deg → 6deg`) so the larger cards read as a spread board rather than scattered debris.
+> 4. `PIN_NOTES` moved to `left` 78 / 33 / 31 — "Balance locked" now anchors the top-right corner instead of sitting at 76%, and the two left notes moved into the open column between the card stacks.
+> 5. Wires Were Repointed, Not Left Behind: `PIN_WIRES` are hand-authored cubic paths in the same 0–100 board space as the card coordinates, so they had to be re-authored to the new positions (endpoints moved from `46/58` to `32/50`). Leaving them would have left connectors pointing into empty space.
+> 6. No Coordinate-Space Change Needed: cards/notes/wires are `position: absolute` with percentage `left`/`top`, and `.esc-pin` is `position: sticky` — already a containing block spanning the full stage. An extra `.esc-board` wrapper was prototyped and removed as unnecessary; the percentages already resolved against the correct origin.
+> 7. Static Fallback Widened: the `≤900px` / reduced-motion static stack uses `width: min(500px, 100%)` (was `min(430px, 100%)`), since the cards themselves got larger.
+> 8. Theme Parity Held: all of the above is un-themed geometry in the base rules. The only theme-conditional escrow rules remain the per-step accent and thumbtack **colours** at `landing-v2.css` (`.esc-card--1..4`, `.esc-note--1..3`), per the AGENTS.md parity rule.
+> 9. Verification: `npx vite build` exits 0. The board is a scroll-driven `480svh` pinned stage, so its composition at intermediate scroll progress was **not** verified in a browser — the card/wire/overlap geometry in particular is tuned by eye and wants a look at 1440px and ~2560px before being called done.
+>
+> **Update 2026-10-05 (Landing V2 live-metrics section rebuilt):**
+> 1. What Changed: `StatsSection` in `apps/frontend/src/LandingPageV2.tsx` and the `.v2-stats*` rules in `apps/frontend/src/landing-v2.css` were rebuilt from the supplied HTML reference. The old 4-up divided band (a `repeat(4, 1fr)` grid using a `gap: 1px` over `--v2-border` background as dividers, absolutely-positioned icons, a gradient underline wiping in on hover) is gone.
+> 2. Skewed Cascade: four independent `.v2-stat-card`s sit on a wrapping flex row, each `skewY(-6deg)` with a `margin-top` cascade of `0 / 24 / 48 / 72px`. Hover un-skews to `0deg`, lifts `-20px` and scales `1.02`. `.v2-stat-inner` counter-skews by `calc(var(--skew) * -1)` so the tilted card does not tilt its own text.
+> 3. Accents Are Tokenised, Not Hard-Coded: blue / purple / green / amber each drive the blurred orb, label, counter, divider rule, hover border and hover shadow through `--stat-accent*` custom properties. The reference hard-coded dark-only hex and a `#050507` page background; those became `color-mix()` over existing `--v2-*` tokens so both themes work.
+> 4. Fills the Container: `.v2-container` is `width: 100%` with 6% gutters and has **no max-width** — `--v2-max: 1180px` is declared at `landing-v2.css:9` but never referenced. The first attempt pinned cards at `max-width: 17rem`, which made the row cluster in the centre and leave both gutters empty. Cards are now `flex: 1 1 auto` with `min-width: 16rem` and no max-width, so the row absorbs the available width.
+> 5. Why `min-width` and Not `flex-basis: 0`: a `0` basis means the row can never wrap — all four cards stay on one line at any width and simply get crushed. `min-width` is the wrap trigger; the `auto` basis is what lets the cards grow to fill the row.
+> 6. Proportional Scaling: `.v2-stat` is a `container-type: inline-size` container. The counter is `clamp(30px, 13cqi, 64px)` and card height is `clamp(13.5rem, 76cqi, 18rem)`, so a wider card gets a proportionally larger number instead of a small one stranded in whitespace. `76cqi` roughly preserves the reference's ~0.78 width-to-height proportion.
+> 7. Backdrop: a violet→teal radial spotlight, a 60px square grid masked to a radial falloff, and SVG film grain, all behind a `z-index: 1` container.
+> 8. Theme Parity Held: the four `:root[data-theme="light"]` overrides reassign **only** colour custom properties (`--stat-accent-text`, `--stat-accent-val`, `--stat-accent-edge`, `--stat-accent-shadow`). No geometry, per the AGENTS.md parity rule. Light mode gets darker accents because the reference's 300-weight pastels wash out on paper.
+> 9. Responsive: `1024px` goes 2-up with the cascade flattened to alternate-row offsets; `600px` goes single-column and un-skews (`--skew: 0deg`), since a tilted full-width card reads as a bug rather than a flourish.
+> 10. Unchanged: the four figures are still hardcoded literals in `STAT_CARDS` (not fetched from an API), and the existing `CountUp` animator — including its `prefers-reduced-motion` short-circuit — is reused as-is. Note that the global reduced-motion block kills `transition-duration` but does not neutralise the skew, so cards stay statically tilted and jump instantly on hover; a stats-specific override was not added.
+> 11. Verification: `npx vite build` exits 0. ESLint could not be run — it is broken repo-wide (`config` references `no-unassigned-vars`, absent from the installed `@humanwhocodes/config-array` plugin), unrelated to this change. The visual result was not inspected in a browser.
 >
 > **Update 2026-10-03 (Customer support is now 100% native — Chatwoot reverted):**
 > 1. Why Chatwoot went: the bridge built earlier today worked, but it was the wrong shape. Chatwoot delivers webhooks through an `ssrf_filter` that rejects every private/loopback address with no override, so agent replies were undeliverable locally and would have needed a public ingress in production. It also meant a second inbox, a second message store, a second UI beside the staff dashboard's existing queue, a third-party bubble that cannot be styled to match the design system, and a ~3 GB container stack — all to obtain capabilities the platform already had.

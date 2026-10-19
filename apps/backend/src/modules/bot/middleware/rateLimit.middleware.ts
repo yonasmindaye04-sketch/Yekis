@@ -1,6 +1,7 @@
 import { BotContext } from "../types.js";
 import { redis } from "../../../lib/redis.js";
 import { logger } from "../../../lib/logger.js";
+import { env } from "../../../config/env.js";
 
 interface RateLimitConfig {
   windowMs: number;
@@ -31,7 +32,7 @@ function getRateLimitKey(
   // ctx.session then throws. The chat-session guard stops those updates earlier,
   // but a rate limiter must never be the thing that crashes the bot.
   const userId = ctx.session?.telegramUserId || ctx.session?.telegramChatId;
-  return `${RATE_LIMITS[type]!.keyPrefix}:${userId}`;
+  return `${env.RATE_LIMIT_KEY_PREFIX}${RATE_LIMITS[type]!.keyPrefix}:${userId}`;
 }
 
 function getLimitType(ctx: BotContext): keyof typeof RATE_LIMITS {
@@ -67,6 +68,19 @@ export async function rateLimitMiddleware(
   ctx: BotContext,
   next: () => Promise<void>,
 ) {
+  // RATE_LIMIT_DISABLED gates this limiter too. It previously did not, and the
+  // counters are keyed `ratelimit:<type>:<userId>` in Redis with no test prefix,
+  // so they survive between runs. Bot suites reuse the same numeric user IDs, so
+  // each full-suite run added to the same buckets until a suite received
+  // "Too many requests. Please wait a moment." after roughly a dozen runs --
+  // an intermittent failure that had nothing to do with whatever it landed on.
+  //
+  // Read per call rather than at import, so a suite can flip it if it needs the
+  // limiter live.
+  if (env.RATE_LIMIT_DISABLED) {
+    return next();
+  }
+
   const type = getLimitType(ctx);
   const config = RATE_LIMITS[type];
   if (!config) return next();

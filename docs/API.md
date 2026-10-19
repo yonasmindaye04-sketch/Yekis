@@ -55,7 +55,7 @@ Marketplace roles are `CLIENT`, `FREELANCER`, and `BOTH`.
 | `POST` | `/api/v1/kyc/documents` | Authenticated | Upload one KYC document and trigger verification/review |
 | `GET` | `/api/v1/kyc/status` | Authenticated | Return tier, status, review metadata, and submitted documents |
 | `POST` | `/api/v1/kyc/upgrade-tier2` | Authenticated Tier 1 user | Submit TIN/business registration for Tier 2 review |
-| `GET` | `/api/v1/kyc/review-queue` | Staff | List pending and periodic KYC reviews |
+| `GET` | `/api/v1/kyc/review-queue` | Staff (`kyc.review`) | Paginated KYC records. Omit `status` for **all** statuses; pass `status=UNDER_REVIEW` for the actionable queue. Response also carries `counts: { underReview, pending }` |
 | `POST` | `/api/v1/kyc/:targetUserId/review` | Staff | Verify or reject KYC |
 
 `POST /documents` is `multipart/form-data` with `file`, `documentType`, `fullName`, `dateOfBirth`, and `documentNumber`. Maximum file size is 8 MB.
@@ -549,7 +549,8 @@ All administrative surfaces are protected by router-level `requireAuth` and gran
 ### Other staff surfaces (not under `/admin`)
 These use `requireStaffRole(...)` rather than `requirePermission(...)`, so a role can hold a console page's permission yet still be rejected at the route. The console degrades per-section rather than failing.
 
-- **KYC** (`/api/v1/kyc`, `COMPLIANCE_OFFICER | ADMIN`): `GET /review-queue` (envelope uses `limit`), `POST /:targetUserId/review` with `{ decision: "VERIFIED" | "REJECTED", rejectionReason? }` — there is **no** "clearer photo" decision, `GET /documents/:documentId/url`, `GET /:targetUserId/history`.
+- **KYC** (`/api/v1/kyc`, permission `kyc.review` — no longer `requireStaffRole`, so SUPER_ADMIN and COMPLIANCE_ADMIN are included): `GET /review-queue` (envelope uses `limit`; **omitting `status` returns every status** — it does not default to `UNDER_REVIEW`), `POST /:targetUserId/review` with `{ decision: "VERIFIED" | "REJECTED", rejectionReason? }` — there is **no** "clearer photo" decision, `GET /documents/:documentId/url`, `GET /:targetUserId/history`.
+- **KYC status semantics**: `PENDING` = registered, never uploaded a document (nothing to review, so excluded from the `pendingIdentity` KPI); `UNDER_REVIEW` = document submitted, a human must decide (the only actionable status); `VERIFIED`/`REJECTED` = decided.
 - **Transaction monitoring** (`/api/v1/tms`, `COMPLIANCE_OFFICER | ADMIN`): `GET /queue`, `POST /:flagId/file-str`, `POST /:flagId/dismiss`, `GET /activity`, `POST /users/:userId/lift-hold`.
 - **Disputes** (`/api/v1/disputes`): `GET /staff/queue`, `POST /:disputeId/resolve` with `{ outcome, recommendation, freelancerShareMinor? }`, plus `/claim`, `/arbitration-award`, `/escalate`, `/evidence`.
 - **Profile reports** (`/api/v1/staff/reports`, `ADMIN | COMPLIANCE_OFFICER`): `GET /` returns `{ data, pagination }`; resolve with `PATCH /:reportId` and `{ status, staffNotes }`. *There is no `/api/v1/admin/profile-reports` route.*

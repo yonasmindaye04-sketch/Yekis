@@ -211,23 +211,30 @@ export async function loginWithOAuthProfile(
     where: { email: profile.email },
   });
 
-  if (user && !user.emailVerified) {
-    // Refuse to claim an account that has its own password. Without a verified
-    // mailbox, an email match proves nothing: an attacker who pre-registers
-    // this address would otherwise receive the real account (and its escrow
-    // balance) the moment the owner clicks "Continue with <provider>".
-    // Federated-only accounts have no password to prove, so merging another
-    // provider into them stays safe.
-    if (isPasswordOwnedAccount(user)) {
-      logger.warn(
-        { userId: user.id, provider: profile.provider },
-        "Refusing OAuth merge into a password-owned account",
-      );
-      throw new AccountLinkRequiredError(
-        accountLinkRequiredMessage(profile.email),
-      );
-    }
+  /**
+   * Refuse to take over an account that has its own password, whatever its
+   * emailVerified state.
+   *
+   * This check used to live inside `if (user && !user.emailVerified)`, which
+   * meant a password account with a VERIFIED email skipped it entirely: an
+   * attacker holding that address at the OAuth provider could sign straight in,
+   * and the merge below then wrote the attacker's provider id onto the account.
+   * That is account takeover, and it was scoped out by one boolean.
+   *
+   * Email verification proves the address, not the person. It is a reason to
+   * trust a *federated* account's own identity, never a reason to let a
+   * password account be claimed by whoever holds the same address at another
+   * provider.
+   */
+  if (user && isPasswordOwnedAccount(user)) {
+    logger.warn(
+      { userId: user.id, provider: profile.provider, emailVerified: user.emailVerified },
+      "Refusing OAuth merge into a password-owned account",
+    );
+    throw new AccountLinkRequiredError(accountLinkRequiredMessage(profile.email));
+  }
 
+  if (user && !user.emailVerified) {
     // Federated providers verify email ownership - mark verified on first
     // OAuth login.
     user = await prisma.user.update({
@@ -266,7 +273,10 @@ export async function loginWithOAuthProfile(
             avatarUrl: profile.avatarUrl,
             role: userRole,
             languagePreference: "en",
-            kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+            // F-02: a Google/Apple/Facebook account is not a verified account.
+            // Creating this VERIFIED with no document defeated every
+            // requireKycVerified gate for the social sign-up path.
+            kyc: { create: { tier: "TIER_1", status: "PENDING" } },
             wallet: { create: { balanceMinor: 0 } },
             consents: {
               create: [
@@ -311,7 +321,9 @@ export async function loginWithOAuthProfile(
   }
 
   const { createAuthTokens } = await import("./auth.service.js");
-  const result = await createAuthTokens(user);
+  // A federated provider session is not a strong factor: it cannot authorise a
+  // withdrawal or an account change on its own.
+  const result = await createAuthTokens(user, ["oauth"]);
 
   await recordAuditEvent({
     userId: user.id,

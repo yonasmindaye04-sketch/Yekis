@@ -4,6 +4,7 @@ import type {
   DisputeResolutionOutcome,
 } from "@marketplace/schemas";
 import { prisma } from "../../lib/prisma.js";
+import { Prisma } from "@prisma/client";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { autoReleaseQueue, notificationQueue } from "../../queue/queues.js";
@@ -12,6 +13,7 @@ import {
   refundMilestoneToClient,
 } from "../escrow/escrow.service.js";
 import { checkAndUpdateContractCompletion } from "../contracts/contracts.service.js";
+import { recordDisputeRefundLedger } from "../finance/ledger.service.js";
 import { uploadEvidenceBundle } from "../../lib/objectStore.js";
 import { logger } from "../../lib/logger.js";
 import { createHash } from "node:crypto";
@@ -24,6 +26,31 @@ export class MilestoneNotFoundError extends Error {}
 export class InvalidEscrowStateForDisputeError extends Error {}
 export class MutualWithdrawalOutcomeMismatchError extends Error {}
 export class DisputeAlreadyClaimedError extends Error {}
+/**
+ * F-04 — the dispute was already resolved by someone else, either a concurrent
+ * resolution or an earlier one. Thrown BEFORE any money moves, so a losing
+ * caller cannot pay a party twice.
+ */
+export class DisputeAlreadyResolvedError extends Error {}
+/**
+ * F-04 — the milestone backing this dispute is not in a state that can still be
+ * settled (e.g. already RELEASED or REFUNDED). Without this guard a
+ * REFUND_TO_CLIENT award could credit a wallet for money that has already been
+ * released to the other party.
+ */
+export class MilestoneNotSettleableError extends Error {}
+
+/**
+ * F-04 — escrow states from which a dispute resolution can still move money.
+ * Deliberately excludes RELEASED and REFUNDED: those mean the money already
+ * went somewhere, and a second movement would duplicate it.
+ */
+const SETTLEABLE_ESCROW_STATES = [
+  "DISPUTED",
+  "SUBMITTED_FOR_REVIEW",
+  "ESCROW_HELD",
+  "WORK_IN_PROGRESS",
+] as const;
 
 const NEGOTIATION_WINDOW_DAYS = 7; // Stage 1 — matches the roadmap's dispute-flow design
 const MEDIATION_WINDOW_DAYS = 5; // Stage 3 target SLA (3-5 business days)
@@ -410,63 +437,195 @@ export async function resolveDispute(params: {
     where: { id: dispute.milestoneId },
   });
 
-  if (params.outcome === "RELEASE_TO_FREELANCER") {
-    await releaseMilestoneFunds(
-      milestone.id,
-      dispute.contract.freelancerId,
-      milestone.amountMinor,
-    );
-  } else if (params.outcome === "REFUND_TO_CLIENT") {
-    await refundMilestoneToClient(
-      milestone.id,
-      dispute.contract.clientId,
-      milestone.amountMinor,
-    );
-  } else {
-    const freelancerShare = params.freelancerShareMinor!;
-    if (freelancerShare > milestone.amountMinor) {
+  // F-05 — validate the PARTIAL_SPLIT share before the claim, so a malformed
+  // award is rejected while the dispute is still open and nothing has moved.
+  // Routed input is a `number | undefined`; here it must be a real integer
+  // inside the escrow amount, or the split is undefined and paying it would
+  // either lose money or create it.
+  let validatedFreelancerShare: number | undefined;
+  if (params.outcome === "PARTIAL_SPLIT") {
+    const share = params.freelancerShareMinor;
+    if (typeof share !== "number" || !Number.isInteger(share) || share < 0) {
+      throw new InvalidDisputeStageError(
+        "A PARTIAL_SPLIT resolution requires a non-negative integer freelancerShareMinor.",
+      );
+    }
+    if (share > milestone.amountMinor) {
       throw new InvalidDisputeStageError(
         "Freelancer share cannot exceed the milestone amount.",
       );
     }
-    const clientShare = milestone.amountMinor - freelancerShare;
-    if (freelancerShare > 0) {
-      await releaseMilestoneFunds(
-        milestone.id,
-        dispute.contract.freelancerId,
-        freelancerShare,
-      );
-    }
-    if (clientShare > 0) {
-      await prisma.wallet.update({
-        where: { userId: dispute.contract.clientId },
-        data: { balanceMinor: { increment: clientShare } },
-      });
-    }
-    await prisma.milestone.update({
-      where: { id: milestone.id },
-      data: { escrowState: "PARTIAL_REFUND" },
-    });
-    try {
-      await checkAndUpdateContractCompletion(milestone.id);
-    } catch (err) {
-      logger.error(
-        { err, milestoneId: milestone.id },
-        "Contract completion check failed after PARTIAL_SPLIT",
-      );
-    }
+    validatedFreelancerShare = share;
   }
 
-  const resolved = await prisma.dispute.update({
+  // Captured into a local so the non-null narrowing survives the transaction
+  // callback below, which is a fresh closure scope.
+  const contract = dispute.contract;
+
+  // F-04 — the claim, the settleability check and EVERY money movement share a
+  // single transaction.
+  //
+  // Previously the claim was its own auto-committed statement and the payout
+  // helpers opened their own transactions, so the two could not both fail
+  // together: a dispute could be marked RESOLVED and then fail to pay (or the
+  // process could die in between), which is what the hand-rolled compensating
+  // `dispute.update` below used to paper over. A crash mid-settlement left a
+  // RESOLVED dispute with no money moved.
+  //
+  // Now one failure rolls all of it back: the dispute stays unresolved and no
+  // balance moves. The helpers receive `tx`, which also makes them propagate a
+  // lost claim instead of swallowing it.
+  // Cheap pre-check so an already-resolved dispute never has to take a pooled
+// connection for a transaction it cannot use. The stage is already narrowed to
+// STAGE_3_MEDIATION by the guard above, so `resolvedAt` is the signal here.
+// Correctness still rests on the conditional claim inside the transaction
+// below; this only avoids wasting a connection under contention (P2028).
+if (dispute.resolvedAt !== null) {
+  throw new DisputeAlreadyResolvedError(
+    "This dispute has already been resolved.",
+  );
+}
+
+try {
+    await prisma.$transaction(
+      async (tx) => {
+        // Claim the dispute BEFORE any money moves. A conditional updateMany, so
+        // exactly one caller can flip it to RESOLVED; the loser gets count=0 and
+        // throws before crediting anybody.
+        const claim = await tx.dispute.updateMany({
+          where: {
+            id: dispute.id,
+            stage: { not: "RESOLVED" },
+            resolvedAt: null,
+          },
+          data: {
+            stage: "RESOLVED",
+            resolvedByStaffId: params.staffUserId,
+            resolutionOutcome: params.outcome,
+            mediatorRecommendation: params.recommendation,
+            freelancerShareMinor: params.freelancerShareMinor ?? null,
+            resolvedAt: new Date(),
+          },
+        });
+        if (claim.count === 0) {
+          throw new DisputeAlreadyResolvedError(
+            "This dispute has already been resolved.",
+          );
+        }
+
+        // The milestone must still hold the money. A dispute can reach a
+        // resolver while the milestone has already been released (auto-release,
+        // or a competing settlement), and paying out again duplicates funds.
+        // Throwing here rolls the claim back with it — no compensating write.
+        if (
+          !(SETTLEABLE_ESCROW_STATES as readonly string[]).includes(
+            milestone.escrowState,
+          )
+        ) {
+          throw new MilestoneNotSettleableError(
+            `Cannot settle a dispute: the milestone is already in state ${milestone.escrowState}.`,
+          );
+        }
+
+        if (params.outcome === "RELEASE_TO_FREELANCER") {
+          await releaseMilestoneFunds(
+            milestone.id,
+            contract.freelancerId,
+            milestone.amountMinor,
+            { tx },
+          );
+        } else if (params.outcome === "REFUND_TO_CLIENT") {
+          await refundMilestoneToClient(
+            milestone.id,
+            contract.clientId,
+            milestone.amountMinor,
+            { tx },
+          );
+        } else {
+          // F-05 — the share is validated above, BEFORE the claim and before any
+          // movement. `params.freelancerShareMinor!` used to be trusted, and a
+          // missing value produced `amountMinor - undefined` = NaN, so neither
+          // branch ran and the escrow was silently marked PARTIAL_REFUND with
+          // nobody paid.
+          const freelancerShare = validatedFreelancerShare!;
+          const clientShare = milestone.amountMinor - freelancerShare;
+          if (freelancerShare > 0) {
+            await releaseMilestoneFunds(
+              milestone.id,
+              contract.freelancerId,
+              freelancerShare,
+              { tx },
+            );
+          }
+          if (clientShare > 0) {
+            await tx.wallet.update({
+              where: { userId: contract.clientId },
+              data: { balanceMinor: { increment: clientShare } },
+            });
+
+            // The freelancer's share went out through releaseMilestoneFunds,
+            // which posts a journal debiting the escrow pool. This branch used
+            // to credit the wallet and stop: the pool was debited for the
+            // freelancer's portion only, so the client's portion of the
+            // escrowed money was never relieved and 2000-LIABILITY-ESCROW kept
+            // carrying a liability that had been paid out. The books said the
+            // platform still owed every client their disputed money, forever.
+            //
+            // Together the two journals debit the pool by exactly
+            // freelancerShare + clientShare = milestone.amountMinor, matching
+            // the funding journal, so the milestone nets to zero.
+            await recordDisputeRefundLedger(tx, {
+              clientId: contract.clientId,
+              milestoneId: milestone.id,
+              amountMinor: clientShare,
+            });
+          }
+          await tx.milestone.update({
+            where: { id: milestone.id },
+            data: { escrowState: "PARTIAL_REFUND" },
+          });
+        }
+      },
+      // Default READ COMMITTED isolation, deliberately. Under SERIALIZABLE the two
+      // racing transactions abort each other, so whichever one had already
+      // moved money could still lose and retry — then both callers would fail
+      // and nobody would be told they were the second resolver. Under READ
+      // COMMITTED the loser's conditional `updateMany` simply blocks on the
+      // row lock, re-evaluates its WHERE after the winner commits, matches 0
+      // rows, and throws the domain error. Exactly one caller moves money.
+      // maxWait/timeout are explicit because an interactive transaction holds a
+      // pooled connection for its whole duration, and the default 2s maxWait
+      // was not enough for the loser to acquire one under load.
+      { maxWait: 15_000, timeout: 20_000 },
+    );
+  } catch (err) {
+    // P2034 = serialization/write conflict, P2002 = unique violation on the
+    // concurrent update. Both mean another transaction settled this dispute
+    // first, which is exactly what DisputeAlreadyResolvedError describes.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      (err.code === "P2034" || err.code === "P2002")
+    ) {
+      throw new DisputeAlreadyResolvedError(
+        "This dispute has already been resolved.",
+      );
+    }
+    throw err;
+  }
+
+  try {
+    await checkAndUpdateContractCompletion(milestone.id);
+  } catch (err) {
+    logger.error(
+      { err, milestoneId: milestone.id },
+      "Contract completion check failed after dispute settlement",
+    );
+  }
+
+  // The claim above already wrote the resolution fields; re-read for the return
+  // value so callers get the persisted row.
+  const resolved = await prisma.dispute.findUniqueOrThrow({
     where: { id: dispute.id },
-    data: {
-      stage: "RESOLVED",
-      resolvedByStaffId: params.staffUserId,
-      resolutionOutcome: params.outcome,
-      mediatorRecommendation: params.recommendation,
-      freelancerShareMinor: params.freelancerShareMinor,
-      resolvedAt: new Date(),
-    },
   });
 
   await recordAuditEvent({
@@ -478,12 +637,12 @@ export async function resolveDispute(params: {
   });
 
   await notificationQueue.add("dispute-resolved", {
-    userId: dispute.contract.clientId,
+    userId: contract.clientId,
     disputeId: dispute.id,
     message: "Your dispute has been resolved.",
   });
   await notificationQueue.add("dispute-resolved", {
-    userId: dispute.contract.freelancerId,
+    userId: contract.freelancerId,
     disputeId: dispute.id,
     message: "Your dispute has been resolved.",
   });
@@ -504,7 +663,15 @@ export async function escalateToArbitration(params: {
   disputeId: string;
 }) {
   const dispute = await getDisputeForParty(params.disputeId, params.userId);
-  if (dispute.stage !== "STAGE_3_MEDIATION" && dispute.stage !== "RESOLVED") {
+  // F-04 — only a dispute that is genuinely still open may be escalated. This
+  // edge used to accept RESOLVED, which let a settled dispute be pushed back
+  // to arbitration and then resolved (and paid) a second time.
+  if (dispute.stage === "RESOLVED" || dispute.resolvedAt) {
+    throw new InvalidDisputeStageError(
+      "Cannot escalate a resolved dispute to arbitration.",
+    );
+  }
+  if (dispute.stage !== "STAGE_3_MEDIATION") {
     throw new InvalidDisputeStageError(
       `Cannot escalate to arbitration from stage ${dispute.stage}.`,
     );
@@ -554,11 +721,29 @@ export async function applyArbitrationAward(params: {
       `Can only apply an award when stage is STAGE_4_ARBITRATION, current stage: ${dispute.stage}.`,
     );
   }
+  // F-04 — refuse an award on an already-resolved dispute before the stage
+  // rewind below can put it back in play.
+  if (dispute.resolvedAt || dispute.resolutionOutcome) {
+    throw new DisputeAlreadyResolvedError(
+      "This dispute has already been resolved; an award cannot be applied on top of it.",
+    );
+  }
 
-  await prisma.dispute.update({
-    where: { id: dispute.id },
+  // F-04 — the rewind is conditional, so a concurrent resolution that lands
+  // between the stage read and this write cannot be silently undone.
+  const rewind = await prisma.dispute.updateMany({
+    where: {
+      id: dispute.id,
+      stage: "STAGE_4_ARBITRATION",
+      resolvedAt: null,
+    },
     data: { stage: "STAGE_3_MEDIATION" },
   });
+  if (rewind.count === 0) {
+    throw new DisputeAlreadyResolvedError(
+      "This dispute was resolved before the award could be applied.",
+    );
+  }
 
   const resolved = await resolveDispute({
     staffUserId: params.staffUserId,

@@ -1,3 +1,4 @@
+import { useI18n } from "./i18n";
 import "./marketing.css";
 
 type ThankYouPageProps = {
@@ -11,24 +12,25 @@ export function ThankYouPage({
   onNavigate,
   onStart,
 }: ThankYouPageProps) {
+  const { t } = useI18n();
+
   const content = {
     signup: {
-      title: "Welcome to Yekis!",
-      message:
-        "Your account is ready. Next step: verify your identity to start posting or finding work.",
-      btnText: "Verify Identity",
+      title: t.marketing.thankYou.signup,
+      message: t.marketing.thankYou.signupMessage,
+      btnText: t.marketing.thankYou.verifyBtn,
       btnAction: () => onStart("login"),
     },
     "job-posted": {
-      title: "Your job is live!",
-      message: "Qualified freelancers will start sending proposals soon.",
-      btnText: "View Dashboard",
+      title: t.marketing.thankYou.jobPosted,
+      message: t.marketing.thankYou.jobMessage,
+      btnText: t.marketing.thankYou.viewDashboard,
       btnAction: () => onStart("login"),
     },
     contact: {
-      title: "Thanks for reaching out!",
-      message: "We'll get back to you within 24 hours.",
-      btnText: "Back to Home",
+      title: t.marketing.thankYou.contact,
+      message: t.marketing.thankYou.contactMessage,
+      btnText: t.marketing.thankYou.backHome,
       btnAction: () => onNavigate("home"),
     },
   };

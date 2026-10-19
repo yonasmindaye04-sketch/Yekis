@@ -9,6 +9,8 @@ import { FileText, RefreshCw, Search } from "lucide-react";
 import { dts, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { RawAuditLog } from "../opsBackend";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Empty,
   ErrorBox,
@@ -33,9 +35,9 @@ export default function AuditLogs() {
         title="Audit Logs"
         sub="Append-only record of privileged actions across the platform"
         right={
-          <button className="btn btn-ghost" onClick={reload}>
+          <Button variant="outline" onClick={reload}>
             <RefreshCw size={14} /> Refresh
-          </button>
+          </Button>
         }
       />
       <div className="grid g4" style={{ marginBottom: 16 }}>
@@ -44,7 +46,7 @@ export default function AuditLogs() {
         <Kv k="With an amount" v={String(rows.filter((r) => r.amountMinor != null).length)} />
         <Kv k="Staff actors" v={String(rows.filter((r) => r.actorRole).length)} />
       </div>
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -53,10 +55,10 @@ export default function AuditLogs() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["Event", "Entity", "Action", "Actor", "Amount", "IP", "When"]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="entries" />}

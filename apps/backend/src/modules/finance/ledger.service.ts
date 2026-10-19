@@ -49,6 +49,22 @@ export function getUserAccountCode(userId: string): string {
   return `2100-USER-${userId}`;
 }
 
+/**
+ * Resolves which settlement asset account a provider's cash moves through.
+ *
+ * The `PaymentProvider` enum values are TELEBIRR, CHAPA, CBE_BIRR and M_PESA.
+ * Comparing against the literal "CBE" could never be true, so every CBE
+ * top-up and every CBE payout was posting against the Telebirr asset account —
+ * two different bank accounts collapsed into one ledger line. Match on the
+ * enum member, and default anything unrecognised to Telebirr rather than
+ * inventing a new account.
+ */
+export function resolveSettlementAssetAccount(provider: string | null | undefined) {
+  return provider === "CBE_BIRR"
+    ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
+    : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+}
+
 // === ERROR CLASSES ===
 export class UnbalancedJournalError extends Error {
   constructor(debits: number, credits: number) {
@@ -161,6 +177,8 @@ export async function postJournalEntry(
     },
   });
 
+  const rows: Prisma.LedgerEntryCreateManyInput[] = [];
+
   for (const line of params.entries) {
     const debit = line.debitMinor ?? 0;
     const credit = line.creditMinor ?? 0;
@@ -208,15 +226,20 @@ export async function postJournalEntry(
       },
     });
 
-    await tx.ledgerEntry.create({
-      data: {
-        journalId: journal.id,
-        accountId: account.id,
-        debitMinor: debit,
-        creditMinor: credit,
-      },
+    // Buffered rather than inserted per line. The ledger_balance_guard trigger
+    // validates an entire journal per STATEMENT, which is what lets a valid
+    // multi-line posting satisfy debits == credits without a row-level trigger
+    // rejecting the first line. Posting line-by-line in separate statements
+    // would make every journal look unbalanced after its first insert.
+    rows.push({
+      journalId: journal.id,
+      accountId: account.id,
+      debitMinor: debit,
+      creditMinor: credit,
     });
   }
+
+  await tx.ledgerEntry.createMany({ data: rows });
 
   logger.info(
     {
@@ -247,10 +270,7 @@ export async function recordWalletTopUpLedger(
     provider: string;
   },
 ) {
-  const assetAccount =
-    params.provider === "CBE"
-      ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
-      : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+  const assetAccount = resolveSettlementAssetAccount(params.provider);
 
   return postJournalEntry(tx, {
     idempotencyKey: `topup-${params.topUpId}`,
@@ -387,6 +407,22 @@ export async function recordMilestoneReleaseLedger(
  * Disputed milestone refunded to client wallet.
  * Debit:  LIABILITY (Escrow Pool)
  * Credit: LIABILITY (Client wallet account)
+ *
+ * The idempotency key is the milestone, and nothing else.
+ *
+ * This used to end in `-${Date.now()}`, which made the key unique per call by
+ * construction. The dedupe could therefore never fire, so the guard was
+ * decorative: any retry posted a second journal. The escrow-pool debit is what
+ * that duplicate corrupted -- relief for one refund obligation was recorded
+ * twice, understating the liability the platform still owed every other
+ * client.
+ *
+ * Keying on the milestone alone is correct because a milestone is refunded at
+ * most once. refundMilestoneToClient takes its state as a conditional claim on
+ * escrowState, so a second caller matches no rows and throws before reaching
+ * this function. PARTIAL_SPLIT calls it for the client's share only, against a
+ * milestone whose release journal is separately keyed `escrow-release-<id>`,
+ * so the two never collide.
  */
 export async function recordDisputeRefundLedger(
   tx: Prisma.TransactionClient,
@@ -397,7 +433,7 @@ export async function recordDisputeRefundLedger(
   },
 ) {
   return postJournalEntry(tx, {
-    idempotencyKey: `dispute-refund-${params.milestoneId}-${Date.now()}`,
+    idempotencyKey: `dispute-refund-${params.milestoneId}`,
     referenceType: "DISPUTE_REFUND",
     referenceId: params.milestoneId,
     description: `Dispute resolution refund to client wallet`,
@@ -435,10 +471,7 @@ export async function recordWithdrawalDisbursementLedger(
     provider: string;
   },
 ) {
-  const assetAccount =
-    params.provider === "CBE"
-      ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
-      : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+  const assetAccount = resolveSettlementAssetAccount(params.provider);
 
   const entries: JournalEntryLine[] = [
     {

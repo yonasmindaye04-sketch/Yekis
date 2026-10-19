@@ -3,6 +3,10 @@ import { Router } from "express";
 import { logger } from "../../lib/logger.js";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import {
+  CreatePortfolioItemInput,
+  UpdatePortfolioItemInput,
+} from "@marketplace/schemas";
+import {
   listPortfolioItems,
   createPortfolioItem,
   updatePortfolioItem,
@@ -24,9 +28,16 @@ portfolioRouter.get("/users/:userId/portfolio", async (req, res) => {
 });
 
 portfolioRouter.post("/me", requireAuth, async (req: AuthedRequest, res) => {
+  // F-17: parse before the service. The old route handed the raw body through.
+  const parsed = CreatePortfolioItemInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+  }
   try {
     const userId = req.user!.id;
-    const item = await createPortfolioItem(userId, req.body);
+    const item = await createPortfolioItem(userId, parsed.data);
     return res.status(201).json(item);
   } catch (err: any) {
     if (err.message?.startsWith("BAD_REQUEST"))
@@ -40,10 +51,18 @@ portfolioRouter.patch(
   "/me/:itemId",
   requireAuth,
   async (req: AuthedRequest, res) => {
+    // F-17: `.strict()` means `userId`, `id`, `createdAt` etc. are rejected
+    // rather than reaching Prisma.
+    const parsed = UpdatePortfolioItemInput.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
     try {
       const userId = req.user!.id;
       const { itemId } = req.params;
-      const item = await updatePortfolioItem(userId, itemId!, req.body);
+      const item = await updatePortfolioItem(userId, itemId!, parsed.data);
       return res.json(item);
     } catch (err: any) {
       if (err.message?.startsWith("NOT_FOUND"))

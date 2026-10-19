@@ -1,6 +1,63 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-10-04
+Last validated: 2026-10-17
+
+> **Landing V2 FAQ section rebuilt from the "Earth & Cream" reference (2026-10-17):**
+> - **`LandingPageV2.tsx`** — `FAQSection` is a direct port of the supplied HTML reference: the centred bordered card, the lens + `/` kbd filter, the serif `FAQ` wordmark with its pulsing dot, the self-drawing arc with an orbiting dot, the rounded-square chips, the `grid-template-rows` answer morph, the drifting leaves, the ambient blobs and the pointer parallax are all kept as authored. Only two things differ, both forced by the content: the real questions are grouped by the three existing `marketing.faq.*Title` categories, and their text comes from the translations.
+>   - **Was**: a centred single column — eyebrow/headline/sub-copy band, a free-floating filter pill, then the questions in a `720px` column. Almost every visual property was an inline `style` object.
+>   - **Structure**: `<section class="v2-faq">` is a `place-items: center` stage holding three layers in z-order — the blurred blobs (`z-index 0`), the falling leaves (`1`) and the card (`2`). The card is `min(1120px, 100%)`, `30px` radius, `1.5px` border, padding `clamp(36px,5vw,64px) clamp(28px,5vw,68px)`, columns `.92fr / 1.08fr`, gap `clamp(32px,5vw,72px)`, with the breathing radial `::before` wash.
+>   - **Left column**: lens glyph, the filter (which widens to `360px` and picks up a glow on focus), the `clamp(64px, 8.5vw, 116px)` Georgia `FAQ` with a per-letter rise and the pulsing dot, the tagline, and the arc wrapper pinned to the column's right edge.
+>   - **Right column**: a single `<ul>`. Rows stagger in from `translateX(26px)` on a `--i * 65ms + 450ms` delay; the first question auto-opens at `1150ms`; opening one closes the others; the open row gets the lime gradient wash and its chip fills and rotates `180deg`.
+>   - **Behaviour** (`1150ms` open, `/` shortcut, filter) follows the reference script. Re-staggering on filter is done by re-keying the `<ul>`, which is the React equivalent of the reference's `li.style.animation = "none"; void offsetWidth; li.style.animation = ""`.
+>   - **Two additions**: the fees answer links to the fees page (`FAQSection` now takes `onNavigate`), and opening a question fires `events.faqExpanded(question)` — the same call `FAQPage.tsx` makes. The landing section previously recorded nothing.
+>   - **One bug fixed in the reference**: its arc uses `pathLength="1"` with `stroke-dasharray: 1` / `stroke-dashoffset: 1`, which collapses the dash to a fraction of a pixel and leaves the stroke invisible. The draw is driven by framer-motion's `pathLength` instead, which writes real dash values — the arc now actually draws.
+> - **`landing-v2.css`** — new `.yk-v2 .v2-faq-*` block, all inline styles removed. Ten `v2-faq-*` keyframes: `card-in`, `breathe`, `rise`, `letter-up`, `pulse`, `orbit`, `item-in`, `float1/2`, `drift`, `sway`.
+>   - **Theme parity**: every colour resolves from the existing `--v2-*` tokens and there are **no** theme-conditional rules in the block, so parity holds by construction. Verified byte-identical card geometry between themes in every state at 1440px and 390px.
+>   - Responsive at `900px` (single column, arc hidden, filter no longer capped); a reduced-motion block kills all animations and hides the leaves.
+> - **Verified**: `vite build` exits 0; `eslint src/LandingPageV2.tsx` reports only the pre-existing `set-state-in-effect` error in `CountUp` (untouched here). Screenshots in headless Chrome against the production build at 1440×1000 and 390×844 in both themes, for the closed / open / filtered / empty states. Note: a full `tsc -b` currently fails on `App.tsx` / `FullPlatformApp.tsx` with `'om' is not assignable to '"en" | "am"'` — that is the separate in-flight 4-language work, not this change.
+
+
+> **Comprehensive Telegram Bot & Frontend Multilingual Parity (2026-10-17):**
+> - **Capability**: Extended native 4-language support (`en`, `am`, `om`, `ti`) across both the Web Application and the Telegram Bot ecosystem with 100% key parity and culturally authentic translations.
+> - **Bot Locale Expansion & Fixes (`apps/backend/src/modules/bot/locales/`)**:
+>   - Discovered and corrected 81 missing bot locale keys previously causing raw string keys (e.g. `jobs_budget_under_10k`, `milestone_fund`, `dispute_category_*`, `notify_*`) to be displayed to users.
+>   - Fixed severe machine-translation anomalies in Amharic (`am.json`):
+>     - Corrected `"ተቀብሯል"` ("buried") to `"ተቀባይነት አግኝቷል"` ("accepted").
+>     - Corrected `"የስራ ንቸሮች"` (corrupted typo) to `"ክፍት የሥራ ዕድሎች"` ("job opportunities").
+>     - Corrected `"የእኔ ምክሮች"` ("my advices") to `"የእኔ ፕሮፖዛሎች"` ("my proposals").
+>     - Corrected `"አስተሳሰቦች በመጠበቅ"` ("waiting for thoughts") to `"ፊርማ በመጠባበቅ ላይ"` ("awaiting signatures").
+>     - Corrected `"ወርደት"` ("humiliation/disgrace") to `"ወረፋ"` ("queue") across staff KYC, top-up, and dispute queues.
+>     - Corrected `"ማሳቀፍ"` ("hugging") to `"እርቅ እና ሽምግልና"` / `"የቀጥታ ድርድር"` ("mediation" / "negotiation").
+>     - Corrected `"ይዝቱ"` ("threaten") to `"ዝጋ"` ("close").
+>     - Fixed session expiration message from corrupted characters to `"ምንም እንቅስቃሴ ባለመኖሩ የቆይታ ጊዜዎ አልፏል። እባክዎ እንደገና ይጀምሩ።"`
+>   - Added full Afaan Oromoo (`om.json`) and Tigrigna (`ti.json`) locale files to the bot, matching all 243 keys.
+> - **Bot Engine & Notification Wiring**:
+>   - Extended `types.ts` bot locale union to `"en" | "am" | "om" | "ti"`.
+>   - Updated `i18n.middleware.ts` to synchronously load all 4 locales and exported `getBotTranslation()`.
+>   - Connected `notifications.ts` push notifications (previously using an identity stub `(k) => k`) to real localized strings via `getBotTranslation()`.
+>   - Upgraded inline keyboards (`language.ts`, `mainMenu.ts`) and callback handlers (`callbacks.ts`) to handle 4-language selection and persist preference to `User.languagePreference`.
+> - **Frontend Branding & Preference Sync**:
+>   - Fixed legacy brand name residue in `apps/frontend/src/i18n.ts`: updated `appName: "ሙያሎጂ (Yekis)"` in Amharic and Tigrigna to `"ዬኪስ (Yekis)"`.
+>   - Synchronized user registration language with active UI language in `App.tsx` and `FullPlatformApp.tsx`, and synced user preference on login (`getMe()`).
+> - **Verification**:
+>   - All 314 frontend keys across 4 languages verified at 100% key parity.
+>   - All 243 backend bot keys across 4 languages verified at 100% key parity.
+>   - Both `frontend` and `backend` TypeScript builds compile cleanly (`tsc --noEmit` exits 0).
+>   - Bot test suites (`tests/bot-updates.test.ts` and `tests/bot-deeplinks.test.ts`) pass cleanly.
+>
+> **Multilingual 4-Language System — Amharic, Oromiffa, Tigrigna, English (2026-10-14):**
+> - **Capability**: Native, high-quality, culturally authentic multilingual support across English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ).
+> - **Architecture**: Full typed dictionary (`apps/frontend/src/i18n.ts`) supporting `LanguageProvider`, `useI18n()` hook, `localStorage` persistence (`yekis-language`), and automatic `<html lang="...">` attribute binding.
+> - **Theme-Invariant Language Selectors (`apps/frontend/src/components/LanguageSelector.tsx` / `LanguageSelector.css`)**:
+>   - Dropdown variant (`variant="dropdown"`) for marketing header and workspace topbar with native language names, English subtitles, check indicators, and click-away dismissal.
+>   - Segmented pill variant (`variant="segmented"`) for footers and compact contexts.
+>   - Theme parity enforced: colors/shadows change between themes while width, height, padding, gap, display, and typography remain strictly theme-invariant.
+> - **Coverage**:
+>   - Landing Page V2 (Hero, Stats, 4-step Escrow, Transparent Fees, Category Deck, Testimonials Marquee, About, FAQ, Final CTA, and Footer V2).
+>   - Marketing Subpages (FAQPage, FeesPage, AboutPage, CaseStudiesPage, CookieBanner, MobileCTA, NotFoundPage, ThankYouPage).
+>   - Platform Workspace (FullPlatformApp auth header, workspace topbar, and translated navigation items).
+> - **Offline Tracking Parity (`Yekis_translations.csv`)**: 7-column format (`key,page,section,english_text,amharic_translation,oromiffa_translation,tigrigna_translation`) with all 219 keys populated.
+> - **Verification**: Frontend build (`tsc -b && vite build`) compiles cleanly in ~10s.
 
 > **Bot Markdown Parse Error Fix (2026-10-04):**
 > - **Root Cause**: All bot reply messages used parse_mode: "Markdown" (legacy) but were written with **double-asterisk bold** and backtick-code syntax, which belongs to MarkdownV2. Telegram's legacy Markdown parser cannot handle these tokens � it responded with 400: Can't find end of the entity starting at byte offset 265 on every /login and /start command.
@@ -269,7 +326,7 @@ otificationQueue.
 > - Resolved all strict TypeScript errors across KYC, Escrow, TMS, and Bot Scene modules.
 
 > **Telegram Mini App Startup, Clean Typography & Registration Workflow Update (2026-08-22):**
-> - **Immediate Mini App Loading**: Added inline Telegram WebApp initialization script in `index.html` executing `Telegram.WebApp.ready()` and `Telegram.WebApp.expand()` immediately to bypass Telegram iframe loading stalls. Configured `allowedHosts: true` and `ngrok-skip-browser-warning` in `vite.config.ts`.
+> - **Immediate Mini App Loading**: Added inline Telegram WebApp initialization script in `index.html` executing `Telegram.WebApp.ready()` and `Telegram.WebApp.expand()` immediately to bypass Telegram iframe loading stalls. Configured `allowedHosts: true` in `vite.config.ts` (Cloudflare Tunnel compatible).
 > - **Emoji-Free Professional UI**: Removed all decorative emojis from Telegram Bot commands, keyboards, greetings, and Mini App UI buttons (clean professional text).
 > - **Comprehensive Registration & Onboarding Guide**: Unified registration flow supporting 1-tap Telegram WebApp authentication, Ethiopian mobile phone + password/PIN sign-up, and 1-click Google sign-in with automatic workspace provisioning.
 > **Universal Theme Toggle & Footer Alignment Update (2026-08-22):**
@@ -505,14 +562,16 @@ When implementation changes, update this walkthrough if the user journey, state 
  2 .   M e d i a t o r s   c a n   v i e w   t h e   o r i g i n a l   c o n t r a c t   s c o p e   a l o n g s i d e   t h e   s u b m i t t e d   d e l i v e r a b l e   ( w i t h   i n l i n e   v i e w e r   f o r   U R L - b a s e d   d e l i v e r i e s ) . 
  3 .   A d d e d   \ d e l i v e r a b l e U r l \   t o   t h e   \ M i l e s t o n e \   s c h e m a   t o   t r a c k   a n d   p r e s e n t   t h e   s u b m i t t e d   w o r k   d u r i n g   d i s p u t e s . 
  4 .   S t a g e   2   E v i d e n c e   s t a t e m e n t s   f r o m   b o t h   c l i e n t   a n d   f r e e l a n c e r   a r e   r e n d e r e d   i n l i n e   a s   a   c h a t   f l o w . 
- 5 .   R e s o l v i n g   a   d i s p u t e   p r o v i d e s   a   l i v e ,   c a l c u l a t e d   p r e v i e w   o f   e x a c t   E T B   a m o u n t s   a l l o c a t e d   t o   t h e   f r e e l a n c e r   a n d   r e f u n d e d   t o   t h e   c l i e n t ,   f a c t o r i n g   i n   t h e   p l a t f o r m   f e e   ( 5 % )   a n d   e s t i m a t e d   w i t h h o l d i n g   t a x .  
+ 5 .   R e s o l v i n g   a   d i s p u t e   p r o v i d e s   a   l i v e ,   c a l c u l a t e d   p r e v i e w   o f   e x a c t   E T B   a m o u n t s   a l l o c a t e d   t o   t h e   f r e e l a n c e r   a n d   r e f u n d e d   t o   t h e   c l i e n t ,   f a c t o r i n g   i n   t h e   p l a t f o r m   f e e   ( 5 % )   a n d   e s t i m a t e d   w i t h h o l d i n g   t a x . 
+ 
  
  # #   S t a f f C o m p l i a n c e P a n e l   R e d e s i g n   ( a d d e d   2 0 2 6 - 0 8 - 0 9 ) 
  
  1 .   R e d e s i g n e d   t h e   T M S   A M L   q u e u e   t o   f e a t u r e   d e d i c a t e d   v i s u a l   b l o c k s   f o r   S T R U C T U R I N G ,   V E L O C I T Y ,   P A S S _ T H R O U G H ,   a n d   W A L L E T _ M I S M A T C H   f l a g s . 
  2 .   C o m p l i a n c e   a c t i o n s   n o w   s t r i c t l y   e n f o r c e   a   1 0 - c h a r a c t e r   m i n i m u m   f o r   r e v i e w   n o t e s ,   a n d   d e m a n d   a   v a l i d   F I C   r e f e r e n c e   n u m b e r   w h e n   f i l i n g   a n   S T R . 
  3 .   R e p l a c e d   g e n e r i c   t i m e s t a m p   d e t a i l s   w i t h   a   c r i t i c a l   2 4 - h o u r   S L A   c o u n t d o w n ,   a g g r e s s i v e l y   f l a g g i n g   b r e a c h e d   f i l i n g   d e a d l i n e s . 
- 4 .   I n t e g r a t e d   a   n e w   ' U s e r   C o m p l i a n c e   H i s t o r y '   s i d e b a r ,   d i r e c t l y   f e t c h i n g   p a s t   f l a g s ,   c u r r e n t   K Y C   T i e r ,   a n d   W a l l e t   b a l a n c e   f o r   h o l i s t i c   r i s k   a s s e s s m e n t   d u r i n g   m a n u a l   r e v i e w s .  
+ 4 .   I n t e g r a t e d   a   n e w   ' U s e r   C o m p l i a n c e   H i s t o r y '   s i d e b a r ,   d i r e c t l y   f e t c h i n g   p a s t   f l a g s ,   c u r r e n t   K Y C   T i e r ,   a n d   W a l l e t   b a l a n c e   f o r   h o l i s t i c   r i s k   a s s e s s m e n t   d u r i n g   m a n u a l   r e v i e w s . 
+ 
  
 
 ## Updates

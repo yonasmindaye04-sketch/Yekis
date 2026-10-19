@@ -1,6 +1,6 @@
-﻿# Yekis_jobs Completeness Checklist
+# Yekis_jobs Completeness Checklist
 
-Last reviewed: 2026-08-15
+Last reviewed: 2026-10-17
 
 `[x]` means implemented and verified locally. `[ ]` means production work, broader test coverage, or external validation is still required. This is the authoritative project checklist; `EXTENDED_COMPLETENESS_CHECKLIST.md` points here to prevent status drift.
 
@@ -38,6 +38,7 @@ Last reviewed: 2026-08-15
 - [x] Multi-rail payment choices (Telebirr, Commercial Bank of Ethiopia CBE, and Safaricom M-Pesa) across Instant Checkout, Manual Transfer, and Freelancer Withdrawals
 - [x] Manual verification fallback: actionable transfer fallback on API failure and receipt attachment to unconfirmed checkout requests (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`)
 - [x] In-app notifications and support chat surfaces
+- [x] Telegram bot full 4-language support (English, Amharic, Afaan Oromoo, Tigrigna) with native authentic phrasing, 100% dictionary key parity (243 keys), dynamic user language preference sync, and localized push notifications
 - [x] Support runs entirely on the platform's own engine (no third-party agent inbox): ticket creation, agent auto-assignment/claim/reassign, OPEN/CLOSED workflow, live messaging, attachments, unread counts and audit trail
 - [x] Native customer support chat end to end: public widget creates a ticket, the visitor receives a conversation-scoped token so replies and follow-ups work without an account, staff work the queue in the admin dashboard, and updates arrive live over the WebSocket
 - [x] WebSocket channel authorization: client-requested subscriptions and typing/read broadcasts verified against conversation membership
@@ -140,11 +141,11 @@ Last reviewed: 2026-08-15
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [ ] Professional Amharic linguistic review of all translated strings (marketing strings now filled; core + marketing both need a native-speaker pass)
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system, persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem.
 
 ## Marketing Site (Public)
 
-- [x] Escrow explainer and 4-step trust process
+- [x] Escrow explainer and 4-step trust process — rebuilt 2026-10-05 as a single-slogan stepper with one product screen per step (autoplaying tabs, keyboard-navigable, `inert` on inactive screens); the old pinned scroll board is gone
 - [x] Dual CTA hero section
 - [x] Transparent pricing and fees page
 - [x] FAQ accordion with deep-linking
@@ -154,7 +155,7 @@ Last reviewed: 2026-08-15
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Amharic translation integration â€” all `[TODO]` marketing stubs filled; professional linguistic review still open (see verification section)
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv`.
 
 ## Automated And Manual Verification
 

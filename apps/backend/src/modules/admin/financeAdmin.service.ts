@@ -83,6 +83,7 @@ export async function listEscrows(params: {
           },
         },
         paymentTransactions: { select: { provider: true, providerTransactionId: true, status: true } },
+        escrowHolds: { where: { active: true }, orderBy: { createdAt: "desc" }, take: 1, select: { id: true, reason: true, createdAt: true } },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,

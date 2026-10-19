@@ -6,10 +6,13 @@
 
 import { useState } from "react";
 import { DollarSign, RefreshCw, Search } from "lucide-react";
-import { dt, fmt, opsListApi } from "../opsApi";
+import { dt, fmt, opsApi, opsListApi } from "../opsApi";
+import { useToast } from "../components/ui";
 import { useListPage } from "../opsList";
 import { ESCROW_STATES, HELD_STATES } from "../opsConst";
 import type { Escrow } from "../opsTypes";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Banner,
   Empty,
@@ -24,6 +27,7 @@ import {
 } from "../components/ui";
 
 export default function EscrowPage() {
+  const toast = useToast();
   const [state, setState] = useState("");
 
   const list = useListPage<Escrow>(
@@ -32,6 +36,18 @@ export default function EscrowPage() {
     [state],
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
+  const release = async (id: string) => {
+    const reason = window.prompt("Reason for administrative escrow release (minimum 10 characters):") ?? "";
+    if (reason.trim().length < 10) { toast("A reason of at least 10 characters is required."); return; }
+    try { await opsApi.releaseEscrow(id, reason.trim()); toast("Escrow released and audited."); reload(); }
+    catch (e) { toast(e instanceof Error ? e.message : "Could not release escrow"); }
+  };
+  const toggleHold = async (e: Escrow) => {
+    const reason = window.prompt(`${e.held ? "Reason for removing" : "Reason for placing"} this escrow hold (minimum 10 characters):`) ?? "";
+    if (reason.trim().length < 10) { toast("A reason of at least 10 characters is required."); return; }
+    try { if (e.held) await opsApi.unholdEscrow(e.id, reason.trim()); else await opsApi.holdEscrow(e.id, reason.trim()); toast(e.held ? "Escrow hold removed." : "Escrow placed on hold."); reload(); }
+    catch (err) { toast(err instanceof Error ? err.message : "Could not update escrow hold"); }
+  };
 
   if (loading && rows.length === 0) return <LoadingBox />;
   if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
@@ -57,7 +73,7 @@ export default function EscrowPage() {
           rest="Sum of milestones in ESCROW_HELD, WORK_IN_PROGRESS or SUBMITTED_FOR_REVIEW on this page."
         />
       ) : null}
-      <div className="card filters" style={{ marginTop: 16 }}>
+      <Card className="card filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -67,12 +83,12 @@ export default function EscrowPage() {
           />
         </div>
         <FilterSelect value={state} onChange={setState} options={ESCROW_STATES} allLabel="All escrow states" label="Escrow state" />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
-        heads={["Contract", "Milestone", "Freelancer", "Amount", "Held / Released", "State", "Created"]}
+        heads={["Contract", "Milestone", "Freelancer", "Amount", "Held / Released", "State", "Created", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="milestones" />}
       >
         {rows.length === 0 ? (
@@ -85,8 +101,9 @@ export default function EscrowPage() {
               <td style={{ color: "var(--ops-text-2)" }}>{e.fl}</td>
               <td className="amount">{fmt(e.amt)}</td>
               <td style={{ fontSize: 12, color: "var(--ops-text-2)", fontWeight: 600 }}>{e.rail}</td>
-              <td><Pill s={e.state} /></td>
+              <td><Pill s={e.held ? "ADMIN_HOLD" : e.state} /></td>
               <td style={{ color: "var(--ops-text-2)" }}>{dt(e.created)}</td>
+              <td><div style={{ display: "flex", gap: 5 }}>{e.state !== "RELEASED" ? <Button variant="ghost" size="sm" onClick={() => void toggleHold(e)}>{e.held ? "Unhold" : "Hold"}</Button> : null}{!e.held && (e.state === "SUBMITTED_FOR_REVIEW" || e.state === "DISPUTED") ? <Button variant="outline" size="sm" onClick={() => void release(e.id)}>Release</Button> : null}</div></td>
             </tr>
           ))
         )}

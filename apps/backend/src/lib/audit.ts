@@ -33,8 +33,21 @@ export async function recordAuditEvent(params: {
   amountMinor?: number;
   requestId?: string; // pino-http request id (req.id)
   ipAddress?: string | null; // client IP (req.ip under TRUST_PROXY)
+  /**
+   * Join an enclosing transaction.
+   *
+   * Without this the audit row is written on a SEPARATE connection while the
+   * caller's transaction is still open, so it commits independently — the row
+   * survives a rollback of the very change it describes. An audit trail that
+   * records state changes which never happened is worse than none: it is
+   * evidence, and evidence that lies is used in disputes.
+   *
+   * Omit it for events that are not part of a transaction.
+   */
+  tx?: Prisma.TransactionClient;
 }) {
-  await prisma.auditLog.create({
+  const client = params.tx ?? prisma;
+  await client.auditLog.create({
     data: {
       userId: params.userId,
       eventType: params.eventType,

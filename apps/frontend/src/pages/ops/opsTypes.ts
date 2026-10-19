@@ -131,6 +131,7 @@ export interface Escrow {
   fl: string;
   rail: string;
   created: string;
+  held: boolean;
 }
 
 export interface UserActivity {

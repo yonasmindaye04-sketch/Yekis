@@ -182,6 +182,10 @@ model User {
   ucid                    String     @unique @default(cuid()) // platform-wide Unique Customer ID
   email                   String     @unique
   phone                   String     @unique
+  /// Set when the account holder proved control of phone by SMS. phone is
+  /// the Telebirr / M-Pesa payout destination and the TMS identity check, so an
+  /// unverified value is someone else's number. NULL means never verified.
+  phoneVerifiedAt         DateTime?
   passwordHash            String
   // NULL while the account only ever authenticated via a federated provider
   // (Google / Apple / Facebook / Telegram sentinel accounts). Set the moment
@@ -199,8 +203,14 @@ model User {
   isComplianceHeld        Boolean    @default(false)
   complianceHeldAt        DateTime?
   complianceHeldReason    String?
-  circumventionAlertCount Int        @default(0)
+circumventionAlertCount Int        @default(0)
   isSuspended             Boolean    @default(false)
+  sessionVersion          Int        @default(0)
+  // Synthetic identity created by the signed-out support widget. Never
+  // routable: no password, no session, no KYC tier it can act on. requireAuth
+  // refuses these outright so a guest row can never be used as a login even if
+  // a guest token ever leaked. See F-01.
+  isGuestContact          Boolean    @default(false)
   staffRole               StaffRole? // null for regular users; set for Compliance Officer / Admin accounts
 
   cachedKycTier        KycTier?
@@ -284,6 +294,7 @@ model User {
   notificationSettings Json?
 
   @@index([faydaPsut])
+  @@index([isGuestContact])
 }
 
 model ConsentRecord {
@@ -456,9 +467,32 @@ model Milestone {
   createdAt       DateTime    @default(now())
 
   paymentTransactions PaymentTransaction[]
+  escrowHolds        EscrowHold[]
 
   @@index([contractId])
   @@index([escrowState, autoReleaseAt])
+}
+
+// Administrative compliance hold. A hold is deliberately separate from the
+// business escrow state so staff can freeze release/funding without corrupting
+// the participant workflow state or pretending that a disputed milestone is a
+// hold. Multiple historical holds are retained; only active holds block money
+// movement.
+model EscrowHold {
+  id             String   @id @default(cuid())
+  milestoneId    String
+  milestone      Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+  placedByStaffId String
+  reason         String   @db.VarChar(1000)
+  active         Boolean  @default(true)
+  releasedByStaffId String?
+  releasedAt     DateTime?
+  releaseReason  String?  @db.VarChar(1000)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([milestoneId, active])
+  @@index([active, createdAt])
 }
 
 // ---------- Payments ----------
@@ -683,6 +717,11 @@ model Conversation {
   creator         User     @relation("ConversationCreator", fields: [creatorId], references: [id])
   assignedStaffId String? // staff member who claimed/was assigned to this conversation
   assignedStaff   User?    @relation("ConversationAssignedStaff", fields: [assignedStaffId], references: [id])
+  // The address a signed-out visitor typed into the support widget. Contact
+  // metadata for staff only — deliberately NOT an account key. F-01: the old
+  // code used this address to look up (and upsert) a real User, which handed
+  // anyone who knew an email address a full session as that user.
+  contactEmail    String?
   subject         String
   status          String   @default("OPEN") // OPEN | CLOSED
   createdAt       DateTime @default(now())
@@ -1040,6 +1079,43 @@ model TelegramLoginCode {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+/// SMS OTP challenges proving a User.phone belongs to the account holder.
+///
+/// User.phone is NOT NULL, unique, accepted as a login identifier and used as
+/// the payout destination for Telebirr and M-Pesa, so proving ownership of that
+/// number is a money-safety control, not just a contact detail.
+///
+/// Only the salted SHA-256 of the code is stored. Verified rows are kept, not
+/// deleted, so there is an audit trail of which number was ever proven; the
+/// stored hash is inert once the code expires.
+model PhoneVerificationCode {
+  id String @id @default(cuid())
+
+  /// Intentionally NOT a relation on User. Verification must be possible before
+  /// the account exists (registration) and for number recovery, so an FK would
+  /// block the primary flow.
+  userId String?
+
+  phone String
+  /// sha256(salt + ":" + code), hex. Unique so verification is one index hit.
+  codeHash String @unique
+  salt     String
+  /// Wrong guesses so far. Capped by the service.
+  attempts Int       @default(0)
+  expiresAt DateTime
+  verifiedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([phone, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@index([userId])
+  // NOTE: "at most one outstanding challenge per phone" is enforced in
+  // phone-verification.service.ts inside a transaction, not by a partial unique
+  // index. Prisma 5.22 cannot express `@@unique(..., where:)`, and adding the
+  // index with raw SQL alone would make the migrated schema diverge from this
+  // file, which db:check-fresh compares.
 }
 
 // ---------- Gigs (Fiverr-style service packages) ----------

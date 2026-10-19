@@ -4,7 +4,10 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { uploadKycDocument, getKycDocumentUrl } from "../../lib/objectStore.js";
 import { verifyWithFayda } from "./fayda.client.js";
-import { screenForPep } from "./pep.client.js";
+import {
+  screenForPep,
+  PepProviderUnavailableError,
+} from "./pep.client.js";
 import { logger } from "../../lib/logger.js";
 import { randomBytes } from "node:crypto";
 import { redis } from "../../lib/redis.js";
@@ -309,7 +312,37 @@ export async function upgradeToTier2(params: {
     );
   }
 
-  const pepResult = await screenForPep(params.fullName);
+  // The screening provider throws rather than returning a clean result when it is
+  // not configured in production. Left unhandled that would surface as a 500 and
+  // tell the applicant nothing. It must land in manual review instead: the TIN
+  // is still captured, the record is not advanced, and a Compliance Officer
+  // decides. pepScreenedAt is deliberately left null -- nobody was screened.
+  let pepResult: { isMatch: boolean };
+  try {
+    pepResult = await screenForPep(params.fullName);
+  } catch (err) {
+    if (!(err instanceof PepProviderUnavailableError)) throw err;
+    logger.error(
+      { userId: params.userId },
+      "PEP screening unavailable; routing Tier 2 request to manual review",
+    );
+    const pending = await prisma.kycRecord.update({
+      where: { id: kyc.id },
+      data: {
+        tin: params.tin,
+        businessRegNumber: params.businessRegNumber,
+        status: "UNDER_REVIEW",
+      },
+    });
+    await recordAuditEvent({
+      userId: params.userId,
+      eventType: "KYC_TIER_UPGRADE_REQUESTED",
+      entityType: "KycRecord",
+      entityId: kyc.id,
+      metadata: { tier: "TIER_2", pepScreening: "UNAVAILABLE" },
+    });
+    return pending;
+  }
 
   await recordAuditEvent({
     userId: params.userId,
@@ -327,9 +360,9 @@ export async function upgradeToTier2(params: {
       isPepMatch: pepResult.isMatch,
       pepScreenedAt: new Date(),
       // A PEP match forces Tier 3 enhanced review instead of a standard
-      // Tier 2 review — never silently approve a flagged user.
-      tier: pepResult.isMatch ? "TIER_3" : "TIER_2",
-      status: "UNDER_REVIEW",
+    // Tier 2 review — never silently approve a flagged user.
+    tier: pepResult.isMatch ? "TIER_3" : "TIER_2",
+    status: "UNDER_REVIEW",
     },
   });
 
@@ -484,9 +517,12 @@ export async function getReviewQueue(filters?: {
   const where: any = {};
   if (filters?.status) {
     where.status = filters.status;
-  } else {
-    where.status = "UNDER_REVIEW";
   }
+  // Deliberately no `else` coercing to UNDER_REVIEW. An absent status filter
+  // means "every status". It previously defaulted to UNDER_REVIEW, which made
+  // the console's "All statuses" option return byte-identical rows to the
+  // explicit UNDER_REVIEW filter — PENDING records were unreachable from the
+  // UI through any normal selection.
   const page = Math.max(1, filters?.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters?.limit ?? 25));
 
@@ -515,8 +551,10 @@ export async function getReviewQueue(filters?: {
       take: limit,
       skip: (page - 1) * limit,
     }),
-    // Unfiltered actionable split, so the console can explain why the sidebar
-    // badge (PENDING + UNDER_REVIEW) is larger than this page's row count.
+    // Two populations the console must not conflate:
+    //  - underReview: a document was submitted and a human must decide.
+    //  - pending: registered, never uploaded a document. There is no evidence
+    //    to review, so it is NOT actionable and must stay out of the KPI.
     prisma.kycRecord.groupBy({
       by: ["status"],
       where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },
@@ -526,15 +564,13 @@ export async function getReviewQueue(filters?: {
 
   const count = (status: KycStatus) =>
     byStatus.find((g) => g.status === status)?._count._all ?? 0;
-  const pending = count("PENDING");
-  const underReview = count("UNDER_REVIEW");
 
   return {
     items,
     total,
     page,
     limit,
-    counts: { pending, underReview, actionable: pending + underReview },
+    counts: { underReview: count("UNDER_REVIEW"), pending: count("PENDING") },
   };
 }
 
@@ -602,7 +638,12 @@ export async function initiateFaydaVerification(userId: string) {
       state,
       nonce,
     });
-    return { authorizeUrl, requestUri, state };
+    // clientId is returned because a Pushed Authorization Request is a two-step
+    // redirect: the browser has to send the user to
+    //   authorizeUrl?request_uri=<requestUri>&client_id=<clientId>
+    // Without it the frontend cannot build the redirect, and the flow simply
+    // was not callable from a browser. It is a public identifier.
+    return { authorizeUrl, requestUri, state, clientId: env.ESIGNET_CLIENT_ID };
   } else {
     // Mock fallback for local dev when eSignet is not configured
     return {
@@ -649,8 +690,29 @@ export async function completeFaydaCallback(params: {
     esignetSub = claims.sub;
     verifiedName = claims.name || "";
     verifiedDob = claims.birthdate || "";
+  } else if (env.NODE_ENV === "production") {
+    /**
+     * Refuse rather than fall through to the mock.
+     *
+     * The mock branch below fabricated a PSUT and a date of birth and then set
+     * the record to VERIFIED. ESIGNET_CLIENT_ID is optional and, unlike
+     * PEP_PROVIDER, had no production boot guard -- so a production deploy that
+     * simply omitted it exposed POST /kyc/fayda/callback to anyone who sent a
+     * valid `state` and an arbitrary `code`. The `code` was never validated on
+     * this path; only the state was.
+     *
+     * That is a self-service KYC bypass, and it is the same class of failure
+     * already fixed for the Fayda document lookup.
+     */
+    logger.error(
+      { userId },
+      "ESIGNET_CLIENT_ID is not configured; refusing to mark a production identity verified",
+    );
+    throw new Error(
+      "Fayda verification is not configured on this server. Escalate to Compliance rather than verifying automatically.",
+    );
   } else {
-    // Mock fallback
+    // Mock fallback, development only.
     esignetSub = `mock-psut-${userId}`;
     verifiedName = "Mock User";
     verifiedDob = "1990-01-01";

@@ -6,6 +6,7 @@ import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { createAuthTokens } from "./auth.service.js";
+import type { AuthMethod } from "./auth-methods.js";
 import {
   AccountLinkRequiredError,
   accountLinkRequiredMessage,
@@ -14,233 +15,172 @@ import {
   withPlaceholderPhone,
 } from "./identity.js";
 
-const TelegramUser = z.object({
-  id: z.number().int().positive(),
-  first_name: z.string().optional(),
-  last_name: z.string().optional(),
-  username: z.string().optional(),
-  language_code: z.string().optional(),
-  photo_url: z.string().url().optional(),
-});
-
 // === MAIN FUNCTIONS ===
 export class TelegramAuthError extends Error {}
 export class TelegramNotConfiguredError extends Error {}
 export class TelegramAccountConflictError extends Error {}
+export class NeedsOnboardingError extends Error {
+  constructor(message: string = "User not found, needs onboarding.") {
+    super(message);
+    this.name = "NeedsOnboardingError";
+  }
+}
+export class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
 
 // === INTERFACES & TYPES ===
-export type TelegramUser = z.infer<typeof TelegramUser>;
+export type TgUser = {
+  id: bigint;
+  firstName: string;
+  lastName?: string;
+  username?: string;
+  languageCode?: string;
+  photoUrl?: string;
+};
 
-function buildDataCheckString(params: URLSearchParams) {
-  return [...params.entries()]
-    .filter(([key]) => key !== "hash")
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join("\n");
+const NL = '\n';
+
+function dataCheckString(entries: [string, string][]) {
+  return entries
+    .filter(([k]) => k !== 'hash')
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([k, v]) => `${k}=${v}`)
+    .join(NL);
 }
 
-function verifyTelegramHash(initData: string, botToken: string) {
-  const params = new URLSearchParams(initData);
-  const hash = params.get("hash");
-
-  if (!hash) {
-    throw new TelegramAuthError("Telegram auth data is missing hash.");
-  }
-
-  // Telegram Mini App uses HMAC("WebAppData", botToken)
-  // Telegram Login Widget uses SHA256(botToken)
-  const isWidget = params.has("id") && !params.has("user");
-  const secret = isWidget
-    ? createHash("sha256").update(botToken).digest()
-    : createHmac("sha256", "WebAppData").update(botToken).digest();
-
-  const dataCheckString = buildDataCheckString(params);
-  const calculatedHash = createHmac("sha256", secret)
-    .update(dataCheckString)
-    .digest("hex");
-
-  const received = Buffer.from(hash, "hex");
-  const calculated = Buffer.from(calculatedHash, "hex");
-
-  if (
-    received.length !== calculated.length ||
-    !timingSafeEqual(received, calculated)
-  ) {
-    throw new TelegramAuthError("Telegram authentication signature is invalid.");
-  }
-
-  return params;
+function safeEqualHex(a: string, b: string) {
+  const x = Buffer.from(a, 'hex');
+  const y = Buffer.from(b, 'hex');
+  return x.length === y.length && x.length > 0 && timingSafeEqual(x, y);
 }
 
-function parseAndCheckFreshness(params: URLSearchParams) {
-  const authDateRaw = params.get("auth_date");
-  if (!authDateRaw) {
-    throw new TelegramAuthError("Telegram auth data is missing auth_date.");
-  }
-
+function assertFresh(authDateRaw: string | null | undefined, maxAgeSec: number) {
+  if (!authDateRaw) throw new AuthError('NO_AUTH_DATE');
   const authDateSeconds = Number(authDateRaw);
-  if (!Number.isFinite(authDateSeconds)) {
-    throw new TelegramAuthError("Telegram auth_date is invalid.");
-  }
-
+  if (!Number.isFinite(authDateSeconds)) throw new AuthError('INVALID_AUTH_DATE');
   const ageSeconds = Math.floor(Date.now() / 1000) - authDateSeconds;
-  if (ageSeconds < 0 || ageSeconds > env.TELEGRAM_INIT_DATA_MAX_AGE_SECONDS) {
-    throw new TelegramAuthError("Telegram auth data is stale.");
-  }
-
-  if (params.has("user")) {
-    const userRaw = params.get("user")!;
-    let userJson: unknown;
-    try {
-      userJson = JSON.parse(userRaw);
-    } catch {
-      throw new TelegramAuthError("Telegram user payload is not valid JSON.");
-    }
-
-    const parsedUser = TelegramUser.safeParse(userJson);
-    if (!parsedUser.success) {
-      throw new TelegramAuthError("Telegram user payload is invalid.");
-    }
-    return parsedUser.data;
-  }
-
-  if (params.has("id")) {
-    const id = Number(params.get("id"));
-    const parsedUser = TelegramUser.safeParse({
-      id,
-      first_name: params.get("first_name") || undefined,
-      last_name: params.get("last_name") || undefined,
-      username: params.get("username") || undefined,
-      photo_url: params.get("photo_url") || undefined,
-    });
-    if (!parsedUser.success) {
-      throw new TelegramAuthError("Telegram widget payload is invalid.");
-    }
-    return parsedUser.data;
-  }
-
-  throw new TelegramAuthError("Telegram auth data is missing user info.");
+  if (ageSeconds < 0 || ageSeconds > maxAgeSec) throw new AuthError('STALE_AUTH_DATE');
 }
 
-function telegramEmail(telegramId: number) {
-  return `telegram+${telegramId}@yekis.local`;
-}
-
-/**
- * Verifies a signed, fresh Telegram credential and returns the claimed
- * identity. Shared by the sign-in and the account-link flows so both apply
- * exactly the same replay window and signature rules.
- */
-function verifyTelegramCredential(initData: string): TelegramUser {
-  if (!env.TELEGRAM_BOT_TOKEN) {
-    throw new TelegramNotConfiguredError(
-      "TELEGRAM_BOT_TOKEN is not configured.",
-    );
-  }
-  const params = verifyTelegramHash(initData, env.TELEGRAM_BOT_TOKEN);
-  return parseAndCheckFreshness(params);
-}
-
-/**
- * A Telegram private chat id equals the user's own numeric id, so the web
- * sign-in payload is enough to give the bot a delivery target. Persisting it
- * is what makes Telegram push notifications and bot session resolution work.
- */
-function telegramChatId(telegramId: number) {
-  return String(telegramId);
-}
-
-function profileFields(telegram: TelegramUser) {
-  const displayName = telegram.first_name
-    ? `${telegram.first_name}${telegram.last_name ? " " + telegram.last_name : ""}`
-    : undefined;
-
-  return {
-    firstName: telegram.first_name || undefined,
-    lastName: telegram.last_name || undefined,
-    displayName,
-    avatarUrl: telegram.photo_url || undefined,
-    languagePreference: telegram.language_code === "am" ? "am" : "en",
+export function verifyMiniAppInitData(raw: string, botToken: string, maxAgeSec = 3600): TgUser {
+  const p = new URLSearchParams(raw);
+  const hash = p.get('hash') ?? '';
+  const secret = createHmac('sha256', 'WebAppData').update(botToken).digest();
+  const expected = createHmac('sha256', secret).update(dataCheckString([...p.entries()])).digest('hex');
+  if (!safeEqualHex(expected, hash)) throw new AuthError('BAD_SIGNATURE');
+  assertFresh(p.get('auth_date'), maxAgeSec);
+  const u = JSON.parse(p.get('user') ?? 'null');
+  if (!u?.id) throw new AuthError('NO_USER');
+  return { 
+    id: BigInt(u.id), 
+    firstName: u.first_name || "", 
+    lastName: u.last_name, 
+    username: u.username, 
+    languageCode: u.language_code,
+    photoUrl: u.photo_url 
   };
 }
 
-/**
- * Resolves the Yekis account behind a Telegram identity.
- *
- * `telegramUserId` is the authoritative key: it is the one field Telegram
- * guarantees to be unique and stable, and it survives an email migration.
- * The synthetic email is only a fallback for accounts provisioned before the
- * column was populated.
- */
-async function findUserByTelegramIdentity(telegramId: number) {
+export function verifyLoginWidget(payload: Record<string, string | number>, botToken: string, maxAgeSec = 300): TgUser {
+  const entries = Object.entries(payload).map(([k, v]) => [k, String(v)] as [string, string]);
+  const hash = String(payload.hash ?? '');
+  const secret = createHash('sha256').update(botToken).digest();
+  const expected = createHmac('sha256', secret).update(dataCheckString(entries)).digest('hex');
+  if (!safeEqualHex(expected, hash)) throw new AuthError('BAD_SIGNATURE');
+  assertFresh(String(payload.auth_date), maxAgeSec);
+  return { 
+    id: BigInt(payload.id as string), 
+    firstName: String(payload.first_name || ""),
+    lastName: payload.last_name ? String(payload.last_name) : undefined,
+    username: payload.username as string | undefined,
+    photoUrl: payload.photo_url as string | undefined
+  };
+}
+
+function telegramEmail(telegramId: bigint) {
+  return `telegram+${telegramId}@yekis.local`;
+}
+
+function telegramChatId(telegramId: bigint) {
+  return String(telegramId);
+}
+
+function profileFields(telegram: TgUser) {
+  const displayName = telegram.firstName
+    ? `${telegram.firstName}${telegram.lastName ? " " + telegram.lastName : ""}`
+    : undefined;
+
+  return {
+    firstName: telegram.firstName || undefined,
+    lastName: telegram.lastName || undefined,
+    displayName,
+    avatarUrl: telegram.photoUrl || undefined,
+    languagePreference: telegram.languageCode === "am" ? "am" : "en",
+  };
+}
+
+export async function findUserByTelegramIdentity(telegramId: bigint) {
   return prisma.user.findUnique({
-    where: { telegramUserId: BigInt(telegramId) },
+    where: { telegramUserId: telegramId },
   });
 }
 
-async function findUserBySyntheticEmail(telegramId: number) {
+async function findUserBySyntheticEmail(telegramId: bigint) {
   return prisma.user.findUnique({ where: { email: telegramEmail(telegramId) } });
 }
 
 /**
- * Telegram sign-in: verify the credential, then resolve, backfill or
- * provision the account.
+ * The shape Telegram delivers on an inbound update (`from`). Kept separate
+ * from {@link TgUser} because the field names are snake_case here and `id` is
+ * still a JS number — it must be widened to BigInt exactly once, at this
+ * boundary, rather than compared as a number anywhere downstream.
  */
-export async function loginWithTelegram(initData: string, role?: string) {
-  const telegram = verifyTelegramCredential(initData);
-  const user = await resolveOrProvisionTelegramUser(telegram, { role });
+export type TelegramIdentity = {
+  id: bigint | string | number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  language_code?: string;
+  photo_url?: string;
+};
 
-  await recordAuditEvent({
-    userId: user.id,
-    eventType: "TELEGRAM_LOGIN",
-    entityType: "User",
-    entityId: user.id,
-    metadata: {
-      telegramId: telegram.id,
-      username: telegram.username ?? null,
-      firstName: telegram.first_name ?? null,
-      lastName: telegram.last_name ?? null,
-    },
-  });
-
+function toTgUser(identity: TelegramIdentity): TgUser {
   return {
-    ...(await createAuthTokens(user)),
-    user: {
-      id: user.id,
-      ucid: user.ucid,
-      role: user.role,
-      email: user.email,
-      phone: user.phone,
-      languagePreference: user.languagePreference,
-    },
-    telegram: {
-      id: telegram.id,
-      username: telegram.username ?? null,
-      firstName: telegram.first_name ?? null,
-      lastName: telegram.last_name ?? null,
-      photoUrl: telegram.photo_url ?? null,
-    },
+    id: BigInt(identity.id),
+    firstName: identity.first_name ?? "",
+    lastName: identity.last_name,
+    username: identity.username,
+    languageCode: identity.language_code,
+    photoUrl: identity.photo_url,
   };
 }
 
 /**
- * Resolves the Yekis account for an ALREADY-VERIFIED Telegram identity,
+ * Resolves the Yekis account behind an ALREADY-VERIFIED Telegram identity,
  * provisioning one if this Telegram account has never been seen.
  *
- * Shared by every Telegram entry point so they cannot drift:
- *   - Mini App / Login Widget (`loginWithTelegram`) — identity proven by a
- *     signed `initData` payload verified against the bot token.
- *   - The bot itself (handlers/commands.ts) — identity proven by Telegram
- *     delivering the update to our webhook/polling connection, which carries
- *     the same assurance and involves no client-supplied data at all.
+ * LEGACY. Retained for the bot entry point (handlers/commands.ts) and its test
+ * suite; the route layer no longer provisions (POST /telegram/miniapp returns
+ * 409 NEEDS_ONBOARDING instead). Removed once the onboarding conversation
+ * replaces bot-side provisioning.
  *
- * A requested `role` only ever applies at provisioning time, so a repeat
- * sign-in can never silently downgrade a member.
+ * Trust anchor: Telegram delivers the update to our own webhook/polling
+ * connection, so `from.id` is authenticated by Telegram itself. That is the
+ * same assurance as a verified Login Widget payload and involves no
+ * client-supplied data.
+ *
+ * A requested `role` only applies at provisioning time, so a repeat sign-in
+ * can never silently downgrade a member.
  */
 export async function resolveOrProvisionTelegramUser(
-  telegram: TelegramUser,
+  identity: TelegramIdentity,
   options: { role?: string; chatId?: string | number } = {},
 ) {
+  const telegram = toTgUser(identity);
   const chatId = String(options.chatId ?? telegramChatId(telegram.id));
   const profile = profileFields(telegram);
   const selectedRole =
@@ -249,10 +189,9 @@ export async function resolveOrProvisionTelegramUser(
       : "CLIENT";
 
   const existing = await findUserByTelegramIdentity(telegram.id);
-
   if (existing) {
-    // Returning member: refresh the mutable Telegram profile fields and
-    // re-assert the chat target, which the bot clears when a user blocks it.
+    // Returning member: refresh the mutable profile fields and re-assert the
+    // chat target, which the bot clears when a member blocks it.
     return prisma.user.update({
       where: { id: existing.id },
       data: { ...profile, telegramChatId: chatId },
@@ -261,25 +200,17 @@ export async function resolveOrProvisionTelegramUser(
   }
 
   const legacy = await findUserBySyntheticEmail(telegram.id);
-
   if (legacy) {
-    // The synthetic address is only ever issued to Telegram, so an email hit
-    // is the same human on an account provisioned before telegramUserId was
-    // persisted. A password-owned account is the one exception: it was created
-    // through the public sign-up form and must be claimed from an
-    // authenticated session instead.
+    // The synthetic address is only ever issued to Telegram, so an email hit is
+    // the same human on an account provisioned before telegramUserId was
+    // persisted. A password-owned account is the exception: it came from the
+    // public sign-up form and must be claimed from an authenticated session.
     if (isPasswordOwnedAccount(legacy)) {
-      throw new AccountLinkRequiredError(
-        accountLinkRequiredMessage(legacy.email),
-      );
+      throw new AccountLinkRequiredError(accountLinkRequiredMessage(legacy.email));
     }
     return prisma.user.update({
       where: { id: legacy.id },
-      data: {
-        ...profile,
-        telegramUserId: BigInt(telegram.id),
-        telegramChatId: chatId,
-      },
+      data: { ...profile, telegramUserId: telegram.id, telegramChatId: chatId },
       include: { kyc: { select: { tier: true, status: true } } },
     });
   }
@@ -295,21 +226,22 @@ export async function resolveOrProvisionTelegramUser(
         email: telegramEmail(telegram.id),
         phone,
         passwordHash: sentinelHash,
-        role: selectedRole,
-        firstName: telegram.first_name || "",
-        lastName: telegram.last_name || "",
+        role: selectedRole as any,
+        firstName: telegram.firstName || "",
+        lastName: telegram.lastName || "",
         displayName: profile.displayName ?? "Telegram Member",
-        avatarUrl: telegram.photo_url || null,
+        avatarUrl: telegram.photoUrl || null,
         languagePreference: profile.languagePreference,
-        telegramUserId: BigInt(telegram.id),
+        telegramUserId: telegram.id,
         telegramChatId: chatId,
-        // No fabricated DOB - AML data integrity. Real DOB captured at Tier-2 Fayda.
-        kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
+        // F-02: a federated account is NOT a verified account. This used to be
+        // created VERIFIED with no document ever uploaded, which satisfied
+        // requireKycVerified for the highest-volume sign-up path. New
+        // federated users verify like anyone else: submit a document, and the
+        // same Fayda/manual review flow applies.
+        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
         wallet: { create: { balanceMinor: 0 } },
         consents: {
-          // Mirrors the five-purpose registration model (Master Design §12.2).
-          // platform_notifications is granted: the bot IS the notification
-          // channel the user launched — using it is the affirmative opt-in.
           create: [
             { purpose: "kyc_data_processing", granted: true },
             { purpose: "financial_data_processing", granted: true },
@@ -325,31 +257,133 @@ export async function resolveOrProvisionTelegramUser(
   );
 }
 
+export async function loginWithTelegram(telegram: TgUser, method: AuthMethod = "tg_miniapp") {
+  const existing = await findUserByTelegramIdentity(telegram.id);
+  if (existing) {
+    const updated = await prisma.user.update({
+      where: { id: existing.id },
+      data: { ...profileFields(telegram), telegramChatId: telegramChatId(telegram.id) },
+      include: { kyc: { select: { tier: true, status: true } } },
+    });
+    return buildAuthResponse(updated, telegram, method);
+  }
+
+  const legacy = await findUserBySyntheticEmail(telegram.id);
+  if (legacy) {
+    if (isPasswordOwnedAccount(legacy)) {
+      throw new AccountLinkRequiredError(accountLinkRequiredMessage(legacy.email));
+    }
+    const updated = await prisma.user.update({
+      where: { id: legacy.id },
+      data: {
+        ...profileFields(telegram),
+        telegramUserId: telegram.id,
+        telegramChatId: telegramChatId(telegram.id),
+      },
+      include: { kyc: { select: { tier: true, status: true } } },
+    });
+    return buildAuthResponse(updated, telegram, method);
+  }
+
+  throw new NeedsOnboardingError("User not found, needs onboarding.");
+}
+
+export async function registerTelegramUser(telegram: TgUser, role: string) {
+  if (role !== "CLIENT" && role !== "FREELANCER") {
+    throw new Error("Invalid role");
+  }
+
+  const sentinelHash = await argon2.hash(randomBytes(32).toString("hex"));
+  const profile = profileFields(telegram);
+
+  const user = await withPlaceholderPhone((phone) =>
+    prisma.user.create({
+      data: {
+        email: telegramEmail(telegram.id),
+        phone,
+        passwordHash: sentinelHash,
+        role: role as any,
+        firstName: telegram.firstName || "",
+        lastName: telegram.lastName || "",
+        displayName: profile.displayName ?? "Telegram Member",
+        avatarUrl: telegram.photoUrl || null,
+        languagePreference: profile.languagePreference,
+        telegramUserId: telegram.id,
+        telegramChatId: telegramChatId(telegram.id),
+        // F-02: see the note at the other create site — PENDING, not VERIFIED.
+        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+        wallet: { create: { balanceMinor: 0 } },
+        consents: {
+          create: [
+            { purpose: "kyc_data_processing", granted: true },
+            { purpose: "financial_data_processing", granted: true },
+            { purpose: "platform_notifications", granted: true },
+            { purpose: "telegram_account_linking", granted: true },
+            { purpose: "marketing_communications", granted: false },
+            { purpose: "analytics", granted: false },
+          ],
+        },
+      },
+      include: { kyc: { select: { tier: true, status: true } } },
+    })
+  );
+
+  return buildAuthResponse(user, telegram, "tg_miniapp");
+}
+
 /**
- * Binds a Telegram identity to the ALREADY authenticated account. This is the
- * only path that may attach Telegram to an account created with a password:
- * possession of a valid session proves the caller owns that account, and the
- * signed Telegram payload proves they own the Telegram identity. No email
- * match is involved.
+ * Shared session envelope for every Telegram entry point.
+ *
+ * `method` becomes the token's `amr`, and it is never `pwd`/`totp`/`email_otp`:
+ * a Telegram proof is not a strong factor, so a session minted here can browse
+ * and transact but cannot move money or change credentials without a step-up.
  */
-export async function linkTelegramToUser(userId: string, initData: string) {
-  const telegram = verifyTelegramCredential(initData);
+export async function buildAuthResponse(user: any, telegram: TgUser, method: AuthMethod) {
+  await recordAuditEvent({
+    userId: user.id,
+    eventType: "TELEGRAM_LOGIN",
+    entityType: "User",
+    entityId: user.id,
+    metadata: {
+      telegramId: telegram.id.toString(),
+      username: telegram.username ?? null,
+      firstName: telegram.firstName ?? null,
+      lastName: telegram.lastName ?? null,
+    },
+  });
+
+  return {
+    ...(await createAuthTokens(user, [method])),
+    user: {
+      id: user.id,
+      ucid: user.ucid,
+      role: user.role,
+      email: user.email,
+      phone: user.phone,
+      languagePreference: user.languagePreference,
+    },
+    telegram: {
+      id: telegram.id.toString(),
+      username: telegram.username ?? null,
+      firstName: telegram.firstName ?? null,
+      lastName: telegram.lastName ?? null,
+      photoUrl: telegram.photoUrl ?? null,
+    },
+  };
+}
+
+export async function linkTelegramToUser(userId: string, telegram: TgUser) {
   const chatId = telegramChatId(telegram.id);
 
   const owner = await findUserByTelegramIdentity(telegram.id);
   if (owner && owner.id !== userId) {
-    throw new TelegramAccountConflictError(
-      "This Telegram account is already linked to a different Yekis account.",
-    );
+    throw new TelegramAccountConflictError("This Telegram account is already linked to a different Yekis account.");
   }
 
   try {
     const user = await prisma.user.update({
       where: { id: userId },
-      data: {
-        telegramUserId: BigInt(telegram.id),
-        telegramChatId: chatId,
-      },
+      data: { telegramUserId: telegram.id, telegramChatId: chatId },
     });
 
     await recordAuditEvent({
@@ -357,31 +391,18 @@ export async function linkTelegramToUser(userId: string, initData: string) {
       eventType: "TELEGRAM_ACCOUNT_LINKED",
       entityType: "User",
       entityId: user.id,
-      metadata: {
-        telegramId: telegram.id,
-        username: telegram.username ?? null,
-      },
+      metadata: { telegramId: telegram.id.toString(), username: telegram.username ?? null },
     });
 
-    return {
-      telegramUserId: String(telegram.id),
-      telegramChatId: chatId,
-    };
+    return { telegramUserId: telegram.id.toString(), telegramChatId: chatId };
   } catch (err) {
-    // Lost a race against a concurrent link of the same Telegram identity.
     if (isUniqueConstraintViolation(err)) {
-      throw new TelegramAccountConflictError(
-        "This Telegram account is already linked to a different Yekis account.",
-      );
+      throw new TelegramAccountConflictError("This Telegram account is already linked to a different Yekis account.");
     }
     throw err;
   }
 }
 
-/**
- * Detaches Telegram from the authenticated account. Stops push delivery and
- * lets another Yekis account claim the identity.
- */
 export async function unlinkTelegramFromUser(userId: string) {
   await prisma.user.update({
     where: { id: userId },

@@ -2,8 +2,7 @@ import { BotContext } from "../types.js";
 import { prisma } from "../../../lib/prisma.js";
 import { logger } from "../../../lib/logger.js";
 import type { StaffRole } from "@prisma/client";
-import { resolveOrProvisionTelegramUser } from "../../auth/telegram.service.js";
-import { AccountLinkRequiredError } from "../../auth/identity.js";
+import { toTelegramBigInt } from "../../../lib/json.js";
 
 const userSelect = {
   id: true,
@@ -54,68 +53,46 @@ export async function authMiddleware(
     return next();
   }
 
-  const telegramId = from.id;
+  // Widened once, here, at the boundary. `from.id` arrives as a JS number and
+  // Prisma wants a BigInt; the session keeps the decimal string so that neither
+  // floating-point precision nor JSON serialisation can lose it.
+  const telegramId = String(from.id);
   const chatId = String(chat.id);
 
+  const telegramBigId = toTelegramBigInt(telegramId);
+  if (telegramBigId === null) {
+    // grammY types `from.id` as a number, so this should be unreachable. If it
+    // ever is not, stop: falling back to 0n would resolve to a real member's
+    // row and hand them this session.
+    logger.error({ updateId: ctx.update.update_id }, "Malformed Telegram user id");
+    return next();
+  }
+
   let user: ResolvedUser | null = await prisma.user.findUnique({
-    where: { telegramUserId: BigInt(telegramId) },
+    where: { telegramUserId: telegramBigId },
     select: userSelect,
   });
 
   if (!user) {
-    // No account bound to this Telegram identity yet. Provision one (this
-    // also backfills the column for accounts that only had the synthetic
-    // email, and adopts nothing it should not).
-    try {
-      const provisioned = await resolveOrProvisionTelegramUser(
-        {
-          id: telegramId,
-          first_name: from.first_name,
-          last_name: from.last_name,
-          username: from.username,
-          language_code: from.language_code,
-        },
-        { chatId },
-      );
+    // Check legacy email
+    user = await prisma.user.findUnique({
+      where: { email: `telegram+${telegramId}@yekis.local` },
+      select: userSelect,
+    }) as unknown as ResolvedUser | null;
+  }
 
-      user = {
-        id: provisioned.id,
-        role: provisioned.role,
-        staffRole: provisioned.staffRole ?? null,
-        languagePreference: provisioned.languagePreference,
-        telegramUserId: provisioned.telegramUserId,
-        telegramChatId: provisioned.telegramChatId,
-        kyc: provisioned.kyc
-          ? {
-              tier: provisioned.kyc.tier as string | null,
-              status: provisioned.kyc.status as string | null,
-            }
-          : null,
-      };
-
-      logger.info(
-        { telegramId, userId: provisioned.id },
-        "Provisioned Yekis account from Telegram update",
-      );
-    } catch (err) {
-      if (err instanceof AccountLinkRequiredError) {
-        // A password-owned account owns this synthetic address. Surface it on
-        // the session so /start can tell the member how to proceed instead of
-        // silently treating them as anonymous.
-        ctx.session.loginBlocked = err.message;
-        ctx.session.language = from.language_code === "am" ? "am" : "en";
-        ctx.session.telegramUserId = telegramId;
-        ctx.session.telegramChatId = chat.id;
-        return next();
-      }
-      logger.error({ err, telegramId }, "Telegram identity resolution failed");
-      ctx.session.loginBlocked =
-        "We could not complete your sign-in right now. Please try again shortly.";
-      ctx.session.language = from.language_code === "am" ? "am" : "en";
-      ctx.session.telegramUserId = telegramId;
-      ctx.session.telegramChatId = chat.id;
-      return next();
-    }
+  // C5: Strict Onboarding - Do not auto-provision here
+  if (!user) {
+    ctx.session.userId = undefined;
+    ctx.session.role = undefined;
+    ctx.session.kycTier = undefined;
+    ctx.session.kycStatus = undefined;
+    ctx.session.staffRole = undefined;
+    ctx.session.loginBlocked = "You are not registered. Please sign in via the web.";
+    ctx.session.language = from.language_code === "am" ? "am" : "en";
+    ctx.session.telegramUserId = telegramId;
+    ctx.session.telegramChatId = chatId;
+    return next();
   }
 
   ctx.session.loginBlocked = undefined;
@@ -141,7 +118,7 @@ export async function authMiddleware(
   }
 
   ctx.session.telegramUserId = telegramId;
-  ctx.session.telegramChatId = chat.id;
+  ctx.session.telegramChatId = chatId;
 
   await next();
 }

@@ -187,6 +187,12 @@ export class RealtimeSocketManager {
     return () => this.off(event, handler);
   }
 
+  /** Listen to every server event. Useful for notification fan-out events
+   * whose job type is intentionally extensible. */
+  onAny(handler: SocketEventHandler<{ event: string; data: unknown }>): () => void {
+    return this.on("*", handler);
+  }
+
   off<T = any>(event: string, handler: SocketEventHandler<T>): void {
     const handlers = this.eventHandlers.get(event);
     if (handlers) {
@@ -221,6 +227,16 @@ export class RealtimeSocketManager {
           handler(data);
         } catch (err) {
           console.error("Socket handler error:", err);
+        }
+      }
+    }
+    const anyHandlers = this.eventHandlers.get("*");
+    if (anyHandlers) {
+      for (const handler of anyHandlers) {
+        try {
+          handler({ event, data });
+        } catch (err) {
+          console.error("Socket wildcard handler error:", err);
         }
       }
     }
