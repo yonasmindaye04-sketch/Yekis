@@ -1,4 +1,4 @@
-﻿// === REALTIME WEBSOCKET MANAGER ===
+// === REALTIME WEBSOCKET MANAGER ===
 import { api } from "./client";
 
 export type SocketEventHandler<T = any> = (data: T) => void;
@@ -30,7 +30,8 @@ export class RealtimeSocketManager {
 
   private getWebSocketUrl(): string | null {
     const token = this.tokenOverride ? this.tokenOverride() : api.getToken();
-    if (!token) return null;
+    if (!token || token.startsWith("demo-")) return null;
+    if (this.reconnectAttempts >= 2) return null;
 
     const apiBase = import.meta.env.VITE_API_BASE_URL;
     let wsHost = window.location.host;

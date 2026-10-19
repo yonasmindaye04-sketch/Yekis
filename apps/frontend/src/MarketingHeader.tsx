@@ -8,7 +8,10 @@ type MarketingHeaderProps = {
   onStart: (mode: "login" | "register") => void;
 };
 
-export function MarketingHeader({ onNavigate, onStart }: MarketingHeaderProps) {
+export function MarketingHeader({
+  onNavigate,
+  onStart,
+}: MarketingHeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { t } = useI18n();
 

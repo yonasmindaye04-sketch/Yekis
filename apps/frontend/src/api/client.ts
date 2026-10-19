@@ -79,9 +79,10 @@ export interface SelfProfile {
 
 export interface TopUpRequest {
   id: string;
-  userId: string;
+  userId?: string;
   amountMinor: number;
-  provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+  provider?: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+  paymentMethod?: string;
   senderName?: string;
   referenceNumber: string;
   receiptPath?: string;
@@ -146,6 +147,7 @@ export interface Job {
   budgetMaxMinor: number;
   deadline: string;
   status: string;
+  createdAt?: string;
   proposalsCount?: number;
   proposedMilestones?: { title: string; amountMinor: number; dueDate: string }[];
   contract?: { id: string } | null;
@@ -178,10 +180,14 @@ export interface Proposal {
 export interface Milestone {
   id: string;
   contractId: string;
+  sequenceNumber?: number;
   title: string;
+  description?: string;
   amountMinor: number;
   dueDate: string;
   escrowState: string;
+  deliverablePath?: string | null;
+  deliverableUrl?: string | null;
   submittedAt: string | null;
   autoReleaseAt: string | null;
   releasedAt: string | null;

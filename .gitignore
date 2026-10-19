@@ -1,5 +1,8 @@
 node_modules/
 dist/
+apps/frontend/dist/
+.aistudio/
+bun.lock
 .env
 *.log
 .DS_Store
