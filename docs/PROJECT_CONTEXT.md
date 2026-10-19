@@ -1,5 +1,18 @@
 # Project Context
 
+> **Update 2026-10-17 (Telegram Bot Multilingual Support & Translation Quality Audit):**
+> 1. **Motivation & Scope.** Following frontend multilingual integration, an audit revealed the Telegram bot had severe translation quality issues in Amharic, 81 missing translation keys causing raw key strings to be sent to users, no Afaan Oromoo or Tigrigna support, and push notifications bypassing translation via an identity stub.
+> 2. **Translation Quality Overhaul.** Corrected critical machine-translation artifacts in Amharic (`apps/backend/src/modules/bot/locales/am.json`), such as translating "accepted" as "ተቀብሯል" ("buried" -> "ተቀባይነት አግኝቷል"), "queue" as "ወርደት" ("humiliation" -> "ወረፋ"), "mediation/negotiation" as "ማሳቀፍ" ("hugging" -> "እርቅ እና ሽምግልና"), "close" as "ይዝቱ" ("threaten" -> "ዝጋ"), and corrupted session timeout copy.
+> 3. **4-Language Bot Parity.** Added complete Afaan Oromoo (`om.json`) and Tigrigna (`ti.json`) locale files to the bot. All 4 languages (`en`, `am`, `om`, `ti`) now feature exact 100% key parity across 243 keys.
+> 4. **Bot Infrastructure & Push Notifications.**
+>    - Extended `types.ts` bot locale union and `i18n.middleware.ts` to synchronously load and serve all 4 languages.
+>    - Rewired `notifications.ts` outbound push alerts with `getBotTranslation()`, ensuring users receive real localized notifications instead of raw string keys.
+>    - Upgraded language switcher inline keyboards (`language.ts`, `mainMenu.ts`) and callback handlers (`callbacks.ts`) to persist language preferences to the database (`User.languagePreference`).
+> 5. **Frontend Consistency.** Fixed remaining brand name references (`appName: "ዬኪስ (Yekis)"`) in Amharic and Tigrigna, and synchronized user registration language preference with the currently active UI language.
+> 6. **Verification.** 100% key parity across all 314 frontend keys and 243 bot keys; zero TypeScript errors (`tsc --noEmit` exits 0 for frontend and backend); all bot integration tests pass (`tests/bot-updates.test.ts` and `tests/bot-deeplinks.test.ts`).
+>
+> Last updated: 2026-10-17
+
 > **Update 2026-10-14 (Four-Language Multilingual Translation System — Amharic, Oromiffa, Tigrigna, English):**
 > 1. **Motivation & Scope.** The platform previously lacked a complete and functional multilingual interface. In accordance with user requirements, comprehensive, native, culturally authentic translations were implemented across the website for Ethiopia's major national languages: **Amharic (`am` / አማርኛ)**, **Oromiffa (`om` / Afaan Oromoo)**, and **Tigrigna (`ti` / ትግርኛ)**, alongside **English (`en`)**.
 > 2. **i18n Architecture (`apps/frontend/src/i18n.ts`).** Implemented a typed React `LanguageProvider` and `useI18n()` hook with full `localStorage` persistence under key `yekis-language`, automatic synchronization with `<html lang="...">`, and real-time reactive rerendering across all subscribed components.

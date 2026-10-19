@@ -355,6 +355,7 @@ export async function startBot(): Promise<boolean> {
       { command: "start", description: "Sign in and open the Mini App" },
       { command: "login", description: "Get a one-time code to sign in on the web" },
       { command: "account", description: "Show which Yekis account you are signed in as" },
+      { command: "link", description: "Show the current Mini App link" },
       { command: "menu", description: "Show the main menu panel" },
       { command: "jobs", description: "Browse available jobs" },
       { command: "wallet", description: "View your balance & manage funds" },
@@ -388,10 +389,11 @@ export async function startBot(): Promise<boolean> {
   const configuredWebhookUrl = env.TELEGRAM_WEBHOOK_URL?.trim();
   let useWebhook = Boolean(configuredWebhookUrl) && !env.TELEGRAM_POLLING_ENABLED;
 
-  // ngrok prints values such as "https://public.ngrok.dev ->
-  // http://localhost:5173" in its terminal output. That entire string is not
-  // a URL, and Telegram rejects it. Never send malformed configuration to the
-  // Bot API; local development can safely fall back to polling.
+  // Cloudflare Tunnel (cloudflared) prints values such as
+  // "https://xxx.trycloudflare.com -> http://localhost:5173" in its terminal
+  // output. That entire string is not a URL, and Telegram rejects it. Never
+  // send malformed configuration to the Bot API; local development can safely
+  // fall back to polling.
   if (configuredWebhookUrl) {
     try {
       const parsedWebhookUrl = new URL(configuredWebhookUrl);

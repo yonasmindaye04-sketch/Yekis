@@ -34,7 +34,7 @@ export interface BotSession {
   kycTier?: "TIER_1" | "TIER_2" | "TIER_3";
   kycStatus?: "VERIFIED" | "PENDING" | "REJECTED" | "UNDER_REVIEW";
   staffRole?: StaffRole;
-  language: "en" | "am";
+  language: "en" | "am" | "om" | "ti";
   scene?: string;
   sceneStep?: number;
   sceneData?: Record<string, any>;
@@ -55,8 +55,8 @@ export interface BotSession {
 export interface BotSessionContext extends SessionFlavor<BotSession> {
   i18n: {
     t: (key: string, params?: Record<string, any>) => string;
-    locale: "en" | "am";
-    setLocale: (locale: "en" | "am") => Promise<void>;
+    locale: "en" | "am" | "om" | "ti";
+    setLocale: (locale: "en" | "am" | "om" | "ti") => Promise<void>;
   };
 }
 
@@ -70,8 +70,8 @@ declare module "grammy" {
   interface Context {
     i18n: {
       t: (key: string, params?: Record<string, any>) => string;
-      locale: "en" | "am";
-      setLocale: (locale: "en" | "am") => Promise<void>;
+      locale: "en" | "am" | "om" | "ti";
+      setLocale: (locale: "en" | "am" | "om" | "ti") => Promise<void>;
     };
   }
 }

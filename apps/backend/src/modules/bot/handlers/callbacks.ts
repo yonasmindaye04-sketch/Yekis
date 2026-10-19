@@ -121,13 +121,20 @@ export function registerCallbacks(bot: Bot<BotContext>) {
   registerStaffHandlers(bot);
 
   // Language selection
-  bot.callbackQuery(/^lang:(en|am)$/, async (ctx) => {
-    const lang = ctx.match[1] as "en" | "am";
+  bot.callbackQuery(/^lang:(en|am|om|ti)$/, async (ctx) => {
+    const lang = ctx.match[1] as "en" | "am" | "om" | "ti";
     ctx.session.language = lang;
     await ctx.i18n.setLocale(lang);
+    if (ctx.session.userId) {
+      await prisma.user.update({
+        where: { id: ctx.session.userId },
+        data: { languagePreference: lang },
+      }).catch(() => {});
+    }
 
+    const confirmKey = lang === "en" ? "language_set" : `language_set_${lang}`;
     await ctx.editMessageText(
-      lang === "en" ? ctx.t("language_set") : ctx.t("language_set_am"),
+      ctx.t(confirmKey),
       { reply_markup: mainMenuKeyboard(ctx) },
     );
     await ctx.answerCallbackQuery();
@@ -350,8 +357,8 @@ export function registerCallbacks(bot: Bot<BotContext>) {
   });
 
   // Settings callbacks
-  bot.callbackQuery(/^settings:lang:(en|am)$/, async (ctx) => {
-    const lang = ctx.match[1] as "en" | "am";
+  bot.callbackQuery(/^settings:lang:(en|am|om|ti)$/, async (ctx) => {
+    const lang = ctx.match[1] as "en" | "am" | "om" | "ti";
     await ctx.i18n.setLocale(lang);
     ctx.session.language = lang;
     if (ctx.session.userId) {
@@ -364,13 +371,13 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       reply_markup: settingsKeyboard(ctx),
     });
     await ctx.answerCallbackQuery({
-      text: lang === "am" ? "ቋንቋ ተቀይሯል" : "Language updated",
+      text: ctx.t("settings_language_updated"),
     });
   });
 
   bot.callbackQuery("settings:language", async (ctx) => {
     await ctx.editMessageText(ctx.t("settings_choose_language"), {
-      reply_markup: languageKeyboard(),
+      reply_markup: languageKeyboard("settings:lang"),
     });
     await ctx.answerCallbackQuery();
   });

@@ -39,11 +39,13 @@ export function mainMenuKeyboard(ctx: BotContext): InlineKeyboard {
   return kb;
 }
 
-export function languageKeyboard(): InlineKeyboard {
-  const kb = new InlineKeyboard()
-    .text(" English", "lang:en")
-    .text(" አማርኛ", "lang:am");
-  return kb;
+export function languageKeyboard(prefix = "lang"): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("🇬🇧 English", `${prefix}:en`)
+    .text("🇪🇹 አማርኛ", `${prefix}:am`)
+    .row()
+    .text("🇪🇹 Afaan Oromoo", `${prefix}:om`)
+    .text("🇪🇹 ትግርኛ", `${prefix}:ti`);
 }
 
 export function settingsKeyboard(ctx: BotContext): InlineKeyboard {

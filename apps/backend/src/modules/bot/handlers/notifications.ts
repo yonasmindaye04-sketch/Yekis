@@ -4,6 +4,7 @@ import { prisma } from "../../../lib/prisma.js";
 import { logger } from "../../../lib/logger.js";
 import { formatNotification } from "../formatters/index.js";
 import { webAppRoutes } from "../utils/deepLink.js";
+import { getBotTranslation } from "../middleware/i18n.middleware.js";
 
 interface NotificationPayload {
   userId: string;
@@ -57,9 +58,11 @@ export async function sendNotification(
     }
 
     // Build message with user's language
-    const locale = user.languagePreference === "am" ? "am" : "en";
+    const locale = user.languagePreference || "en";
+    const t = (k: string, params?: Record<string, any>) => getBotTranslation(locale, k, params);
     const message = formatNotification(event, data, {
-      i18n: { t: (k: string) => k, locale } as any,
+      t,
+      i18n: { t, locale } as any,
     } as BotContext);
 
     // Determine deep link if applicable
