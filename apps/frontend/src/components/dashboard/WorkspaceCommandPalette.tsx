@@ -18,7 +18,6 @@ import {
   Sun,
   Moon,
   ArrowRight,
-  Terminal,
   PanelLeft,
 } from "lucide-react";
 import { useShadcnLayout, type DemoWorkspaceMode } from "./ShadcnLayoutContext";
@@ -206,38 +205,30 @@ export function WorkspaceCommandPalette({
       list.push(
         {
           id: "role-client",
-          group: "Role & Console Switcher",
-          label: "Preview Client Workspace (Hiring & Escrow)",
-          hint: currentRole === "CLIENT" ? "Active role" : "Switch to Client view",
+          group: "Workspace Mode (Dual-Role)",
+          label: "Switch to Client Mode (Hiring & Escrow)",
+          hint: currentRole === "CLIENT" ? "Active mode" : "Switch to Client view",
           icon: <Briefcase size={15} />,
           run: () => onSwitchRoleMode("CLIENT"),
         },
         {
           id: "role-freelancer",
-          group: "Role & Console Switcher",
-          label: "Preview Freelancer Workspace (Talent & Payouts)",
+          group: "Workspace Mode (Dual-Role)",
+          label: "Switch to Freelancer Mode (Talent & Payouts)",
           hint:
             currentRole === "FREELANCER"
-              ? "Active role"
+              ? "Active mode"
               : "Switch to Freelancer view",
           icon: <UserIcon size={15} />,
           run: () => onSwitchRoleMode("FREELANCER"),
         },
         {
           id: "role-both",
-          group: "Role & Console Switcher",
-          label: "Preview Dual-Role Workspace (Client + Freelancer)",
-          hint: currentRole === "BOTH" ? "Active role" : "Hire and deliver work",
+          group: "Workspace Mode (Dual-Role)",
+          label: "Switch to Combined Mode (Client + Freelancer)",
+          hint: currentRole === "BOTH" ? "Active mode" : "Hire and deliver work",
           icon: <LayoutDashboard size={15} />,
           run: () => onSwitchRoleMode("BOTH"),
-        },
-        {
-          id: "role-admin",
-          group: "Role & Console Switcher",
-          label: "Launch Staff Operations Console (Admin / Mediator)",
-          hint: "18 RBAC queues, KYC, ledger & risk flags",
-          icon: <Terminal size={15} />,
-          run: () => onSwitchRoleMode("ADMIN"),
         },
       );
     }

@@ -99,8 +99,9 @@ export function useListPage<T>(
   }, []);
 
   /* Results are tagged with the request that produced them, so `loading` is
-     derived rather than flipped inside the effect. This also stops stale rows
-     from the previous page flashing while the next one loads. */
+     derived rather than flipped inside the effect. Keeping `settled.result`
+     populated during background reloads prevents the table/queue UI from
+     wiping `rows` to `[]` and flashing a full-page loading screen. */
   const reqKey = `${page}|${limit}|${q}|${nonce}|${depKey}`;
   const [settled, setSettled] = useState<{
     key: string;
@@ -119,11 +120,11 @@ export function useListPage<T>(
       })
       .catch((e: unknown) => {
         if (alive) {
-          setSettled({
+          setSettled((prev) => ({
             key: reqKey,
-            result: null,
+            result: prev.result,
             error: e instanceof Error ? e.message : String(e),
-          });
+          }));
         }
       });
     return () => {
@@ -135,12 +136,12 @@ export function useListPage<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqKey]);
 
-  const loading = settled.key !== reqKey;
+  const loading = settled.key !== reqKey && settled.result === null;
   const error = settled.key === reqKey ? settled.error : null;
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
-  const live = settled.key === reqKey ? settled.result : null;
+  const live = settled.result;
 
   return useMemo(
     () => ({

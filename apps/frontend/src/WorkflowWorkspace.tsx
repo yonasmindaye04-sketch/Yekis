@@ -20,12 +20,6 @@ import {
   type Proposal,
 } from "./api/client";
 import { events } from "./analytics";
-import {
-  FALLBACK_CONTRACTS,
-  FALLBACK_DISPUTES,
-  FALLBACK_JOBS,
-  FALLBACK_PROPOSALS,
-} from "./components/dashboard/dashboardData";
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
@@ -47,18 +41,11 @@ export function JobsWorkspace({
   openJobs: Job[];
   onChanged: () => Promise<void>;
 }) {
-  const [ownedJobs, setOwnedJobs] = useState<Job[]>(
-    isHiring(role) ? FALLBACK_JOBS.slice(0, 2) : [],
-  );
-  const [myProposals, setMyProposals] = useState<Proposal[]>(
-    isWorking(role) ? FALLBACK_PROPOSALS : [],
-  );
+  const [ownedJobs, setOwnedJobs] = useState<Job[]>([]);
+  const [myProposals, setMyProposals] = useState<Proposal[]>([]);
   const [proposalsByJob, setProposalsByJob] = useState<
     Record<string, Proposal[]>
-  >({
-    "job-eth-101": [FALLBACK_PROPOSALS[0]],
-    "job-eth-102": [FALLBACK_PROPOSALS[1]],
-  });
+  >({});
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [detailJobId, setDetailJobId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -74,8 +61,8 @@ export function JobsWorkspace({
     if (isHiring(role)) {
       try {
         const jobs = await api.getMyJobs();
+        setOwnedJobs(jobs);
         if (jobs.length > 0) {
-          setOwnedJobs(jobs);
           const entries = await Promise.all(
             jobs.map(
               async (job) => [job.id, await api.getJobProposals(job.id)] as const,
@@ -83,20 +70,18 @@ export function JobsWorkspace({
           );
           setProposalsByJob(Object.fromEntries(entries));
         } else {
-          setOwnedJobs(FALLBACK_JOBS.slice(0, 2));
+          setProposalsByJob({});
         }
       } catch {
-        setOwnedJobs((prev) =>
-          prev.length > 0 ? prev : FALLBACK_JOBS.slice(0, 2),
-        );
+        // Retain current state on transient network error
       }
     }
     if (isWorking(role)) {
       try {
         const list = await api.getMyProposals();
-        setMyProposals(list.length > 0 ? list : FALLBACK_PROPOSALS);
+        setMyProposals(list);
       } catch {
-        setMyProposals((prev) => (prev.length > 0 ? prev : FALLBACK_PROPOSALS));
+        // Retain current state on transient network error
       }
     }
   }, [role]);
@@ -107,7 +92,7 @@ export function JobsWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    fallbackUpdate: () => void,
+    _fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
@@ -116,9 +101,8 @@ export function JobsWorkspace({
       await operation();
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
-    } catch {
-      fallbackUpdate();
-      setMessage(success);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -159,39 +143,17 @@ export function JobsWorkspace({
       });
       events.proposalSubmitted();
       setMessage("Proposal submitted.");
-      await Promise.all([refresh(), onChanged().catch(() => {})]);
-    } catch {
-      const localProp: Proposal = {
-        id: `prop-${Date.now()}`,
-        jobId: job.id,
-        freelancerId: "usr-free-addis-02",
-        coverLetter: coverLetter.trim(),
-        quotedAmountMinor: amountMinor,
-        estimatedDays: Number(days),
-        milestoneBreakdown: [
-          {
-            title: "Project delivery",
-            amount: { amountMinor, currency: "ETB" },
-            dueDate,
-          },
-        ],
-        status: "SUBMITTED",
-        createdAt: new Date().toISOString(),
-        job: {
-          id: job.id,
-          title: job.title,
-          status: job.status,
-          clientId: job.clientId ?? "usr-client-addis-01",
-        },
-      };
-      setMyProposals((prev) => [localProp, ...prev]);
-      setMessage("Proposal submitted.");
-    } finally {
       setCoverLetter("");
       setAmount("");
       setDueDate("");
       setAttachments([]);
       setSelectedJobId(null);
+      await Promise.all([refresh(), onChanged().catch(() => {})]);
+    } catch (err) {
+      setMessage(
+        err instanceof Error ? err.message : "Unable to submit proposal.",
+      );
+    } finally {
       setBusy(false);
     }
   };
@@ -356,7 +318,7 @@ export function JobsWorkspace({
   const proposalByJob = new Map(
     myProposals.map((proposal) => [proposal.jobId, proposal]),
   );
-  const effectiveOpenJobs = openJobs.length > 0 ? openJobs : FALLBACK_JOBS;
+  const effectiveOpenJobs = openJobs;
   const filteredOpenJobs = effectiveOpenJobs.filter(
     (j) =>
       !searchQuery.trim() ||
@@ -671,7 +633,7 @@ export function ContractsWorkspace({
   userId: string;
   onChanged: () => Promise<void>;
 }) {
-  const [contracts, setContracts] = useState<Contract[]>(FALLBACK_CONTRACTS);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [disputeMilestoneId, setDisputeMilestoneId] = useState<string | null>(
@@ -683,9 +645,9 @@ export function ContractsWorkspace({
   const refresh = useCallback(async () => {
     try {
       const list = await api.getContracts();
-      setContracts(list.length > 0 ? list : FALLBACK_CONTRACTS);
+      setContracts(list);
     } catch {
-      setContracts((prev) => (prev.length > 0 ? prev : FALLBACK_CONTRACTS));
+      // Retain current state on transient network error
     }
   }, []);
 
@@ -695,7 +657,7 @@ export function ContractsWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    fallbackUpdate: () => void,
+    _fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
@@ -704,9 +666,8 @@ export function ContractsWorkspace({
       await operation();
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
-    } catch {
-      fallbackUpdate();
-      setMessage(success);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -1091,7 +1052,7 @@ export function ContractsWorkspace({
 }
 
 export function DisputesWorkspace() {
-  const [disputes, setDisputes] = useState<Dispute[]>(FALLBACK_DISPUTES);
+  const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [statement, setStatement] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1099,9 +1060,9 @@ export function DisputesWorkspace() {
   const refresh = useCallback(async () => {
     try {
       const list = await api.getDisputes();
-      setDisputes(list.length > 0 ? list : FALLBACK_DISPUTES);
+      setDisputes(list);
     } catch {
-      setDisputes((prev) => (prev.length > 0 ? prev : FALLBACK_DISPUTES));
+      // Retain current state on transient network error
     }
   }, []);
 
@@ -1113,7 +1074,7 @@ export function DisputesWorkspace() {
 
   const act = async (
     operation: () => Promise<unknown>,
-    fallbackUpdate: () => void,
+    _fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
@@ -1122,9 +1083,8 @@ export function DisputesWorkspace() {
       await operation();
       setMessage(success);
       await refresh();
-    } catch {
-      fallbackUpdate();
-      setMessage(success);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -1234,31 +1194,14 @@ export function DisputesWorkspace() {
                         onClick={() => {
                           const text = statement[dispute.id]?.trim() ?? "";
                           void act(
-                            () => api.submitDisputeEvidence(dispute.id, text),
-                            () => {
-                              setDisputes((prev) =>
-                                prev.map((d) =>
-                                  d.id === dispute.id
-                                    ? {
-                                        ...d,
-                                        evidence: [
-                                          ...(d.evidence ?? []),
-                                          {
-                                            id: `ev-${Date.now()}`,
-                                            submittedByUserId: "current-user",
-                                            statement: text,
-                                            createdAt: new Date().toISOString(),
-                                          },
-                                        ],
-                                      }
-                                    : d,
-                                ),
-                              );
+                            async () => {
+                              await api.submitDisputeEvidence(dispute.id, text);
                               setStatement((curr) => ({
                                 ...curr,
                                 [dispute.id]: "",
                               }));
                             },
+                            () => {},
                             "Evidence statement recorded for staff mediation.",
                           );
                         }}

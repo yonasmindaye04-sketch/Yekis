@@ -49,7 +49,7 @@ export default function SupportDesk() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const list = useListPage<RawConversation>(
-    (p) => opsListApi.conversations({ ...p, status: scope, assignment, sort }),
+    (p) => opsListApi.conversations({ ...p, status: scope || "ALL", assignment, sort }),
     25,
     [scope, assignment, sort],
   );
@@ -68,14 +68,14 @@ export default function SupportDesk() {
 
   const active = rows.find((c) => c.id === selected) ?? null;
 
-  const loadMessages = useCallback(async (id: string) => {
-    setMsgLoading(true);
+  const loadMessages = useCallback(async (id: string, silent = false) => {
+    if (!silent) setMsgLoading(true);
     try {
       setMessages(await opsApi.chatMessages(id));
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not load the thread");
+      if (!silent) toast(e instanceof Error ? e.message : "Could not load the thread");
     } finally {
-      setMsgLoading(false);
+      if (!silent) setMsgLoading(false);
     }
   }, [toast]);
 
@@ -84,7 +84,7 @@ export default function SupportDesk() {
       setSelected(c.id);
       setReply("");
       setFile(null);
-      void loadMessages(c.id);
+      void loadMessages(c.id, false);
     },
     [loadMessages],
   );
@@ -103,7 +103,7 @@ export default function SupportDesk() {
       "chat:new_message",
       (message) => {
         reload();
-        if (message.conversationId === selected) void loadMessages(selected);
+        if (message.conversationId === selected) void loadMessages(selected, true);
       },
     );
     const offNewConversation = realtimeSocket.on("chat:new_conversation", () => reload());
@@ -115,8 +115,8 @@ export default function SupportDesk() {
     const timer = window.setInterval(() => {
       if (document.visibilityState !== "visible") return;
       reload();
-      if (selected) void loadMessages(selected);
-    }, 2000);
+      if (selected) void loadMessages(selected, true);
+    }, 15_000);
     return () => window.clearInterval(timer);
   }, [socketLive, selected, reload, loadMessages]);
 
@@ -153,7 +153,7 @@ export default function SupportDesk() {
       setReply("");
       setInternal(false);
       setFile(null);
-      await loadMessages(selected);
+      await loadMessages(selected, true);
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Could not send reply");

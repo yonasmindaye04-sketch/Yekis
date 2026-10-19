@@ -544,6 +544,14 @@ export async function sendMessage(params: {
   // Real-time broadcast to conversation channel (for open active chat window)
   broadcastToConversation(conversation.id, "chat:message", createdMessage);
 
+  // Notify staff desk when a non-staff user messages on a support conversation
+  if (!isStaff) {
+    broadcastToStaff("chat:new_message", {
+      ...createdMessage,
+      conversationId: conversation.id,
+    });
+  }
+
   // Real-time push notification to other participants' private user socket channels
   const allParticipants = await prisma.conversationParticipant.findMany({
     where: { conversationId: conversation.id },
@@ -907,26 +915,25 @@ export async function listStaffConversations(params?: {
 
   const where: Record<string, unknown> = {};
 
-  if (params?.status) {
+  if (params?.status && params.status !== "ALL") {
     where.status = params.status;
-  } else {
+  } else if (!params?.status) {
     where.status = "OPEN";
   }
 
-  // If a staffId is provided, only show that staff member's conversations
-  if (params?.staffId) {
-    where.assignedStaffId = params.staffId;
-  }
-
-  if (params?.assignment === "unassigned") {
+  const assignmentNorm = params?.assignment?.toLowerCase();
+  if (assignmentNorm === "unassigned") {
     where.assignedStaffId = null;
-  } else if (params?.assignment === "mine" && params.staffId) {
+  } else if (assignmentNorm === "mine" && params?.staffId) {
+    where.assignedStaffId = params.staffId;
+  } else if (params?.staffId) {
     where.assignedStaffId = params.staffId;
   }
 
   if (params?.search) {
     where.OR = [
       { subject: { contains: params.search, mode: "insensitive" } },
+      { contactEmail: { contains: params.search, mode: "insensitive" } },
       { creator: { email: { contains: params.search, mode: "insensitive" } } },
     ];
   }
@@ -958,6 +965,12 @@ export async function listStaffConversations(params?: {
   return {
     items: items.map((c) => ({
       ...c,
+      creator: {
+        ...c.creator,
+        email: c.creator.email.endsWith("@guest.invalid")
+          ? c.contactEmail || "Guest visitor"
+          : c.creator.email,
+      },
       assignedStaff: c.assignedStaff
         ? {
             id: c.assignedStaff.id,

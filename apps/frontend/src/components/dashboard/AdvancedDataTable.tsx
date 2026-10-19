@@ -88,18 +88,16 @@ export function AdvancedDataTable({
         );
       })
       .sort((a, b) => {
-        let cmp = 0;
-        if (sortField === "amountMinor") {
-          cmp = a.amountMinor - b.amountMinor;
-        } else if (sortField === "dueDate") {
-          cmp = a.dueDate.localeCompare(b.dueDate);
-        } else if (sortField === "title") {
-          cmp = a.title.localeCompare(b.title);
-        } else if (sortField === "counterparty") {
-          cmp = a.counterparty.localeCompare(b.counterparty);
-        } else {
-          cmp = a.escrowState.localeCompare(b.escrowState);
-        }
+        const cmp =
+          sortField === "amountMinor"
+            ? a.amountMinor - b.amountMinor
+            : sortField === "dueDate"
+              ? a.dueDate.localeCompare(b.dueDate)
+              : sortField === "title"
+                ? a.title.localeCompare(b.title)
+                : sortField === "counterparty"
+                  ? a.counterparty.localeCompare(b.counterparty)
+                  : a.escrowState.localeCompare(b.escrowState);
         return sortDir === "asc" ? cmp : -cmp;
       });
   }, [records, search, statusFilter, railFilter, sortField, sortDir]);

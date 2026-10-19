@@ -47,24 +47,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../../api/client";
 import type { ListFetchParams } from "./opsList";
-import {
-  FALLBACK_OPS_BADGES,
-  FALLBACK_OPS_CONTRACTS,
-  FALLBACK_OPS_DISPUTES,
-  FALLBACK_OPS_ESCROWS,
-  FALLBACK_OPS_HEALTH,
-  FALLBACK_OPS_KYC,
-  FALLBACK_OPS_LEDGER,
-  FALLBACK_OPS_OVERVIEW,
-  FALLBACK_OPS_PAYMENTS,
-  FALLBACK_OPS_PAYOUTS,
-  FALLBACK_OPS_RECON,
-  FALLBACK_OPS_REPORTS,
-  FALLBACK_OPS_REPORTS_BUNDLE,
-  FALLBACK_OPS_RISK_FLAGS,
-  FALLBACK_OPS_STAFF,
-  FALLBACK_OPS_USERS,
-} from "./opsFallbackData";
 import type {
   ActivityEvent,
   Contract,
@@ -521,7 +503,19 @@ const toHealth = (h: RawSystemHealth): HealthState => ({
 const EMPTY_HEALTH: HealthState = {
   checks: {},
   ledger: { dr: 0, cr: 0, bal: true },
-  checkedAt: new Date(0).toISOString(),
+  checkedAt: new Date().toISOString(),
+};
+
+const EMPTY_BADGES: OpsBadges = {
+  payouts: 0,
+  kyc: 0,
+  disputes: 0,
+  reports: 0,
+  risk: 0,
+  recon: 0,
+  monitoring: 0,
+  tickets: 0,
+  receipts: 0,
 };
 
 /* ── aggregates ───────────────────────────────────────────────────────── */
@@ -540,14 +534,24 @@ async function loadOverview(): Promise<OverviewBundle> {
       soft(rFlags(), { items: [] as RawRiskFlag[] }),
     ]);
 
-  if (!dash) return FALLBACK_OPS_OVERVIEW;
-
   const d14 = lastNDays(14);
   const w8 = lastNWeeks(8);
 
+  const metrics = dash?.metrics ?? {
+    totalUsers: 0,
+    activeContracts: 0,
+    openDisputes: disputes.items.length,
+    pendingIdentity: kyc.items.length,
+    fundsInEscrowMinor: escrows.items.reduce((s, e) => s + e.amountMinor, 0),
+    pendingPayments: payments.items.filter((p) => p.status === "PENDING").length,
+    pendingPayouts: payouts.items.filter((p) => p.status === "PENDING").length,
+    pendingTopUps: 0,
+    openSupportTickets: 0,
+  };
+
   return {
-    metrics: dash.metrics,
-    activity: (dash.recentActivity ?? []).map(toActivity),
+    metrics,
+    activity: (dash?.recentActivity ?? []).map(toActivity),
     health: health ? toHealth(health) : EMPTY_HEALTH,
     escrows: escrows.items.map(toEscrow),
     recon: recon.items.map(toRecon),
@@ -575,7 +579,7 @@ async function loadOverview(): Promise<OverviewBundle> {
 
 async function loadBadges(): Promise<OpsBadges> {
   const dash = await soft(rDashboard(), null);
-  if (!dash) return FALLBACK_OPS_BADGES;
+  if (!dash) return EMPTY_BADGES;
   const m = dash.metrics;
   const [flags, reports, tickets] = await Promise.all([
     soft(rFlags(), { items: [] as RawRiskFlag[] }),
@@ -596,15 +600,47 @@ async function loadBadges(): Promise<OpsBadges> {
 }
 
 async function loadReports(): Promise<ReportsBundle> {
-  const raw = await soft(rReportsSummary(), null);
-  if (!raw) return FALLBACK_OPS_REPORTS_BUNDLE;
-  const [payments, contracts] = await Promise.all([
+  const [raw, payments, contracts] = await Promise.all([
+    soft(rReportsSummary(), null),
     soft(rPayments(), { items: [] as RawPayment[] }),
     soft(rContracts(), { items: [] as RawContractRow[] }),
   ]);
-
   const w12 = lastNWeeks(12);
   const m6 = lastNMonths(6);
+  if (!raw) {
+    return {
+      financial: {
+        vol: 0,
+        released: 0,
+        refunded: 0,
+        payouts: 0,
+        fees: 0,
+        wh: 0,
+        failPay: 0,
+        failPo: 0,
+      },
+      marketplace: {
+        clients: 0,
+        freelancers: 0,
+        totalContracts: 0,
+        byStatus: {},
+        disputes: 0,
+        flags: 0,
+      },
+      series: {
+        volume12: {
+          labels: w12.map((d) => d.slice(5)),
+          values: new Array<number>(w12.length).fill(0),
+        },
+        railMonthly: {
+          labels: m6.map((m) => m.slice(2)),
+          telebirr: new Array<number>(m6.length).fill(0),
+          cbe: new Array<number>(m6.length).fill(0),
+        },
+        categoryDone: [],
+      },
+    };
+  }
 
   const telebirr = new Array<number>(m6.length).fill(0);
   const cbe = new Array<number>(m6.length).fill(0);
@@ -675,7 +711,13 @@ async function loadLedger(): Promise<LedgerBundle> {
     soft(rLedger(), null),
     soft(rJournals(), { items: [] as RawJournal[] }),
   ]);
-  if (!summary) return FALLBACK_OPS_LEDGER;
+  if (!summary) {
+    return {
+      accounts: [],
+      journal: [],
+      integrity: { dr: 0, cr: 0, bal: true, entries: 0, journals: 0 },
+    };
+  }
   return {
     accounts: (summary.accounts ?? []).map((a) => ({
       code: a.code,
@@ -738,7 +780,7 @@ export const opsListApi = {
       })) as { items: RawPayment[]; total: number; page: number; pageSize: number };
       return { rows: r.items.map(toPayment), total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_PAYMENTS, total: FALLBACK_OPS_PAYMENTS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -753,7 +795,7 @@ export const opsListApi = {
       })) as { items: RawPayout[]; total: number; page: number; pageSize: number };
       return { rows: r.items.map(toPayout), total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_PAYOUTS, total: FALLBACK_OPS_PAYOUTS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -767,7 +809,7 @@ export const opsListApi = {
       })) as { items: RawEscrow[]; total: number; page: number; pageSize: number };
       return { rows: r.items.map(toEscrow), total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_ESCROWS, total: FALLBACK_OPS_ESCROWS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -785,7 +827,7 @@ export const opsListApi = {
         .map(toRecon);
       return { rows, total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_RECON, total: FALLBACK_OPS_RECON.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -799,7 +841,7 @@ export const opsListApi = {
       })) as { items: RawContractRow[]; total: number; page: number; pageSize: number };
       return { rows: r.items.map(toContract), total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_CONTRACTS, total: FALLBACK_OPS_CONTRACTS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -813,7 +855,7 @@ export const opsListApi = {
       })) as { items: RawUserRow[]; total: number; page: number; pageSize: number };
       return { rows: r.items.map(toUser), total: r.total, page: r.page, pageSize: r.pageSize };
     } catch {
-      return { rows: FALLBACK_OPS_USERS, total: FALLBACK_OPS_USERS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -842,7 +884,7 @@ export const opsListApi = {
         pageSize: r.limit,
       };
     } catch {
-      return { rows: FALLBACK_OPS_STAFF, total: FALLBACK_OPS_STAFF.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -862,7 +904,7 @@ export const opsListApi = {
         pageSize: r.pageSize,
       };
     } catch {
-      return { rows: FALLBACK_OPS_RISK_FLAGS, total: FALLBACK_OPS_RISK_FLAGS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -893,11 +935,11 @@ export const opsListApi = {
       };
     } catch {
       return {
-        rows: FALLBACK_OPS_KYC,
-        total: FALLBACK_OPS_KYC.length,
+        rows: [],
+        total: 0,
         page: 1,
         pageSize: limit,
-        extra: { pending: 1, underReview: 2, actionable: 2 },
+        extra: { pending: 0, underReview: 0, actionable: 0 },
       };
     }
   },
@@ -917,7 +959,7 @@ export const opsListApi = {
         pageSize: r.pageSize,
       };
     } catch {
-      return { rows: FALLBACK_OPS_DISPUTES, total: FALLBACK_OPS_DISPUTES.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -934,35 +976,7 @@ export const opsListApi = {
         : r.items;
       return { rows, total: r.total, page: r.page, pageSize: r.limit };
     } catch {
-      const fallbackAudit = [
-        {
-          id: "aud-1",
-          eventType: "ESCROW_FUNDED",
-          entityType: "Milestone",
-          entityId: "ms-2041-a",
-          action: "FUND_TELEBIRR",
-          actorRole: "CLIENT",
-          userId: "usr-client-addis-01",
-          amountMinor: 6_500_000,
-          ipAddress: "196.188.42.19",
-          createdAt: "2026-10-19T06:45:00Z",
-          metadata: {},
-        },
-        {
-          id: "aud-2",
-          eventType: "KYC_REVIEW",
-          entityType: "KycRecord",
-          entityId: "usr-kyc-03",
-          action: "VERIFIED_FAYDA",
-          actorRole: "COMPLIANCE_ADMIN",
-          userId: "usr-staff-ops-01",
-          amountMinor: null,
-          ipAddress: "196.189.14.88",
-          createdAt: "2026-10-18T14:20:00Z",
-          metadata: {},
-        },
-      ];
-      return { rows: fallbackAudit, total: fallbackAudit.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -1019,7 +1033,7 @@ export const opsListApi = {
         pageSize: r.pagination.limit,
       };
     } catch {
-      return { rows: FALLBACK_OPS_REPORTS, total: FALLBACK_OPS_REPORTS.length, page: 1, pageSize: limit };
+      return { rows: [], total: 0, page: 1, pageSize: limit };
     }
   },
 
@@ -1046,8 +1060,8 @@ export const opsListApi = {
       };
     } catch {
       return {
-        rows: FALLBACK_OPS_LEDGER.journal,
-        total: FALLBACK_OPS_LEDGER.journal.length,
+        rows: [],
+        total: 0,
         page: 1,
         pageSize: limit,
       };
@@ -1060,26 +1074,26 @@ export const opsApi = {
   badges: () => loadBadges(),
   activity: async () => {
     const dash = await soft(rDashboard(), null);
-    return dash ? (dash.recentActivity ?? []).map(toActivity) : FALLBACK_OPS_OVERVIEW.activity;
+    return dash ? (dash.recentActivity ?? []).map(toActivity) : [];
   },
   health: async () => {
     const h = await soft(rHealth(), null);
-    return h ? toHealth(h) : FALLBACK_OPS_HEALTH;
+    return h ? toHealth(h) : EMPTY_HEALTH;
   },
 
   contracts: async () => {
     const r = await soft(rContracts(), null);
-    return r ? r.items.map(toContract) : FALLBACK_OPS_CONTRACTS;
+    return r ? r.items.map(toContract) : [];
   },
   contractDetail: (id: string) => api.adminGetContract(id) as Promise<RawContractDetail>,
 
   payments: async () => {
     const r = await soft(rPayments(), null);
-    return r ? r.items.map(toPayment) : FALLBACK_OPS_PAYMENTS;
+    return r ? r.items.map(toPayment) : [];
   },
   payouts: async () => {
     const r = await soft(rPayouts(), null);
-    return r ? r.items.map(toPayout) : FALLBACK_OPS_PAYOUTS;
+    return r ? r.items.map(toPayout) : [];
   },
   settlePayout: (id: string, body: { outcome: "CONFIRMED" | "FAILED"; ref?: string; reason?: string }) =>
     api.adminSettlePayout(id, {
@@ -1093,17 +1107,17 @@ export const opsApi = {
 
   escrows: async () => {
     const r = await soft(rEscrows(), null);
-    return r ? r.items.map(toEscrow) : FALLBACK_OPS_ESCROWS;
+    return r ? r.items.map(toEscrow) : [];
   },
   reconciliation: async () => {
     const r = await soft(rRecon(), null);
-    return r ? r.items.map(toRecon) : FALLBACK_OPS_RECON;
+    return r ? r.items.map(toRecon) : [];
   },
   ledger: () => loadLedger(),
 
   users: async () => {
     const r = await soft(rUsers(), null);
-    return r ? r.items.map(toUser) : FALLBACK_OPS_USERS;
+    return r ? r.items.map(toUser) : [];
   },
   userDetail: (id: string) => api.adminGetUser(id) as Promise<RawUserSummary>,
 
@@ -1120,7 +1134,7 @@ export const opsApi = {
             suspended: x.isSuspended,
           }),
         )
-      : FALLBACK_OPS_STAFF;
+      : [];
   },
   /** `null` demotes the account back to a regular user. */
   setStaffRole: (id: string, role: StaffRole | null) => api.setStaffRole(id, role),
@@ -1129,12 +1143,12 @@ export const opsApi = {
   reports: () => loadReports(),
   riskFlags: async () => {
     const r = await soft(rFlags(), null);
-    return r ? r.items.map(toRiskFlag) : FALLBACK_OPS_RISK_FLAGS;
+    return r ? r.items.map(toRiskFlag) : [];
   },
 
   kycQueue: async () => {
     const r = await soft(rKyc(), null);
-    return r ? r.items.map(toKyc) : FALLBACK_OPS_KYC;
+    return r ? r.items.map(toKyc) : [];
   },
   kycHistory: (userId: string) => api.getKycReviewHistory(userId),
   kycDocumentUrl: (documentId: string) => api.getKycDocumentUrl(documentId),
@@ -1147,7 +1161,7 @@ export const opsApi = {
 
   disputes: async () => {
     const r = await soft(rDisputes(), null);
-    return r ? r.items.map(toDispute) : FALLBACK_OPS_DISPUTES;
+    return r ? r.items.map(toDispute) : [];
   },
   resolveDispute: (
     id: string,

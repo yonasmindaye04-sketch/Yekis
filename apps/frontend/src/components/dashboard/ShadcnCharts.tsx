@@ -1,16 +1,103 @@
-import { useState, useId } from "react";
-import { TIME_SERIES_BY_RANGE, type TimeRangeKey } from "./dashboardData";
+import { useMemo, useState, useId } from "react";
+import type { Milestone, TopUpRequest } from "../../api/client";
+import type { TimeRangeKey, TimeSeriesPoint } from "./dashboardData";
+
+const DAY_MS = 86_400_000;
+
+export function buildLiveTimeSeries(
+  range: TimeRangeKey,
+  milestones: Milestone[] = [],
+  topUps: TopUpRequest[] = [],
+  overrideSeries?: TimeSeriesPoint[],
+): TimeSeriesPoint[] {
+  if (overrideSeries && overrideSeries.length > 0) {
+    return overrideSeries;
+  }
+
+  const now = new Date();
+  const bucketCount =
+    range === "7d" ? 7 : range === "30d" ? 8 : range === "90d" ? 9 : 12;
+  const spanDays =
+    range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365;
+  const stepMs = (spanDays * DAY_MS) / bucketCount;
+  const startMs = now.getTime() - spanDays * DAY_MS;
+
+  const buckets: TimeSeriesPoint[] = Array.from({ length: bucketCount }, (_, i) => {
+    const bucketDate = new Date(startMs + (i + 1) * stepMs);
+    const label =
+      range === "12m"
+        ? bucketDate.toLocaleDateString("en-US", { month: "short" })
+        : bucketDate.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return {
+      label,
+      escrowInflowETB: 0,
+      payoutReleasedETB: 0,
+      telebirrETB: 0,
+      cbeBirrETB: 0,
+      mpesaETB: 0,
+      milestonesCompleted: 0,
+    };
+  });
+
+  const placeInBucket = (isoDate: string | undefined) => {
+    if (!isoDate) return bucketCount - 1;
+    const ts = new Date(isoDate).getTime();
+    if (!Number.isFinite(ts)) return bucketCount - 1;
+    if (ts <= startMs) return 0;
+    const idx = Math.floor((ts - startMs) / stepMs);
+    return Math.max(0, Math.min(bucketCount - 1, idx));
+  };
+
+  for (const ms of milestones) {
+    const idx = placeInBucket(ms.dueDate);
+    const etb = Math.round((ms.amountMinor || 0) / 100);
+    if (ms.escrowState !== "UNFUNDED" && ms.escrowState !== "REFUNDED") {
+      buckets[idx].escrowInflowETB += etb;
+    }
+    if (ms.escrowState === "RELEASED") {
+      buckets[idx].payoutReleasedETB += etb;
+      buckets[idx].milestonesCompleted += 1;
+    }
+  }
+
+  for (const t of topUps) {
+    const idx = placeInBucket(t.createdAt);
+    const etb = Math.round((t.amountMinor || 0) / 100);
+    if (t.status === "APPROVED") {
+      buckets[idx].escrowInflowETB += etb;
+    }
+    const method = (t.paymentMethod || "").toUpperCase();
+    if (method.includes("TELEBIRR")) {
+      buckets[idx].telebirrETB += etb;
+    } else if (method.includes("CBE") || method.includes("BANK")) {
+      buckets[idx].cbeBirrETB += etb;
+    } else {
+      buckets[idx].mpesaETB += etb;
+    }
+  }
+
+  return buckets;
+}
 
 interface CashflowChartProps {
   range: TimeRangeKey;
   onRangeChange: (r: TimeRangeKey) => void;
+  milestones?: Milestone[];
+  topUps?: TopUpRequest[];
+  series?: TimeSeriesPoint[];
 }
 
 export function InteractiveCashflowAreaChart({
   range,
   onRangeChange,
+  milestones,
+  topUps,
+  series,
 }: CashflowChartProps) {
-  const points = TIME_SERIES_BY_RANGE[range];
+  const points = useMemo(
+    () => buildLiveTimeSeries(range, milestones, topUps, series),
+    [range, milestones, topUps, series],
+  );
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const [showInflow, setShowInflow] = useState(true);
   const [showReleased, setShowReleased] = useState(true);
@@ -280,10 +367,22 @@ export function InteractiveCashflowAreaChart({
 
 export function InteractiveRailVelocityBarChart({
   range,
+  milestones,
+  topUps,
+  series,
 }: {
   range: TimeRangeKey;
+  milestones?: Milestone[];
+  topUps?: TopUpRequest[];
+  series?: TimeSeriesPoint[];
 }) {
-  const points = TIME_SERIES_BY_RANGE[range];
+  const points = useMemo(
+    () =>
+      series && series.length > 0
+        ? series
+        : buildLiveTimeSeries(range, milestones, topUps),
+    [series, range, milestones, topUps],
+  );
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
 
   const width = 440;

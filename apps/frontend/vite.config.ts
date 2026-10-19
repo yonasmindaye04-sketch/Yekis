@@ -1,13 +1,14 @@
 import http from "node:http";
+import net from "node:net";
 import { defineConfig, type Plugin } from "vite";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * Proxies `/api/*` to the local backend (`http://127.0.0.1:4000`) when it is
- * running, and responds cleanly without spamming `[vite] http proxy error:
- * ECONNREFUSED` when running the frontend in standalone/preview mode.
+ * Proxies `/api/*` HTTP and WebSocket traffic to the local backend
+ * (`http://127.0.0.1:4000`) when running, and responds cleanly without
+ * spamming ECONNREFUSED when the backend is restarting.
  */
 function resilientApiProxyPlugin(): Plugin {
   return {
@@ -55,12 +56,42 @@ function resilientApiProxyPlugin(): Plugin {
           res.end(
             JSON.stringify({
               error: "BACKEND_OFFLINE",
-              message: "HTTP 503: Local preview mode active",
+              message: "HTTP 503: Backend service unavailable",
             }),
           );
         });
 
         req.pipe(proxyReq, { end: true });
+      });
+
+      server.httpServer?.on("upgrade", (req, socket, head) => {
+        if (!req.url?.startsWith("/api/")) return;
+
+        const upstream = net.connect(4000, "127.0.0.1", () => {
+          const lines = [`${req.method || "GET"} ${req.url} HTTP/${req.httpVersion}`];
+          for (let i = 0; i < req.rawHeaders.length; i += 2) {
+            const key = req.rawHeaders[i];
+            const val = req.rawHeaders[i + 1];
+            if (key.toLowerCase() === "host") {
+              lines.push("Host: 127.0.0.1:4000");
+            } else {
+              lines.push(`${key}: ${val}`);
+            }
+          }
+          lines.push("", "");
+          upstream.write(lines.join("\r\n"));
+          if (head && head.length > 0) {
+            upstream.write(head);
+          }
+          socket.pipe(upstream).pipe(socket);
+        });
+
+        upstream.on("error", () => {
+          socket.destroy();
+        });
+        socket.on("error", () => {
+          upstream.destroy();
+        });
       });
     },
   };

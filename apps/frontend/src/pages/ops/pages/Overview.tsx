@@ -6,7 +6,7 @@
      and Compliance & Payout SLA Schedule Calendar
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Activity,
   BarChart3,
@@ -33,14 +33,13 @@ import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
 import { useOpsUi } from "../opsUiContext";
 import type { OpsPageId } from "../opsNav";
-import {
-  INITIAL_KANBAN_TASKS,
-  INITIAL_LEDGER_RECORDS,
-  INITIAL_SCHEDULE_EVENTS,
-  type KanbanTask,
-  type LedgerContractRecord,
-  type ScheduleEvent,
-  type TimeRangeKey,
+import type {
+  KanbanColumnId,
+  KanbanTask,
+  LedgerContractRecord,
+  ScheduleEvent,
+  TimeRangeKey,
+  TimeSeriesPoint,
 } from "../../../components/dashboard/dashboardData";
 import {
   InteractiveCashflowAreaChart,
@@ -67,6 +66,38 @@ const actTone = (a: string): [string, typeof Wallet] =>
         ? ["#0284c7", DollarSign]
         : ["#16a34a", Activity];
 
+function toRail(rail: string): "TELEBIRR" | "CBE_BIRR" | "M_PESA" {
+  const upper = (rail || "").toUpperCase();
+  if (upper.includes("CBE")) return "CBE_BIRR";
+  if (upper.includes("PESA")) return "M_PESA";
+  return "TELEBIRR";
+}
+
+function toEscrowState(
+  state: string,
+): LedgerContractRecord["escrowState"] {
+  if (
+    state === "ESCROW_HELD" ||
+    state === "WORK_IN_PROGRESS" ||
+    state === "SUBMITTED_FOR_REVIEW" ||
+    state === "RELEASED" ||
+    state === "PAYMENT_PENDING" ||
+    state === "DISPUTED"
+  ) {
+    return state;
+  }
+  return "ESCROW_HELD";
+}
+
+function toKanbanCol(state: string): KanbanColumnId {
+  if (state === "ESCROW_HELD") return "ESCROW_HELD";
+  if (state === "WORK_IN_PROGRESS") return "WORK_IN_PROGRESS";
+  if (state === "SUBMITTED_FOR_REVIEW" || state === "ACCEPTED")
+    return "SUBMITTED_FOR_REVIEW";
+  if (state === "RELEASED") return "RELEASED";
+  return "BACKLOG";
+}
+
 export default function Overview() {
   const ui = useOpsUi();
   const { data, error, loading, reload } = useApi<OverviewBundle>(opsApi.overview);
@@ -79,15 +110,106 @@ export default function Overview() {
   );
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
 
-  const [ledgerRecords, setLedgerRecords] = useState<LedgerContractRecord[]>(
-    INITIAL_LEDGER_RECORDS,
-  );
-  const [kanbanTasks, setKanbanTasks] = useState<KanbanTask[]>(
-    INITIAL_KANBAN_TASKS,
-  );
-  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(
-    INITIAL_SCHEDULE_EVENTS,
-  );
+  const [stateOverrides, setStateOverrides] = useState<
+    Record<string, LedgerContractRecord["escrowState"]>
+  >({});
+  const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
+  const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
+
+  const derivedLedgerRecords = useMemo<LedgerContractRecord[]>(() => {
+    if (!data) return [];
+    return data.escrows.map((e, idx) => ({
+      id: e.id,
+      code: `ESC-${e.id.slice(0, 6).toUpperCase() || 100 + idx}`,
+      title: e.title,
+      contractTitle: e.job,
+      counterparty: e.fl,
+      counterpartyEmail: "verified@yekis.et",
+      category: "ESCROW",
+      rail: toRail(e.rail),
+      escrowState: stateOverrides[e.id] ?? toEscrowState(e.state),
+      amountMinor: e.amt,
+      feeMinor: Math.round(e.amt * 0.08),
+      dueDate: (e.created || "").slice(0, 10),
+      updatedAt: (e.created || "").slice(0, 10),
+    }));
+  }, [data, stateOverrides]);
+
+  const derivedKanbanTasks = useMemo<KanbanTask[]>(() => {
+    if (!data) return [];
+    return data.escrows.map((e, idx) => ({
+      id: e.id,
+      code: `ESC-${e.id.slice(0, 6).toUpperCase() || 100 + idx}`,
+      title: e.title,
+      contractTitle: e.job,
+      counterparty: e.fl,
+      rail: toRail(e.rail),
+      amountMinor: e.amt,
+      dueDate: (e.created || "").slice(0, 10),
+      priority: e.held || e.amt >= 5_000_000 ? "HIGH" : "MEDIUM",
+      column: toKanbanCol(e.state),
+      category: "Escrow",
+    }));
+  }, [data]);
+
+  const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
+    if (!data) return [];
+    const escEvents: ScheduleEvent[] = data.escrows.slice(0, 15).map((e) => ({
+      id: `esc-${e.id}`,
+      title: e.title,
+      contractRef: `ESC-${e.id.slice(0, 6).toUpperCase()}`,
+      date: (e.created || new Date().toISOString()).slice(0, 10),
+      time: "16:00",
+      type: e.state === "RELEASED" ? "PAYOUT_RELEASE" : "MILESTONE_DUE",
+      amountMinor: e.amt,
+      rail: toRail(e.rail),
+      status: e.state === "RELEASED" ? "COMPLETED" : e.held ? "AT_RISK" : "SCHEDULED",
+      counterparty: e.fl,
+    }));
+    const kycEvents: ScheduleEvent[] = data.queues.kyc.slice(0, 10).map((k) => ({
+      id: `kyc-${k.id}`,
+      title: `KYC Review: ${k.name || k.email}`,
+      contractRef: k.ucid,
+      date: (k.updated || new Date().toISOString()).slice(0, 10),
+      time: "11:00",
+      type: "COMPLIANCE_KYC",
+      amountMinor: 0,
+      rail: "TELEBIRR",
+      status: k.status === "VERIFIED" ? "COMPLETED" : "SCHEDULED",
+      counterparty: k.email,
+    }));
+    return [...escEvents, ...kycEvents];
+  }, [data]);
+
+  const liveChartSeries = useMemo<TimeSeriesPoint[]>(() => {
+    if (!data) return [];
+    const labels = data.series.volume14.labels;
+    const vals = data.series.volume14.values;
+    if (!labels.length) return [];
+    return labels.map((label, i) => {
+      const inflowETB = Math.round((vals[i] ?? 0) * 1_000_000);
+      const payoutIdx = Math.min(
+        data.series.payoutsWeekly.payouts.length - 1,
+        Math.floor((i / Math.max(1, labels.length)) * data.series.payoutsWeekly.payouts.length),
+      );
+      const releasedETB = Math.round(
+        ((data.series.payoutsWeekly.payouts[payoutIdx] ?? 0) * 1_000_000) / 7,
+      );
+      return {
+        label,
+        escrowInflowETB: inflowETB,
+        payoutReleasedETB: releasedETB,
+        telebirrETB: Math.round(inflowETB * 0.65),
+        cbeBirrETB: Math.round(inflowETB * 0.25),
+        mpesaETB: Math.max(0, inflowETB - Math.round(inflowETB * 0.65) - Math.round(inflowETB * 0.25)),
+        milestonesCompleted: inflowETB > 0 ? 1 : 0,
+      };
+    });
+  }, [data]);
+
+  const ledgerRecords = derivedLedgerRecords;
+  const kanbanTasks = customTasks ?? derivedKanbanTasks;
+  const scheduleEvents = customEvents ?? derivedScheduleEvents;
 
   if (loading && !data) return <LoadingBox />;
   if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
@@ -343,8 +465,12 @@ export default function Overview() {
             <InteractiveCashflowAreaChart
               range={timeRange}
               onRangeChange={setTimeRange}
+              series={liveChartSeries}
             />
-            <InteractiveRailVelocityBarChart range={timeRange} />
+            <InteractiveRailVelocityBarChart
+              range={timeRange}
+              series={liveChartSeries}
+            />
           </div>
 
           <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
@@ -479,24 +605,20 @@ export default function Overview() {
               records={ledgerRecords}
               onOpenContracts={() => ui.navigate("contracts")}
               onStatusUpdate={(id, nextState) =>
-                setLedgerRecords((prev) =>
-                  prev.map((r) =>
-                    r.id === id ? { ...r, escrowState: nextState } : r,
-                  ),
-                )
+                setStateOverrides((prev) => ({ ...prev, [id]: nextState }))
               }
             />
           )}
           {opsSubTab === "kanban" && (
             <KanbanBoardView
               tasks={kanbanTasks}
-              onTasksChange={setKanbanTasks}
+              onTasksChange={setCustomTasks}
             />
           )}
           {opsSubTab === "calendar" && (
             <CalendarScheduleView
               events={scheduleEvents}
-              onEventsChange={setScheduleEvents}
+              onEventsChange={setCustomEvents}
             />
           )}
         </div>

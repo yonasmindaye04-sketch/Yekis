@@ -31,7 +31,7 @@ export class RealtimeSocketManager {
   private getWebSocketUrl(): string | null {
     const token = this.tokenOverride ? this.tokenOverride() : api.getToken();
     if (!token || token.startsWith("demo-")) return null;
-    if (this.reconnectAttempts >= 2) return null;
+    if (this.reconnectAttempts >= 10) return null;
 
     const apiBase = import.meta.env.VITE_API_BASE_URL;
     let wsHost = window.location.host;

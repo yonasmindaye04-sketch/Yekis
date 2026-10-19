@@ -83,13 +83,6 @@ import {
 } from "./components/dashboard/ShadcnLayoutContext";
 import { MarketplaceShadcnDashboard } from "./components/dashboard/MarketplaceShadcnDashboard";
 import { WorkspaceCommandPalette } from "./components/dashboard/WorkspaceCommandPalette";
-import {
-  DEMO_ACCOUNTS,
-  FALLBACK_JOBS,
-  FALLBACK_MILESTONES,
-  FALLBACK_TOPUPS,
-  FALLBACK_WALLET,
-} from "./components/dashboard/dashboardData";
 
 // === INTERFACES & TYPES ===
 /**
@@ -352,10 +345,10 @@ function FullPlatformAppInner() {
   const [view, setView] = useState<View>("overview");
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
-  const [jobs, setJobs] = useState<Job[]>(FALLBACK_JOBS);
-  const [milestones, setMilestones] = useState<Milestone[]>(FALLBACK_MILESTONES);
-  const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 48250000 });
-  const [topUps, setTopUps] = useState<TopUpRequest[]>(FALLBACK_TOPUPS);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
+  const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [jobTitle, setJobTitle] = useState("");
   const [jobCategory, setJobCategory] = useState(categories[0]);
@@ -364,31 +357,31 @@ function FullPlatformAppInner() {
   const [jobBudgetMax, setJobBudgetMax] = useState("");
   const [jobDeadline, setJobDeadline] = useState("");
   /* Overview interactivity state */
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(new Date());
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [realtimeLive, setRealtimeLive] = useState(false);
+  /* Dual-role ("BOTH") accounts can toggle between combined, client, or freelancer workspace views */
+  const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
 
-  const switchRoleMode = (mode: DemoWorkspaceMode) => {
-    const demo = DEMO_ACCOUNTS[mode];
-    setUser(demo);
-    setWallet(demo.wallet ?? FALLBACK_WALLET);
-    setJobs((prev) => (prev.length > 0 ? prev : FALLBACK_JOBS));
-    setMilestones((prev) => (prev.length > 0 ? prev : FALLBACK_MILESTONES));
-    setTopUps((prev) => (prev.length > 0 ? prev : FALLBACK_TOPUPS));
-    setLastUpdatedAt(new Date());
-    setShowLanding(false);
-    if (mode !== "ADMIN") {
-      setView("overview");
+  const switchDualRoleMode = (mode: DemoWorkspaceMode) => {
+    if (user?.role !== "BOTH") return;
+    if (mode === "CLIENT" || mode === "FREELANCER" || mode === "BOTH") {
+      setDualRoleMode(mode);
     }
   };
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem("yekis_offline_demo_session_v1");
+    }
     // Auto-resume active session on visit without prompting to re-register
     const token =
       typeof window !== "undefined"
         ? window.localStorage.getItem("yekis-api-token")
         : null;
-    if (token) {
+    if (token && token.startsWith("demo-")) {
+      api.clearToken();
+    } else if (token) {
       loadWorkspace()
         .then(() => {
           setShowLanding(false);
@@ -636,36 +629,6 @@ if (authMode === "register") {
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
-      if (
-        message.includes("HTTP 404") ||
-        message.includes("HTTP 50") ||
-        message.includes("Failed to fetch") ||
-        message.includes("NetworkError")
-      ) {
-        const lower = email.toLowerCase();
-        const inferredMode: DemoWorkspaceMode =
-          authMode === "register"
-            ? role
-            : lower.includes("ops") || lower.includes("admin")
-              ? "ADMIN"
-              : lower.includes("free") || lower.includes("hanna")
-                ? "FREELANCER"
-                : lower.includes("both") || lower.includes("yonas")
-                  ? "BOTH"
-                  : "CLIENT";
-        const baseDemo = DEMO_ACCOUNTS[inferredMode];
-        setUser({
-          ...baseDemo,
-          email: email.trim() || baseDemo.email,
-        });
-        setWallet(baseDemo.wallet ?? FALLBACK_WALLET);
-        setJobs(FALLBACK_JOBS);
-        setMilestones(FALLBACK_MILESTONES);
-        setTopUps(FALLBACK_TOPUPS);
-        setLastUpdatedAt(new Date());
-        setShowLanding(false);
-        return;
-      }
       setError(
         message === "DUPLICATE_USER"
           ? "This email or phone already has an account. Switch to Sign in."
@@ -681,6 +644,7 @@ if (authMode === "register") {
     setUser(null);
     setPassword("");
     setResetToken("");
+    setDualRoleMode("BOTH");
     setView("overview");
     setShowLanding(true);
   };
@@ -706,46 +670,22 @@ if (authMode === "register") {
           "Enter valid budgets; maximum must be greater than or equal to minimum.",
         );
       if (!jobDeadline) throw new Error("Choose a deadline.");
-      try {
-        await api.createJob({
-          title: jobTitle,
-          category: jobCategory,
-          description: jobDescription,
-          budgetMin: { amountMinor: min, currency: "ETB" },
-          budgetMax: { amountMinor: max, currency: "ETB" },
-          proposedMilestones: [
-            {
-              title: "Initial delivery",
-              amount: { amountMinor: max, currency: "ETB" },
-              dueDate: jobDeadline,
-            },
-          ],
-          deadline: jobDeadline,
-        });
-        await loadWorkspace();
-      } catch (apiErr) {
-        const msg = apiErr instanceof Error ? apiErr.message : "";
-        if (
-          msg.includes("HTTP 404") ||
-          msg.includes("HTTP 50") ||
-          msg.includes("Failed to fetch") ||
-          msg.includes("NetworkError")
-        ) {
-          const localJob: Job = {
-            id: `job-eth-${Date.now()}`,
-            title: jobTitle.trim(),
-            category: jobCategory,
-            description: jobDescription.trim(),
-            budgetMinMinor: min,
-            budgetMaxMinor: max,
-            deadline: jobDeadline,
-            status: "OPEN",
-          };
-          setJobs((prev) => [localJob, ...prev]);
-        } else {
-          throw apiErr;
-        }
-      }
+      await api.createJob({
+        title: jobTitle,
+        category: jobCategory,
+        description: jobDescription,
+        budgetMin: { amountMinor: min, currency: "ETB" },
+        budgetMax: { amountMinor: max, currency: "ETB" },
+        proposedMilestones: [
+          {
+            title: "Initial delivery",
+            amount: { amountMinor: max, currency: "ETB" },
+            dueDate: jobDeadline,
+          },
+        ],
+        deadline: jobDeadline,
+      });
+      await loadWorkspace();
       events.jobPosted();
       setJobTitle("");
       setJobDescription("");
@@ -769,7 +709,9 @@ if (authMode === "register") {
     }
   };
 
-  const platformRole = (user?.role as PlatformRole) || "CLIENT";
+  const basePlatformRole = (user?.role as PlatformRole) || "CLIENT";
+  const platformRole: PlatformRole =
+    basePlatformRole === "BOTH" ? dualRoleMode : basePlatformRole;
 
   // Onboarding facts, built only from state this screen has actually loaded.
   // The workspace fetches /auth/me, /wallet, open jobs and the caller's
@@ -849,7 +791,6 @@ if (authMode === "register") {
       <OpsConsole
         user={user}
         onExit={logout}
-        onSwitchRoleMode={switchRoleMode}
       />
     );
   }
@@ -1499,42 +1440,6 @@ if (authMode === "register") {
               ? "New to Yekis? Create an account"
               : "Already have an account? Sign in"}
           </button>
-
-          <div className="sh-auth-preview-bar">
-            <span className="sh-auth-preview-label">
-              Instant Workspace Preview (Shadcn Dashboards):
-            </span>
-            <div className="sh-auth-preview-actions">
-              <button
-                type="button"
-                className="sh-btn sh-btn-outline sh-btn-xs"
-                onClick={() => switchRoleMode("CLIENT")}
-              >
-                Client Workspace
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-outline sh-btn-xs"
-                onClick={() => switchRoleMode("FREELANCER")}
-              >
-                Freelancer Workspace
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-outline sh-btn-xs"
-                onClick={() => switchRoleMode("BOTH")}
-              >
-                Dual-Role
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-primary sh-btn-xs"
-                onClick={() => switchRoleMode("ADMIN")}
-              >
-                Staff Ops Console
-              </button>
-            </div>
-          </div>
         </form>
 
         {legalModal && (
@@ -1659,13 +1564,6 @@ if (authMode === "register") {
     );
   }
 
-  const activeDemoRole: DemoWorkspaceMode =
-    platformRole === "BOTH"
-      ? "BOTH"
-      : platformRole === "FREELANCER"
-        ? "FREELANCER"
-        : "CLIENT";
-
   return (
     <div
       className={`platform-shell sh-shell sh-workspace-shell sh-variant-${sidebarVariant}${sidebarCollapsed ? " sh-collapsed sh-sidebar-collapsed" : ""}`}
@@ -1765,23 +1663,25 @@ if (authMode === "register") {
           >
             <WorkspaceCommandPalette
               onNavigateView={(v) => setView(v as View)}
-              onSwitchRoleMode={switchRoleMode}
+              onSwitchRoleMode={basePlatformRole === "BOTH" ? switchDualRoleMode : undefined}
+              currentRole={platformRole}
             />
 
-            <select
-              className="sh-select"
-              value={activeDemoRole}
-              onChange={(e) =>
-                switchRoleMode(e.target.value as DemoWorkspaceMode)
-              }
-              aria-label="Switch workspace role or console"
-              title="Switch workspace role or console"
-            >
-              <option value="CLIENT">Workspace: Client</option>
-              <option value="FREELANCER">Workspace: Freelancer</option>
-              <option value="BOTH">Workspace: Dual-Role</option>
-              <option value="ADMIN">Console: Staff Ops</option>
-            </select>
+            {basePlatformRole === "BOTH" && (
+              <select
+                className="sh-select"
+                value={dualRoleMode}
+                onChange={(e) =>
+                  switchDualRoleMode(e.target.value as DemoWorkspaceMode)
+                }
+                aria-label="Switch workspace mode"
+                title="Switch between Client and Freelancer modes"
+              >
+                <option value="BOTH">Mode: Client &amp; Freelancer</option>
+                <option value="CLIENT">Mode: Client (Hiring)</option>
+                <option value="FREELANCER">Mode: Freelancer (Work)</option>
+              </select>
+            )}
 
             <LayoutCustomizerTrigger />
             <LanguageSelector variant="dropdown" />

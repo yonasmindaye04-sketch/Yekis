@@ -45,7 +45,6 @@ import type { ViewerDoc } from "./components/EvidenceViewer";
 import {
   LayoutCustomizerTrigger,
   useShadcnLayout,
-  type DemoWorkspaceMode,
 } from "../../components/dashboard/ShadcnLayoutContext";
 
 import Overview from "./pages/Overview";
@@ -103,14 +102,12 @@ export interface OpsConsoleProps {
   user?: MeResponse | null;
   /** Called when the reviewer signs out or leaves the console. */
   onExit?: () => void;
-  /** Allows switching directly between Staff Ops and Client/Freelancer views. */
-  onSwitchRoleMode?: (mode: DemoWorkspaceMode) => void;
 }
 
 /** localStorage key holding the sidebar collapsed/expanded preference. */
 const NAV_KEY = "yekis-ops-nav";
 
-export function OpsConsole({ user, onExit, onSwitchRoleMode }: OpsConsoleProps) {
+export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const { theme, toggleTheme } = useTheme();
   const { sidebarVariant } = useShadcnLayout();
   const perms = useOpsPerms(user?.staffRole);
@@ -342,22 +339,6 @@ const toast = useCallback((msg: string) => {
                     <span className="kbd srch-kbd">Ctrl K</span>
                   </div>
                   <div className="hdr-right">
-                    {onSwitchRoleMode && (
-                      <select
-                        className="sh-select compact"
-                        value="ADMIN"
-                        onChange={(e) =>
-                          onSwitchRoleMode(e.target.value as DemoWorkspaceMode)
-                        }
-                        aria-label="Switch workspace role"
-                        title="Switch between Staff Ops and Client/Freelancer Workspaces"
-                      >
-                        <option value="ADMIN">Role: Staff Ops Console</option>
-                        <option value="CLIENT">Switch: Client Workspace</option>
-                        <option value="FREELANCER">Switch: Freelancer Workspace</option>
-                        <option value="BOTH">Switch: Dual-Role Workspace</option>
-                      </select>
-                    )}
                     <LayoutCustomizerTrigger />
                     <button
                       className="icon-btn"

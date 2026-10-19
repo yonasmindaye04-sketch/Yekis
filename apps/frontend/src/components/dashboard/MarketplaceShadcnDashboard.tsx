@@ -22,18 +22,12 @@ import type {
   TopUpRequest,
   WalletResponse,
 } from "../../api/client";
-import {
-  FALLBACK_JOBS,
-  FALLBACK_MILESTONES,
-  FALLBACK_TOPUPS,
-  FALLBACK_WALLET,
-  INITIAL_KANBAN_TASKS,
-  INITIAL_LEDGER_RECORDS,
-  INITIAL_SCHEDULE_EVENTS,
-  type KanbanTask,
-  type LedgerContractRecord,
-  type ScheduleEvent,
-  type TimeRangeKey,
+import type {
+  KanbanColumnId,
+  KanbanTask,
+  LedgerContractRecord,
+  ScheduleEvent,
+  TimeRangeKey,
 } from "./dashboardData";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
 import {
@@ -56,6 +50,31 @@ interface MarketplaceShadcnDashboardProps {
   onRefresh: () => void;
   onNavigateView: (view: string) => void;
   onSelectProfile?: (userId: string) => void;
+}
+
+function toKanbanCol(state: string): KanbanColumnId {
+  if (state === "ESCROW_HELD") return "ESCROW_HELD";
+  if (state === "WORK_IN_PROGRESS") return "WORK_IN_PROGRESS";
+  if (state === "SUBMITTED_FOR_REVIEW" || state === "ACCEPTED")
+    return "SUBMITTED_FOR_REVIEW";
+  if (state === "RELEASED") return "RELEASED";
+  return "BACKLOG";
+}
+
+function toLedgerState(
+  state: string,
+): LedgerContractRecord["escrowState"] {
+  if (
+    state === "ESCROW_HELD" ||
+    state === "WORK_IN_PROGRESS" ||
+    state === "SUBMITTED_FOR_REVIEW" ||
+    state === "RELEASED" ||
+    state === "PAYMENT_PENDING" ||
+    state === "DISPUTED"
+  ) {
+    return state;
+  }
+  return "ESCROW_HELD";
 }
 
 export function MarketplaceShadcnDashboard({
@@ -83,24 +102,86 @@ export function MarketplaceShadcnDashboard({
     "wallet" | "escrow" | "milestones" | "jobs" | null
   >(null);
 
-  // Stateful interactive CRM collections
-  const [ledgerRecords, setLedgerRecords] = useState<LedgerContractRecord[]>(
-    INITIAL_LEDGER_RECORDS,
-  );
-  const [kanbanTasks, setKanbanTasks] = useState<KanbanTask[]>(
-    INITIAL_KANBAN_TASKS,
-  );
-  const [scheduleEvents, setScheduleEvents] = useState<ScheduleEvent[]>(
-    INITIAL_SCHEDULE_EVENTS,
+  const effectiveWallet = wallet;
+  const effectiveJobs = jobs;
+  const effectiveMilestones = milestones;
+  const effectiveTopUps = topUps;
+
+  // Track user-driven local overrides/additions on top of live API records
+  const [stateOverrides, setStateOverrides] = useState<
+    Record<string, LedgerContractRecord["escrowState"]>
+  >({});
+  const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
+  const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
+
+  const ledgerRecords = useMemo<LedgerContractRecord[]>(
+    () =>
+      effectiveMilestones.map((m, idx) => ({
+        id: m.id,
+        code: `MS-${m.id.slice(0, 6).toUpperCase() || 100 + idx}`,
+        title: m.title,
+        contractTitle: `Contract #${m.contractId.slice(0, 8)}`,
+        counterparty: "Contract Counterparty",
+        counterpartyEmail: "escrow@yekis.et",
+        category: "WEB_APP_DEVELOPMENT",
+        rail: "TELEBIRR",
+        escrowState: stateOverrides[m.id] ?? toLedgerState(m.escrowState),
+        amountMinor: m.amountMinor,
+        feeMinor: Math.round(m.amountMinor * 0.08),
+        dueDate: (m.dueDate || "").slice(0, 10),
+        updatedAt: (m.releasedAt || m.submittedAt || m.dueDate || "").slice(0, 10),
+      })),
+    [effectiveMilestones, stateOverrides],
   );
 
-  // Merge live API data with rich fallback when backend arrays are empty
-  const effectiveWallet =
-    wallet.balanceMinor > 0 ? wallet : FALLBACK_WALLET;
-  const effectiveJobs = jobs.length > 0 ? jobs : FALLBACK_JOBS;
-  const effectiveMilestones =
-    milestones.length > 0 ? milestones : FALLBACK_MILESTONES;
-  const effectiveTopUps = topUps.length > 0 ? topUps : FALLBACK_TOPUPS;
+  const derivedKanbanTasks = useMemo<KanbanTask[]>(
+    () =>
+      effectiveMilestones.map((m, idx) => ({
+        id: m.id,
+        code: `MS-${m.id.slice(0, 6).toUpperCase() || 100 + idx}`,
+        title: m.title,
+        contractTitle: `Contract #${m.contractId.slice(0, 8)}`,
+        counterparty: "Escrow Contract",
+        rail: "TELEBIRR",
+        amountMinor: m.amountMinor,
+        dueDate: (m.dueDate || "").slice(0, 10),
+        priority: m.amountMinor >= 5_000_000 ? "HIGH" : "MEDIUM",
+        column: toKanbanCol(m.escrowState),
+        category: "Milestone",
+      })),
+    [effectiveMilestones],
+  );
+
+  const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
+    const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m) => ({
+      id: `ms-${m.id}`,
+      title: m.title,
+      contractRef: `CNT-${m.contractId.slice(0, 6).toUpperCase()}`,
+      date: (m.dueDate || new Date().toISOString()).slice(0, 10),
+      time: "17:00",
+      type: m.escrowState === "RELEASED" ? "PAYOUT_RELEASE" : "MILESTONE_DUE",
+      amountMinor: m.amountMinor,
+      rail: "TELEBIRR",
+      status: m.escrowState === "RELEASED" ? "COMPLETED" : "SCHEDULED",
+      counterparty: "Contract Milestone",
+    }));
+    const jobEvents: ScheduleEvent[] = effectiveJobs.slice(0, 10).map((j) => ({
+      id: `job-${j.id}`,
+      title: j.title,
+      contractRef: `JOB-${j.id.slice(0, 6).toUpperCase()}`,
+      date: (j.deadline || new Date().toISOString()).slice(0, 10),
+      time: "18:00",
+      type: "PROPOSAL_DEADLINE",
+      amountMinor: j.budgetMaxMinor,
+      rail: "TELEBIRR",
+      status: j.status === "OPEN" ? "SCHEDULED" : "COMPLETED",
+      counterparty: j.category.replaceAll("_", " "),
+    }));
+    return [...milestoneEvents, ...jobEvents];
+  }, [effectiveMilestones, effectiveJobs]);
+
+  const kanbanTasks = customTasks ?? derivedKanbanTasks;
+  const scheduleEvents = customEvents ?? derivedScheduleEvents;
 
   // Derived KPI metrics
   const escrowSecuredMinor = useMemo(
@@ -141,9 +222,7 @@ export function MarketplaceShadcnDashboard({
     id: string,
     nextState: LedgerContractRecord["escrowState"],
   ) => {
-    setLedgerRecords((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, escrowState: nextState } : r)),
-    );
+    setStateOverrides((prev) => ({ ...prev, [id]: nextState }));
   };
 
   return (
@@ -513,8 +592,14 @@ export function MarketplaceShadcnDashboard({
             <InteractiveCashflowAreaChart
               range={timeRange}
               onRangeChange={setTimeRange}
+              milestones={effectiveMilestones}
+              topUps={effectiveTopUps}
             />
-            <InteractiveRailVelocityBarChart range={timeRange} />
+            <InteractiveRailVelocityBarChart
+              range={timeRange}
+              milestones={effectiveMilestones}
+              topUps={effectiveTopUps}
+            />
           </div>
 
           {/* 2-Column Operational Snapshot: Recent Escrow Ledger + Open Briefs */}
@@ -541,32 +626,43 @@ export function MarketplaceShadcnDashboard({
               </div>
 
               <div className="sh-compact-list">
-                {effectiveMilestones.slice(0, 5).map((ms) => (
-                  <div key={ms.id} className="sh-compact-row">
+                {effectiveMilestones.length === 0 ? (
+                  <div className="sh-compact-row">
                     <div className="sh-compact-row-main">
-                      <div className="sh-cell-primary">{ms.title}</div>
+                      <div className="sh-cell-primary">No active milestones yet</div>
                       <div className="sh-cell-meta">
-                        <span className="sh-mono">#{ms.id.slice(0, 8)}</span>
-                        <span aria-hidden="true">·</span>
-                        <span>{ms.escrowState.replaceAll("_", " ")}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="sh-mono">Due {ms.dueDate.slice(0, 10)}</span>
+                        Milestones will appear here once contracts are funded in escrow.
                       </div>
                     </div>
-                    <div className="sh-compact-row-right">
-                      <strong className="sh-mono">
-                        ETB {(ms.amountMinor / 100).toLocaleString()}
-                      </strong>
-                      <button
-                        type="button"
-                        className="sh-row-action-btn"
-                        onClick={() => onNavigateView("contracts")}
-                      >
-                        Contract <ArrowRight size={11} />
-                      </button>
-                    </div>
                   </div>
-                ))}
+                ) : (
+                  effectiveMilestones.slice(0, 5).map((ms) => (
+                    <div key={ms.id} className="sh-compact-row">
+                      <div className="sh-compact-row-main">
+                        <div className="sh-cell-primary">{ms.title}</div>
+                        <div className="sh-cell-meta">
+                          <span className="sh-mono">#{ms.id.slice(0, 8)}</span>
+                          <span aria-hidden="true">·</span>
+                          <span>{ms.escrowState.replaceAll("_", " ")}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="sh-mono">Due {ms.dueDate.slice(0, 10)}</span>
+                        </div>
+                      </div>
+                      <div className="sh-compact-row-right">
+                        <strong className="sh-mono">
+                          ETB {(ms.amountMinor / 100).toLocaleString()}
+                        </strong>
+                        <button
+                          type="button"
+                          className="sh-row-action-btn"
+                          onClick={() => onNavigateView("contracts")}
+                        >
+                          Contract <ArrowRight size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -591,30 +687,41 @@ export function MarketplaceShadcnDashboard({
               </div>
 
               <div className="sh-compact-list">
-                {effectiveJobs.slice(0, 4).map((job) => (
-                  <div key={job.id} className="sh-compact-row">
+                {effectiveJobs.length === 0 ? (
+                  <div className="sh-compact-row">
                     <div className="sh-compact-row-main">
-                      <div className="sh-cell-primary">{job.title}</div>
+                      <div className="sh-cell-primary">No open marketplace briefs</div>
                       <div className="sh-cell-meta">
-                        <span>{job.category.replaceAll("_", " ")}</span>
-                        <span aria-hidden="true">·</span>
-                        <span className="sh-mono">Deadline {job.deadline.slice(0, 10)}</span>
+                        Post a new job brief or refresh to check for newly published projects.
                       </div>
                     </div>
-                    <div className="sh-compact-row-right">
-                      <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
-                        ETB {(job.budgetMaxMinor / 100).toLocaleString()}
-                      </strong>
-                      <button
-                        type="button"
-                        className="sh-row-action-btn"
-                        onClick={() => onNavigateView("jobs")}
-                      >
-                        {canWork ? "Submit Proposal" : "Manage"}
-                      </button>
-                    </div>
                   </div>
-                ))}
+                ) : (
+                  effectiveJobs.slice(0, 4).map((job) => (
+                    <div key={job.id} className="sh-compact-row">
+                      <div className="sh-compact-row-main">
+                        <div className="sh-cell-primary">{job.title}</div>
+                        <div className="sh-cell-meta">
+                          <span>{job.category.replaceAll("_", " ")}</span>
+                          <span aria-hidden="true">·</span>
+                          <span className="sh-mono">Deadline {job.deadline.slice(0, 10)}</span>
+                        </div>
+                      </div>
+                      <div className="sh-compact-row-right">
+                        <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                          ETB {(job.budgetMaxMinor / 100).toLocaleString()}
+                        </strong>
+                        <button
+                          type="button"
+                          className="sh-row-action-btn"
+                          onClick={() => onNavigateView("jobs")}
+                        >
+                          {canWork ? "Submit Proposal" : "Manage"}
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -643,14 +750,14 @@ export function MarketplaceShadcnDashboard({
           {opsSubTab === "kanban" && (
             <KanbanBoardView
               tasks={kanbanTasks}
-              onTasksChange={setKanbanTasks}
+              onTasksChange={setCustomTasks}
             />
           )}
 
           {opsSubTab === "calendar" && (
             <CalendarScheduleView
               events={scheduleEvents}
-              onEventsChange={setScheduleEvents}
+              onEventsChange={setCustomEvents}
             />
           )}
         </div>

@@ -1,4 +1,4 @@
-﻿// === IMPORTS ===
+// === IMPORTS ===
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
@@ -437,7 +437,8 @@ chatRouter.get(
         : undefined;
       const search = req.query.search as string | undefined;
       const status = req.query.status as string | undefined;
-      const assignment = req.query.assignment as string | undefined;
+      const assignmentRaw = req.query.assignment as string | undefined;
+      const assignment = assignmentRaw?.toLowerCase();
       const sort = req.query.sort as string | undefined;
       // Full staff can see all queues or filter; others see their own assigned
       const isFullStaff = [

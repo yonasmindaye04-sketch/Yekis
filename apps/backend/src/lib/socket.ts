@@ -259,7 +259,7 @@ async function isConversationParticipant(
 
     const isParticipant = conversation.participants.length > 0;
     // Staff are trusted across support threads; regular users are not.
-    const allowed = isParticipant || (ws.isStaff === true && Boolean(conversation.assignedStaffId));
+    const allowed = isParticipant || ws.isStaff === true;
 
     if (allowed) {
       if (cache) cache.add(conversationId);
