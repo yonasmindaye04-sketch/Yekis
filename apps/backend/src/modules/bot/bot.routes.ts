@@ -1,33 +1,86 @@
-import { Router, Request, Response, NextFunction } from "express";
+import { Router, Request, Response, NextFunction, json } from "express";
+import { timingSafeEqual } from "node:crypto";
 import { getBot, webhookHandler, startBot, stopBot, withApiTimeout } from "./bot.service.js";
 import { env } from "../../config/env.js";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, requireFreshAuth } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
+import { isPublishableWebUrl } from "./utils/deepLink.js";
 
 const router = Router();
+
+/**
+ * Length-safe constant-time compare. `timingSafeEqual` throws on a length
+ * mismatch, so lengths are compared first and the result folded into a boolean
+ * without an early return. Same shape as the comparison in
+ * telegram-code.service.ts.
+ */
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "utf8");
+  const bufB = Buffer.from(b, "utf8");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+/** scheme://host[:port] of a URL, or null when it cannot be parsed. */
+function webhookOrigin(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).origin.toLowerCase();
+  } catch {
+    return null;
+  }
+}
 
 // Webhook endpoint - must be before body parser for raw body access
 router.post(
   "/webhook",
   async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const bot = getBot();
-      if (!bot) {
-        return res.status(503).json({ error: "Bot not initialized" });
+try {
+      // Authentication comes FIRST, before getBot() and before any body
+      // handling. An unauthenticated caller must not be able to make the process
+      // do work, and the two failure modes must stay distinguishable so a
+      // misconfiguration is not mistaken for an attack.
+      //
+      // Telegram sends the configured secret in this header, and it is the only
+      // thing distinguishing a genuine update from anybody who found the URL.
+      // Without it this endpoint is an open door: it runs commands on behalf of
+      // whoever posts to it, and Mini App initData payloads are bearer
+      // credentials.
+      //
+      // The check used to be skipped entirely when the secret was unset
+      // (`if (env.TELEGRAM_WEBHOOK_SECRET && ...)`). Production is protected by
+      // assertProductionSafety refusing to boot without one, so the gap was dev
+      // and staging — the environments most likely to be reachable and least
+      // likely to be watched. An unset secret is now a hard failure: fail closed,
+      // and say why.
+      const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
+      if (!configuredSecret) {
+        logger.error(
+          {},
+          "TELEGRAM_WEBHOOK_SECRET is not set - refusing webhook updates rather than accepting unauthenticated ones",
+        );
+        return res.status(503).json({
+          error: "WEBHOOK_NOT_CONFIGURED",
+          message: "Webhook secret is not configured; updates are refused.",
+        });
       }
 
-      // Verify secret token if configured
       const secretToken = req.headers["x-telegram-bot-api-secret-token"];
       if (
-        env.TELEGRAM_WEBHOOK_SECRET &&
-        secretToken !== env.TELEGRAM_WEBHOOK_SECRET
+        typeof secretToken !== "string" ||
+        !timingSafeEqualStrings(secretToken, configuredSecret)
       ) {
         logger.warn(
           { secretProvided: typeof secretToken === "string" },
           "Invalid webhook secret token",
         );
         return res.status(401).json({ error: "Invalid secret token" });
+      }
+
+      const bot = getBot();
+      if (!bot) {
+        return res.status(503).json({ error: "Bot not initialized" });
       }
 
       // Use Grammy's webhook handler
@@ -128,20 +181,104 @@ router.get(
 router.post(
   "/set-webhook",
   requireAuth,
+  // Step-up: this route redirects every future bot update — including Mini App
+  // initData login proofs — to a host of the caller's choosing. A hijacked
+  // admin session must not be able to do that silently.
+  requireFreshAuth(300),
   requireStaffRole("ADMIN"),
+  // This router is mounted BEFORE express.json() (app.ts), because /webhook
+  // needs the raw bytes for signature verification. That ordering means every
+  // route here saw `req.body === undefined`, so the URL and secretToken this
+  // handler reads were silently ignored and it always fell back to the
+  // configured values. Parsing the body here makes the route do what it says,
+  // now that those inputs are validated rather than trusted.
+  json({ limit: "64kb" }),
   async (req: Request, res: Response) => {
     try {
-      const bot = getBot();
-      if (!bot) {
-        return res.status(503).json({ error: "Bot not initialized" });
-      }
-
+      // Validate the request BEFORE touching the Bot API. getBot() can perform
+      // a network round trip, and an unauthorised caller must not be able to
+      // make this process do work — nor have "bot not initialised" mask a
+      // rejected payload.
       const { url, secretToken } = req.body || {};
       const webhookUrl = url || env.TELEGRAM_WEBHOOK_URL;
-      const secret = secretToken || env.TELEGRAM_WEBHOOK_SECRET;
+      // The secret is server configuration, never a request parameter. Accepting
+      // one from the body let a caller overwrite the secret with a value they
+      // control and then receive the updates the new webhook is pointed at.
+      const secret = env.TELEGRAM_WEBHOOK_SECRET;
+
+      if (secretToken !== undefined) {
+        return res.status(400).json({
+          error: "secretToken is not accepted",
+          message: "The webhook secret is server configuration and cannot be set per request.",
+        });
+      }
 
       if (!webhookUrl) {
         return res.status(400).json({ error: "Webhook URL required" });
+      }
+
+      // A body-supplied URL must be a public https endpoint. Without this, any
+      // admin could repoint the bot at an attacker host or an internal address
+      // and silently take over every subsequent update.
+      if (!isPublishableWebUrl(webhookUrl)) {
+        logger.warn(
+          { requestedUrl: webhookUrl },
+          "Refused to set a webhook to a non-public or non-https URL",
+        );
+        return res.status(400).json({
+          error: "WEBHOOK_URL_NOT_ALLOWED",
+          message: "Webhook URL must be a public https address.",
+        });
+      }
+
+      // It must also point back at THIS deployment.
+      //
+      // isPublishableWebUrl is not sufficient here: it rejects private and
+      // internal hosts, which is the right rule for a link the bot SENDS the
+      // user, but it happily accepts any public https host — including one an
+      // attacker controls. A webhook pointed there delivers every future update
+      // to them, including Mini App initData login proofs, which are bearer
+      // credentials.
+      //
+      // The origin is pinned to API_PUBLIC_URL, falling back to the configured
+      // webhook URL's own origin when that is set.
+      const expectedOrigin = webhookOrigin(env.API_PUBLIC_URL) ?? webhookOrigin(env.TELEGRAM_WEBHOOK_URL);
+      if (!expectedOrigin) {
+        // Fail CLOSED. Without this the comparison is skipped entirely when
+        // neither variable is configured, and an arbitrary host is accepted --
+        // which is the bug, reappearing through a missing setting.
+        logger.error(
+          { requestedUrl: webhookUrl },
+          "Neither API_PUBLIC_URL nor TELEGRAM_WEBHOOK_URL is set - cannot verify the webhook points at this deployment",
+        );
+        return res.status(503).json({
+          error: "WEBHOOK_ORIGIN_UNKNOWN",
+          message: "API_PUBLIC_URL is not configured; refusing to set a webhook that cannot be verified.",
+        });
+      }
+      if (webhookOrigin(webhookUrl) !== expectedOrigin) {
+        logger.warn(
+          { requestedUrl: webhookUrl, expectedOrigin },
+          "Refused to set a webhook pointing at a host other than this deployment",
+        );
+        return res.status(400).json({
+          error: "WEBHOOK_URL_NOT_ALLOWED",
+          message: `Webhook URL must point at this deployment (${expectedOrigin}).`,
+        });
+      }
+
+      if (!secret) {
+        // setWebhook without a secret makes the endpoint above refuse every
+        // update, so refuse here with an explanation rather than bricking the bot.
+        return res.status(503).json({
+          error: "WEBHOOK_NOT_CONFIGURED",
+          message: "TELEGRAM_WEBHOOK_SECRET is not set; refusing to publish an unauthenticated webhook.",
+        });
+      }
+
+      const bot = getBot();
+      if (!bot) {
+        return res.status(503).json({ error: "Bot not initialized" });
       }
 
       await bot.api.setWebhook(webhookUrl, {
