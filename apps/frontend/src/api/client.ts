@@ -1468,21 +1468,49 @@ class ApiClient {
   }
 
   // --- Portfolio ---
+  //
+  // These four called /api/v1/portfolios/... (plural) against a router mounted
+  // at /api/v1/portfolio (singular), so every one of them was a 404. The shapes
+  // were wrong too, not just the paths: the writes are JSON against
+  // CreatePortfolioItemInput / UpdatePortfolioItemInput, while createPortfolioItem
+  // was posting multipart FormData. Fixing only the path would have traded a 404
+  // for a 400 VALIDATION_ERROR.
+  //
+  // The collection is "me" for writes and "users/:id/portfolio" for reads,
+  // because reads are another user's public portfolio and writes are necessarily
+  // the caller's own.
   async getPortfolio(userId: string): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${userId}`);
+    return this.request(`/api/v1/portfolio/users/${userId}/portfolio`);
   }
-  async createPortfolioItem(data: FormData): Promise<unknown> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
-    const response = await fetch(`${API_BASE_URL}/api/v1/portfolios`, { method: "POST", headers, body: data });
-    if (!response.ok) { const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" })); throw new Error(error.message || error.error || `HTTP ${response.status}`); }
-    return response.json();
+  async createPortfolioItem(data: {
+    title: string;
+    description?: string;
+    thumbnailUrl?: string;
+    projectUrl?: string;
+    displayOrder?: number;
+  }): Promise<unknown> {
+    return this.request(`/api/v1/portfolio/me`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
   }
-  async updatePortfolioItem(itemId: string, data: unknown): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${itemId}`, { method: "PATCH", body: JSON.stringify(data) });
+  async updatePortfolioItem(
+    itemId: string,
+    data: {
+      title?: string;
+      description?: string;
+      thumbnailUrl?: string;
+      projectUrl?: string;
+      displayOrder?: number;
+    },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/portfolio/me/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
   }
   async deletePortfolioItem(itemId: string): Promise<unknown> {
-    return this.request(`/api/v1/portfolios/${itemId}`, { method: "DELETE" });
+    return this.request(`/api/v1/portfolio/me/${itemId}`, { method: "DELETE" });
   }
 
   // --- Staff Profile Reports ---

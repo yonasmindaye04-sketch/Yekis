@@ -256,23 +256,26 @@ it("a phone code can be requested and verified over HTTP", async () => {
   });
 });
 
-describe("frontend paths that do not resolve — kept until they are fixed", () => {
+describe("frontend paths — the portfolio mismatch, now fixed", () => {
   /**
-   * The frontend client calls "/api/v1/portfolios/..." (plural) but the router
-   * is mounted at "/api/v1/portfolio" (singular), so every portfolio call from
-   * the browser is a 404. This is asserted rather than quietly dropped, because
-   * the whole reason this layer exists is that these mismatches were invisible
-   * while 435 unit tests stayed green.
+   * The frontend client called "/api/v1/portfolios/..." (plural) against a
+   * router mounted at "/api/v1/portfolio" (singular), so every portfolio call
+   * from the browser was a 404 — and the write bodies were multipart FormData
+   * against a JSON schema, so fixing only the path would have traded a 404 for
+   * a 400. Both are corrected in the client; this assertion has flipped from
+   * "currently a 404" to asserting the whole CRUD journey resolves.
    *
-   * When the frontend or the mount is fixed, this test flips and the real
-   * journey test replaces it.
+   * Kept as an explicit describe block rather than deleted, because the reason
+   * this layer exists is that these mismatches were invisible while 435 unit
+   * tests stayed green. A test that recorded the bug should record its repair.
    */
-  it("GET /api/v1/portfolios/:userId is currently a 404 (frontend calls it)", async () => {
-    const id = await makeUser("portfolio");
+  it("the plural path the frontend used to call no longer exists", async () => {
+    const id = await makeUser("portfolio-old-path");
     const token = await tokenFor(id, "CLIENT");
     const res = await request(app)
       .get(`/api/v1/portfolios/${id}`)
       .set("Authorization", `Bearer ${token}`);
+    // Still a 404, and deliberately: nothing serves it any more.
     expect(res.status).toBe(404);
   });
 
@@ -283,6 +286,42 @@ describe("frontend paths that do not resolve — kept until they are fixed", () 
       .get(`/api/v1/portfolio/users/${id}/portfolio`)
       .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
+  });
+
+  it("the portfolio CRUD journey the frontend now performs works end to end", async () => {
+    const id = await makeUser("portfolio-crud");
+    const token = await tokenFor(id, "CLIENT");
+
+    const created = await request(app)
+      .post("/api/v1/portfolio/me")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "A project", description: "What it does.", displayOrder: 1 });
+    expect(created.status).toBe(201);
+    const itemId = created.body.id as string;
+    expect(itemId).toBeTruthy();
+
+    const listed = await request(app)
+      .get(`/api/v1/portfolio/users/${id}/portfolio`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(listed.status).toBe(200);
+    expect(Array.isArray(listed.body)).toBe(true);
+    expect(listed.body.some((i: { id: string }) => i.id === itemId)).toBe(true);
+
+    const patched = await request(app)
+      .patch(`/api/v1/portfolio/me/${itemId}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send({ title: "A renamed project" });
+    expect(patched.status).toBe(200);
+
+    const removed = await request(app)
+      .delete(`/api/v1/portfolio/me/${itemId}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(removed.status).toBeLessThan(300);
+
+    const after = await request(app)
+      .get(`/api/v1/portfolio/users/${id}/portfolio`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(after.body.some((i: { id: string }) => i.id === itemId)).toBe(false);
   });
 });
 

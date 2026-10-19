@@ -83,8 +83,36 @@ export type StaffRole = z.infer<typeof StaffRole>;
 // Always store and pass amounts as integer minor units (ETB cents) to avoid
 // floating-point drift on financial calculations. Convert to display birr
 // only at the presentation layer.
+
+/**
+ * Ceiling for any single money amount, in minor units.
+ *
+ * Every amount column in this schema is a Postgres `Int`, whose maximum is
+ * 2,147,483,647. Nothing in the money chain declared that limit, so a value
+ * above it passed validation and then failed at the database — after the
+ * provider had already been asked to create a real payment order. The route
+ * returned 500 and the order existed.
+ *
+ * This is the storage ceiling, not a product limit. It is the largest value
+ * that can be stored losslessly, which makes it the defensible cap to enforce
+ * in a schema. A business cap (a maximum top-up, a maximum payout) is a
+ * separate decision and belongs with the product, not in the type.
+ */
+export const MAX_MONEY_MINOR = 2_147_483_647;
+
+/**
+ * A monetary amount that can be persisted: a whole number of minor units,
+ * within the range of the underlying column.
+ *
+ * Use this instead of an ad-hoc `z.number().int()`. The float case matters as
+ * much as the ceiling: a fractional amount passes `int()` checks written as
+ * `typeof x === "number"` and `x > 0`, and then cannot be written to an `Int`
+ * column at all.
+ */
+export const AmountMinor = z.number().int().min(0).max(MAX_MONEY_MINOR);
+
 export const Money = z.object({
-  amountMinor: z.number().int().nonnegative(), // e.g. 150000 = 1,500.00 ETB
+  amountMinor: AmountMinor, // e.g. 150000 = 1,500.00 ETB
   currency: z.literal("ETB"),
 });
 export type Money = z.infer<typeof Money>;
@@ -206,7 +234,7 @@ export type TopUpStatus = z.infer<typeof TopUpStatus>;
 // SubmitKycDocumentInput.
 export const SubmitTopUpInput = z.object({
   provider: PaymentProvider,
-  amountMinor: z.number().int().positive(),
+  amountMinor: AmountMinor.positive(),
   referenceNumber: z.string().min(3).max(100),
 });
 export type SubmitTopUpInput = z.infer<typeof SubmitTopUpInput>;
@@ -221,7 +249,7 @@ export type SubmitTopUpInput = z.infer<typeof SubmitTopUpInput>;
  */
 export const WithdrawInput = z.object({
   provider: PaymentProvider,
-  amountMinor: z.number().int().positive(),
+  amountMinor: AmountMinor.positive(),
   payoutAccountIdentifier: z.string().min(4).max(100),
 });
 export type WithdrawInput = z.infer<typeof WithdrawInput>;

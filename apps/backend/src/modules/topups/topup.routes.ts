@@ -5,7 +5,10 @@ import {
   SubmitTopUpInput,
   TopUpRejectInput,
   FlagTopUpInput,
+  AmountMinor,
+  PaymentProvider,
 } from "@marketplace/schemas";
+import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import { logger } from "../../lib/logger.js";
@@ -100,11 +103,42 @@ topupsRouter.post(
   },
 );
 
+const KNOWN_PROVIDERS = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+
+/**
+ * Hosted-checkout amount validation.
+ *
+ * Deliberately validates the amount ONLY. The provider is left to the
+ * KNOWN_PROVIDERS check in the handler, because that check's error codes are
+ * part of this route's contract:
+ *
+ *   - the schema's PaymentProvider enum is TELEBIRR/CBE_BIRR/M_PESA, while the
+ *     Prisma enum also contains CHAPA. Constraining the provider here turned a
+ *     CHAPA request into VALIDATION_ERROR, where the route has always answered
+ *     UNSUPPORTED_PROVIDER. An existing suite asserts that code.
+ *
+ * So: schema for what the schema should own (a value the database can hold),
+ * handler for the provider policy.
+ */
+const CheckoutTopUpAmount = z.object({
+  amountMinor: AmountMinor.positive(),
+});
+
 topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
-  const { amountMinor, provider } = req.body;
-  if (!amountMinor || typeof amountMinor !== "number" || amountMinor <= 0) {
-    return res.status(400).json({ error: "INVALID_AMOUNT" });
+  // A schema, not hand-rolled checks. The previous guard was
+  // `typeof amountMinor !== "number" || amountMinor <= 0`, which accepted
+  // 100.5 — a value that cannot be written to an Int column, so it reached
+  // initiateCheckoutTopUp, created a provider order, and then failed at the
+  // database. Nothing anywhere in the money chain declared a maximum either,
+  // so a value above Int32 did the same at a larger scale.
+  const parsed = CheckoutTopUpAmount.safeParse(req.body);
+  if (!parsed.success) {
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
   }
+  const { amountMinor } = parsed.data;
+  const provider = (req.body?.provider ?? "") as string;
   const KNOWN_PROVIDERS = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
   if (!KNOWN_PROVIDERS.includes(provider)) {
     return res.status(400).json({ error: "UNSUPPORTED_PROVIDER" });
@@ -121,7 +155,9 @@ topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
     const result = await initiateCheckoutTopUp({
       userId: req.user!.id,
       amountMinor,
-      provider,
+      // Narrowed by the KNOWN_PROVIDERS membership check above, which runs
+      // before this point and is the only way to get here.
+      provider: provider as PaymentProvider,
     });
     return res.json(result);
   } catch (err) {
