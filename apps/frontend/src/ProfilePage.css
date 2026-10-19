@@ -1,13 +1,16 @@
 .profile-view-page {
   width: 100%;
+  overflow-x: hidden;
 }
 
 .profile-view-container {
   max-width: 1080px;
+  width: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
+  box-sizing: border-box;
 }
 
 /* ── Hero ─────────────────────────────────────────────── */
@@ -27,6 +30,7 @@
 
 .hero-content {
   padding: 0 28px 24px;
+  min-width: 0;
 }
 
 .hero-top-row {
@@ -61,6 +65,8 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+  word-break: break-word;
 }
 
 .tier-badge {
@@ -167,6 +173,7 @@
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 20px;
   align-items: start;
+  min-width: 0;
 }
 
 .profile-sidebar,
@@ -254,7 +261,7 @@
 
 .portfolio-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -518,6 +525,63 @@
 
   .hero-avatar {
     margin-top: -68px;
+  }
+}
+
+/* ── Narrow (Telegram Mini App / phone ≤ 480px) ────────── */
+
+@media (max-width: 480px) {
+  .profile-view-page {
+    overflow-x: hidden;
+  }
+
+  .profile-view-container {
+    padding: 0;
+    gap: 12px;
+  }
+
+  .hero-content {
+    padding: 0 14px 18px;
+  }
+
+  .hero-top-row {
+    gap: 10px;
+  }
+
+  .hero-text h1 {
+    font-size: 1.15rem;
+  }
+
+  .hero-avatar {
+    width: 76px;
+    height: 76px;
+    margin-top: -52px;
+  }
+
+  .hero-user-info {
+    gap: 10px;
+  }
+
+  .profile-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .profile-hero.panel,
+  .panel {
+    border-radius: 0;
+  }
+
+  .portfolio-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .completeness-meter {
+    min-width: 0;
+  }
+
+  .stat-item {
+    gap: 8px;
   }
 }
 
