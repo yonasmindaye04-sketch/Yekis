@@ -25,7 +25,6 @@ import {
   CheckCircle,
   Shield,
   ShieldCheck,
-  MessageCircle,
   Clock,
   Check,
   Circle,
@@ -48,11 +47,10 @@ import {
   Lock,
   Zap,
   Star,
-  TrendingUp,
   BadgeCheck,
-  Sparkles,
   } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
+import { HandWrittenTitle } from "./components/HandWrittenTitle";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
@@ -951,34 +949,12 @@ function EscrowSection() {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
-  const { t } = useI18n();
-  const ref = useRef<HTMLDivElement>(null);
-  const seen = useInView(ref, { once: true, amount: 0.35 });
   return (
-    <section className="v2-section" id="fees" style={{ paddingTop: 0 }}>
-      <div className="v2-container">
-        <Reveal dir="zoom">
-          <div className="v2-fees-card" ref={ref}>
-            <span className="v2-eyebrow"><TrendingUp size={14} /> {t.marketing.fees.eyebrow}</span>
-            <h2 className="v2-sec-title" style={{ maxWidth: 620 }}>{t.marketing.fees.headline}</h2>
-            <p className="v2-sec-sub">{t.marketing.fees.subheadline}</p>
-            <div className="v2-fee-bar">
-              <motion.div className="v2-fee-seg a" initial={{ width: 0 }} animate={seen ? { width: "12%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}>5%</motion.div>
-              <motion.div className="v2-fee-seg b" initial={{ width: 0 }} animate={seen ? { width: "16%" } : {}} transition={{ duration: 0.9, ease: EASE, delay: 0.3 }}>7%</motion.div>
-              <motion.div className="v2-fee-seg c" initial={{ width: 0 }} animate={seen ? { width: "72%" } : {}} transition={{ duration: 1.1, ease: EASE, delay: 0.42 }}>88% → {t.marketing.fees.talentShare}</motion.div>
-            </div>
-            <div className="v2-fee-legend">
-              <span><i style={{ background: "var(--v2-teal)" }} />{t.marketing.fees.clientFee}</span>
-              <span><i style={{ background: "var(--v2-violet)" }} />{t.marketing.fees.freelancerFee}</span>
-              <span><i style={{ background: "var(--v2-border2)" }} />{t.marketing.fees.talentShare}</span>
-            </div>
-            <p style={{ marginTop: 20, color: "var(--v2-text2)", fontSize: 13.5 }}>
-              <WalletCards size={15} style={{ verticalAlign: "text-bottom", marginRight: 7, color: "var(--v2-primary)" }} />
-              {t.marketing.fees.note}
-            </p>
-          </div>
-        </Reveal>
-      </div>
+    <section id="fees">
+      <HandWrittenTitle
+        title="Make ideas visible."
+        subtitle="A clean hand-drawn title reveal for modern landing pages."
+      />
     </section>
   );
 }
@@ -1207,7 +1183,6 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     <section className="v2-section" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
       {/* section header */}
       <div className="v2-container">
-        <Reveal><span className="v2-eyebrow"><Sparkles size={14} /> {t.marketing.categories.eyebrow}</span></Reveal>
         <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
         <Reveal delay={0.1}>
           <p className="v2-sec-sub" style={{ marginBottom: 38 }}>
@@ -1366,11 +1341,6 @@ function TestimonialsSection() {
       <div className="v2-testi-aurora" aria-hidden="true" />
       <div className="v2-container">
         <div className="v2-center">
-          <Reveal>
-            <span className="v2-eyebrow">
-              <MessageCircle size={14} /> {t.marketing.testimonials.eyebrow}
-            </span>
-          </Reveal>
           <Reveal delay={0.06}>
             <h2 className="v2-sec-title" id="v2-testi-title">
               {t.marketing.testimonials.title}
@@ -1825,10 +1795,6 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
       </span>
 
       <div className="v2-outro-cta-inner">
-        <p className="v2-outro-kicker">
-          <Sparkles />
-          {t.marketing.cta.eyebrow}
-        </p>
         <h2 id="ready-heading">{t.marketing.cta.title}</h2>
         <p>
           {t.marketing.cta.subtitle}

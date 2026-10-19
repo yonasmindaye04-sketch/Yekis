@@ -20,7 +20,7 @@ import {
   ArrowRight,
   PanelLeft,
 } from "lucide-react";
-import { useShadcnLayout, type DemoWorkspaceMode } from "./ShadcnLayoutContext";
+import { useShadcnLayout } from "./ShadcnLayoutContext";
 import { useTheme } from "../../theme/ThemeContext";
 
 export interface CommandPaletteAction {
@@ -34,14 +34,10 @@ export interface CommandPaletteAction {
 
 interface WorkspaceCommandPaletteProps {
   onNavigateView: (view: string) => void;
-  onSwitchRoleMode?: (mode: DemoWorkspaceMode) => void;
-  currentRole?: string;
 }
 
 export function WorkspaceCommandPalette({
   onNavigateView,
-  onSwitchRoleMode,
-  currentRole,
 }: WorkspaceCommandPaletteProps) {
   const {
     commandPaletteOpen,
@@ -233,6 +229,7 @@ export function WorkspaceCommandPalette({
       );
     }
 
+
     list.push(
       {
         id: "ui-customizer",
@@ -263,8 +260,6 @@ export function WorkspaceCommandPalette({
     return list;
   }, [
     onNavigateView,
-    onSwitchRoleMode,
-    currentRole,
     setDashboardVariant,
     setOpsSubTab,
     setCustomizerOpen,

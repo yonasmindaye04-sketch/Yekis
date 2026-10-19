@@ -98,16 +98,22 @@ export function useListPage<T>(
     setPage(1);
   }, []);
 
-  /* Results are tagged with the request that produced them, so `loading` is
-     derived rather than flipped inside the effect. Keeping `settled.result`
-     populated during background reloads prevents the table/queue UI from
-     wiping `rows` to `[]` and flashing a full-page loading screen. */
-  const reqKey = `${page}|${limit}|${q}|${nonce}|${depKey}`;
+  /* Results are tagged with the query that produced them (`queryKey`) and with
+     the exact request (`reqKey`). Background reloads only change `nonce`, so
+     the previous rows stay visible while the refresh is in flight — otherwise
+     a polling page (Support Desk) dropped its whole table into a loading box
+     every couple of seconds and the console visibly jumped. Rows are cleared
+     only when the query itself changes, which stops stale data from the
+     previous page or filter flashing on screen. */
+  const queryKey = `${page}|${limit}|${q}|${depKey}`;
+  const reqKey = `${queryKey}|${nonce}`;
+
   const [settled, setSettled] = useState<{
     key: string;
+    queryKey: string;
     result: ListResult<T> | null;
     error: string | null;
-  }>({ key: "", result: null, error: null });
+  }>({ key: "", queryKey: "", result: null, error: null });
 
   useEffect(() => {
     let alive = true;
@@ -116,13 +122,19 @@ export function useListPage<T>(
     fnRef
       .current({ page, limit, q: term })
       .then((r) => {
-        if (alive) setSettled({ key: reqKey, result: r, error: null });
+        if (alive) {
+          setSettled({ key: reqKey, queryKey, result: r, error: null });
+        }
       })
       .catch((e: unknown) => {
         if (alive) {
           setSettled((prev) => ({
             key: reqKey,
-            result: prev.result,
+            queryKey,
+            // A failed background refresh should not wipe rows that are still
+            // valid for this query; a failed new query has nothing to keep.
+            result: prev.queryKey === queryKey ? prev.result : null,
+
             error: e instanceof Error ? e.message : String(e),
           }));
         }
@@ -130,18 +142,18 @@ export function useListPage<T>(
     return () => {
       alive = false;
     };
-    // `reqKey` encodes page, limit, q and the filter signature, so listing it
-    // alone is both correct and stable (listing page/q directly would work
-    // too, but reqKey is what tags the settled result).
+    // `reqKey` encodes page, limit, q, the filter signature and the reload
+    // nonce, so listing it alone is both correct and stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reqKey]);
 
-  const loading = settled.key !== reqKey && settled.result === null;
-  const error = settled.key === reqKey ? settled.error : null;
+  const loading = settled.queryKey !== queryKey;
+  const error = settled.queryKey === queryKey ? settled.error : null;
 
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
-  const live = settled.result;
+  const live = settled.queryKey === queryKey ? settled.result : null;
+
 
   return useMemo(
     () => ({

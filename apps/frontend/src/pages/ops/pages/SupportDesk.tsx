@@ -110,6 +110,9 @@ export default function SupportDesk() {
     return () => { offPrivate(); offStatus(); offNewConversation(); };
   }, [reload, selected, loadMessages]);
 
+  // Socket-first, polling as a fallback. The background refresh is silent: rows
+  // and the open thread stay on screen while the request is in flight, so the
+  // desk no longer blanks into a loading box every few seconds.
   useEffect(() => {
     if (socketLive) return;
     const timer = window.setInterval(() => {

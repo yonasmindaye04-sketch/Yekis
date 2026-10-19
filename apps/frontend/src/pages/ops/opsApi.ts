@@ -1003,7 +1003,7 @@ export const opsListApi = {
         pageSize: limit,
         search: q || undefined,
         status: status || "OPEN",
-        assignment: assignment || undefined,
+        assignment: assignment ? assignment.toLowerCase() : undefined,
         sort: sort || "newest",
       })) as RawConversationPage;
       return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };

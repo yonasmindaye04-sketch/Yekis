@@ -79,10 +79,14 @@ import {
   ShadcnLayoutProvider,
   useShadcnLayout,
   LayoutCustomizerTrigger,
-  type DemoWorkspaceMode,
 } from "./components/dashboard/ShadcnLayoutContext";
 import { MarketplaceShadcnDashboard } from "./components/dashboard/MarketplaceShadcnDashboard";
 import { WorkspaceCommandPalette } from "./components/dashboard/WorkspaceCommandPalette";
+import {
+  FALLBACK_JOBS,
+  FALLBACK_MILESTONES,
+  FALLBACK_TOPUPS,
+} from "./components/dashboard/dashboardData";
 
 // === INTERFACES & TYPES ===
 /**
@@ -369,6 +373,7 @@ function FullPlatformAppInner() {
       setDualRoleMode(mode);
     }
   };
+
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1682,6 +1687,7 @@ if (authMode === "register") {
                 <option value="FREELANCER">Mode: Freelancer (Work)</option>
               </select>
             )}
+
 
             <LayoutCustomizerTrigger />
             <LanguageSelector variant="dropdown" />
