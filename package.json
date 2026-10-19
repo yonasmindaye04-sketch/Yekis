@@ -11,6 +11,8 @@
     "dev": "pnpm -r --parallel dev",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
+  "tunnel:cloudflare": "powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1",
+  "dev:tunnel": "node scripts/dev-with-tunnel.mjs",
     "infra:up": "docker compose up -d",
     "infra:down": "docker compose down",
     "build": "pnpm -r build",

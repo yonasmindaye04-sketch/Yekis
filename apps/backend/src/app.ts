@@ -34,7 +34,7 @@ import { env } from "./config/env.js";
 export function buildApp() {
   const app = express();
 
-  // Behind a reverse proxy (ngrok in dev, nginx/ALB in prod) Express must be
+  // Behind a reverse proxy (cloudflared in dev, nginx/ALB in prod) Express must be
   // told how many hops to trust, otherwise req.ip is the proxy's IP — which
   // breaks rate limiting (all users share one bucket) and audit attribution.
   //

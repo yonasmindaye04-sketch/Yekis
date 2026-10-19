@@ -13,10 +13,9 @@ export default defineConfig({
   server: {
     host: true, // binds to 0.0.0.0 for external and tunnel traffic
     port: 5173,
-    allowedHosts: true, // Allow all ngrok and tunnel hostnames
+    allowedHosts: true, // Allow all tunnel hostnames (cloudflared, ngrok, ...)
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'ngrok-skip-browser-warning': 'true',
       'X-Frame-Options': 'ALLOWALL',
     },
     proxy: {

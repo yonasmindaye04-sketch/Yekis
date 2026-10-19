@@ -20,7 +20,14 @@ for (const envPath of envPaths) {
 // confusing runtime error three requests into production.
 const EnvSchema = z.object({
   NODE_ENV: z
-    .enum(["development", "test", "production"])
+    // "staging" was missing, and that gap was load-bearing. The safety checks
+    // key off NODE_ENV, so a staging deployment configured with
+    // NODE_ENV=staging failed validation outright — and a staging box left on
+    // "development" tripped none of them at all, including the ones that refuse
+    // to boot with a mock KYC provider or a disabled rate limiter. The second
+    // case is the dangerous one: a production hostname running development
+    // semantics is exactly the misconfiguration this enum could not express.
+    .enum(["development", "test", "staging", "production"])
     .default("development"),
   PORT: z.coerce.number().default(4000),
 
@@ -323,7 +330,7 @@ const EnvSchema = z.object({
   // See COMPLIANCE_BLOCKERS.md §PEP Screening for details.
   PEP_PROVIDER: z.enum(["mock", "real"]).default("mock"),
 
-  // Number of trusted proxy hops in front of the API (ngrok, nginx, ALB...).
+  // Number of trusted proxy hops in front of the API (cloudflared, nginx, ALB...).
   // Required for correct client IPs (rate limiting, audit logs) whenever the
   // API is not reached directly. Leave unset when running bare on localhost.
   //
@@ -519,7 +526,8 @@ export function assertProductionSafety(
     // many apps share one process.
     if (cfg.RATE_LIMIT_DISABLED === true) {
       violations.push(
-        "RATE_LIMIT_DISABLED is true but NODE_ENV=production. The API rate limiter is an abuse control and must stay enabled in production.",
+        "RATE_LIMIT_DISABLED is true but this is not a development/test environment. The API rate limiter is an abuse control and must stay enabled anywhere a real deployment could point. " +
+          `NODE_ENV=${cfg.NODE_ENV}. Set NODE_ENV to development or test explicitly if that is genuinely what this is.`,
       );
     }
 
