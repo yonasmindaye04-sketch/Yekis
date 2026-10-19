@@ -4,7 +4,25 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+- **ProfilePage horizontal scroll on Telegram Mini App (2026-10-17)** (`ProfilePage.css`): the profile section was overflowing horizontally on narrow (≤480 px) viewports such as the Telegram Mini App shell.
+  - Added `overflow-x: hidden` + `box-sizing: border-box` on `.profile-view-page` and `.profile-view-container` to hard-contain any bleed.
+  - Added `min-width: 0` to `.hero-content` and `.profile-grid` to prevent grid/flex blowout.
+  - Fixed `.portfolio-grid` min column width: `minmax(240px, 1fr)` → `minmax(min(240px, 100%), 1fr)` so cards never force a wider-than-viewport column.
+  - Added `flex-wrap: wrap` + `word-break: break-word` on `.hero-text h1` so long display names wrap instead of pushing the layout wider.
+  - Added a new `@media (max-width: 480px)` block that: collapses `.profile-grid` to `1fr`, reduces `.hero-content` padding to `0 14px 18px`, shrinks the avatar to 76×76px, reduces the h1 to `1.15rem`, forces `.portfolio-grid` to a single column, and removes border-radius on panels so they edge-to-edge fill the phone screen.
+  - All changes are layout/geometry — no colour or theme-conditional rules were added; theme parity is preserved per `AGENTS.md`.
+
 ### Changed
+- **Landing V2 FAQ section rebuilt from the "Earth & Cream" reference (2026-10-17)**: the `#faq` section on the home page (`LandingPageV2.tsx` `FAQSection`, `landing-v2.css`) is now a direct port of the supplied HTML reference.
+  - **Was**: a centred single column — eyebrow/headline/sub-copy band, a free-floating filter pill, then the questions in a `720px` column. Almost every visual property was an inline `style` object.
+  - **Now**: a `place-items: center` stage holding three layers — blurred blobs, five falling leaves, and the `min(1120px, 100%)` card (`30px` radius, `1.5px` border, `.92fr / 1.08fr` columns, breathing radial `::before`). The card carries the lens + `/` kbd filter, the `clamp(64px, 8.5vw, 116px)` Georgia `FAQ` wordmark with its per-letter rise and pulsing dot, the tagline, the self-drawing arc with its orbiting dot, and the accordion — rounded-square chips, `grid-template-rows` answer morph, lime gradient wash on the open row, staggered `translateX` entrance.
+  - **Behaviour** follows the reference script: single-open accordion, first question auto-opens at `1150ms`, `/` focuses the filter, and filtering re-staggers the entrance (re-keying the `<ul>` — the React equivalent of the reference's `li.style.animation` reset). A category marker is dropped while its group has no matching question.
+  - **Two additions**: the fees answer links to the fees page (`FAQSection` now takes `onNavigate`), and opening a question fires `events.faqExpanded(question)`, matching `FAQPage.tsx`.
+  - **Reference bug fixed**: the arc's `pathLength="1"` + `stroke-dasharray: 1` / `stroke-dashoffset: 1` collapses the dash to a fraction of a pixel and leaves the stroke invisible. The draw is now driven by framer-motion's `pathLength`, which writes real dash values.
+  - **Theme parity**: the new block has no theme-conditional rules — every colour resolves from the existing `--v2-*` tokens. Verified byte-identical card geometry between light and dark across the closed / open / filtered / empty states at 1440px and 390px.
+  - **Responsive**: `900px` collapses the card to one column, hides the arc and uncaps the filter width; a reduced-motion block kills every animation and hides the leaves.
+  - **Verified**: `vite build` exits 0; `eslint src/LandingPageV2.tsx` reports only the pre-existing `set-state-in-effect` error in `CountUp`. Screenshots in headless Chrome against the production build at 1440×1000 and 390×844 in both themes. (A full `tsc -b` currently fails on `App.tsx` / `FullPlatformApp.tsx` from the separate in-flight 4-language work — not this change.)
 - **Ops Console accent recoloured from indigo to brand green (2026-10-06)**: the admin dashboard's accent now matches the rest of the product instead of a separate purple identity.
   - **Tokens** (`apps/frontend/src/styles/ops-console.css`): `--ops-primary` `#4f46e5 → #16a34a` (light) / `#818cf8 → #22c55e` (dark), `--ops-primary-dark` `#4338ca → #15803d` / `#a5b4fc → #4ade80`, `--ops-primary-soft` `#eef0ff → #dcfce7` / `rgba(99,102,241,.16) → rgba(34,197,94,.16)`. These are the same values as `--color-primary*` in `index.css`, so the console and the app share one palette.
   - **Hardcoded indigo gradients** in the same file: the sidebar avatar (`#818cf8,#4f46e5 → #4ade80,#16a34a`), the primary button glow (`rgba(79,70,229,.3) → rgba(22,163,74,.3)`) and the Action Center progress fill (`#4f46e5,#7c3aed → #16a34a,#4ade80`).
