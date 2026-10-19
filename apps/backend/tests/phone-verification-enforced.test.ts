@@ -190,12 +190,19 @@ describe("registration carries the proof across", () => {
   });
 
   it("leaves an unproven number unverified at registration", async () => {
-    const other = `+251933${String(STAMP % 1_000_000).padStart(6, "0")}`;
+    // A number derived from a per-run random component, and its code history
+    // cleared first. `hasRecentVerifiedCode` matches on the phone number alone
+    // within a 10-minute window, so a number that any earlier run — in this file
+    // or another — happened to verify makes this assertion depend on global
+    // database state rather than on the code under test.
+    const other = `+251933${String(Math.floor(Math.random() * 1_000_000)).padStart(6, "0")}`;
+    await prisma.phoneVerificationCode.deleteMany({ where: { phone: other } });
+
     const adult = new Date();
     adult.setFullYear(adult.getFullYear() - 30);
 
     const user = await registerUser({
-      email: `register-unverified-${STAMP}@test.et`,
+      email: `register-unverified-${STAMP}-${Math.random().toString(36).slice(2, 8)}@test.et`,
       phone: other,
       password: "Sup3rSecret!pass",
       role: "CLIENT",
@@ -211,7 +218,10 @@ describe("registration carries the proof across", () => {
     } as never);
     userIds.push(user.id);
 
-    expect(await verifiedAtFor(user.id)).toBeNull();
+    expect(
+      await verifiedAtFor(user.id),
+      "a number nobody proved must not be marked verified",
+    ).toBeNull();
   });
 });
 
