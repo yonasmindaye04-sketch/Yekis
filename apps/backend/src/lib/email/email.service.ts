@@ -116,21 +116,55 @@ export async function sendEmail(
     }
   }
 
-  // Development / fallback logging
-  logger.warn(
-    { to, subject },
-    "SMTP not configured (SMTP_HOST/SMTP_USER/SMTP_PASS) - email NOT delivered, logged to console only.",
-  );
-  // eslint-disable-next-line no-console
-  console.log(
-    `\n================== 📧 [DEV - NOT SENT] EMAIL ==================`,
-  );
-  console.log(`To: ${to}`);
-  console.log(`Subject: ${subject}`);
-  console.log(`Body:\n${text}`);
-  console.log(`============================================================\n`);
+  // Development / fallback logging.
+  //
+  // The body is printed ONLY on a developer machine. This used to be an
+  // unconditional console.log, and the password-reset email's body contains the
+  // reset URL — a live bearer credential that sets the account password for
+  // anyone who holds it, valid for an hour. Two problems with printing it
+  // anywhere else:
+  //
+  //   - console.log bypasses the pino redaction in lib/logger.ts entirely. That
+  //     logger scrubs `token` keys and every string argument; none of it runs
+  //     here, so a misconfigured staging box writes real reset tokens to
+  //     whatever collects stdout.
+  //   - it reported success for a message that was never sent, so
+  //     requestPasswordReset believed the user had a mail. It had not.
+  //
+  // Development only is the correct blast radius: a local developer needs to
+  // read the token out of their own terminal to test the flow, and that token
+  // is theirs.
+  const isDevelopment = env.NODE_ENV === "development";
 
-  return { success: true, messageId: `mock-${Date.now()}` };
+  if (isDevelopment) {
+    logger.warn(
+      { to, subject },
+      "SMTP not configured - email NOT delivered, printed to console for local development only.",
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `\n================== 📧 [DEV - NOT SENT] EMAIL ==================`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(`To: ${to}`);
+    // eslint-disable-next-line no-console
+    console.log(`Subject: ${subject}`);
+    // eslint-disable-next-line no-console
+    console.log(`Body:\n${text}`);
+    // eslint-disable-next-line no-console
+    console.log(`============================================================\n`);
+
+    return { success: true, messageId: `mock-${Date.now()}` };
+  }
+
+  // Not development and not configured: this is a misconfiguration, not a dev
+  // affordance. Report failure so the caller can invalidate the undelivered
+  // token instead of leaving a valid credential nobody can receive.
+  logger.error(
+    { to, subject },
+    "SMTP is not configured and this is not a development environment - email NOT delivered.",
+  );
+  return { success: false };
 }
 
 /**

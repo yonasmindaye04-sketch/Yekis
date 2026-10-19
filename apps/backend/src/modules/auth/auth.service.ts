@@ -376,7 +376,7 @@ export async function requestPasswordReset(email: string) {
   // Expire in 1 hour
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-  await prisma.passwordResetToken.create({
+  const resetRow = await prisma.passwordResetToken.create({
     data: {
       userId: user.id,
       tokenHash,
@@ -392,14 +392,38 @@ export async function requestPasswordReset(email: string) {
   });
 
   // Dispatch branded transactional email with password reset link and token
+  let delivered = false;
   try {
-    await sendPasswordResetEmail({
+    const result = await sendPasswordResetEmail({
       email,
       name: user.displayName || user.firstName || undefined,
       token,
     });
+    delivered = result.success;
+    if (!delivered) {
+      logger.error(
+        { userId: user.id },
+        "Password reset email was not delivered - invalidating the token",
+      );
+    }
   } catch (err) {
-    console.error("Failed to transmit password reset email:", err);
+    // The logger, not console.error. console.error bypasses pino redaction
+    // entirely, so whatever the transport attached to the error went to stdout
+    // unscrubbed.
+    logger.error({ err, userId: user.id }, "Failed to transmit password reset email");
+  }
+
+  if (!delivered) {
+    // A token nobody received is not a helpful artefact, it is a live
+    // credential sitting in the database for an hour. The user simply requests
+    // another. This deliberately does NOT throw: the route answers every request
+    // with the same success shape, and turning a delivery failure into an error
+    // would turn this endpoint into an account-enumeration oracle.
+    await prisma.passwordResetToken
+      .delete({ where: { id: resetRow.id } })
+      .catch((err: unknown) => {
+        logger.error({ err, userId: user.id }, "Failed to invalidate undelivered reset token");
+      });
   }
 }
 
