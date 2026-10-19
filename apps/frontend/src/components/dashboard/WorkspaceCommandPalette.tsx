@@ -34,10 +34,14 @@ export interface CommandPaletteAction {
 
 interface WorkspaceCommandPaletteProps {
   onNavigateView: (view: string) => void;
+  onSwitchRoleMode?: (mode: "CLIENT" | "FREELANCER" | "BOTH") => void;
+  currentRole?: string;
 }
 
 export function WorkspaceCommandPalette({
   onNavigateView,
+  onSwitchRoleMode,
+  currentRole,
 }: WorkspaceCommandPaletteProps) {
   const {
     commandPaletteOpen,

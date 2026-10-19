@@ -82,11 +82,6 @@ import {
 } from "./components/dashboard/ShadcnLayoutContext";
 import { MarketplaceShadcnDashboard } from "./components/dashboard/MarketplaceShadcnDashboard";
 import { WorkspaceCommandPalette } from "./components/dashboard/WorkspaceCommandPalette";
-import {
-  FALLBACK_JOBS,
-  FALLBACK_MILESTONES,
-  FALLBACK_TOPUPS,
-} from "./components/dashboard/dashboardData";
 
 // === INTERFACES & TYPES ===
 /**
@@ -367,7 +362,7 @@ function FullPlatformAppInner() {
   /* Dual-role ("BOTH") accounts can toggle between combined, client, or freelancer workspace views */
   const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
 
-  const switchDualRoleMode = (mode: DemoWorkspaceMode) => {
+  const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER" | "BOTH") => {
     if (user?.role !== "BOTH") return;
     if (mode === "CLIENT" || mode === "FREELANCER" || mode === "BOTH") {
       setDualRoleMode(mode);
@@ -1677,7 +1672,7 @@ if (authMode === "register") {
                 className="sh-select"
                 value={dualRoleMode}
                 onChange={(e) =>
-                  switchDualRoleMode(e.target.value as DemoWorkspaceMode)
+                  switchDualRoleMode(e.target.value as "CLIENT" | "FREELANCER" | "BOTH")
                 }
                 aria-label="Switch workspace mode"
                 title="Switch between Client and Freelancer modes"

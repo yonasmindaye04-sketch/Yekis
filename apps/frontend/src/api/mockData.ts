@@ -853,14 +853,50 @@ class MockStore {
   /* ── Operations Console Mock Responses ────────────────────────────────── */
   handleApiFallback(path: string, method: string, bodyRaw?: unknown): unknown {
     const cleanPath = path.replace(/^\/api\/v1/, "").split("?")[0];
+    const parsedBody = (() => {
+      if (!bodyRaw) return undefined;
+      if (typeof bodyRaw === "string") {
+        try {
+          return JSON.parse(bodyRaw) as Record<string, unknown>;
+        } catch {
+          return undefined;
+        }
+      }
+      return bodyRaw as Record<string, unknown>;
+    })();
 
     // Auth & Session
     if (cleanPath === "/users/me" || cleanPath === "/auth/me") {
       return this.getCurrentUser();
     }
+    if (cleanPath === "/auth/phone/code") {
+      return {
+        sent: true,
+        expiresAt: new Date(Date.now() + 300_000).toISOString(),
+        retryAfterSec: 30,
+        devCode: "482910",
+      };
+    }
+    if (cleanPath === "/auth/phone/verify") {
+      return { verified: true };
+    }
     if (cleanPath.startsWith("/auth/")) {
+      if (parsedBody?.role && (parsedBody.role === "CLIENT" || parsedBody.role === "FREELANCER" || parsedBody.role === "BOTH" || parsedBody.role === "ADMIN")) {
+        this.setRole(parsedBody.role);
+      } else if (typeof parsedBody?.email === "string") {
+        const lower = parsedBody.email.toLowerCase();
+        if (lower.includes("admin") || lower.includes("ops")) {
+          this.setRole("ADMIN");
+        } else if (lower.includes("free") || lower.includes("hanna")) {
+          this.setRole("FREELANCER");
+        } else if (lower.includes("client") || lower.includes("abebe")) {
+          this.setRole("CLIENT");
+        }
+      }
       const user = this.getCurrentUser();
       return {
+        id: user.id,
+        ucid: user.ucid,
         accessToken: "mock-jwt-access-token",
         refreshToken: "mock-jwt-refresh-token",
         user,
@@ -892,19 +928,25 @@ class MockStore {
     }
 
     // Jobs & Milestones
+    if (cleanPath === "/jobs/mine") {
+      return this.jobs;
+    }
+    if (cleanPath === "/jobs/proposals/mine" || cleanPath.endsWith("/proposals")) {
+      return [];
+    }
     if (cleanPath === "/jobs" && method === "GET") {
       return { items: this.jobs, total: this.jobs.length, page: 1, pageSize: 20 };
     }
     if (cleanPath === "/jobs" && method === "POST") {
-      const payload = (typeof bodyRaw === "string" ? JSON.parse(bodyRaw) : bodyRaw) as Record<string, unknown> | undefined;
+      const payload = parsedBody;
       const newJob: Job = {
         id: `job-${Date.now()}`,
         clientId: this.getCurrentUser().id,
         title: String(payload?.title || "New Marketplace Brief"),
         description: String(payload?.description || "Scoped milestone deliverable."),
         category: String(payload?.category || "WEB_APP_DEVELOPMENT"),
-        budgetMinMinor: Number(payload?.budgetMinMinor || 3000000),
-        budgetMaxMinor: Number(payload?.budgetMaxMinor || 6000000),
+        budgetMinMinor: Number((payload?.budgetMin as { amountMinor?: number })?.amountMinor || payload?.budgetMinMinor || 3000000),
+        budgetMaxMinor: Number((payload?.budgetMax as { amountMinor?: number })?.amountMinor || payload?.budgetMaxMinor || 6000000),
         deadline: String(payload?.deadline || isoDaysFromNow(14)),
         status: "OPEN",
         createdAt: new Date().toISOString(),
@@ -920,6 +962,9 @@ class MockStore {
     }
 
     // Gigs
+    if (cleanPath === "/gigs/mine") {
+      return this.getGigs();
+    }
     if (cleanPath.startsWith("/gigs/orders")) {
       const orders: GigOrder[] = [
         {
@@ -945,6 +990,9 @@ class MockStore {
     if (cleanPath.startsWith("/gigs")) {
       const gigs = this.getGigs();
       return { items: gigs, data: gigs, total: gigs.length, page: 1, pageSize: 20 };
+    }
+    if (cleanPath === "/users/me/profile/completeness") {
+      return { profileCompleteness: 96 };
     }
 
     // Skills, Featured, Profile

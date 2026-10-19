@@ -1,8 +1,5 @@
 {
   "name": "Yekis Jobs",
   "description": "Escrow-backed freelance marketplace and gig platform for Ethiopia with multi-rail payments, KYC verification, and dispute mediation.",
-  "permissions": [],
-  "capabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
+  "requestFramePermissions": []
 }

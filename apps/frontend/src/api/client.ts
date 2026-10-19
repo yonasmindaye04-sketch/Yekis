@@ -1,5 +1,5 @@
-
 import type { Language } from "../i18n";
+import { mockStore } from "./mockData";
 
 // === INTERFACES & TYPES ===
 export interface TelegramAuthResponse {
@@ -589,6 +589,13 @@ class ApiClient {
     }
 
     if (!response.ok) {
+      if (response.status === 503) {
+        return mockStore.handleApiFallback(
+          path,
+          options.method || "GET",
+          options.body,
+        ) as T;
+      }
       if (response.status === 429) {
         throw new Error("Too many requests. Please wait a moment before trying again.");
       }
