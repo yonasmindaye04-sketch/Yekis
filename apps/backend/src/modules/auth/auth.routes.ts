@@ -80,6 +80,58 @@ const passwordResetLimiter = rateLimit({
   message: { error: "TOO_MANY_RESET_ATTEMPTS" },
 });
 
+/**
+ * Limits for the remaining unauthenticated credential endpoints.
+ *
+ * /register, /login and the reset routes already had their own limiters, which
+ * left the rest of the unauthenticated surface with only the shared per-IP API
+ * limiter in app.ts — 2000 requests per 15 minutes, which is an availability
+ * budget, not an abuse control.
+ *
+ * These are the endpoints where an unauthenticated caller causes real work:
+ *   - /oauth/* verifies a provider-signed idToken over the network on every
+ *     request, so it is an amplification vector against us and the provider.
+ *   - /telegram* and /telegram/miniapp* mint a session from an HMAC-verified
+ *     payload; a flood is a flood of account/session creation.
+ *   - /refresh is called by every client, so its budget is generous, but
+ *     without a limit a stolen refresh token can be ground against the store.
+ *
+ * Thresholds are deliberately generous relative to real traffic. These exist to
+ * stop a flood, not to inconvenience a user who refreshes a few times.
+ */
+const oauthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_OAUTH_ATTEMPTS" },
+});
+
+const telegramLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_TELEGRAM_LOGIN_ATTEMPTS" },
+});
+
+// Account creation from the Mini App, so tighter than plain sign-in.
+const telegramRegisterLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REGISTRATIONS" },
+});
+
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_REFRESH_ATTEMPTS" },
+});
+
 authRouter.post("/register", registrationLimiter, async (req, res) => {
   const parsed = RegisterInput.safeParse(req.body);
   if (!parsed.success) {
@@ -145,7 +197,7 @@ import {
  * back to the other: a payload that fails its own scheme's check must be
  * rejected, not retried against the other algorithm.
  */
-authRouter.post("/telegram", async (req, res) => {
+authRouter.post("/telegram", telegramLoginLimiter, async (req, res) => {
   const payload = req.body;
   if (!payload || typeof payload !== "object") {
     return res.status(400).json({ error: "MISSING_PAYLOAD" });
@@ -189,7 +241,7 @@ authRouter.post("/telegram", async (req, res) => {
   }
 });
 
-authRouter.post("/telegram/miniapp", async (req, res) => {
+authRouter.post("/telegram/miniapp", telegramLoginLimiter, async (req, res) => {
   const { initData } = req.body;
   if (!initData || typeof initData !== "string") return res.status(400).json({ error: "MISSING_INIT_DATA" });
   if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
@@ -206,7 +258,7 @@ authRouter.post("/telegram/miniapp", async (req, res) => {
   }
 });
 
-authRouter.post("/telegram/miniapp/register", async (req, res) => {
+authRouter.post("/telegram/miniapp/register", telegramRegisterLimiter, async (req, res) => {
   const { initData, role, termsVersion } = req.body;
   if (!initData || typeof initData !== "string") return res.status(400).json({ error: "MISSING_INIT_DATA" });
   if (!role || (role !== "CLIENT" && role !== "FREELANCER")) return res.status(400).json({ error: "INVALID_ROLE" });
@@ -222,7 +274,7 @@ authRouter.post("/telegram/miniapp/register", async (req, res) => {
   }
 });
 
-authRouter.post("/telegram/widget", async (req, res) => {
+authRouter.post("/telegram/widget", telegramLoginLimiter, async (req, res) => {
   const payload = req.body;
   if (!payload || typeof payload !== "object" || !payload.hash) return res.status(400).json({ error: "MISSING_WIDGET_DATA" });
   if (!env.TELEGRAM_BOT_TOKEN) return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
@@ -374,7 +426,7 @@ authRouter.get("/oauth/providers", (_req, res) => {
   return res.json(getOAuthProviderAvailability());
 });
 
-authRouter.post("/oauth/google", async (req, res) => {
+authRouter.post("/oauth/google", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({
       idToken: z.string().min(20),
@@ -411,7 +463,7 @@ authRouter.post("/oauth/google", async (req, res) => {
   }
 });
 
-authRouter.post("/oauth/apple", async (req, res) => {
+authRouter.post("/oauth/apple", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({
       idToken: z.string().min(20),
@@ -455,7 +507,7 @@ authRouter.post("/oauth/apple", async (req, res) => {
   }
 });
 
-authRouter.post("/oauth/facebook", async (req, res) => {
+authRouter.post("/oauth/facebook", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({ accessToken: z.string().min(10) })
     .safeParse(req.body);
@@ -537,7 +589,7 @@ authRouter.post("/reset-password", passwordResetLimiter, async (req, res) => {
  * previously the refresh token was issued at login but had no consumer, so
  * every user was silently logged out every JWT_ACCESS_TTL (default 15m).
  */
-authRouter.post("/refresh", async (req, res) => {
+authRouter.post("/refresh", refreshLimiter, async (req, res) => {
   const parsed = z
     .object({ refreshToken: z.string().min(20) })
     .safeParse(req.body);
