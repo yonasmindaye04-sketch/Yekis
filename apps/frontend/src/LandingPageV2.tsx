@@ -49,13 +49,11 @@ import {
   Zap,
   Star,
   TrendingUp,
-  Search,
   BadgeCheck,
-  ChevronDown,
-  X,
   Sparkles,
   } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
+import { events } from "./analytics";
 import { useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./landing-v2.css";
@@ -1487,119 +1485,284 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 /* ─────────────────────────────────────────────────
    FAQ
 ───────────────────────────────────────────────── */
-function FAQSection() {
+function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   const { t } = useI18n();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  /* rows are flattened on the way in so one index drives the whole list —
+     the open state, the --i stagger and the filter all key off it */
+  const rows = useMemo(() => {
+    const groups = [
+      {
+        cat: t.marketing.faq.trustTitle,
+        items: [
+          { q: t.marketing.faq.q1, a: t.marketing.faq.a1 },
+          { q: t.marketing.faq.q2, a: t.marketing.faq.a2 },
+          { q: t.marketing.faq.q3, a: t.marketing.faq.a3 },
+        ],
+      },
+      {
+        cat: t.marketing.faq.startTitle,
+        items: [
+          { q: t.marketing.faq.q5, a: t.marketing.faq.a5 },
+          { q: t.marketing.faq.q7, a: t.marketing.faq.a7, link: "fees" },
+          { q: t.marketing.faq.q8, a: t.marketing.faq.a8 },
+        ],
+      },
+      {
+        cat: t.marketing.faq.paidTitle,
+        items: [
+          { q: t.marketing.faq.q9, a: t.marketing.faq.a9 },
+          { q: t.marketing.faq.q11, a: t.marketing.faq.a11 },
+        ],
+      },
+    ];
+    const out: {
+      key: string;
+      g: number;
+      cat?: string;
+      q?: string;
+      a?: string;
+      link?: string;
+    }[] = [];
+    groups.forEach((g, gi) => {
+      out.push({ key: `cat-${gi}`, g: gi, cat: g.cat });
+      g.items.forEach((it, ii) => {
+        out.push({ key: `q-${gi}-${ii}`, g: gi, q: it.q, a: it.a, link: it.link });
+      });
+    });
+    return out;
+  }, [t]);
+
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [q, setQ] = useState("");
+  const [query, setQuery] = useState("");
+  /* bumping this remounts the list, which replays the staggered entrance
+     exactly like the reference does by resetting li.style.animation */
+  const [tick, setTick] = useState(0);
 
-  const faqs = useMemo(() => [
-    {
-      cat: t.marketing.faq.trustTitle,
-      items: [
-        { q: t.marketing.faq.q1, a: t.marketing.faq.a1 },
-        { q: t.marketing.faq.q2, a: t.marketing.faq.a2 },
-        { q: t.marketing.faq.q3, a: t.marketing.faq.a3 },
-      ],
-    },
-    {
-      cat: t.marketing.faq.startTitle,
-      items: [
-        { q: t.marketing.faq.q5, a: t.marketing.faq.a5 },
-        { q: t.marketing.faq.q7, a: t.marketing.faq.a7 },
-        { q: t.marketing.faq.q8, a: t.marketing.faq.a8 },
-      ],
-    },
-    {
-      cat: t.marketing.faq.paidTitle,
-      items: [
-        { q: t.marketing.faq.q9, a: t.marketing.faq.a9 },
-        { q: t.marketing.faq.q11, a: t.marketing.faq.a11 },
-      ],
-    },
-  ], [t]);
-
-  const groups = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return faqs.map((cat) => ({
-      cat: cat.cat,
-      items: cat.items.filter((it) => {
+  const needle = query.trim().toLowerCase();
+  const matched = useMemo(
+    () =>
+      rows.filter((r) => {
+        if (r.cat) return false;
         if (!needle) return true;
-        return `${it.q} ${it.a}`.toLowerCase().includes(needle);
+        return `${r.q} ${r.a}`.toLowerCase().includes(needle);
       }),
-    })).filter((g) => g.items.length > 0);
-  }, [q, faqs]);
+    [rows, needle]
+  );
+  /* a category marker only rides along while its group still has a hit */
+  const visible = useMemo(() => {
+    const live = new Set(matched.map((r) => r.g));
+    return rows.filter((r) => (r.cat ? live.has(r.g) : matched.includes(r)));
+  }, [rows, matched]);
+  const shown = matched.length;
+
+  /* open the first question once the entrance settles */
+  useEffect(() => {
+    const first = rows.find((r) => !r.cat);
+    if (!first) return;
+    const id = window.setTimeout(
+      () => setOpenKey(first.key),
+      prefersReduced() ? 0 : 1150
+    );
+    return () => window.clearTimeout(id);
+  }, [rows]);
+
+  /* "/" focuses the filter from anywhere on the page */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing =
+        el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      if (e.key === "/" && !typing) {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  /* gentle pointer parallax, lerped in a rAF loop like the reference */
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || prefersReduced()) return;
+    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+    const onMove = (e: PointerEvent) => {
+      tx = e.clientX / window.innerWidth - 0.5;
+      ty = e.clientY / window.innerHeight - 0.5;
+    };
+    const loop = () => {
+      cx += (tx - cx) * 0.06;
+      cy += (ty - cy) * 0.06;
+      el.style.setProperty("--mx", cx.toFixed(4));
+      el.style.setProperty("--my", cy.toFixed(4));
+      raf = requestAnimationFrame(loop);
+    };
+    window.addEventListener("pointermove", onMove);
+    raf = requestAnimationFrame(loop);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      cancelAnimationFrame(raf);
+    };
+  }, []);
+
+  const toggle = (key: string, question: string) => {
+    if (openKey !== key) events.faqExpanded(question);
+    setOpenKey(openKey === key ? null : key);
+  };
+
+  /* every visible non-category row, numbered for the entrance stagger */
+  let i = 0;
 
   return (
-    <section className="v2-section" id="faq">
-      <div className="v2-container">
-        <div className="v2-center" style={{ marginBottom: 40 }}>
-          <Reveal><span className="v2-eyebrow"><MessageCircle size={14} /> {t.marketing.faq.eyebrow}</span></Reveal>
-          <Reveal delay={0.06}><h2 className="v2-sec-title">{t.marketing.faq.title}</h2></Reveal>
-          <Reveal delay={0.12}><p className="v2-sec-sub" style={{ margin: "0 auto" }}>{t.marketing.faq.subtitle}</p></Reveal>
+    <section className="v2-faq" id="faq" ref={sectionRef} aria-labelledby="v2-faq-title">
+      {/* ambient motion layer */}
+      <div className="v2-faq-blobs" aria-hidden="true">
+        <span className="v2-faq-blob b1" />
+        <span className="v2-faq-blob b2" />
+        <span className="v2-faq-blob b3" />
+      </div>
+
+      <div className="v2-faq-leaves" aria-hidden="true">
+        <span className="v2-faq-leaf l1">
+          <svg width="22" height="30" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".55" />
+            <path d="M12 6V27" stroke="var(--v2-primary-ink)" strokeWidth="1.2" opacity=".6" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l2">
+          <svg width="16" height="22" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".45" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l3">
+          <svg width="20" height="27" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".35" />
+            <path d="M12 6V27" stroke="var(--v2-bg2)" strokeWidth="1.1" opacity=".5" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l4">
+          <svg width="14" height="19" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".4" />
+          </svg>
+        </span>
+        <span className="v2-faq-leaf l5">
+          <svg width="18" height="25" viewBox="0 0 24 32">
+            <path d="M12 1C20 9 22 20 12 31C2 20 4 9 12 1Z" fill="var(--v2-primary)" opacity=".45" />
+            <path d="M12 6V27" stroke="var(--v2-primary-ink)" strokeWidth="1.1" opacity=".55" />
+          </svg>
+        </span>
+      </div>
+
+      <div className="v2-faq-card">
+        {/* LEFT : search + wordmark */}
+        <div className="v2-faq-left">
+          <div className="v2-faq-searchrow">
+            <svg className="v2-faq-lens" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="10.2" cy="10.2" r="7.2" />
+              <line x1="15.6" y1="15.6" x2="21.5" y2="21.5" />
+            </svg>
+            <label className="v2-faq-search">
+              <input
+                ref={inputRef}
+                type="search"
+                placeholder={t.marketing.faq.searchPlaceholder}
+                aria-label={t.marketing.faq.searchPlaceholder}
+                autoComplete="off"
+                value={query}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  setTick((n) => n + 1);
+                }}
+              />
+              <kbd>/</kbd>
+            </label>
+          </div>
+
+          <h2 className="v2-faq-title" id="v2-faq-title">
+            <span>F</span>
+            <span>A</span>
+            <span>Q</span>
+            <span className="v2-faq-dot" aria-hidden="true" />
+          </h2>
+
+          <p className="v2-faq-tag">{t.marketing.faq.subtitle}</p>
+
+          {/* arc divider */}
+          <div className="v2-faq-arcwrap" aria-hidden="true">
+            <svg viewBox="0 0 200 620" preserveAspectRatio="none">
+              <motion.path
+                d="M8 6 C 196 150, 196 470, 8 614"
+                initial={{ pathLength: prefersReduced() ? 1 : 0 }}
+                whileInView={{ pathLength: 1 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 1.6, delay: 0.5, ease: EASE }}
+              />
+            </svg>
+            <span className="v2-faq-arcdot" />
+          </div>
         </div>
 
-        <Reveal>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "13px 16px", borderRadius: 14, background: "var(--v2-surface)", border: "1px solid var(--v2-border)", marginBottom: 24, maxWidth: 640, margin: "0 auto 24px" }}>
-            <Search size={17} color="var(--v2-text2)" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder={t.marketing.faq.searchPlaceholder}
-              style={{ flex: 1, background: "none", border: "none", outline: "none", color: "var(--v2-text)", fontSize: 14.5, fontFamily: "inherit" }}
-            />
-            <AnimatePresence>
-              {q && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.7 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.7 }}
-                  onClick={() => setQ("")}
-                  style={{ background: "none", border: "none", cursor: "pointer", display: "grid", placeItems: "center", color: "var(--v2-text2)" }}
-                >
-                  <X size={16} />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        </Reveal>
-
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          {groups.length === 0 ? (
-            <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} style={{ padding: 34, textAlign: "center", color: "var(--v2-text2)", border: "1px dashed var(--v2-border)", borderRadius: 14, fontSize: 14.5 }}>
+        {/* RIGHT : questions */}
+        <div className="v2-faq-right">
+          {shown === 0 ? (
+            <p className="v2-faq-empty" aria-live="polite">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 21v-8M12 13c0-4 3-7 7-7 0 4-3 7-7 7ZM12 13c0-4-3-7-7-7 0 4 3 7 7 7Z" />
+              </svg>
+              <br />
               {t.marketing.faq.noResults}
-            </motion.div>
+            </p>
           ) : (
-            <AnimatePresence initial={false}>
-              {groups.map((g) => (
-                <motion.div key={g.cat} initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.4, ease: EASE }} layout style={{ marginBottom: 30 }}>
-                  <h3 style={{ fontSize: 14, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--v2-primary)", marginBottom: 14, fontWeight: 700 }}>{g.cat}</h3>
-                  {g.items.map((it) => {
-                    const isOpen = openKey === it.q;
-                    return (
-                      <div key={it.q} style={{ borderBottom: "1px solid var(--v2-border)" }}>
-                        <button
-                          onClick={() => setOpenKey(isOpen ? null : it.q)}
-                          aria-expanded={isOpen}
-                          style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, padding: "19px 4px", background: "none", border: "none", cursor: "pointer", textAlign: "left", color: isOpen ? "var(--v2-primary)" : "var(--v2-text)", fontSize: 16, fontWeight: 600, fontFamily: "var(--v2-font-head)", transition: "color 0.3s" }}
-                        >
-                          <span>{it.q}</span>
-                          <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.35 }} style={{ display: "grid", placeItems: "center", width: 28, height: 28, borderRadius: 9, background: isOpen ? "var(--v2-primary)" : "var(--v2-surface)", color: isOpen ? "var(--v2-primary-ink)" : "var(--v2-text2)", border: `1px solid ${isOpen ? "transparent" : "var(--v2-border)"}`, flexShrink: 0 }}>
-                            <ChevronDown size={15} />
-                          </motion.span>
-                        </button>
-                        <AnimatePresence initial={false}>
-                          {isOpen && (
-                            <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.42, ease: EASE }} style={{ overflow: "hidden" }}>
-                              <p style={{ padding: "0 4px 22px", fontSize: 14.8, lineHeight: 1.72, color: "var(--v2-text2)" }}>{it.a}</p>
-                            </motion.div>
+            <ul className="v2-faq-list" key={tick}>
+              {visible.map((r) => {
+                if (r.cat) {
+                  return (
+                    <li key={r.key} className="v2-faq-cat" style={{ ["--i" as string]: i++ }}>
+                      <span className="v2-faq-catname">{r.cat}</span>
+                    </li>
+                  );
+                }
+                const isOpen = openKey === r.key;
+                return (
+                  <li
+                    key={r.key}
+                    className={isOpen ? "open" : ""}
+                    style={{ ["--i" as string]: i++ }}
+                  >
+                    <button
+                      className="v2-faq-q"
+                      aria-expanded={isOpen}
+                      onClick={() => toggle(r.key!, r.q!)}
+                    >
+                      <span>{r.q}</span>
+                      <span className="v2-faq-chip">
+                        <svg viewBox="0 0 14 14" aria-hidden="true">
+                          <path d="M7 2v10M3 8.5 7 12l4-3.5" />
+                        </svg>
+                      </span>
+                    </button>
+                    <div className="v2-faq-a">
+                      <div>
+                        <p>
+                          {r.a}
+                          {r.link === "fees" && (
+                            <button
+                              className="v2-faq-link"
+                              onClick={() => onNavigate("fees")}
+                            >
+                              {t.marketing.faq.viewFees}
+                            </button>
                           )}
-                        </AnimatePresence>
+                        </p>
                       </div>
-                    );
-                  })}
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           )}
         </div>
       </div>
@@ -1971,7 +2134,7 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       <AboutSection onNavigate={onNavigate} />
 
       {/* FAQ */}
-      <FAQSection />
+      <FAQSection onNavigate={onNavigate} />
 
       {/* Final CTA */}
       <FinalCTASection onStart={onStart} />

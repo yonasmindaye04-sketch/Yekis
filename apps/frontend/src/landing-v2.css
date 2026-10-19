@@ -1,4 +1,4 @@
-/* ============================================================
+﻿/* ============================================================
    Yekis Landing V2 — Design System
    All rules are scoped to .yk-v2 to avoid ANY clash with the
    existing LandingPage styles.
@@ -1575,6 +1575,467 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+
+/* ────────────────────────────────────────────────────────────────
+   FAQ — card, ambient field, arc divider, accordion.
+
+   Ported from the "Earth & Cream" FAQ reference: the centred
+   bordered card, the lens + kbd filter, the serif wordmark with
+   its pulsing dot, the self-drawing arc and orbiting dot, the
+   rounded-square chips, the grid-rows answer morph, the drifting
+   leaves and the pointer parallax are all kept as authored.
+
+   Geometry is theme-invariant (declared once, here). Every colour
+   resolves from the --v2-* tokens so the whole block follows the
+   site theme with no theme-conditional rules at all.
+   ──────────────────────────────────────────────────────────────── */
+
+/* the whole section is a viewport-centred stage */
+.yk-v2 .v2-faq {
+  --mx: 0;
+  --my: 0;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-soft: cubic-bezier(0.25, 0.8, 0.25, 1);
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 48px 20px;
+  scroll-margin-top: 92px;
+  overflow: hidden;
+}
+
+/* ── ambient layer: blurred blobs + falling leaves ── */
+.yk-v2 .v2-faq-blobs,
+.yk-v2 .v2-faq-leaves {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.yk-v2 .v2-faq-blobs { z-index: 0; }
+.yk-v2 .v2-faq-leaves { z-index: 1; }
+.yk-v2 .v2-faq-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  transform: translate3d(calc(var(--mx) * -18px), calc(var(--my) * -14px), 0);
+  transition: transform 1.2s var(--ease-soft);
+}
+.yk-v2 .v2-faq-blob.b1 {
+  width: 460px;
+  height: 460px;
+  background: var(--v2-glow-2);
+  opacity: 0.5;
+  top: -140px;
+  left: -120px;
+  animation: v2-faq-float1 19s ease-in-out infinite alternate;
+}
+.yk-v2 .v2-faq-blob.b2 {
+  width: 420px;
+  height: 420px;
+  background: var(--v2-glow-1);
+  opacity: 0.5;
+  bottom: -160px;
+  right: -100px;
+  animation: v2-faq-float2 23s ease-in-out infinite alternate;
+}
+.yk-v2 .v2-faq-blob.b3 {
+  width: 340px;
+  height: 340px;
+  background: var(--v2-glow-1);
+  opacity: 0.6;
+  top: 38%;
+  left: 58%;
+  animation: v2-faq-float1 27s ease-in-out infinite alternate-reverse;
+}
+@keyframes v2-faq-float1 { from { translate: 0 0; } to { translate: 60px 44px; } }
+@keyframes v2-faq-float2 { from { translate: 0 0; } to { translate: -52px -38px; } }
+
+.yk-v2 .v2-faq-leaf {
+  position: absolute;
+  top: -8vh;
+  opacity: 0;
+  animation: v2-faq-drift linear infinite;
+}
+.yk-v2 .v2-faq-leaf svg { display: block; animation: v2-faq-sway ease-in-out infinite alternate; }
+.yk-v2 .v2-faq-leaf.l1 { left: 8%;  animation-duration: 26s; animation-delay: 0s; }
+.yk-v2 .v2-faq-leaf.l1 svg { animation-duration: 3.1s; }
+.yk-v2 .v2-faq-leaf.l2 { left: 26%; animation-duration: 32s; animation-delay: 6s; }
+.yk-v2 .v2-faq-leaf.l2 svg { animation-duration: 4.2s; }
+.yk-v2 .v2-faq-leaf.l3 { left: 52%; animation-duration: 24s; animation-delay: 11s; }
+.yk-v2 .v2-faq-leaf.l3 svg { animation-duration: 3.6s; }
+.yk-v2 .v2-faq-leaf.l4 { left: 74%; animation-duration: 30s; animation-delay: 3s; }
+.yk-v2 .v2-faq-leaf.l4 svg { animation-duration: 4.6s; }
+.yk-v2 .v2-faq-leaf.l5 { left: 90%; animation-duration: 36s; animation-delay: 15s; }
+.yk-v2 .v2-faq-leaf.l5 svg { animation-duration: 3.9s; }
+@keyframes v2-faq-drift {
+  0%   { transform: translateY(-8vh) rotate(0deg); opacity: 0; }
+  8%   { opacity: 0.5; }
+  85%  { opacity: 0.4; }
+  100% { transform: translateY(112vh) rotate(300deg); opacity: 0; }
+}
+@keyframes v2-faq-sway {
+  from { transform: translateX(-16px) rotate(-14deg); }
+  to   { transform: translateX(16px) rotate(14deg); }
+}
+
+/* ── the card ── */
+.yk-v2 .v2-faq-card {
+  position: relative;
+  z-index: 2;
+  width: min(1120px, 100%);
+  background: var(--v2-bg2);
+  border: 1.5px solid var(--v2-border2);
+  border-radius: 30px;
+  padding: clamp(36px, 5vw, 64px) clamp(28px, 5vw, 68px);
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: clamp(32px, 5vw, 72px);
+  box-shadow: var(--v2-shadow);
+  overflow: hidden;
+  animation: v2-faq-card-in 1s var(--ease-out) both;
+}
+@keyframes v2-faq-card-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.965); }
+}
+/* soft inner wash that breathes */
+.yk-v2 .v2-faq-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(560px 380px at 12% 8%, var(--v2-glow-1), transparent 65%);
+  animation: v2-faq-breathe 7s ease-in-out infinite alternate;
+}
+@keyframes v2-faq-breathe { from { opacity: 0.55; } to { opacity: 1; } }
+
+/* ── LEFT: filter, wordmark, tagline, arc ── */
+.yk-v2 .v2-faq-left {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 0;
+}
+.yk-v2 .v2-faq-searchrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  animation: v2-faq-rise 0.8s 0.25s var(--ease-out) both;
+}
+.yk-v2 .v2-faq-lens {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  stroke: var(--v2-text);
+  stroke-width: 2.4;
+  fill: none;
+  stroke-linecap: round;
+  transition: transform 0.5s var(--ease-out);
+}
+.yk-v2 .v2-faq-searchrow:hover .v2-faq-lens { transform: rotate(-14deg) scale(1.08); }
+.yk-v2 .v2-faq-search {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+  display: flex;
+  align-items: center;
+  border: 1.5px solid var(--v2-border2);
+  border-radius: 14px;
+  background: transparent;
+  transition:
+    max-width 0.55s var(--ease-out),
+    background-color 0.35s ease,
+    box-shadow 0.35s ease;
+}
+.yk-v2 .v2-faq-search:focus-within {
+  max-width: 360px;
+  background: var(--v2-surface);
+  box-shadow: 0 0 0 5px var(--v2-glow);
+}
+.yk-v2 .v2-faq-search input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  border: 0;
+  outline: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--v2-text);
+  font: inherit;
+  font-size: 15.5px;
+}
+.yk-v2 .v2-faq-search input::placeholder { color: var(--v2-text2); opacity: 0.8; }
+.yk-v2 .v2-faq-search kbd {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  translate: 0 -50%;
+  padding: 4px 7px;
+  border: 1px solid var(--v2-border);
+  border-radius: 6px;
+  background: var(--v2-surface);
+  color: var(--v2-text2);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.yk-v2 .v2-faq-title {
+  margin-top: 18px;
+  display: flex;
+  color: var(--v2-text);
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: clamp(64px, 8.5vw, 116px);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.035em;
+}
+.yk-v2 .v2-faq-title span { display: inline-block; animation: v2-faq-letter-up 0.9s var(--ease-out) both; }
+.yk-v2 .v2-faq-title span:nth-child(1) { animation-delay: 0.35s; }
+.yk-v2 .v2-faq-title span:nth-child(2) { animation-delay: 0.45s; }
+.yk-v2 .v2-faq-title span:nth-child(3) { animation-delay: 0.55s; }
+.yk-v2 .v2-faq-dot {
+  width: 0.22em;
+  height: 0.22em;
+  margin: 0.55em 0 0 0.12em;
+  border-radius: 50%;
+  background: var(--v2-primary);
+  animation:
+    v2-faq-letter-up 0.9s 0.68s var(--ease-out) both,
+    v2-faq-pulse 3.4s 1.6s ease-in-out infinite;
+}
+@keyframes v2-faq-letter-up {
+  from { opacity: 0; transform: translateY(0.55em) rotate(4deg); }
+}
+@keyframes v2-faq-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.35); }
+}
+.yk-v2 .v2-faq-tag {
+  max-width: 30ch;
+  margin-top: 16px;
+  color: var(--v2-text2);
+  font-size: 15px;
+  line-height: 1.6;
+  animation: v2-faq-rise 0.8s 0.6s var(--ease-out) both;
+}
+@keyframes v2-faq-rise {
+  from { opacity: 0; transform: translateY(16px); }
+}
+
+/* the arc draws itself and parallaxes, with a dot orbiting it */
+.yk-v2 .v2-faq-arcwrap {
+  position: absolute;
+  top: 4%;
+  bottom: 4%;
+  right: -34px;
+  width: 200px;
+  pointer-events: none;
+  z-index: 1;
+}
+.yk-v2 .v2-faq-arcwrap svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  transform: translate3d(calc(var(--mx) * 12px), calc(var(--my) * 9px), 0);
+  transition: transform 0.9s var(--ease-soft);
+}
+.yk-v2 .v2-faq-arcwrap path {
+  fill: none;
+  stroke: var(--v2-text2);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.yk-v2 .v2-faq-arcdot {
+  position: absolute;
+  right: -38px;
+  top: 50%;
+  width: 11px;
+  height: 11px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: var(--v2-primary);
+  opacity: 0;
+  animation: v2-faq-orbit 6s 2.1s ease-in-out infinite;
+}
+@keyframes v2-faq-orbit {
+  0%   { opacity: 0; transform: translateY(-150px) scale(0.4); }
+  12%  { opacity: 1; }
+  50%  { transform: translateY(0) scale(1); }
+  88%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(150px) scale(0.4); }
+}
+
+/* ── RIGHT: the question list ── */
+.yk-v2 .v2-faq-right {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.yk-v2 .v2-faq-list { list-style: none; }
+.yk-v2 .v2-faq-list li {
+  border-bottom: 1px solid var(--v2-border);
+  animation: v2-faq-item-in 0.65s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 65ms + 450ms);
+}
+.yk-v2 .v2-faq-list li:first-child { border-top: 1px solid var(--v2-border); }
+@keyframes v2-faq-item-in { from { opacity: 0; transform: translateX(26px); } }
+/* the category markers ride the list but carry no rule of their own */
+.yk-v2 .v2-faq-list li.v2-faq-cat {
+  padding: 18px 2px 4px;
+  border-bottom: 0;
+}
+.yk-v2 .v2-faq-list li.v2-faq-cat:first-child { padding-top: 14px; }
+.yk-v2 .v2-faq-catname {
+  color: var(--v2-primary);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.yk-v2 .v2-faq-q {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 17px 2px;
+  border: 0;
+  background: none;
+  color: var(--v2-text);
+  font-family: inherit;
+  font-size: 16.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: padding 0.35s var(--ease-out), color 0.25s ease;
+}
+.yk-v2 .v2-faq-q:hover { padding-left: 10px; color: var(--v2-primary); }
+.yk-v2 .v2-faq-q:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+/* rounded-square toggle chip */
+.yk-v2 .v2-faq-chip {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--v2-border2);
+  border-radius: 9px;
+  transition:
+    transform 0.45s var(--ease-out),
+    background-color 0.3s ease,
+    border-color 0.3s ease;
+}
+.yk-v2 .v2-faq-chip svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: var(--v2-text);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.3s ease;
+}
+.yk-v2 .v2-faq-q:hover .v2-faq-chip { transform: translateY(-2px); }
+.yk-v2 .v2-faq-list li.open .v2-faq-chip {
+  background: var(--v2-primary);
+  border-color: var(--v2-primary);
+  transform: rotate(180deg);
+}
+.yk-v2 .v2-faq-list li.open .v2-faq-chip svg { stroke: var(--v2-primary-ink); }
+
+/* smooth open/close via the grid-rows morph */
+.yk-v2 .v2-faq-a {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.55s var(--ease-soft);
+}
+.yk-v2 .v2-faq-a > div { overflow: hidden; }
+.yk-v2 .v2-faq-a p {
+  padding: 0 52px 20px 2px;
+  color: var(--v2-text2);
+  font-size: 14.5px;
+  line-height: 1.65;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.yk-v2 .v2-faq-list li.open .v2-faq-a { grid-template-rows: 1fr; }
+.yk-v2 .v2-faq-list li.open .v2-faq-a p {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.08s;
+}
+.yk-v2 .v2-faq-list li.open {
+  background: linear-gradient(90deg, var(--v2-glow-1), transparent 70%);
+}
+.yk-v2 .v2-faq-list li.open .v2-faq-q { color: var(--v2-primary); }
+.yk-v2 .v2-faq-link {
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--v2-primary);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.yk-v2 .v2-faq-link:hover { text-decoration-thickness: 2px; }
+.yk-v2 .v2-faq-link:focus-visible {
+  outline: 2px solid var(--v2-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.yk-v2 .v2-faq-empty {
+  padding: 34px 0;
+  color: var(--v2-text2);
+  font-size: 15px;
+  text-align: center;
+  animation: v2-faq-rise 0.5s var(--ease-out) both;
+}
+.yk-v2 .v2-faq-empty svg {
+  width: 34px;
+  height: 34px;
+  margin-bottom: 10px;
+  fill: none;
+  stroke: var(--v2-primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+/* ── responsive ── */
+@media (max-width: 900px) {
+  .yk-v2 .v2-faq-card { grid-template-columns: 1fr; }
+  .yk-v2 .v2-faq-arcwrap { display: none; }
+  .yk-v2 .v2-faq-search,
+  .yk-v2 .v2-faq-search:focus-within { max-width: none; }
+}
+
+/* ── reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .yk-v2 .v2-faq *,
+  .yk-v2 .v2-faq *::before,
+  .yk-v2 .v2-faq *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .yk-v2 .v2-faq-leaf { display: none; }
 }
 
 /* ════════════════════════════════════════════════
