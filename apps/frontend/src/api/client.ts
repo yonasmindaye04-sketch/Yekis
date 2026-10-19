@@ -1,4 +1,6 @@
 
+import type { Language } from "../i18n";
+
 // === INTERFACES & TYPES ===
 export interface TelegramAuthResponse {
   accessToken: string;
@@ -1025,7 +1027,7 @@ class ApiClient {
     email: string;
     phone: string;
     password: string;
-    languagePreference: "am" | "en";
+    languagePreference: Language;
     /** BOTH is a real UserRole (see the Prisma enum and RegisterInput). */
     role: "CLIENT" | "FREELANCER" | "BOTH";
     dateOfBirth: string;

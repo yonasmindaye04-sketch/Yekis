@@ -1498,6 +1498,16 @@ export const translations = {
 
 export type TranslationsType = typeof translations.en;
 
+/**
+ * Narrows an untrusted value -- localStorage, or a languagePreference coming back
+ * from the API -- to a Language. The stored preference predates Oromiffa and
+ * Tigrigna, and the API column is a plain string, so neither can be trusted to
+ * hold one of the four.
+ */
+export function isLanguage(value: unknown): value is Language {
+  return value === "en" || value === "am" || value === "om" || value === "ti";
+}
+
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
@@ -1516,7 +1526,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "en" || saved === "am" || saved === "om" || saved === "ti") {
+      if (isLanguage(saved)) {
         return saved;
       }
       const navLang = navigator.language.toLowerCase();

@@ -72,7 +72,7 @@ import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
 import { GigSellerDashboard } from "./GigSellerDashboard";
 import { TelegramAuthPage } from "./pages/TelegramAuthPage";
-import { useI18n } from "./i18n";
+import { useI18n, isLanguage } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
 
@@ -573,8 +573,8 @@ const loadWorkspace = async () => {
     ]);
     if (meResult.status === "rejected") throw meResult.reason;
     setUser(meResult.value);
-    if (meResult.value?.languagePreference && ["en", "am", "om", "ti"].includes(meResult.value.languagePreference)) {
-      setLanguage(meResult.value.languagePreference as any);
+    if (isLanguage(meResult.value?.languagePreference)) {
+      setLanguage(meResult.value.languagePreference);
     }
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
