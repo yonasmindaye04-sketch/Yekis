@@ -1,13 +1,29 @@
 {
-  "name": "yekis",
+  "name": "ethiopian-freelance-marketplace",
   "private": true,
-  "type": "module",
+  "version": "0.1.0",
   "workspaces": [
-    "apps/frontend"
+    "apps/*",
+    "packages/*"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=frontend",
-    "build": "npm run build --workspace=frontend",
-    "lint": "npm run lint --workspace=frontend"
+    "predev": "docker compose up -d",
+    "dev": "pnpm -r --parallel dev",
+    "dev:backend": "pnpm --filter backend dev",
+    "dev:frontend": "pnpm --filter frontend dev",
+  "tunnel:cloudflare": "powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1",
+  "dev:tunnel": "node scripts/dev-with-tunnel.mjs",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "devDependencies": {
+    "ts-morph": "^28.0.0"
   }
 }

@@ -11,13 +11,20 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] })
   ],
   server: {
-    host: '0.0.0.0',
-    port: 3000,
-    allowedHosts: true,
+    host: true, // binds to 0.0.0.0 for external and tunnel traffic
+    port: 5173,
+    allowedHosts: true, // Allow all tunnel hostnames (cloudflared, ngrok, ...)
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'ngrok-skip-browser-warning': 'true',
       'X-Frame-Options': 'ALLOWALL',
+    },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+        secure: false,
+        ws: true,
+      },
     },
   },
 })
