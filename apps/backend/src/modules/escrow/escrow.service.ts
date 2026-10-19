@@ -378,10 +378,74 @@ export async function handlePaymentWebhook(params: {
       return "FAILED" as const;
     }
 
-    await tx.milestone.update({
-      where: { id: transaction.milestoneId },
+    // The money DID arrive — the provider says so and the transaction row now
+    // records that. But it must not be parked in escrow on a milestone that is
+    // no longer fundable.
+    //
+    // This write used to be unconditional, so a late SUCCESS callback could
+    // move a milestone to ESCROW_HELD whatever state it was in. The concrete
+    // case: a client cancels during the cooling-off window, which marks the
+    // contract CANCELLED and deliberately leaves the milestone in
+    // PAYMENT_PENDING — the payment they had already started then succeeds. The
+    // old code locked it in escrow on a cancelled contract, where no accept,
+    // dispute or refund path can ever reach it. The client's money, held, with
+    // no route out.
+    //
+    // Both predicates are needed and neither is sufficient alone:
+    //   - escrowState alone does not help, because cooling-off cancellation
+    //     LEAVES the milestone in PAYMENT_PENDING. The contract predicate is the
+    //     one that actually stops this case.
+    //   - contract status alone does not help, because a milestone can reach a
+    //     settled state on an ACTIVE contract.
+    const funded = await tx.milestone.updateMany({
+      where: {
+        id: transaction.milestoneId,
+        escrowState: "PAYMENT_PENDING",
+        // Only a live contract can hold funds.
+        contract: { status: "ACTIVE" },
+      },
       data: { escrowState: "ESCROW_HELD" },
     });
+
+    if (funded.count === 0) {
+      // The money is real and recorded on the transaction; the milestone is not
+      // in a state to hold it. Refusing silently would leave a known payment
+      // that nobody has been told about, so it is raised for a human to return.
+      // NOT auto-refunded: the platform should not move money on a webhook
+      // whose destination is in doubt, and this is the path a duplicate or
+      // out-of-order delivery would take.
+      await recordAuditEvent({
+        userId: transaction.milestone.contract.clientId,
+        eventType: "ESCROW_FUNDING_ORPHANED",
+        entityType: "Milestone",
+        entityId: transaction.milestoneId,
+        amountMinor: transaction.amountMinor,
+        metadata: {
+          transactionId: transaction.id,
+          provider: params.provider,
+          observedEscrowState: transaction.milestone.escrowState,
+          contractStatus: transaction.milestone.contract.status,
+        },
+      });
+
+      await tx.transactionFlag.create({
+        data: {
+          userId: transaction.milestone.contract.clientId,
+          type: "STAFF_FLAGGED",
+          status: "PENDING_REVIEW",
+          details: {
+            transactionId: transaction.id,
+            milestoneId: transaction.milestoneId,
+            amountMinor: transaction.amountMinor,
+            observedEscrowState: transaction.milestone.escrowState,
+            contractStatus: transaction.milestone.contract.status,
+          },
+          relatedEntityId: transaction.id,
+        },
+      });
+
+      return "ORPHANED" as const;
+    }
 
     await tx.user.update({
       where: { id: transaction.milestone.contract.clientId },
@@ -400,6 +464,32 @@ export async function handlePaymentWebhook(params: {
   }
 
   if (outcome === "FAILED") {
+    return;
+  }
+
+  if (outcome === "ORPHANED") {
+    // Money received, not placed, not notified as funded. The transaction row
+    // says SUCCESS and the flag says a human must return it; do NOT also send
+    // the freelancer a "your milestone is funded" notification, because no
+    // escrow exists for them to be paid from.
+    logger.error(
+      { transactionId: params.providerTransactionId, amountMinor: transaction.amountMinor },
+      "Payment succeeded for a milestone that is not in a fundable state - flagged for staff, funds NOT placed in escrow.",
+    );
+    await notifyStaffOfEvent({
+      eventType: "PAYMENT_RECEIVED_FOR_UNFUNDABLE_MILESTONE",
+      message:
+        `A payment of ${transaction.amountMinor} minor units succeeded ` +
+        `(${params.provider}) for milestone ${transaction.milestoneId}, which is in state ` +
+        `${transaction.milestone.escrowState} on a ${transaction.milestone.contract.status} contract. ` +
+        "The funds were received but NOT placed in escrow and must be returned manually.",
+      metadata: {
+        transactionId: transaction.id,
+        milestoneId: transaction.milestoneId,
+        amountMinor: transaction.amountMinor,
+        provider: params.provider,
+      },
+    });
     return;
   }
 
