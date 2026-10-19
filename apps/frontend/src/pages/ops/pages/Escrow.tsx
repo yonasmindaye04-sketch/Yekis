@@ -11,6 +11,8 @@ import { useToast } from "../components/ui";
 import { useListPage } from "../opsList";
 import { ESCROW_STATES, HELD_STATES } from "../opsConst";
 import type { Escrow } from "../opsTypes";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Banner,
   Empty,
@@ -71,7 +73,7 @@ export default function EscrowPage() {
           rest="Sum of milestones in ESCROW_HELD, WORK_IN_PROGRESS or SUBMITTED_FOR_REVIEW on this page."
         />
       ) : null}
-      <div className="card filters" style={{ marginTop: 16 }}>
+      <Card className="card filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -81,10 +83,10 @@ export default function EscrowPage() {
           />
         </div>
         <FilterSelect value={state} onChange={setState} options={ESCROW_STATES} allLabel="All escrow states" label="Escrow state" />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["Contract", "Milestone", "Freelancer", "Amount", "Held / Released", "State", "Created", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="milestones" />}
@@ -101,7 +103,7 @@ export default function EscrowPage() {
               <td style={{ fontSize: 12, color: "var(--ops-text-2)", fontWeight: 600 }}>{e.rail}</td>
               <td><Pill s={e.held ? "ADMIN_HOLD" : e.state} /></td>
               <td style={{ color: "var(--ops-text-2)" }}>{dt(e.created)}</td>
-              <td><div style={{ display: "flex", gap: 5 }}>{e.state !== "RELEASED" ? <button className="btn btn-ghost btn-sm" onClick={() => void toggleHold(e)}>{e.held ? "Unhold" : "Hold"}</button> : null}{!e.held && (e.state === "SUBMITTED_FOR_REVIEW" || e.state === "DISPUTED") ? <button className="btn btn-ghost btn-sm" onClick={() => void release(e.id)}>Release</button> : null}</div></td>
+              <td><div style={{ display: "flex", gap: 5 }}>{e.state !== "RELEASED" ? <Button variant="ghost" size="sm" onClick={() => void toggleHold(e)}>{e.held ? "Unhold" : "Hold"}</Button> : null}{!e.held && (e.state === "SUBMITTED_FOR_REVIEW" || e.state === "DISPUTED") ? <Button variant="outline" size="sm" onClick={() => void release(e.id)}>Release</Button> : null}</div></td>
             </tr>
           ))
         )}

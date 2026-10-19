@@ -22,6 +22,8 @@ import {
   Rail,
 } from "../components/ui";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 export default function Contracts() {
   const [status, setStatus] = useState("");
@@ -85,7 +87,7 @@ export default function Contracts() {
           <button className="back-link" onClick={closeDetail}>
             <ChevronLeft size={15} /> Back to contracts
           </button>
-          <div className="card card-pad">
+          <Card className="card card-pad">
             <div style={{ fontSize: 10.5, fontWeight: 800, color: "var(--ops-text-3)", textTransform: "uppercase", letterSpacing: ".08em" }}>
               Contract Overview
             </div>
@@ -137,7 +139,7 @@ export default function Contracts() {
                 </div>
               </>
             ) : null}
-          </div>
+          </Card>
         </div>
       );
     }
@@ -150,8 +152,7 @@ export default function Contracts() {
         title="Contracts"
         sub="Manage and monitor all platform contracts, milestones and disputes"
         right={
-          <button
-            className="btn btn-primary"
+          <Button
             disabled={rows.length === 0}
             onClick={() =>
               downloadCsv(
@@ -167,10 +168,10 @@ export default function Contracts() {
             }
           >
             <Download size={14} /> Export this page
-          </button>
+          </Button>
         }
       />
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -180,8 +181,8 @@ export default function Contracts() {
           />
         </div>
         <FilterSelect value={status} onChange={setStatus} options={CONTRACT_STATUSES} allLabel="All statuses" label="Contract status" />
-        <button className="btn btn-ghost" onClick={list.reload}><RefreshCw size={14} /> Refresh</button>
-      </div>
+        <Button variant="outline" onClick={list.reload}><RefreshCw size={14} /> Refresh</Button>
+      </Card>
       <OpsTable
         heads={["Contract", "Client", "Freelancer", "Milestones", "Status", "Created", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="contracts" />}

@@ -4,6 +4,8 @@ import { opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { RawGigModeration } from "../opsBackend";
 import { Empty, ErrorBox, FilterSelect, LoadingBox, PageHead, Pager, Pill, useToast } from "../components/ui";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const money = (minor: number) => `${(minor / 100).toLocaleString()} ETB`;
 
@@ -48,15 +50,15 @@ export default function GigModeration() {
       <PageHead
         title="Gig Moderation"
         sub="Review listings before they become visible to clients."
-        right={<button className="btn btn-ghost" onClick={list.reload}><RefreshCw size={14} /> Refresh</button>}
+        right={<Button variant="outline" onClick={list.reload}><RefreshCw size={14} /> Refresh</Button>}
       />
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search"><Search size={15} /><input placeholder="Search title or freelancer…" value={list.search} onChange={(e) => list.setSearch(e.target.value)} /></div>
         <FilterSelect value={status} onChange={setStatus} options={["DRAFT", "ACTIVE", "REJECTED", "PAUSED", "ARCHIVED"]} allLabel="All statuses" label="Gig status" />
-      </div>
+      </Card>
       <div className="queue-wrap">
         <div className="queue-list">
-          {list.rows.length === 0 ? <div className="card" style={{ padding: 36, textAlign: "center" }}><Empty>No gigs in this queue.</Empty></div> : list.rows.map((gig) => (
+          {list.rows.length === 0 ? <Card className="card" style={{ padding: 36, textAlign: "center" }}><Empty>No gigs in this queue.</Empty></Card> : list.rows.map((gig) => (
             <button key={gig.id} className={`q-card ${selected === gig.id ? "selected" : ""}`} onClick={() => setSelected(gig.id)}>
               <div className="q-head"><strong>{gig.title}</strong><Pill s={gig.status} /></div>
               <div className="q-sub"><span className="subject">{gig.freelancer.displayName || gig.freelancer.email}</span><span className="q-date">{new Date(gig.updatedAt).toLocaleDateString()}</span></div>
@@ -65,7 +67,7 @@ export default function GigModeration() {
           ))}
           <Pager page={list.page} pages={list.pages} total={list.total} onPage={list.setPage} unit="gigs" />
         </div>
-        <div className="queue-detail card">
+        <Card className="queue-detail card">
           {active ? <>
             <div className="qd-head"><h3 style={{ margin: 0 }}>{active.title}</h3><div className="qd-meta">{active.freelancer.email} · {active.status}</div></div>
             <div className="qd-body">
@@ -74,12 +76,12 @@ export default function GigModeration() {
               <p><strong>Packages:</strong> {active.packages.map((p) => `${p.tier} ${money(p.priceMinor)} / ${p.deliveryDays}d`).join(" · ") || "None"}</p>
               <textarea className="inp" rows={4} placeholder="Reason for rejection or internal moderation note…" value={reason} onChange={(e) => setReason(e.target.value)} />
               <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                <button className="btn btn-green" disabled={busy} onClick={() => void decide("ACTIVE")}><Check size={14} /> Approve & publish</button>
-                <button className="btn btn-red" disabled={busy} onClick={() => void decide("REJECTED")}><X size={14} /> Reject</button>
+                <Button disabled={busy} onClick={() => void decide("ACTIVE")}><Check size={14} /> Approve & publish</Button>
+                <Button variant="destructive" disabled={busy} onClick={() => void decide("REJECTED")}><X size={14} /> Reject</Button>
               </div>
             </div>
           </> : <div className="qd-body"><Empty>Select a gig to review.</Empty></div>}
-        </div>
+        </Card>
       </div>
     </div>
   );

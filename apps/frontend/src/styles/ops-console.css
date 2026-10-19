@@ -12,17 +12,18 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 .ops-root{
-  --ops-bg:#f4f6fa; --ops-panel:#ffffff; --ops-border:#e4e8f0; --ops-border-soft:#eef1f6;
-  --ops-text:#111a2e; --ops-text-2:#5b6779; --ops-text-3:#646e7b;
+  /* shadcn-inspired neutral tokens; Yekis green remains the product accent. */
+  --ops-bg:#f8fafc; --ops-panel:#ffffff; --ops-border:#e2e8f0; --ops-border-soft:#f1f5f9;
+  --ops-text:#0f172a; --ops-text-2:#475569; --ops-text-3:#64748b;
   /* Brand accent matches the app-wide Yekis green (--color-primary in
      index.css) so the console and the product read as one system. */
   --ops-primary:#16a34a; --ops-primary-soft:#dcfce7; --ops-primary-dark:#15803d;
   --ops-green:#059669; --ops-amber:#d97706; --ops-red:#dc2626;
   --ops-blue:#2563eb; --ops-violet:#7c3aed; --ops-sky:#0284c7;
-  --ops-head-bg:#fafbfd; --ops-row-hover:#f8f9fc; --ops-input:#f7f8fb; --ops-kv:#f8f9fc;
-  --ops-shadow:0 1px 2px rgba(16,24,40,.05),0 4px 16px rgba(16,24,40,.05);
-  --ops-radius:12px;
-  --ops-sidebar-w:252px; --ops-header-h:60px;
+  --ops-head-bg:#ffffff; --ops-row-hover:#f8fafc; --ops-input:#f8fafc; --ops-kv:#f8fafc;
+  --ops-shadow:0 1px 2px rgba(15,23,42,.04),0 4px 12px rgba(15,23,42,.04);
+  --ops-radius:10px;
+  --ops-sidebar-w:248px; --ops-header-h:64px;
   --ops-spring:cubic-bezier(.34,1.56,.64,1);
 
   font-family:'Inter',system-ui,-apple-system,sans-serif;
@@ -30,12 +31,12 @@
   font-size:14px;line-height:1.5;min-height:100vh;
 }
 :root[data-theme="dark"] .ops-root{
-  --ops-bg:#0d1220; --ops-panel:#151b2c; --ops-border:#242c3f; --ops-border-soft:#1e2536;
-  --ops-text:#eef2f8; --ops-text-2:#a7b1c2; --ops-text-3:#8492a6;
+  --ops-bg:#09090b; --ops-panel:#0f1013; --ops-border:#27272a; --ops-border-soft:#1f1f22;
+  --ops-text:#fafafa; --ops-text-2:#a1a1aa; --ops-text-3:#71717a;
   --ops-primary:#22c55e; --ops-primary-soft:rgba(34,197,94,.16); --ops-primary-dark:#4ade80;
   --ops-green:#34d399; --ops-amber:#fbbf24; --ops-red:#f87171;
   --ops-blue:#60a5fa; --ops-violet:#a78bfa; --ops-sky:#38bdf8;
-  --ops-head-bg:#121828; --ops-row-hover:#1a2133; --ops-input:#101625; --ops-kv:#121826;
+  --ops-head-bg:#0f1013; --ops-row-hover:#18181b; --ops-input:#151518; --ops-kv:#151518;
   --ops-shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
 }
 .ops-root *,.ops-root *::before,.ops-root *::after{box-sizing:border-box}
@@ -49,6 +50,26 @@
 .ops-root .main{flex:1;margin-left:var(--ops-sidebar-w);display:flex;flex-direction:column;min-width:0}
 .ops-root .header{height:var(--ops-header-h);background:color-mix(in srgb,var(--ops-panel) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ops-border);display:flex;align-items:center;gap:12px;padding:0 24px;position:sticky;top:0;z-index:50}
 .ops-root .content{padding:28px;max-width:1440px;width:100%}
+
+/* Local shadcn-style primitives. They are intentionally framework-agnostic so
+   existing admin pages can adopt them incrementally without a route rewrite. */
+.ops-root .ui-card{background:var(--ops-panel);border:1px solid var(--ops-border);border-radius:var(--ops-radius);box-shadow:var(--ops-shadow)}
+.ops-root .ui-card-header{display:flex;flex-direction:column;gap:6px;padding:20px 20px 0}
+.ops-root .ui-card-title{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
+.ops-root .ui-card-content{padding:20px}
+.ops-root .ui-badge{display:inline-flex;align-items:center;border:1px solid var(--ops-border);border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700;line-height:1.4}
+.ops-root .ui-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid transparent;border-radius:8px;font-family:inherit;font-size:13px;font-weight:600;line-height:1.2;white-space:nowrap;transition:background .15s,border-color .15s,color .15s,box-shadow .15s}
+.ops-root .ui-button-default{background:var(--ops-primary);color:#fff;box-shadow:0 1px 2px rgba(15,23,42,.1)}
+.ops-root .ui-button-default:hover{background:var(--ops-primary-dark)}
+.ops-root .ui-button-outline{background:var(--ops-panel);border-color:var(--ops-border);color:var(--ops-text)}
+.ops-root .ui-button-outline:hover,.ops-root .ui-button-ghost:hover{background:var(--ops-row-hover)}
+.ops-root .ui-button-ghost{background:transparent;color:var(--ops-text-2)}
+.ops-root .ui-button-destructive{background:var(--ops-red);color:#fff}
+.ops-root .ui-button-default,.ops-root .ui-button-outline,.ops-root .ui-button-ghost,.ops-root .ui-button-destructive{padding:9px 14px}
+.ops-root .ui-button-sm{padding:7px 11px;font-size:12px}
+.ops-root .ui-button-icon{width:36px;height:36px;padding:0}
+.ops-root .ui-button:focus-visible{outline:2px solid var(--ops-primary);outline-offset:2px}
+.ops-root .ui-button:disabled{opacity:.5;cursor:not-allowed}
 
 .ops-root .brand{display:flex;align-items:center;gap:10px;padding:0 20px;height:var(--ops-header-h);border-bottom:1px solid var(--ops-border);flex-shrink:0}
 /* The Yekis Jobs mark ships as an opaque near-white 800×800 tile, so it is
@@ -149,7 +170,7 @@
 :root[data-theme="dark"] .ops-root .p-gray{color:#9ca3af}
 
 /* filters + inputs */
-.ops-root .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 16px;margin-bottom:16px}
+.ops-root .filters{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:16px;margin-bottom:16px;background:var(--ops-panel);border:1px solid var(--ops-border);border-radius:var(--ops-radius);box-shadow:var(--ops-shadow)}
 .ops-root .f-search{position:relative;flex:1;min-width:200px}
 .ops-root .f-search>svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--ops-text-3)}
 .ops-root .f-search input{width:100%;padding:8px 12px 8px 34px;border:1px solid var(--ops-border);border-radius:9px;background:var(--ops-input);outline:none}
@@ -186,8 +207,8 @@
 /* tables */
 .ops-root .tbl-wrap{overflow-x:auto}
 .ops-root table.tbl{width:100%;border-collapse:collapse}
-.ops-root .tbl th{text-align:left;font-size:10.5px;font-weight:800;color:var(--ops-text-3);text-transform:uppercase;letter-spacing:.08em;padding:12px 16px;border-bottom:1px solid var(--ops-border);background:var(--ops-head-bg);white-space:nowrap}
-.ops-root .tbl td{padding:13px 16px;border-bottom:1px solid var(--ops-border-soft);vertical-align:middle;white-space:nowrap}
+.ops-root .tbl th{text-align:left;font-size:10.5px;font-weight:700;color:var(--ops-text-3);text-transform:uppercase;letter-spacing:.08em;padding:12px 16px;border-bottom:1px solid var(--ops-border);background:var(--ops-head-bg);white-space:nowrap}
+.ops-root .tbl td{padding:14px 16px;border-bottom:1px solid var(--ops-border-soft);vertical-align:middle;white-space:nowrap}
 .ops-root .tbl tbody tr{transition:background .12s}
 .ops-root .tbl tbody tr:hover{background:var(--ops-row-hover)}
 .ops-root .tbl tbody tr.clickable{cursor:pointer}

@@ -25,6 +25,8 @@ import {
   useToast,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const KYC_REASONS = [
   "Photo is unclear, blurry, or cropped. Please re-upload a clear image.",
@@ -186,7 +188,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         <Kv k="With documents" v={String(rows.filter((k) => k.docs.length > 0).length)} />
       </div>
       {status === "UNDER_REVIEW" && counts ? (
-        <div className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
+        <Card className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
           <b>{counts.underReview.toLocaleString()}</b> awaiting review (shown below).{" "}
           {counts.pending > 0 ? (
             <>
@@ -195,12 +197,12 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
               as pending KYC.{" "}
             </>
           ) : null}
-          <button className="btn btn-ghost" style={{ marginLeft: 8 }} onClick={() => { setStatus(""); setSelId(null); }}>
+          <Button variant="outline" size="sm" style={{ marginLeft: 8 }} onClick={() => { setStatus(""); setSelId(null); }}>
             Show all statuses
-          </button>
-        </div>
+          </Button>
+        </Card>
       ) : null}
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -219,17 +221,17 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           allLabel="All statuses"
           label="KYC status"
         />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+            <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={ShieldCheck}>No KYC applications in this view.</Empty>
-            </div>
+            </Card>
           ) : (
             rows.map((k) => (
               <button
@@ -265,7 +267,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         </div>
 
         {detail ? (
-          <div className="queue-detail card">
+          <Card className="queue-detail card">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>Identity Review</h3>
@@ -334,18 +336,18 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 {/* Was `disabled={busy || !(sel.pep || sel.dup)}`, which meant a
                     reviewer could only reject PEP and duplicate cases — a plain
                     blurry-photo rejection was impossible from the queue. */}
-                <button className="btn btn-red" disabled={busy} onClick={() => void decide("REJECTED")}>
+                <Button variant="destructive" disabled={busy} onClick={() => void decide("REJECTED")}>
                   Reject
-                </button>
-                <button className="btn btn-amber" disabled={busy} onClick={() => void decide("CLEARER")}>
+                </Button>
+                <Button variant="outline" disabled={busy} onClick={() => void decide("CLEARER")}>
                   Ask for Clearer Photo
-                </button>
-                <button className="btn btn-green" disabled={busy} title="Press A" onClick={() => void decide("VERIFIED")}>
+                </Button>
+                <Button disabled={busy} title="Press A" onClick={() => void decide("VERIFIED")}>
                   <Check size={15} /> Approve{" "}
                   <span className="kbd" style={{ background: "rgba(255,255,255,.25)", borderColor: "rgba(255,255,255,.4)", color: "#fff" }}>
                     A
                   </span>
-                </button>
+                </Button>
               </div>
               {reason === "custom" ? (
                 <div style={{ marginTop: 10 }}>
@@ -358,9 +360,9 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 <span className="kbd">Esc</span> close viewer
               </div>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="queue-detail card">
+          <Card className="queue-detail card">
             <div className="empty-detail">
               <UserCheck size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a record to review.</p>
@@ -368,7 +370,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate the queue
               </span>
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </div>

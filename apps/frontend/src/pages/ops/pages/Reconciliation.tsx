@@ -9,6 +9,8 @@ import { fmt, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { RECON_STATUSES, RAILS } from "../opsConst";
 import type { ReconRow } from "../opsTypes";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Banner,
   Empty,
@@ -59,7 +61,7 @@ export default function Reconciliation() {
           rest="Amounts differ between provider rail and internal ledger — investigate before the next settlement run."
         />
       ) : null}
-      <div className="card filters" style={{ marginTop: 16 }}>
+      <Card className="card filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -70,10 +72,10 @@ export default function Reconciliation() {
         </div>
         <FilterSelect value={recStatus} onChange={setRecStatus} options={RECON_STATUSES} allLabel="All reconciliation status" label="Reconciliation status" />
         <FilterSelect value={provider} onChange={setProvider} options={RAILS} allLabel="Any rail" label="Provider" humanise={false} />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["Provider TX ID", "Provider", "Internal Amount", "Escrow State", "Rec Status", "Difference"]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="transactions" />}

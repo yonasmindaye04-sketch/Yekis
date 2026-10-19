@@ -17,6 +17,8 @@ import type { LucideIcon } from "lucide-react";
 import { fmt } from "../opsApi";
 import type { Rail as RailT } from "../opsTypes";
 import { Sparkline } from "./charts";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 /* ── toast ─ */
 export const ToastContext = createContext<(msg: string) => void>(() => {});
@@ -166,7 +168,7 @@ export function StatCard({
   spark?: number[];
 }) {
   return (
-    <div className="card stat">
+    <Card className="card stat">
       {trend ? (
         <span className={`stat-t ${trend === "up" ? "t-up" : "t-dn"}`}>
           {trend === "up" ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
@@ -179,7 +181,7 @@ export function StatCard({
       <div className="stat-v">{value}</div>
       <div className="stat-l">{label}</div>
       {spark ? <Sparkline data={spark} color={color} /> : null}
-    </div>
+    </Card>
   );
 }
 
@@ -224,7 +226,7 @@ export function OpsTable({
   children: ReactNode;
 }) {
   return (
-    <div className="card">
+    <Card className="card">
       <div className="tbl-wrap">
         <table className="tbl">
           <thead>
@@ -238,7 +240,7 @@ export function OpsTable({
         </table>
       </div>
       {foot}
-    </div>
+    </Card>
   );
 }
 
@@ -263,20 +265,22 @@ export function Pager({
         Page {page} of {pages} · {total.toLocaleString()} {unit}
       </span>
       <div className="pager-btns">
-        <button
-          className="btn btn-ghost btn-sm"
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!canNav || page <= 1}
           onClick={() => onPage?.(page - 1)}
         >
           ← Prev
-        </button>
-        <button
-          className="btn btn-ghost btn-sm"
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
           disabled={!canNav || page >= pages}
           onClick={() => onPage?.(page + 1)}
         >
           Next →
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -327,7 +331,7 @@ export function ErrorBox({ error, reload }: { error: string; reload: () => void 
       </span>
       <div>
         <b>Could not load data.</b> {error}{" "}
-        <button className="btn btn-ghost btn-sm" onClick={reload}>Retry</button>
+        <Button variant="ghost" size="sm" onClick={reload}>Retry</Button>
       </div>
     </div>
   );

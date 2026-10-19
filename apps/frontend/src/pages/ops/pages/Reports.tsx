@@ -9,6 +9,8 @@ import type { ReportsBundle } from "../opsTypes";
 import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
 import { ErrorBox, Kv, LoadingBox, PageHead, SecTitle } from "../components/ui";
 import { toCsv, downloadCsv, etb } from "../opsExport";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const ST_C: Record<string, string> = {
   ACTIVE: "#059669",
@@ -69,8 +71,8 @@ export default function Reports() {
         sub={`Financial and marketplace analytics · generated ${dts(new Date().toISOString())}`}
         right={
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>
-            <button className="btn btn-primary" onClick={download}><Download size={14} /> Export CSV</button>
+            <Button variant="outline" onClick={reload}><RefreshCw size={14} /> Refresh</Button>
+            <Button onClick={download}><Download size={14} /> Export CSV</Button>
           </div>
         }
       />
@@ -94,20 +96,20 @@ export default function Reports() {
         <Kv k="Open Risk Flags" v={mk.flags} warn />
       </div>
       <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <SecTitle icon={BarChart3}>
             Transaction Volume — last 12 weeks{" "}
             <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>ETB millions / week</span>
           </SecTitle>
           <AreaChart labels={data.series.volume12.labels} values={data.series.volume12.values} color="#059669" />
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <SecTitle icon={Briefcase}>Contracts by Status</SecTitle>
           <Donut segs={statusSegs} centerSub="contracts" />
-        </div>
+        </Card>
       </div>
       <div className="grid gc-1-1">
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <SecTitle icon={CreditCard}>Rail Volume — monthly</SecTitle>
           <BarChart
             labels={data.series.railMonthly.labels}
@@ -117,11 +119,11 @@ export default function Reports() {
             ]}
           />
           <ChartLegend series={[{ name: "Telebirr", color: "#22c55e" }, { name: "CBE Birr", color: "#3b82f6" }]} />
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <SecTitle icon={Briefcase}>Completed Contracts by Category</SecTitle>
           <HBars rows={data.series.categoryDone.map((c) => ({ ...c, meta: "completed" }))} />
-        </div>
+        </Card>
       </div>
     </div>
   );

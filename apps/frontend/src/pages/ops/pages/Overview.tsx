@@ -28,6 +28,8 @@ import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
 import { useOpsUi } from "../opsUiContext";
 import type { OpsPageId } from "../opsNav";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 const ESC_C: Record<string, string> = {
   ESCROW_HELD: "#0284c7",
@@ -97,9 +99,9 @@ export default function Overview() {
         title="Command Center"
         sub={`Platform health, financial controls and staff review queues · updated ${dts(data.health.checkedAt)}`}
         right={
-          <button className="btn btn-ghost" onClick={reload}>
+          <Button variant="outline" onClick={reload}>
             <RefreshCw size={14} /> Refresh
-          </button>
+          </Button>
         }
       />
 
@@ -126,7 +128,7 @@ export default function Overview() {
       />
 
       <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div className="sec-title">
             <BarChart3 size={16} /> Transaction Volume — last 14 days{" "}
             <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
@@ -137,17 +139,17 @@ export default function Overview() {
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Derived from the most recent 100 payment records — earlier days fall away as volume grows.
           </div>
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">
             <DollarSign size={16} /> Escrow by State
           </div>
           {escSegs.length ? <Donut segs={escSegs} centerSub="in escrow" /> : <Empty icon={DollarSign}>No escrow rows.</Empty>}
-        </div>
+        </Card>
       </div>
 
       <div className="grid gc-1-1" style={{ marginBottom: 16 }}>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div className="sec-title">
             <Wallet size={16} /> Payouts vs Refunds — weekly
           </div>
@@ -162,8 +164,8 @@ export default function Overview() {
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Weekly buckets from the most recent 100 payouts and escrow records.
           </div>
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">
             <Activity size={16} /> Review Workload — open items per queue
           </div>
@@ -171,16 +173,16 @@ export default function Overview() {
           <div className="kbd-hint" style={{ marginTop: 6 }}>
             Bars are relative to the busiest queue — rebalance staff where the bar is longest.
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="grid gc-2-1">
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
             <div className="sec-title" style={{ marginBottom: 0 }}>Recent Activity</div>
-            <button className="btn btn-ghost btn-sm" onClick={() => ui.navigate("audit")}>
+            <Button variant="ghost" size="sm" onClick={() => ui.navigate("audit")}>
               View all
-            </button>
+            </Button>
           </div>
           {data.activity.map((a, i) => {
             const [fg, Icon] = actTone(a.a);
@@ -199,8 +201,8 @@ export default function Overview() {
               </div>
             );
           })}
-        </div>
-        <div className="card card-pad">
+        </Card>
+        <Card className="card card-pad">
           <div className="sec-title">Work Queues</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {qa.map(([pg, l, n, Icon, c]) => (
@@ -215,7 +217,7 @@ export default function Overview() {
               </button>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

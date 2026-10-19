@@ -22,6 +22,8 @@ import {
   useToast,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 
 export default function Payouts() {
   const ui = useOpsUi();
@@ -85,7 +87,7 @@ export default function Payouts() {
           rest="Confirm once the transfer executed on the rail — failing re-credits the wallet."
         />
       ) : null}
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -96,10 +98,10 @@ export default function Payouts() {
         </div>
         <FilterSelect value={status} onChange={setStatus} options={PAYOUT_STATUSES} allLabel="Any status" label="Payout status" />
         <FilterSelect value={provider} onChange={setProvider} options={RAILS} allLabel="Any rail" label="Provider" humanise={false} />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["Freelancer", "Payout Acct", "Provider Ref", "Provider", "Net", "Status", "Reason", "Settle"]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="payouts" />}
@@ -167,9 +169,9 @@ function PayoutRow({
         </td>
         <td>
           {settleable ? (
-            <button className="btn btn-ghost btn-sm" onClick={onToggle}>
+            <Button variant="ghost" size="sm" onClick={onToggle}>
               {open ? "Close" : "Settle"} <ChevronDown size={12} />
-            </button>
+            </Button>
           ) : (
             <span style={{ color: "var(--ops-text-3)" }}>—</span>
           )}
@@ -188,9 +190,9 @@ function PayoutRow({
                 <input className="inp" placeholder="e.g. Wrong account number" value={reasonVal} onChange={(e) => onReason(e.target.value)} />
               </div>
               <div style={{ display: "flex", gap: 8 }}>
-                <button className="btn btn-green btn-sm" disabled={busy} onClick={() => onSettle("CONFIRMED")}><Check size={13} /> Confirm</button>
-                <button className="btn btn-red btn-sm" disabled={busy} onClick={() => onSettle("FAILED")}><X size={13} /> Failed</button>
-                <button className="btn btn-ghost btn-sm" onClick={onToggle}>Cancel</button>
+                <Button size="sm" disabled={busy} onClick={() => onSettle("CONFIRMED")}><Check size={13} /> Confirm</Button>
+                <Button variant="destructive" size="sm" disabled={busy} onClick={() => onSettle("FAILED")}><X size={13} /> Failed</Button>
+                <Button variant="ghost" size="sm" onClick={onToggle}>Cancel</Button>
               </div>
             </div>
           </td>

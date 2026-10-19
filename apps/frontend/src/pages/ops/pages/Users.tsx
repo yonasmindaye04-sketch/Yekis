@@ -20,6 +20,8 @@ import { dt, fmt, opsApi, opsListApi, withUserDetail } from "../opsApi";
 import { useListPage } from "../opsList";
 import { USER_ROLES } from "../opsConst";
 import type { User } from "../opsTypes";
+import { Button } from "../../../components/ui/Button";
+import { Card } from "../../../components/ui/Card";
 import {
   Empty,
   ErrorBox,
@@ -130,7 +132,7 @@ export default function UsersPage() {
         <button className="back-link" onClick={closeDetail}>
           <ChevronLeft size={15} /> Back to users
         </button>
-        <div className="card card-pad">
+        <Card className="card card-pad">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
               <div className="avatar" style={{ width: 52, height: 52, fontSize: 16 }}>
@@ -170,17 +172,17 @@ export default function UsersPage() {
           <div className="sec-title" style={{ marginTop: 22 }}>Moderation</div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             {detail.suspended ? (
-              <button className="btn btn-green btn-sm" onClick={() => void moderate(detail, "unsuspend")}>
+              <Button size="sm" onClick={() => void moderate(detail, "unsuspend")}>
                 <UserCheck size={13} /> Reinstate account
-              </button>
+              </Button>
             ) : (
-              <button className="btn btn-red btn-sm" onClick={() => void moderate(detail, "suspend")}>
+              <Button variant="destructive" size="sm" onClick={() => void moderate(detail, "suspend")}>
                 <UserX size={13} /> Suspend account
-              </button>
+              </Button>
             )}
-            <button className="btn btn-ghost btn-sm" onClick={() => void moderate(detail, "rereview")}>
+            <Button variant="outline" size="sm" onClick={() => void moderate(detail, "rereview")}>
               <ShieldAlert size={13} /> Force KYC re-review
-            </button>
+            </Button>
           </div>
           {detailRaw ? <>
             <div className="sec-title" style={{ marginTop: 22 }}>Recent support conversations</div>
@@ -192,7 +194,7 @@ export default function UsersPage() {
             Suspension requires <span className="mono">users.suspend</span>; forcing re-review requires{" "}
             <span className="mono">kyc.review</span>. Both are enforced server-side and audited.
           </div>
-        </div>
+        </Card>
       </div>
     );
   }
@@ -206,7 +208,7 @@ export default function UsersPage() {
         <Kv k="Suspended" v={String(rows.filter((u) => u.suspended).length)} warn />
         <Kv k="KYC verified" v={String(rows.filter((u) => u.kyc === "VERIFIED").length)} />
       </div>
-      <div className="card filters">
+      <Card className="card filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -216,10 +218,10 @@ export default function UsersPage() {
           />
         </div>
         <FilterSelect value={role} onChange={setRole} options={USER_ROLES} allLabel="All roles" label="Role" />
-        <button className="btn btn-ghost" onClick={reload}>
+        <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
-        </button>
-      </div>
+        </Button>
+      </Card>
       <OpsTable
         heads={["User", "Contact", "Role", "KYC", "Status", "Joined", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="accounts" />}
