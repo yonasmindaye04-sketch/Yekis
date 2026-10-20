@@ -2511,3 +2511,77 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .yk-avatar-wrap.yk-blobatar { background: transparent; border: none; box-shadow: none; overflow: visible !important; }
 .yk-avatar-wrap.yk-blobatar .yk-blobatar-svg { transform: scale(1.6); }
 
+/* ==========================================================================
+   GLOBAL MULTI-DEVICE RESPONSIVE FOUNDATION (320px -> 1920px+)
+   ========================================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  overflow-x: clip;
+  max-width: 100%;
+}
+
+img, video, iframe, canvas {
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* Prevent iOS auto-zoom on form focus by ensuring >= 16px font size */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1rem);
+  }
+
+  /* Auth & Verification Responsive Stacking */
+  .auth-panel {
+    padding: 24px 16px;
+  }
+
+  .auth-card {
+    padding: 22px 16px;
+    width: 100%;
+  }
+
+  .role-picker {
+    grid-template-columns: 1fr;
+  }
+
+  /* Gig Marketplace & Seller Dashboard Responsive Adaptation */
+  .gig-grid,
+  .gigs-grid,
+  .seller-stats-grid,
+  .profile-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kyc-queue-container,
+  .detail-split {
+    flex-direction: column;
+    height: auto;
+  }
+
+  .kyc-queue-list {
+    max-width: 100%;
+    border-right: none;
+    padding-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-row-split,
+  .form-row-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .overview-meta {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 0 14px 24px !important;
+  }
+}
+
+

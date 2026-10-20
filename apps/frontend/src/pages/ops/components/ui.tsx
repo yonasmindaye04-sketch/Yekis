@@ -3,7 +3,7 @@
    All class names are scoped under .ops-root by ops-console.css.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 import {
   ArrowDownRight,
@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Clock,
   XCircle,
+  LayoutList,
+  Table2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { fmt } from "../opsApi";
@@ -225,10 +227,49 @@ export function OpsTable({
   foot?: ReactNode;
   children: ReactNode;
 }) {
+  const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">("cards");
+  const tableRef = useRef<HTMLTableElement | null>(null);
+
+  useEffect(() => {
+    const tbl = tableRef.current;
+    if (!tbl) return;
+    const rows = tbl.querySelectorAll("tbody > tr");
+    rows.forEach((tr) => {
+      const cells = tr.querySelectorAll(":scope > td");
+      if (cells.length === 1 && cells[0].hasAttribute("colspan")) return;
+      cells.forEach((td, idx) => {
+        if (heads[idx]) {
+          td.setAttribute("data-label", heads[idx]);
+        }
+      });
+    });
+  }, [heads, children, mobileViewMode]);
+
   return (
     <Card className="card">
-      <div className="tbl-wrap">
-        <table className="tbl">
+      <div className="ops-table-view-bar" role="group" aria-label="Mobile table layout">
+        <span className="ops-table-view-label">Mobile View</span>
+        <div className="ops-table-view-seg">
+          <button
+            type="button"
+            className={`ops-view-btn ${mobileViewMode === "cards" ? "active" : ""}`}
+            onClick={() => setMobileViewMode("cards")}
+            aria-pressed={mobileViewMode === "cards"}
+          >
+            <LayoutList size={13} /> Cards
+          </button>
+          <button
+            type="button"
+            className={`ops-view-btn ${mobileViewMode === "table" ? "active" : ""}`}
+            onClick={() => setMobileViewMode("table")}
+            aria-pressed={mobileViewMode === "table"}
+          >
+            <Table2 size={13} /> Table
+          </button>
+        </div>
+      </div>
+      <div className={`tbl-wrap ${mobileViewMode === "cards" ? "ops-tbl-cards-mode" : "ops-tbl-scroll-mode"}`}>
+        <table ref={tableRef} className="tbl">
           <thead>
             <tr>
               {heads.map((h) => (

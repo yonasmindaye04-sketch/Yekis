@@ -25,6 +25,7 @@ import {
   Search,
   Sun,
   Moon,
+  Menu,
 } from "lucide-react";
 import type { MeResponse } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
@@ -102,12 +103,14 @@ export interface OpsConsoleProps {
   user?: MeResponse | null;
   /** Called when the reviewer signs out or leaves the console. */
   onExit?: () => void;
+  /** Optional 1-click persona switcher for platform testing. */
+  onSwitchPersona?: (role: "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN") => void;
 }
 
 /** localStorage key holding the sidebar collapsed/expanded preference. */
 const NAV_KEY = "yekis-ops-nav";
 
-export function OpsConsole({ user, onExit }: OpsConsoleProps) {
+export function OpsConsole({ user, onExit, onSwitchPersona }: OpsConsoleProps) {
   const { theme, toggleTheme } = useTheme();
   const { sidebarVariant } = useShadcnLayout();
   const perms = useOpsPerms(user?.staffRole);
@@ -186,17 +189,19 @@ const toast = useCallback((msg: string) => {
     toastTimer.current = window.setTimeout(() => setToastMsg(null), 3200);
   }, []);
 
-  /* Ctrl/⌘+K — palette toggle (queue hotkeys live inside each page) */
+  /* Ctrl/⌘+K — palette toggle + Escape to close mobile sidebar drawer */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((o) => !o);
+      } else if (e.key === "Escape" && sidebarOpen) {
+        setSidebarOpen(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [sidebarOpen]);
 
   useEffect(() => () => window.clearTimeout(toastTimer.current), []);
 
@@ -339,6 +344,34 @@ const toast = useCallback((msg: string) => {
                     <span className="kbd srch-kbd">Ctrl K</span>
                   </div>
                   <div className="hdr-right">
+                    {onSwitchPersona && (
+                      <select
+                        className="sh-select"
+                        value="ADMIN"
+                        onChange={(e) =>
+                          onSwitchPersona(
+                            e.target.value as "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN",
+                          )
+                        }
+                        aria-label="Switch test persona"
+                        title="Switch test persona across the platform"
+                        style={{ minHeight: 34, fontSize: 12.5, padding: "0 10px" }}
+                      >
+                        <option value="ADMIN">Persona: Ops Console (Admin)</option>
+                        <option value="CLIENT">Persona: Client (Abebe)</option>
+                        <option value="FREELANCER">Persona: Freelancer (Hanna)</option>
+                        <option value="BOTH">Persona: Dual-Role (Dawit)</option>
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-btn ops-mobile-search-btn"
+                      onClick={() => setPaletteOpen(true)}
+                      aria-label="Search or jump to page"
+                      title="Search or jump to page (Ctrl+K)"
+                    >
+                      <Search size={17} />
+                    </button>
                     <LayoutCustomizerTrigger />
                     <button
                       className="icon-btn"
@@ -356,6 +389,33 @@ const toast = useCallback((msg: string) => {
                 </main>
               </div>
             </div>
+
+            <nav className="ops-bottom-nav" aria-label="Operations mobile navigation">
+              {groups
+                .flatMap((g) => g.items)
+                .slice(0, 4)
+                .map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`ops-bottom-nav-item ${activePage === item.id && !sidebarOpen ? "active" : ""}`}
+                    onClick={() => navigate(item.id)}
+                  >
+                    <item.icon size={18} />
+                    <span>{item.name}</span>
+                  </button>
+                ))}
+              <button
+                type="button"
+                className={`ops-bottom-nav-item ${sidebarOpen ? "active" : ""}`}
+                onClick={() => setSidebarOpen((o) => !o)}
+                aria-expanded={sidebarOpen}
+                aria-label="Toggle operations menu drawer"
+              >
+                <Menu size={18} />
+                <span>Menu</span>
+              </button>
+            </nav>
 
             {viewer ? (
               <EvidenceViewer docs={viewer.docs} startIdx={viewer.idx} onClose={() => setViewer(null)} />

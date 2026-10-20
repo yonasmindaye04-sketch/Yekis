@@ -1150,3 +1150,64 @@
   margin: 0;
   line-height: 1.4;
 }
+
+@media (max-width: 768px) {
+  .chat-workspace {
+    height: calc(100dvh - 180px);
+    min-height: 460px;
+  }
+
+  .chat-mobile-back {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .chat-window-header {
+    padding: 10px 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chat-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .chat-bubble {
+    max-width: 86%;
+  }
+
+  .composer-input-box textarea,
+  .chat-search-box input,
+  .form-group input {
+    font-size: 16px;
+  }
+
+  .composer-send-btn,
+  .composer-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-grid,
+  .deal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-modal-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .chat-modal-footer button {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+}
+

@@ -1,8 +1,9 @@
 /* ────────────────────────────────────────────────────────────────────────
    mockData.ts — Stateful in-memory Ethiopian marketplace & Ops Console
    fallback store. Ensures all Client, Freelancer, Dual-Role, and Staff
-   Operations Console views, charts, tables, Kanban boards, and calendars
-   operate with rich, realistic data even when the backend DB is offline.
+   Operations Console views, charts, tables, Kanban boards, calendars,
+   proposals, contracts, escrow milestones, gigs, disputes, portfolios,
+   reviews, chat, and notifications operate with rich, realistic data.
    ──────────────────────────────────────────────────────────────────────── */
 
 import type {
@@ -18,7 +19,8 @@ import type {
   ChatConversation,
   ChatMessage,
   SkillSummary,
-  SelfProfile,
+  Proposal,
+  NotificationItem,
 } from "./client";
 
 const DAY = 86_400_000;
@@ -110,16 +112,20 @@ class MockStore {
 
   walletMinor = 31920000;
 
-  skills: SkillSummary[] = [
-    { id: "sk-1", name: "React & TypeScript", category: "WEB_APP_DEVELOPMENT" },
-    { id: "sk-2", name: "Telebirr & Chapa API", category: "WEB_APP_DEVELOPMENT" },
-    { id: "sk-3", name: "UI/UX & Figma Design", category: "GRAPHIC_DESIGN" },
-    { id: "sk-4", name: "Amharic & Afaan Oromo Localization", category: "TRANSLATION" },
-    { id: "sk-5", name: "Node.js & PostgreSQL", category: "WEB_APP_DEVELOPMENT" },
-    { id: "sk-6", name: "SEO & Growth Marketing", category: "DIGITAL_MARKETING" },
+  skills: (SkillSummary & { nameEn: string; nameAm: string })[] = [
+    { id: "sk-1", name: "React & TypeScript", nameEn: "React & TypeScript", nameAm: "ሪአክት እና ታይፕስክሪፕት", category: "WEB_APP_DEVELOPMENT" },
+    { id: "sk-2", name: "Telebirr & CBE Birr API", nameEn: "Telebirr & CBE Birr API", nameAm: "የቴሌብር እና ሲቢኢ ብር ኤፒአይ", category: "WEB_APP_DEVELOPMENT" },
+    { id: "sk-3", name: "UI/UX & Figma Design", nameEn: "UI/UX & Figma Design", nameAm: "የገጽታ ዲዛይን (Figma)", category: "GRAPHIC_DESIGN" },
+    { id: "sk-4", name: "Amharic & Afaan Oromo Localization", nameEn: "Amharic & Afaan Oromo Localization", nameAm: "የአማርኛ እና አፋን ኦሮሞ ትርጉም", category: "TRANSLATION" },
+    { id: "sk-5", name: "Node.js & PostgreSQL", nameEn: "Node.js & PostgreSQL", nameAm: "ኖድ ጄኤስ እና ፖስትግሬስ", category: "WEB_APP_DEVELOPMENT" },
+    { id: "sk-6", name: "SEO & Growth Marketing", nameEn: "SEO & Growth Marketing", nameAm: "ዲጂታል ግብይት እና ኤስኢኦ", category: "DIGITAL_MARKETING" },
+    { id: "sk-7", name: "Telegram Mini-App Engineering", nameEn: "Telegram Mini-App Engineering", nameAm: "የቴሌግራም ሚኒ-አፕ ልማት", category: "WEB_APP_DEVELOPMENT" },
+    { id: "sk-8", name: "Brand Identity & Packaging", nameEn: "Brand Identity & Packaging", nameAm: "የብራንድ ማንነት እና ዲዛይን", category: "GRAPHIC_DESIGN" },
+    { id: "sk-9", name: "B2B Copywriting & Grant Proposals", nameEn: "B2B Copywriting & Grant Proposals", nameAm: "የይዘት ጽሑፍ እና ፕሮፖዛል", category: "CONTENT_WRITING" },
+    { id: "sk-10", name: "Financial Data ETL & Reconciliation", nameEn: "Financial Data ETL & Reconciliation", nameAm: "የፋይናንስ ዳታ ትንተና", category: "DATA_ENTRY" },
   ];
 
-  jobs: Job[] = [
+  jobs: (Job & { _count?: { proposals?: number } })[] = [
     {
       id: "job-101",
       clientId: "usr-client-01",
@@ -132,10 +138,12 @@ class MockStore {
       deadline: isoDaysFromNow(14),
       status: "OPEN",
       createdAt: isoDaysAgo(3),
+      proposalsCount: 3,
+      _count: { proposals: 3 },
     },
     {
       id: "job-102",
-      clientId: "usr-client-02",
+      clientId: "usr-client-01",
       title: "Addis Coffee Export Traceability Dashboard & ERP",
       description:
         "Build an executive supply-chain analytics portal tracking ECX coffee lots from Yirgacheffe and Sidama washing stations to Djibouti port dispatch with tabular ledger exports.",
@@ -145,10 +153,12 @@ class MockStore {
       deadline: isoDaysFromNow(21),
       status: "OPEN",
       createdAt: isoDaysAgo(5),
+      proposalsCount: 2,
+      _count: { proposals: 2 },
     },
     {
       id: "job-103",
-      clientId: "usr-client-01",
+      clientId: "usr-both-01",
       title: "Fayda National ID KYC Onboarding Flow & Brand System",
       description:
         "Create a high-contrast Figma component library and selfie verification onboarding UX compliant with Ethiopian National ID (Fayda eSignet) accessibility standards.",
@@ -158,10 +168,12 @@ class MockStore {
       deadline: isoDaysFromNow(10),
       status: "OPEN",
       createdAt: isoDaysAgo(6),
+      proposalsCount: 2,
+      _count: { proposals: 2 },
     },
     {
       id: "job-104",
-      clientId: "usr-client-03",
+      clientId: "usr-client-01",
       title: "Amharic, Tigrinya & Afaan Oromo FinTech App Localization",
       description:
         "Translate and culturally adapt 1,850 mobile banking UI strings, legal terms, and customer support scripts with Ethiopic typography QA.",
@@ -171,10 +183,12 @@ class MockStore {
       deadline: isoDaysFromNow(7),
       status: "OPEN",
       createdAt: isoDaysAgo(2),
+      proposalsCount: 1,
+      _count: { proposals: 1 },
     },
     {
       id: "job-105",
-      clientId: "usr-client-02",
+      clientId: "usr-both-01",
       title: "Bole Retail E-Commerce Performance Marketing Campaign",
       description:
         "Plan and execute a 60-day Telegram channel, TikTok, and Google Search conversion campaign for an Addis Ababa electronics retailer with weekly ROAS attribution.",
@@ -184,6 +198,8 @@ class MockStore {
       deadline: isoDaysFromNow(18),
       status: "OPEN",
       createdAt: isoDaysAgo(8),
+      proposalsCount: 1,
+      _count: { proposals: 1 },
     },
     {
       id: "job-106",
@@ -197,6 +213,273 @@ class MockStore {
       deadline: isoDaysFromNow(12),
       status: "OPEN",
       createdAt: isoDaysAgo(4),
+      proposalsCount: 1,
+      _count: { proposals: 1 },
+    },
+    {
+      id: "job-107",
+      clientId: "usr-both-01",
+      title: "NGO Annual Impact Report & Amharic/English Editorial Copy",
+      description:
+        "Write, edit, and structure a 40-page bilingual annual report covering rural solar electrification and agricultural cooperatives across Amhara, Oromia, and SNNPR.",
+      category: "CONTENT_WRITING",
+      budgetMinMinor: 3000000,
+      budgetMaxMinor: 4800000,
+      deadline: isoDaysFromNow(16),
+      status: "OPEN",
+      createdAt: isoDaysAgo(1),
+      proposalsCount: 1,
+      _count: { proposals: 1 },
+    },
+  ];
+
+  proposals: Proposal[] = [
+    {
+      id: "prp-101",
+      jobId: "job-101",
+      freelancerId: "usr-free-01",
+      coverLetter:
+        "I have built 4 production Telebirr H5 Mini-Apps with RSA-SHA256 webhook verification and automatic reconciliation. I can deliver both the checkout UI and sandbox test suite in 10 days.",
+      quotedAmountMinor: 8200000,
+      estimatedDays: 10,
+      milestoneBreakdown: [
+        {
+          title: "Phase 1: Telebirr H5 Signing & Checkout UI",
+          amount: { amountMinor: 4200000, currency: "ETB" },
+          dueDate: isoDaysFromNow(5),
+        },
+        {
+          title: "Phase 2: Webhook Reconciliation & Amharic QA",
+          amount: { amountMinor: 4000000, currency: "ETB" },
+          dueDate: isoDaysFromNow(10),
+        },
+      ],
+      status: "SHORTLISTED",
+      createdAt: isoDaysAgo(2),
+      freelancer: {
+        id: "usr-free-01",
+        ucid: "YEK-FL-2089",
+        email: "hanna.tadesse@addisdev.et",
+      },
+      job: {
+        id: "job-101",
+        title: "Telebirr SuperApp Mini-Program & Escrow Checkout UI",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-102",
+      jobId: "job-101",
+      freelancerId: "usr-both-01",
+      coverLetter:
+        "Senior Frontend & FinTech Architect here. I will deliver a mobile-first checkout experience with CBE Birr receipt OCR fallback and complete bilingual tokens.",
+      quotedAmountMinor: 7800000,
+      estimatedDays: 9,
+      milestoneBreakdown: [
+        {
+          title: "Complete Multi-Rail Checkout & Receipt Flow",
+          amount: { amountMinor: 7800000, currency: "ETB" },
+          dueDate: isoDaysFromNow(9),
+        },
+      ],
+      status: "SUBMITTED",
+      createdAt: isoDaysAgo(1.5),
+      freelancer: {
+        id: "usr-both-01",
+        ucid: "YEK-DL-3015",
+        email: "dawit.mekonnen@ethio-digital.et",
+      },
+      job: {
+        id: "job-101",
+        title: "Telebirr SuperApp Mini-Program & Escrow Checkout UI",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-103",
+      jobId: "job-102",
+      freelancerId: "usr-free-01",
+      coverLetter:
+        "Experienced with ECX lot tracking and PostgreSQL geospatial queries. Ready to build the washing-station-to-Djibouti container dispatch ledger and PDF customs manifest exporter.",
+      quotedAmountMinor: 13500000,
+      estimatedDays: 16,
+      milestoneBreakdown: [
+        {
+          title: "Database Schema & Washing Station Ingestion API",
+          amount: { amountMinor: 6500000, currency: "ETB" },
+          dueDate: isoDaysFromNow(8),
+        },
+        {
+          title: "Executive Analytics Dashboard & Customs Export",
+          amount: { amountMinor: 7000000, currency: "ETB" },
+          dueDate: isoDaysFromNow(16),
+        },
+      ],
+      status: "SUBMITTED",
+      createdAt: isoDaysAgo(2.5),
+      freelancer: {
+        id: "usr-free-01",
+        ucid: "YEK-FL-2089",
+        email: "hanna.tadesse@addisdev.et",
+      },
+      job: {
+        id: "job-102",
+        title: "Addis Coffee Export Traceability Dashboard & ERP",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-104",
+      jobId: "job-103",
+      freelancerId: "usr-free-04",
+      coverLetter:
+        "Our Addis design studio specializes in accessible biometric eKYC flows and Ethiopic design systems. We include interactive Figma variables for both dark and light mode.",
+      quotedAmountMinor: 5100000,
+      estimatedDays: 8,
+      milestoneBreakdown: [
+        {
+          title: "Fayda eSignet Biometric Wireframes & Figma Component Kit",
+          amount: { amountMinor: 5100000, currency: "ETB" },
+          dueDate: isoDaysFromNow(8),
+        },
+      ],
+      status: "SHORTLISTED",
+      createdAt: isoDaysAgo(3),
+      freelancer: {
+        id: "usr-free-04",
+        ucid: "YEK-FL-4102",
+        email: "nahom.girma@addisdesign.et",
+      },
+      job: {
+        id: "job-103",
+        title: "Fayda National ID KYC Onboarding Flow & Brand System",
+        status: "OPEN",
+        clientId: "usr-both-01",
+      },
+    },
+    {
+      id: "prp-105",
+      jobId: "job-104",
+      freelancerId: "usr-free-03",
+      coverLetter:
+        "Certified Ethiopian financial translator with 50+ completed fintech localization contracts. I provide glossary alignment across Amharic, Afaan Oromo, and Tigrinya.",
+      quotedAmountMinor: 3400000,
+      estimatedDays: 6,
+      milestoneBreakdown: [
+        {
+          title: "1,850 UI Strings & Legal Glossary Translation",
+          amount: { amountMinor: 3400000, currency: "ETB" },
+          dueDate: isoDaysFromNow(6),
+        },
+      ],
+      status: "SUBMITTED",
+      createdAt: isoDaysAgo(1),
+      freelancer: {
+        id: "usr-free-03",
+        ucid: "YEK-FL-3890",
+        email: "meron.alemu@lexethiopia.et",
+      },
+      job: {
+        id: "job-104",
+        title: "Amharic, Tigrinya & Afaan Oromo FinTech App Localization",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-106",
+      jobId: "job-105",
+      freelancerId: "usr-free-01",
+      coverLetter:
+        "I have built barcode and POS inventory sync pipelines for 3 Addis retail chains using chunked streaming and idempotent upserts.",
+      quotedAmountMinor: 6400000,
+      estimatedDays: 11,
+      milestoneBreakdown: [
+        {
+          title: "Phase 1: POS Webhook & Barcode Batch Ingestion",
+          amount: { amountMinor: 3200000, currency: "ETB" },
+          dueDate: isoDaysFromNow(5),
+        },
+        {
+          title: "Phase 2: Automated Stock Reconciliation & Alerting",
+          amount: { amountMinor: 3200000, currency: "ETB" },
+          dueDate: isoDaysFromNow(11),
+        },
+      ],
+      status: "SUBMITTED",
+      createdAt: isoDaysAgo(1.2),
+      freelancer: {
+        id: "usr-free-01",
+        ucid: "YEK-FL-2089",
+        email: "hanna.tadesse@addisdev.et",
+      },
+      job: {
+        id: "job-105",
+        title: "Telegram Bot & Mini-App for Addis Logistics Fleet Dispatch",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-107",
+      jobId: "job-106",
+      freelancerId: "usr-both-01",
+      coverLetter:
+        "Ready to normalize all 45,000 microfinance borrower rows with automated TIN/phone validation and zero-downtime PostgreSQL migration scripts.",
+      quotedAmountMinor: 2850000,
+      estimatedDays: 7,
+      milestoneBreakdown: [
+        {
+          title: "Cleaned PostgreSQL Dump & Validation Audit Report",
+          amount: { amountMinor: 2850000, currency: "ETB" },
+          dueDate: isoDaysFromNow(7),
+        },
+      ],
+      status: "SHORTLISTED",
+      createdAt: isoDaysAgo(0.8),
+      freelancer: {
+        id: "usr-both-01",
+        ucid: "YEK-DL-3015",
+        email: "dawit.mekonnen@ethio-digital.et",
+      },
+      job: {
+        id: "job-106",
+        title: "Regional Microfinance Loan Portfolio Data Normalization",
+        status: "OPEN",
+        clientId: "usr-client-01",
+      },
+    },
+    {
+      id: "prp-108",
+      jobId: "job-107",
+      freelancerId: "usr-free-03",
+      coverLetter:
+        "Experienced bilingual editorial lead for development NGOs across Ethiopia. Will deliver both English and natural Amharic layout-ready copy.",
+      quotedAmountMinor: 3900000,
+      estimatedDays: 10,
+      milestoneBreakdown: [
+        {
+          title: "40-Page Bilingual Annual Impact Report Copy & Proofread",
+          amount: { amountMinor: 3900000, currency: "ETB" },
+          dueDate: isoDaysFromNow(10),
+        },
+      ],
+      status: "SUBMITTED",
+      createdAt: isoDaysAgo(0.5),
+      freelancer: {
+        id: "usr-free-03",
+        ucid: "YEK-FL-3890",
+        email: "meron.alemu@lexethiopia.et",
+      },
+      job: {
+        id: "job-107",
+        title: "NGO Annual Impact Report & Amharic/English Editorial Copy",
+        status: "OPEN",
+        clientId: "usr-both-01",
+      },
     },
   ];
 
@@ -262,7 +545,7 @@ class MockStore {
       contractId: "ctr-303",
       sequenceNumber: 1,
       title: "Amharic & Afaan Oromo Terminology Glossary & Core UI",
-      description: " Complete translation of core wallet, KYC, and contract screens.",
+      description: "Complete translation of core wallet, KYC, and contract screens.",
       amountMinor: 2900000,
       dueDate: isoDaysAgo(4),
       escrowState: "RELEASED",
@@ -278,8 +561,8 @@ class MockStore {
       title: "Fayda eSignet Biometric Liveness Flow Wireframes",
       description: "Figma interactive prototype for mobile and Telegram Mini App.",
       amountMinor: 3800000,
-      dueDate: isoDaysFromNow(2),
-      escrowState: "ESCROW_HELD",
+      dueDate: isoDaysFromNow(5),
+      escrowState: "PAYMENT_PENDING",
       deliverablePath: null,
       submittedAt: null,
       autoReleaseAt: null,
@@ -312,6 +595,130 @@ class MockStore {
       submittedAt: isoDaysAgo(7),
       autoReleaseAt: null,
       releasedAt: null,
+    },
+  ];
+
+  contractsMeta: Array<{
+    id: string;
+    jobId: string;
+    clientId: string;
+    freelancerId: string;
+    templateVersion: string;
+    clientAcceptedAt: string | null;
+    freelancerAcceptedAt: string | null;
+    fullyExecuted: boolean;
+    status: string;
+    cancellableUntil: string | null;
+    createdAt: string;
+    job: { id: string; title: string; status: string };
+  }> = [
+    {
+      id: "ctr-301",
+      jobId: "job-101",
+      clientId: "usr-client-01",
+      freelancerId: "usr-free-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(14),
+      freelancerAcceptedAt: isoDaysAgo(14),
+      fullyExecuted: true,
+      status: "ACTIVE",
+      cancellableUntil: null,
+      createdAt: isoDaysAgo(14),
+      job: {
+        id: "job-101",
+        title: "Telebirr SuperApp Mini-Program & Escrow Checkout UI",
+        status: "IN_PROGRESS",
+      },
+    },
+    {
+      id: "ctr-302",
+      jobId: "job-102",
+      clientId: "usr-client-01",
+      freelancerId: "usr-both-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(9),
+      freelancerAcceptedAt: isoDaysAgo(9),
+      fullyExecuted: true,
+      status: "ACTIVE",
+      cancellableUntil: null,
+      createdAt: isoDaysAgo(9),
+      job: {
+        id: "job-102",
+        title: "Addis Coffee Export Traceability Dashboard & ERP",
+        status: "IN_PROGRESS",
+      },
+    },
+    {
+      id: "ctr-305",
+      jobId: "job-106",
+      clientId: "usr-both-01",
+      freelancerId: "usr-free-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(4),
+      freelancerAcceptedAt: isoDaysAgo(4),
+      fullyExecuted: true,
+      status: "ACTIVE",
+      cancellableUntil: null,
+      createdAt: isoDaysAgo(4),
+      job: {
+        id: "job-106",
+        title: "FinTech M-Pesa Till Reconciliation & Automated Ledger",
+        status: "IN_PROGRESS",
+      },
+    },
+    {
+      id: "ctr-304",
+      jobId: "job-103",
+      clientId: "usr-client-01",
+      freelancerId: "usr-both-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(1),
+      freelancerAcceptedAt: null,
+      fullyExecuted: false,
+      status: "ACTIVE",
+      cancellableUntil: isoDaysFromNow(1),
+      createdAt: isoDaysAgo(1),
+      job: {
+        id: "job-103",
+        title: "Fayda National ID KYC Onboarding Flow & Brand System",
+        status: "IN_PROGRESS",
+      },
+    },
+    {
+      id: "ctr-306",
+      jobId: "job-105",
+      clientId: "usr-client-01",
+      freelancerId: "usr-free-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(11),
+      freelancerAcceptedAt: isoDaysAgo(11),
+      fullyExecuted: true,
+      status: "ACTIVE",
+      cancellableUntil: null,
+      createdAt: isoDaysAgo(11),
+      job: {
+        id: "job-105",
+        title: "Legacy Inventory ERP API Connector",
+        status: "IN_PROGRESS",
+      },
+    },
+    {
+      id: "ctr-303",
+      jobId: "job-104",
+      clientId: "usr-both-01",
+      freelancerId: "usr-free-01",
+      templateVersion: "v2.4-ET",
+      clientAcceptedAt: isoDaysAgo(12),
+      freelancerAcceptedAt: isoDaysAgo(12),
+      fullyExecuted: true,
+      status: "COMPLETED",
+      cancellableUntil: null,
+      createdAt: isoDaysAgo(12),
+      job: {
+        id: "job-104",
+        title: "Amharic, Tigrinya & Afaan Oromo FinTech App Localization",
+        status: "COMPLETED",
+      },
     },
   ];
 
@@ -349,6 +756,18 @@ class MockStore {
       referenceNumber: "RJK91M28LP",
       status: "PENDING_REVIEW",
       createdAt: isoDaysAgo(0.4),
+      reviewedAt: null,
+      rejectionReason: null,
+    },
+    {
+      id: "tu-404",
+      userId: "usr-client-01",
+      amountMinor: 8000000,
+      provider: "CBE_BIRR",
+      senderName: "Abebe Kebede",
+      referenceNumber: "FT26290AB774",
+      status: "PENDING_REVIEW",
+      createdAt: isoDaysAgo(0.2),
       reviewedAt: null,
       rejectionReason: null,
     },
@@ -538,6 +957,705 @@ class MockStore {
     ];
   })();
 
+  gigs: Gig[] = [
+    {
+      id: "gig-501",
+      freelancerId: "usr-free-01",
+      title: "I will integrate Telebirr, CBE Birr & M-Pesa into your React or Node app",
+      category: "WEB_APP_DEVELOPMENT",
+      description:
+        "Production-ready Ethiopian payment gateway integration with cryptographic webhook validation, automatic reconciliation, and sandbox test suite.",
+      tags: ["Telebirr", "CBE Birr", "M-Pesa", "Node.js", "React"],
+      requirements: [{ label: "Merchant API credentials & callback URL", type: "TEXT", required: true }],
+      faqJson: [{ question: "Do you support H5 Mini-Apps?", answer: "Yes, both native H5 and web redirect flows." }],
+      thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+      mediaUrls: [],
+      status: "ACTIVE",
+      autoAcceptOrders: true,
+      maxRevisions: 3,
+      viewCount: 1420,
+      ratingAverage: 4.95,
+      ratingCount: 38,
+      createdAt: isoDaysAgo(20),
+      freelancer: {
+        id: "usr-free-01",
+        displayName: "Hanna Tadesse",
+        avatarUrl: null,
+        bio: "Senior Full-Stack & FinTech Engineer in Addis Ababa",
+        profileCompleteness: 98,
+      },
+      packages: [
+        {
+          id: "pkg-1",
+          tier: "BASIC",
+          title: "Single Rail Setup",
+          description: "Telebirr or CBE Birr checkout + webhook verification",
+          deliveryDays: 4,
+          revisionsIncluded: 2,
+          priceMinor: 1800000,
+        },
+        {
+          id: "pkg-2",
+          tier: "STANDARD",
+          title: "Multi-Rail + Ledger",
+          description: "Telebirr + CBE + M-Pesa with reconciliation table",
+          deliveryDays: 7,
+          revisionsIncluded: 3,
+          priceMinor: 3500000,
+        },
+        {
+          id: "pkg-3",
+          tier: "PREMIUM",
+          title: "Full Escrow Suite",
+          description: "End-to-end escrow state machine, payouts & admin UI",
+          deliveryDays: 14,
+          revisionsIncluded: 5,
+          priceMinor: 6800000,
+        },
+      ],
+    },
+    {
+      id: "gig-502",
+      freelancerId: "usr-both-01",
+      title: "I will design a high-converting SaaS dashboard & Figma design system",
+      category: "GRAPHIC_DESIGN",
+      description:
+        "Clean shadcn/ui and Tailwind CSS component architecture with light/dark mode tokens, Ethiopic font pairing, and interactive prototypes.",
+      tags: ["Figma", "shadcn/ui", "Dashboard", "UI/UX"],
+      requirements: [{ label: "Brand guidelines & target user personas", type: "TEXT", required: true }],
+      faqJson: null,
+      thumbnailUrl: "/marketing/yekis-cta-workspace.png",
+      mediaUrls: [],
+      status: "ACTIVE",
+      autoAcceptOrders: true,
+      maxRevisions: 4,
+      viewCount: 980,
+      ratingAverage: 4.9,
+      ratingCount: 24,
+      createdAt: isoDaysAgo(15),
+      freelancer: {
+        id: "usr-both-01",
+        displayName: "Dawit Mekonnen",
+        avatarUrl: null,
+        bio: "Product Designer & Frontend Architect",
+        profileCompleteness: 95,
+      },
+      packages: [
+        {
+          id: "pkg-4",
+          tier: "BASIC",
+          title: "Core Dashboard Screen",
+          description: "Up to 3 key views with responsive layout & dark mode",
+          deliveryDays: 3,
+          revisionsIncluded: 2,
+          priceMinor: 1500000,
+        },
+        {
+          id: "pkg-5",
+          tier: "STANDARD",
+          title: "Full SaaS Workspace",
+          description: "8 screens + shadcn component kit + interactive prototype",
+          deliveryDays: 7,
+          revisionsIncluded: 4,
+          priceMinor: 3200000,
+        },
+      ],
+    },
+    {
+      id: "gig-503",
+      freelancerId: "usr-free-03",
+      title: "I will localize your app or website into natural Amharic, Afaan Oromo & Tigrinya",
+      category: "TRANSLATION",
+      description:
+        "Human localization for fintech, e-commerce, and NGO platforms with Ethiopic typography QA and cultural adaptation.",
+      tags: ["Amharic", "Afaan Oromo", "Tigrinya", "Localization"],
+      requirements: [{ label: "JSON/CSV string file or Figma link", type: "TEXT", required: true }],
+      faqJson: null,
+      thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+      mediaUrls: [],
+      status: "ACTIVE",
+      autoAcceptOrders: true,
+      maxRevisions: 3,
+      viewCount: 840,
+      ratingAverage: 5.0,
+      ratingCount: 51,
+      createdAt: isoDaysAgo(18),
+      freelancer: {
+        id: "usr-free-03",
+        displayName: "Meron Alemu",
+        avatarUrl: null,
+        bio: "Certified Ethiopian FinTech & Legal Translator",
+        profileCompleteness: 99,
+      },
+      packages: [
+        {
+          id: "pkg-6",
+          tier: "BASIC",
+          title: "500 UI Strings",
+          description: "1 language pair + glossary + in-context proofread",
+          deliveryDays: 3,
+          revisionsIncluded: 2,
+          priceMinor: 1200000,
+        },
+        {
+          id: "pkg-7",
+          tier: "STANDARD",
+          title: "2,000 Strings (Trilingual)",
+          description: "Amharic + Afaan Oromo + Tigrinya complete UI pack",
+          deliveryDays: 6,
+          revisionsIncluded: 3,
+          priceMinor: 2950000,
+        },
+      ],
+    },
+    {
+      id: "gig-504",
+      freelancerId: "usr-free-01",
+      title: "I will build a custom Telegram Mini-App with Fayda KYC & Telebirr checkout",
+      category: "WEB_APP_DEVELOPMENT",
+      description:
+        "Full-stack Telegram WebApp with cryptographic initData authentication, BotFather menu integration, and instant ETB escrow payments.",
+      tags: ["Telegram", "Mini-App", "Bot", "Telebirr"],
+      requirements: [{ label: "Bot username & feature scope", type: "TEXT", required: true }],
+      faqJson: null,
+      thumbnailUrl: "/marketing/yekis-cta-workspace.png",
+      mediaUrls: [],
+      status: "DRAFT",
+      autoAcceptOrders: true,
+      maxRevisions: 3,
+      viewCount: 310,
+      ratingAverage: 4.92,
+      ratingCount: 14,
+      createdAt: isoDaysAgo(1),
+      freelancer: {
+        id: "usr-free-01",
+        displayName: "Hanna Tadesse",
+        avatarUrl: null,
+        bio: "Senior Full-Stack & FinTech Engineer in Addis Ababa",
+        profileCompleteness: 98,
+      },
+      packages: [
+        {
+          id: "pkg-8",
+          tier: "BASIC",
+          title: "Mini-App Starter",
+          description: "Telegram auth + 3 responsive screens + webhook bot",
+          deliveryDays: 5,
+          revisionsIncluded: 2,
+          priceMinor: 2400000,
+        },
+      ],
+    },
+  ];
+
+  gigOrders: GigOrder[] = [
+    {
+      id: "go-801",
+      gigId: "gig-501",
+      packageId: "pkg-2",
+      clientId: "usr-client-01",
+      status: "IN_PROGRESS",
+      escrowState: "WORK_IN_PROGRESS",
+      revisionStatus: "NONE",
+      revisionsUsed: 0,
+      totalChargeMinor: 3500000,
+      createdAt: isoDaysAgo(2),
+      gig: {
+        id: "gig-501",
+        title: "I will integrate Telebirr, CBE Birr & M-Pesa into your React or Node app",
+        freelancerId: "usr-free-01",
+      },
+    },
+    {
+      id: "go-802",
+      gigId: "gig-502",
+      packageId: "pkg-5",
+      clientId: "usr-client-01",
+      status: "DELIVERED",
+      escrowState: "SUBMITTED_FOR_REVIEW",
+      submittedAt: isoDaysAgo(0.5),
+      deliverableUrl: "https://figma.com/file/yekis-saas-kit-v2",
+      autoReleaseAt: isoDaysFromNow(6.5),
+      revisionStatus: "NONE",
+      revisionsUsed: 1,
+      totalChargeMinor: 3200000,
+      createdAt: isoDaysAgo(6),
+      gig: {
+        id: "gig-502",
+        title: "I will design a high-converting SaaS dashboard & Figma design system",
+        freelancerId: "usr-both-01",
+      },
+    },
+  ];
+
+  disputes: Dispute[] = [
+    {
+      id: "dsp-601",
+      contractId: "ctr-306",
+      milestoneId: "ms-208",
+      category: "QUALITY_OF_WORK",
+      stage: "STAGE_3_MEDIATION",
+      description:
+        "Batch barcode scanner endpoint returns timeout on payloads above 500 SKUs. Freelancer has proposed a streaming fix within 48 hours.",
+      negotiationDeadlineAt: isoDaysAgo(2),
+      mediationDeadlineAt: isoDaysFromNow(3),
+      mediatorRecommendation:
+        "Release 70% upon verified streaming patch deployment; refund 30% for 4-day SLA delay.",
+      resolutionOutcome: null,
+      createdAt: isoDaysAgo(5),
+      contract: {
+        id: "ctr-306",
+        clientId: "usr-client-01",
+        freelancerId: "usr-free-01",
+        job: { title: "Legacy Inventory ERP API Connector" },
+      },
+      milestone: {
+        id: "ms-208",
+        title: "Legacy Inventory ERP API Connector",
+        amountMinor: 2750000,
+        escrowState: "DISPUTED",
+      },
+      evidence: [
+        {
+          id: "evd-1",
+          submittedByUserId: "usr-client-01",
+          statement: "Load test logs showing 504 timeout at 650 concurrent SKU items.",
+          createdAt: isoDaysAgo(4),
+        },
+        {
+          id: "evd-2",
+          submittedByUserId: "usr-free-01",
+          statement: "Patch PR #42 uploaded with chunked cursor pagination reducing latency to 140ms.",
+          createdAt: isoDaysAgo(2),
+        },
+      ],
+    },
+    {
+      id: "dsp-602",
+      contractId: "ctr-302",
+      milestoneId: "ms-203",
+      category: "SCOPE_CREEP",
+      stage: "STAGE_2_EVIDENCE",
+      description:
+        "Clarification needed on whether Djibouti customs XML schema v3 is part of Milestone 1 or Milestone 2.",
+      negotiationDeadlineAt: isoDaysAgo(1),
+      mediationDeadlineAt: isoDaysFromNow(5),
+      mediatorRecommendation: null,
+      resolutionOutcome: null,
+      createdAt: isoDaysAgo(3),
+      contract: {
+        id: "ctr-302",
+        clientId: "usr-client-01",
+        freelancerId: "usr-both-01",
+        job: { title: "Addis Coffee Export Traceability Dashboard & ERP" },
+      },
+      milestone: {
+        id: "ms-203",
+        title: "Supply Chain Lot Tracking Schema & API Endpoints",
+        amountMinor: 6200000,
+        escrowState: "WORK_IN_PROGRESS",
+      },
+      evidence: [
+        {
+          id: "evd-3",
+          submittedByUserId: "usr-both-01",
+          statement: "Signed contract annex lists ECX washing station schema in Phase 1 and Customs XML in Phase 2.",
+          createdAt: isoDaysAgo(1.5),
+        },
+      ],
+    },
+    {
+      id: "dsp-603",
+      contractId: "ctr-301",
+      milestoneId: "ms-202",
+      category: "LATE_DELIVERY",
+      stage: "STAGE_1_NEGOTIATION",
+      description:
+        "Sandbox callback URL from telecom partner was offline for 36 hours; requesting 2-day milestone extension.",
+      negotiationDeadlineAt: isoDaysAgo(0.2),
+      mediationDeadlineAt: null,
+      mediatorRecommendation: null,
+      resolutionOutcome: null,
+      createdAt: isoDaysAgo(2),
+      contract: {
+        id: "ctr-301",
+        clientId: "usr-client-01",
+        freelancerId: "usr-free-01",
+        job: { title: "Telebirr SuperApp Mini-Program & Escrow Checkout UI" },
+      },
+      milestone: {
+        id: "ms-202",
+        title: "Phase 2: Multi-Rail Escrow Checkout & CBE Birr Flow",
+        amountMinor: 5000000,
+        escrowState: "SUBMITTED_FOR_REVIEW",
+      },
+      evidence: [],
+    },
+  ];
+
+  conversations: ChatConversation[] = [
+    {
+      id: "conv-701",
+      subject: "Telebirr SuperApp Mini-Program — Phase 2 Review",
+      status: "OPEN",
+      createdAt: isoDaysAgo(5),
+      updatedAt: isoDaysAgo(0.1),
+      latestMessage: {
+        body: "I have uploaded the Phase 2 CBE Birr fallback build for your review.",
+        createdAt: isoDaysAgo(0.1),
+        senderId: "usr-free-01",
+      },
+      otherParticipant: {
+        id: "usr-free-01",
+        email: "hanna.tadesse@addisdev.et",
+        role: "FREELANCER",
+        displayName: "Hanna Tadesse",
+      },
+      isSupport: false,
+      unread: true,
+      assignedStaff: null,
+    },
+    {
+      id: "conv-702",
+      subject: "Addis Coffee Export ERP — Schema Sign-off",
+      status: "OPEN",
+      createdAt: isoDaysAgo(3),
+      updatedAt: isoDaysAgo(1),
+      latestMessage: {
+        body: "Washing station lot codes match ECX export manifest format. Proceeding to chart view.",
+        createdAt: isoDaysAgo(1),
+        senderId: "usr-client-01",
+      },
+      otherParticipant: {
+        id: "usr-client-01",
+        email: "abebe.kebede@abyssinia-tech.et",
+        role: "CLIENT",
+        displayName: "Abebe Kebede",
+      },
+      isSupport: false,
+      unread: false,
+      assignedStaff: null,
+    },
+    {
+      id: "conv-703",
+      subject: "Fayda National ID KYC Onboarding — Figma Prototype",
+      status: "OPEN",
+      createdAt: isoDaysAgo(2),
+      updatedAt: isoDaysAgo(0.4),
+      latestMessage: {
+        body: "We added high-contrast Amharic voiceover prompts for the selfie liveness step.",
+        createdAt: isoDaysAgo(0.4),
+        senderId: "usr-free-04",
+      },
+      otherParticipant: {
+        id: "usr-free-04",
+        email: "nahom.girma@addisdesign.et",
+        role: "FREELANCER",
+        displayName: "Nahom Girma",
+      },
+      isSupport: false,
+      unread: false,
+      assignedStaff: null,
+    },
+    {
+      id: "conv-704",
+      subject: "Yekis Support Desk — Escrow & Telebirr Assistance",
+      status: "OPEN",
+      createdAt: isoDaysAgo(4),
+      updatedAt: isoDaysAgo(0.3),
+      latestMessage: {
+        body: "Your CBE Birr transfer FT26288XK910 has been reconciled and credited.",
+        createdAt: isoDaysAgo(0.3),
+        senderId: "usr-admin-01",
+      },
+      otherParticipant: {
+        id: "usr-admin-01",
+        email: "yonael.ops@yekis.et",
+        role: "ADMIN",
+        displayName: "Yekis Support Desk",
+      },
+      isSupport: true,
+      unread: false,
+      assignedStaff: { id: "usr-admin-01", name: "Yonael Mindaye" },
+    },
+  ];
+
+  messagesByConv: Record<string, ChatMessage[]> = {
+    "conv-701": [
+      {
+        id: "msg-101",
+        conversationId: "conv-701",
+        senderId: "usr-client-01",
+        body: "Selam Hanna! Everything looks solid on the RSA signature verification. How is the CBE Birr receipt fallback coming along?",
+        createdAt: isoDaysAgo(1.2),
+        sender: {
+          id: "usr-client-01",
+          email: "abebe.kebede@abyssinia-tech.et",
+          role: "CLIENT",
+          staffRole: null,
+          displayName: "Abebe Kebede",
+        },
+      },
+      {
+        id: "msg-102",
+        conversationId: "conv-701",
+        senderId: "usr-free-01",
+        body: "Selam Abebe! I have uploaded the Phase 2 CBE Birr fallback build for your review. Ready for escrow release whenever you verify.",
+        createdAt: isoDaysAgo(0.1),
+        sender: {
+          id: "usr-free-01",
+          email: "hanna.tadesse@addisdev.et",
+          role: "FREELANCER",
+          staffRole: null,
+          displayName: "Hanna Tadesse",
+        },
+      },
+    ],
+    "conv-702": [
+      {
+        id: "msg-201",
+        conversationId: "conv-702",
+        senderId: "usr-both-01",
+        body: "Hello Abebe, I have pushed the Yirgacheffe and Sidama washing station lot schema with hulling mill foreign keys.",
+        createdAt: isoDaysAgo(1.5),
+        sender: {
+          id: "usr-both-01",
+          email: "dawit.mekonnen@ethio-digital.et",
+          role: "BOTH",
+          staffRole: null,
+          displayName: "Dawit Mekonnen",
+        },
+      },
+      {
+        id: "msg-202",
+        conversationId: "conv-702",
+        senderId: "usr-client-01",
+        body: "Washing station lot codes match ECX export manifest format. Proceeding to chart view.",
+        createdAt: isoDaysAgo(1),
+        sender: {
+          id: "usr-client-01",
+          email: "abebe.kebede@abyssinia-tech.et",
+          role: "CLIENT",
+          staffRole: null,
+          displayName: "Abebe Kebede",
+        },
+      },
+    ],
+    "conv-703": [
+      {
+        id: "msg-301",
+        conversationId: "conv-703",
+        senderId: "usr-free-04",
+        body: "We added high-contrast Amharic voiceover prompts for the selfie liveness step. Proposed budget is ETB 51,000 over 8 days.",
+        createdAt: isoDaysAgo(0.4),
+        sender: {
+          id: "usr-free-04",
+          email: "nahom.girma@addisdesign.et",
+          role: "FREELANCER",
+          staffRole: null,
+          displayName: "Nahom Girma",
+        },
+      },
+    ],
+    "conv-704": [
+      {
+        id: "msg-401",
+        conversationId: "conv-704",
+        senderId: "usr-both-01",
+        body: "Hello Support, I uploaded CBE Birr receipt FT26288XK910 for ETB 95,000.",
+        createdAt: isoDaysAgo(0.5),
+        sender: {
+          id: "usr-both-01",
+          email: "dawit.mekonnen@ethio-digital.et",
+          role: "BOTH",
+          staffRole: null,
+          displayName: "Dawit Mekonnen",
+        },
+      },
+      {
+        id: "msg-402",
+        conversationId: "conv-704",
+        senderId: "usr-admin-01",
+        body: "Your CBE Birr transfer FT26288XK910 has been reconciled and credited.",
+        createdAt: isoDaysAgo(0.3),
+        sender: {
+          id: "usr-admin-01",
+          email: "yonael.ops@yekis.et",
+          role: "ADMIN",
+          staffRole: "SUPER_ADMIN",
+          displayName: "Yonael Mindaye (Support)",
+        },
+      },
+    ],
+    "sup-1": [
+      {
+        id: "msg-sup-101",
+        conversationId: "sup-1",
+        senderId: "usr-both-01",
+        body: "Hello Support team, I uploaded CBE Birr receipt FT26289C8831 for our Addis Coffee Export ERP milestone. Could you confirm verification?",
+        createdAt: isoDaysAgo(0.4),
+        sender: {
+          id: "usr-both-01",
+          email: "dawit.mekonnen@ethio-digital.et",
+          role: "BOTH",
+          staffRole: null,
+          displayName: "Dawit Mekonnen",
+        },
+      },
+      {
+        id: "msg-sup-102",
+        conversationId: "sup-1",
+        senderId: "usr-admin-01",
+        body: "Selam Dawit! We see transfer reference FT26289C8831 in the CBE settlement feed and are completing verification now.",
+        createdAt: isoDaysAgo(0.2),
+        sender: {
+          id: "usr-admin-01",
+          email: "yonael.ops@yekis.et",
+          role: "ADMIN",
+          staffRole: "SUPER_ADMIN",
+          displayName: "Yonael Mindaye (Ops)",
+        },
+      },
+    ],
+    "sup-2": [
+      {
+        id: "msg-sup-201",
+        conversationId: "sup-2",
+        senderId: "usr-free-01",
+        body: "Selam! Please confirm my 10-digit ERCA TIN certificate so my withholding tax rate updates from 30% to 3%.",
+        createdAt: isoDaysAgo(0.6),
+        sender: {
+          id: "usr-free-01",
+          email: "hanna.tadesse@addisdev.et",
+          role: "FREELANCER",
+          staffRole: null,
+          displayName: "Hanna Tadesse",
+        },
+      },
+    ],
+  };
+
+  notifications: NotificationItem[] = [
+    {
+      id: "ntf-1",
+      type: "milestone-submitted",
+      message: "Hanna Tadesse submitted Phase 2: Multi-Rail Escrow Checkout (ETB 50,000) for your review.",
+      isRead: false,
+      createdAt: isoDaysAgo(0.15),
+      metadata: { contractId: "ctr-301", milestoneId: "ms-202" },
+    },
+    {
+      id: "ntf-2",
+      type: "proposal-received",
+      message: "New proposal from Hanna Tadesse (ETB 82,000) on Telebirr SuperApp Mini-Program.",
+      isRead: false,
+      createdAt: isoDaysAgo(0.4),
+      metadata: { jobId: "job-101", proposalId: "prp-101" },
+    },
+    {
+      id: "ntf-3",
+      type: "escrow-funded",
+      message: "ETB 62,000.00 locked in escrow via CBE Birr for Addis Coffee Export ERP.",
+      isRead: false,
+      createdAt: isoDaysAgo(1.1),
+      metadata: { contractId: "ctr-302", milestoneId: "ms-203" },
+    },
+    {
+      id: "ntf-4",
+      type: "new-message",
+      message: "Nahom Girma sent a message in Fayda National ID KYC Onboarding.",
+      isRead: true,
+      createdAt: isoDaysAgo(1.4),
+      metadata: { conversationId: "conv-703" },
+    },
+    {
+      id: "ntf-5",
+      type: "dispute-raised",
+      message: "Stage 3 Mediation recommendation posted on Legacy Inventory ERP API Connector.",
+      isRead: true,
+      createdAt: isoDaysAgo(2.2),
+      metadata: { disputeId: "dsp-601" },
+    },
+    {
+      id: "ntf-6",
+      type: "SUPPORT_REQUEST_CREATED",
+      message: "Support ticket #SUP-1: CBE Birr Receipt Reference Verification awaiting response.",
+      isRead: false,
+      createdAt: isoDaysAgo(0.25),
+      metadata: { conversationId: "sup-1" },
+    },
+  ];
+
+  portfolioItems = [
+    {
+      id: "pf-1",
+      title: "Telebirr H5 SuperApp Checkout & Escrow SDK",
+      description: "Cryptographic RSA-SHA256 payment signing, instant callback reconciliation, and bilingual UI for 120k+ monthly active users.",
+      thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+      projectUrl: "https://yekis.et/case-studies",
+      displayOrder: 1,
+    },
+    {
+      id: "pf-2",
+      title: "ECX Specialty Coffee Traceability & Export Portal",
+      description: "Supply-chain ledger tracking Yirgacheffe & Sidama lots from washing stations to Djibouti port dispatch.",
+      thumbnailUrl: "/marketing/yekis-cta-workspace.png",
+      projectUrl: "https://yekis.et/case-studies",
+      displayOrder: 2,
+    },
+    {
+      id: "pf-3",
+      title: "Fayda National ID eSignet Biometric Verification Flow",
+      description: "Accessible mobile-first KYC verification flow supporting Amharic, Afaan Oromo, Tigrinya, and English.",
+      thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+      projectUrl: "https://yekis.et/case-studies",
+      displayOrder: 3,
+    },
+  ];
+
+  reviews = [
+    {
+      id: "rev-1",
+      rating: 5,
+      comment: "Delivered our Telebirr H5 checkout module 2 days ahead of schedule. Zero webhook drops in production!",
+      createdAt: isoDaysAgo(8),
+      reviewer: { displayName: "Abebe Kebede — Abyssinia Commerce" },
+    },
+    {
+      id: "rev-2",
+      rating: 5,
+      comment: "Exceptional attention to detail on the Amharic and Afaan Oromo localization and Ethiopic typography.",
+      createdAt: isoDaysAgo(16),
+      reviewer: { displayName: "Sara Mohammed — Horizon NGO" },
+    },
+    {
+      id: "rev-3",
+      rating: 5,
+      comment: "Milestone structure was crystal clear and the PostgreSQL reconciliation scripts saved our finance team 15 hours a week.",
+      createdAt: isoDaysAgo(24),
+      reviewer: { displayName: "Solomon Tesfaye — Zemen Microfinance" },
+    },
+  ];
+
+  withholdingReports = [
+    {
+      id: "wh-2026-09",
+      periodMonth: "2026-09",
+      totalWithholdingMinor: 6850000,
+      transactionCount: 42,
+      filedAt: isoDaysAgo(18),
+      eraReferenceNumber: "ERCA-WH-202609-88412",
+    },
+    {
+      id: "wh-2026-10",
+      periodMonth: "2026-10",
+      totalWithholdingMinor: 5550000,
+      transactionCount: 31,
+      filedAt: null,
+      eraReferenceNumber: null,
+    },
+  ];
+
   getCurrentUser(): MeResponse {
     const base = DEMO_USERS[this.activeRole] ?? DEMO_USERS.BOTH;
     return {
@@ -555,302 +1673,59 @@ class MockStore {
   }
 
   getContracts(): Contract[] {
-    return [
-      {
-        id: "ctr-301",
-        jobId: "job-101",
-        clientId: "usr-client-01",
-        freelancerId: "usr-free-01",
-        templateVersion: "v2.4-ET",
-        clientAcceptedAt: isoDaysAgo(14),
-        freelancerAcceptedAt: isoDaysAgo(14),
-        fullyExecuted: true,
-        status: "ACTIVE",
-        cancellableUntil: null,
-        createdAt: isoDaysAgo(14),
-        job: {
-          id: "job-101",
-          title: "Telebirr SuperApp Mini-Program & Escrow Checkout UI",
-          status: "IN_PROGRESS",
-        },
-        milestones: this.milestones.filter((m) => m.contractId === "ctr-301"),
-      },
-      {
-        id: "ctr-302",
-        jobId: "job-102",
-        clientId: "usr-client-01",
-        freelancerId: "usr-both-01",
-        templateVersion: "v2.4-ET",
-        clientAcceptedAt: isoDaysAgo(9),
-        freelancerAcceptedAt: isoDaysAgo(9),
-        fullyExecuted: true,
-        status: "ACTIVE",
-        cancellableUntil: null,
-        createdAt: isoDaysAgo(9),
-        job: {
-          id: "job-102",
-          title: "Addis Coffee Export Traceability Dashboard & ERP",
-          status: "IN_PROGRESS",
-        },
-        milestones: this.milestones.filter((m) => m.contractId === "ctr-302"),
-      },
-      {
-        id: "ctr-303",
-        jobId: "job-104",
-        clientId: "usr-both-01",
-        freelancerId: "usr-free-01",
-        templateVersion: "v2.4-ET",
-        clientAcceptedAt: isoDaysAgo(12),
-        freelancerAcceptedAt: isoDaysAgo(12),
-        fullyExecuted: true,
-        status: "COMPLETED",
-        cancellableUntil: null,
-        createdAt: isoDaysAgo(12),
-        job: {
-          id: "job-104",
-          title: "Amharic, Tigrinya & Afaan Oromo FinTech App Localization",
-          status: "COMPLETED",
-        },
-        milestones: this.milestones.filter((m) => m.contractId === "ctr-303"),
-      },
-    ];
+    const uid = this.getCurrentUser().id;
+    return this.contractsMeta.map((c) => {
+      let clientId = c.clientId;
+      let freelancerId = c.freelancerId;
+      if (this.activeRole === "CLIENT") {
+        clientId = uid;
+      } else if (this.activeRole === "FREELANCER") {
+        freelancerId = uid;
+      } else if (this.activeRole === "BOTH") {
+        // For dual-role, make user the Client on ctr-301, ctr-304, ctr-305 (to test funding/releasing/cooling-off)
+        // and the Freelancer on ctr-302, ctr-306 (to test submitting deliverables)
+        if (c.id === "ctr-301" || c.id === "ctr-304" || c.id === "ctr-305") {
+          clientId = uid;
+        } else {
+          freelancerId = uid;
+        }
+      }
+      return {
+        ...c,
+        clientId,
+        freelancerId,
+        milestones: this.milestones.filter((m) => m.contractId === c.id),
+      };
+    });
   }
 
   getGigs(): Gig[] {
-    return [
-      {
-        id: "gig-501",
-        freelancerId: "usr-free-01",
-        title: "I will integrate Telebirr, CBE Birr & M-Pesa into your React or Node app",
-        category: "WEB_APP_DEVELOPMENT",
-        description:
-          "Production-ready Ethiopian payment gateway integration with cryptographic webhook validation, automatic reconciliation, and sandbox test suite.",
-        tags: ["Telebirr", "CBE Birr", "M-Pesa", "Node.js", "React"],
-        requirements: [{ label: "Merchant API credentials & callback URL", type: "TEXT", required: true }],
-        faqJson: [{ question: "Do you support H5 Mini-Apps?", answer: "Yes, both native H5 and web redirect flows." }],
-        thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
-        mediaUrls: [],
-        status: "ACTIVE",
-        autoAcceptOrders: true,
-        maxRevisions: 3,
-        viewCount: 1420,
-        ratingAverage: 4.95,
-        ratingCount: 38,
-        createdAt: isoDaysAgo(20),
-        freelancer: {
-          id: "usr-free-01",
-          displayName: "Hanna Tadesse",
-          avatarUrl: null,
-          bio: "Senior Full-Stack & FinTech Engineer in Addis Ababa",
-          profileCompleteness: 98,
-        },
-        packages: [
-          {
-            id: "pkg-1",
-            tier: "BASIC",
-            title: "Single Rail Setup",
-            description: "Telebirr or CBE Birr checkout + webhook verification",
-            deliveryDays: 4,
-            revisionsIncluded: 2,
-            priceMinor: 1800000,
-          },
-          {
-            id: "pkg-2",
-            tier: "STANDARD",
-            title: "Multi-Rail + Ledger",
-            description: "Telebirr + CBE + M-Pesa with reconciliation table",
-            deliveryDays: 7,
-            revisionsIncluded: 3,
-            priceMinor: 3500000,
-          },
-          {
-            id: "pkg-3",
-            tier: "PREMIUM",
-            title: "Full Escrow Suite",
-            description: "End-to-end escrow state machine, payouts & admin UI",
-            deliveryDays: 14,
-            revisionsIncluded: 5,
-            priceMinor: 6800000,
-          },
-        ],
-      },
-      {
-        id: "gig-502",
-        freelancerId: "usr-both-01",
-        title: "I will design a high-converting SaaS dashboard & Figma design system",
-        category: "GRAPHIC_DESIGN",
-        description:
-          "Clean shadcn/ui and Tailwind CSS component architecture with light/dark mode tokens, Ethiopic font pairing, and interactive prototypes.",
-        tags: ["Figma", "shadcn/ui", "Dashboard", "UI/UX"],
-        requirements: [{ label: "Brand guidelines & target user personas", type: "TEXT", required: true }],
-        faqJson: null,
-        thumbnailUrl: "/marketing/yekis-cta-workspace.png",
-        mediaUrls: [],
-        status: "ACTIVE",
-        autoAcceptOrders: true,
-        maxRevisions: 4,
-        viewCount: 980,
-        ratingAverage: 4.9,
-        ratingCount: 24,
-        createdAt: isoDaysAgo(15),
-        freelancer: {
-          id: "usr-both-01",
-          displayName: "Dawit Mekonnen",
-          avatarUrl: null,
-          bio: "Product Designer & Frontend Architect",
-          profileCompleteness: 95,
-        },
-        packages: [
-          {
-            id: "pkg-4",
-            tier: "BASIC",
-            title: "Core Dashboard Screen",
-            description: "Up to 3 key views with responsive layout & dark mode",
-            deliveryDays: 3,
-            revisionsIncluded: 2,
-            priceMinor: 1500000,
-          },
-          {
-            id: "pkg-5",
-            tier: "STANDARD",
-            title: "Full SaaS Workspace",
-            description: "8 screens + shadcn component kit + interactive prototype",
-            deliveryDays: 7,
-            revisionsIncluded: 4,
-            priceMinor: 3200000,
-          },
-        ],
-      },
-    ];
+    return this.gigs;
   }
 
   getDisputes(): Dispute[] {
-    return [
-      {
-        id: "dsp-601",
-        contractId: "ctr-306",
-        milestoneId: "ms-208",
-        category: "QUALITY_OF_WORK",
-        stage: "STAGE_3_MEDIATION",
-        description:
-          "Batch barcode scanner endpoint returns timeout on payloads above 500 SKUs. Freelancer has proposed a streaming fix within 48 hours.",
-        negotiationDeadlineAt: isoDaysAgo(2),
-        mediationDeadlineAt: isoDaysFromNow(3),
-        mediatorRecommendation:
-          "Release 70% upon verified streaming patch deployment; refund 30% for 4-day SLA delay.",
-        resolutionOutcome: null,
-        createdAt: isoDaysAgo(5),
-        contract: {
-          id: "ctr-306",
-          clientId: "usr-client-01",
-          freelancerId: "usr-free-02",
-          job: { title: "Legacy Inventory ERP API Connector" },
-        },
-        milestone: {
-          id: "ms-208",
-          title: "Legacy Inventory ERP API Connector",
-          amountMinor: 2750000,
-          escrowState: "DISPUTED",
-        },
-        evidence: [
-          {
-            id: "evd-1",
-            submittedByUserId: "usr-client-01",
-            statement: "Load test logs showing 504 timeout at 650 concurrent SKU items.",
-            createdAt: isoDaysAgo(4),
-          },
-          {
-            id: "evd-2",
-            submittedByUserId: "usr-free-02",
-            statement: "Patch PR #42 uploaded with chunked cursor pagination reducing latency to 140ms.",
-            createdAt: isoDaysAgo(2),
-          },
-        ],
-      },
-    ];
+    const uid = this.getCurrentUser().id;
+    return this.disputes.map((d) => ({
+      ...d,
+      contract: d.contract
+        ? {
+            ...d.contract,
+            clientId: this.activeRole === "FREELANCER" ? d.contract.clientId : uid,
+            freelancerId: this.activeRole === "FREELANCER" ? uid : d.contract.freelancerId,
+          }
+        : d.contract,
+    }));
   }
 
   getConversations(): ChatConversation[] {
-    return [
-      {
-        id: "conv-701",
-        subject: "Telebirr SuperApp Mini-Program — Phase 2 Review",
-        status: "OPEN",
-        createdAt: isoDaysAgo(5),
-        updatedAt: isoDaysAgo(0.1),
-        latestMessage: {
-          body: "I have uploaded the Phase 2 CBE Birr fallback build for your review.",
-          createdAt: isoDaysAgo(0.1),
-          senderId: "usr-free-01",
-        },
-        otherParticipant: {
-          id: "usr-free-01",
-          email: "hanna.tadesse@addisdev.et",
-          role: "FREELANCER",
-          displayName: "Hanna Tadesse",
-        },
-        isSupport: false,
-        unread: true,
-        assignedStaff: null,
-      },
-      {
-        id: "conv-702",
-        subject: "Addis Coffee Export ERP — Schema Sign-off",
-        status: "OPEN",
-        createdAt: isoDaysAgo(3),
-        updatedAt: isoDaysAgo(1),
-        latestMessage: {
-          body: "Washing station lot codes match ECX export manifest format. Proceeding to chart view.",
-          createdAt: isoDaysAgo(1),
-          senderId: "usr-client-01",
-        },
-        otherParticipant: {
-          id: "usr-client-01",
-          email: "abebe.kebede@abyssinia-tech.et",
-          role: "CLIENT",
-          displayName: "Abebe Kebede",
-        },
-        isSupport: false,
-        unread: false,
-        assignedStaff: null,
-      },
-    ];
+    return this.conversations;
   }
 
   getMessages(conversationId: string): ChatMessage[] {
-    return [
-      {
-        id: "msg-1",
-        conversationId,
-        senderId: "usr-client-01",
-        body: "Selam Hanna! Everything looks solid on the RSA signature verification. How is the CBE Birr receipt fallback coming along?",
-        createdAt: isoDaysAgo(1.2),
-        sender: {
-          id: "usr-client-01",
-          email: "abebe.kebede@abyssinia-tech.et",
-          role: "CLIENT",
-          staffRole: null,
-          displayName: "Abebe Kebede",
-        },
-      },
-      {
-        id: "msg-2",
-        conversationId,
-        senderId: "usr-free-01",
-        body: "Selam Abebe! I have uploaded the Phase 2 CBE Birr fallback build for your review. Ready for escrow release whenever you verify.",
-        createdAt: isoDaysAgo(0.1),
-        sender: {
-          id: "usr-free-01",
-          email: "hanna.tadesse@addisdev.et",
-          role: "FREELANCER",
-          staffRole: null,
-          displayName: "Hanna Tadesse",
-        },
-      },
-    ];
+    return this.messagesByConv[conversationId] ?? this.messagesByConv["conv-701"] ?? [];
   }
 
-  /* ── Operations Console Mock Responses ────────────────────────────────── */
+  /* ── Operations Console & Platform Mock API Handler ──────────────────── */
   handleApiFallback(path: string, method: string, bodyRaw?: unknown): unknown {
     const cleanPath = path.replace(/^\/api\/v1/, "").split("?")[0];
     const parsedBody = (() => {
@@ -881,7 +1756,13 @@ class MockStore {
       return { verified: true };
     }
     if (cleanPath.startsWith("/auth/")) {
-      if (parsedBody?.role && (parsedBody.role === "CLIENT" || parsedBody.role === "FREELANCER" || parsedBody.role === "BOTH" || parsedBody.role === "ADMIN")) {
+      if (
+        parsedBody?.role &&
+        (parsedBody.role === "CLIENT" ||
+          parsedBody.role === "FREELANCER" ||
+          parsedBody.role === "BOTH" ||
+          parsedBody.role === "ADMIN")
+      ) {
         this.setRole(parsedBody.role);
       } else if (typeof parsedBody?.email === "string") {
         const lower = parsedBody.email.toLowerCase();
@@ -905,18 +1786,35 @@ class MockStore {
 
     // Wallet & TopUps
     if (cleanPath === "/escrow/wallet") {
-      return { balanceMinor: this.walletMinor } satisfies WalletResponse;
+      return {
+        balanceMinor: this.walletMinor,
+        availableMinor: this.walletMinor,
+        pendingMinor: 4500000,
+      } satisfies WalletResponse;
+    }
+    if (cleanPath === "/escrow/wallet/withdraw" && method === "POST") {
+      const amountMinor = Number(parsedBody?.amountMinor || 0);
+      if (amountMinor > 0 && amountMinor <= this.walletMinor) {
+        this.walletMinor -= amountMinor;
+      }
+      return {
+        balanceMinor: this.walletMinor,
+        message: "Withdrawal queued for instant payout.",
+      };
     }
     if (cleanPath === "/wallet/topups" && method === "GET") {
       return this.topUps;
     }
     if (cleanPath.startsWith("/wallet/topups") && method === "POST") {
+      const amt = Number(parsedBody?.amountMinor || 5000000);
+      const prov = (parsedBody?.provider as "TELEBIRR" | "CBE_BIRR" | "M_PESA") || "TELEBIRR";
       const added: TopUpRequest = {
         id: `tu-${Date.now()}`,
         userId: this.getCurrentUser().id,
-        amountMinor: 5000000,
-        provider: "TELEBIRR",
-        referenceNumber: `TB-${Date.now().toString().slice(-6)}`,
+        amountMinor: amt,
+        provider: prov,
+        senderName: "Dawit Mekonnen",
+        referenceNumber: String(parsedBody?.referenceNumber || `TB-${Date.now().toString().slice(-6)}`),
         status: "APPROVED",
         createdAt: new Date().toISOString(),
         reviewedAt: new Date().toISOString(),
@@ -924,201 +1822,758 @@ class MockStore {
       };
       this.topUps = [added, ...this.topUps];
       this.walletMinor += added.amountMinor;
-      return { redirectUrl: null, topUpId: added.id, ...added };
+      return { redirectUrl: null, topUpId: added.id, credited: true, ...added };
+    }
+    if (cleanPath.startsWith("/wallet/topups/") && method === "GET") {
+      if (cleanPath.endsWith("/receipt-url")) {
+        return { url: "/payment/Telebirr.png" };
+      }
+      const id = cleanPath.split("/").pop() || "tu-401";
+      const found = this.topUps.find((t) => t.id === id) || this.topUps[0];
+      return {
+        ...found,
+        providerTransactionId: found.referenceNumber,
+        credited: found.status === "APPROVED",
+      };
     }
 
-    // Jobs & Milestones
+    // Jobs & Proposals
     if (cleanPath === "/jobs/mine") {
       return this.jobs;
     }
-    if (cleanPath === "/jobs/proposals/mine" || cleanPath.endsWith("/proposals")) {
-      return [];
+    if (cleanPath === "/jobs/proposals/mine") {
+      return this.proposals;
+    }
+    if (cleanPath.match(/^\/jobs\/[^/]+\/proposals$/) && method === "GET") {
+      const jobId = cleanPath.split("/")[2];
+      return this.proposals.filter((p) => p.jobId === jobId);
+    }
+    if (cleanPath.match(/^\/jobs\/[^/]+\/proposals$/) && method === "POST") {
+      const jobId = cleanPath.split("/")[2];
+      const job = this.jobs.find((j) => j.id === jobId) || this.jobs[0];
+      const quotedAmount =
+        Number((parsedBody?.quotedAmount as { amountMinor?: number })?.amountMinor) ||
+        Number(parsedBody?.quotedAmountMinor) ||
+        5500000;
+      const newProposal: Proposal = {
+        id: `prp-${Date.now()}`,
+        jobId,
+        freelancerId: this.getCurrentUser().id,
+        coverLetter: String(parsedBody?.coverLetter || "Experienced Ethiopian specialist ready to deliver on schedule."),
+        quotedAmountMinor: quotedAmount,
+        estimatedDays: Number(parsedBody?.estimatedDays || 7),
+        milestoneBreakdown: [
+          {
+            title: "Project delivery",
+            amount: { amountMinor: quotedAmount, currency: "ETB" },
+            dueDate: isoDaysFromNow(Number(parsedBody?.estimatedDays || 7)),
+          },
+        ],
+        status: "SUBMITTED",
+        createdAt: new Date().toISOString(),
+        freelancer: {
+          id: this.getCurrentUser().id,
+          ucid: this.getCurrentUser().ucid,
+          email: this.getCurrentUser().email,
+        },
+        job: {
+          id: job.id,
+          title: job.title,
+          status: job.status,
+          clientId: job.clientId || "usr-client-01",
+        },
+      };
+      this.proposals = [newProposal, ...this.proposals];
+      return newProposal;
+    }
+    if (cleanPath.match(/^\/jobs\/proposals\/[^/]+\/decision$/) && method === "POST") {
+      const proposalId = cleanPath.split("/")[3];
+      const decision = String(parsedBody?.decision || "SHORTLISTED");
+      let target: Proposal | undefined;
+      this.proposals = this.proposals.map((p) => {
+        if (p.id === proposalId) {
+          target = { ...p, status: decision };
+          return target;
+        }
+        return p;
+      });
+      if (decision === "ACCEPTED" && target) {
+        const newContractId = `ctr-${Date.now().toString().slice(-4)}`;
+        const newMilestoneId = `ms-${Date.now().toString().slice(-4)}`;
+        const newMilestone: Milestone = {
+          id: newMilestoneId,
+          contractId: newContractId,
+          sequenceNumber: 1,
+          title: target.milestoneBreakdown?.[0]?.title || "Milestone 1 Delivery",
+          description: "Generated from accepted proposal",
+          amountMinor: target.quotedAmountMinor,
+          dueDate: isoDaysFromNow(target.estimatedDays || 7),
+          escrowState: "PAYMENT_PENDING",
+          deliverablePath: null,
+          submittedAt: null,
+          autoReleaseAt: null,
+          releasedAt: null,
+        };
+        this.milestones = [newMilestone, ...this.milestones];
+        this.contractsMeta = [
+          {
+            id: newContractId,
+            jobId: target.jobId,
+            clientId: this.getCurrentUser().id,
+            freelancerId: target.freelancerId,
+            templateVersion: "v2.4-ET",
+            clientAcceptedAt: new Date().toISOString(),
+            freelancerAcceptedAt: new Date().toISOString(),
+            fullyExecuted: true,
+            status: "ACTIVE",
+            cancellableUntil: null,
+            createdAt: new Date().toISOString(),
+            job: {
+              id: target.jobId,
+              title: target.job?.title || "Marketplace Contract",
+              status: "IN_PROGRESS",
+            },
+          },
+          ...this.contractsMeta,
+        ];
+      }
+      return { proposal: target };
+    }
+    if (cleanPath.match(/^\/jobs\/proposals\/[^/]+\/withdraw$/) && method === "POST") {
+      const proposalId = cleanPath.split("/")[3];
+      const found = this.proposals.find((p) => p.id === proposalId);
+      this.proposals = this.proposals.filter((p) => p.id !== proposalId);
+      return found ?? { id: proposalId, status: "WITHDRAWN" };
     }
     if (cleanPath === "/jobs" && method === "GET") {
       return { items: this.jobs, total: this.jobs.length, page: 1, pageSize: 20 };
     }
+    if (cleanPath.match(/^\/jobs\/[^/]+$/) && method === "GET") {
+      const jobId = cleanPath.split("/")[2];
+      return this.jobs.find((j) => j.id === jobId) || this.jobs[0];
+    }
     if (cleanPath === "/jobs" && method === "POST") {
       const payload = parsedBody;
-      const newJob: Job = {
+      const newJob: Job & { _count?: { proposals?: number } } = {
         id: `job-${Date.now()}`,
         clientId: this.getCurrentUser().id,
         title: String(payload?.title || "New Marketplace Brief"),
         description: String(payload?.description || "Scoped milestone deliverable."),
         category: String(payload?.category || "WEB_APP_DEVELOPMENT"),
-        budgetMinMinor: Number((payload?.budgetMin as { amountMinor?: number })?.amountMinor || payload?.budgetMinMinor || 3000000),
-        budgetMaxMinor: Number((payload?.budgetMax as { amountMinor?: number })?.amountMinor || payload?.budgetMaxMinor || 6000000),
+        budgetMinMinor: Number(
+          (payload?.budgetMin as { amountMinor?: number })?.amountMinor ||
+            payload?.budgetMinMinor ||
+            3000000,
+        ),
+        budgetMaxMinor: Number(
+          (payload?.budgetMax as { amountMinor?: number })?.amountMinor ||
+            payload?.budgetMaxMinor ||
+            6000000,
+        ),
         deadline: String(payload?.deadline || isoDaysFromNow(14)),
         status: "OPEN",
         createdAt: new Date().toISOString(),
+        proposalsCount: 0,
+        _count: { proposals: 0 },
       };
       this.jobs = [newJob, ...this.jobs];
       return newJob;
     }
+
+    // Contracts & Escrow Milestones
     if (cleanPath === "/contracts/milestones" || cleanPath === "/escrow/milestones") {
       return this.milestones;
     }
-    if (cleanPath === "/contracts") {
+    if (cleanPath === "/contracts" && method === "GET") {
       return this.getContracts();
     }
+    if (cleanPath.match(/^\/contracts\/[^/]+\/accept$/) && method === "POST") {
+      const contractId = cleanPath.split("/")[2];
+      const nowIso = new Date().toISOString();
+      this.contractsMeta = this.contractsMeta.map((c) =>
+        c.id === contractId
+          ? {
+              ...c,
+              clientAcceptedAt: c.clientAcceptedAt ?? nowIso,
+              freelancerAcceptedAt: c.freelancerAcceptedAt ?? nowIso,
+              fullyExecuted: true,
+            }
+          : c,
+      );
+      return this.getContracts().find((c) => c.id === contractId) ?? this.getContracts()[0];
+    }
+    if (cleanPath.match(/^\/contracts\/[^/]+\/cancel-cooling-off$/) && method === "POST") {
+      const contractId = cleanPath.split("/")[2];
+      this.contractsMeta = this.contractsMeta.map((c) =>
+        c.id === contractId ? { ...c, status: "CANCELLED" } : c,
+      );
+      return this.getContracts().find((c) => c.id === contractId) ?? this.getContracts()[0];
+    }
+    if (cleanPath.match(/^\/contracts\/[^/]+\/document$/)) {
+      return { url: "/Terms" };
+    }
+    if ((cleanPath === "/escrow/fund" || cleanPath === "/escrow/fund-from-wallet") && method === "POST") {
+      const milestoneId = String(parsedBody?.milestoneId || "ms-207");
+      this.milestones = this.milestones.map((m) => {
+        if (m.id === milestoneId) {
+          if (this.walletMinor >= m.amountMinor) {
+            this.walletMinor -= m.amountMinor;
+          }
+          return { ...m, escrowState: "ESCROW_HELD" };
+        }
+        return m;
+      });
+      const updated = this.milestones.find((m) => m.id === milestoneId) || this.milestones[0];
+      return {
+        ...updated,
+        redirectUrl: null,
+        providerTransactionId: `TB-${Date.now().toString().slice(-8)}`,
+      };
+    }
+    if (cleanPath.match(/^\/escrow\/milestones\/[^/]+\/submit$/) && method === "POST") {
+      const milestoneId = cleanPath.split("/")[3];
+      const nowIso = new Date().toISOString();
+      const autoIso = isoDaysFromNow(7);
+      this.milestones = this.milestones.map((m) =>
+        m.id === milestoneId
+          ? {
+              ...m,
+              escrowState: "SUBMITTED_FOR_REVIEW",
+              submittedAt: nowIso,
+              autoReleaseAt: autoIso,
+              deliverablePath: "/uploads/milestone-deliverable.zip",
+            }
+          : m,
+      );
+      return this.milestones.find((m) => m.id === milestoneId) || this.milestones[0];
+    }
+    if (cleanPath.match(/^\/escrow\/milestones\/[^/]+\/accept$/) && method === "POST") {
+      const milestoneId = cleanPath.split("/")[3];
+      const nowIso = new Date().toISOString();
+      this.milestones = this.milestones.map((m) => {
+        if (m.id === milestoneId) {
+          this.walletMinor += Math.round(m.amountMinor * 0.92);
+          return {
+            ...m,
+            escrowState: "RELEASED",
+            releasedAt: nowIso,
+          };
+        }
+        return m;
+      });
+      return this.milestones.find((m) => m.id === milestoneId) || this.milestones[0];
+    }
 
-    // Gigs
+    // Gigs & Gig Orders
     if (cleanPath === "/gigs/mine") {
-      return this.getGigs();
+      return this.gigs;
+    }
+    if (cleanPath === "/gigs" && method === "POST") {
+      const created: Gig = {
+        id: `gig-${Date.now()}`,
+        freelancerId: this.getCurrentUser().id,
+        title: String(parsedBody?.title || "Custom Ethiopian Freelance Service"),
+        category: String(parsedBody?.category || "WEB_APP_DEVELOPMENT"),
+        description: String(parsedBody?.description || "Fixed-price escrow service package."),
+        tags: Array.isArray(parsedBody?.tags) ? (parsedBody.tags as string[]) : ["Ethiopia", "Escrow"],
+        requirements: [],
+        faqJson: null,
+        thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+        mediaUrls: [],
+        status: "ACTIVE",
+        autoAcceptOrders: true,
+        maxRevisions: Number(parsedBody?.maxRevisions ?? 2),
+        viewCount: 1,
+        ratingAverage: 5.0,
+        ratingCount: 1,
+        createdAt: new Date().toISOString(),
+        freelancer: {
+          id: this.getCurrentUser().id,
+          displayName: "Hanna Tadesse",
+          avatarUrl: null,
+          bio: "Verified Yekis Specialist",
+          profileCompleteness: 98,
+        },
+        packages: Array.isArray(parsedBody?.packages)
+          ? (parsedBody.packages as Gig["packages"])?.map((p, idx) => ({
+              ...p,
+              id: `pkg-new-${idx}-${Date.now()}`,
+            }))
+          : [],
+      };
+      this.gigs = [created, ...this.gigs];
+      return created;
+    }
+    if (cleanPath.match(/^\/gigs\/[^/]+\/status$/) && method === "POST") {
+      const gigId = cleanPath.split("/")[2];
+      const nextStatus = String(parsedBody?.status || "PAUSED");
+      this.gigs = this.gigs.map((g) => (g.id === gigId ? { ...g, status: nextStatus } : g));
+      return this.gigs.find((g) => g.id === gigId) || this.gigs[0];
+    }
+    if (cleanPath === "/gigs/orders" && method === "POST") {
+      const packageId = String(parsedBody?.packageId || "pkg-1");
+      let matchedGig = this.gigs[0];
+      let matchedPkg = matchedGig.packages?.[0];
+      for (const g of this.gigs) {
+        const foundPkg = g.packages?.find((p) => p.id === packageId);
+        if (foundPkg) {
+          matchedGig = g;
+          matchedPkg = foundPkg;
+          break;
+        }
+      }
+      const order: GigOrder = {
+        id: `go-${Date.now()}`,
+        gigId: matchedGig.id,
+        packageId,
+        clientId: this.getCurrentUser().id,
+        status: "PENDING_PAYMENT",
+        escrowState: "PAYMENT_PENDING",
+        revisionStatus: "NONE",
+        revisionsUsed: 0,
+        totalChargeMinor: matchedPkg?.priceMinor ?? 1800000,
+        createdAt: new Date().toISOString(),
+        gig: {
+          id: matchedGig.id,
+          title: matchedGig.title,
+          freelancerId: matchedGig.freelancerId,
+        },
+        package: matchedPkg,
+      };
+      this.gigOrders = [order, ...this.gigOrders];
+      return order;
+    }
+    if (cleanPath.match(/^\/gigs\/orders\/[^/]+\/fund$/) && method === "POST") {
+      const orderId = cleanPath.split("/")[3];
+      this.gigOrders = this.gigOrders.map((o) =>
+        o.id === orderId ? { ...o, status: "IN_PROGRESS", escrowState: "WORK_IN_PROGRESS" } : o,
+      );
+      return this.gigOrders.find((o) => o.id === orderId) || this.gigOrders[0];
+    }
+    if (cleanPath.match(/^\/gigs\/orders\/[^/]+\/submit$/) && method === "POST") {
+      const orderId = cleanPath.split("/")[3];
+      this.gigOrders = this.gigOrders.map((o) =>
+        o.id === orderId
+          ? {
+              ...o,
+              status: "DELIVERED",
+              escrowState: "SUBMITTED_FOR_REVIEW",
+              submittedAt: new Date().toISOString(),
+              deliverableUrl: String(parsedBody?.deliverableUrl || "/uploads/gig-delivery.zip"),
+            }
+          : o,
+      );
+      return this.gigOrders.find((o) => o.id === orderId) || this.gigOrders[0];
+    }
+    if (cleanPath.match(/^\/gigs\/orders\/[^/]+\/accept$/) && method === "POST") {
+      const orderId = cleanPath.split("/")[3];
+      this.gigOrders = this.gigOrders.map((o) =>
+        o.id === orderId ? { ...o, status: "COMPLETED", escrowState: "RELEASED" } : o,
+      );
+      return this.gigOrders.find((o) => o.id === orderId) || this.gigOrders[0];
     }
     if (cleanPath.startsWith("/gigs/orders")) {
-      const orders: GigOrder[] = [
-        {
-          id: "go-801",
-          gigId: "gig-501",
-          packageId: "pkg-2",
-          clientId: "usr-client-01",
-          status: "IN_PROGRESS",
-          escrowState: "WORK_IN_PROGRESS",
-          revisionStatus: "NONE",
-          revisionsUsed: 0,
-          totalChargeMinor: 3500000,
-          createdAt: isoDaysAgo(2),
-          gig: {
-            id: "gig-501",
-            title: "I will integrate Telebirr, CBE Birr & M-Pesa into your React or Node app",
-            freelancerId: "usr-free-01",
-          },
-        },
-      ];
-      return orders;
+      return this.gigOrders;
     }
     if (cleanPath.startsWith("/gigs")) {
-      const gigs = this.getGigs();
-      return { items: gigs, data: gigs, total: gigs.length, page: 1, pageSize: 20 };
+      const activeGigs = this.gigs.filter((g) => g.status === "ACTIVE");
+      return { items: activeGigs, data: activeGigs, total: activeGigs.length, page: 1, pageSize: 20 };
     }
     if (cleanPath === "/users/me/profile/completeness") {
       return { profileCompleteness: 96 };
     }
 
-    // Skills, Featured, Profile
+    // Skills, Featured, Portfolio, Reviews, Profile
     if (cleanPath === "/skills") {
       return this.skills;
     }
     if (cleanPath === "/featured") {
       return [
         {
-          id: "ft-1",
+          id: "usr-free-01",
           userId: "usr-free-01",
           displayName: "Hanna Tadesse",
-          primarySkill: "Full-Stack & FinTech Engineering",
+          avatarUrl: null,
+          primarySkill: { id: "sk-1", nameEn: "Full-Stack & FinTech Engineering" },
           ratingAverage: 4.95,
+          totalJobsCompleted: 38,
           completedContracts: 38,
+          kycBadge: "shield",
           bio: "Specialist in Telebirr, CBE Birr, and enterprise React/Node architectures.",
         },
         {
-          id: "ft-2",
+          id: "usr-both-01",
           userId: "usr-both-01",
           displayName: "Dawit Mekonnen",
-          primarySkill: "Product UI/UX & Design Systems",
+          avatarUrl: null,
+          primarySkill: { id: "sk-3", nameEn: "Product UI/UX & Design Systems" },
           ratingAverage: 4.92,
+          totalJobsCompleted: 29,
           completedContracts: 29,
+          kycBadge: "shield",
           bio: "Designing accessible financial & logistics products for East Africa.",
         },
         {
-          id: "ft-3",
+          id: "usr-free-03",
           userId: "usr-free-03",
           displayName: "Meron Alemu",
-          primarySkill: "Amharic & Afaan Oromo Localization",
+          avatarUrl: null,
+          primarySkill: { id: "sk-4", nameEn: "Amharic & Afaan Oromo Localization" },
           ratingAverage: 5.0,
+          totalJobsCompleted: 51,
           completedContracts: 51,
+          kycBadge: "shield",
           bio: "Certified fintech, legal, and medical translator for Ethiopian languages.",
         },
       ];
     }
+    if (cleanPath.startsWith("/featured/staff/")) {
+      return { ok: true, refreshedAt: new Date().toISOString() };
+    }
+    if (cleanPath.startsWith("/reviews/")) {
+      if (method === "POST") {
+        const added = {
+          id: `rev-${Date.now()}`,
+          rating: Number(parsedBody?.rating || 5),
+          comment: String(parsedBody?.comment || "Great collaboration and timely delivery."),
+          createdAt: new Date().toISOString(),
+          reviewer: { displayName: this.getCurrentUser().email },
+        };
+        this.reviews = [added, ...this.reviews];
+        return added;
+      }
+      return { items: this.reviews, total: this.reviews.length };
+    }
+    if (cleanPath.startsWith("/portfolio")) {
+      if (method === "POST") {
+        const item = {
+          id: `pf-${Date.now()}`,
+          title: String(parsedBody?.title || "New Portfolio Case Study"),
+          description: String(parsedBody?.description || "Delivered with Yekis milestone escrow."),
+          thumbnailUrl: String(parsedBody?.thumbnailUrl || "/marketing/yekis-collaboration-banner.png"),
+          projectUrl: String(parsedBody?.projectUrl || "https://yekis.et"),
+          displayOrder: this.portfolioItems.length + 1,
+        };
+        this.portfolioItems = [...this.portfolioItems, item];
+        return item;
+      }
+      if (method === "DELETE") {
+        const itemId = cleanPath.split("/").pop();
+        this.portfolioItems = this.portfolioItems.filter((i) => i.id !== itemId);
+        return { deleted: true };
+      }
+      return this.portfolioItems;
+    }
     if (cleanPath.includes("/profile")) {
       const u = this.getCurrentUser();
-      const prof: SelfProfile = {
+      const displayName =
+        this.activeRole === "CLIENT"
+          ? "Abebe Kebede"
+          : this.activeRole === "FREELANCER"
+            ? "Hanna Tadesse"
+            : this.activeRole === "ADMIN"
+              ? "Yonael Ops Lead"
+              : "Dawit Mekonnen";
+      const [firstName, lastName] = displayName.split(" ");
+      return {
         id: u.id,
-        displayName:
-          this.activeRole === "CLIENT"
-            ? "Abebe Kebede"
-            : this.activeRole === "FREELANCER"
-              ? "Hanna Tadesse"
-              : this.activeRole === "ADMIN"
-                ? "Yonael Ops Lead"
-                : "Dawit Mekonnen",
-        firstName: "Dawit",
-        lastName: "Mekonnen",
-        bio: "Building resilient escrow-backed software and digital products across Ethiopia.",
+        displayName,
+        firstName: String(parsedBody?.firstName || firstName || "Dawit"),
+        lastName: String(parsedBody?.lastName || lastName || "Mekonnen"),
+        bio: String(
+          parsedBody?.bio ||
+            "Building resilient escrow-backed software, Telebirr integrations, and digital products across Ethiopia.",
+        ),
         avatarUrl: null,
         profileCompleteness: 96,
-        isAvailableForWork: true,
-        profileVisibility: "PUBLIC",
-        primarySkillId: "sk-1",
-        skills: this.skills.slice(0, 4),
+        isAvailableForWork: parsedBody?.isAvailableForWork !== undefined ? Boolean(parsedBody.isAvailableForWork) : true,
+        profileVisibility: (parsedBody?.profileVisibility as "PUBLIC" | "PROPOSERS" | "PRIVATE") || "PUBLIC",
+        primarySkillId: String(parsedBody?.primarySkillId || "sk-1"),
+        skills: this.skills.slice(0, 6),
+        portfolio: this.portfolioItems,
+        kyc: { tier: u.kyc?.tier ?? "TIER_2", status: u.kyc?.status ?? "VERIFIED", badgeType: "FAYDA_VERIFIED" },
+        stats: {
+          jobsCompleted: 38,
+          rating: { average: 4.95, count: 38 },
+          earnedRange: "ETB 450,000+",
+          memberSince: "2025-02-10T00:00:00.000Z",
+        },
         isOwnProfile: true,
+        canViewFullProfile: true,
       };
-      return prof;
     }
 
     // KYC, Disputes, Chat, Notifications
     if (cleanPath === "/kyc/status") {
+      return {
+        tier: "TIER_2",
+        status: "VERIFIED",
+        nextReviewDueAt: isoDaysFromNow(180),
+        rejectionReason: null,
+        documentsSubmitted: ["NATIONAL_ID", "SELFIE_LIVENESS", "TIN_CERTIFICATE"],
+      };
+    }
+    if (cleanPath === "/kyc/documents" || cleanPath === "/kyc/upgrade-tier2") {
       return { tier: "TIER_2", status: "VERIFIED" };
+    }
+    if (cleanPath.match(/^\/kyc\/documents\/[^/]+\/url$/)) {
+      return { url: "/payment/Telebirr.png" };
+    }
+    if (cleanPath === "/kyc/fayda/initiate") {
+      return {
+        authorizeUrl: "https://esignet.ida.gov.et/authorize",
+        requestUri: "urn:ietf:params:oauth:request_uri:mock-fayda-par",
+        state: "mock-fayda-state",
+        clientId: "yekis-fayda-client",
+      };
     }
     if (cleanPath === "/disputes" && method === "GET") {
       return this.getDisputes();
     }
-    if (cleanPath === "/chat/conversations") {
+    if (cleanPath === "/disputes" && method === "POST") {
+      const created: Dispute = {
+        id: `dsp-${Date.now().toString().slice(-4)}`,
+        contractId: String(parsedBody?.contractId || "ctr-301"),
+        milestoneId: String(parsedBody?.milestoneId || "ms-202"),
+        category: String(parsedBody?.category || "QUALITY_ISSUE"),
+        stage: "STAGE_1_NEGOTIATION",
+        description: String(parsedBody?.description || "Milestone scope discrepancy reported."),
+        negotiationDeadlineAt: isoDaysFromNow(7),
+        mediationDeadlineAt: null,
+        mediatorRecommendation: null,
+        resolutionOutcome: null,
+        createdAt: new Date().toISOString(),
+        contract: {
+          id: String(parsedBody?.contractId || "ctr-301"),
+          clientId: "usr-client-01",
+          freelancerId: "usr-free-01",
+          job: { title: "Active Escrow Contract" },
+        },
+        milestone: {
+          id: String(parsedBody?.milestoneId || "ms-202"),
+          title: "Disputed Milestone",
+          amountMinor: 5000000,
+          escrowState: "DISPUTED",
+        },
+        evidence: [],
+      };
+      this.disputes = [created, ...this.disputes];
+      return created;
+    }
+    if (cleanPath.match(/^\/disputes\/[^/]+\/escalate$/) && method === "POST") {
+      const disputeId = cleanPath.split("/")[2];
+      this.disputes = this.disputes.map((d) =>
+        d.id === disputeId ? { ...d, stage: "STAGE_2_EVIDENCE" } : d,
+      );
+      return this.disputes.find((d) => d.id === disputeId) || this.disputes[0];
+    }
+    if (cleanPath.match(/^\/disputes\/[^/]+\/evidence$/) && method === "POST") {
+      const disputeId = cleanPath.split("/")[2];
+      const statement = String(parsedBody?.statement || "Evidence submitted.");
+      this.disputes = this.disputes.map((d) =>
+        d.id === disputeId
+          ? {
+              ...d,
+              evidence: [
+                ...(d.evidence || []),
+                {
+                  id: `evd-${Date.now()}`,
+                  submittedByUserId: this.getCurrentUser().id,
+                  statement,
+                  createdAt: new Date().toISOString(),
+                },
+              ],
+            }
+          : d,
+      );
+      return this.disputes.find((d) => d.id === disputeId) || this.disputes[0];
+    }
+    if (cleanPath.match(/^\/disputes\/[^/]+\/arbitration$/) && method === "POST") {
+      const disputeId = cleanPath.split("/")[2];
+      this.disputes = this.disputes.map((d) =>
+        d.id === disputeId ? { ...d, stage: "STAGE_4_ARBITRATION" } : d,
+      );
+      return this.disputes.find((d) => d.id === disputeId) || this.disputes[0];
+    }
+    if (cleanPath.match(/^\/disputes\/[^/]+\/(resolve|claim|arbitration-award)$/) && method === "POST") {
+      const disputeId = cleanPath.split("/")[2];
+      this.disputes = this.disputes.map((d) =>
+        d.id === disputeId
+          ? {
+              ...d,
+              stage: "RESOLVED",
+              resolutionOutcome: String(parsedBody?.outcome || "PARTIAL_SPLIT"),
+              mediatorRecommendation: String(parsedBody?.recommendation || d.mediatorRecommendation || "Resolved by staff mediator."),
+            }
+          : d,
+      );
+      return this.disputes.find((d) => d.id === disputeId) || this.disputes[0];
+    }
+
+    // Chat & Assistant
+    if (cleanPath === "/chat/conversations" && method === "GET") {
       return this.getConversations();
     }
-    if (cleanPath.startsWith("/chat/conversations/") && cleanPath.endsWith("/messages")) {
-      return this.getMessages("conv-701");
-    }
-    if (cleanPath.startsWith("/notifications")) {
-      return {
-        items: [
-          {
-            id: "ntf-1",
-            title: "Milestone Submitted for Review",
-            body: "Hanna Tadesse submitted Phase 2: Multi-Rail Escrow Checkout (ETB 50,000).",
-            readAt: null,
-            createdAt: isoDaysAgo(0.2),
-            type: "MILESTONE_SUBMITTED",
-          },
-          {
-            id: "ntf-2",
-            title: "Telebirr Escrow Funded",
-            body: "ETB 62,000.00 locked in escrow for Addis Coffee Export ERP.",
-            readAt: isoDaysAgo(1),
-            createdAt: isoDaysAgo(2),
-            type: "ESCROW_FUNDED",
-          },
-        ],
-        unreadCount: 1,
+    if (
+      (cleanPath === "/chat/conversations" ||
+        cleanPath === "/chat/support" ||
+        cleanPath === "/chat/direct" ||
+        cleanPath === "/chat/guest") &&
+      method === "POST"
+    ) {
+      const isSupport = cleanPath.includes("support") || cleanPath.includes("guest");
+      const newConv: ChatConversation = {
+        id: `conv-${Date.now()}`,
+        subject: String(parsedBody?.subject || (isSupport ? "Support Request" : "Direct Project Discussion")),
+        status: "OPEN",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        latestMessage: parsedBody?.body
+          ? {
+              body: String(parsedBody.body),
+              createdAt: new Date().toISOString(),
+              senderId: this.getCurrentUser().id,
+            }
+          : null,
+        otherParticipant: {
+          id: isSupport ? "usr-admin-01" : "usr-free-01",
+          email: isSupport ? "support@yekis.et" : "hanna.tadesse@addisdev.et",
+          role: isSupport ? "ADMIN" : "FREELANCER",
+          displayName: isSupport ? "Yekis Support Desk" : "Hanna Tadesse",
+        },
+        isSupport,
+        unread: false,
+        assignedStaff: isSupport ? { id: "usr-admin-01", name: "Yonael Mindaye" } : null,
       };
+      this.conversations = [newConv, ...this.conversations];
+      this.messagesByConv[newConv.id] = [
+        {
+          id: `msg-${Date.now()}`,
+          conversationId: newConv.id,
+          senderId: "usr-admin-01",
+          body: isSupport
+            ? "Selam! Welcome to Yekis Support. How can our escrow or verification team help you today?"
+            : "Selam! Let's discuss the project milestones and deliverables here.",
+          createdAt: new Date().toISOString(),
+          sender: {
+            id: "usr-admin-01",
+            email: "support@yekis.et",
+            role: "ADMIN",
+            staffRole: "SUPER_ADMIN",
+            displayName: isSupport ? "Yekis Support Desk" : "Hanna Tadesse",
+          },
+        },
+      ];
+      return { ...newConv, accessToken: "mock-guest-token" };
+    }
+    if (cleanPath.startsWith("/chat/conversations/") && cleanPath.endsWith("/messages")) {
+      const parts = cleanPath.split("/");
+      const convId = parts[3] || "conv-701";
+      if (method === "POST") {
+        const u = this.getCurrentUser();
+        const msg: ChatMessage = {
+          id: `msg-${Date.now()}`,
+          conversationId: convId,
+          senderId: u.id,
+          body: String(parsedBody?.body || ""),
+          attachmentUrl: (parsedBody?.attachmentUrl as string | undefined) ?? null,
+          createdAt: new Date().toISOString(),
+          sender: {
+            id: u.id,
+            email: u.email,
+            role: u.role,
+            staffRole: u.staffRole,
+            displayName: u.role === "CLIENT" ? "Abebe Kebede" : u.role === "FREELANCER" ? "Hanna Tadesse" : "Dawit Mekonnen",
+          },
+        };
+        const existing = this.messagesByConv[convId] ?? [];
+        this.messagesByConv[convId] = [...existing, msg];
+        this.conversations = this.conversations.map((c) =>
+          c.id === convId
+            ? {
+                ...c,
+                updatedAt: msg.createdAt,
+                latestMessage: { body: msg.body, createdAt: msg.createdAt, senderId: u.id },
+              }
+            : c,
+        );
+        return msg;
+      }
+      return this.getMessages(convId);
+    }
+    if (cleanPath.endsWith("/assistant/suggest-replies")) {
+      return {
+        suggestions: [
+          "Looks great! I have reviewed the build and will release the escrow milestone now.",
+          "Can we split this into two milestones—Phase 1 (ETB 45,000) and Phase 2 (ETB 40,000)?",
+          "I have uploaded the Telebirr sandbox logs and deliverable zip for your inspection.",
+        ],
+      };
+    }
+    if (cleanPath.endsWith("/assistant/summarize")) {
+      return {
+        topic: "Telebirr H5 Checkout & CBE Birr Receipt Fallback Review",
+        keyPoints: [
+          "Phase 1 RSA signature verification was approved and released.",
+          "Phase 2 CBE Birr fallback build is uploaded and awaiting client QA sign-off.",
+          "Both parties agreed on a 50,000 ETB milestone release upon verification.",
+        ],
+        agreedBudgetETB: "50,000 ETB",
+        detectedTimeline: "4 days remaining",
+        nextStep: "Inspect Phase 2 deliverable and release escrow milestone #MS-202.",
+        messageCount: 6,
+        lastActivity: new Date().toISOString(),
+      };
+    }
+    if (cleanPath.endsWith("/assistant/extract-deal")) {
+      return {
+        suggestedTitle: "Phase 2: Multi-Rail Escrow Checkout & CBE Birr Flow",
+        suggestedBudgetETB: 50000,
+        estimatedDays: 5,
+        confidence: "HIGH",
+        readyForEscrow: true,
+      };
+    }
+    if (cleanPath.endsWith("/read") && cleanPath.startsWith("/chat/")) {
+      return { ok: true };
+    }
+
+    // Notifications (returns NotificationItem[] array)
+    if (cleanPath === "/notifications" && method === "GET") {
+      return this.notifications;
+    }
+    if (cleanPath.match(/^\/notifications\/[^/]+\/read$/) && method === "POST") {
+      const id = cleanPath.split("/")[2];
+      this.notifications = this.notifications.map((n) =>
+        n.id === id ? { ...n, isRead: true } : n,
+      );
+      return { ok: true };
     }
 
     /* ── Admin / Operations Console Endpoints ─────────────────────────── */
     if (cleanPath === "/admin/permissions/matrix") {
+      const allPerms = [
+        "DASHBOARD_VIEW",
+        "USERS_VIEW",
+        "USERS_MANAGE",
+        "STAFF_MANAGE",
+        "CONTRACTS_VIEW",
+        "ESCROW_VIEW",
+        "PAYMENTS_VIEW",
+        "PAYOUTS_VIEW",
+        "PAYOUTS_SETTLE",
+        "RECONCILIATION_VIEW",
+        "LEDGER_VIEW",
+        "REPORTS_VIEW",
+        "AUDIT_VIEW",
+        "MONITORING_VIEW",
+      ];
       return {
-        permissions: [
-          "DASHBOARD_VIEW",
-          "USERS_VIEW",
-          "USERS_MANAGE",
-          "STAFF_MANAGE",
-          "CONTRACTS_VIEW",
-          "ESCROW_VIEW",
-          "PAYMENTS_VIEW",
-          "PAYOUTS_VIEW",
-          "PAYOUTS_SETTLE",
-          "RECONCILIATION_VIEW",
-          "LEDGER_VIEW",
-          "REPORTS_VIEW",
-          "AUDIT_VIEW",
-          "MONITORING_VIEW",
-        ],
+        permissions: allPerms,
         roles: {
-          SUPER_ADMIN: [
+          SUPER_ADMIN: allPerms,
+          FINANCE_ADMIN: [
             "DASHBOARD_VIEW",
-            "USERS_VIEW",
-            "USERS_MANAGE",
-            "STAFF_MANAGE",
-            "CONTRACTS_VIEW",
             "ESCROW_VIEW",
             "PAYMENTS_VIEW",
             "PAYOUTS_VIEW",
@@ -1126,9 +2581,10 @@ class MockStore {
             "RECONCILIATION_VIEW",
             "LEDGER_VIEW",
             "REPORTS_VIEW",
-            "AUDIT_VIEW",
-            "MONITORING_VIEW",
           ],
+          DISPUTE_MEDIATOR: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "ESCROW_VIEW", "USERS_VIEW"],
+          COMPLIANCE_OFFICER: ["DASHBOARD_VIEW", "USERS_VIEW", "USERS_MANAGE", "REPORTS_VIEW", "AUDIT_VIEW"],
+          SUPPORT_STAFF: ["DASHBOARD_VIEW", "USERS_VIEW", "CONTRACTS_VIEW"],
         },
       };
     }
@@ -1301,6 +2757,7 @@ class MockStore {
             freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
           },
           paymentTransactions: [{ provider: "TELEBIRR", providerTransactionId: "TB26101899201", status: "SUCCESS" }],
+          escrowHolds: [],
         },
         {
           id: "ms-203",
@@ -1315,6 +2772,7 @@ class MockStore {
             freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
           },
           paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8831", status: "SUCCESS" }],
+          escrowHolds: [],
         },
         {
           id: "ms-204",
@@ -1329,6 +2787,7 @@ class MockStore {
             freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
           },
           paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8839", status: "SUCCESS" }],
+          escrowHolds: [],
         },
         {
           id: "ms-208",
@@ -1343,9 +2802,13 @@ class MockStore {
             freelancer: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile" },
           },
           paymentTransactions: [{ provider: "M_PESA", providerTransactionId: "RJK88A12LP", status: "SUCCESS" }],
+          escrowHolds: [{ id: "hold-1", reason: "Dispute mediation active" }],
         },
       ];
       return { items, total: items.length, page: 1, pageSize: 25 };
+    }
+    if (cleanPath.match(/^\/admin\/escrows\/[^/]+\/(release|hold|unhold)$/) && method === "POST") {
+      return { ok: true };
     }
 
     if (cleanPath === "/admin/payouts") {
@@ -1376,8 +2839,24 @@ class MockStore {
           createdAt: isoDaysAgo(0.3),
           user: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
         },
+        {
+          id: "po-903",
+          amountMinor: 3400000,
+          feeMinor: 340000,
+          netAmountMinor: 3060000,
+          provider: "M_PESA",
+          providerPayoutId: null,
+          payoutAccountIdentifier: "+251711904812",
+          status: "PENDING",
+          errorMessage: null,
+          createdAt: isoDaysAgo(0.1),
+          user: { id: "usr-free-03", email: "meron.alemu@lexethiopia.et", displayName: "Meron Alemu" },
+        },
       ];
       return { items, total: items.length, page: 1, pageSize: 25 };
+    }
+    if (cleanPath.match(/^\/admin\/payouts\/[^/]+\/settle$/) && method === "POST") {
+      return { ok: true, settledAt: new Date().toISOString() };
     }
 
     if (cleanPath === "/admin/reconciliation") {
@@ -1427,7 +2906,7 @@ class MockStore {
           { id: "acc-3", code: "2010", name: "Client Escrow Liability Pool", type: "LIABILITY", currency: "ETB", balanceMinor: 492500000 },
           { id: "acc-4", code: "2020", name: "Freelancer Payable Clearing", type: "LIABILITY", currency: "ETB", balanceMinor: 98400000 },
           { id: "acc-5", code: "2030", name: "MOR Withholding Tax Payable", type: "LIABILITY", currency: "ETB", balanceMinor: 12400000 },
-          { id: "acc-6", code: "4010", name: "Platform Commission Revenue (10%)", type: "REVENUE", currency: "ETB", balanceMinor: 39500000 },
+          { id: "acc-6", code: "4010", name: "Platform Commission Revenue (5%)", type: "REVENUE", currency: "ETB", balanceMinor: 39500000 },
         ],
         journalCount: 418,
         integrity: {
@@ -1453,7 +2932,7 @@ class MockStore {
         },
         {
           id: "jrn-102",
-          description: "Milestone Release & 10% Commission Split — Phase 1 SDK",
+          description: "Milestone Release & Commission Split — Phase 1 SDK",
           referenceType: "PAYOUT_SETTLEMENT",
           referenceId: "po-901",
           postedAt: isoDaysAgo(1),
@@ -1538,10 +3017,32 @@ class MockStore {
           cachedKycStatus: "VERIFIED",
           createdAt: isoDaysAgo(30),
         },
+        {
+          id: "usr-free-03",
+          ucid: "YEK-FL-3890",
+          email: "meron.alemu@lexethiopia.et",
+          phone: "+251944112233",
+          displayName: "Meron Alemu",
+          role: "FREELANCER",
+          staffRole: null,
+          isSuspended: false,
+          cachedKycTier: "TIER_3",
+          cachedKycStatus: "VERIFIED",
+          createdAt: isoDaysAgo(75),
+        },
       ];
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
-
+    if (cleanPath.match(/^\/admin\/users\/[^/]+\/(suspend|unsuspend|force-kyc-rereview)$/) && method === "POST") {
+      const uid = cleanPath.split("/")[3];
+      return {
+        id: uid,
+        isSuspended: cleanPath.endsWith("/suspend"),
+        kycRecordId: "kyc-1",
+        periodicReviewPending: true,
+        nextReviewDueAt: isoDaysFromNow(14),
+      };
+    }
     if (cleanPath.startsWith("/admin/users/")) {
       return {
         user: {
@@ -1597,6 +3098,43 @@ class MockStore {
       ];
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
+    if (cleanPath.match(/^\/admin\/staff\/[^/]+\/(role|status)$/) && method === "POST") {
+      const uid = cleanPath.split("/")[3];
+      return {
+        id: uid,
+        email: "selam.finance@yekis.et",
+        staffRole: String(parsedBody?.staffRole || "FINANCE_ADMIN"),
+        isSuspended: Boolean(parsedBody?.suspended),
+      };
+    }
+
+    if (cleanPath === "/admin/gigs") {
+      const rows = this.gigs.map((g) => ({
+        id: g.id,
+        title: g.title,
+        description: g.description,
+        category: g.category,
+        status: g.status,
+        updatedAt: g.createdAt,
+        freelancer: {
+          id: g.freelancer?.id || g.freelancerId,
+          email: "hanna.tadesse@addisdev.et",
+          displayName: g.freelancer?.displayName || "Hanna Tadesse",
+        },
+        packages: (g.packages || []).map((p) => ({
+          tier: p.tier,
+          priceMinor: p.priceMinor,
+          deliveryDays: p.deliveryDays,
+        })),
+      }));
+      return { items: rows, total: rows.length, page: 1, pageSize: 25 };
+    }
+    if (cleanPath.match(/^\/admin\/gigs\/[^/]+\/moderation$/) && method === "POST") {
+      const gigId = cleanPath.split("/")[3];
+      const nextStatus = String(parsedBody?.status || "ACTIVE");
+      this.gigs = this.gigs.map((g) => (g.id === gigId ? { ...g, status: nextStatus } : g));
+      return { id: gigId, status: nextStatus };
+    }
 
     if (cleanPath === "/admin/contracts") {
       const items = [
@@ -1617,6 +3155,15 @@ class MockStore {
           freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
           job: { id: "job-102", title: "Addis Coffee Export ERP", category: "WEB_APP_DEVELOPMENT" },
           _count: { milestones: 2 },
+        },
+        {
+          id: "ctr-303",
+          status: "COMPLETED",
+          createdAt: isoDaysAgo(12),
+          client: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
+          freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse", role: "FREELANCER" },
+          job: { id: "job-104", title: "Amharic & Afaan Oromo FinTech App Localization", category: "TRANSLATION" },
+          _count: { milestones: 1 },
         },
       ];
       return { items, total: items.length, page: 1, pageSize: 25 };
@@ -1649,7 +3196,7 @@ class MockStore {
     }
 
     if (cleanPath === "/kyc/review-queue") {
-      return [
+      const items = [
         {
           id: "kyc-1",
           userId: "usr-free-04",
@@ -1670,11 +3217,47 @@ class MockStore {
             { id: "doc-2", documentType: "SELFIE_LIVENESS", uploadedAt: isoDaysAgo(0.4) },
           ],
         },
+        {
+          id: "kyc-2",
+          userId: "usr-free-05",
+          tier: "TIER_3",
+          status: "UNDER_REVIEW",
+          fullName: "Meron Alemu Bekele",
+          documentNumber: "PASS-EP9948102",
+          tin: "0091827364",
+          businessRegNumber: "AA/BOLE/2025/99104",
+          isPepMatch: false,
+          faydaVerificationAttempted: true,
+          faydaVerificationSucceeded: true,
+          rejectionReason: null,
+          updatedAt: isoDaysAgo(0.8),
+          user: { id: "usr-free-05", email: "meron.alemu@lexethiopia.et", ucid: "YEK-FL-3890" },
+          documents: [
+            { id: "doc-3", documentType: "PASSPORT", uploadedAt: isoDaysAgo(0.8) },
+            { id: "doc-4", documentType: "TIN_CERTIFICATE", uploadedAt: isoDaysAgo(0.8) },
+          ],
+        },
+      ];
+      return { items, total: items.length, page: 1, pageSize: 25 };
+    }
+    if (cleanPath.match(/^\/kyc\/[^/]+\/review$/) && method === "POST") {
+      return { ok: true };
+    }
+    if (cleanPath.match(/^\/kyc\/[^/]+\/history$/)) {
+      return [
+        {
+          id: "kh-1",
+          staffUserId: "usr-admin-01",
+          decision: "VERIFIED",
+          tierAtDecision: "TIER_1",
+          reason: "Phone & Fayda OTP verified",
+          createdAt: isoDaysAgo(10),
+        },
       ];
     }
 
     if (cleanPath === "/disputes/staff/queue") {
-      return [
+      const items = [
         {
           id: "dsp-601",
           category: "QUALITY_OF_WORK",
@@ -1685,6 +3268,7 @@ class MockStore {
           createdAt: isoDaysAgo(5),
           evidence: [
             { id: "ev-1", submittedByUserId: "usr-client-01", statement: "504 gateway timeout log attached.", createdAt: isoDaysAgo(4) },
+            { id: "ev-2", submittedByUserId: "usr-free-01", statement: "Streaming pagination fix deployed on staging.", createdAt: isoDaysAgo(2) },
           ],
           contract: {
             id: "ctr-306",
@@ -1695,10 +3279,11 @@ class MockStore {
           },
         },
       ];
+      return { items, total: items.length, page: 1, pageSize: 25 };
     }
 
     if (cleanPath === "/tms/queue") {
-      return [
+      const items = [
         {
           id: "flg-1",
           type: "VELOCITY",
@@ -1718,6 +3303,28 @@ class MockStore {
           },
         },
       ];
+      return { items, total: items.length, page: 1, pageSize: 25 };
+    }
+    if (cleanPath === "/tms/activity") {
+      return [
+        {
+          id: "tms-act-1",
+          userId: "usr-admin-01",
+          eventType: "TMS_SCAN_COMPLETED",
+          entityType: "TransactionFlag",
+          entityId: "flg-1",
+          action: "RULE_VELOCITY_TRIGGERED",
+          actorRole: "COMPLIANCE_OFFICER",
+          amountMinor: 19500000,
+          requestId: "req-tms-01",
+          ipAddress: "196.188.42.19",
+          createdAt: isoDaysAgo(0.6),
+          user: { id: "usr-admin-01", email: "yonael.ops@yekis.et", staffRole: "SUPER_ADMIN" },
+        },
+      ];
+    }
+    if (cleanPath.match(/^\/tms\/[^/]+\/(file-str|dismiss)$/) || cleanPath.match(/^\/tms\/users\/[^/]+\/lift-hold$/)) {
+      return { ok: true };
     }
 
     if (cleanPath === "/staff/reports") {
@@ -1736,27 +3343,42 @@ class MockStore {
         pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
       };
     }
+    if (cleanPath.match(/^\/staff\/reports\/[^/]+$/) && method === "PATCH") {
+      return { ok: true };
+    }
 
     if (cleanPath === "/wallet/topups/queue") {
+      const items = this.topUps.map((t) => ({
+        ...t,
+        status: t.status === "PENDING_REVIEW" ? "PENDING" : t.status,
+        receiptImagePath: "/payment/Telebirr.png",
+        user:
+          t.userId === "usr-client-01"
+            ? { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", phone: "+251911234567", ucid: "YEK-CL-1042" }
+            : { id: t.userId || "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", phone: "+251933456789", ucid: "YEK-DL-3015" },
+        userHistory: { approvedCount: 12, approvedTotalMinor: 98500000, rejectedCount: 0 },
+      }));
       return {
-        items: [
-          {
-            id: "tu-403",
-            provider: "M_PESA",
-            amountMinor: 4500000,
-            referenceNumber: "RJK91M28LP",
-            status: "PENDING_REVIEW",
-            rejectionReason: null,
-            receiptImagePath: "/payment/mpesa.svg",
-            createdAt: isoDaysAgo(0.4),
-            user: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", phone: "+251933456789", ucid: "YEK-DL-3015" },
-            userHistory: { approvedCount: 12, approvedTotalMinor: 98500000, rejectedCount: 0 },
-          },
-        ],
-        total: 1,
+        items,
+        total: items.length,
         page: 1,
         pageSize: 25,
       };
+    }
+    if (cleanPath.match(/^\/wallet\/topups\/[^/]+\/(approve|reject|flag)$/) && method === "POST") {
+      const parts = cleanPath.split("/");
+      const topUpId = parts[3];
+      const action = parts[4];
+      this.topUps = this.topUps.map((t) =>
+        t.id === topUpId
+          ? {
+              ...t,
+              status: action === "approve" ? "APPROVED" : action === "reject" ? "REJECTED" : "FLAGGED",
+              reviewedAt: new Date().toISOString(),
+            }
+          : t,
+      );
+      return { ok: true };
     }
 
     if (cleanPath === "/admin/audit-logs") {
@@ -1785,6 +3407,18 @@ class MockStore {
           ipAddress: "196.188.42.22",
           createdAt: isoDaysAgo(1.1),
         },
+        {
+          id: "aud-3",
+          userId: "usr-staff-02",
+          eventType: "ESCROW_FUNDED",
+          entityType: "Milestone",
+          entityId: "ms-204",
+          actorRole: "FINANCE_ADMIN",
+          action: "VERIFY_CBE_RECEIPT",
+          amountMinor: 5800000,
+          ipAddress: "196.188.42.31",
+          createdAt: isoDaysAgo(1.8),
+        },
       ];
       return { items, total: items.length, page: 1, limit: 25 };
     }
@@ -1796,16 +3430,76 @@ class MockStore {
             id: "sup-1",
             subject: "CBE Birr Receipt Reference Verification",
             status: "OPEN",
+            createdAt: isoDaysAgo(1),
             updatedAt: isoDaysAgo(0.2),
             creator: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", role: "BOTH" },
             assignedStaff: { id: "usr-admin-01", name: "Yonael Ops" },
             messages: [{ body: "Hello, I uploaded FT26289C8831 for our coffee ERP escrow milestone.", createdAt: isoDaysAgo(0.2) }],
           },
+          {
+            id: "sup-2",
+            subject: "Fayda TIN Certificate Tier 2 Upgrade Inquiry",
+            status: "OPEN",
+            createdAt: isoDaysAgo(2),
+            updatedAt: isoDaysAgo(0.6),
+            creator: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", role: "FREELANCER" },
+            assignedStaff: null,
+            messages: [{ body: "Please confirm my 10-digit ERCA TIN certificate for 3% withholding rate.", createdAt: isoDaysAgo(0.6) }],
+          },
         ],
-        total: 1,
+        total: 2,
         page: 1,
         pageSize: 25,
       };
+    }
+    if (cleanPath.match(/^\/chat\/admin\/conversations\/[^/]+\/(claim|status)$/)) {
+      return {
+        id: "sup-1",
+        subject: "CBE Birr Receipt Reference Verification",
+        status: String(parsedBody?.status || "OPEN"),
+        createdAt: isoDaysAgo(1),
+        updatedAt: new Date().toISOString(),
+        creator: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", role: "BOTH" },
+        assignedStaff: { id: "usr-admin-01", name: "Yonael Ops" },
+        messages: [],
+      };
+    }
+
+    if (cleanPath === "/finance/withholding" && method === "GET") {
+      return { items: this.withholdingReports, total: this.withholdingReports.length };
+    }
+    if (cleanPath.match(/^\/finance\/withholding\/[^/]+\/file$/) && method === "POST") {
+      const reportId = cleanPath.split("/")[3];
+      const eraRef = String(parsedBody?.eraReferenceNumber || "ERCA-FILED-2026");
+      this.withholdingReports = this.withholdingReports.map((r) =>
+        r.id === reportId
+          ? { ...r, filedAt: new Date().toISOString(), eraReferenceNumber: eraRef }
+          : r,
+      );
+      return { ok: true };
+    }
+
+    if (cleanPath === "/telegram/health") {
+      return {
+        status: "HEALTHY",
+        transport: "LONG_POLLING (Dev Mode)",
+        webhook: {
+          pendingUpdateCount: 0,
+          lastErrorMessage: "No reported delivery error",
+        },
+      };
+    }
+    if (cleanPath === "/telegram/info") {
+      return {
+        bot: {
+          id: 719283746,
+          username: "YekisEscrowBot",
+          firstName: "Yekis Jobs & Escrow Bot",
+        },
+      };
+    }
+    if (cleanPath.startsWith("/telegram/")) {
+      return { ok: true };
     }
 
     return {};

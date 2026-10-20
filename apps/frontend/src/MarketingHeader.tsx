@@ -1,4 +1,5 @@
-import { Sun, Moon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Sun, Moon, Menu, X } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
 import { useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
@@ -14,6 +15,28 @@ export function MarketingHeader({
 }: MarketingHeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { t } = useI18n();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [mobileMenuOpen]);
+
+  const handleMobileNav = (page: string) => {
+    setMobileMenuOpen(false);
+    onNavigate(page);
+  };
+
+  const handleMobileAuth = (mode: "login" | "register") => {
+    setMobileMenuOpen(false);
+    onStart(mode);
+  };
 
   return (
     <header className="marketing-header">
@@ -23,7 +46,7 @@ export function MarketingHeader({
           href="#top"
           onClick={(e) => {
             e.preventDefault();
-            onNavigate("home");
+            handleMobileNav("home");
           }}
         >
           <img
@@ -34,15 +57,24 @@ export function MarketingHeader({
           <strong>YEKIS</strong>
         </a>
       </div>
-      <nav className="marketing-nav-center">
-        <button onClick={() => onNavigate("faq")}>{t.nav.faq}</button>
-        <button onClick={() => onNavigate("fees")}>{t.nav.fees}</button>
-        <button onClick={() => onNavigate("about")}>{t.nav.about}</button>
-        <button onClick={() => onNavigate("case-studies")}>{t.nav.caseStudies}</button>
+      <nav className="marketing-nav-center" aria-label="Primary navigation">
+        <button type="button" onClick={() => onNavigate("faq")}>
+          {t.nav.faq}
+        </button>
+        <button type="button" onClick={() => onNavigate("fees")}>
+          {t.nav.fees}
+        </button>
+        <button type="button" onClick={() => onNavigate("about")}>
+          {t.nav.about}
+        </button>
+        <button type="button" onClick={() => onNavigate("case-studies")}>
+          {t.nav.caseStudies}
+        </button>
       </nav>
       <div className="marketing-nav-right">
         <LanguageSelector variant="dropdown" />
         <button
+          type="button"
           className="theme-toggle"
           onClick={toggleTheme}
           aria-label={
@@ -51,12 +83,91 @@ export function MarketingHeader({
         >
           {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
         </button>
-        <button className="btn-ghost" onClick={() => onStart("login")}>
+        <button
+          type="button"
+          className="btn-ghost marketing-signin-btn"
+          onClick={() => onStart("login")}
+        >
           {t.nav.signIn}
         </button>
-        <button className="btn-primary" onClick={() => onStart("register")}>
+        <button
+          type="button"
+          className="btn-primary marketing-cta-btn"
+          onClick={() => onStart("register")}
+        >
           {t.nav.getStarted}
         </button>
+        <button
+          type="button"
+          className="marketing-mobile-toggle"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="marketing-mobile-drawer"
+          aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+        >
+          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+      </div>
+
+      {mobileMenuOpen && (
+        <div
+          className="marketing-mobile-backdrop"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div
+        id="marketing-mobile-drawer"
+        className={`marketing-mobile-drawer ${mobileMenuOpen ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation menu"
+      >
+        <div className="marketing-mobile-drawer-head">
+          <span className="marketing-mobile-drawer-title">Navigation</span>
+          <button
+            type="button"
+            className="marketing-mobile-close"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Close navigation menu"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <nav className="marketing-mobile-links" aria-label="Mobile navigation">
+          <button type="button" onClick={() => handleMobileNav("home")}>
+            Home
+          </button>
+          <button type="button" onClick={() => handleMobileNav("faq")}>
+            {t.nav.faq}
+          </button>
+          <button type="button" onClick={() => handleMobileNav("fees")}>
+            {t.nav.fees}
+          </button>
+          <button type="button" onClick={() => handleMobileNav("about")}>
+            {t.nav.about}
+          </button>
+          <button type="button" onClick={() => handleMobileNav("case-studies")}>
+            {t.nav.caseStudies}
+          </button>
+        </nav>
+        <div className="marketing-mobile-actions">
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => handleMobileAuth("login")}
+          >
+            {t.nav.signIn}
+          </button>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => handleMobileAuth("register")}
+          >
+            {t.nav.getStarted}
+          </button>
+        </div>
       </div>
     </header>
   );

@@ -114,66 +114,142 @@ export function MarketplaceShadcnDashboard({
   const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
   const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
 
+  const CONTRACT_META_MAP: Record<
+    string,
+    {
+      contractTitle: string;
+      counterparty: string;
+      counterpartyEmail: string;
+      category: string;
+      rail: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+    }
+  > = {
+    "ctr-301": {
+      contractTitle: "Telebirr SuperApp Mini-Program",
+      counterparty: "Hanna Tadesse",
+      counterpartyEmail: "hanna.tadesse@addisdev.et",
+      category: "Web app development",
+      rail: "TELEBIRR",
+    },
+    "ctr-302": {
+      contractTitle: "Addis Coffee Export ERP",
+      counterparty: "Dawit Mekonnen",
+      counterpartyEmail: "dawit.mekonnen@ethio-digital.et",
+      category: "Web app development",
+      rail: "CBE_BIRR",
+    },
+    "ctr-303": {
+      contractTitle: "Amharic & Afaan Oromo FinTech Localization",
+      counterparty: "Meron Alemu",
+      counterpartyEmail: "meron.alemu@lexethiopia.et",
+      category: "Translation",
+      rail: "CBE_BIRR",
+    },
+    "ctr-304": {
+      contractTitle: "Fayda National ID KYC Onboarding",
+      counterparty: "Nahom Girma",
+      counterpartyEmail: "nahom.girma@addisdesign.et",
+      category: "Graphic design",
+      rail: "CBE_BIRR",
+    },
+    "ctr-305": {
+      contractTitle: "M-Pesa Till Reconciliation & Ledger",
+      counterparty: "Robel Tesfaye",
+      counterpartyEmail: "robel@ethiofintech.et",
+      category: "Web app development",
+      rail: "M_PESA",
+    },
+    "ctr-306": {
+      contractTitle: "Legacy Inventory ERP API Connector",
+      counterparty: "Bereket Haile",
+      counterpartyEmail: "bereket@coders.et",
+      category: "Data entry",
+      rail: "M_PESA",
+    },
+  };
+
+  const RAILS: Array<"TELEBIRR" | "CBE_BIRR" | "M_PESA"> = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
+
   const ledgerRecords = useMemo<LedgerContractRecord[]>(
     () =>
-      effectiveMilestones.map((m, idx) => ({
-        id: m.id,
-        code: `MS-${m.id.slice(0, 6).toUpperCase() || 100 + idx}`,
-        title: m.title,
-        contractTitle: `Contract #${m.contractId.slice(0, 8)}`,
-        counterparty: "Contract Counterparty",
-        counterpartyEmail: "escrow@yekis.et",
-        category: "WEB_APP_DEVELOPMENT",
-        rail: "TELEBIRR",
-        escrowState: stateOverrides[m.id] ?? toLedgerState(m.escrowState),
-        amountMinor: m.amountMinor,
-        feeMinor: Math.round(m.amountMinor * 0.08),
-        dueDate: (m.dueDate || "").slice(0, 10),
-        updatedAt: (m.releasedAt || m.submittedAt || m.dueDate || "").slice(0, 10),
-      })),
+      effectiveMilestones.map((m, idx) => {
+        const meta = CONTRACT_META_MAP[m.contractId];
+        return {
+          id: m.id,
+          code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
+          title: m.title,
+          contractTitle: meta?.contractTitle ?? `Contract #${m.contractId.slice(0, 8)}`,
+          counterparty: meta?.counterparty ?? "Hanna Tadesse",
+          counterpartyEmail: meta?.counterpartyEmail ?? "hanna.tadesse@addisdev.et",
+          category: meta?.category ?? "Web app development",
+          rail: meta?.rail ?? RAILS[idx % RAILS.length],
+          escrowState: stateOverrides[m.id] ?? toLedgerState(m.escrowState),
+          amountMinor: m.amountMinor,
+          feeMinor: Math.round(m.amountMinor * 0.1),
+          dueDate: (m.dueDate || "").slice(0, 10),
+          updatedAt: (m.releasedAt || m.submittedAt || m.dueDate || "").slice(0, 10),
+        };
+      }),
     [effectiveMilestones, stateOverrides],
   );
 
   const derivedKanbanTasks = useMemo<KanbanTask[]>(
     () =>
-      effectiveMilestones.map((m, idx) => ({
-        id: m.id,
-        code: `MS-${m.id.slice(0, 6).toUpperCase() || 100 + idx}`,
-        title: m.title,
-        contractTitle: `Contract #${m.contractId.slice(0, 8)}`,
-        counterparty: "Escrow Contract",
-        rail: "TELEBIRR",
-        amountMinor: m.amountMinor,
-        dueDate: (m.dueDate || "").slice(0, 10),
-        priority: m.amountMinor >= 5_000_000 ? "HIGH" : "MEDIUM",
-        column: toKanbanCol(m.escrowState),
-        category: "Milestone",
-      })),
-    [effectiveMilestones],
+      effectiveMilestones.map((m, idx) => {
+        const meta = CONTRACT_META_MAP[m.contractId];
+        const state = stateOverrides[m.id] ?? m.escrowState;
+        return {
+          id: m.id,
+          code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
+          title: m.title,
+          contractTitle: meta?.contractTitle ?? `Contract #${m.contractId.slice(0, 8)}`,
+          counterparty: meta?.counterparty ?? "Hanna Tadesse",
+          rail: meta?.rail ?? RAILS[idx % RAILS.length],
+          amountMinor: m.amountMinor,
+          dueDate: (m.dueDate || "").slice(0, 10),
+          priority: m.amountMinor >= 5_000_000 ? "HIGH" : m.amountMinor >= 3_500_000 ? "MEDIUM" : "LOW",
+          column: toKanbanCol(state),
+          category: meta?.category ?? "Web app development",
+        };
+      }),
+    [effectiveMilestones, stateOverrides],
   );
 
   const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
-    const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m) => ({
-      id: `ms-${m.id}`,
-      title: m.title,
-      contractRef: `CNT-${m.contractId.slice(0, 6).toUpperCase()}`,
-      date: (m.dueDate || new Date().toISOString()).slice(0, 10),
-      time: "17:00",
-      type: m.escrowState === "RELEASED" ? "PAYOUT_RELEASE" : "MILESTONE_DUE",
-      amountMinor: m.amountMinor,
-      rail: "TELEBIRR",
-      status: m.escrowState === "RELEASED" ? "COMPLETED" : "SCHEDULED",
-      counterparty: "Contract Milestone",
-    }));
-    const jobEvents: ScheduleEvent[] = effectiveJobs.slice(0, 10).map((j) => ({
+    const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m, idx) => {
+      const meta = CONTRACT_META_MAP[m.contractId];
+      return {
+        id: `ms-${m.id}`,
+        title: m.title,
+        contractRef: `${meta?.contractTitle ?? m.contractId} · MS-0${m.sequenceNumber || 1}`,
+        date: (m.dueDate || new Date().toISOString()).slice(0, 10),
+        time: idx % 2 === 0 ? "14:00 EAT" : "17:00 EAT",
+        type:
+          m.escrowState === "RELEASED"
+            ? "PAYOUT_RELEASE"
+            : m.escrowState === "DISPUTED"
+              ? "COMPLIANCE_KYC"
+              : "MILESTONE_DUE",
+        amountMinor: m.amountMinor,
+        rail: meta?.rail ?? RAILS[idx % RAILS.length],
+        status:
+          m.escrowState === "RELEASED"
+            ? "COMPLETED"
+            : m.escrowState === "DISPUTED"
+              ? "AT_RISK"
+              : "SCHEDULED",
+        counterparty: meta?.counterparty ?? "Hanna Tadesse",
+      };
+    });
+    const jobEvents: ScheduleEvent[] = effectiveJobs.slice(0, 10).map((j, idx) => ({
       id: `job-${j.id}`,
       title: j.title,
-      contractRef: `JOB-${j.id.slice(0, 6).toUpperCase()}`,
+      contractRef: `BRIEF-${j.id.replace(/^job-/, "")}`,
       date: (j.deadline || new Date().toISOString()).slice(0, 10),
-      time: "18:00",
+      time: "18:00 EAT",
       type: "PROPOSAL_DEADLINE",
       amountMinor: j.budgetMaxMinor,
-      rail: "TELEBIRR",
+      rail: RAILS[idx % RAILS.length],
       status: j.status === "OPEN" ? "SCHEDULED" : "COMPLETED",
       counterparty: j.category.replaceAll("_", " "),
     }));

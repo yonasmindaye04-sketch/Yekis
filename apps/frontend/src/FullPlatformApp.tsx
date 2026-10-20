@@ -9,6 +9,7 @@ import {
   type TopUpRequest,
   type WalletResponse,
 } from "./api/client";
+import { mockStore, type DemoWorkspaceRole } from "./api/mockData";
 import { realtimeSocket } from "./api/socket";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
@@ -47,6 +48,7 @@ import {
   LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
+  Menu,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -361,6 +363,29 @@ function FullPlatformAppInner() {
   const [realtimeLive, setRealtimeLive] = useState(false);
   /* Dual-role ("BOTH") accounts can toggle between combined, client, or freelancer workspace views */
   const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== "undefined" && window.innerWidth <= 768,
+  );
+
+  useEffect(() => {
+    const onResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobileViewport(mobile);
+      if (!mobile) setMobileDrawerOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    if (!mobileDrawerOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileDrawerOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mobileDrawerOpen]);
 
   const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER" | "BOTH") => {
     if (user?.role !== "BOTH") return;
@@ -566,6 +591,21 @@ const loadWorkspace = async () => {
     }
   };
 
+  const switchTestPersona = async (personaRole: DemoWorkspaceRole) => {
+    mockStore.setRole(personaRole);
+    api.setSession({
+      accessToken: "mock-jwt-access-token",
+      refreshToken: "mock-jwt-refresh-token",
+    });
+    if (personaRole === "CLIENT" || personaRole === "FREELANCER" || personaRole === "BOTH") {
+      switchDualRoleMode(personaRole);
+    }
+    setShowLanding(false);
+    setError("");
+    setSuccessMessage("");
+    await loadWorkspace();
+  };
+
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -723,7 +763,9 @@ if (authMode === "register") {
   // step the user could never tick off.
   const tourFacts = useMemo(
     () => ({
+      userId: user?.id,
       role: (user?.role as "CLIENT" | "FREELANCER" | "BOTH") || "CLIENT",
+      activeMode: dualRoleMode,
       kycStatus: user?.kyc?.status ?? "PENDING",
       walletBalanceMinor: wallet.balanceMinor ?? 0,
       hasFundedMilestone: milestones.some((m) => m.escrowState !== "PAYMENT_PENDING"),
@@ -738,7 +780,9 @@ if (authMode === "register") {
       profileCompleteness === null ? undefined : profileCompleteness >= 60,
     }),
     [
+      user?.id,
       user?.role,
+      dualRoleMode,
       user?.kyc?.status,
       wallet.balanceMinor,
       milestones,
@@ -791,6 +835,7 @@ if (authMode === "register") {
       <OpsConsole
         user={user}
         onExit={logout}
+        onSwitchPersona={(persona) => void switchTestPersona(persona)}
       />
     );
   }
@@ -1440,6 +1485,69 @@ if (authMode === "register") {
               ? "New to Yekis? Create an account"
               : "Already have an account? Sign in"}
           </button>
+
+          <div
+            style={{
+              marginTop: "14px",
+              paddingTop: "14px",
+              borderTop: "1px dashed var(--color-border)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.73rem",
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+                color: "var(--color-text-secondary)",
+              }}
+            >
+              Instant Demo Personas (1-Click Full Platform Test)
+            </span>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                gap: "6px",
+              }}
+            >
+              <button
+                type="button"
+                className="sh-btn sh-btn-secondary sh-btn-sm"
+                onClick={() => void switchTestPersona("BOTH")}
+                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
+              >
+                <strong>Dual Role</strong> · Dawit (ETB 319k)
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-secondary sh-btn-sm"
+                onClick={() => void switchTestPersona("CLIENT")}
+                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
+              >
+                <strong>Client</strong> · Abebe (ETB 248k)
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-secondary sh-btn-sm"
+                onClick={() => void switchTestPersona("FREELANCER")}
+                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
+              >
+                <strong>Freelancer</strong> · Hanna (ETB 142k)
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-secondary sh-btn-sm"
+                onClick={() => void switchTestPersona("ADMIN")}
+                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
+              >
+                <strong>Ops Admin</strong> · Yonael (Staff)
+              </button>
+            </div>
+          </div>
         </form>
 
         {legalModal && (
@@ -1566,9 +1674,20 @@ if (authMode === "register") {
 
   return (
     <div
-      className={`platform-shell sh-shell sh-workspace-shell sh-variant-${sidebarVariant}${sidebarCollapsed ? " sh-collapsed sh-sidebar-collapsed" : ""}`}
+      className={`platform-shell sh-shell sh-workspace-shell sh-variant-${sidebarVariant}${sidebarCollapsed && !isMobileViewport ? " sh-collapsed sh-sidebar-collapsed" : ""}`}
     >
-      <aside className="platform-sidebar">
+      {mobileDrawerOpen && (
+        <div
+          className="sh-mobile-backdrop"
+          onClick={() => setMobileDrawerOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      <aside
+        id="workspace-mobile-drawer"
+        className={`platform-sidebar${mobileDrawerOpen ? " mobile-open" : ""}`}
+        aria-label="Workspace navigation"
+      >
         <div className="sidebar-brand">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <img
@@ -1576,16 +1695,34 @@ if (authMode === "register") {
               alt="Yekis Logo"
               className="platform-logo small"
             />
-            {!sidebarCollapsed && <strong>Yekis</strong>}
+            {(!sidebarCollapsed || isMobileViewport) && <strong>Yekis</strong>}
           </div>
           <button
             type="button"
             className="sh-icon-only-btn"
-            onClick={toggleSidebarCollapsed}
-            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            onClick={() =>
+              isMobileViewport
+                ? setMobileDrawerOpen(false)
+                : toggleSidebarCollapsed()
+            }
+            title={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+            aria-label={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
           >
-            {sidebarCollapsed ? (
+            {isMobileViewport ? (
+              <X size={16} />
+            ) : sidebarCollapsed ? (
               <PanelLeftOpen size={15} />
             ) : (
               <PanelLeftClose size={15} />
@@ -1594,19 +1731,45 @@ if (authMode === "register") {
         </div>
         <div className="sidebar-role">
           <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
-          {!sidebarCollapsed && (
+          {(!sidebarCollapsed || isMobileViewport) && (
             <span>
               <strong>{roleLabel(platformRole)}</strong>
               <small>{user.email}</small>
             </span>
           )}
         </div>
+        {isMobileViewport && basePlatformRole === "BOTH" && (
+          <div className="sh-mobile-drawer-role-switch">
+            <label className="sh-customizer-label" htmlFor="mobile-role-select">
+              Workspace Mode
+            </label>
+            <select
+              id="mobile-role-select"
+              className="sh-select"
+              value={dualRoleMode}
+              onChange={(e) =>
+                switchDualRoleMode(
+                  e.target.value as "CLIENT" | "FREELANCER" | "BOTH",
+                )
+              }
+              style={{ width: "100%" }}
+            >
+              <option value="BOTH">Mode: Client &amp; Freelancer</option>
+              <option value="CLIENT">Mode: Client (Hiring)</option>
+              <option value="FREELANCER">Mode: Freelancer (Work)</option>
+            </select>
+          </div>
+        )}
         <nav className="sidebar-nav">
           {navItems.map((item) => (
             <button
               key={item.view}
+              type="button"
               className={view === item.view ? "active" : ""}
-              onClick={() => setView(item.view)}
+              onClick={() => {
+                setView(item.view);
+                setMobileDrawerOpen(false);
+              }}
               title={item.label}
             >
               <span className="nav-icon">{navIconMap[item.iconKey]}</span>
@@ -1615,8 +1778,12 @@ if (authMode === "register") {
           ))}
         </nav>
         <button
+          type="button"
           className={`sidebar-settings ${view === "settings" ? "active" : ""}`}
-          onClick={() => setView("settings")}
+          onClick={() => {
+            setView("settings");
+            setMobileDrawerOpen(false);
+          }}
           title="Settings"
         >
           <Settings size={16} /> <span className="nav-label">{t.nav.settings}</span>
@@ -1632,12 +1799,32 @@ if (authMode === "register") {
           <div className="sh-topbar-left">
             <button
               type="button"
-              className="sh-icon-only-btn"
-              onClick={toggleSidebarCollapsed}
-              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              className="sh-icon-only-btn sh-topbar-menu-btn"
+              onClick={() =>
+                isMobileViewport
+                  ? setMobileDrawerOpen((prev) => !prev)
+                  : toggleSidebarCollapsed()
+              }
+              aria-expanded={isMobileViewport ? mobileDrawerOpen : !sidebarCollapsed}
+              aria-controls="workspace-mobile-drawer"
+              title={
+                isMobileViewport
+                  ? "Open navigation drawer"
+                  : sidebarCollapsed
+                    ? "Expand sidebar"
+                    : "Collapse sidebar"
+              }
+              aria-label={
+                isMobileViewport
+                  ? "Open navigation drawer"
+                  : sidebarCollapsed
+                    ? "Expand sidebar"
+                    : "Collapse sidebar"
+              }
             >
-              {sidebarCollapsed ? (
+              {isMobileViewport ? (
+                <Menu size={17} />
+              ) : sidebarCollapsed ? (
                 <PanelLeftOpen size={16} />
               ) : (
                 <PanelLeftClose size={16} />
@@ -1683,6 +1870,20 @@ if (authMode === "register") {
               </select>
             )}
 
+            <select
+              className="sh-select"
+              value={mockStore.activeRole}
+              onChange={(e) =>
+                void switchTestPersona(e.target.value as DemoWorkspaceRole)
+              }
+              aria-label="Switch test persona"
+              title="Switch active demo account (Client, Freelancer, Dual-Role, or Ops Console Admin)"
+            >
+              <option value="BOTH">Persona: Dual-Role (Dawit)</option>
+              <option value="CLIENT">Persona: Client (Abebe)</option>
+              <option value="FREELANCER">Persona: Freelancer (Hanna)</option>
+              <option value="ADMIN">Persona: Ops Console (Admin)</option>
+            </select>
 
             <LayoutCustomizerTrigger />
             <LanguageSelector variant="dropdown" />
@@ -2084,17 +2285,33 @@ if (authMode === "register") {
         )}
       </main>
 
-      <nav className="platform-mobile-nav">
-        {navItems.map((item) => (
+      <nav className="platform-mobile-nav" aria-label="Primary mobile navigation">
+        {navItems.slice(0, 4).map((item) => (
           <button
             key={item.view}
-            className={view === item.view ? "active" : ""}
-            onClick={() => setView(item.view)}
+            type="button"
+            className={view === item.view && !mobileDrawerOpen ? "active" : ""}
+            onClick={() => {
+              setView(item.view);
+              setMobileDrawerOpen(false);
+            }}
           >
             <span>{navIconMap[item.iconKey]}</span>
             <small>{item.label}</small>
           </button>
         ))}
+        <button
+          type="button"
+          className={mobileDrawerOpen ? "active" : ""}
+          onClick={() => setMobileDrawerOpen((o) => !o)}
+          aria-expanded={mobileDrawerOpen}
+          aria-controls="workspace-mobile-drawer"
+        >
+          <span>
+            <Menu size={18} />
+          </span>
+          <small>Menu</small>
+        </button>
       </nav>
     </div>
   );

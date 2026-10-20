@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    Yekis Landing V2 — Design System
    All rules are scoped to .yk-v2 to avoid ANY clash with the
    existing LandingPage styles.
@@ -3317,6 +3317,19 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 :root[data-theme="light"] .yk-v2 .stk-count b { color:#5e7f16; }
 
 /* ── responsive ── */
+@media (min-width: 1441px) {
+  .yk-v2 .v2-container {
+    max-width: 1440px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .yk-v2 .v2-container-wide {
+    max-width: 1680px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
 @media (max-width: 1000px) {
   .yk-v2 .stk-card          { width: calc(100% - 2.4rem); height: 78%; flex-direction: column; padding: 1.5rem; gap: 1rem; }
   .yk-v2 .stk-copy h2       { font-size: clamp(2rem, 9vw, 3.2rem); }
@@ -3327,6 +3340,79 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   .yk-v2 .stk-scroll .stk-circle { width: 40px; height: 40px; }
 }
 
+@media (max-width: 768px) {
+  .yk-v2 .v2-hero-inner {
+    padding: 5.5rem 16px 2.5rem;
+    width: 100%;
+  }
+  .yk-v2 .v2-hero-title {
+    font-size: clamp(2.1rem, 9vw, 3.8rem);
+    word-break: break-word;
+  }
+  .yk-v2 .v2-hero-title .v2-word {
+    white-space: normal;
+  }
+  .yk-v2 .esc-panel {
+    overflow-y: auto;
+  }
+  .yk-v2 .esc-preview {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .yk-v2 .esc-thumb {
+    width: 100%;
+    height: 96px;
+  }
+}
+
+@media (max-width: 480px) {
+  .yk-v2 .v2-container,
+  .yk-v2 .v2-container-wide {
+    padding: 0 16px;
+  }
+  .yk-v2 .stk-card {
+    width: calc(100% - 1.5rem);
+    height: 82%;
+    padding: 1.15rem;
+  }
+  .yk-v2 .stk-copy h2 {
+    font-size: clamp(1.65rem, 8vw, 2.4rem);
+  }
+  .yk-v2 .stk-flat h1 {
+    font-size: clamp(2.6rem, 11vw, 5rem);
+  }
+  .yk-v2 .stk-cta-row {
+    width: 100%;
+    flex-direction: column;
+  }
+  .yk-v2 .stk-outro-btn,
+  .yk-v2 .stk-outro-ghost {
+    width: 100%;
+    min-height: 46px;
+    justify-content: center;
+  }
+  .yk-v2 .v2-footer-card {
+    width: calc(100% - 24px);
+    padding: 28px 18px 24px;
+  }
+}
+
+@media (max-width: 375px) {
+  .yk-v2 .v2-hero-title {
+    font-size: clamp(1.85rem, 8.8vw, 2.5rem);
+  }
+  .yk-v2 .v2-footer-nav {
+    grid-template-columns: 1fr;
+    row-gap: 24px;
+  }
+  .yk-v2 .esc-stage {
+    min-height: 700px;
+  }
+  .yk-v2 .esc-panel {
+    padding: 16px 14px;
+  }
+}
+
 /* ── reduced-motion: static 2-column grid ── */
 @media (prefers-reduced-motion: reduce) {
   .yk-v2 .stk-wrap  { height: auto; }
@@ -3334,7 +3420,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   .yk-v2 .stk-stage {
     position: static;
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 1.2rem;
     padding: 1.2rem 6%;
   }
@@ -3352,3 +3438,4 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   .yk-v2 .stk-scroll .stk-ring,
   .yk-v2 .stk-scroll .stk-circle svg { animation: none; }
 }
+

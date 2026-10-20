@@ -60,6 +60,8 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<KanbanColumnId | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [activeMobileColumn, setActiveMobileColumn] =
+    useState<KanbanColumnId>("ESCROW_HELD");
 
   // New task form state
   const [newTitle, setNewTitle] = useState("");
@@ -99,7 +101,9 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
     const idx = COLUMN_ORDER.indexOf(item.column);
     const nextIdx = idx + dir;
     if (nextIdx < 0 || nextIdx >= COLUMN_ORDER.length) return;
-    moveTask(taskId, COLUMN_ORDER[nextIdx]);
+    const nextCol = COLUMN_ORDER[nextIdx];
+    moveTask(taskId, nextCol);
+    setActiveMobileColumn(nextCol);
   };
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -177,17 +181,45 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
         </div>
       </div>
 
+      {/* Mobile Stage Tabs (visible on <= 768px) */}
+      <div
+        className="sh-kanban-mobile-tabs"
+        role="tablist"
+        aria-label="Kanban workflow stages"
+      >
+        {COLUMNS.map((col) => {
+          const colTasks = filteredTasks.filter((t) => t.column === col.id);
+          const isActive = activeMobileColumn === col.id;
+          return (
+            <button
+              key={col.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              className={`sh-kanban-mobile-tab ${isActive ? "active" : ""}`}
+              onClick={() => setActiveMobileColumn(col.id)}
+            >
+              <span>{col.title}</span>
+              <span className="sh-mono sh-kanban-mobile-tab-count">
+                {colTasks.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* 5-Column Kanban Board */}
       <div className="sh-kanban-grid">
         {COLUMNS.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.column === col.id);
           const colTotalMinor = colTasks.reduce((sum, t) => sum + t.amountMinor, 0);
           const isDropTarget = dragOverCol === col.id;
+          const isMobileActive = activeMobileColumn === col.id;
 
           return (
             <div
               key={col.id}
-              className={`sh-kanban-col ${isDropTarget ? "drag-over" : ""}`}
+              className={`sh-kanban-col ${isDropTarget ? "drag-over" : ""} ${isMobileActive ? "mobile-active" : "sh-kanban-col-hidden-mobile"}`}
               onDragOver={(e) => {
                 e.preventDefault();
                 setDragOverCol(col.id);

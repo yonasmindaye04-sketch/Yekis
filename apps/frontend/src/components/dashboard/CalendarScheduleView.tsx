@@ -205,6 +205,32 @@ export function CalendarScheduleView({
         </div>
       </div>
 
+      {/* Mobile Quick-Jump Date Strip (visible on <= 768px) */}
+      <div
+        className="sh-cal-mobile-strip"
+        role="region"
+        aria-label="Scheduled dates in month"
+      >
+        {Array.from(eventsByDate.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([dateStr, list]) => {
+            const isSelected = selectedDate === dateStr;
+            return (
+              <button
+                key={dateStr}
+                type="button"
+                className={`sh-cal-mobile-pill ${isSelected ? "active" : ""}`}
+                onClick={() => setSelectedDate(dateStr)}
+              >
+                <span className="sh-mono">{dateStr.slice(5)}</span>
+                <span className="sh-mono sh-cal-mobile-pill-count">
+                  {list.length}
+                </span>
+              </button>
+            );
+          })}
+      </div>
+
       {/* Split Layout: Month Grid + Right Agenda Inspector */}
       <div className="sh-cal-split">
         <div className="sh-cal-grid-wrap">

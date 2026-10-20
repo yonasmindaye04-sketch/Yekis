@@ -1567,7 +1567,171 @@
   border-color: var(--color-primary);
 }
 
-/* ── Responsive Breakpoints ─────────────────────────────────────────────── */
+/* ── Mobile Adaptive Components (Drawer, Ledger Cards, Kanban Tabs, Calendar Strip) ── */
+.sh-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 13, 18, 0.58);
+  backdrop-filter: blur(3px);
+  z-index: 125;
+}
+
+.sh-mobile-drawer-role-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sh-mobile-view-switcher {
+  display: none;
+}
+
+.sh-mobile-ledger-cards {
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sh-mobile-ledger-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--sh-radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  cursor: pointer;
+  transition: border-color 140ms ease;
+}
+
+.sh-mobile-ledger-card:hover,
+.sh-mobile-ledger-card.selected {
+  border-color: var(--color-primary);
+}
+
+.sh-mobile-ledger-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sh-mobile-ledger-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sh-mobile-ledger-title {
+  margin: 2px 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.35;
+}
+
+.sh-mobile-ledger-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.sh-mobile-ledger-amount {
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
+/* Mobile Kanban Stage Tabs */
+.sh-kanban-mobile-tabs {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.sh-kanban-mobile-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: var(--sh-radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-neutral-text, #64748b);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.sh-kanban-mobile-tab.active {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.sh-kanban-mobile-tab-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Mobile Calendar Quick-Jump Date Strip */
+.sh-cal-mobile-strip {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.sh-cal-mobile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: var(--sh-radius);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.sh-cal-mobile-pill.active {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.sh-cal-mobile-pill-count {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* ── Responsive Breakpoints (1441px+ | 1025-1440px | 769-1024px | 481-768px | 376-480px | 320-375px) ── */
+@media (min-width: 1441px) {
+  .sh-dashboard-wrap {
+    max-width: 1560px;
+  }
+}
+
 @media (max-width: 1120px) {
   .sh-kpi-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1580,18 +1744,296 @@
 
 @media (max-width: 768px) {
   .platform-shell.sh-shell,
-  .platform-shell.sh-shell.sh-collapsed {
+  .platform-shell.sh-shell.sh-collapsed,
+  .platform-shell.sh-shell.sh-variant-inset,
+  .platform-shell.sh-shell.sh-variant-floating {
+    display: block;
     grid-template-columns: 1fr;
-    padding: 0;
+    padding: 0 0 calc(68px + env(safe-area-inset-bottom));
   }
+
+  .platform-shell.sh-shell .platform-sidebar {
+    display: flex !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: min(84vw, 300px) !important;
+    height: 100dvh !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    border-right: 1px solid var(--color-border) !important;
+    background: var(--color-bg-elevated) !important;
+    z-index: 130 !important;
+    align-items: stretch !important;
+    padding: max(18px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom)) !important;
+    transform: translateX(-105%);
+    transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-y: auto;
+    box-shadow: 16px 0 40px rgba(0, 0, 0, 0.38);
+  }
+
+  .platform-shell.sh-shell .platform-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .platform-shell.sh-shell .platform-sidebar .sidebar-brand strong,
+  .platform-shell.sh-shell .platform-sidebar .sidebar-role > span:last-child,
+  .platform-shell.sh-shell .platform-sidebar .sidebar-nav button .nav-label,
+  .platform-shell.sh-shell .platform-sidebar .sidebar-settings .nav-label {
+    display: inline !important;
+  }
+
+  .platform-shell.sh-shell .platform-sidebar .sidebar-settings {
+    display: flex !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    min-height: 44px;
+    padding: 10px 12px !important;
+  }
+
+  .platform-shell.sh-shell .platform-sidebar .sidebar-nav button {
+    justify-content: flex-start !important;
+    width: 100% !important;
+    min-height: 44px;
+    padding: 10px 12px !important;
+  }
+
+  .sh-topbar {
+    padding: 10px 14px;
+    gap: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 80;
+  }
+
+  .sh-breadcrumb {
+    font-size: 0.8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sh-breadcrumb-muted,
+  .sh-breadcrumb-sep {
+    display: none;
+  }
+
+  .sh-topbar-right {
+    gap: 6px;
+  }
+
+  .sh-topbar-right > select.sh-select {
+    display: none;
+  }
+
+  .sh-icon-only-btn,
+  .sh-icon-btn,
+  .sh-btn,
+  .sh-seg-btn {
+    min-height: 44px;
+  }
+
+  .sh-icon-only-btn {
+    min-width: 44px;
+  }
+
+  .sh-dashboard-wrap {
+    padding: 14px 14px 32px;
+    gap: 14px;
+  }
+
+  .sh-subnav-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sh-subnav-left,
+  .sh-subnav-right {
+    width: 100%;
+  }
+
+  .sh-subnav-left .sh-segmented {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .sh-subnav-left .sh-seg-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .sh-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sh-hide-mobile {
+    display: none !important;
+  }
+
+  /* Prevent iOS auto-zoom on form focus */
+  .sh-dashboard-wrap input:not([type="checkbox"]):not([type="radio"]),
+  .sh-dashboard-wrap select,
+  .sh-dashboard-wrap textarea,
+  .sh-search-input-wrap input,
+  .sh-select,
+  .sh-form-field input {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+
+  /* Hybrid Table / Card View on Mobile */
+  .sh-mobile-view-switcher {
+    display: inline-flex;
+  }
+
+  .sh-mobile-ledger-cards.is-active {
+    display: flex;
+  }
+
+  .sh-table-scroll.sh-hide-on-mobile-cards {
+    display: none;
+  }
+
+  .sh-table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sh-search-input-wrap {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .sh-table-toolbar .sh-segmented {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  /* Mobile Stage-Tab Kanban */
+  .sh-kanban-mobile-tabs {
+    display: flex;
+  }
+
+  .sh-kanban-grid {
+    grid-template-columns: 1fr;
+    overflow-x: visible;
+  }
+
+  .sh-kanban-col.sh-kanban-col-hidden-mobile {
+    display: none;
+  }
+
+  .sh-kanban-col {
+    min-height: 260px;
+  }
+
+  /* Mobile Calendar & Date Strip */
+  .sh-cal-mobile-strip {
+    display: flex;
+  }
+
+  .sh-cal-cell {
+    min-height: 54px;
+    padding: 5px 4px;
+  }
+
+  .sh-cal-cell-events,
+  .sh-cal-day-count {
+    display: none;
+  }
+
+  .sh-cal-cell.has-events::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    margin-top: auto;
+    align-self: center;
+  }
+
+  .sh-customizer-grid-2,
+  .sh-customizer-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  /* Bottom Navigation Bar (5 thumb-zone items) */
+  .platform-shell.sh-shell .platform-mobile-nav {
+    display: flex !important;
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 95 !important;
+    background: var(--color-bg-elevated) !important;
+    border-top: 1px solid var(--color-border) !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+    border-radius: 0 !important;
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom)) !important;
+    gap: 4px;
+    justify-content: space-around;
+    overflow-x: hidden;
+  }
+
+  .platform-shell.sh-shell .platform-mobile-nav button {
+    flex: 1 1 0%;
+    min-width: 0 !important;
+    min-height: 46px;
+    padding: 6px 4px !important;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+  }
+
+  .platform-shell.sh-shell .platform-mobile-nav button small {
+    font-size: 0.65rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
   .sh-kpi-grid {
     grid-template-columns: 1fr;
   }
-  .sh-hide-mobile {
-    display: none;
+
+  .sh-card {
+    padding: 14px;
   }
-  .sh-dashboard-wrap {
-    padding: 14px 16px 80px;
+
+  .sh-table-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .sh-kv-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
   }
 }
+
+@media (max-width: 375px) {
+  .sh-topbar {
+    padding: 8px 10px;
+  }
+
+  .sh-dashboard-wrap {
+    padding: 12px 10px 28px;
+  }
+
+  .sh-cal-weekday {
+    padding: 6px 2px;
+    font-size: 0.68rem;
+  }
+}
+
 

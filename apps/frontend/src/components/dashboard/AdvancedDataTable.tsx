@@ -14,6 +14,8 @@ import {
   ChevronRight,
   ExternalLink,
   X,
+  LayoutList,
+  Table2,
 } from "lucide-react";
 import type { LedgerContractRecord } from "./dashboardData";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
@@ -63,6 +65,7 @@ export function AdvancedDataTable({
   const [page, setPage] = useState<number>(1);
   const [colMenuOpen, setColMenuOpen] = useState(false);
   const [inspectedRecord, setInspectedRecord] = useState<LedgerContractRecord | null>(null);
+  const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">("cards");
 
   const [visibleCols, setVisibleCols] = useState({
     counterparty: true,
@@ -247,6 +250,28 @@ export function AdvancedDataTable({
               </div>
             )}
           </div>
+          <div
+            className="sh-segmented sh-mobile-view-switcher"
+            role="group"
+            aria-label="Mobile layout view"
+          >
+            <button
+              type="button"
+              className={`sh-seg-btn ${mobileViewMode === "cards" ? "active" : ""}`}
+              onClick={() => setMobileViewMode("cards")}
+              aria-pressed={mobileViewMode === "cards"}
+            >
+              <LayoutList size={13} /> Cards
+            </button>
+            <button
+              type="button"
+              className={`sh-seg-btn ${mobileViewMode === "table" ? "active" : ""}`}
+              onClick={() => setMobileViewMode("table")}
+              aria-pressed={mobileViewMode === "table"}
+            >
+              <Table2 size={13} /> Table
+            </button>
+          </div>
         </div>
       </div>
 
@@ -317,8 +342,93 @@ export function AdvancedDataTable({
         </select>
       </div>
 
+      {/* Mobile Stacked Summary Cards (shown on <=768px when mobileViewMode === "cards") */}
+      <div
+        className={`sh-mobile-ledger-cards ${mobileViewMode === "cards" ? "is-active" : ""}`}
+        aria-label="Contracts and milestones card list"
+      >
+        {pagedRows.length === 0 ? (
+          <div className="sh-kanban-empty">
+            No contract milestones match your current search or filter criteria.
+          </div>
+        ) : (
+          pagedRows.map((row) => {
+            const statusInfo = STATUS_META[row.escrowState];
+            const isSelected = selectedIds.has(row.id);
+            return (
+              <article
+                key={row.id}
+                className={`sh-mobile-ledger-card ${isSelected ? "selected" : ""}`}
+                onClick={() => setInspectedRecord(row)}
+              >
+                <div className="sh-mobile-ledger-card-top">
+                  <div
+                    className="sh-mobile-ledger-check"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleRow(row.id)}
+                      aria-label={`Select ${row.title}`}
+                    />
+                    <span className="sh-mono sh-cell-meta">{row.code}</span>
+                    <span aria-hidden="true" className="sh-cell-meta">·</span>
+                    <span className="sh-mono sh-cell-meta">
+                      {row.rail.replace("_", " ")}
+                    </span>
+                  </div>
+                  <span className={`sh-status-inline ${statusInfo.tone}`}>
+                    {statusInfo.tone === "emerald" && <ShieldCheck size={13} />}
+                    {statusInfo.tone === "amber" && <Clock size={13} />}
+                    {statusInfo.tone === "crimson" && <AlertTriangle size={13} />}
+                    {statusInfo.tone === "neutral" && <CheckCircle2 size={13} />}
+                    <span>{statusInfo.label}</span>
+                  </span>
+                </div>
+
+                <h4 className="sh-mobile-ledger-title">{row.title}</h4>
+                <div className="sh-cell-meta">
+                  <span>{row.contractTitle}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{row.counterparty}</span>
+                </div>
+
+                <div className="sh-mobile-ledger-foot">
+                  <div>
+                    <strong className="sh-mono sh-mobile-ledger-amount">
+                      ETB{" "}
+                      {(row.amountMinor / 100).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </strong>
+                    <span className="sh-cell-meta sh-mono" style={{ display: "block" }}>
+                      Due {row.dueDate} · Fee ETB{" "}
+                      {(row.feeMinor / 100).toLocaleString()}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="sh-row-action-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setInspectedRecord(row);
+                    }}
+                  >
+                    Inspect <ExternalLink size={12} />
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+
       {/* Data Grid */}
-      <div className="sh-table-scroll">
+      <div
+        className={`sh-table-scroll ${mobileViewMode === "cards" ? "sh-hide-on-mobile-cards" : ""}`}
+      >
         <table className={`sh-data-table ${density === "compact" ? "compact" : "comfortable"}`}>
           <thead>
             <tr>
