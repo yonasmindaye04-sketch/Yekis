@@ -9,7 +9,6 @@ import {
   type TopUpRequest,
   type WalletResponse,
 } from "./api/client";
-import { mockStore, type DemoWorkspaceRole } from "./api/mockData";
 import { realtimeSocket } from "./api/socket";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
@@ -591,21 +590,6 @@ const loadWorkspace = async () => {
     }
   };
 
-  const switchTestPersona = async (personaRole: DemoWorkspaceRole) => {
-    mockStore.setRole(personaRole);
-    api.setSession({
-      accessToken: "mock-jwt-access-token",
-      refreshToken: "mock-jwt-refresh-token",
-    });
-    if (personaRole === "CLIENT" || personaRole === "FREELANCER" || personaRole === "BOTH") {
-      switchDualRoleMode(personaRole);
-    }
-    setShowLanding(false);
-    setError("");
-    setSuccessMessage("");
-    await loadWorkspace();
-  };
-
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -835,7 +819,6 @@ if (authMode === "register") {
       <OpsConsole
         user={user}
         onExit={logout}
-        onSwitchPersona={(persona) => void switchTestPersona(persona)}
       />
     );
   }
@@ -1485,69 +1468,6 @@ if (authMode === "register") {
               ? "New to Yekis? Create an account"
               : "Already have an account? Sign in"}
           </button>
-
-          <div
-            style={{
-              marginTop: "14px",
-              paddingTop: "14px",
-              borderTop: "1px dashed var(--color-border)",
-              display: "flex",
-              flexDirection: "column",
-              gap: "8px",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "0.73rem",
-                fontWeight: 700,
-                textTransform: "uppercase",
-                letterSpacing: "0.06em",
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              Instant Demo Personas (1-Click Full Platform Test)
-            </span>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-                gap: "6px",
-              }}
-            >
-              <button
-                type="button"
-                className="sh-btn sh-btn-secondary sh-btn-sm"
-                onClick={() => void switchTestPersona("BOTH")}
-                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
-              >
-                <strong>Dual Role</strong> · Dawit (ETB 319k)
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-secondary sh-btn-sm"
-                onClick={() => void switchTestPersona("CLIENT")}
-                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
-              >
-                <strong>Client</strong> · Abebe (ETB 248k)
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-secondary sh-btn-sm"
-                onClick={() => void switchTestPersona("FREELANCER")}
-                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
-              >
-                <strong>Freelancer</strong> · Hanna (ETB 142k)
-              </button>
-              <button
-                type="button"
-                className="sh-btn sh-btn-secondary sh-btn-sm"
-                onClick={() => void switchTestPersona("ADMIN")}
-                style={{ justifyContent: "flex-start", fontSize: "0.76rem", padding: "6px 10px" }}
-              >
-                <strong>Ops Admin</strong> · Yonael (Staff)
-              </button>
-            </div>
-          </div>
         </form>
 
         {legalModal && (
@@ -1869,21 +1789,6 @@ if (authMode === "register") {
                 <option value="FREELANCER">Mode: Freelancer (Work)</option>
               </select>
             )}
-
-            <select
-              className="sh-select"
-              value={mockStore.activeRole}
-              onChange={(e) =>
-                void switchTestPersona(e.target.value as DemoWorkspaceRole)
-              }
-              aria-label="Switch test persona"
-              title="Switch active demo account (Client, Freelancer, Dual-Role, or Ops Console Admin)"
-            >
-              <option value="BOTH">Persona: Dual-Role (Dawit)</option>
-              <option value="CLIENT">Persona: Client (Abebe)</option>
-              <option value="FREELANCER">Persona: Freelancer (Hanna)</option>
-              <option value="ADMIN">Persona: Ops Console (Admin)</option>
-            </select>
 
             <LayoutCustomizerTrigger />
             <LanguageSelector variant="dropdown" />

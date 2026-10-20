@@ -114,13 +114,18 @@ export function useOpsPerms(staffRole: string | null | undefined): PermsApi {
   }, []);
 
   return useMemo(() => {
-    const keys = (staffRole && matrix[staffRole]) || [];
+    const isSuper = staffRole === "SUPER_ADMIN" || staffRole === "ADMIN";
+    const keys =
+      (staffRole && matrix[staffRole]) ||
+      (staffRole && FALLBACK_MATRIX[staffRole]) ||
+      (isSuper ? ["*"] : []);
     const set = new Set(keys);
     return {
       keys,
       role: staffRole ?? null,
       loading,
       can: (page: OpsPageId) => {
+        if (isSuper) return true;
         const needed = OPS_PERMS[page];
         return set.has("*") || set.has(needed);
       },

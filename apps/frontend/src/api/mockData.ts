@@ -1656,16 +1656,30 @@ class MockStore {
     },
   ];
 
+  customEmail: string | null = null;
+  customPhone: string | null = null;
+  customStaffRole: string | null = null;
+  registeredRolesByEmail: Record<string, DemoWorkspaceRole> = {};
+
   getCurrentUser(): MeResponse {
     const base = DEMO_USERS[this.activeRole] ?? DEMO_USERS.BOTH;
     return {
       ...base,
+      email: this.customEmail || base.email,
+      phone: this.customPhone || base.phone,
+      staffRole:
+        this.activeRole === "ADMIN"
+          ? (this.customStaffRole ?? base.staffRole)
+          : null,
       wallet: { balanceMinor: this.walletMinor },
     };
   }
 
   setRole(role: DemoWorkspaceRole) {
     this.activeRole = role;
+    this.customEmail = null;
+    this.customPhone = null;
+    this.customStaffRole = null;
     this.walletMinor = DEMO_USERS[role].wallet?.balanceMinor ?? 24850000;
     if (typeof window !== "undefined") {
       window.localStorage.setItem("yekis-demo-role", role);
@@ -1756,6 +1770,14 @@ class MockStore {
       return { verified: true };
     }
     if (cleanPath.startsWith("/auth/")) {
+      const rawEmail =
+        typeof parsedBody?.email === "string"
+          ? parsedBody.email.trim()
+          : typeof parsedBody?.identifier === "string"
+            ? parsedBody.identifier.trim()
+            : "";
+      const lower = rawEmail.toLowerCase();
+
       if (
         parsedBody?.role &&
         (parsedBody.role === "CLIENT" ||
@@ -1764,14 +1786,43 @@ class MockStore {
           parsedBody.role === "ADMIN")
       ) {
         this.setRole(parsedBody.role);
-      } else if (typeof parsedBody?.email === "string") {
-        const lower = parsedBody.email.toLowerCase();
-        if (lower.includes("admin") || lower.includes("ops")) {
+        if (lower) {
+          this.registeredRolesByEmail[lower] = parsedBody.role;
+          this.customEmail = rawEmail;
+        }
+        if (typeof parsedBody?.phone === "string" && parsedBody.phone.trim()) {
+          this.customPhone = parsedBody.phone.trim();
+        }
+      } else if (lower) {
+        if (this.registeredRolesByEmail[lower]) {
+          this.setRole(this.registeredRolesByEmail[lower]);
+          this.customEmail = rawEmail;
+        } else if (
+          lower.includes("admin") ||
+          lower.includes("ops") ||
+          lower.includes("compliance") ||
+          lower.includes("support")
+        ) {
           this.setRole("ADMIN");
-        } else if (lower.includes("free") || lower.includes("hanna")) {
+          this.customEmail = rawEmail;
+          if (lower.includes("compliance")) {
+            this.customStaffRole = "COMPLIANCE_OFFICER";
+          } else if (lower.includes("support")) {
+            this.customStaffRole = "SUPPORT";
+          } else {
+            this.customStaffRole = "SUPER_ADMIN";
+          }
+        } else if (
+          lower.includes("free") ||
+          lower.includes("hanna") ||
+          lower.includes("seller") ||
+          lower.includes("selam")
+        ) {
           this.setRole("FREELANCER");
         } else if (lower.includes("client") || lower.includes("abebe")) {
           this.setRole("CLIENT");
+        } else {
+          this.setRole("BOTH");
         }
       }
       const user = this.getCurrentUser();
@@ -2553,38 +2604,105 @@ class MockStore {
     /* ── Admin / Operations Console Endpoints ─────────────────────────── */
     if (cleanPath === "/admin/permissions/matrix") {
       const allPerms = [
-        "DASHBOARD_VIEW",
-        "USERS_VIEW",
-        "USERS_MANAGE",
-        "STAFF_MANAGE",
-        "CONTRACTS_VIEW",
-        "ESCROW_VIEW",
-        "PAYMENTS_VIEW",
-        "PAYOUTS_VIEW",
-        "PAYOUTS_SETTLE",
-        "RECONCILIATION_VIEW",
-        "LEDGER_VIEW",
-        "REPORTS_VIEW",
-        "AUDIT_VIEW",
-        "MONITORING_VIEW",
+        "dashboard.view",
+        "users.view",
+        "users.suspend",
+        "admins.manage",
+        "contracts.view",
+        "escrow.view",
+        "payments.view",
+        "payouts.view",
+        "payouts.settle",
+        "reconciliation.view",
+        "ledger.view",
+        "reports.view",
+        "receipts.view",
+        "topups.review",
+        "kyc.review",
+        "tms.review",
+        "disputes.view",
+        "disputes.mediate",
+        "disputes.resolve",
+        "support.handle",
+        "profiles.moderate",
+        "gigs.moderate",
+        "featured.manage",
+        "bot.manage",
+        "monitoring.view",
+        "audit.view",
       ];
       return {
         permissions: allPerms,
         roles: {
-          SUPER_ADMIN: allPerms,
-          FINANCE_ADMIN: [
-            "DASHBOARD_VIEW",
-            "ESCROW_VIEW",
-            "PAYMENTS_VIEW",
-            "PAYOUTS_VIEW",
-            "PAYOUTS_SETTLE",
-            "RECONCILIATION_VIEW",
-            "LEDGER_VIEW",
-            "REPORTS_VIEW",
+          SUPER_ADMIN: ["*", ...allPerms],
+          ADMIN: ["*", ...allPerms],
+          OPERATIONS_ADMIN: [
+            "dashboard.view",
+            "users.view",
+            "users.suspend",
+            "contracts.view",
+            "escrow.view",
+            "payments.view",
+            "payouts.view",
+            "payouts.settle",
+            "disputes.view",
+            "support.handle",
+            "gigs.moderate",
+            "featured.manage",
+            "bot.manage",
+            "monitoring.view",
+            "receipts.view",
           ],
-          DISPUTE_MEDIATOR: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "ESCROW_VIEW", "USERS_VIEW"],
-          COMPLIANCE_OFFICER: ["DASHBOARD_VIEW", "USERS_VIEW", "USERS_MANAGE", "REPORTS_VIEW", "AUDIT_VIEW"],
-          SUPPORT_STAFF: ["DASHBOARD_VIEW", "USERS_VIEW", "CONTRACTS_VIEW"],
+          FINANCE_ADMIN: [
+            "dashboard.view",
+            "users.view",
+            "payments.view",
+            "escrow.view",
+            "payouts.view",
+            "payouts.settle",
+            "ledger.view",
+            "reconciliation.view",
+            "reports.view",
+            "receipts.view",
+            "topups.review",
+            "audit.view",
+          ],
+          DISPUTE_MEDIATOR: [
+            "dashboard.view",
+            "users.view",
+            "contracts.view",
+            "escrow.view",
+            "disputes.view",
+            "disputes.mediate",
+            "disputes.resolve",
+          ],
+          COMPLIANCE_ADMIN: [
+            "dashboard.view",
+            "users.view",
+            "kyc.review",
+            "tms.review",
+            "support.handle",
+            "disputes.view",
+            "disputes.mediate",
+            "monitoring.view",
+            "audit.view",
+            "topups.review",
+            "profiles.moderate",
+          ],
+          COMPLIANCE_OFFICER: [
+            "dashboard.view",
+            "users.view",
+            "kyc.review",
+            "tms.review",
+            "support.handle",
+            "disputes.view",
+            "disputes.mediate",
+            "monitoring.view",
+            "audit.view",
+            "topups.review",
+            "profiles.moderate",
+          ],
+          SUPPORT: ["dashboard.view", "users.view", "contracts.view", "support.handle"],
         },
       };
     }

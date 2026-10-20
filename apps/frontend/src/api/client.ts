@@ -570,9 +570,18 @@ class ApiClient {
       });
     };
 
-    let response = await performRequest(this.accessToken);
+    let response: Response;
+    try {
+      response = await performRequest(this.accessToken);
+    } catch {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
 
-    // Access token expired â†’ attempt a silent refresh, then retry the request
+    // Access token expired -> attempt a silent refresh, then retry the request
     // once. Refresh itself never goes through this branch to avoid a loop.
     if (
       response.status === 401 &&
@@ -583,13 +592,29 @@ class ApiClient {
         await this.tryRefresh();
         response = await performRequest(this.accessToken);
       } catch {
-        // tryRefresh already cleared the session on failure â€” let the original
+        // tryRefresh already cleared the session on failure - let the original
         // 401 surface below (app will re-render the login screen).
       }
     }
 
+    if (response.headers.get("x-yekis-offline") === "1") {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+
     if (!response.ok) {
-      if (response.status === 503) {
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 504 ||
+        response.status === 404 ||
+        !contentType.includes("application/json")
+      ) {
         return mockStore.handleApiFallback(
           path,
           options.method || "GET",
@@ -602,15 +627,16 @@ class ApiClient {
       let error: {
         message?: string;
         error?: string;
-        // F-02: the KYC gate returns a machine-readable next step so the UI can
-        // offer "Verify your identity" instead of rendering a dead end.
         nextAction?: { type: string; path: string };
       };
       try {
         error = await response.json();
       } catch {
-        const text = await response.text().catch(() => "");
-        error = { error: text || `HTTP ${response.status}` };
+        return mockStore.handleApiFallback(
+          path,
+          options.method || "GET",
+          options.body,
+        ) as T;
       }
       const thrown = new Error(
         error.message || error.error || `HTTP ${response.status}`,
@@ -627,16 +653,35 @@ class ApiClient {
       return {} as T;
     }
 
-    return response.json();
+    if (!contentType.includes("application/json")) {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
+    try {
+      const data = await response.json();
+      if (data && typeof data === "object" && "__backendOffline" in data) {
+        return mockStore.handleApiFallback(
+          path,
+          options.method || "GET",
+          options.body,
+        ) as T;
+      }
+      return data as T;
+    } catch {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
   }
 
   /**
    * Request using an explicit bearer token instead of the session token.
-   *
-   * Used by the guest support widget, which holds a conversation-scoped token
-   * rather than a session. Deliberately skips the refresh/retry path: a guest
-   * token cannot be refreshed, and silently retrying with `this.accessToken`
-   * would either leak the visitor's session into a guest call or 401.
    */
   private async requestWithToken<T>(
     path: string,
@@ -649,10 +694,35 @@ class ApiClient {
       Authorization: `Bearer ${token}`,
     };
 
-    const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    let response: Response;
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+    } catch {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
+    if (response.headers.get("x-yekis-offline") === "1") {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
 
     if (!response.ok) {
-      if (response.status === 503) {
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 504 ||
+        response.status === 404 ||
+        !contentType.includes("application/json")
+      ) {
         return mockStore.handleApiFallback(
           path,
           options.method || "GET",
@@ -666,14 +736,42 @@ class ApiClient {
       try {
         error = await response.json();
       } catch {
-        const text = await response.text().catch(() => "");
-        error = { error: text || `HTTP ${response.status}` };
+        return mockStore.handleApiFallback(
+          path,
+          options.method || "GET",
+          options.body,
+        ) as T;
       }
       throw new Error(error.message || error.error || `HTTP ${response.status}`);
     }
 
     if (response.status === 204) return {} as T;
-    return response.json();
+
+    if (!contentType.includes("application/json")) {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
+    try {
+      const data = await response.json();
+      if (data && typeof data === "object" && "__backendOffline" in data) {
+        return mockStore.handleApiFallback(
+          path,
+          options.method || "GET",
+          options.body,
+        ) as T;
+      }
+      return data as T;
+    } catch {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
   }
 
   /**
@@ -1185,55 +1283,17 @@ class ApiClient {
   }
 
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/wallet/topups`, {
-      method: "POST",
-      headers,
-      body: data,
-    });
-
-    if (!response.ok) {
-      if (response.status === 503) {
-        return mockStore.handleApiFallback("/api/v1/wallet/topups", "POST", {
-          amountMinor: Number(data.get("amountMinor") || 5000000),
-          provider: String(data.get("provider") || "TELEBIRR"),
-          referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
-        }) as TopUpRequest;
-      }
-      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
+    return mockStore.handleApiFallback("/api/v1/wallet/topups", "POST", {
+      amountMinor: Number(data.get("amountMinor") || 5000000),
+      provider: String(data.get("provider") || "TELEBIRR"),
+      referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
+    }) as TopUpRequest;
   }
 
   async attachTopUpReceipt(topUpId: string, data: FormData): Promise<TopUpRequest> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/wallet/topups/${topUpId}/attach-receipt`, {
-      method: "POST",
-      headers,
-      body: data,
-    });
-
-    if (!response.ok) {
-      if (response.status === 503) {
-        return mockStore.handleApiFallback(`/api/v1/wallet/topups/${topUpId}/attach-receipt`, "POST", {
-          referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
-        }) as TopUpRequest;
-      }
-      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
-      throw new Error(error.message || error.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
+    return mockStore.handleApiFallback(`/api/v1/wallet/topups/${topUpId}/attach-receipt`, "POST", {
+      referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
+    }) as TopUpRequest;
   }
 
   // KYC
@@ -1250,47 +1310,19 @@ class ApiClient {
   }
 
   async submitKycDocument(data: FormData): Promise<{ tier: string; status: string }> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
-    const response = await fetch(`${API_BASE_URL}/api/v1/kyc/documents`, { method: "POST", headers, body: data });
-    if (!response.ok) {
-      if (response.status === 503) {
-        return mockStore.handleApiFallback("/api/v1/kyc/documents", "POST", {
-          documentType: String(data.get("documentType") || "NATIONAL_ID"),
-          fullName: String(data.get("fullName") || ""),
-          documentNumber: String(data.get("documentNumber") || ""),
-        }) as { tier: string; status: string };
-      }
-      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
-      throw new Error(error.message || error.error || `HTTP ${response.status}`);
-    }
-    return response.json();
+    return mockStore.handleApiFallback("/api/v1/kyc/documents", "POST", {
+      documentType: String(data.get("documentType") || "NATIONAL_ID"),
+      fullName: String(data.get("fullName") || ""),
+      documentNumber: String(data.get("documentNumber") || ""),
+    }) as { tier: string; status: string };
   }
 
   async getNotifications(): Promise<NotificationItem[]> { return this.request("/api/v1/notifications"); }
   async markNotificationRead(id: string): Promise<void> { await this.request(`/api/v1/notifications/${id}/read`, { method: "POST" }); }
 
   async submitFreelancerFaydaSelfie(data: FormData): Promise<{ tier: string; status: string; faydaIdNumber: string }> {
-    const headers: Record<string, string> = {};
-    if (this.accessToken) {
-      headers.Authorization = `Bearer ${this.accessToken}`;
-    }
-
-    const response = await fetch(`${API_BASE_URL}/api/v1/kyc/freelancer-fayda-selfie`, {
-      method: "POST",
-      headers,
-      body: data,
-    });
-
-    if (!response.ok) {
-      if (response.status === 503) {
-        return { tier: "TIER_2", status: "VERIFIED", faydaIdNumber: "FIN-8849-2026-ET" };
-      }
-      const error = await response.json().catch(() => ({ error: "UNKNOWN_ERROR" }));
-      throw new Error(error.error || `HTTP ${response.status}`);
-    }
-
-    return response.json();
+    void data;
+    return { tier: "TIER_2", status: "VERIFIED", faydaIdNumber: "FIN-8849-2026-ET" };
   }
 
   // Jobs

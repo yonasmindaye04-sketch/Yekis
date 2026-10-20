@@ -103,14 +103,12 @@ export interface OpsConsoleProps {
   user?: MeResponse | null;
   /** Called when the reviewer signs out or leaves the console. */
   onExit?: () => void;
-  /** Optional 1-click persona switcher for platform testing. */
-  onSwitchPersona?: (role: "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN") => void;
 }
 
 /** localStorage key holding the sidebar collapsed/expanded preference. */
 const NAV_KEY = "yekis-ops-nav";
 
-export function OpsConsole({ user, onExit, onSwitchPersona }: OpsConsoleProps) {
+export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const { theme, toggleTheme } = useTheme();
   const { sidebarVariant } = useShadcnLayout();
   const perms = useOpsPerms(user?.staffRole);
@@ -344,25 +342,6 @@ const toast = useCallback((msg: string) => {
                     <span className="kbd srch-kbd">Ctrl K</span>
                   </div>
                   <div className="hdr-right">
-                    {onSwitchPersona && (
-                      <select
-                        className="sh-select"
-                        value="ADMIN"
-                        onChange={(e) =>
-                          onSwitchPersona(
-                            e.target.value as "CLIENT" | "FREELANCER" | "BOTH" | "ADMIN",
-                          )
-                        }
-                        aria-label="Switch test persona"
-                        title="Switch test persona across the platform"
-                        style={{ minHeight: 34, fontSize: 12.5, padding: "0 10px" }}
-                      >
-                        <option value="ADMIN">Persona: Ops Console (Admin)</option>
-                        <option value="CLIENT">Persona: Client (Abebe)</option>
-                        <option value="FREELANCER">Persona: Freelancer (Hanna)</option>
-                        <option value="BOTH">Persona: Dual-Role (Dawit)</option>
-                      </select>
-                    )}
                     <button
                       type="button"
                       className="icon-btn ops-mobile-search-btn"
