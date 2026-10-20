@@ -1624,8 +1624,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 }
 .chat-bubble.user {
   align-self: flex-end;
-  background: #436a56;
-  color: #ffffff;
+  background: var(--color-primary);
+  color: var(--color-primary-text);
   border-bottom-right-radius: 4px;
 }
 .chat-bubble.typing {
@@ -1642,20 +1642,21 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
   align-items: center;
   gap: 10px;
   padding: 16px;
-  background: #ffffff;
-  border-top: 1px solid #e2e8e4;
+  background: var(--color-bg-elevated, #ffffff);
+  border-top: 1px solid var(--color-border, #e2e8e4);
 }
 .chat-composer-area input {
   flex: 1;
   min-height: 44px;
   margin: 0;
-  border: 1px solid #d1dcd6;
+  border: 1px solid var(--color-border, #d1dcd6);
   border-radius: 22px;
   padding: 0 16px;
-  background: #f2efe9;
+  background: var(--color-bg-subtle, #f2efe9);
+  color: var(--color-text);
 }
 .chat-composer-area input:focus {
-  border-color: #436a56;
+  border-color: var(--color-primary);
   outline: none;
 }
 .chat-composer-area button {
@@ -1666,15 +1667,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
   border: none;
   border-radius: 50%;
   background: transparent;
-  color: #436a56;
+  color: var(--color-primary);
   cursor: pointer;
 }
 .chat-composer-area button:disabled {
-  color: #baccbe;
+  color: var(--color-text-tertiary, #94a3b8);
   cursor: not-allowed;
 }
 .chat-composer-area button:not(:disabled):hover {
-  background: #e6efea;
+  background: var(--color-primary-light);
 }
 
 /* ΓöÇΓöÇ Staff live chat inbox additions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */

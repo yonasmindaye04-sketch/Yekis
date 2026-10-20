@@ -331,8 +331,8 @@
 }
 
 .hero-section .btn-secondary:hover {
-  border-color: #d8f36b;
-  color: #d8f36b;
+  border-color: var(--yekis-lime);
+  color: var(--yekis-lime);
   background: rgba(255, 255, 255, 0.12);
 }
 
@@ -396,7 +396,7 @@
 
 .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
 .marketing-header:not(.is-scrolled) .btn-ghost:hover {
-  color: #d8f36b;
+  color: var(--yekis-lime);
 }
 
 /* Light mode on the landing page: dark header text over the light hero.
@@ -794,12 +794,12 @@
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  background-color: var(--yekis-lime);
-  color: #0b1116;
+  background-color: var(--color-primary, var(--yekis-lime));
+  color: #ffffff;
   border-radius: 999px;
   font-weight: 700;
   font-size: 0.95rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 10px 30px rgba(22, 163, 74, 0.32);
   border: none;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -1140,7 +1140,7 @@
 
 .marketing-mobile-links button:hover,
 .marketing-mobile-links button:focus-visible {
-  background: rgba(163, 230, 53, 0.1);
+  background: rgba(22, 163, 74, 0.12);
   color: var(--yekis-lime);
   outline: none;
 }
