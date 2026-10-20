@@ -277,7 +277,7 @@ function Reveal({
   dir = "up",
   delay = 0,
   className,
-  amount = 0.2,
+  amount = 0.08,
   style,
 }: {
   children: React.ReactNode;
@@ -289,12 +289,12 @@ function Reveal({
 }) {
   const hidden =
     dir === "left"
-      ? { opacity: 0, x: -46 }
+      ? { opacity: 0, x: -18 }
       : dir === "right"
-        ? { opacity: 0, x: 46 }
+        ? { opacity: 0, x: 18 }
         : dir === "zoom"
-          ? { opacity: 0, scale: 0.93 }
-          : { opacity: 0, y: 38 };
+          ? { opacity: 0, scale: 0.97 }
+          : { opacity: 0, y: 16 };
   return (
     <motion.div
       className={className}
@@ -302,7 +302,7 @@ function Reveal({
       initial={hidden}
       whileInView={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       viewport={{ once: true, amount }}
-      transition={{ duration: 0.75, delay, ease: EASE }}
+      transition={{ duration: 0.26, delay: Math.min(delay, 0.06), ease: EASE }}
     >
       {children}
     </motion.div>
@@ -314,7 +314,7 @@ function CountUp({
   decimals = 0,
   prefix = "",
   suffix = "",
-  duration = 1.9,
+  duration = 0.55,
 }: {
   to: number;
   decimals?: number;
@@ -323,7 +323,7 @@ function CountUp({
   duration?: number;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
+  const inView = useInView(ref, { once: true, amount: 0.15 });
   const [val, setVal] = useState(0);
   useEffect(() => {
     if (!inView) return;
@@ -336,7 +336,7 @@ function CountUp({
     const tick = (ts: number) => {
       if (!start) start = ts;
       const p = Math.min(1, (ts - start) / (duration * 1000));
-      const eased = 1 - Math.pow(1 - p, 4);
+      const eased = 1 - Math.pow(1 - p, 3);
       setVal(to * eased);
       if (p < 1) raf = requestAnimationFrame(tick);
     };
@@ -382,7 +382,7 @@ function SpringTitle({
                 key={`${ch}-${myIdx}`}
                 style={
                   {
-                    "--d": `${(myIdx * 0.035).toFixed(3)}s`,
+                    "--d": `${(myIdx * 0.007).toFixed(3)}s`,
                     "--i": myIdx,
                   } as React.CSSProperties
                 }
@@ -462,7 +462,8 @@ function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
 function FloatingPaths({ position }: { position: 1 | -1 }) {
   const paths = useMemo(
     () =>
-      Array.from({ length: 36 }, (_, i) => {
+      Array.from({ length: 18 }, (_, idx) => {
+        const i = idx * 2;
         const a = 380 - i * 5 * position, b = 189 + i * 6;
         const c = 312 - i * 5 * position, e = 216 - i * 6;
         const f = 152 - i * 5 * position, g = 343 - i * 6;
@@ -470,10 +471,10 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
         const m = 684 - i * 5 * position, n = 875 - i * 6;
         return {
           d: `M-${a} -${b} C-${a} -${b} -${c} ${e} ${f} ${g} C${h} ${k} ${m} ${n} ${m} ${n}`,
-          w: (0.5 + i * 0.03).toFixed(2),
-          o: Math.min(0.1 + i * 0.025, 0.85).toFixed(3),
-          fd: `${9 + ((i * 7) % 8)}s`,   // flow speed
-          dl: `${-((i * 13) % 17)}s`,    // desync phase
+          w: (0.55 + i * 0.03).toFixed(2),
+          o: Math.min(0.14 + i * 0.025, 0.85).toFixed(3),
+          fd: `${5 + ((idx * 5) % 5)}s`,
+          dl: `${-((idx * 7) % 11)}s`,
         };
       }),
     [position],
@@ -504,36 +505,33 @@ function HeroSection() {
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
 
-  /* hand the title's transform over to the hover transition once the
-     entrance spring has finished (a filled animation would outrank it) */
   useEffect(() => {
     if (settled) return;
-    const t = window.setTimeout(() => setSettled(true), 2200);
-    return () => window.clearTimeout(t);
+    const timer = window.setTimeout(() => setSettled(true), 450);
+    return () => window.clearTimeout(timer);
   }, [settled]);
 
-  /* gentle pointer parallax: path field drifts with the cursor, hero leans back */
+  /* On-demand pointer parallax (zero idle CPU/GPU loop when not moving cursor) */
   useEffect(() => {
     if (prefersReduced()) return;
     const layer = layerRef.current;
     const inner = innerRef.current;
     if (!layer || !inner) return;
-    let tx = 0, ty = 0, sx = 0, sy = 0, raf = 0;
+    let raf = 0;
     const onMove = (e: PointerEvent) => {
-      tx = (e.clientX / window.innerWidth - 0.5) * 2;
-      ty = (e.clientY / window.innerHeight - 0.5) * 2;
+      if (window.scrollY > window.innerHeight) return;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const tx = (e.clientX / window.innerWidth - 0.5) * 2;
+        const ty = (e.clientY / window.innerHeight - 0.5) * 2;
+        layer.style.transform = `translate3d(${(tx * 10).toFixed(1)}px,${(ty * 7).toFixed(1)}px,0)`;
+        inner.style.transform = `translate3d(${(tx * -4).toFixed(1)}px,${(ty * -3).toFixed(1)}px,0)`;
+      });
     };
     window.addEventListener("pointermove", onMove, { passive: true });
-    const loop = () => {
-      sx += (tx - sx) * 0.045;
-      sy += (ty - sy) * 0.045;
-      layer.style.transform = `translate3d(${(sx * 14).toFixed(2)}px,${(sy * 10).toFixed(2)}px,0)`;
-      inner.style.transform = `translate3d(${(sx * -6).toFixed(2)}px,${(sy * -4).toFixed(2)}px,0)`;
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("pointermove", onMove);
     };
   }, []);
@@ -615,10 +613,10 @@ function StatsSection() {
             <motion.div
               key={s.label}
               className="v2-stat"
-              initial={{ opacity: 0, y: 28 }}
+              initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.35 }}
-              transition={{ duration: 0.7, delay: i * 0.09, ease: EASE }}
+              viewport={{ once: true, amount: 0.12 }}
+              transition={{ duration: 0.25, delay: i * 0.03, ease: EASE }}
             >
               <article className={`v2-stat-card v2-stat-card--${s.tone}`}>
                 <span className="v2-stat-orb" aria-hidden="true" />
@@ -649,7 +647,7 @@ function StatsSection() {
 /* ─────────────────────────────────────────────────
    Escrow / How it works — slogan, stepper + product stage
    ───────────────────────────────────────────────── */
-const ESC_DUR = 6500;
+const ESC_DUR = 4200;
 
 /* Status pill on a product screen. Solid tint, bold ink — never a
    low-opacity wash (see .agents/AGENTS.md). */
@@ -976,11 +974,10 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
     const Y_OFFSET   = 4;
     const SCALE_STEP = 0.06;
-    const ENTER_Y    = 62, ENTER_RX = -16, ENTER_SCALE = 0.88;
-    const CARD_MS    = 950, STAGGER_MS = 110;
-    const TILT_X = 2.6, TILT_Y = 3.4;
-    const VEL_KICK = 240, VEL_MAX = 6;
-    const PARALLAX   = 7;
+    const ENTER_Y    = 24, ENTER_RX = -6, ENTER_SCALE = 0.94;
+    const CARD_MS    = 260, STAGGER_MS = 30;
+    const TILT_X = 2.0, TILT_Y = 2.6;
+    const PARALLAX   = 5;
     const introTotal = (total - 1) * STAGGER_MS + CARD_MS;
     const reduced    = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1023,11 +1020,11 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
         const y  = lerp(ENTER_Y, pose.y, e);
         const rx = lerp(ENTER_RX, pose.rx, e);
         const sc = lerp(ENTER_SCALE, pose.sc, e);
-        card.style.opacity   = clamp(e * 1.6, 0, 1).toFixed(3);
+        card.style.opacity   = clamp(e * 1.8, 0, 1).toFixed(3);
         card.style.transform = `translate(-50%, ${y.toFixed(2)}%) rotateX(${rx.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
         const t = pose.t * e;
         copies[i].style.transform = `translate3d(0,${(t * -PARALLAX).toFixed(2)}%,0)`;
-        medias[i].style.transform = `translate3d(0,${(t * PARALLAX).toFixed(2)}%,0) scale(${(1 - t * 0.05).toFixed(3)})`;
+        medias[i].style.transform = `translate3d(0,${(t * PARALLAX).toFixed(2)}%,0) scale(${(1 - t * 0.04).toFixed(3)})`;
       });
       cur!.textContent = String(active + 1).padStart(2, "0");
     }
@@ -1044,7 +1041,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
               if (en.isIntersecting) { outro.classList.add("on"); io.disconnect(); }
             });
           },
-          { threshold: 0.35 },
+          { threshold: 0.12 },
         );
         io.observe(outro);
       } else {
@@ -1063,46 +1060,47 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       return () => window.removeEventListener("scroll", cueCheck);
     }
 
-    /* hide cards before the entrance beat */
-    cards.forEach((c) => { c.style.opacity = "0"; });
+    let tx = 0, ty = 0;
+    const updateDeck = () => {
+      rafRef.current = 0;
+      const rect = wrap!.getBoundingClientRect();
+      if (rect.bottom < -200 || rect.top > window.innerHeight + 200) return;
+      const span = Math.max(1, wrap!.offsetHeight - window.innerHeight);
+      const p    = clamp(-rect.top / span, 0, 1);
+      stage!.style.transform =
+        `rotateX(${(-ty * TILT_X).toFixed(2)}deg) rotateY(${(tx * TILT_Y).toFixed(2)}deg)`;
+      render(p, Infinity);
+      countEl!.classList.add("on");
+      cue!.classList.add("on");
+      cue!.classList.toggle("hide", p > 0.02);
+    };
 
-    let tx = 0, ty = 0, sx = 0, sy = 0;
+    const scheduleUpdate = () => {
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(updateDeck);
+      }
+    };
+
     const onMove = (e: PointerEvent) => {
       const r = pin.getBoundingClientRect();
       tx = ((e.clientX - r.left) / r.width  - 0.5) * 2;
       ty = ((e.clientY - r.top)  / r.height - 0.5) * 2;
+      scheduleUpdate();
     };
-    const onLeave = () => { tx = 0; ty = 0; };
-    pin.addEventListener("pointermove", onMove);
-    pin.addEventListener("pointerleave", onLeave);
+    const onLeave = () => { tx = 0; ty = 0; scheduleUpdate(); };
 
-    const introStart = performance.now();
-    let lastP = 0, vel = 0;
+    render(0, Infinity);
+    countEl.classList.add("on");
+    cue.classList.add("on");
+    updateDeck();
 
-    function loop(now: number) {
-      const elapsed = now - introStart;
-      const top  = wrap!.getBoundingClientRect().top;
-      const span = wrap!.offsetHeight - window.innerHeight;
-      const p    = clamp(-top / span, 0, 1);
-
-      vel  = lerp(vel, clamp((p - lastP) * VEL_KICK, -VEL_MAX, VEL_MAX), 0.12);
-      lastP = p;
-      sx    = lerp(sx, tx, 0.06);
-      sy    = lerp(sy, ty, 0.06);
-
-      stage!.style.transform =
-        `rotateX(${(vel - sy * TILT_X).toFixed(2)}deg) rotateY(${(sx * TILT_Y).toFixed(2)}deg)`;
-
-      render(p, elapsed);
-      if (elapsed >= introTotal) countEl!.classList.add("on");
-      cue!.classList.toggle("on",   elapsed >= introTotal);
-      cue!.classList.toggle("hide", p > 0.02);
-      rafRef.current = requestAnimationFrame(loop);
-    }
-    rafRef.current = requestAnimationFrame(loop);
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    pin.addEventListener("pointermove", onMove, { passive: true });
+    pin.addEventListener("pointerleave", onLeave, { passive: true });
 
     return () => {
-      cancelAnimationFrame(rafRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("scroll", scheduleUpdate);
       pin.removeEventListener("pointermove", onMove);
       pin.removeEventListener("pointerleave", onLeave);
     };
@@ -1260,7 +1258,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 /* ─────────────────────────────────────────────────
    Testimonials — vertical review marquee
 ───────────────────────────────────────────────── */
-const MARQUEE_DURATIONS = ["38s", "46s", "34s"];
+const MARQUEE_DURATIONS = ["22s", "26s", "20s"];
 
 function GoogleMark() {
   return (
@@ -1491,10 +1489,8 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
     return out;
   }, [t]);
 
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>("q-0-0");
   const [query, setQuery] = useState("");
-  /* bumping this remounts the list, which replays the staggered entrance
-     exactly like the reference does by resetting li.style.animation */
   const [tick, setTick] = useState(0);
 
   const needle = query.trim().toLowerCase();
@@ -1514,17 +1510,6 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   }, [rows, matched]);
   const shown = matched.length;
 
-  /* open the first question once the entrance settles */
-  useEffect(() => {
-    const first = rows.find((r) => !r.cat);
-    if (!first) return;
-    const id = window.setTimeout(
-      () => setOpenKey(first.key),
-      prefersReduced() ? 0 : 1150
-    );
-    return () => window.clearTimeout(id);
-  }, [rows]);
-
   /* "/" focuses the filter from anywhere on the page */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1538,30 +1523,6 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
-  /* gentle pointer parallax, lerped in a rAF loop like the reference */
-  useEffect(() => {
-    const el = sectionRef.current;
-    if (!el || prefersReduced()) return;
-    let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
-    const onMove = (e: PointerEvent) => {
-      tx = e.clientX / window.innerWidth - 0.5;
-      ty = e.clientY / window.innerHeight - 0.5;
-    };
-    const loop = () => {
-      cx += (tx - cx) * 0.06;
-      cy += (ty - cy) * 0.06;
-      el.style.setProperty("--mx", cx.toFixed(4));
-      el.style.setProperty("--my", cy.toFixed(4));
-      raf = requestAnimationFrame(loop);
-    };
-    window.addEventListener("pointermove", onMove);
-    raf = requestAnimationFrame(loop);
-    return () => {
-      window.removeEventListener("pointermove", onMove);
-      cancelAnimationFrame(raf);
-    };
   }, []);
 
   const toggle = (key: string, question: string) => {
@@ -1653,8 +1614,8 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
                 d="M8 6 C 196 150, 196 470, 8 614"
                 initial={{ pathLength: prefersReduced() ? 1 : 0 }}
                 whileInView={{ pathLength: 1 }}
-                viewport={{ once: true, amount: 0.3 }}
-                transition={{ duration: 1.6, delay: 0.5, ease: EASE }}
+                viewport={{ once: true, amount: 0.15 }}
+                transition={{ duration: 0.45, delay: 0.04, ease: EASE }}
               />
             </svg>
             <span className="v2-faq-arcdot" />

@@ -140,20 +140,10 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
   return (
     <div className="yk-v2 yk-v2-subpage">
       <div className="v2-container">
-        {/* Breadcrumb */}
-        <nav className="v2-sub-breadcrumb" aria-label="Breadcrumb">
-          <button type="button" onClick={() => onNavigate("home")}>
-            {t.nav.home}
-          </button>
-          <span>/</span>
-          <span className="v2-sub-breadcrumb-cur">{t.marketing.faq.title}</span>
-        </nav>
-
         {/* Hero Header */}
         <header className="v2-sub-hero" style={{ marginBottom: 36 }}>
           <div className="v2-sub-hero-grid">
             <div>
-              <span className="v2-eyebrow">Escrow, Payouts &amp; Account Help</span>
               <h1 className="v2-sub-title">{t.marketing.faq.title}</h1>
               <p className="v2-sub-lead">{t.marketing.faq.subtitle}</p>
             </div>

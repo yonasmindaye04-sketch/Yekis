@@ -397,13 +397,13 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   opacity: 0;
   transform-origin: 50% 100%;
   will-change: transform;
-  animation: v2-fp-letter 0.9s var(--v2-spring) var(--d) forwards;
+  animation: v2-fp-letter 0.28s var(--v2-spring) var(--d) forwards;
   /* the pop hover (once the entrance has settled) */
   transition:
-    transform 0.55s var(--v2-spring),
-    color 0.3s ease,
-    text-shadow 0.3s ease;
-  transition-delay: calc(var(--i) * 35ms);
+    transform 0.18s var(--v2-spring),
+    color 0.15s ease,
+    text-shadow 0.15s ease;
+  transition-delay: 0ms;
 }
 /* after the entrance the animation is dropped so the hover transition
    owns the transform (a running/filled animation would win over it) */
@@ -420,7 +420,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   justify-content: center;
   margin-top: 34px;
 }
-.yk-v2 .v2-hero .v2-hero-actions { animation: v2-fp-up 0.9s ease 0.9s both; }
+.yk-v2 .v2-hero .v2-hero-actions { animation: v2-fp-up 0.28s ease 0.15s both; }
 
 /* ── stats: skewed cascade cards ── */
 .yk-v2 .v2-stats {
@@ -507,9 +507,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   overflow: hidden;
   display: flex;
   transition:
-    transform 0.7s var(--v2-ease),
-    border-color 0.55s var(--v2-ease),
-    box-shadow 0.7s var(--v2-ease);
+    transform 0.22s var(--v2-ease),
+    border-color 0.2s var(--v2-ease),
+    box-shadow 0.22s var(--v2-ease);
 }
 /* gradient hairline on the top edge, drawn with a masked pseudo */
 .yk-v2 .v2-stat-card::before {
@@ -528,7 +528,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 /* hover: unskew, lift, and come forward */
 .yk-v2 .v2-stat-card:hover {
   --skew: 0deg;
-  transform: skewY(0deg) translateY(-20px) scale(1.02);
+  transform: skewY(0deg) translateY(-14px) scale(1.02);
   z-index: 5;
 }
 /* blurred accent orb, top-right */
@@ -543,7 +543,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   filter: blur(46px);
   opacity: 0.26;
   pointer-events: none;
-  transition: opacity 0.6s var(--v2-ease);
+  transition: opacity 0.22s var(--v2-ease);
 }
 .yk-v2 .v2-stat-card:hover .v2-stat-orb { opacity: 0.52; }
 /* one-shot specular sweep on hover */
@@ -554,7 +554,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   width: 100%;
   height: 100%;
   background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.07) 50%, transparent 80%);
-  transition: left 0.9s ease;
+  transition: left 0.4s ease;
   pointer-events: none;
   z-index: 1;
 }
@@ -570,7 +570,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   gap: 12px;
   flex: 1;
   min-width: 0;
-  transition: transform 0.7s var(--v2-ease);
+  transition: transform 0.22s var(--v2-ease);
 }
 .yk-v2 .v2-stat-top {
   display: flex;
@@ -711,7 +711,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   background: var(--v2-surface);
   color: var(--v2-text);
   font-family: var(--v2-font-body);
-  transition: background 0.4s, border-color 0.4s, transform 0.4s var(--v2-ease), box-shadow 0.4s;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s var(--v2-ease), box-shadow 0.18s;
 }
 .yk-v2 .esc-step:hover { transform: translateX(4px); border-color: var(--v2-border2); }
 .yk-v2 .esc-step:focus-visible { outline: 2px solid var(--esc-ac); outline-offset: 3px; }
@@ -728,7 +728,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   color: var(--v2-text2);
   background: var(--v2-surface2);
   border: 1px solid var(--v2-border);
-  transition: color 0.4s, background 0.4s, border-color 0.4s;
+  transition: color 0.18s, background 0.18s, border-color 0.18s;
 }
 .yk-v2 .esc-step-h {
   align-self: center;
@@ -747,7 +747,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   border-radius: 50%;
   background: var(--esc-ac);
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.18s;
 }
 .yk-v2 .esc-step-p {
   grid-column: 2;
@@ -779,8 +779,8 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   background: color-mix(in srgb, var(--esc-ac) 14%, transparent);
   border-color: color-mix(in srgb, var(--esc-ac) 40%, transparent);
 }
-.yk-v2 .esc-step.is-active .esc-step-live { opacity: 1; animation: esc-pulse 1.8s ease-out infinite; }
-.yk-v2 .esc-step.is-active .esc-step-track i { animation: esc-fill 6.5s linear forwards; }
+.yk-v2 .esc-step.is-active .esc-step-live { opacity: 1; animation: esc-pulse 1.4s ease-out infinite; }
+.yk-v2 .esc-step.is-active .esc-step-track i { animation: esc-fill 4.2s linear forwards; }
 .yk-v2 .esc-module.is-paused .esc-step.is-active .esc-step-track i { animation-play-state: paused; }
 
 /* ── stage: dark frame, clear light product screen ── */
@@ -840,8 +840,8 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   padding: 30px 34px;
   overflow: hidden;
   opacity: 0;
-  transform: translateY(14px);
-  transition: opacity 0.45s var(--v2-ease), transform 0.45s var(--v2-ease);
+  transform: translateY(8px);
+  transition: opacity 0.2s var(--v2-ease), transform 0.2s var(--v2-ease);
 }
 .yk-v2 .esc-panel.is-active { opacity: 1; transform: none; }
 
@@ -1685,10 +1685,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   gap: clamp(32px, 5vw, 72px);
   box-shadow: var(--v2-shadow);
   overflow: hidden;
-  animation: v2-faq-card-in 1s var(--ease-out) both;
+  animation: v2-faq-card-in 0.28s var(--ease-out) both;
 }
 @keyframes v2-faq-card-in {
-  from { opacity: 0; transform: translateY(28px) scale(0.965); }
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
 }
 /* soft inner wash that breathes */
 .yk-v2 .v2-faq-card::before {
@@ -1713,7 +1713,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   display: flex;
   align-items: center;
   gap: 14px;
-  animation: v2-faq-rise 0.8s 0.25s var(--ease-out) both;
+  animation: v2-faq-rise 0.24s 0.03s var(--ease-out) both;
 }
 .yk-v2 .v2-faq-lens {
   flex: none;
@@ -1723,7 +1723,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   stroke-width: 2.4;
   fill: none;
   stroke-linecap: round;
-  transition: transform 0.5s var(--ease-out);
+  transition: transform 0.22s var(--ease-out);
 }
 .yk-v2 .v2-faq-searchrow:hover .v2-faq-lens { transform: rotate(-14deg) scale(1.08); }
 .yk-v2 .v2-faq-search {
@@ -1736,9 +1736,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   border-radius: 14px;
   background: transparent;
   transition:
-    max-width 0.55s var(--ease-out),
-    background-color 0.35s ease,
-    box-shadow 0.35s ease;
+    max-width 0.24s var(--ease-out),
+    background-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 .yk-v2 .v2-faq-search:focus-within {
   max-width: 360px;
@@ -1783,10 +1783,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   line-height: 0.95;
   letter-spacing: -0.035em;
 }
-.yk-v2 .v2-faq-title span { display: inline-block; animation: v2-faq-letter-up 0.9s var(--ease-out) both; }
-.yk-v2 .v2-faq-title span:nth-child(1) { animation-delay: 0.35s; }
-.yk-v2 .v2-faq-title span:nth-child(2) { animation-delay: 0.45s; }
-.yk-v2 .v2-faq-title span:nth-child(3) { animation-delay: 0.55s; }
+.yk-v2 .v2-faq-title span { display: inline-block; animation: v2-faq-letter-up 0.26s var(--ease-out) both; }
+.yk-v2 .v2-faq-title span:nth-child(1) { animation-delay: 0.04s; }
+.yk-v2 .v2-faq-title span:nth-child(2) { animation-delay: 0.08s; }
+.yk-v2 .v2-faq-title span:nth-child(3) { animation-delay: 0.12s; }
 .yk-v2 .v2-faq-dot {
   width: 0.22em;
   height: 0.22em;
@@ -1794,11 +1794,11 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   border-radius: 50%;
   background: var(--v2-primary);
   animation:
-    v2-faq-letter-up 0.9s 0.68s var(--ease-out) both,
-    v2-faq-pulse 3.4s 1.6s ease-in-out infinite;
+    v2-faq-letter-up 0.26s 0.16s var(--ease-out) both,
+    v2-faq-pulse 3.4s 0.5s ease-in-out infinite;
 }
 @keyframes v2-faq-letter-up {
-  from { opacity: 0; transform: translateY(0.55em) rotate(4deg); }
+  from { opacity: 0; transform: translateY(0.3em) rotate(2deg); }
 }
 @keyframes v2-faq-pulse {
   0%, 100% { transform: scale(1); }
@@ -1810,10 +1810,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   color: var(--v2-text2);
   font-size: 15px;
   line-height: 1.6;
-  animation: v2-faq-rise 0.8s 0.6s var(--ease-out) both;
+  animation: v2-faq-rise 0.24s 0.08s var(--ease-out) both;
 }
 @keyframes v2-faq-rise {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(10px); }
 }
 
 /* the arc draws itself and parallaxes, with a dot orbiting it */
@@ -1831,7 +1831,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   height: 100%;
   overflow: visible;
   transform: translate3d(calc(var(--mx) * 12px), calc(var(--my) * 9px), 0);
-  transition: transform 0.9s var(--ease-soft);
+  transition: transform 0.3s var(--ease-soft);
 }
 .yk-v2 .v2-faq-arcwrap path {
   fill: none;
@@ -1849,7 +1849,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   border-radius: 50%;
   background: var(--v2-primary);
   opacity: 0;
-  animation: v2-faq-orbit 6s 2.1s ease-in-out infinite;
+  animation: v2-faq-orbit 5s 0.4s ease-in-out infinite;
 }
 @keyframes v2-faq-orbit {
   0%   { opacity: 0; transform: translateY(-150px) scale(0.4); }
@@ -1870,11 +1870,11 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .v2-faq-list { list-style: none; }
 .yk-v2 .v2-faq-list li {
   border-bottom: 1px solid var(--v2-border);
-  animation: v2-faq-item-in 0.65s var(--ease-out) both;
-  animation-delay: calc(var(--i) * 65ms + 450ms);
+  animation: v2-faq-item-in 0.22s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 16ms + 20ms);
 }
 .yk-v2 .v2-faq-list li:first-child { border-top: 1px solid var(--v2-border); }
-@keyframes v2-faq-item-in { from { opacity: 0; transform: translateX(26px); } }
+@keyframes v2-faq-item-in { from { opacity: 0; transform: translateX(12px); } }
 /* the category markers ride the list but carry no rule of their own */
 .yk-v2 .v2-faq-list li.v2-faq-cat {
   padding: 18px 2px 4px;
@@ -1905,7 +1905,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: padding 0.35s var(--ease-out), color 0.25s ease;
+  transition: padding 0.18s var(--ease-out), color 0.15s ease;
 }
 .yk-v2 .v2-faq-q:hover { padding-left: 10px; color: var(--v2-primary); }
 .yk-v2 .v2-faq-q:focus-visible {
@@ -1924,9 +1924,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   border: 1.5px solid var(--v2-border2);
   border-radius: 9px;
   transition:
-    transform 0.45s var(--ease-out),
-    background-color 0.3s ease,
-    border-color 0.3s ease;
+    transform 0.2s var(--ease-out),
+    background-color 0.18s ease,
+    border-color 0.18s ease;
 }
 .yk-v2 .v2-faq-chip svg {
   width: 13px;
@@ -1936,7 +1936,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: stroke 0.3s ease;
+  transition: stroke 0.18s ease;
 }
 .yk-v2 .v2-faq-q:hover .v2-faq-chip { transform: translateY(-2px); }
 .yk-v2 .v2-faq-list li.open .v2-faq-chip {
@@ -1950,7 +1950,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .v2-faq-a {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows 0.55s var(--ease-soft);
+  transition: grid-template-rows 0.22s var(--ease-soft);
 }
 .yk-v2 .v2-faq-a > div { overflow: hidden; }
 .yk-v2 .v2-faq-a p {
@@ -1959,14 +1959,14 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   font-size: 14.5px;
   line-height: 1.65;
   opacity: 0;
-  transform: translateY(-6px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
 }
 .yk-v2 .v2-faq-list li.open .v2-faq-a { grid-template-rows: 1fr; }
 .yk-v2 .v2-faq-list li.open .v2-faq-a p {
   opacity: 1;
   transform: none;
-  transition-delay: 0.08s;
+  transition-delay: 0.02s;
 }
 .yk-v2 .v2-faq-list li.open {
   background: linear-gradient(90deg, var(--v2-glow-1), transparent 70%);
@@ -2174,7 +2174,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   padding-top: 58px;
   text-align: center;
   color: var(--v2-out-text);
-  animation: v2-out-content 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: v2-out-content 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .yk-v2 .v2-outro-kicker {
   display: inline-flex;
@@ -2522,8 +2522,8 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 @keyframes v2-fp-up { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: none; } }
 /* bottom outro — CTA spotlight panel + footer */
 @keyframes v2-out-content {
-  from { opacity: 0; transform: translateY(18px); filter: blur(7px); }
-  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 @keyframes v2-out-ambient {
   0%, 100% { opacity: 0.12; transform: translateX(-50%) scale(0.95); }
@@ -2542,10 +2542,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   to { transform: translateY(9px) rotate(2deg); }
 }
 @keyframes v2-out-word-pop {
-  0% { opacity: 0; transform: translateY(104px) scale(0.84); }
-  42% { opacity: 1; }
-  62% { transform: translateY(-14px) scale(1.045); }
-  82% { transform: translateY(5px) scale(0.988); }
+  0% { opacity: 0; transform: translateY(36px) scale(0.94); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -2602,10 +2599,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   backdrop-filter: blur(25px);
   -webkit-backdrop-filter: blur(25px);
   opacity: 0;
-  transform: translateY(38px) scale(0.985);
+  transform: translateY(16px) scale(0.99);
   transition:
-    opacity 850ms ease,
-    transform 950ms cubic-bezier(0.16, 1, 0.3, 1);
+    opacity 260ms ease,
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .yk-v2 .v2-footer-card.is-visible {
   opacity: 1;
@@ -2855,7 +2852,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   );
 }
 .yk-v2 .v2-footer-area.is-visible .v2-footer-word {
-  animation: v2-out-word-pop 1250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: v2-out-word-pop 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @media (max-width: 1024px) {
@@ -2933,7 +2930,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .stk-wrap {
   position: relative;
   width: 100%;
-  height: 800svh;
+  height: 340svh;
 }
 .yk-v2 .stk-pin {
   position: sticky;
@@ -3163,7 +3160,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .stk-rv span {
   display: inline-block;
   transform: translateY(115%);
-  transition: transform 1s cubic-bezier(0.16,1,0.3,1);
+  transition: transform 0.3s cubic-bezier(0.16,1,0.3,1);
 }
 .yk-v2 .stk-outro.on .stk-rv span { transform: translateY(0); }
 .yk-v2 .stk-outro-sub {
@@ -3176,8 +3173,8 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .stk-outro .stk-outro-sub,
 .yk-v2 .stk-outro .stk-cta-row {
   opacity: 0;
-  transform: translateY(26px);
-  transition: opacity 0.8s ease 0.3s, transform 0.8s cubic-bezier(0.16,1,0.3,1) 0.3s;
+  transform: translateY(14px);
+  transition: opacity 0.25s ease 0.05s, transform 0.25s cubic-bezier(0.16,1,0.3,1) 0.05s;
 }
 .yk-v2 .stk-outro.on .stk-outro-sub,
 .yk-v2 .stk-outro.on .stk-cta-row { opacity: 1; transform: none; }

@@ -98,20 +98,10 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
   return (
     <div className="yk-v2 yk-v2-subpage">
       <div className="v2-container">
-        {/* Breadcrumb */}
-        <nav className="v2-sub-breadcrumb" aria-label="Breadcrumb">
-          <button type="button" onClick={() => onNavigate("home")}>
-            {t.nav.home}
-          </button>
-          <span>/</span>
-          <span className="v2-sub-breadcrumb-cur">{t.nav.about}</span>
-        </nav>
-
         {/* Hero Section */}
         <header className="v2-sub-hero">
           <div className="v2-sub-hero-grid">
             <div>
-              <span className="v2-eyebrow">{t.marketing.about.eyebrow}</span>
               <h1 className="v2-sub-title">{t.marketing.about.title}</h1>
               <p
                 style={{
@@ -152,8 +142,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
         <section style={{ marginBottom: 64 }}>
           <div className="v2-about-panel">
             <div className="v2-about-content">
-              <span className="v2-eyebrow">{t.marketing.about.missionTitle}</span>
-              <h2 className="v2-about-title" style={{ marginTop: 14 }}>
+              <h2 className="v2-about-title">
                 {t.marketing.about.problemTitle}
               </h2>
               <div className="v2-about-intro">
@@ -190,11 +179,6 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                 alt="Ethiopian team collaborating on milestone-funded projects"
                 loading="lazy"
               />
-              <div className="v2-about-visual-bar">
-                <span>{t.marketing.about.visualEscrow}</span>
-                <span>{t.marketing.about.visualKyc}</span>
-                <span>{t.marketing.about.visualMediation}</span>
-              </div>
             </div>
           </div>
         </section>
@@ -202,15 +186,13 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
         {/* Three Trust Pillars */}
         <section aria-label="Core Trust Pillars">
           <div style={{ marginBottom: 28 }}>
-            <span className="v2-eyebrow">How We Protect Every Contract</span>
             <h2 className="v2-sec-title">Three non-negotiable guarantees</h2>
           </div>
 
           <div className="v2-about-pillars">
             {pillars.map(({ num, Icon, title, body }) => (
               <article key={num} className="v2-pillar-card">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="v2-pillar-num">{num}</span>
+                <div style={{ display: "flex", justifyContent: "flex-start", alignItems: "center" }}>
                   <span className="v2-policy-icon">
                     <Icon size={16} />
                   </span>
@@ -224,7 +206,6 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
 
         {/* Leadership & Operations Team */}
         <section aria-labelledby="about-team-heading">
-          <span className="v2-eyebrow">Addis Ababa Operations &amp; Engineering</span>
           <h2 className="v2-sec-title" id="about-team-heading">
             {t.marketing.about.teamTitle}
           </h2>
@@ -278,8 +259,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           <div className="v2-contact-split">
             {/* Left: Direct Channels */}
             <div>
-              <span className="v2-eyebrow">Direct Support &amp; Community</span>
-              <h2 id="about-contact-heading" style={{ fontSize: 28, fontWeight: 800, marginTop: 12 }}>
+              <h2 id="about-contact-heading" style={{ fontSize: 28, fontWeight: 800 }}>
                 {t.marketing.about.contactTitle}
               </h2>
               <p style={{ fontSize: 14.5, color: "var(--v2-text2)", marginTop: 8, lineHeight: 1.6 }}>

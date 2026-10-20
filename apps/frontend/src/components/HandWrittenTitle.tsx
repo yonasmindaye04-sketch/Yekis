@@ -25,11 +25,11 @@ export function HandWrittenTitle({
       opacity: 1,
       transition: {
         pathLength: {
-          duration: 2.6,
-          ease: [0.43, 0.13, 0.23, 0.96] as const,
+          duration: 0.85,
+          ease: [0.22, 1, 0.36, 1] as const,
         },
         opacity: {
-          duration: 0.4,
+          duration: 0.2,
         },
       },
     },
@@ -43,9 +43,10 @@ export function HandWrittenTitle({
       <motion.div
         key={animationKey}
         className="yk-hw-card"
-        initial={{ opacity: 0, scale: 0.97 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7, ease: "easeOut" }}
+        initial={{ opacity: 0, scale: 0.985 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true, amount: 0.15 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
       >
         <div className="yk-hw-grain" />
 
@@ -54,7 +55,8 @@ export function HandWrittenTitle({
           viewBox="0 0 1200 600"
           preserveAspectRatio="xMidYMid meet"
           initial="hidden"
-          animate="visible"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.15 }}
           aria-hidden="true"
         >
           <motion.path
@@ -77,20 +79,22 @@ export function HandWrittenTitle({
         <div className="yk-hw-content">
           <motion.span
             className="yk-hw-eyebrow"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.25, duration: 0.7 }}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ delay: 0.04, duration: 0.22 }}
           >
             {eyebrow}
           </motion.span>
 
           <motion.h2
             className="yk-hw-title"
-            initial={{ opacity: 0, y: 24, filter: "blur(8px)" }}
-            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
             transition={{
-              delay: 0.55,
-              duration: 0.9,
+              delay: 0.08,
+              duration: 0.28,
               ease: [0.22, 1, 0.36, 1],
             }}
           >
@@ -100,9 +104,10 @@ export function HandWrittenTitle({
           {subtitle && (
             <motion.p
               className="yk-hw-sub"
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 1, duration: 0.8 }}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.15 }}
+              transition={{ delay: 0.12, duration: 0.25 }}
             >
               {subtitle}
             </motion.p>
@@ -112,11 +117,12 @@ export function HandWrittenTitle({
             type="button"
             className="yk-hw-replay"
             onClick={() => setAnimationKey((current) => current + 1)}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.35, duration: 0.6 }}
-            whileHover={{ scale: 1.04 }}
-            whileTap={{ scale: 0.96 }}
+            initial={{ opacity: 0, y: 8 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.15 }}
+            transition={{ delay: 0.16, duration: 0.22 }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.97 }}
           >
             <span className="yk-hw-replay-icon" aria-hidden="true">
               ↻

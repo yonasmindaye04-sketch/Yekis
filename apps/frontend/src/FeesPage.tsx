@@ -9,7 +9,6 @@ import {
   Wallet,
   Scale,
   AlertTriangle,
-  Sparkles,
   HelpCircle,
 } from "lucide-react";
 import { useI18n } from "./i18n";
@@ -60,20 +59,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
   return (
     <div className="yk-v2 yk-v2-subpage">
       <div className="v2-container">
-        {/* Breadcrumb */}
-        <nav className="v2-sub-breadcrumb" aria-label="Breadcrumb">
-          <button type="button" onClick={() => onNavigate("home")}>
-            {t.nav.home}
-          </button>
-          <span>/</span>
-          <span className="v2-sub-breadcrumb-cur">{t.nav.fees}</span>
-        </nav>
-
         {/* Hero Section */}
         <header className="v2-sub-hero">
           <div className="v2-sub-hero-grid">
             <div>
-              <span className="v2-eyebrow">{t.marketing.fees.eyebrow}</span>
               <h1 className="v2-sub-title">{t.marketing.fees.title}</h1>
               <p className="v2-sub-lead">{t.marketing.fees.subheadline}</p>
             </div>
@@ -317,8 +306,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
           {/* Right: Official Fee Policy & Visual Split */}
           <div className="v2-policy-card">
-            <span className="v2-eyebrow">Fair Split Architecture</span>
-            <h2 style={{ fontSize: 26, fontWeight: 800, marginTop: 12 }}>
+            <h2 style={{ fontSize: 26, fontWeight: 800 }}>
               {t.marketing.fees.panelTitle}
             </h2>
             <p style={{ fontSize: 14.5, color: "var(--v2-text2)", marginTop: 8, lineHeight: 1.6 }}>
@@ -387,7 +375,6 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
         {/* 3-Column Comparison Matrix */}
         <section style={{ marginBottom: 72 }} aria-labelledby="fees-compare-heading">
           <div className="v2-center" style={{ marginBottom: 36 }}>
-            <span className="v2-eyebrow">Risk &amp; Cost Comparison</span>
             <h2 className="v2-sec-title" id="fees-compare-heading">
               {t.marketing.fees.compareTitle}
             </h2>
@@ -399,9 +386,6 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           <div className="v2-compare-grid">
             {/* Column 1: Yekis (Featured) */}
             <article className="v2-compare-card is-featured">
-              <div className="v2-compare-badge">
-                <Sparkles size={13} /> Recommended · {t.marketing.fees.yekisCol}
-              </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <ShieldCheck size={26} color="var(--v2-primary)" />
                 <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.yekisCol}</h3>
@@ -436,15 +420,6 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
             {/* Column 2: Informal Trust */}
             <article className="v2-compare-card">
-              <div
-                className="v2-compare-badge"
-                style={{
-                  background: "rgba(234, 179, 8, 0.14)",
-                  color: "#eab308",
-                }}
-              >
-                <AlertTriangle size={13} /> High Counterparty Risk
-              </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <AlertTriangle size={24} color="#eab308" />
                 <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.informalCol}</h3>
@@ -475,15 +450,6 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
             {/* Column 3: Hiring a Lawyer */}
             <article className="v2-compare-card">
-              <div
-                className="v2-compare-badge"
-                style={{
-                  background: "var(--v2-surface2)",
-                  color: "var(--v2-text2)",
-                }}
-              >
-                <Scale size={13} /> Slow &amp; Costly
-              </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Scale size={24} color="var(--v2-text2)" />
                 <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.lawyerCol}</h3>

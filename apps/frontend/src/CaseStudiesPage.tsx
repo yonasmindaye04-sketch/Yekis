@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import {
-  ShieldCheck,
   CheckCircle2,
   ArrowUpRight,
   Clock,
@@ -214,20 +213,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   return (
     <div className="yk-v2 yk-v2-subpage">
       <div className="v2-container">
-        {/* Breadcrumb */}
-        <nav className="v2-sub-breadcrumb" aria-label="Breadcrumb">
-          <button type="button" onClick={() => onNavigate("home")}>
-            {t.nav.home}
-          </button>
-          <span>/</span>
-          <span className="v2-sub-breadcrumb-cur">{t.nav.caseStudies}</span>
-        </nav>
-
         {/* Hero */}
         <header className="v2-sub-hero">
           <div className="v2-sub-hero-grid">
             <div>
-              <span className="v2-eyebrow">Verified Ethiopian Escrow Outcomes</span>
               <h1 className="v2-sub-title">{t.marketing.caseStudies.title}</h1>
               <p className="v2-sub-lead">{t.marketing.caseStudies.subtitle}</p>
             </div>
@@ -283,14 +272,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
           {filteredStudies.map((study) => (
             <article key={study.id} className="v2-case-card">
               <div>
-                <div className="v2-case-meta-top">
-                  <span className="v2-case-cat">{study.categoryLabel}</span>
-                  <span className="v2-case-verified">
-                    <ShieldCheck size={13} /> Escrow Verified
-                  </span>
-                </div>
-
-                <h2 className="v2-case-title">{study.title}</h2>
+                <h2 className="v2-case-title" style={{ marginTop: 0 }}>{study.title}</h2>
                 <div className="v2-case-client">
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                     <MapPin size={13} color="var(--v2-primary)" />
@@ -432,8 +414,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
           <div className="v2-case-modal" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
               <div>
-                <span className="v2-case-cat">{selectedStudy.categoryLabel}</span>
-                <h2 id="case-modal-title" style={{ fontSize: 24, fontWeight: 800, marginTop: 6 }}>
+                <h2 id="case-modal-title" style={{ fontSize: 24, fontWeight: 800 }}>
                   {selectedStudy.title}
                 </h2>
                 <p style={{ fontSize: 13.5, color: "var(--v2-text2)", marginTop: 4 }}>
