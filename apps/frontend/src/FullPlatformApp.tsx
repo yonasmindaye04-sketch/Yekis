@@ -877,7 +877,7 @@ if (authMode === "register") {
           <AboutPage onNavigate={handleNavigate} onStart={handleStart} />
         )}
         {marketingPage === "case-studies" && (
-          <CaseStudiesPage onNavigate={handleNavigate} />
+          <CaseStudiesPage onNavigate={handleNavigate} onStart={handleStart} />
         )}
         {marketingPage === "404" && (
           <NotFoundPage onNavigate={handleNavigate} onStart={handleStart} />

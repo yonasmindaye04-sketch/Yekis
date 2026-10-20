@@ -59,16 +59,12 @@ export function PageLoadSplash() {
   );
 }
 
-// ── Scroll progress + header shadow + hero parallax ──────
+// ── Header shadow + hero parallax ──────
 
 export function ScrollEffects() {
   useEffect(() => {
-    const progress = document.createElement("div");
-    progress.className = "yekis-scroll-progress";
-    const fill = document.createElement("div");
-    fill.className = "yekis-scroll-progress-fill";
-    progress.appendChild(fill);
-    document.body.appendChild(progress);
+    // Clean up any lingering scroll progress bar elements if present
+    document.querySelectorAll(".yekis-scroll-progress").forEach((el) => el.remove());
 
     let raf = 0;
     const onScroll = () => {
@@ -76,9 +72,6 @@ export function ScrollEffects() {
       raf = requestAnimationFrame(() => {
         raf = 0;
         const doc = document.documentElement;
-        const max = doc.scrollHeight - doc.clientHeight;
-        const pct = max > 0 ? (doc.scrollTop / max) * 100 : 0;
-        fill.style.width = `${pct}%`;
 
         const header = document.querySelector(".marketing-header");
         if (header) header.classList.toggle("is-scrolled", doc.scrollTop > 8);
@@ -104,7 +97,6 @@ export function ScrollEffects() {
     return () => {
       window.removeEventListener("scroll", onScroll);
       if (raf) cancelAnimationFrame(raf);
-      progress.remove();
     };
   }, []);
 

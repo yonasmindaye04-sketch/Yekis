@@ -1164,15 +1164,13 @@
    RESPONSIVE BREAKPOINTS (320px -> 1920px+ Fluid Multi-Device System)
    ========================================================================== */
 
-@media (min-width: 1441px) {
-  .marketing-container {
-    max-width: 1440px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-}
-
 @media (max-width: 1024px) {
+  .marketing-container {
+    padding: 0 5%;
+  }
+  .marketing-header {
+    padding: var(--space-4) 5%;
+  }
   .footer-grid {
     grid-template-columns: 1fr 1fr;
     gap: 36px 32px;
@@ -1190,7 +1188,7 @@
   }
 
   .marketing-header {
-    padding: 12px 0;
+    padding: 12px 5%;
     gap: 8px;
   }
 
@@ -1301,7 +1299,7 @@
   }
 
   .marketing-header {
-    padding: 10px 0;
+    padding: 10px 16px;
   }
 
   .marketing-brand strong {

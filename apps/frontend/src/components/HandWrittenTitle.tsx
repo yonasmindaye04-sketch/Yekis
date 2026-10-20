@@ -3,13 +3,15 @@ import { useState } from "react";
 import "./HandWrittenTitle.css";
 
 interface HandWrittenTitleProps {
+  eyebrow?: string;
   title?: string;
   subtitle?: string;
 }
 
 export function HandWrittenTitle({
-  title = "Hand Written",
-  subtitle = "A smooth hand-drawn title animation",
+  eyebrow = "Yekis Jobs",
+  title = "Make ideas visible.",
+  subtitle = "Where verified Ethiopian talent and ambitious teams build together — protected by escrow from day one.",
 }: HandWrittenTitleProps) {
   const [animationKey, setAnimationKey] = useState(0);
 
@@ -79,7 +81,7 @@ export function HandWrittenTitle({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.25, duration: 0.7 }}
           >
-            Your Brand
+            {eyebrow}
           </motion.span>
 
           <motion.h2

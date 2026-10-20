@@ -15,8 +15,6 @@ import {
 import {
   motion,
   AnimatePresence,
-  useScroll,
-  useSpring,
   useInView,
 } from "framer-motion";
 import {
@@ -449,19 +447,6 @@ function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
   );
 }
 
-/* ─────────────────────────────────────────────────
-   Scroll Progress Bar
-   ───────────────────────────────────────────────── */
-function ScrollProgressBar() {
-  const { scrollYProgress } = useScroll();
-  const scaleX = useSpring(scrollYProgress, { stiffness: 100, damping: 30 });
-  return (
-    <motion.div
-      className="yk-v2-scroll-bar"
-      style={{ scaleX }}
-    />
-  );
-}
 
 /* ─────────────────────────────────────────────────
    Hero Section — Floating Paths
@@ -952,8 +937,9 @@ function FeesSection() {
   return (
     <section id="fees">
       <HandWrittenTitle
+        eyebrow="Yekis Jobs"
         title="Make ideas visible."
-        subtitle="A clean hand-drawn title reveal for modern landing pages."
+        subtitle="Where verified Ethiopian talent and ambitious teams build together — protected by escrow from day one."
       />
     </section>
   );
@@ -2074,9 +2060,6 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
 export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
   return (
     <div className="yk-v2">
-      {/* Scroll progress bar */}
-      <ScrollProgressBar />
-
       {/* Hero */}
       <HeroSection />
 

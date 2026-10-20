@@ -77,24 +77,10 @@
   }
 }
 
-/* Scroll progress bar */
-.yekis-scroll-progress {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  z-index: 1500;
-  pointer-events: none;
-  background: transparent;
-}
-
+/* Scroll progress bar (disabled) */
+.yekis-scroll-progress,
 .yekis-scroll-progress-fill {
-  height: 100%;
-  width: 0;
-  background: linear-gradient(90deg, var(--color-primary), var(--color-teal));
-  border-radius: 0 999px 999px 0;
-  box-shadow: 0 0 8px rgba(22, 163, 74, 0.45);
+  display: none !important;
 }
 
 /* Header elevation on scroll */
