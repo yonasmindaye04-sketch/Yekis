@@ -42,6 +42,7 @@
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
   --color-bg: #f8fafc;
   --color-bg-elevated: #ffffff;
   --color-bg-subtle: #f1f5f9;
@@ -98,6 +99,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --color-bg: #0b1116;
   --color-bg-elevated: #12181d;
   --color-bg-subtle: #182026;
@@ -870,9 +872,36 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
 .topbar-actions .icon-button { position: relative; transition: all .18s; }
 .topbar-actions .icon-button:hover { border-color: var(--color-primary); color: var(--color-primary); transform: scale(1.06); }
-.user-menu { display: flex; align-items: center; gap: 8px; padding: 5px 12px 5px 5px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-bg-subtle); color: var(--color-text); font-size: 0.95rem; cursor: pointer; transition: all .18s; }
-.user-menu:hover { border-color: var(--color-primary); background: var(--color-bg-hover); }
-.user-menu b { color: var(--color-text-secondary); }
+.user-menu {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.user-menu:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-hover);
+  transform: scale(1.04);
+}
+.user-menu .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-size: 0.88rem;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
 .platform-content { max-width: 1240px; padding: 36px 5vw 80px; margin: 0 auto; }
 .platform-content.chat-page-container { padding-top: 18px; padding-bottom: 30px; }
 .overview-hero, .wallet-hero { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 28px; border: 1px solid var(--color-border); border-radius: 16px; background: var(--color-bg-elevated); transition: border-color .25s; box-shadow: var(--shadow-sm); }
@@ -1529,9 +1558,35 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .inline-workflow-form .form-wide { grid-column: 1 / -1; }
 .inline-workflow-form textarea, .evidence-input { min-height: 88px; resize: vertical; }
 .dispute-form { grid-column: 1 / -1; width: 100%; margin-top: 4px; }
-.signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.signature-grid span { padding: 9px 11px; border: 1px solid var(--color-border); border-radius: 5px; color: var(--color-text-secondary); font-size: .82rem; }
-.signature-grid span.done { border-color: var(--color-primary); background: var(--color-primary-light); color: var(--color-primary); font-weight: 600; }
+.signature-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+}
+.signature-grid > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.signature-grid > span.done {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-weight: 600;
+}
 .danger-button { border-color: var(--color-error) !important; color: var(--color-error) !important; }
 .compact-panel { padding: 20px; border-radius: 12px; }
 .evidence-list { display: grid; gap: 8px; }

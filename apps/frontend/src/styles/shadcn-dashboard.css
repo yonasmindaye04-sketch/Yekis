@@ -53,13 +53,19 @@
 .platform-shell.sh-shell.sh-variant-inset .platform-sidebar {
   background: transparent;
   border-right: none;
+  height: calc(100vh - 20px);
+  top: 10px;
 }
 
 .platform-shell.sh-shell.sh-variant-inset .platform-main {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: calc(var(--sh-radius) + 4px);
-  overflow: hidden;
+}
+
+.platform-shell.sh-shell.sh-variant-inset .platform-topbar.sh-topbar {
+  border-top-left-radius: calc(var(--sh-radius) + 3px);
+  border-top-right-radius: calc(var(--sh-radius) + 3px);
 }
 
 /* Floating Variant: Detached floating sidebar card */
@@ -84,6 +90,14 @@
   gap: 8px;
 }
 
+.ops-root.sh-ops-shell.sh-variant-inset .sidebar {
+  top: 8px;
+  bottom: 8px;
+  left: 8px;
+  border: 1px solid var(--ops-border);
+  border-radius: calc(var(--sh-radius) + 4px);
+}
+
 .ops-root.sh-ops-shell.sh-variant-inset .main {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -97,37 +111,212 @@
   height: calc(100vh - 20px);
 }
 
-/* Collapsed Sidebar Icon-Rail Mode */
+/* ── Side Panel Alignment (Expanded 256px & Collapsed 68px Icon-Rail) ───── */
+.platform-shell.sh-shell .platform-sidebar {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+.platform-shell.sh-shell .sidebar-brand-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 12px;
+}
+
+/* Brand header: 7px left padding + 1px border = 8px inset; 28px logo centered at X=22px; 8px gap puts Yekis wordmark at X=44px */
+.platform-shell.sh-shell .sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 7px;
+  margin: 0;
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: var(--sh-radius);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.platform-shell.sh-shell .sidebar-brand:hover {
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border);
+}
+
+.platform-shell.sh-shell .sidebar-brand:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.platform-shell.sh-shell .sidebar-brand-logo {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 7px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.platform-shell.sh-shell .sidebar-brand-name {
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.platform-shell.sh-shell .sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+/* Nav & Settings buttons: 12px left padding + 20px icon centered at X=22px; 12px gap puts label at X=44px */
+.platform-shell.sh-shell .sidebar-nav button,
+.platform-shell.sh-shell .sidebar-settings {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border-radius: var(--sh-radius);
+  box-sizing: border-box;
+  transform: none !important;
+}
+
+.platform-shell.sh-shell .sidebar-nav button .nav-icon,
+.platform-shell.sh-shell .sidebar-settings .nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  color: var(--color-text-secondary);
+  transition: color 0.18s ease;
+}
+
+.platform-shell.sh-shell .sidebar-nav button:hover .nav-icon,
+.platform-shell.sh-shell .sidebar-settings:hover .nav-icon {
+  color: var(--color-primary);
+}
+
+.platform-shell.sh-shell .sidebar-nav button.active,
+.platform-shell.sh-shell .sidebar-settings.active {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.platform-shell.sh-shell .sidebar-nav button.active .nav-icon,
+.platform-shell.sh-shell .sidebar-settings.active .nav-icon {
+  color: var(--color-primary-text);
+}
+
+.platform-shell.sh-shell .sidebar-settings {
+  margin-top: auto;
+}
+
+/* Collapsed 68px Icon-Rail Mode: uniform 40x40 centered squares on X=34px axis */
 .platform-shell.sh-shell.sh-collapsed .platform-sidebar {
-  padding: 14px 10px;
+  padding: 12px 0 16px;
   align-items: center;
 }
 
-.platform-shell.sh-shell.sh-collapsed .sidebar-brand strong,
-.platform-shell.sh-shell.sh-collapsed .sidebar-role span:last-child,
+.platform-shell.sh-shell.sh-collapsed .sidebar-brand-row {
+  justify-content: center;
+  margin: 0 0 12px;
+}
+
+.platform-shell.sh-shell.sh-collapsed .sidebar-nav {
+  align-items: center;
+}
+
+.platform-shell.sh-shell.sh-collapsed .sidebar-brand,
+.platform-shell.sh-shell.sh-collapsed .sidebar-nav button,
+.platform-shell.sh-shell.sh-collapsed .sidebar-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  margin-inline: auto;
+  gap: 0;
+  border-radius: var(--sh-radius);
+}
+
+.platform-shell.sh-shell.sh-collapsed .sidebar-brand-name,
 .platform-shell.sh-shell.sh-collapsed .sidebar-nav .nav-label,
 .platform-shell.sh-shell.sh-collapsed .sidebar-settings .nav-label,
 .platform-shell.sh-shell.sh-collapsed .sh-sidebar-group-title {
-  display: none;
+  display: none !important;
 }
 
-.platform-shell.sh-shell.sh-collapsed .sidebar-nav button,
-.platform-shell.sh-shell.sh-collapsed .sidebar-settings {
-  justify-content: center;
-  padding: 10px;
-  width: 42px;
-  height: 42px;
+/* Prevent legacy index.css @media (max-width: 900px) rules from breaking expanded sidebar on 769px-900px viewports */
+@media (min-width: 769px) and (max-width: 900px) {
+  .platform-shell.sh-shell:not(.sh-collapsed) .platform-sidebar {
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .platform-shell.sh-shell:not(.sh-collapsed) .sidebar-brand-name {
+    display: inline;
+  }
+
+  .platform-shell.sh-shell:not(.sh-collapsed) .sidebar-nav button .nav-label,
+  .platform-shell.sh-shell:not(.sh-collapsed) .sidebar-settings .nav-label {
+    display: inline;
+  }
+
+  .platform-shell.sh-shell:not(.sh-collapsed) .sidebar-nav button,
+  .platform-shell.sh-shell:not(.sh-collapsed) .sidebar-settings {
+    display: flex;
+    justify-content: flex-start;
+    padding: 9px 12px;
+  }
 }
 
-/* ── Topbar & Breadcrumb Header ─────────────────────────────────────────── */
+/* ── Frozen (Sticky) Topbar & Breadcrumb Header ─────────────────────────── */
+.platform-shell.sh-shell .platform-topbar.sh-topbar,
 .sh-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 85;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  min-height: 60px;
   padding: 12px 24px;
   border-bottom: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
+  background: color-mix(in srgb, var(--color-bg-elevated) 92%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-sizing: border-box;
 }
 
 .sh-topbar-left {
@@ -1777,8 +1966,19 @@
     transform: translateX(0);
   }
 
-  .platform-shell.sh-shell .platform-sidebar .sidebar-brand strong,
-  .platform-shell.sh-shell .platform-sidebar .sidebar-role > span:last-child,
+  .platform-shell.sh-shell .platform-sidebar .sidebar-brand-row {
+    justify-content: space-between !important;
+  }
+
+  .platform-shell.sh-shell .platform-sidebar .sidebar-brand {
+    justify-content: flex-start !important;
+    width: auto !important;
+    flex: 1 1 auto;
+    padding: 7px !important;
+    gap: 8px !important;
+  }
+
+  .platform-shell.sh-shell .platform-sidebar .sidebar-brand-name,
   .platform-shell.sh-shell .platform-sidebar .sidebar-nav button .nav-label,
   .platform-shell.sh-shell .platform-sidebar .sidebar-settings .nav-label {
     display: inline !important;

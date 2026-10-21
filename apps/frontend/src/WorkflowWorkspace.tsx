@@ -957,12 +957,14 @@ export function ContractsWorkspace({
 
               <div className="signature-grid">
                 <span className={contract.clientAcceptedAt ? "done" : ""}>
+                  {contract.clientAcceptedAt && <Check size={12} />}
                   Client E-Signature:{" "}
-                  {contract.clientAcceptedAt ? "Verified ✓" : "Pending"}
+                  <strong>{contract.clientAcceptedAt ? "Verified" : "Pending"}</strong>
                 </span>
                 <span className={contract.freelancerAcceptedAt ? "done" : ""}>
+                  {contract.freelancerAcceptedAt && <Check size={12} />}
                   Freelancer E-Signature:{" "}
-                  {contract.freelancerAcceptedAt ? "Verified ✓" : "Pending"}
+                  <strong>{contract.freelancerAcceptedAt ? "Verified" : "Pending"}</strong>
                 </span>
               </div>
 

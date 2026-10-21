@@ -32,7 +32,6 @@ import {
   ShieldCheck,
   Scale,
   Settings,
-  ChevronDown,
   LogOut,
   ArrowLeft,
   User as UserIcon,
@@ -42,7 +41,6 @@ import {
   Eye,
   EyeOff,
   Package,
-  RefreshCw,
   X,
   LifeBuoy,
   PanelLeftClose,
@@ -1611,54 +1609,37 @@ if (authMode === "register") {
         className={`platform-sidebar${mobileDrawerOpen ? " mobile-open" : ""}`}
         aria-label="Workspace navigation"
       >
-        <div className="sidebar-brand">
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="sidebar-brand-row">
+          <button
+            type="button"
+            className="sidebar-brand"
+            onClick={() => {
+              setView("overview");
+              setMobileDrawerOpen(false);
+            }}
+            title="Yekis — Go to Dashboard Overview"
+            aria-label="Yekis — Go to Dashboard Overview"
+          >
             <img
               src="/svgviewer-output.svg"
               alt="Yekis Logo"
-              className="platform-logo small"
+              className="sidebar-brand-logo"
+              referrerPolicy="no-referrer"
             />
-            {(!sidebarCollapsed || isMobileViewport) && <strong>Yekis</strong>}
-          </div>
-          <button
-            type="button"
-            className="sh-icon-only-btn"
-            onClick={() =>
-              isMobileViewport
-                ? setMobileDrawerOpen(false)
-                : toggleSidebarCollapsed()
-            }
-            title={
-              isMobileViewport
-                ? "Close navigation drawer"
-                : sidebarCollapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
-            }
-            aria-label={
-              isMobileViewport
-                ? "Close navigation drawer"
-                : sidebarCollapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
-            }
-          >
-            {isMobileViewport ? (
-              <X size={16} />
-            ) : sidebarCollapsed ? (
-              <PanelLeftOpen size={15} />
-            ) : (
-              <PanelLeftClose size={15} />
+            {(!sidebarCollapsed || isMobileViewport) && (
+              <strong className="sidebar-brand-name">Yekis</strong>
             )}
           </button>
-        </div>
-        <div className="sidebar-role">
-          <span className="avatar">{user.email.slice(0, 1).toUpperCase()}</span>
-          {(!sidebarCollapsed || isMobileViewport) && (
-            <span>
-              <strong>{roleLabel(platformRole)}</strong>
-              <small>{user.email}</small>
-            </span>
+          {isMobileViewport && (
+            <button
+              type="button"
+              className="sh-icon-only-btn"
+              onClick={() => setMobileDrawerOpen(false)}
+              aria-label="Close navigation drawer"
+              title="Close navigation drawer"
+            >
+              <X size={16} />
+            </button>
           )}
         </div>
         {isMobileViewport && basePlatformRole === "BOTH" && (
@@ -1709,7 +1690,10 @@ if (authMode === "register") {
           }}
           title={t.nav.settings}
         >
-          <Settings size={16} /> <span className="nav-label">{t.nav.settings}</span>
+          <span className="nav-icon">
+            <Settings size={18} />
+          </span>
+          <span className="nav-label">{t.nav.settings}</span>
         </button>
         {isMobileViewport && (
           <button
@@ -1722,7 +1706,10 @@ if (authMode === "register") {
             }}
             title={t.nav.signOut}
           >
-            <LogOut size={16} /> <span className="nav-label">{t.nav.signOut}</span>
+            <span className="nav-icon">
+              <LogOut size={18} />
+            </span>
+            <span className="nav-label">{t.nav.signOut}</span>
           </button>
         )}
       </aside>
@@ -1832,7 +1819,6 @@ if (authMode === "register") {
               <span className="avatar">
                 {user.email.slice(0, 1).toUpperCase()}
               </span>
-              <ChevronDown size={14} />
             </button>
           </div>
         </header>
@@ -1869,19 +1855,6 @@ if (authMode === "register") {
                     })
                   : "…"}
               </span>
-              <button
-                type="button"
-                className="sh-icon-only-btn compact"
-                onClick={() => void refreshDashboard()}
-                disabled={isRefreshing}
-                aria-label="Refresh dashboard data"
-                title="Refresh dashboard data"
-              >
-                <RefreshCw
-                  size={13}
-                  className={isRefreshing ? "refresh-spin" : undefined}
-                />
-              </button>
             </div>
           </div>
         )}
