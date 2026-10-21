@@ -1,8 +1,7 @@
 import http from "node:http";
 import net from "node:net";
 import { defineConfig, type HttpServer, type Plugin } from "vite";
-import react, { reactCompilerPreset } from "@vitejs/plugin-react";
-import babel from "@rolldown/plugin-babel";
+import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
@@ -114,12 +113,10 @@ function resilientApiProxyPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  cacheDir: "../../node_modules/.vite",
   plugins: [
     resilientApiProxyPlugin(),
     tailwindcss(),
     react(),
-    babel({ presets: [reactCompilerPreset()] }),
   ],
   server: {
     host: "0.0.0.0", // binds to 0.0.0.0 for external, AI Studio, and tunnel traffic
