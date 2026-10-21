@@ -6,6 +6,14 @@ import {
   type CreateGigPayload,
   type Gig,
 } from "./api/client";
+import { useI18n } from "./i18n";
+import {
+  ConfirmActionModal,
+  EscrowFeeBreakdown,
+  formatEtbMajor,
+  formatStatusLabel,
+  statusTone,
+} from "./pages/ops/components/ui";
 
 // === HELPERS ===
 const CATEGORIES = [
@@ -64,11 +72,7 @@ function toMinor(etb: string): number | null {
   return Math.round(n * 100);
 }
 
-const formatBirr = (minor: number) =>
-  `ETB ${(minor / 100).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+const formatBirr = (minor: number) => formatEtbMajor(minor / 100, true);
 
 /** Mirrors CreateGigInput in packages/schemas so errors surface here rather
  *  than as an opaque validation failure. */
@@ -152,6 +156,9 @@ const STATUS_COPY: Record<string, { label: string; tone: string; hint: string }>
 
 // === MAIN COMPONENT ===
 export function GigSellerDashboard() {
+  const { t } = useI18n();
+  const gf = t.workspace.gigsFlow;
+  const fb = t.workspace.feeBreakdown;
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -161,6 +168,7 @@ export function GigSellerDashboard() {
   const [editing, setEditing] = useState<Gig | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
+  const [archiveTarget, setArchiveTarget] = useState<Gig | null>(null);
 
   /** Refresh after a mutation. Callers are event handlers, not effects. */
   const load = useCallback(async () => {
@@ -330,7 +338,7 @@ export function GigSellerDashboard() {
       <section className="platform-content">
         <div className="content-toolbar">
           <div>
-            <h2>{editing ? "Edit gig" : "Create a gig"}</h2>
+            <h2>{editing ? gf.editGigTitle : gf.createGigBtn}</h2>
             <p>
               {editing
                 ? "Update the details buyers see."
@@ -338,7 +346,7 @@ export function GigSellerDashboard() {
             </p>
           </div>
           <button className="btn-secondary" onClick={() => { setDraft(null); setEditing(null); }}>
-            Cancel
+            {gf.cancelBtn}
           </button>
         </div>
 
@@ -401,7 +409,7 @@ export function GigSellerDashboard() {
 
         <div className="content-toolbar" style={{ marginTop: 24 }}>
           <div>
-            <h3>Packages</h3>
+            <h3>{gf.packagesTitle}</h3>
             <p>
               {readOnlyPackages
                 ? "Package tiers are fixed once a gig is created."
@@ -414,7 +422,7 @@ export function GigSellerDashboard() {
               onClick={addPackage}
               disabled={draft.packages.length >= 3}
             >
-              <Plus size={15} /> Add tier
+              <Plus size={15} /> {gf.addTierBtn}
             </button>
           ) : null}
         </div>
@@ -436,7 +444,7 @@ export function GigSellerDashboard() {
             </div>
 
             <label className="gig-field">
-              <span>Package title</span>
+              <span>{gf.packageTitleLabel}</span>
               <input
                 value={p.title}
                 disabled={readOnlyPackages}
@@ -446,7 +454,7 @@ export function GigSellerDashboard() {
             </label>
 
             <label className="gig-field">
-              <span>What is included</span>
+              <span>{gf.whatIncludedLabel}</span>
               <textarea
                 value={p.description}
                 rows={3}
@@ -457,7 +465,7 @@ export function GigSellerDashboard() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
               <label className="gig-field">
-                <span>Delivery days</span>
+                <span>{gf.deliveryDaysLabel}</span>
                 <input
                   type="number"
                   min={1}
@@ -468,7 +476,7 @@ export function GigSellerDashboard() {
                 />
               </label>
               <label className="gig-field">
-                <span>Revisions included</span>
+                <span>{gf.revisionsLabel}</span>
                 <input
                   type="number"
                   min={0}
@@ -479,7 +487,7 @@ export function GigSellerDashboard() {
                 />
               </label>
               <label className="gig-field">
-                <span>Price (ETB)</span>
+                <span>{gf.priceEtbLabel}</span>
                 <input
                   inputMode="decimal"
                   value={p.price}
@@ -489,6 +497,20 @@ export function GigSellerDashboard() {
                 />
               </label>
             </div>
+
+            {/* Inline Escrow & Net Payout Breakdown per Package (FR-02) */}
+            {Number(p.price) > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <EscrowFeeBreakdown
+                  grossEtb={Number(p.price)}
+                  compact
+                  labels={{
+                    ...fb,
+                    title: `${p.tier} · ${fb.title}`,
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
 
@@ -497,15 +519,15 @@ export function GigSellerDashboard() {
             {saving
               ? "Saving…"
               : editing
-                ? "Save changes"
-                : "Submit for review"}
+                ? gf.saveChangesBtn
+                : gf.submitReviewBtn}
           </button>
           <button
             className="btn-secondary"
             onClick={() => { setDraft(null); setEditing(null); }}
             disabled={saving}
           >
-            Cancel
+            {gf.cancelBtn}
           </button>
         </div>
       </section>
@@ -517,11 +539,11 @@ export function GigSellerDashboard() {
     <section className="platform-content">
       <div className="content-toolbar">
         <div>
-          <h2>My gigs</h2>
-          <p>Package a service, get orders, and deliver on your own terms.</p>
+          <h2>{gf.myGigsTitle}</h2>
+          <p>{gf.myGigsDesc}</p>
         </div>
         <button className="btn-primary" onClick={startCreate}>
-          <Plus size={16} /> Create a gig
+          <Plus size={16} /> {gf.createGigBtn}
         </button>
       </div>
 
@@ -530,21 +552,26 @@ export function GigSellerDashboard() {
       {loadError ? <div className="form-error">{loadError}</div> : null}
 
       {loading ? (
-        <p>Loading your gigs…</p>
+        <div style={{ display: "grid", gap: 12 }}>
+          {[1, 2].map((idx) => (
+            <div className="panel" key={idx} style={{ padding: 18 }}>
+              <div className="sh-skeleton" style={{ height: 20, width: "45%", marginBottom: 10 }} />
+              <div className="sh-skeleton" style={{ height: 14, width: "65%", marginBottom: 14 }} />
+              <div className="sh-skeleton" style={{ height: 34, width: "100%" }} />
+            </div>
+          ))}
+        </div>
       ) : gigs.length === 0 ? (
         <div className="empty-state">
-          <p style={{ fontWeight: 700 }}>You have no gigs yet.</p>
-          <p>
-            Create one to start selling: pick a category, describe the service, and set up to
-            three package tiers with your own prices and delivery times.
-          </p>
+          <p style={{ fontWeight: 700 }}>{gf.noGigsTitle}</p>
+          <p>{gf.noGigsDesc}</p>
           <button className="btn-primary" style={{ marginTop: 12 }} onClick={startCreate}>
-            <Plus size={16} /> Create your first gig
+            <Plus size={16} /> {gf.createFirstGigBtn}
           </button>
         </div>
       ) : (
         <>
-          <p style={{ color: "var(--color-text-secondary)" }}>
+          <p className="sh-mono" style={{ color: "var(--color-text-secondary)" }}>
             {gigs.length} gig{gigs.length === 1 ? "" : "s"} · {totals.live} live ·{" "}
             {totals.pending} awaiting review
           </p>
@@ -580,11 +607,17 @@ export function GigSellerDashboard() {
                         }}
                       >
                         {CATEGORIES.find((c) => c.value === g.category)?.label ?? g.category}
-                        {cheapest !== null ? ` · from ${formatBirr(cheapest)}` : ""}
+                        {cheapest !== null ? (
+                          <span className="sh-mono"> · from {formatBirr(cheapest)}</span>
+                        ) : (
+                          ""
+                        )}
                       </div>
                     </div>
 
-                    <span className={`status-pill ${copy.tone}`}>{copy.label}</span>
+                    <span className={`status-pill ${statusTone(g.status)}`}>
+                      {formatStatusLabel(g.status, t.workspace.statuses)}
+                    </span>
                   </div>
 
                   {copy.hint ? (
@@ -610,34 +643,34 @@ export function GigSellerDashboard() {
                       fontSize: "0.82rem",
                     }}
                   >
-                    <span>
+                    <span className="sh-mono">
                       <Star size={13} /> {g.ratingCount || 0} rating
                       {g.ratingCount === 1 ? "" : "s"}
                     </span>
-                    <span>· {g.viewCount || 0} views</span>
-                    <span>
+                    <span className="sh-mono">· {g.viewCount || 0} views</span>
+                    <span className="sh-mono">
                       · {(g.packages ?? []).length} package
                       {(g.packages ?? []).length === 1 ? "" : "s"}
                     </span>
 
                     <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                       <button className="btn-secondary" onClick={() => startEdit(g)}>
-                        Edit
+                        {gf.editBtn}
                       </button>
                       {g.status === "ACTIVE" ? (
                         <button
                           className="btn-secondary"
                           onClick={() => void changeStatus(g, "PAUSED")}
                         >
-                          <Pause size={14} /> Pause
+                          <Pause size={14} /> {gf.pauseBtn}
                         </button>
                       ) : null}
                       {g.status !== "ARCHIVED" ? (
                         <button
                           className="btn-secondary"
-                          onClick={() => void changeStatus(g, "ARCHIVED")}
+                          onClick={() => setArchiveTarget(g)}
                         >
-                          <Archive size={14} /> Archive
+                          <Archive size={14} /> {gf.archiveBtn}
                         </button>
                       ) : null}
                     </span>
@@ -648,6 +681,37 @@ export function GigSellerDashboard() {
           </div>
         </>
       )}
+
+      {/* Archive Gig Confirmation Modal (FR-04) */}
+      <ConfirmActionModal
+        open={archiveTarget !== null}
+        title={gf.archiveConfirmTitle}
+        description={gf.archiveConfirmDesc}
+        summaryRows={
+          archiveTarget
+            ? [
+                { label: "Gig", value: archiveTarget.title },
+                {
+                  label: "Status",
+                  value: formatStatusLabel(
+                    archiveTarget.status,
+                    t.workspace.statuses,
+                  ),
+                },
+              ]
+            : undefined
+        }
+        confirmLabel={gf.archiveBtn}
+        cancelLabel={gf.cancelBtn}
+        tone="danger"
+        onCancel={() => setArchiveTarget(null)}
+        onConfirm={() => {
+          if (!archiveTarget) return;
+          const target = archiveTarget;
+          setArchiveTarget(null);
+          void changeStatus(target, "ARCHIVED");
+        }}
+      />
     </section>
   );
 }

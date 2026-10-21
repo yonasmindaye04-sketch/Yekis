@@ -1854,12 +1854,19 @@
 
   .sh-subnav-left .sh-segmented {
     width: 100%;
-    overflow-x: auto;
+    display: flex;
+    flex-wrap: wrap;
+    height: auto;
   }
 
   .sh-subnav-left .sh-seg-btn {
-    flex: 1;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 140px;
     justify-content: center;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+    padding: 8px 10px;
   }
 
   .sh-kpi-grid {

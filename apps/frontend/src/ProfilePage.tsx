@@ -10,12 +10,15 @@ import {
 } from "lucide-react";
 import { api } from "./api/client";
 import { YekisAvatar } from "./components/YekisAvatar";
+import { useI18n } from "./i18n";
+import { loadLocalPortfolio } from "./ProfileEditPage";
 import "./ProfilePage.css";
 
 // Shape mirrors backend profile.service.ts getPublicProfile()
 interface SkillRef {
   id: string;
   nameEn?: string;
+  nameAm?: string;
   name?: string;
 }
 
@@ -54,6 +57,8 @@ interface PublicProfileData {
 }
 
 export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
+  const { t, language: lang } = useI18n();
+  const pr = t.workspace.profile;
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -95,17 +100,40 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
     };
   }, [userId]);
 
-  if (loading) return <div className="loading-spinner">Loading profile...</div>;
+  if (loading) {
+    return (
+      <div className="profile-view-page">
+        <div className="profile-view-container">
+          <div className="panel" style={{ padding: 28 }}>
+            <div className="sh-skeleton" style={{ height: 26, width: "38%", marginBottom: 12 }} />
+            <div className="sh-skeleton" style={{ height: 14, width: "60%", marginBottom: 20 }} />
+            <div className="sh-skeleton" style={{ height: 110, width: "100%" }} />
+          </div>
+        </div>
+      </div>
+    );
+  }
   if (loadError) return <div className="profile-error">{loadError}</div>;
   if (!profile) return null;
 
-  const skillName = (s: SkillRef) => s.nameEn ?? s.name ?? s.id;
+  const skillName = (s: SkillRef) =>
+    (lang === "am" && s.nameAm) || s.nameEn || s.name || s.id;
   const primarySkill = profile.skills.find(
     (s) => s.id === profile.primarySkillId,
   );
   const memberSinceYear = profile.stats?.memberSince
     ? new Date(profile.stats.memberSince).getFullYear()
     : null;
+
+  const localPortfolio = loadLocalPortfolio(profile.id);
+  const fallbackPortfolio =
+    localPortfolio.length > 0 ? localPortfolio : loadLocalPortfolio("me");
+  const effectivePortfolio: PortfolioItem[] =
+    (profile.portfolio?.length ?? 0) > 0
+      ? profile.portfolio
+      : profile.isOwnProfile || userId === "me"
+        ? fallbackPortfolio
+        : [];
 
   const submitReport = async () => {
     setReportError(null);
@@ -175,7 +203,7 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                     }}
                     className="report-btn"
                   >
-                    <Flag size={16} /> Report Profile
+                    <Flag size={16} /> {pr.reportProfileBtn}
                   </button>
                 </div>
               )}
@@ -184,7 +212,7 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
             <div className="hero-tags">
               {profile.isAvailableForWork && (
                 <span className="availability-badge">
-                  <span className="dot"></span> Available for work
+                  <span className="dot"></span> {pr.availableForWorkTitle}
                 </span>
               )}
             </div>
@@ -195,45 +223,45 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
           {/* Sidebar */}
           <div className="profile-sidebar">
             <div className="panel profile-stats">
-              <h3>Overview</h3>
+              <h3>{pr.overviewTitle}</h3>
               <div className="stats-list">
                 <div className="stat-item">
                   <span className="stat-label">
-                    <Star size={16} className="icon-star" /> Rating
+                    <Star size={16} className="icon-star" /> {pr.ratingLabel}
                   </span>
-                  <span className="stat-value">
+                  <span className="stat-value sh-mono">
                     {profile.stats?.rating?.average ?? "-"}
                   </span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">
-                    <Briefcase size={16} /> Jobs
+                    <Briefcase size={16} /> {pr.jobsLabel}
                   </span>
-                  <span className="stat-value">
+                  <span className="stat-value sh-mono">
                     {profile.stats?.jobsCompleted ?? 0}
                   </span>
                 </div>
                 <div className="stat-item">
                   <span className="stat-label">
-                    <strong>$</strong> Earned
+                    <strong>ETB</strong> {pr.earnedLabel}
                   </span>
-                  <span className="stat-value">
+                  <span className="stat-value sh-mono">
                     {profile.stats?.earnedRange ?? "-"}
                   </span>
                 </div>
                 {memberSinceYear && (
                   <div className="stat-item">
                     <span className="stat-label">
-                      <Calendar size={16} /> Member Since
+                      <Calendar size={16} /> {pr.memberSinceLabel}
                     </span>
-                    <span className="stat-value">{memberSinceYear}</span>
+                    <span className="stat-value sh-mono">{memberSinceYear}</span>
                   </div>
                 )}
               </div>
             </div>
 
             <div className="panel profile-skills">
-              <h3>Skills</h3>
+              <h3>{pr.skillsTitle}</h3>
               <div className="tags-list">
                 {profile.skills.map((s) => (
                   <span key={s.id} className="tag">
@@ -250,15 +278,15 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
           {/* Main */}
           <div className="profile-main">
             <div className="panel profile-bio">
-              <h3>About Me</h3>
-              <p>{profile.bio || "No bio provided yet."}</p>
+              <h3>{pr.aboutMeTitle}</h3>
+              <p>{profile.bio || pr.noBioYet}</p>
             </div>
 
-            {(profile.portfolio?.length ?? 0) > 0 && (
-              <div className="panel profile-portfolio">
-                <h3>Portfolio</h3>
+            <div className="panel profile-portfolio">
+              <h3>{pr.portfolioTitle}</h3>
+              {effectivePortfolio.length > 0 ? (
                 <div className="portfolio-grid">
-                  {profile.portfolio.map((item) => (
+                  {effectivePortfolio.map((item) => (
                     <div key={item.id} className="portfolio-card">
                       <div className="portfolio-img-container">
                         {item.thumbnailUrl ? (
@@ -276,12 +304,21 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <div style={{ color: "var(--color-text-secondary)", fontSize: "0.86rem" }}>
+                  <p style={{ margin: "0 0 4px", fontWeight: 600, color: "var(--color-text)" }}>
+                    {pr.noPortfolioYet}
+                  </p>
+                  <p style={{ margin: 0 }}>{pr.noPortfolioHint}</p>
+                </div>
+              )}
+            </div>
 
             {reviews.length > 0 && (
               <div className="panel profile-reviews">
-                <h3>Reviews ({reviews.length})</h3>
+                <h3>
+                  {pr.reviewsTitle} ({reviews.length})
+                </h3>
                 <div className="reviews-list">
                   {reviews.map((review) => (
                     <div key={review.id} className="review-item">
@@ -296,7 +333,7 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
                           ))}
                         </div>
                         {review.createdAt && (
-                          <span className="review-date">
+                          <span className="review-date sh-mono">
                             {new Date(review.createdAt).toLocaleDateString()}
                           </span>
                         )}

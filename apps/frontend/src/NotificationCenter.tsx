@@ -4,6 +4,7 @@ import { Bell, Check, CornerDownRight } from "lucide-react";
 import { api, type NotificationItem } from "./api/client";
 import { appTargetFor } from "./api/notificationTargets";
 import { realtimeSocket } from "./api/socket";
+import { useI18n } from "./i18n";
 
 /** Views this component may navigate to; kept in step with FullPlatformApp's View. */
 const ROUTABLE = new Set([
@@ -19,6 +20,7 @@ const ROUTABLE = new Set([
 
 // === MAIN COMPONENT ===
 export function NotificationCenter({ onNavigate }: { onNavigate?: (view: string) => void }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [open, setOpen] = useState(false);
   const unread = items.filter((item) => !item.isRead).length;
@@ -47,10 +49,10 @@ export function NotificationCenter({ onNavigate }: { onNavigate?: (view: string)
   }, []);
   /* Mark read, then jump to the view the event came from. Marking is attempted
    even when there is no destination, so a click always clears the badge. */
-const read = async (item: NotificationItem) => {
-    const t = appTargetFor(item);
-    if (t && onNavigate && ROUTABLE.has(t.page)) {
-      onNavigate(t.page);
+  const read = async (item: NotificationItem) => {
+    const dest = appTargetFor(item);
+    if (dest && onNavigate && ROUTABLE.has(dest.page)) {
+      onNavigate(dest.page);
       setOpen(false);
     }
     if (item.isRead) return;
@@ -70,7 +72,7 @@ const read = async (item: NotificationItem) => {
       <button
         className="icon-button notification-trigger"
         onClick={() => setOpen((current) => !current)}
-        aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`}
+        aria-label={`${t.workspace.notifications.title}${unread ? `, ${t.workspace.notifications.unreadCount.replace("{count}", String(unread))}` : ""}`}
       >
         <Bell size={18} />
         {unread > 0 && <b>{unread > 9 ? "9+" : unread}</b>}
@@ -78,15 +80,19 @@ const read = async (item: NotificationItem) => {
       {open && (
         <div className="notification-popover">
           <div className="notification-popover-head">
-            <strong>Notifications</strong>
-            {unread > 0 && <span>{unread} unread</span>}
+            <strong>{t.workspace.notifications.title}</strong>
+            {unread > 0 && (
+              <span>
+                {t.workspace.notifications.unreadCount.replace("{count}", String(unread))}
+              </span>
+            )}
           </div>
           {items.length === 0 ? (
-            <p className="empty-state">No notifications yet.</p>
+            <p className="empty-state">{t.workspace.notifications.empty}</p>
           ) : (
             items.slice(0, 8).map((item) => {
-              const t = appTargetFor(item);
-              const reachable = !!t && !!onNavigate && ROUTABLE.has(t.page);
+              const dest = appTargetFor(item);
+              const reachable = !!dest && !!onNavigate && ROUTABLE.has(dest.page);
               return (
                 <button
                   className={
@@ -94,7 +100,11 @@ const read = async (item: NotificationItem) => {
                   }
                   key={item.id}
                   onClick={() => void read(item)}
-                  title={reachable ? `Go to ${t!.page}` : undefined}
+                  title={
+                    reachable
+                      ? t.workspace.notifications.goTo.replace("{page}", dest!.page)
+                      : undefined
+                  }
                 >
                   <span>
                     <strong>{item.type.replaceAll("-", " ")}</strong>
@@ -120,3 +130,4 @@ const read = async (item: NotificationItem) => {
     </div>
   );
 }
+

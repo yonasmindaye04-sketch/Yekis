@@ -788,20 +788,20 @@ if (authMode === "register") {
     const common = [
       { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
-      { view: "gigs" as View, iconKey: "gigs", label: "Gigs" },
+      { view: "gigs" as View, iconKey: "gigs", label: t.workspace.nav.gigs },
       { view: "contracts" as View, iconKey: "contracts", label: t.nav.escrow },
       { view: "wallet" as View, iconKey: "wallet", label: t.nav.wallet },
-      { view: "chat" as View, iconKey: "chat", label: "Chat" },
-      { view: "profile" as View, iconKey: "profile", label: "Profile" },
+      { view: "chat" as View, iconKey: "chat", label: t.workspace.nav.chat },
+      { view: "profile" as View, iconKey: "profile", label: t.workspace.nav.profile },
     ];
     // Anyone who can work can also sell, so they get a seller surface alongside
     // the marketplace. Hiring-only accounts see the marketplace alone.
     const sellerNav = canWork
-      ? [{ view: "my-gigs" as View, iconKey: "gigs", label: "My Gigs" }]
+      ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs }]
       : [];
 
     return isStaff
-      ? [...common, ...sellerNav, { view: "cases" as View, iconKey: "cases", label: "Cases" }]
+      ? [...common, ...sellerNav, { view: "cases" as View, iconKey: "cases", label: t.workspace.nav.cases }]
       : [
           ...common,
           ...sellerNav,
@@ -812,7 +812,7 @@ if (authMode === "register") {
             label: t.nav.kyc,
           },
         ];
-  }, [platformRole, t]);
+  }, [canHire, canWork, isStaff, t]);
 
   if (user?.staffRole) {
     return (
@@ -956,24 +956,24 @@ if (authMode === "register") {
             <button
               type="button"
               className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label={
-              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-            }
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 40,
-              height: 40,
-              borderRadius: "50%",
-              background: "var(--color-bg-elevated)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-text)",
-              cursor: "pointer",
-            }}
-          >
-            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+              onClick={toggleTheme}
+              aria-label={
+                theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 44,
+                height: 44,
+                borderRadius: "50%",
+                background: "var(--color-bg-elevated)",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+                cursor: "pointer",
+              }}
+            >
+              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
           </div>
         </div>
@@ -1005,39 +1005,39 @@ if (authMode === "register") {
             <div>
               <p className="eyebrow">
                 {authMode === "login"
-                  ? "Welcome back"
+                  ? t.workspace.auth.welcomeBack
                   : authMode === "forgot-password"
-                    ? "Recover account"
+                    ? t.workspace.auth.recoverAccount
                     : authMode === "reset-password"
-                      ? "Set new password"
-                      : "Get started"}
+                      ? t.workspace.auth.setNewPassword
+                      : t.workspace.auth.getStarted}
               </p>
               <h2>
                 {authMode === "login"
-                  ? "Sign in to Yekis"
+                  ? t.workspace.auth.signInTitle
                   : authMode === "forgot-password"
-                    ? "Forgot password"
+                    ? t.workspace.auth.forgotTitle
                     : authMode === "reset-password"
-                      ? "Reset password"
-                      : "Create an account"}
+                      ? t.workspace.auth.resetTitle
+                      : t.workspace.auth.createTitle}
               </h2>
             </div>
           </div>
           {authMode === "register" && (
-            <div className="segmented-control">
+            <div className="segmented-control" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
               <button
                 type="button"
                 className={role === "CLIENT" ? "selected" : ""}
                 onClick={() => setRole("CLIENT")}
               >
-                Client
+                {t.workspace.roles.client}
               </button>
               <button
                 type="button"
                 className={role === "FREELANCER" ? "selected" : ""}
                 onClick={() => setRole("FREELANCER")}
               >
-                Freelancer
+                {t.workspace.roles.freelancer}
               </button>
               <button
                 type="button"
@@ -1045,7 +1045,7 @@ if (authMode === "register") {
                 onClick={() => setRole("BOTH")}
                 title="Hire talent and take on work with one account"
               >
-                Both
+                {t.workspace.roles.both}
               </button>
             </div>
           )}
@@ -1053,7 +1053,7 @@ if (authMode === "register") {
             authMode === "register" ||
             authMode === "forgot-password") && (
             <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-              Email
+              {t.workspace.auth.emailLabel}
               <input
                 type="email"
                 value={email}
@@ -1066,6 +1066,7 @@ if (authMode === "register") {
           )}
           {authMode === "register" && (
             <div
+              className="auth-row-split"
               style={{
                 display: "grid",
                 gridTemplateColumns: "1.15fr 0.85fr",
@@ -1074,7 +1075,7 @@ if (authMode === "register") {
               }}
             >
               <label style={{ margin: 0, fontSize: "0.8rem", fontWeight: 600 }}>
-                Phone
+                {t.workspace.auth.phoneLabel}
                 <input
                   value={phone}
                   onChange={(event) => setPhone(event.target.value)}
@@ -1084,7 +1085,7 @@ if (authMode === "register") {
                 />
               </label>
               <label style={{ margin: 0, fontSize: "0.8rem", fontWeight: 600 }}>
-                Date of birth
+                {t.workspace.auth.dobLabel}
                 <input
                   type="date"
                   value={dateOfBirth}
@@ -1097,7 +1098,7 @@ if (authMode === "register") {
           )}
           {authMode === "reset-password" && (
             <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-              Reset token
+              {t.workspace.auth.resetTokenLabel}
               <input
                 type="text"
                 value={resetToken}
@@ -1128,7 +1129,9 @@ if (authMode === "register") {
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  {authMode === "reset-password" ? "New password" : "Password"}
+                  {authMode === "reset-password"
+                    ? t.workspace.auth.newPasswordLabel
+                    : t.workspace.auth.passwordLabel}
                 </label>
                 {authMode === "login" && (
                   <button
@@ -1149,7 +1152,7 @@ if (authMode === "register") {
                       transition: "opacity 0.15s ease",
                     }}
                   >
-                    Forgot your password?
+                    {t.workspace.auth.forgotPasswordBtn}
                   </button>
                 )}
               </div>
@@ -1435,14 +1438,14 @@ if (authMode === "register") {
             style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
-              ? "Please wait..."
+              ? t.marketing.auth.pleaseWait
               : authMode === "login"
-                ? "Sign in"
+                ? t.marketing.auth.signIn
                 : authMode === "forgot-password"
-                  ? "Request reset link"
+                  ? t.workspace.auth.requestResetBtn
                   : authMode === "reset-password"
-                    ? "Set password"
-                    : "Create account"}
+                    ? t.workspace.auth.setPasswordBtn
+                    : t.marketing.auth.createAccount}
           </button>
           {(authMode === "login" || authMode === "register") && (
             <SocialSignInButtons
@@ -1465,8 +1468,8 @@ if (authMode === "register") {
             }}
           >
             {authMode === "login"
-              ? "New to Yekis? Create an account"
-              : "Already have an account? Sign in"}
+              ? t.marketing.auth.newToYekis
+              : t.marketing.auth.alreadyAccount}
           </button>
         </form>
 
@@ -1704,10 +1707,24 @@ if (authMode === "register") {
             setView("settings");
             setMobileDrawerOpen(false);
           }}
-          title="Settings"
+          title={t.nav.settings}
         >
           <Settings size={16} /> <span className="nav-label">{t.nav.settings}</span>
         </button>
+        {isMobileViewport && (
+          <button
+            type="button"
+            className="sidebar-settings"
+            style={{ marginTop: 4 }}
+            onClick={() => {
+              setMobileDrawerOpen(false);
+              logout();
+            }}
+            title={t.nav.signOut}
+          >
+            <LogOut size={16} /> <span className="nav-label">{t.nav.signOut}</span>
+          </button>
+        )}
       </aside>
 
       <main className="platform-main">
@@ -1752,14 +1769,14 @@ if (authMode === "register") {
             </button>
             <div className="sh-breadcrumb">
               <span className="sh-breadcrumb-muted">
-                {roleLabel(platformRole)} Workspace
+                {roleLabel(platformRole)} {t.workspace.nav.workspaceLabel}
               </span>
               <span className="sh-breadcrumb-sep">/</span>
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
-                  ? "Dashboard Overview"
+                  ? t.workspace.nav.overview
                   : navItems.find((item) => item.view === view)?.label ||
-                    "Settings"}
+                    t.nav.settings}
               </strong>
             </div>
           </div>
@@ -1784,9 +1801,9 @@ if (authMode === "register") {
                 aria-label="Switch workspace mode"
                 title="Switch between Client and Freelancer modes"
               >
-                <option value="BOTH">Mode: Client &amp; Freelancer</option>
-                <option value="CLIENT">Mode: Client (Hiring)</option>
-                <option value="FREELANCER">Mode: Freelancer (Work)</option>
+                <option value="BOTH">{t.workspace.roles.modeBoth}</option>
+                <option value="CLIENT">{t.workspace.roles.modeClient}</option>
+                <option value="FREELANCER">{t.workspace.roles.modeFreelancer}</option>
               </select>
             )}
 
@@ -1805,7 +1822,13 @@ if (authMode === "register") {
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
             <NotificationCenter onNavigate={(v) => setView(v as View)} />
-            <button className="user-menu" onClick={logout} title="Sign out">
+            <button
+              type="button"
+              className="user-menu"
+              onClick={() => setView("settings")}
+              title={t.nav.settings}
+              aria-label={t.nav.settings}
+            >
               <span className="avatar">
                 {user.email.slice(0, 1).toUpperCase()}
               </span>
@@ -2062,10 +2085,10 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Identity & Fayda eKYC Verification
+                  {t.workspace.kycFlow.verifyHeading}
                 </h2>
                 <p className="sh-card-desc">
-                  Manage your Fayda National ID tier and instant payout readiness.
+                  {t.workspace.kycFlow.progressionTitle}
                 </p>
               </div>
               <span className="sh-kbd">
@@ -2098,17 +2121,17 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Public Marketplace Profile
+                  {t.workspace.profile.publicHeading}
                 </h2>
                 <p className="sh-card-desc">
-                  Verified credentials, portfolio highlights, and completed contract history.
+                  {t.workspace.profile.publicDesc}
                 </p>
               </div>
               <button
                 className="sh-btn sh-btn-secondary"
                 onClick={() => setView("profile-edit")}
               >
-                <Edit size={14} /> Edit Profile
+                <Edit size={14} /> {t.workspace.profile.editProfileBtn}
               </button>
             </div>
             <ProfilePage userId={viewUserId || user.id} />
@@ -2120,17 +2143,17 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Edit Marketplace Profile
+                  {t.workspace.profile.editHeading}
                 </h2>
                 <p className="sh-card-desc">
-                  Update your bio, skills, hourly rate, and verification portfolio.
+                  {t.workspace.profile.editDesc}
                 </p>
               </div>
               <button
                 className="sh-btn sh-btn-secondary"
                 onClick={() => setView("profile")}
               >
-                <ArrowLeft size={14} /> Back to Profile
+                <ArrowLeft size={14} /> {t.workspace.profile.backToProfileBtn}
               </button>
             </div>
             <ProfileEditPage />
@@ -2142,47 +2165,54 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Workspace & Account Settings
+                  {t.workspace.settings.title}
                 </h2>
                 <p className="sh-card-desc">
-                  Account credentials, active role capabilities, and direct support access.
+                  {t.workspace.settings.desc}
                 </p>
               </div>
               <span className="sh-kbd">{user.ucid ?? "YEK-USER"}</span>
             </div>
             <div className="sh-card settings-list">
               <div className="sh-kv-row">
-                <span>Account Email</span>
+                <span>{t.workspace.settings.emailLabel}</span>
                 <strong className="sh-mono">{user.email}</strong>
               </div>
               <div className="sh-kv-row">
-                <span>Active Workspace Role</span>
+                <span>{t.workspace.settings.roleLabel}</span>
                 <strong>{roleLabel(platformRole)}</strong>
               </div>
               <div className="sh-kv-row">
-                <span>KYC Verification Status</span>
+                <span>{t.workspace.settings.kycLabel}</span>
                 <span className="sh-status-inline emerald">
                   {user.kyc?.tier ?? "TIER_2"} ({user.kyc?.status ?? "VERIFIED"})
                 </span>
               </div>
               <div className="sh-kv-row">
-                <span>Customer Support Desk</span>
-                <span>Get real-time assistance with Telebirr/CBE payments, jobs, or disputes.</span>
+                <span>{t.workspace.settings.supportLabel}</span>
+                <span>{t.workspace.settings.supportDesc}</span>
               </div>
-              <div style={{ display: "flex", gap: 10, paddingTop: 12 }}>
+              <div style={{ display: "flex", gap: 10, paddingTop: 12, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="sh-btn sh-btn-secondary"
+                  onClick={() => setView("profile-edit")}
+                >
+                  <Edit size={14} /> {t.workspace.settings.editProfileBtn}
+                </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
                   onClick={() => setView("chat")}
                 >
-                  <LifeBuoy size={14} /> Chat with Support
+                  <LifeBuoy size={14} /> {t.workspace.settings.chatSupportBtn}
                 </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
                   onClick={logout}
                 >
-                  <LogOut size={14} /> Sign Out
+                  <LogOut size={14} /> {t.nav.signOut}
                 </button>
               </div>
             </div>
@@ -2215,7 +2245,7 @@ if (authMode === "register") {
           <span>
             <Menu size={18} />
           </span>
-          <small>Menu</small>
+          <small>{t.workspace.nav.menu}</small>
         </button>
       </nav>
     </div>

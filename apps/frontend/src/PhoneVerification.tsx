@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ShieldCheck, Loader2 } from "lucide-react";
 import { api } from "./api/client";
+import { useI18n } from "./i18n";
 import "./PhoneVerification.css";
 
 /**
@@ -36,6 +37,8 @@ export function PhoneVerification({
   onVerified,
   onSkip,
 }: PhoneVerificationProps) {
+  const { t } = useI18n();
+  const pv = t.workspace.phoneVerification;
   const [phase, setPhase] = useState<Phase>("idle");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -103,10 +106,9 @@ export function PhoneVerification({
       <div className="pv-shell">
         <div className="pv-card">
           <ShieldCheck size={40} className="pv-ok" aria-hidden />
-          <h3>Number confirmed</h3>
+          <h3>{pv.confirmedTitle}</h3>
           <p className="pv-muted">
-            We have verified {phone}. It is now the number we will use for
-            notifications and for paying you.
+            {pv.confirmedDesc.replace("{phone}", phone)}
           </p>
         </div>
       </div>
@@ -116,10 +118,9 @@ export function PhoneVerification({
   return (
     <div className="pv-shell">
       <div className="pv-card">
-        <h3>Confirm your phone number</h3>
+        <h3>{pv.title}</h3>
         <p className="pv-muted">
-          We use {phone || "your number"} for security alerts and to pay you.
-          We will text you a six-digit code.
+          {pv.subtitle.replace("{phone}", phone || "your number")}
         </p>
 
         {phase === "idle" && (
@@ -129,26 +130,26 @@ export function PhoneVerification({
             onClick={() => void send()}
             disabled={!phone}
           >
-            Send me a code
+            {pv.sendBtn}
           </button>
         )}
 
         {(phase === "sending" || phase === "verifying") && (
           <button type="button" className="btn-primary pv-wide" disabled>
             <Loader2 size={16} className="lucide-spin" aria-hidden />
-            {phase === "sending" ? "Sending..." : "Checking..."}
+            {phase === "sending" ? pv.sendingBtn : pv.checkingBtn}
           </button>
         )}
 
         {phase === "sent" && (
           <form onSubmit={verify}>
             <label className="pv-label" htmlFor="pv-code">
-              Six-digit code
+              {pv.codeLabel}
             </label>
             <input
               id="pv-code"
               ref={inputRef}
-              className="pv-input"
+              className="pv-input sh-mono"
               inputMode="numeric"
               autoComplete="one-time-code"
               pattern="\d{6}"
@@ -165,7 +166,7 @@ export function PhoneVerification({
               className="btn-primary pv-wide"
               disabled={code.length !== 6}
             >
-              Confirm number
+              {pv.confirmBtn}
             </button>
           </form>
         )}
@@ -181,17 +182,17 @@ export function PhoneVerification({
           {phase === "sent" && (
             <button
               type="button"
-              className="pv-link"
+              className="pv-link sh-mono"
               onClick={() => void send()}
               disabled={cooldown > 0}
             >
               {cooldown > 0
-                ? `Send another code in ${cooldown}s`
-                : "Send another code"}
+                ? pv.resendIn.replace("{sec}", String(cooldown))
+                : pv.resendNow}
             </button>
           )}
           <button type="button" className="pv-link pv-muted" onClick={onSkip}>
-            Skip for now
+            {pv.skipBtn}
           </button>
         </div>
       </div>

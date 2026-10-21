@@ -38,6 +38,8 @@ import { AdvancedDataTable } from "./AdvancedDataTable";
 import { KanbanBoardView } from "./KanbanBoardView";
 import { CalendarScheduleView } from "./CalendarScheduleView";
 import { FeaturedCarousel } from "../../FeaturedCarousel";
+import { useI18n } from "../../i18n";
+import { formatStatusLabel } from "../../pages/ops/components/ui";
 
 interface MarketplaceShadcnDashboardProps {
   canHire: boolean;
@@ -96,6 +98,8 @@ export function MarketplaceShadcnDashboard({
     setOpsSubTab,
     setCommandPaletteOpen,
   } = useShadcnLayout();
+  const { t } = useI18n();
+  const d = t.workspace.dashboard;
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
   const [expandedKpi, setExpandedKpi] = useState<
@@ -319,7 +323,7 @@ export function MarketplaceShadcnDashboard({
               onClick={() => setDashboardVariant("dashboard-1")}
             >
               <BarChart3 size={14} />
-              <span>Dashboard 1: Analytics & KPIs</span>
+              <span>{d.tabAnalytics}</span>
             </button>
             <button
               type="button"
@@ -329,7 +333,7 @@ export function MarketplaceShadcnDashboard({
               onClick={() => setDashboardVariant("dashboard-2")}
             >
               <Table2 size={14} />
-              <span>Dashboard 2: Pipeline, Kanban & Schedule</span>
+              <span>{d.tabPipeline}</span>
             </button>
           </div>
 
@@ -344,21 +348,21 @@ export function MarketplaceShadcnDashboard({
                 className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
                 onClick={() => setOpsSubTab("table")}
               >
-                <Table2 size={13} /> Data Table ({ledgerRecords.length})
+                <Table2 size={13} /> {d.subTabTable} ({ledgerRecords.length})
               </button>
               <button
                 type="button"
                 className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
                 onClick={() => setOpsSubTab("kanban")}
               >
-                <Kanban size={13} /> Kanban ({kanbanTasks.length})
+                <Kanban size={13} /> {d.subTabKanban} ({kanbanTasks.length})
               </button>
               <button
                 type="button"
                 className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
                 onClick={() => setOpsSubTab("calendar")}
               >
-                <Calendar size={13} /> Calendar ({scheduleEvents.length})
+                <Calendar size={13} /> {d.subTabCalendar} ({scheduleEvents.length})
               </button>
             </div>
           )}
@@ -372,7 +376,7 @@ export function MarketplaceShadcnDashboard({
             title="Open Command Palette (Ctrl+K)"
           >
             <Search size={14} />
-            <span>Quick Jump</span>
+            <span>{d.quickJump}</span>
             <kbd className="sh-kbd">⌘K</kbd>
           </button>
 
@@ -396,7 +400,7 @@ export function MarketplaceShadcnDashboard({
               className="sh-btn sh-btn-primary"
               onClick={() => onNavigateView("jobs")}
             >
-              <Plus size={14} /> Post Job Brief
+              <Plus size={14} /> {d.postJobBrief}
             </button>
           )}
           {!canHire && canWork && (
@@ -405,7 +409,7 @@ export function MarketplaceShadcnDashboard({
               className="sh-btn sh-btn-primary"
               onClick={() => onNavigateView("jobs")}
             >
-              <Briefcase size={14} /> Browse Open Briefs
+              <Briefcase size={14} /> {d.browseOpenBriefs}
             </button>
           )}
         </div>
@@ -424,7 +428,7 @@ export function MarketplaceShadcnDashboard({
           aria-expanded={expandedKpi === "wallet"}
         >
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Available Wallet Balance</span>
+            <span className="sh-kpi-label">{d.kpiWallet}</span>
             <Wallet size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">
@@ -490,7 +494,7 @@ export function MarketplaceShadcnDashboard({
           aria-expanded={expandedKpi === "escrow"}
         >
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Protected in Escrow Vault</span>
+            <span className="sh-kpi-label">{d.kpiEscrow}</span>
             <ShieldCheck size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">
@@ -553,7 +557,7 @@ export function MarketplaceShadcnDashboard({
           aria-expanded={expandedKpi === "milestones"}
         >
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Active Milestones & Deliverables</span>
+            <span className="sh-kpi-label">{d.kpiMilestones}</span>
             <CheckCircle2 size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">{activeMilestoneCount}</div>
@@ -619,7 +623,7 @@ export function MarketplaceShadcnDashboard({
           aria-expanded={expandedKpi === "jobs"}
         >
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Open Marketplace Briefs</span>
+            <span className="sh-kpi-label">{d.kpiOpenBriefs}</span>
             <Briefcase size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">{openJobsCount}</div>
@@ -684,9 +688,9 @@ export function MarketplaceShadcnDashboard({
             <div className="sh-card">
               <div className="sh-card-header">
                 <div>
-                  <h3 className="sh-card-title">Recent Escrow & Milestone Activity</h3>
+                  <h3 className="sh-card-title">{d.recentActivityTitle}</h3>
                   <p className="sh-card-desc">
-                    Live contract deliverables and automated payout release timers
+                    {d.recentActivityDesc}
                   </p>
                 </div>
                 <button
@@ -697,7 +701,7 @@ export function MarketplaceShadcnDashboard({
                     setOpsSubTab("table");
                   }}
                 >
-                  Open Full Data Table <ArrowRight size={13} />
+                  {d.openFullTable} <ArrowRight size={13} />
                 </button>
               </div>
 
@@ -705,9 +709,9 @@ export function MarketplaceShadcnDashboard({
                 {effectiveMilestones.length === 0 ? (
                   <div className="sh-compact-row">
                     <div className="sh-compact-row-main">
-                      <div className="sh-cell-primary">No active milestones yet</div>
+                      <div className="sh-cell-primary">{d.noMilestonesTitle}</div>
                       <div className="sh-cell-meta">
-                        Milestones will appear here once contracts are funded in escrow.
+                        {d.noMilestonesDesc}
                       </div>
                     </div>
                   </div>
@@ -719,7 +723,7 @@ export function MarketplaceShadcnDashboard({
                         <div className="sh-cell-meta">
                           <span className="sh-mono">#{ms.id.slice(0, 8)}</span>
                           <span aria-hidden="true">·</span>
-                          <span>{ms.escrowState.replaceAll("_", " ")}</span>
+                          <span>{formatStatusLabel(ms.escrowState, t.workspace.statuses)}</span>
                           <span aria-hidden="true">·</span>
                           <span className="sh-mono">Due {ms.dueDate.slice(0, 10)}</span>
                         </div>
@@ -733,7 +737,7 @@ export function MarketplaceShadcnDashboard({
                           className="sh-row-action-btn"
                           onClick={() => onNavigateView("contracts")}
                         >
-                          Contract <ArrowRight size={11} />
+                          {d.contractBtn} <ArrowRight size={11} />
                         </button>
                       </div>
                     </div>
@@ -747,10 +751,10 @@ export function MarketplaceShadcnDashboard({
               <div className="sh-card-header">
                 <div>
                   <h3 className="sh-card-title">
-                    {canWork ? "Recommended Marketplace Briefs" : "Active Hiring Briefs"}
+                    {canWork ? d.recommendedBriefsTitle : d.activeHiringBriefsTitle}
                   </h3>
                   <p className="sh-card-desc">
-                    Escrow-backed opportunities with verified Ethiopian counterparties
+                    {d.recommendedBriefsDesc}
                   </p>
                 </div>
                 <button
@@ -758,7 +762,7 @@ export function MarketplaceShadcnDashboard({
                   className="sh-btn sh-btn-secondary"
                   onClick={() => onNavigateView("jobs")}
                 >
-                  View All ({effectiveJobs.length}) <ArrowRight size={13} />
+                  {d.viewAll} ({effectiveJobs.length}) <ArrowRight size={13} />
                 </button>
               </div>
 
@@ -766,9 +770,9 @@ export function MarketplaceShadcnDashboard({
                 {effectiveJobs.length === 0 ? (
                   <div className="sh-compact-row">
                     <div className="sh-compact-row-main">
-                      <div className="sh-cell-primary">No open marketplace briefs</div>
+                      <div className="sh-cell-primary">{d.noOpenBriefsTitle}</div>
                       <div className="sh-cell-meta">
-                        Post a new job brief or refresh to check for newly published projects.
+                        {d.noOpenBriefsDesc}
                       </div>
                     </div>
                   </div>
@@ -792,7 +796,7 @@ export function MarketplaceShadcnDashboard({
                           className="sh-row-action-btn"
                           onClick={() => onNavigateView("jobs")}
                         >
-                          {canWork ? "Submit Proposal" : "Manage"}
+                          {canWork ? d.submitProposalBtn : d.manageBtn}
                         </button>
                       </div>
                     </div>

@@ -124,6 +124,7 @@ export default defineConfig({
   server: {
     host: "0.0.0.0", // binds to 0.0.0.0 for external, AI Studio, and tunnel traffic
     port: 3000,
+    hmr: false,
     allowedHosts: true, // Allow all tunnel hostnames (cloudflared, ngrok, ...)
     headers: {
       "Access-Control-Allow-Origin": "*",

@@ -1,10 +1,14 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useState } from "react";
-import { Check, Fingerprint, Upload } from "lucide-react";
+import { Check, CheckCircle2, Fingerprint, ShieldCheck, Upload, X } from "lucide-react";
 import { api, type KycStatusResponse } from "./api/client";
+import { useI18n } from "./i18n";
+import { formatStatusLabel, statusTone } from "./pages/ops/components/ui";
 
 // === MAIN COMPONENT ===
 export function BrowserVerification() {
+  const { t } = useI18n();
+  const k = t.workspace.kycFlow;
   const [status, setStatus] = useState<KycStatusResponse | null>(null);
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
@@ -92,35 +96,153 @@ export function BrowserVerification() {
     }
   };
 
+  const currentTier = status?.tier ?? "TIER_1";
+  const currentStatus = status?.status ?? "PENDING";
+  const tier1Done =
+    currentStatus === "VERIFIED" &&
+    (currentTier === "TIER_1" || currentTier === "TIER_2");
+  const tier2Done = currentStatus === "VERIFIED" && currentTier === "TIER_2";
   const canRequestTier2 =
     status?.status === "VERIFIED" && status.tier === "TIER_1";
+
   return (
     <div className="verification-stack">
+      {/* 3-Step Tier Progression Banner (FR-16) */}
+      <section className="panel" style={{ padding: "18px 20px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          <div>
+            <p className="eyebrow">{k.currentStatusEyebrow}</p>
+            <h3 style={{ margin: "2px 0 0", fontSize: "1.05rem" }}>
+              {k.progressionTitle}
+            </h3>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <span className={`status-pill ${statusTone(currentTier)}`}>
+              {formatStatusLabel(currentTier, t.workspace.statuses)}
+            </span>
+            <span className={`status-pill ${statusTone(currentStatus)}`}>
+              {formatStatusLabel(currentStatus, t.workspace.statuses)}
+            </span>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "1px solid var(--color-border)",
+              background: "var(--color-bg-subtle)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: "0.86rem", color: "var(--color-primary)" }}>
+              <CheckCircle2 size={16} />
+              <span>{k.tier0Step}</span>
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+              {k.tier0Desc}
+            </p>
+          </div>
+
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: tier1Done
+                ? "1px solid var(--color-primary)"
+                : "1px solid var(--color-border)",
+              background: tier1Done
+                ? "var(--color-primary-light)"
+                : "var(--color-bg-subtle)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontWeight: 700,
+                fontSize: "0.86rem",
+                color: tier1Done ? "var(--color-primary)" : "var(--color-text)",
+              }}
+            >
+              {tier1Done ? <CheckCircle2 size={16} /> : <Fingerprint size={16} />}
+              <span>{k.tier1Step}</span>
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+              {k.tier1Desc}
+            </p>
+          </div>
+
+          <div
+            style={{
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: tier2Done
+                ? "1px solid var(--color-primary)"
+                : "1px solid var(--color-border)",
+              background: tier2Done
+                ? "var(--color-primary-light)"
+                : "var(--color-bg-subtle)",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontWeight: 700,
+                fontSize: "0.86rem",
+                color: tier2Done ? "var(--color-primary)" : "var(--color-text)",
+              }}
+            >
+              <ShieldCheck size={16} />
+              <span>{k.tier2Step}</span>
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+              {k.tier2Desc}
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="panel browser-verification-panel">
         <div className="verification-intro">
           <span className="step-number">
             <Fingerprint size={18} />
           </span>
           <div>
-            <p className="eyebrow">Fayda identity review</p>
-            <h2>Verify your identity</h2>
-            <p>
-              Upload your Fayda ID. Fayda verification completes a biometric
-              selfie check in a secure popup and may clear Tier 1 automatically.
-            </p>
+            <p className="eyebrow">{k.eyebrowFayda}</p>
+            <h2>{k.verifyHeading}</h2>
+            <p>{k.verifyDesc}</p>
           </div>
         </div>
-        <div className="form-grid verification-form" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+        <div className="form-grid verification-form">
           <label>
-            Full name
+            {k.fullNameLabel}
             <input
               value={fullName}
               onChange={(event) => setFullName(event.target.value)}
-              placeholder="As shown on your ID"
+              placeholder={k.fullNamePlaceholder}
             />
           </label>
           <label>
-            Date of birth
+            {k.dobLabel}
             <input
               type="date"
               value={dob}
@@ -128,30 +250,46 @@ export function BrowserVerification() {
             />
           </label>
           <label className="form-wide" style={{ gridColumn: "1 / -1" }}>
-            Fayda ID number
+            {k.faydaIdLabel}
             <input
               value={documentNumber}
               onChange={(event) => setDocumentNumber(event.target.value)}
-              placeholder="Enter your Fayda ID number"
+              placeholder={k.faydaIdPlaceholder}
             />
           </label>
-          <label className="verification-upload form-wide" style={{ gridColumn: "1 / -1" }}>
-            Fayda ID photo
-            <small style={{ minHeight: 48, cursor: "pointer" }}>
-              <Upload size={16} />
-              {idPhoto?.name ?? "Choose ID photo (front and back)"}
-            </small>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(event) => setIdPhoto(event.target.files?.[0] ?? null)}
-            />
-          </label>
+          <div className="verification-upload form-wide" style={{ gridColumn: "1 / -1" }}>
+            <label style={{ display: "grid", gap: 6 }}>
+              <span>{k.faydaPhotoLabel}</span>
+              <small style={{ minHeight: 48, cursor: "pointer" }}>
+                <Upload size={16} />
+                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {idPhoto
+                    ? `${idPhoto.name} (${(idPhoto.size / 1024).toFixed(1)} KB)`
+                    : k.chooseIdPhoto}
+                </span>
+              </small>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => setIdPhoto(event.target.files?.[0] ?? null)}
+              />
+            </label>
+            {idPhoto && (
+              <div style={{ marginTop: 8 }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  style={{ minHeight: 38, padding: "6px 12px", fontSize: "0.8rem" }}
+                  onClick={() => setIdPhoto(null)}
+                >
+                  <X size={14} /> {k.clearFile}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <p className="wallet-help" style={{ marginTop: "4px" }}>
-          Identity verification now uses Fayda (eSignet) biometrics. After
-          submitting your ID here you will complete a verification check in
-          the Fayda popup directly from the Identity section.
+          {k.faydaHelp}
         </p>
         {message && (
           <p className="verification-message">
@@ -165,55 +303,55 @@ export function BrowserVerification() {
           disabled={sending}
           style={{ width: "fit-content", marginTop: 8 }}
         >
-          {sending ? "Submitting..." : "Submit Tier 1 documents"}
+          {sending ? k.submittingBtn : k.submitTier1Btn}
         </button>
       </section>
-      <section className="panel verification-status-panel">
-        <div>
-          <p className="eyebrow">Current status</p>
-          <h2>{status?.status?.replace("_", " ") ?? "Loading..."}</h2>
-          <p>Tier: {status?.tier ?? "TIER_1"}</p>
-        </div>
-        <span className="status-pill">{status?.status ?? "PENDING"}</span>
-      </section>
-      {canRequestTier2 && (
-        <section className="panel tier2-panel">
+
+      <section className="panel tier2-panel">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
           <div>
-            <p className="eyebrow">Withdrawal access</p>
-            <h2>Request Tier 2 verification</h2>
-            <p>
-              Tier 2 requires a PEP screening and staff approval before
-              withdrawals are enabled.
+            <p className="eyebrow">{k.withdrawalEyebrow}</p>
+            <h2>{k.requestTier2Heading}</h2>
+            <p style={{ color: "var(--color-text-secondary)", fontSize: "0.86rem", maxWidth: 680 }}>
+              {k.requestTier2Desc}
             </p>
           </div>
-          <div className="form-grid" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
-            <label>
-              TIN
-              <input
-                value={tin}
-                onChange={(event) => setTin(event.target.value)}
-                placeholder="Tax identification number"
-              />
-            </label>
-            <label>
-              Business registration
-              <input
-                value={businessRegNumber}
-                onChange={(event) => setBusinessRegNumber(event.target.value)}
-                placeholder="Optional if TIN supplied"
-              />
-            </label>
-          </div>
-          <button
-            className="btn-primary"
-            onClick={() => void requestTier2()}
-            disabled={sending}
-            style={{ width: "fit-content", marginTop: 16 }}
-          >
-            Request Tier 2
-          </button>
-        </section>
-      )}
+          {tier2Done && (
+            <span className="status-pill success">
+              <CheckCircle2 size={14} /> {formatStatusLabel("TIER_2", t.workspace.statuses)}
+            </span>
+          )}
+        </div>
+        <div className="form-grid" style={{ marginTop: 12 }}>
+          <label>
+            {k.tinLabel}
+            <input
+              value={tin}
+              onChange={(event) => setTin(event.target.value)}
+              placeholder={k.tinPlaceholder}
+              disabled={!canRequestTier2 && tier2Done}
+            />
+          </label>
+          <label>
+            {k.businessRegLabel}
+            <input
+              value={businessRegNumber}
+              onChange={(event) => setBusinessRegNumber(event.target.value)}
+              placeholder={k.businessRegPlaceholder}
+              disabled={!canRequestTier2 && tier2Done}
+            />
+          </label>
+        </div>
+        <button
+          className="btn-primary"
+          onClick={() => void requestTier2()}
+          disabled={sending || tier2Done}
+          style={{ width: "fit-content", marginTop: 16 }}
+        >
+          {sending ? k.submittingBtn : k.requestTier2Btn}
+        </button>
+      </section>
     </div>
   );
 }
+

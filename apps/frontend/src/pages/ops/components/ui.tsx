@@ -47,10 +47,14 @@ export const stopKey = (e: ReactKeyboardEvent) => e.stopPropagation();
 const PILL: Record<string, string> = {
   ACTIVE: "p-green", CONFIRMED: "p-green", MATCHED: "p-green", SUCCESS: "p-green",
   VERIFIED: "p-green", RELEASED: "p-green", COMPLETED: "p-green", RESOLVED: "p-green",
+  ACCEPTED: "p-green", TIER_2: "p-green", LIVE: "p-green",
   ESCROW_HELD: "p-sky", WORK_IN_PROGRESS: "p-sky", WALLET_TOPUP: "p-sky",
+  SHORTLISTED: "p-sky", TIER_1: "p-sky",
   PENDING: "p-amber", PROCESSING: "p-amber", SUBMITTED_FOR_REVIEW: "p-amber",
   OPEN: "p-amber", UNDER_REVIEW: "p-amber", STAGE_1_NEGOTIATION: "p-amber",
   HIGH: "p-amber", RESOLVED_PROFILE_HIDDEN: "p-amber", DISPUTE_REFUND: "p-amber",
+  SUBMITTED: "p-amber", PENDING_SIGNATURES: "p-amber", PENDING_FUNDING: "p-amber",
+  PAYMENT_PENDING: "p-amber", PAUSED: "p-amber", AWAITING_REVIEW: "p-amber",
   REVIEWING: "p-violet", STAGE_3_MEDIATION: "p-violet", BOTH: "p-violet",
   SUPER_ADMIN: "p-violet", WITHDRAWAL_PAYOUT: "p-violet",
   STAGE_2_EVIDENCE: "p-blue", MEDIUM: "p-blue", FREELANCER: "p-blue",
@@ -58,15 +62,50 @@ const PILL: Record<string, string> = {
   FAILED: "p-red", SUSPENDED: "p-red", TERMINATED: "p-red", MISMATCH: "p-red",
   DISPUTED: "p-red", CRITICAL: "p-red", REJECTED: "p-red", RESOLVED_PROFILE_BANNED: "p-red",
   CANCELLED: "p-gray", REFUNDED: "p-gray", NONE: "p-gray",
-  RESOLVED_NO_ACTION: "p-gray", ADMIN: "p-gray",
+  RESOLVED_NO_ACTION: "p-gray", ADMIN: "p-gray", DRAFT: "p-gray",
+  ARCHIVED: "p-gray", WITHDRAWN: "p-gray", TIER_0: "p-gray",
   CLIENT: "p-green", FINANCE_ADMIN: "p-green", MILESTONE_RELEASE: "p-green", LOW: "p-green",
   SUPPORT: "p-amber", COMPLIANCE_ADMIN: "p-sky", DISPUTE_MEDIATOR: "p-violet",
 };
-export function Pill({ s }: { s: string }) {
+
+/**
+ * Shared semantic status tone mapper reused across Ops Console and Freelancer workspaces.
+ * Maps backend status codes to `.status-pill.{success|warning|error|info|neutral}` classes.
+ */
+export function statusTone(
+  s: string | null | undefined,
+): "success" | "warning" | "error" | "info" | "neutral" {
+  if (!s) return "neutral";
+  const key = s.toUpperCase().replace(/\s+/g, "_");
+  const p = PILL[key];
+  if (p === "p-green") return "success";
+  if (p === "p-amber") return "warning";
+  if (p === "p-red") return "error";
+  if (p === "p-sky" || p === "p-blue" || p === "p-violet") return "info";
+  return "neutral";
+}
+
+/**
+ * Formats a backend status string using the active i18n workspace.statuses dictionary
+ * when available, or falls back to clean human-readable casing.
+ */
+export function formatStatusLabel(
+  s: string | null | undefined,
+  statusesDict?: Record<string, string>,
+): string {
+  if (!s) return "—";
+  const key = s.toUpperCase().replace(/\s+/g, "_");
+  if (statusesDict && statusesDict[key]) {
+    return statusesDict[key];
+  }
+  return s.replace(/_/g, " ");
+}
+
+export function Pill({ s, dict }: { s: string; dict?: Record<string, string> }) {
   return (
     <span className={`pill ${PILL[s] ?? "p-gray"}`}>
       <span className="pdot" />
-      {s.replace(/_/g, " ")}
+      {formatStatusLabel(s, dict)}
     </span>
   );
 }
@@ -419,3 +458,165 @@ export function ChecksRow({
 }
 
 export const fmtEscrow = (amt: number) => fmt(amt);
+
+/**
+ * Shared tabular ETB currency formatter for major-unit ETB values (e.g. 12500 -> "ETB 12,500").
+ * Preserves decimals when non-integer or when `decimals` is true.
+ */
+export function formatEtbMajor(amount: number, decimals = false): string {
+  const safe = Number.isFinite(amount) ? amount : 0;
+  const hasCents = Math.abs(safe % 1) > 0.001;
+  return `ETB ${safe.toLocaleString("en-US", {
+    minimumFractionDigits: decimals || hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+export interface ConfirmActionModalProps {
+  open: boolean;
+  title: string;
+  description?: string;
+  amountEtb?: string;
+  summaryRows?: Array<{ label: string; value: ReactNode }>;
+  confirmLabel: string;
+  cancelLabel?: string;
+  tone?: "primary" | "danger" | "warning";
+  loading?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export function ConfirmActionModal({
+  open,
+  title,
+  description,
+  amountEtb,
+  summaryRows,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  tone = "primary",
+  loading = false,
+  onConfirm,
+  onCancel,
+}: ConfirmActionModalProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !loading) onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, loading, onCancel]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="yk-confirm-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="yk-confirm-title"
+      onClick={() => !loading && onCancel()}
+    >
+      <div className="yk-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="yk-confirm-head">
+          <h3 id="yk-confirm-title">{title}</h3>
+          {amountEtb && <span className="yk-confirm-amount sh-mono">{amountEtb}</span>}
+        </div>
+        {description && <p className="yk-confirm-desc">{description}</p>}
+        {summaryRows && summaryRows.length > 0 && (
+          <div className="yk-confirm-summary">
+            {summaryRows.map((row, idx) => (
+              <div key={idx} className="yk-confirm-row">
+                <span>{row.label}</span>
+                <strong className="sh-mono">{row.value}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="yk-confirm-actions">
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={loading}
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            className={`btn-primary ${tone === "danger" ? "yk-btn-danger" : ""}`}
+            disabled={loading}
+            onClick={onConfirm}
+          >
+            {loading ? "Processing…" : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export interface EscrowFeeBreakdownProps {
+  grossEtb: number;
+  feeRate?: number;
+  compact?: boolean;
+  labels?: {
+    title?: string;
+    grossLabel?: string;
+    platformFeeLabel?: string;
+    tinTaxLabel?: string;
+    unverifiedTaxLabel?: string;
+    netPayoutLabel?: string;
+    escrowGuarantee?: string;
+  };
+}
+
+export function EscrowFeeBreakdown({
+  grossEtb,
+  feeRate = 0.1,
+  compact = false,
+  labels,
+}: EscrowFeeBreakdownProps) {
+  const safeGross = Number.isFinite(grossEtb) && grossEtb > 0 ? grossEtb : 0;
+  const platformFee = Math.round(safeGross * feeRate * 100) / 100;
+  const tinTax = Math.round(safeGross * 0.03 * 100) / 100;
+  const netWithTin = Math.max(0, Math.round((safeGross - platformFee - tinTax) * 100) / 100);
+
+  return (
+    <div className={`yk-fee-breakdown ${compact ? "compact" : ""}`}>
+      <div className="yk-fee-breakdown-head">
+        <strong>{labels?.title ?? "Escrow & Net Payout Breakdown"}</strong>
+        <span className="status-pill info">Escrow Protected</span>
+      </div>
+      <div className="yk-fee-breakdown-rows">
+        <div className="yk-fee-row">
+          <span>{labels?.grossLabel ?? "Gross Amount"}</span>
+          <strong className="sh-mono">{formatEtbMajor(safeGross)}</strong>
+        </div>
+        <div className="yk-fee-row">
+          <span>
+            {labels?.platformFeeLabel ??
+              `Yekis Freelancer Fee (${Math.round(feeRate * 100)}%)`}
+          </span>
+          <span className="sh-mono">− {formatEtbMajor(platformFee)}</span>
+        </div>
+        <div className="yk-fee-row">
+          <span>{labels?.tinTaxLabel ?? "Withholding Tax (3% Verified TIN)"}</span>
+          <span className="sh-mono">− {formatEtbMajor(tinTax)}</span>
+        </div>
+        <div className="yk-fee-row total">
+          <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout (with TIN)"}</strong>
+          <strong className="sh-mono yk-fee-net">{formatEtbMajor(netWithTin)}</strong>
+        </div>
+      </div>
+      {!compact && (
+        <p className="yk-fee-guarantee">
+          {labels?.escrowGuarantee ??
+            "100% funded in Yekis Escrow before work starts · 7-day auto-release after delivery (30% ERCA withholding applies only if TIN is unverified)."}
+        </p>
+      )}
+    </div>
+  );
+}
+
