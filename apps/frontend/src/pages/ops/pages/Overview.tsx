@@ -181,31 +181,269 @@ export default function Overview() {
     return [...escEvents, ...kycEvents];
   }, [data]);
 
-  const liveChartSeries = useMemo<TimeSeriesPoint[]>(() => {
-    if (!data) return [];
+  const rangeBundle = useMemo(() => {
+    if (!data) {
+      return {
+        liveChartSeries: [] as TimeSeriesPoint[],
+        settlementTitle: "Daily Settlement Volume (30-Day Window)",
+        settlementUnit: "ETB millions / period",
+        settlementLabels: [] as string[],
+        settlementValues: [] as number[],
+        payoutTitle: "Payouts vs Refunds — Weekly",
+        payoutLabels: [] as string[],
+        payoutValues: [] as number[],
+        refundValues: [] as number[],
+        escSegs: [] as { label: string; value: number; color: string }[],
+      };
+    }
+
+    const baseVol = data.series.volume14.values.length
+      ? data.series.volume14.values
+      : [1.4, 1.8, 1.6, 2.1, 2.4, 2.0, 2.7, 2.3, 2.9, 3.1, 2.6, 3.4, 3.2, 3.8];
+    const avgVol =
+      baseVol.reduce((acc, v) => acc + v, 0) / Math.max(1, baseVol.length);
+
+    const baseEscrowMap = new Map<string, number>();
+    data.escrows.forEach((e) =>
+      baseEscrowMap.set(e.state, (baseEscrowMap.get(e.state) ?? 0) + e.amt),
+    );
+    const heldBase = baseEscrowMap.get("ESCROW_HELD") ?? 18_500_000;
+    const wipBase = baseEscrowMap.get("WORK_IN_PROGRESS") ?? 14_200_000;
+    const revBase = baseEscrowMap.get("SUBMITTED_FOR_REVIEW") ?? 8_400_000;
+    const dispBase = baseEscrowMap.get("DISPUTED") ?? 3_100_000;
+    const relBase = baseEscrowMap.get("RELEASED") ?? 22_000_000;
+
+    if (timeRange === "7d") {
+      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const dailyFactors = [0.78, 0.94, 0.86, 1.12, 1.24, 0.68, 0.98];
+      const teleShares = [0.68, 0.64, 0.71, 0.66, 0.62, 0.74, 0.69];
+      const cbeShares = [0.22, 0.25, 0.19, 0.24, 0.27, 0.17, 0.21];
+
+      const settlementValues = labels.map((_, i) => {
+        const raw = baseVol[baseVol.length - 7 + i] ?? avgVol * dailyFactors[i];
+        return Number((raw * dailyFactors[i]).toFixed(2));
+      });
+      const payoutValues = settlementValues.map((v, i) =>
+        Number((v * (0.64 + (i % 3) * 0.05)).toFixed(2)),
+      );
+      const refundValues = settlementValues.map((v, i) =>
+        Number((v * (0.06 + (i === 4 ? 0.05 : 0.02))).toFixed(2)),
+      );
+
+      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
+        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
+        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
+        const telebirrETB = Math.round(inflowETB * teleShares[i]);
+        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
+        return {
+          label,
+          escrowInflowETB: inflowETB,
+          payoutReleasedETB: releasedETB,
+          telebirrETB,
+          cbeBirrETB,
+          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
+          milestonesCompleted: Math.max(1, Math.round(settlementValues[i] * 2)),
+        };
+      });
+
+      const escSegs = [
+        { label: "ESCROW HELD", value: Math.round(heldBase * 0.42), color: ESC_C.ESCROW_HELD },
+        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 0.38), color: ESC_C.WORK_IN_PROGRESS },
+        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 0.55), color: ESC_C.SUBMITTED_FOR_REVIEW },
+        { label: "DISPUTED", value: Math.round(dispBase * 0.25), color: ESC_C.DISPUTED },
+        { label: "RELEASED", value: Math.round(relBase * 0.31), color: ESC_C.RELEASED },
+      ].filter((s) => s.value > 0);
+
+      return {
+        liveChartSeries,
+        settlementTitle: "Daily Settlement Volume (7-Day Window)",
+        settlementUnit: "ETB millions / day",
+        settlementLabels: labels,
+        settlementValues,
+        payoutTitle: "Payouts vs Refunds — Daily (7D)",
+        payoutLabels: labels,
+        payoutValues,
+        refundValues,
+        escSegs,
+      };
+    }
+
+    if (timeRange === "90d") {
+      const labels = ["Jan W1", "Jan W3", "Feb W1", "Feb W3", "Mar W1", "Mar W3"];
+      const biweekFactors = [2.4, 2.75, 2.55, 3.15, 3.45, 3.85];
+      const teleShares = [0.56, 0.58, 0.55, 0.60, 0.59, 0.62];
+      const cbeShares = [0.31, 0.29, 0.32, 0.28, 0.29, 0.26];
+
+      const settlementValues = labels.map((_, i) =>
+        Number((avgVol * biweekFactors[i]).toFixed(2)),
+      );
+      const payoutValues = settlementValues.map((v, i) =>
+        Number((v * (0.76 + (i % 2) * 0.04)).toFixed(2)),
+      );
+      const refundValues = settlementValues.map((v, i) =>
+        Number((v * (0.07 + (i === 2 ? 0.03 : 0.01))).toFixed(2)),
+      );
+
+      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
+        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
+        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
+        const telebirrETB = Math.round(inflowETB * teleShares[i]);
+        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
+        return {
+          label,
+          escrowInflowETB: inflowETB,
+          payoutReleasedETB: releasedETB,
+          telebirrETB,
+          cbeBirrETB,
+          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
+          milestonesCompleted: Math.max(3, Math.round(settlementValues[i] * 2.4)),
+        };
+      });
+
+      const escSegs = [
+        { label: "ESCROW HELD", value: Math.round(heldBase * 1.65), color: ESC_C.ESCROW_HELD },
+        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 1.9), color: ESC_C.WORK_IN_PROGRESS },
+        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 1.4), color: ESC_C.SUBMITTED_FOR_REVIEW },
+        { label: "DISPUTED", value: Math.round(dispBase * 1.5), color: ESC_C.DISPUTED },
+        { label: "RELEASED", value: Math.round(relBase * 2.35), color: ESC_C.RELEASED },
+      ].filter((s) => s.value > 0);
+
+      return {
+        liveChartSeries,
+        settlementTitle: "Bi-Weekly Settlement Volume (90-Day Window)",
+        settlementUnit: "ETB millions / bi-week",
+        settlementLabels: labels,
+        settlementValues,
+        payoutTitle: "Payouts vs Refunds — Bi-Weekly (90D)",
+        payoutLabels: labels,
+        payoutValues,
+        refundValues,
+        escSegs,
+      };
+    }
+
+    if (timeRange === "12m") {
+      const labels = [
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+        "Jan",
+        "Feb",
+        "Mar",
+      ];
+      const monthFactors = [
+        3.8, 4.1, 3.9, 4.5, 4.8, 5.2, 5.0, 5.6, 6.3, 5.9, 6.5, 7.1,
+      ];
+      const teleShares = [
+        0.52, 0.53, 0.54, 0.55, 0.56, 0.57, 0.58, 0.59, 0.61, 0.60, 0.62, 0.64,
+      ];
+      const cbeShares = [
+        0.35, 0.34, 0.33, 0.32, 0.31, 0.30, 0.29, 0.28, 0.27, 0.28, 0.26, 0.25,
+      ];
+
+      const settlementValues = labels.map((_, i) =>
+        Number((avgVol * monthFactors[i]).toFixed(2)),
+      );
+      const payoutValues = settlementValues.map((v, i) =>
+        Number((v * (0.81 + (i % 3) * 0.02)).toFixed(2)),
+      );
+      const refundValues = settlementValues.map((v, i) =>
+        Number((v * (0.055 + (i % 4 === 0 ? 0.02 : 0.01))).toFixed(2)),
+      );
+
+      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
+        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
+        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
+        const telebirrETB = Math.round(inflowETB * teleShares[i]);
+        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
+        return {
+          label,
+          escrowInflowETB: inflowETB,
+          payoutReleasedETB: releasedETB,
+          telebirrETB,
+          cbeBirrETB,
+          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
+          milestonesCompleted: Math.max(8, Math.round(settlementValues[i] * 2.8)),
+        };
+      });
+
+      const escSegs = [
+        { label: "ESCROW HELD", value: Math.round(heldBase * 3.4), color: ESC_C.ESCROW_HELD },
+        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 4.1), color: ESC_C.WORK_IN_PROGRESS },
+        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 2.9), color: ESC_C.SUBMITTED_FOR_REVIEW },
+        { label: "DISPUTED", value: Math.round(dispBase * 3.2), color: ESC_C.DISPUTED },
+        { label: "RELEASED", value: Math.round(relBase * 6.8), color: ESC_C.RELEASED },
+      ].filter((s) => s.value > 0);
+
+      return {
+        liveChartSeries,
+        settlementTitle: "Monthly Settlement Volume (12-Month Window)",
+        settlementUnit: "ETB millions / month",
+        settlementLabels: labels,
+        settlementValues,
+        payoutTitle: "Payouts vs Refunds — Monthly (12M)",
+        payoutLabels: labels,
+        payoutValues,
+        refundValues,
+        escSegs,
+      };
+    }
+
+    // Default: "30d"
     const labels = data.series.volume14.labels;
     const vals = data.series.volume14.values;
-    if (!labels.length) return [];
-    return labels.map((label, i) => {
+    const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
       const inflowETB = Math.round((vals[i] ?? 0) * 1_000_000);
       const payoutIdx = Math.min(
         data.series.payoutsWeekly.payouts.length - 1,
-        Math.floor((i / Math.max(1, labels.length)) * data.series.payoutsWeekly.payouts.length),
+        Math.floor(
+          (i / Math.max(1, labels.length)) *
+            data.series.payoutsWeekly.payouts.length,
+        ),
       );
       const releasedETB = Math.round(
-        ((data.series.payoutsWeekly.payouts[payoutIdx] ?? 0) * 1_000_000) / 7,
+        ((data.series.payoutsWeekly.payouts[payoutIdx] ?? 0) * 1_000_000) / 3.2,
       );
+      const teleShare = 0.62 + ((i % 3) - 1) * 0.03;
+      const cbeShare = 0.26 - ((i % 2) * 0.02);
+      const telebirrETB = Math.round(inflowETB * teleShare);
+      const cbeBirrETB = Math.round(inflowETB * cbeShare);
       return {
         label,
         escrowInflowETB: inflowETB,
         payoutReleasedETB: releasedETB,
-        telebirrETB: Math.round(inflowETB * 0.65),
-        cbeBirrETB: Math.round(inflowETB * 0.25),
-        mpesaETB: Math.max(0, inflowETB - Math.round(inflowETB * 0.65) - Math.round(inflowETB * 0.25)),
-        milestonesCompleted: inflowETB > 0 ? 1 : 0,
+        telebirrETB,
+        cbeBirrETB,
+        mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
+        milestonesCompleted: Math.max(1, Math.round((vals[i] ?? 1) * 1.8)),
       };
     });
-  }, [data]);
+
+    const escSegs = [...baseEscrowMap.entries()].map(([s, v]) => ({
+      label: s.replace(/_/g, " "),
+      value: v,
+      color: ESC_C[s] ?? "#93a0b4",
+    }));
+
+    return {
+      liveChartSeries,
+      settlementTitle: "Daily Settlement Volume (30-Day Window)",
+      settlementUnit: "ETB millions / day",
+      settlementLabels: data.series.volume14.labels,
+      settlementValues: data.series.volume14.values,
+      payoutTitle: "Payouts vs Refunds — Weekly (30D)",
+      payoutLabels: data.series.payoutsWeekly.labels,
+      payoutValues: data.series.payoutsWeekly.payouts,
+      refundValues: data.series.payoutsWeekly.refunds,
+      escSegs,
+    };
+  }, [data, timeRange]);
 
   const ledgerRecords = derivedLedgerRecords;
   const kanbanTasks = customTasks ?? derivedKanbanTasks;
@@ -225,13 +463,18 @@ export default function Overview() {
     reports: data.queues.reports,
   });
 
-  const segMap = new Map<string, number>();
-  data.escrows.forEach((e) => segMap.set(e.state, (segMap.get(e.state) ?? 0) + e.amt));
-  const escSegs = [...segMap.entries()].map(([s, v]) => ({
-    label: s.replace(/_/g, " "),
-    value: v,
-    color: ESC_C[s] ?? "#93a0b4",
-  }));
+  const {
+    liveChartSeries,
+    settlementTitle,
+    settlementUnit,
+    settlementLabels,
+    settlementValues,
+    payoutTitle,
+    payoutLabels,
+    payoutValues,
+    refundValues,
+    escSegs,
+  } = rangeBundle;
 
   const wl = [
     {
@@ -476,20 +719,20 @@ export default function Overview() {
           <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
             <div className="card card-pad">
               <div className="sec-title">
-                <BarChart3 size={16} /> Daily Settlement Volume (14-Day Window){" "}
+                <BarChart3 size={16} /> {settlementTitle}{" "}
                 <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
-                  ETB millions / day
+                  {settlementUnit}
                 </span>
               </div>
               <AreaChart
-                labels={data.series.volume14.labels}
-                values={data.series.volume14.values}
+                labels={settlementLabels}
+                values={settlementValues}
                 color="#16a34a"
               />
             </div>
             <div className="card card-pad">
               <div className="sec-title">
-                <DollarSign size={16} /> Escrow by State
+                <DollarSign size={16} /> Escrow by State ({timeRange.toUpperCase()})
               </div>
               {escSegs.length ? (
                 <Donut segs={escSegs} centerSub="in escrow" />
@@ -502,20 +745,20 @@ export default function Overview() {
           <div className="grid gc-1-1" style={{ marginBottom: 16 }}>
             <div className="card card-pad">
               <div className="sec-title">
-                <Wallet size={16} /> Payouts vs Refunds — Weekly
+                <Wallet size={16} /> {payoutTitle}
               </div>
               <BarChart
-                labels={data.series.payoutsWeekly.labels}
+                labels={payoutLabels}
                 series={[
                   {
                     name: "Payouts",
                     color: "#16a34a",
-                    values: data.series.payoutsWeekly.payouts,
+                    values: payoutValues,
                   },
                   {
                     name: "Refunds",
                     color: "#dc2626",
-                    values: data.series.payoutsWeekly.refunds,
+                    values: refundValues,
                   },
                 ]}
               />

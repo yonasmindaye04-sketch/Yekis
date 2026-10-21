@@ -388,9 +388,12 @@
 .sh-seg-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 5px 11px;
-  font-size: 0.78rem;
+  height: 28px;
+  padding: 0 10px;
+  width: auto;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--color-neutral-text, #64748b);
   background: transparent;
@@ -415,9 +418,12 @@
 .sh-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 7px 13px;
-  font-size: 0.8rem;
+  height: 34px;
+  padding: 0 12px;
+  width: auto;
+  font-size: 0.78rem;
   font-weight: 600;
   border-radius: var(--sh-radius);
   cursor: pointer;
@@ -449,9 +455,11 @@
 .sh-icon-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 34px;
   padding: 0 11px;
+  width: auto;
   font-size: 0.78rem;
   font-weight: 600;
   background: var(--color-bg-elevated);
@@ -795,8 +803,11 @@
 }
 
 .sh-select {
+  width: auto;
+  min-width: 115px;
+  max-width: 220px;
   height: 34px;
-  padding: 0 10px;
+  padding: 0 26px 0 10px;
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--color-text);
@@ -804,11 +815,15 @@
   border: 1px solid var(--color-border);
   border-radius: var(--sh-radius);
   cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sh-select.compact {
+  width: auto;
+  min-width: 72px;
   height: 30px;
-  padding: 0 8px;
+  padding: 0 22px 0 8px;
   font-size: 0.75rem;
 }
 
@@ -935,8 +950,12 @@
 .sh-row-action-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 4px 9px;
+  height: 28px;
+  padding: 0 9px;
+  width: auto;
+  flex-shrink: 0;
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--color-text);

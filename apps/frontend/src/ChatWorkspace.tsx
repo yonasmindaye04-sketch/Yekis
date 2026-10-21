@@ -729,7 +729,13 @@ export function ChatWorkspace({
                 </div>
               ) : (
                 messages.map((m) => {
-                  const isMine = m.senderId === currentUserId;
+                  const isFromStaff = Boolean(m.sender.staffRole);
+                  const isMine = activeConversation.isSupport
+                    ? !isFromStaff
+                    : m.senderId === currentUserId ||
+                      (activeConversation.otherParticipant
+                        ? m.senderId !== activeConversation.otherParticipant.id
+                        : false);
                   const senderName = isMine
                     ? "You"
                     : m.sender.displayName ||

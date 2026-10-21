@@ -575,7 +575,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
 
                 <button
                   className="btn-primary"
-                  style={{ justifyContent: "center", marginTop: 4, width: "100%" }}
+                  style={{ justifyContent: "center", marginTop: 4, width: "fit-content" }}
                   disabled={isSubmitting}
                   onClick={() => void submitCheckoutTopUp()}
                 >
@@ -589,10 +589,10 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                     }
                     alt=""
                     style={{
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       objectFit: "contain",
-                      marginRight: 8,
+                      marginRight: 6,
                       background: "#fff",
                       borderRadius: 4,
                     }}

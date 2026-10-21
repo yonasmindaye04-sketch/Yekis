@@ -118,12 +118,12 @@ export function GigMarketplace() {
                 {pkg.deliveryDays} days · {pkg.revisionsIncluded} revisions
               </p>
               <button
-                className="btn-primary"
-                style={{ width: "100%", marginTop: 8 }}
+                className="sh-btn sh-btn-primary"
+                style={{ marginTop: 10 }}
                 disabled={ordering}
                 onClick={() => void order(pkg)}
               >
-                <Package size={16} style={{ marginRight: 6 }} />
+                <Package size={14} />
                 Order & Pay
               </button>
             </div>
@@ -142,21 +142,20 @@ export function GigMarketplace() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <Search size={16} />
+      <div className="sh-table-toolbar" style={{ marginBottom: 16 }}>
+        <div className="sh-search-input-wrap">
+          <Search size={14} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && load()}
-            placeholder="Search gigs"
-            style={{ padding: "8px 12px", borderRadius: 8 }}
+            placeholder="Search gigs…"
           />
         </div>
         <select
+          className="sh-select"
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          style={{ padding: "8px 12px", borderRadius: 8 }}
         >
           <option value="">All categories</option>
           {categories.map((c) => (

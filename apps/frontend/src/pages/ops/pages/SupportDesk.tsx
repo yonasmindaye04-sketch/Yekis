@@ -334,11 +334,21 @@ export default function SupportDesk() {
                 ) : (
                   messages.map((m) => {
                     const fromStaff = Boolean(m.sender.staffRole);
+                    const isInternal = m.origin === "STAFF_INTERNAL";
+                    const bubbleClass = isInternal
+                      ? "internal"
+                      : fromStaff
+                        ? "staff-msg"
+                        : "user-msg";
                     return (
-                      <div className={`ev-bubble ${m.origin === "STAFF_INTERNAL" ? "internal" : fromStaff ? "freelancer" : "client"}`} key={m.id}>
+                      <div className={`ev-bubble ${bubbleClass}`} key={m.id}>
                         <div className="ev-b-head">
                           <strong>
-                            {fromStaff ? "Staff" : (m.sender.displayName ?? m.sender.email)}
+                            {isInternal
+                              ? "Internal Note · Staff"
+                              : fromStaff
+                                ? "Staff"
+                                : (m.sender.displayName ?? m.sender.email)}
                           </strong>
                           <span>{dts(m.createdAt)}</span>
                         </div>
@@ -372,7 +382,7 @@ export default function SupportDesk() {
                     }
                   }}
                 />
-                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
+                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", margin: 0 }}>
                   <Paperclip size={13} />
                   <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 </label>
@@ -380,8 +390,25 @@ export default function SupportDesk() {
                   <Send size={13} /> {busy ? "Sending…" : "Send"}
                 </button>
               </div>
-              <label style={{ display: "flex", gap: 7, alignItems: "center", marginTop: 8, fontSize: 12, color: "var(--ops-text-2)" }}>
-                <input type="checkbox" checked={internal} onChange={(e) => setInternal(e.target.checked)} /> Internal note (staff only)
+              <label
+                style={{
+                  display: "inline-flex",
+                  gap: 8,
+                  alignItems: "center",
+                  marginTop: 10,
+                  fontSize: 12,
+                  color: "var(--ops-text-2)",
+                  cursor: "pointer",
+                  width: "fit-content",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={internal}
+                  onChange={(e) => setInternal(e.target.checked)}
+                  style={{ width: 15, height: 15, margin: 0, accentColor: "var(--ops-primary)" }}
+                />
+                <span>Internal note (staff only)</span>
               </label>
               {file ? (
                 <div style={{ fontSize: 12, color: "var(--ops-text-2)", marginTop: 6 }}>

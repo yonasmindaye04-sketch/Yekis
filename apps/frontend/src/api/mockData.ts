@@ -1401,13 +1401,27 @@ class MockStore {
         conversationId: "conv-701",
         senderId: "usr-free-01",
         body: "Selam Abebe! I have uploaded the Phase 2 CBE Birr fallback build for your review. Ready for escrow release whenever you verify.",
-        createdAt: isoDaysAgo(0.1),
+        createdAt: isoDaysAgo(0.4),
         sender: {
           id: "usr-free-01",
           email: "hanna.tadesse@addisdev.et",
           role: "FREELANCER",
           staffRole: null,
           displayName: "Hanna Tadesse",
+        },
+      },
+      {
+        id: "msg-103",
+        conversationId: "conv-701",
+        senderId: "usr-client-01",
+        body: "Great, I am running the sandbox checkout test now and will confirm the milestone release shortly.",
+        createdAt: isoDaysAgo(0.1),
+        sender: {
+          id: "usr-client-01",
+          email: "abebe.kebede@abyssinia-tech.et",
+          role: "CLIENT",
+          staffRole: null,
+          displayName: "Abebe Kebede",
         },
       },
     ],
@@ -1443,6 +1457,20 @@ class MockStore {
     ],
     "conv-703": [
       {
+        id: "msg-300",
+        conversationId: "conv-703",
+        senderId: "usr-client-01",
+        body: "Selam Nahom, could we include Amharic voiceover guidance on the biometric liveness screen for rural agents?",
+        createdAt: isoDaysAgo(0.8),
+        sender: {
+          id: "usr-client-01",
+          email: "abebe.kebede@abyssinia-tech.et",
+          role: "CLIENT",
+          staffRole: null,
+          displayName: "Abebe Kebede",
+        },
+      },
+      {
         id: "msg-301",
         conversationId: "conv-703",
         senderId: "usr-free-04",
@@ -1476,7 +1504,7 @@ class MockStore {
         id: "msg-402",
         conversationId: "conv-704",
         senderId: "usr-admin-01",
-        body: "Your CBE Birr transfer FT26288XK910 has been reconciled and credited.",
+        body: "Selam! Your CBE Birr transfer FT26288XK910 has been reconciled and credited to your escrow wallet.",
         createdAt: isoDaysAgo(0.3),
         sender: {
           id: "usr-admin-01",
@@ -1516,6 +1544,20 @@ class MockStore {
           displayName: "Yonael Mindaye (Ops)",
         },
       },
+      {
+        id: "msg-sup-103",
+        conversationId: "sup-1",
+        senderId: "usr-both-01",
+        body: "Thank you! Please let me know as soon as the milestone transitions to FUNDED.",
+        createdAt: isoDaysAgo(0.1),
+        sender: {
+          id: "usr-both-01",
+          email: "dawit.mekonnen@ethio-digital.et",
+          role: "BOTH",
+          staffRole: null,
+          displayName: "Dawit Mekonnen",
+        },
+      },
     ],
     "sup-2": [
       {
@@ -1530,6 +1572,20 @@ class MockStore {
           role: "FREELANCER",
           staffRole: null,
           displayName: "Hanna Tadesse",
+        },
+      },
+      {
+        id: "msg-sup-202",
+        conversationId: "sup-2",
+        senderId: "usr-admin-01",
+        body: "Selam Hanna! Your TIN certificate has been queued with Compliance and will be verified within the hour.",
+        createdAt: isoDaysAgo(0.3),
+        sender: {
+          id: "usr-admin-01",
+          email: "yonael.ops@yekis.et",
+          role: "ADMIN",
+          staffRole: "SUPER_ADMIN",
+          displayName: "Yonael Mindaye (Ops)",
         },
       },
     ],
@@ -1732,11 +1788,60 @@ class MockStore {
   }
 
   getConversations(): ChatConversation[] {
-    return this.conversations;
+    const u = this.getCurrentUser();
+    return this.conversations.map((c) => {
+      if (c.isSupport) return c;
+      // Ensure otherParticipant is always the counterparty relative to the signed-in user
+      if (c.otherParticipant && c.otherParticipant.id === u.id) {
+        const fallbackOther =
+          u.role === "FREELANCER"
+            ? {
+                id: "usr-client-01",
+                email: "abebe.kebede@abyssinia-tech.et",
+                role: "CLIENT",
+                displayName: "Abebe Kebede",
+              }
+            : {
+                id: "usr-free-01",
+                email: "hanna.tadesse@addisdev.et",
+                role: "FREELANCER",
+                displayName: "Hanna Tadesse",
+              };
+        return { ...c, otherParticipant: fallbackOther };
+      }
+      return c;
+    });
   }
 
   getMessages(conversationId: string): ChatMessage[] {
-    return this.messagesByConv[conversationId] ?? this.messagesByConv["conv-701"] ?? [];
+    const raw = this.messagesByConv[conversationId] ?? this.messagesByConv["conv-701"] ?? [];
+    if (conversationId.startsWith("sup-")) {
+      return raw;
+    }
+    const u = this.getCurrentUser();
+    if (u.role === "ADMIN" || u.staffRole) {
+      return raw;
+    }
+    const conv = this.getConversations().find((c) => c.id === conversationId);
+    const otherId = conv?.otherParticipant?.id;
+    return raw.map((m) => {
+      if (conv?.isSupport) {
+        if (m.sender.staffRole) return m;
+        return {
+          ...m,
+          senderId: u.id,
+          sender: { ...m.sender, id: u.id, email: u.email, role: u.role },
+        };
+      }
+      if (otherId && m.senderId === otherId) {
+        return m;
+      }
+      return {
+        ...m,
+        senderId: u.id,
+        sender: { ...m.sender, id: u.id, email: u.email, role: u.role },
+      };
+    });
   }
 
   /* ── Operations Console & Platform Mock API Handler ──────────────────── */
@@ -2522,19 +2627,28 @@ class MockStore {
       const convId = parts[3] || "conv-701";
       if (method === "POST") {
         const u = this.getCurrentUser();
-        const msg: ChatMessage = {
+        const isStaffReply = convId.startsWith("sup-") || u.role === "ADMIN" || Boolean(u.staffRole);
+        const isInternal = Boolean(parsedBody?.internal);
+        const msg: ChatMessage & { origin?: string } = {
           id: `msg-${Date.now()}`,
           conversationId: convId,
-          senderId: u.id,
+          senderId: isStaffReply ? "usr-admin-01" : u.id,
           body: String(parsedBody?.body || ""),
           attachmentUrl: (parsedBody?.attachmentUrl as string | undefined) ?? null,
           createdAt: new Date().toISOString(),
+          ...(isInternal ? { origin: "STAFF_INTERNAL" } : {}),
           sender: {
-            id: u.id,
-            email: u.email,
-            role: u.role,
-            staffRole: u.staffRole,
-            displayName: u.role === "CLIENT" ? "Abebe Kebede" : u.role === "FREELANCER" ? "Hanna Tadesse" : "Dawit Mekonnen",
+            id: isStaffReply ? "usr-admin-01" : u.id,
+            email: isStaffReply ? "yonael.ops@yekis.et" : u.email,
+            role: isStaffReply ? "ADMIN" : u.role,
+            staffRole: isStaffReply ? (u.staffRole || "SUPER_ADMIN") : u.staffRole,
+            displayName: isStaffReply
+              ? "Yonael Mindaye (Ops)"
+              : u.role === "CLIENT"
+                ? "Abebe Kebede"
+                : u.role === "FREELANCER"
+                  ? "Hanna Tadesse"
+                  : "Dawit Mekonnen",
           },
         };
         const existing = this.messagesByConv[convId] ?? [];
@@ -2544,7 +2658,7 @@ class MockStore {
             ? {
                 ...c,
                 updatedAt: msg.createdAt,
-                latestMessage: { body: msg.body, createdAt: msg.createdAt, senderId: u.id },
+                latestMessage: { body: msg.body, createdAt: msg.createdAt, senderId: msg.senderId },
               }
             : c,
         );
