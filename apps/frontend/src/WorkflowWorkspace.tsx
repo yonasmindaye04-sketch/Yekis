@@ -31,6 +31,25 @@ import {
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
+type BudgetPreset =
+  | "ALL"
+  | "UNDER_10K"
+  | "10K_30K"
+  | "30K_75K"
+  | "OVER_75K"
+  | "CUSTOM";
+type DeadlineWindow = "ALL" | "3" | "7" | "14" | "30";
+
+export const DEFAULT_CATEGORY_LABELS: Record<string, string> = {
+  WEB_APP_DEVELOPMENT: "Web app development",
+  GRAPHIC_DESIGN: "Graphic design",
+  DIGITAL_MARKETING: "Digital marketing",
+  CONTENT_WRITING: "Content writing",
+  TRANSLATION: "Translation",
+  DATA_ENTRY: "Data entry",
+};
+
+export const DEFAULT_CATEGORIES = Object.keys(DEFAULT_CATEGORY_LABELS);
 
 const isHiring = (role: MarketplaceRole) => role === "CLIENT" || role === "BOTH";
 const isWorking = (role: MarketplaceRole) => role === "FREELANCER" || role === "BOTH";
@@ -41,14 +60,44 @@ const date = (value: string) => new Date(value).toLocaleDateString();
 const label = (value: string, dict?: Record<string, string>) =>
   formatStatusLabel(value, dict);
 
+function formatCategoryName(
+  category: string,
+  labelsMap: Record<string, string>,
+): string {
+  if (labelsMap[category]) return labelsMap[category];
+  const normalized = category.replaceAll("_", " ").toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function getDaysUntilDeadline(deadlineStr: string): number | null {
+  const parsed = new Date(deadlineStr);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const now = new Date();
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  ).getTime();
+  const targetStartOfDay = new Date(
+    parsed.getFullYear(),
+    parsed.getMonth(),
+    parsed.getDate(),
+  ).getTime();
+  return Math.round((targetStartOfDay - startOfToday) / 86_400_000);
+}
+
 export function JobsWorkspace({
   role,
   openJobs,
   onChanged,
+  categories = DEFAULT_CATEGORIES,
+  categoryLabels = DEFAULT_CATEGORY_LABELS,
 }: {
   role: MarketplaceRole;
   openJobs: Job[];
   onChanged: () => Promise<void>;
+  categories?: string[];
+  categoryLabels?: Record<string, string>;
 }) {
   const { t } = useI18n();
   const jf = t.workspace.jobsFlow;
@@ -71,6 +120,11 @@ export function JobsWorkspace({
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
+  const [budgetPreset, setBudgetPreset] = useState<BudgetPreset>("ALL");
+  const [customMinEtb, setCustomMinEtb] = useState("");
+  const [customMaxEtb, setCustomMaxEtb] = useState("");
+  const [deadlineWindow, setDeadlineWindow] = useState<DeadlineWindow>("ALL");
   const [withdrawTarget, setWithdrawTarget] = useState<Proposal | null>(null);
 
   const refresh = useCallback(async () => {
@@ -204,7 +258,7 @@ export function JobsWorkspace({
                   <h3>{job.title}</h3>
                   <p>{job.description}</p>
                   <small className="sh-cell-meta">
-                    Category: {job.category.replaceAll("_", " ")} · Deadline:{" "}
+                    Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
                     <span className="sh-mono">{date(job.deadline)}</span>
                   </small>
                 </div>
@@ -337,12 +391,91 @@ export function JobsWorkspace({
     myProposals.map((proposal) => [proposal.jobId, proposal]),
   );
   const effectiveOpenJobs = openJobs;
-  const filteredOpenJobs = effectiveOpenJobs.filter(
-    (j) =>
-      !searchQuery.trim() ||
-      j.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      j.description.toLowerCase().includes(searchQuery.toLowerCase()),
+
+  const availableCategories = Array.from(
+    new Set([
+      ...categories,
+      ...effectiveOpenJobs.map((j) => j.category).filter(Boolean),
+    ]),
   );
+
+  const hasActiveFilters =
+    searchQuery.trim() !== "" ||
+    selectedCategory !== "ALL" ||
+    budgetPreset !== "ALL" ||
+    deadlineWindow !== "ALL";
+
+  const resetAllFilters = () => {
+    setSearchQuery("");
+    setSelectedCategory("ALL");
+    setBudgetPreset("ALL");
+    setCustomMinEtb("");
+    setCustomMaxEtb("");
+    setDeadlineWindow("ALL");
+  };
+
+  const filteredOpenJobs = effectiveOpenJobs.filter((j) => {
+    // 1. Keyword search (title, description, or category label)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const catLabel = formatCategoryName(j.category, categoryLabels).toLowerCase();
+      const matchesKeyword =
+        j.title.toLowerCase().includes(q) ||
+        j.description.toLowerCase().includes(q) ||
+        catLabel.includes(q);
+      if (!matchesKeyword) return false;
+    }
+
+    // 2. Category filter
+    if (selectedCategory !== "ALL" && j.category !== selectedCategory) {
+      return false;
+    }
+
+    // 3. Budget range filter (overlap-aware in minor ETB units)
+    if (budgetPreset !== "ALL") {
+      let minMinor = 0;
+      let maxMinor = Number.POSITIVE_INFINITY;
+      if (budgetPreset === "UNDER_10K") {
+        maxMinor = 10_000 * 100;
+      } else if (budgetPreset === "10K_30K") {
+        minMinor = 10_000 * 100;
+        maxMinor = 30_000 * 100;
+      } else if (budgetPreset === "30K_75K") {
+        minMinor = 30_000 * 100;
+        maxMinor = 75_000 * 100;
+      } else if (budgetPreset === "OVER_75K") {
+        minMinor = 75_000 * 100;
+      } else if (budgetPreset === "CUSTOM") {
+        const parsedMin =
+          customMinEtb.trim() !== "" ? Number(customMinEtb) : Number.NaN;
+        const parsedMax =
+          customMaxEtb.trim() !== "" ? Number(customMaxEtb) : Number.NaN;
+        if (Number.isFinite(parsedMin) && parsedMin >= 0) {
+          minMinor = Math.round(parsedMin * 100);
+        }
+        if (Number.isFinite(parsedMax) && parsedMax >= 0) {
+          maxMinor = Math.round(parsedMax * 100);
+        }
+      }
+      if (minMinor > maxMinor) return false;
+      const jobMin = j.budgetMinMinor ?? 0;
+      const jobMax = j.budgetMaxMinor ?? jobMin;
+      if (jobMax < minMinor || jobMin > maxMinor) {
+        return false;
+      }
+    }
+
+    // 4. Deadline proximity filter (due within N days from today)
+    if (deadlineWindow !== "ALL") {
+      const maxDays = Number(deadlineWindow);
+      const daysUntil = getDaysUntilDeadline(j.deadline);
+      if (daysUntil === null || daysUntil < 0 || daysUntil > maxDays) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   return (
     <div className="workflow-stack">
@@ -472,13 +605,168 @@ export function JobsWorkspace({
                 Verified Ethiopian clients with milestone-backed escrow budgets
               </p>
             </div>
-            <div className="sh-search-input-wrap">
+            <span className="sh-kbd sh-mono">
+              Showing {filteredOpenJobs.length} of {effectiveOpenJobs.length} briefs
+            </span>
+          </div>
+
+          {/* Compact Multi-Criteria Filter Bar */}
+          <div
+            className="sh-table-toolbar"
+            role="region"
+            aria-label="Filter open job briefs"
+            style={{
+              paddingBottom: 12,
+              borderBottom: "1px solid var(--color-border)",
+            }}
+          >
+            <div className="sh-search-input-wrap" style={{ minWidth: 220, flex: "1 1 240px" }}>
               <Search size={14} />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={jf.searchPlaceholder}
+                aria-label="Search briefs by keyword"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="sh-clear-input"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search query"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              <select
+                className="sh-select"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                aria-label="Filter by category"
+              >
+                <option value="ALL">All categories</option>
+                {availableCategories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {formatCategoryName(cat, categoryLabels)}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                className="sh-select"
+                value={budgetPreset}
+                onChange={(e) => {
+                  const next = e.target.value as BudgetPreset;
+                  setBudgetPreset(next);
+                  if (next !== "CUSTOM") {
+                    setCustomMinEtb("");
+                    setCustomMaxEtb("");
+                  }
+                }}
+                aria-label="Filter by budget range"
+              >
+                <option value="ALL">Any budget (ETB)</option>
+                <option value="UNDER_10K">Under ETB 10,000</option>
+                <option value="10K_30K">ETB 10,000 – 30,000</option>
+                <option value="30K_75K">ETB 30,000 – 75,000</option>
+                <option value="OVER_75K">ETB 75,000+</option>
+                <option value="CUSTOM">Custom ETB range…</option>
+              </select>
+
+              {budgetPreset === "CUSTOM" && (
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    className="sh-mono"
+                    value={customMinEtb}
+                    onChange={(e) => setCustomMinEtb(e.target.value)}
+                    placeholder="Min ETB"
+                    aria-label="Minimum budget in ETB"
+                    style={{
+                      width: 104,
+                      height: 34,
+                      padding: "0 10px",
+                      fontSize: "0.78rem",
+                      borderRadius: "var(--sh-radius)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                    }}
+                  />
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      color: "var(--color-neutral-text, #64748b)",
+                      fontSize: "0.78rem",
+                    }}
+                  >
+                    –
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="500"
+                    className="sh-mono"
+                    value={customMaxEtb}
+                    onChange={(e) => setCustomMaxEtb(e.target.value)}
+                    placeholder="Max ETB"
+                    aria-label="Maximum budget in ETB"
+                    style={{
+                      width: 104,
+                      height: 34,
+                      padding: "0 10px",
+                      fontSize: "0.78rem",
+                      borderRadius: "var(--sh-radius)",
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text)",
+                    }}
+                  />
+                </div>
+              )}
+
+              <select
+                className="sh-select"
+                value={deadlineWindow}
+                onChange={(e) =>
+                  setDeadlineWindow(e.target.value as DeadlineWindow)
+                }
+                aria-label="Filter by deadline proximity"
+              >
+                <option value="ALL">Any deadline</option>
+                <option value="3">Due within 3 days</option>
+                <option value="7">Due within 7 days</option>
+                <option value="14">Due within 14 days</option>
+                <option value="30">Due within 30 days</option>
+              </select>
+
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  className="sh-btn sh-btn-secondary"
+                  onClick={resetAllFilters}
+                >
+                  <X size={13} /> Reset filters
+                </button>
+              )}
             </div>
           </div>
 
@@ -487,11 +775,11 @@ export function JobsWorkspace({
               <p className="empty-state" style={{ marginBottom: 10 }}>
                 {jf.noMatchingJobs}
               </p>
-              {searchQuery.trim() && (
+              {hasActiveFilters && (
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
-                  onClick={() => setSearchQuery("")}
+                  onClick={resetAllFilters}
                 >
                   {jf.clearSearchBtn}
                 </button>
@@ -503,6 +791,7 @@ export function JobsWorkspace({
                 const existing = proposalByJob.get(job.id);
                 const showDetail = detailJobId === job.id;
                 const showForm = selectedJobId === job.id;
+                const daysUntil = getDaysUntilDeadline(job.deadline);
 
                 return (
                   <article className="workflow-item sh-subcard" key={job.id}>
@@ -530,8 +819,21 @@ export function JobsWorkspace({
                           </p>
                         )}
                         <small className="sh-cell-meta">
-                          Category: {job.category.replaceAll("_", " ")} · Deadline:{" "}
+                          Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
                           <span className="sh-mono">{date(job.deadline)}</span>
+                          {daysUntil !== null && (
+                            <>
+                              {" "}
+                              ·{" "}
+                              <span className="sh-mono">
+                                {daysUntil < 0
+                                  ? `${Math.abs(daysUntil)}d overdue`
+                                  : daysUntil === 0
+                                    ? "Due today"
+                                    : `${daysUntil}d left`}
+                              </span>
+                            </>
+                          )}
                         </small>
                       </div>
                       {existing ? (

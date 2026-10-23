@@ -821,10 +821,34 @@ function EscrowSection() {
   const seen = useInView(moduleRef, { amount: 0.25 });
 
   const steps = [
-    { n: "01", title: t.marketing.escrow.step1Title, body: t.marketing.escrow.step1Desc },
-    { n: "02", title: t.marketing.escrow.step2Title, body: t.marketing.escrow.step2Desc },
-    { n: "03", title: t.marketing.escrow.step3Title, body: t.marketing.escrow.step3Desc },
-    { n: "04", title: t.marketing.escrow.step4Title, body: t.marketing.escrow.step4Desc },
+    {
+      n: "01",
+      tone: "blue" as const,
+      Icon: Wallet,
+      title: t.marketing.escrow.step1Title,
+      body: t.marketing.escrow.step1Desc,
+    },
+    {
+      n: "02",
+      tone: "purple" as const,
+      Icon: Briefcase,
+      title: t.marketing.escrow.step2Title,
+      body: t.marketing.escrow.step2Desc,
+    },
+    {
+      n: "03",
+      tone: "green" as const,
+      Icon: CheckCircle,
+      title: t.marketing.escrow.step3Title,
+      body: t.marketing.escrow.step3Desc,
+    },
+    {
+      n: "04",
+      tone: "amber" as const,
+      Icon: ShieldCheck,
+      title: t.marketing.escrow.step4Title,
+      body: t.marketing.escrow.step4Desc,
+    },
   ];
 
   /* honour a mid-session motion preference change */
@@ -881,23 +905,40 @@ function EscrowSection() {
             onKeyDown={onKey}
           >
             {steps.map((s, i) => (
-              <button
+              <div
                 key={s.n}
-                ref={(el) => { tabRefs.current[i] = el; }}
-                type="button"
-                role="tab"
-                id={`esc-tab-${i}`}
-                aria-selected={i === active}
-                aria-controls={`esc-panel-${i}`}
-                tabIndex={i === active ? 0 : -1}
-                className={`esc-step${i === active ? " is-active" : ""}`}
-                onClick={() => setActive(i)}
+                className={`esc-step-wrap${i === active ? " is-active" : ""}`}
               >
-                <span className="esc-step-n">{s.n}</span>
-                <span className="esc-step-h">{s.title}<i className="esc-step-live" /></span>
-                <span className="esc-step-p">{s.body}</span>
-                <span className="esc-step-track"><i /></span>
-              </button>
+                <button
+                  ref={(el) => { tabRefs.current[i] = el; }}
+                  type="button"
+                  role="tab"
+                  id={`esc-tab-${i}`}
+                  aria-selected={i === active}
+                  aria-controls={`esc-panel-${i}`}
+                  tabIndex={i === active ? 0 : -1}
+                  className={`esc-step v2-stat-card--${s.tone}${i === active ? " is-active" : ""}`}
+                  onClick={() => setActive(i)}
+                >
+                  <span className="v2-stat-orb" aria-hidden="true" />
+                  <span className="v2-stat-shine" aria-hidden="true" />
+                  <span className="esc-step-inner">
+                    <span className="esc-step-top">
+                      <span className="esc-step-label">STEP {s.n}</span>
+                      <span className="esc-step-ico" aria-hidden="true">
+                        <s.Icon size={19} strokeWidth={1.9} />
+                      </span>
+                    </span>
+                    <span className="esc-step-h">
+                      {s.title}
+                      <i className="esc-step-live" />
+                    </span>
+                    <span className="esc-step-rule" aria-hidden="true" />
+                    <span className="esc-step-p">{s.body}</span>
+                  </span>
+                  <span className="esc-step-track"><i /></span>
+                </button>
+              </div>
             ))}
           </div>
 

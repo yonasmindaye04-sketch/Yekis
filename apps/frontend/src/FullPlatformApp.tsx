@@ -152,7 +152,7 @@ type MarketingPage =
   | "thank-you-contact"
   | "telegram_auth";
 
-const categoryLabels: Record<string, string> = {
+export const categoryLabels: Record<string, string> = {
   WEB_APP_DEVELOPMENT: "Web app development",
   GRAPHIC_DESIGN: "Graphic design",
   DIGITAL_MARKETING: "Digital marketing",
@@ -161,7 +161,7 @@ const categoryLabels: Record<string, string> = {
   DATA_ENTRY: "Data entry",
 };
 
-const categories = Object.keys(categoryLabels);
+export const categories = Object.keys(categoryLabels);
 
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
@@ -1986,6 +1986,8 @@ if (authMode === "register") {
               role={marketplaceRole}
               openJobs={jobs}
               onChanged={loadWorkspace}
+              categories={categories}
+              categoryLabels={categoryLabels}
             />
           </section>
         )}

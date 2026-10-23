@@ -650,8 +650,8 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
    ─────────────────────────────────────────────────────── */
 .yk-v2 .esc-module {
   display: grid;
-  grid-template-columns: minmax(300px, 4fr) 7fr;
-  gap: 22px;
+  grid-template-columns: 1fr;
+  gap: 38px;
   align-items: stretch;
 
   /* the one accent — green, nothing else */
@@ -679,7 +679,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 /* slogan — the wrapper carries the grid placement, the h2 the type */
 .yk-v2 .esc-slogan-wrap { grid-column: 1 / -1; }
 .yk-v2 .esc-slogan {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   text-align: center;
   font-family: var(--v2-font-head);
   font-weight: 800;
@@ -690,69 +690,163 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 }
 .yk-v2 .esc-slogan em { font-style: normal; color: var(--esc-ac); }
 
-/* ── stepper ── */
+/* ── stepper: 4-column skewed cascade cards matching .v2-stat-card ── */
 .yk-v2 .esc-steps {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: 24px;
+  padding: 12px 0 18px;
 }
-.yk-v2 .esc-step {
+.yk-v2 .esc-step-wrap {
+  container-type: inline-size;
   position: relative;
+  z-index: 1;
+}
+/* horizontal cascade — matching .v2-stat stagger (24px / 48px / 72px) */
+.yk-v2 .esc-step-wrap:nth-child(2) { margin-top: 24px; }
+.yk-v2 .esc-step-wrap:nth-child(3) { margin-top: 48px; }
+.yk-v2 .esc-step-wrap:nth-child(4) { margin-top: 72px; }
+.yk-v2 .esc-step-wrap:hover,
+.yk-v2 .esc-step-wrap.is-active {
+  z-index: 5;
+}
+
+.yk-v2 .esc-step {
+  --skew: -6deg;
+  position: relative;
+  width: 100%;
+  /* holds the same ~0.78 w/h proportion as .v2-stat-card */
+  min-height: clamp(13.5rem, 76cqi, 18rem);
+  transform: skewY(var(--skew));
   overflow: hidden;
   text-align: left;
   cursor: pointer;
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 16px;
-  align-items: start;
-  padding: 20px 20px 22px;
-  border-radius: 18px;
+  display: flex;
+  padding: 22px 24px;
+  border-radius: var(--v2-r-md);
   border: 1px solid var(--v2-border);
-  background: var(--v2-surface);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--v2-bg2) 92%, transparent) 0%,
+    color-mix(in srgb, var(--v2-bg) 88%, transparent) 100%
+  );
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: var(--v2-text);
   font-family: var(--v2-font-body);
-  transition: background 0.18s, border-color 0.18s, transform 0.18s var(--v2-ease), box-shadow 0.18s;
+  transition:
+    transform 0.22s var(--v2-ease),
+    border-color 0.2s var(--v2-ease),
+    box-shadow 0.22s var(--v2-ease),
+    background 0.22s var(--v2-ease);
 }
-.yk-v2 .esc-step:hover { transform: translateX(4px); border-color: var(--v2-border2); }
-.yk-v2 .esc-step:focus-visible { outline: 2px solid var(--esc-ac); outline-offset: 3px; }
-.yk-v2 .esc-step-n {
-  grid-row: span 2;
-  width: 44px;
-  height: 44px;
-  border-radius: 13px;
-  display: grid;
-  place-items: center;
-  font-family: var(--v2-font-head);
+/* gradient hairline on the top edge, matching .v2-stat-card::before */
+.yk-v2 .esc-step::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 55%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* hover or active: unskew, lift, and glow just like .v2-stat-card */
+.yk-v2 .esc-step:hover,
+.yk-v2 .esc-step.is-active {
+  --skew: 0deg;
+  transform: skewY(0deg) translateY(-14px) scale(1.02);
+  border-color: var(--stat-accent-edge, var(--v2-border2));
+  box-shadow: 0 25px 60px -15px var(--stat-accent-shadow, rgba(0, 0, 0, 0.45));
+  z-index: 5;
+}
+.yk-v2 .esc-step:hover .v2-stat-orb,
+.yk-v2 .esc-step.is-active .v2-stat-orb {
+  opacity: 0.52;
+}
+.yk-v2 .esc-step:hover .v2-stat-shine {
+  left: 100%;
+}
+.yk-v2 .esc-step:focus-visible {
+  outline: 2px solid var(--stat-accent, var(--esc-ac));
+  outline-offset: 3px;
+}
+/* counter-skew inner content so text stays upright */
+.yk-v2 .esc-step-inner {
+  transform: skewY(calc(var(--skew) * -1));
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  transition: transform 0.22s var(--v2-ease);
+}
+.yk-v2 .esc-step-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.yk-v2 .esc-step-label {
+  font-size: 12.5px;
   font-weight: 800;
-  font-size: 15px;
-  color: var(--v2-text2);
-  background: var(--v2-surface2);
-  border: 1px solid var(--v2-border);
-  transition: color 0.18s, background 0.18s, border-color 0.18s;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  line-height: 1.35;
+  color: var(--stat-accent-text, var(--v2-primary));
+}
+.yk-v2 .esc-step-ico {
+  flex: none;
+  display: inline-flex;
+  color: var(--stat-accent-text, var(--v2-primary));
+  opacity: 0.55;
+  transition: opacity 0.45s var(--v2-ease), transform 0.55s var(--v2-ease);
+}
+.yk-v2 .esc-step:hover .esc-step-ico,
+.yk-v2 .esc-step.is-active .esc-step-ico {
+  opacity: 1;
+  transform: rotate(-8deg) scale(1.1);
 }
 .yk-v2 .esc-step-h {
-  align-self: center;
+  margin-top: auto;
   display: flex;
   align-items: center;
   gap: 10px;
   font-family: var(--v2-font-head);
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--v2-text);
+  font-size: clamp(26px, 11cqi, 46px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+  color: var(--stat-accent-val, var(--v2-text));
 }
 .yk-v2 .esc-step-live {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: var(--esc-ac);
+  background: var(--stat-accent, var(--esc-ac));
   opacity: 0;
   transition: opacity 0.18s;
 }
+.yk-v2 .esc-step-rule {
+  display: block;
+  height: 1px;
+  width: 100%;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--stat-accent-text, var(--v2-primary)) 40%, transparent),
+    transparent
+  );
+}
 .yk-v2 .esc-step-p {
-  grid-column: 2;
-  font-size: 13.5px;
-  line-height: 1.6;
+  font-size: 12.5px;
+  line-height: 1.45;
   color: var(--v2-text2);
 }
 .yk-v2 .esc-step-track {
@@ -762,26 +856,24 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   width: 100%;
   height: 2px;
   background: var(--v2-grid-line);
+  z-index: 2;
 }
 .yk-v2 .esc-step-track i {
   display: block;
   width: 0;
   height: 100%;
-  background: var(--esc-ac);
+  background: var(--stat-accent, var(--esc-ac));
 }
-.yk-v2 .esc-step.is-active {
-  background: var(--v2-surface2);
-  border-color: var(--v2-border2);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--esc-ac) 24%, transparent), var(--v2-shadow-sm);
+.yk-v2 .esc-step.is-active .esc-step-live {
+  opacity: 1;
+  animation: esc-pulse 1.4s ease-out infinite;
 }
-.yk-v2 .esc-step.is-active .esc-step-n {
-  color: var(--esc-ac);
-  background: color-mix(in srgb, var(--esc-ac) 14%, transparent);
-  border-color: color-mix(in srgb, var(--esc-ac) 40%, transparent);
+.yk-v2 .esc-step.is-active .esc-step-track i {
+  animation: esc-fill 4.2s linear forwards;
 }
-.yk-v2 .esc-step.is-active .esc-step-live { opacity: 1; animation: esc-pulse 1.4s ease-out infinite; }
-.yk-v2 .esc-step.is-active .esc-step-track i { animation: esc-fill 4.2s linear forwards; }
-.yk-v2 .esc-module.is-paused .esc-step.is-active .esc-step-track i { animation-play-state: paused; }
+.yk-v2 .esc-module.is-paused .esc-step.is-active .esc-step-track i {
+  animation-play-state: paused;
+}
 
 /* ── stage: dark frame, clear light product screen ── */
 /* Tall enough for the densest screen (02 · Work) on every breakpoint —
@@ -1169,7 +1261,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 /* keyframes */
 @keyframes esc-fill { from { width: 0; } to { width: 100%; } }
 @keyframes esc-pulse {
-  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--esc-ac) 50%, transparent); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--stat-accent, var(--esc-ac)) 50%, transparent); }
   70%  { box-shadow: 0 0 0 7px transparent; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
@@ -1183,17 +1275,22 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 @media (max-width: 1040px) {
   .yk-v2 .esc-module { grid-template-columns: 1fr; }
   .yk-v2 .esc-slogan { margin-bottom: 4px; }
-  .yk-v2 .esc-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .yk-v2 .esc-step { padding: 16px 16px 20px; }
-  .yk-v2 .esc-step:hover { transform: none; }
+  .yk-v2 .esc-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .yk-v2 .esc-step-wrap:nth-child(2),
+  .yk-v2 .esc-step-wrap:nth-child(3),
+  .yk-v2 .esc-step-wrap:nth-child(4) { margin-top: 0; }
+  .yk-v2 .esc-step-wrap:nth-child(even) { margin-top: 24px; }
+  .yk-v2 .esc-step { padding: 20px 22px; }
 }
 @media (max-width: 600px) {
-  .yk-v2 .esc-steps { grid-template-columns: 1fr; }
+  .yk-v2 .esc-steps { grid-template-columns: 1fr; gap: 14px; }
+  .yk-v2 .esc-step-wrap { margin-top: 0 !important; }
   /* tighter stepper so the product screen is not pushed a full
      screen further down — the copy stays, only the spacing goes */
-  .yk-v2 .esc-step { gap: 4px 12px; padding: 14px 14px 16px; }
-  .yk-v2 .esc-step-n { width: 38px; height: 38px; border-radius: 11px; font-size: 14px; }
-  .yk-v2 .esc-step-h { font-size: 16px; }
+  .yk-v2 .esc-step { min-height: 11rem; --skew: 0deg; padding: 18px 20px; }
+  .yk-v2 .esc-step:hover,
+  .yk-v2 .esc-step.is-active { transform: translateY(-6px); }
+  .yk-v2 .esc-step-h { font-size: 24px; }
   .yk-v2 .esc-step-p { font-size: 13px; line-height: 1.55; }
   .yk-v2 .esc-stage { min-height: 660px; }
   .yk-v2 .esc-panel { padding: 22px 20px; }
@@ -1213,10 +1310,12 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   .yk-v2 .esc-st.is-now { animation: none; }
   .yk-v2 .esc-step.is-active .esc-step-track i { animation: none; width: 100%; }
   .yk-v2 .esc-step,
+  .yk-v2 .esc-step-inner,
   .yk-v2 .esc-panel,
   .yk-v2 .esc-bar i,
   .yk-v2 .esc-btn { transition: none; }
   .yk-v2 .esc-step:hover,
+  .yk-v2 .esc-step.is-active { transform: skewY(var(--skew)); }
   .yk-v2 .esc-btn:hover { transform: none; }
 }
 
