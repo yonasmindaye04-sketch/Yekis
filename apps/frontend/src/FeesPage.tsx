@@ -10,9 +10,14 @@ import {
   Scale,
   AlertTriangle,
   HelpCircle,
+  FileText,
 } from "lucide-react";
 import { useI18n } from "./i18n";
 import { openSupportChat } from "./components/supportChatEvents";
+import {
+  FiscalDocumentSheet,
+  type FiscalDocType,
+} from "./components/FiscalDocumentModal";
 import "./landing-v2.css";
 
 type FeesPageProps = {
@@ -30,13 +35,15 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
   const [amountEtb, setAmountEtb] = useState<number>(25000);
   const [rolePerspective, setRolePerspective] = useState<"client" | "freelancer">("freelancer");
   const [selectedRail, setSelectedRail] = useState<PaymentRail>("TELEBIRR");
-  const [includeWithholding, setIncludeWithholding] = useState<boolean>(false);
+  const [includeVat15, setIncludeVat15] = useState<boolean>(true);
+  const [includeWithholding, setIncludeWithholding] = useState<boolean>(true);
   const [hasVerifiedTin, setHasVerifiedTin] = useState<boolean>(true);
 
   const safeAmount = Number.isFinite(amountEtb) && amountEtb > 0 ? amountEtb : 0;
   const clientFee = Math.round(safeAmount * 0.025);
   const freelancerFee = Math.round(safeAmount * 0.025);
-  const clientTotalDeposit = safeAmount + clientFee;
+  const vatAmount = includeVat15 ? Math.round(safeAmount * 0.15) : 0;
+  const clientTotalDeposit = safeAmount + clientFee + vatAmount;
 
   const withholdingRate = includeWithholding && safeAmount >= 10000
     ? hasVerifiedTin
@@ -44,7 +51,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
       : 0.30
     : 0;
   const withholdingTax = Math.round(safeAmount * withholdingRate);
-  const freelancerNetPayout = Math.max(0, safeAmount - freelancerFee - withholdingTax);
+  const freelancerNetPayout = Math.max(
+    0,
+    safeAmount + vatAmount - freelancerFee - withholdingTax,
+  );
 
   const formatEtb = (val: number) => `${val.toLocaleString("en-US")} ETB`;
 
@@ -55,6 +65,9 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
     t.marketing.fees.feeItem4,
     t.marketing.fees.feeItem5,
   ];
+
+  const activeDocType: FiscalDocType =
+    rolePerspective === "client" ? "CLIENT_INVOICE" : "FREELANCER_VOUCHER";
 
   return (
     <div className="yk-v2 yk-v2-subpage">
@@ -200,8 +213,32 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               </div>
             </div>
 
-            {/* Optional ERCA Withholding Tax Estimator */}
+            {/* Optional ERCA Withholding Tax & 15% VAT Estimator */}
             <div className="v2-calc-options">
+              <button
+                type="button"
+                className={`v2-calc-toggle-card ${includeVat15 ? "is-active" : ""}`}
+                onClick={() => setIncludeVat15((prev) => !prev)}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--v2-text)" }}>
+                    15% Ethiopian VAT (ተ.እ.ታ)
+                  </span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: includeVat15 ? "var(--v2-primary)" : "var(--v2-text2)",
+                    }}
+                  >
+                    {includeVat15 ? "15% INCLUDED" : "EXEMPT"}
+                  </span>
+                </div>
+                <span style={{ fontSize: 12, color: "var(--v2-text2)" }}>
+                  Standard ERCA commercial tax invoice for VAT-registered entities
+                </span>
+              </button>
+
               <button
                 type="button"
                 className={`v2-calc-toggle-card ${includeWithholding ? "is-active" : ""}`}
@@ -209,7 +246,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               >
                 <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--v2-text)" }}>
-                    Corporate / NGO Withholding
+                    ERCA Withholding Tax
                   </span>
                   <span
                     style={{
@@ -267,6 +304,12 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                 <span>Client Escrow Fee (+2.5%)</span>
                 <strong>+{formatEtb(clientFee)}</strong>
               </div>
+              {includeVat15 && (
+                <div className="v2-calc-row">
+                  <span>Ethiopian VAT (+15% ተ.እ.ታ)</span>
+                  <strong>+{formatEtb(vatAmount)}</strong>
+                </div>
+              )}
               <div className="v2-calc-row">
                 <span>Total Client Escrow Deposit</span>
                 <strong>{formatEtb(clientTotalDeposit)}</strong>
@@ -370,6 +413,56 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               </button>
             </div>
           </div>
+        </section>
+
+        {/* Live Bilingual Client Invoice & Freelancer Payout Receipt Preview */}
+        <section
+          style={{ marginBottom: 72 }}
+          aria-labelledby="fees-invoice-preview-heading"
+        >
+          <div className="v2-center" style={{ marginBottom: 28 }}>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--v2-primary)",
+                marginBottom: 8,
+              }}
+            >
+              <FileText size={16} />
+              <span>OFFICIAL ERCA &amp; AACCSA FISCAL DOCUMENTS · የክፍያ እና የታክስ ደረሰኞች</span>
+            </div>
+            <h2 className="v2-sec-title" id="fees-invoice-preview-heading">
+              Client Invoice &amp; Freelancer Payout Receipt Preview
+            </h2>
+            <p className="v2-sec-sub">
+              Every funded milestone and released payout generates a bilingual (English / አማርኛ) fiscal document with TIN, 15% VAT, and 3%/30% Withholding Tax breakdown—ready to print or save as PDF.
+            </p>
+          </div>
+
+          <FiscalDocumentSheet
+            mode="embedded"
+            interactiveControls={true}
+            data={{
+              docType: activeDocType,
+              principalEtb: safeAmount,
+              rail: selectedRail,
+              includeVat15,
+              includeWithholding: includeWithholding && safeAmount >= 10000,
+              hasVerifiedTin,
+              clientFeeRate: 0.025,
+              freelancerFeeRate: 0.025,
+            }}
+            onChangeDocType={(next) =>
+              setRolePerspective(next === "CLIENT_INVOICE" ? "client" : "freelancer")
+            }
+            onToggleVat={setIncludeVat15}
+            onToggleWithholding={setIncludeWithholding}
+            onToggleVerifiedTin={setHasVerifiedTin}
+          />
         </section>
 
         {/* 3-Column Comparison Matrix */}

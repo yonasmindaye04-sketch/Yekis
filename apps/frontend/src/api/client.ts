@@ -1720,8 +1720,62 @@ class ApiClient {
     if (params?.referenceType) qs.set("referenceType", params.referenceType);
     return this.request(`/api/v1/admin/ledger/journals?${qs.toString()}`);
   }
-  async adminSettlePayout(payoutId: string, input: { decision: "CONFIRMED" | "FAILED"; providerPayoutId?: string; failureReason?: string }): Promise<unknown> {
+  async adminSettlePayout(
+    payoutId: string,
+    input: {
+      decision: "CONFIRMED" | "FAILED" | "RETRY" | "SWITCH_RAIL" | "HOLD";
+      provider?: string;
+      payoutAccountIdentifier?: string;
+      providerPayoutId?: string;
+      failureReason?: string;
+    },
+  ): Promise<unknown> {
     return this.request(`/api/v1/admin/payouts/${payoutId}/settle`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async adminInterveneContract(
+    contractId: string,
+    input: { action: string; milestoneId?: string; reason: string },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/admin/contracts/${contractId}/intervene`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async adminPaymentAction(
+    paymentId: string,
+    input: { action: "VERIFY" | "RESYNC" | "FLAG" | "REFUND"; ref?: string; reason: string },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/admin/payments/${paymentId}/action`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async adminEscrowAction(
+    milestoneId: string,
+    input: { action: "RELEASE" | "PARTIAL_SPLIT" | "HOLD" | "UNHOLD" | "RETURN_WIP" | "REFUND_CLIENT"; splitAmountMinor?: number; reason: string },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/admin/escrows/${milestoneId}/action`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async adminResolveReconciliation(
+    reconId: string,
+    input: { action: "FORCE_MATCH" | "POST_ADJUSTMENT" | "FLAG_FAILED" | "RESOLVE"; adjustedAmountMinor?: number; reason: string },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/admin/reconciliation/${reconId}/resolve`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async adminJournalAction(
+    journalId: string,
+    input: { action: "VERIFY" | "REVERSE" | "ADJUSTMENT"; amountMinor?: number; description?: string; referenceType?: string; referenceId?: string },
+  ): Promise<unknown> {
+    return this.request(`/api/v1/admin/ledger/journals/${journalId}/action`, {
       method: "POST",
       body: JSON.stringify(input),
     });

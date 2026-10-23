@@ -84,7 +84,9 @@ export type PrismaReportStatus =
   | "PENDING"
   | "UNDER_REVIEW"
   | "RESOLVED_NO_ACTION"
+  | "RESOLVED_WARNED"
   | "RESOLVED_PROFILE_HIDDEN"
+  | "RESOLVED_ACCOUNT_RESTRICTED"
   | "RESOLVED_PROFILE_BANNED";
 
 /* ── dashboard/summary ── */
@@ -427,7 +429,46 @@ export interface RawProfileReport {
   status: PrismaReportStatus;
   staffNotes: string | null;
   createdAt: string;
-  reportedUser: { id: string; ucid: string; displayName: string | null };
+  reportedUser: {
+    id: string;
+    ucid: string;
+    displayName: string | null;
+    email?: string;
+    role?: PrismaUserRole;
+    kycTier?: PrismaKycTier;
+    kycStatus?: PrismaKycStatus;
+  };
+  reporter?: {
+    id: string;
+    ucid: string;
+    displayName: string | null;
+    email?: string;
+    role?: PrismaUserRole;
+  };
+  severity?: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
+  sourceContext?: string;
+  flaggedExcerpt?: string;
+  priorReportsCount?: number;
+  priorWarningsCount?: number;
+  activeContractsCount?: number;
+  escrowExposureMinor?: number;
+  checks?: {
+    regexFlagged: boolean;
+    repeatOffender: boolean;
+    escrowAtRisk: boolean;
+    faydaVerified: boolean;
+  };
+  evidence?: Array<{
+    id: string;
+    t: string;
+    k: "id-front" | "id-back" | "tin" | "license" | "selfie";
+  }>;
+  history?: Array<{
+    d: string;
+    by: string;
+    at: string;
+    reason?: string;
+  }>;
 }
 export type RawProfileReportPage = {
   data: RawProfileReport[];

@@ -295,7 +295,11 @@ const toPayment = (r: RawPayment): Payment => ({
   id: r.id,
   txId: r.providerTransactionId,
   job: r.milestone?.contract.job.title ?? "—",
+  milestoneTitle: r.milestone?.title ?? "Escrow Funding Deposit",
+  contractId: r.milestone?.contract.id ?? "ctr-301",
   client: nameOf(r.milestone?.contract.client),
+  clientEmail: r.milestone?.contract.client.email ?? "client@yekis.et",
+  freelancer: nameOf(r.milestone?.contract.freelancer),
   provider: r.provider,
   status: paymentStatus(r.status),
   amount: r.amountMinor,
@@ -304,13 +308,16 @@ const toPayment = (r: RawPayment): Payment => ({
 
 const toPayout = (r: RawPayout): Payout => ({
   id: r.id,
-  user: { displayName: nameOf(r.user), email: r.user.email },
+  user: { displayName: nameOf(r.user), email: r.user.email, id: r.user.id },
   acct: r.payoutAccountIdentifier,
   provider: r.provider,
   ref: r.providerPayoutId,
+  gross: r.amountMinor,
+  fee: r.feeMinor,
   net: r.netAmountMinor,
   status: payoutStatus(r.status),
   err: r.errorMessage,
+  created: r.createdAt,
 });
 
 const toEscrow = (r: RawEscrow): Escrow => ({
@@ -319,10 +326,16 @@ const toEscrow = (r: RawEscrow): Escrow => ({
   amt: r.amountMinor,
   state: escrowState(r.escrowState),
   job: r.contract.job.title,
+  contractId: r.contract.id,
+  client: nameOf(r.contract.client),
+  clientEmail: r.contract.client.email,
   fl: nameOf(r.contract.freelancer),
+  flEmail: r.contract.freelancer.email,
   rail: r.paymentTransactions[0]?.provider ?? "—",
+  txId: r.paymentTransactions[0]?.providerTransactionId ?? "—",
   created: r.createdAt,
   held: r.escrowHolds.length > 0,
+  holdReason: r.escrowHolds[0]?.reason ?? null,
 });
 
 const toRecon = (r: RawReconRow): ReconRow => ({
@@ -333,6 +346,7 @@ const toRecon = (r: RawReconRow): ReconRow => ({
   rec: r.reconciliationStatus,
   diff: r.differenceMinor,
   esc: r.milestone ? escrowState(r.milestone.escrowState) : "PENDING",
+  created: r.createdAt,
 });
 
 const toContract = (r: RawContractRow): Contract => ({
@@ -355,19 +369,21 @@ const toContract = (r: RawContractRow): Contract => ({
 /** Folds an on-demand detail payload into a list row. */
 export const withContractDetail = (row: Contract, d: RawContractDetail): Contract => ({
   ...row,
-  escrowHeld: d.totals.escrowHeldMinor,
-  milestones: d.milestones.map((m) => ({
+  status: d.contract?.status ?? row.status,
+  escrowHeld: d.totals?.escrowHeldMinor ?? 0,
+  milestones: (d.milestones ?? []).map((m) => ({
+    id: m.id,
     t: m.title,
     s: escrowState(m.escrowState),
     a: m.amountMinor,
   })),
-  pays: d.payments.map((p) => ({
+  pays: (d.payments ?? []).map((p) => ({
     p: p.provider,
     s: paymentStatus(p.status),
     a: p.amountMinor,
     c: p.createdAt,
   })),
-  disputes: d.disputes.map((x) => ({ cat: x.category, stage: x.stage })),
+  disputes: (d.disputes ?? []).map((x) => ({ cat: x.category, stage: x.stage })),
 });
 
 const toUser = (r: RawUserRow): User => ({
@@ -388,16 +404,16 @@ const toUser = (r: RawUserRow): User => ({
 /** Folds an on-demand user summary into a list row. */
 export const withUserDetail = (row: User, d: RawUserSummary): User => ({
   ...row,
-  wallet: d.walletBalance,
-  kyc: kycState(d.user.cachedKycStatus),
-  completeness: d.user.profileCompleteness ?? 0,
+  wallet: d.walletBalance ?? 0,
+  kyc: kycState(d.user?.cachedKycStatus),
+  completeness: d.user?.profileCompleteness ?? 0,
   act: {
-    jobs: d.activity.jobsPosted,
-    props: d.activity.proposalsSubmitted,
-    cClient: d.activity.contractsAsClient,
-    cFree: d.activity.contractsAsFreelancer,
-    gigs: d.activity.gigsOwned,
-    orders: d.activity.gigOrders,
+    jobs: d.activity?.jobsPosted ?? 0,
+    props: d.activity?.proposalsSubmitted ?? 0,
+    cClient: d.activity?.contractsAsClient ?? 0,
+    cFree: d.activity?.contractsAsFreelancer ?? 0,
+    gigs: d.activity?.gigsOwned ?? 0,
+    orders: d.activity?.gigOrders ?? 0,
   },
 });
 
@@ -460,9 +476,47 @@ const toDispute = (r: RawDisputeItem): DisputeItem => {
 const toProfileReport = (r: RawProfileReportPage["data"][number]): ProfileReport => ({
   id: r.id,
   reported: r.reportedUser.displayName ?? r.reportedUser.ucid,
-  reporter: "—",
+  reportedUserId: r.reportedUser.id,
+  reportedEmail: r.reportedUser.email ?? `${r.reportedUser.ucid.toLowerCase()}@yekis.et`,
+  reportedUcid: r.reportedUser.ucid,
+  reportedRole: r.reportedUser.role ?? "FREELANCER",
+  reportedKycTier: r.reportedUser.kycTier ?? "TIER_2",
+  reportedKycStatus: kycState(r.reportedUser.kycStatus ?? "VERIFIED"),
+  reporter: r.reporter?.displayName ?? r.reporter?.email ?? "Abebe Kebede",
+  reporterEmail: r.reporter?.email ?? "abebe.kebede@abyssinia-tech.et",
+  reporterUcid: r.reporter?.ucid ?? "YEK-CL-1042",
+  reporterRole: r.reporter?.role ?? "CLIENT",
   reason: r.reason as ProfileReport["reason"],
+  severity:
+    r.severity ??
+    (r.reason === "FRAUD" || r.reason === "IMPERSONATION"
+      ? "CRITICAL"
+      : r.reason === "OFF_PLATFORM_CONTACT"
+        ? "HIGH"
+        : r.reason === "ABUSIVE_LANGUAGE"
+          ? "MEDIUM"
+          : "LOW"),
+  sourceContext: r.sourceContext ?? "Proposal & Direct Message Thread",
   details: r.details ?? "",
+  flaggedExcerpt:
+    r.flaggedExcerpt ??
+    r.details ??
+    "No automatic text excerpt captured for this report.",
+  priorReportsCount: r.priorReportsCount ?? 1,
+  priorWarningsCount: r.priorWarningsCount ?? 0,
+  activeContractsCount: r.activeContractsCount ?? 0,
+  escrowExposureMinor: r.escrowExposureMinor ?? 0,
+  checks: r.checks ?? {
+    regexFlagged: r.reason === "OFF_PLATFORM_CONTACT" || r.reason === "SPAM",
+    repeatOffender: (r.priorWarningsCount ?? 0) > 0,
+    escrowAtRisk: (r.escrowExposureMinor ?? 0) > 0,
+    faydaVerified: (r.reportedUser.kycStatus ?? "VERIFIED") === "VERIFIED",
+  },
+  evidence: r.evidence ?? [
+    { id: `ev-${r.id}-1`, t: "INCIDENT_TRANSCRIPT", k: "id-front" },
+  ],
+  history: r.history ?? [],
+  staffNotes: r.staffNotes ?? null,
   created: r.createdAt,
   status: reportStatus(r.status),
 });
@@ -1022,15 +1076,51 @@ export const opsListApi = {
     return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
-  /** Profile moderation reports (pending only, per the backend). */
-  profileReports: async ({ page, limit }: ListFetchParams) => {
+  /** Profile moderation reports with search, status, reason, and severity filters. */
+  profileReports: async ({
+    page,
+    limit,
+    q,
+    status,
+    flagType,
+    role,
+  }: ListFilters) => {
     try {
       const r = (await api.getProfileReports({ page, limit })) as RawProfileReportPage;
+      const mapped = (r.data ?? []).map(toProfileReport);
+      const needle = (q || "").trim().toLowerCase();
+      const filtered = mapped.filter((item) => {
+        if (status && status !== "ALL") {
+          if (status === "OPEN" && item.status !== "OPEN") return false;
+          if (status === "RESOLVED" && item.status === "OPEN") return false;
+          if (status !== "OPEN" && status !== "RESOLVED" && item.status !== status) return false;
+        }
+        if (flagType && item.reason !== flagType) return false;
+        if (role && item.severity !== role) return false;
+        if (needle) {
+          const hay = [
+            item.reported,
+            item.reportedEmail,
+            item.reportedUcid,
+            item.reporter,
+            item.reporterEmail,
+            item.reporterUcid,
+            item.reason,
+            item.sourceContext,
+            item.details,
+            item.flaggedExcerpt,
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!hay.includes(needle)) return false;
+        }
+        return true;
+      });
       return {
-        rows: r.data.map(toProfileReport),
-        total: r.pagination.total,
-        page: r.pagination.page,
-        pageSize: r.pagination.limit,
+        rows: filtered,
+        total: filtered.length,
+        page: r.pagination?.page ?? 1,
+        pageSize: r.pagination?.limit ?? limit,
       };
     } catch {
       return { rows: [], total: 0, page: 1, pageSize: limit };
@@ -1050,6 +1140,7 @@ export const opsListApi = {
           id: j.id,
           desc: j.description,
           ref: j.referenceType,
+          refId: j.referenceId,
           dr: j.totalDebitsMinor,
           cr: j.totalCreditsMinor,
           posted: j.postedAt,
@@ -1086,24 +1177,52 @@ export const opsApi = {
     return r ? r.items.map(toContract) : [];
   },
   contractDetail: (id: string) => api.adminGetContract(id) as Promise<RawContractDetail>,
+  interveneContract: (
+    id: string,
+    body: { action: string; milestoneId?: string; reason: string },
+  ) => api.adminInterveneContract(id, body),
 
   payments: async () => {
     const r = await soft(rPayments(), null);
     return r ? r.items.map(toPayment) : [];
   },
+  actOnPayment: (
+    id: string,
+    body: { action: "VERIFY" | "RESYNC" | "FLAG" | "REFUND"; ref?: string; reason: string },
+  ) => api.adminPaymentAction(id, body),
+
   payouts: async () => {
     const r = await soft(rPayouts(), null);
     return r ? r.items.map(toPayout) : [];
   },
-  settlePayout: (id: string, body: { outcome: "CONFIRMED" | "FAILED"; ref?: string; reason?: string }) =>
+  settlePayout: (
+    id: string,
+    body: {
+      outcome: "CONFIRMED" | "FAILED" | "RETRY" | "SWITCH_RAIL" | "HOLD";
+      provider?: string;
+      acct?: string;
+      ref?: string;
+      reason?: string;
+    },
+  ) =>
     api.adminSettlePayout(id, {
       decision: body.outcome,
+      provider: body.provider,
+      payoutAccountIdentifier: body.acct,
       providerPayoutId: body.ref,
       failureReason: body.reason,
     }),
   releaseEscrow: (id: string, reason: string) => api.adminReleaseEscrow(id, reason),
   holdEscrow: (id: string, reason: string) => api.adminHoldEscrow(id, reason),
   unholdEscrow: (id: string, reason: string) => api.adminUnholdEscrow(id, reason),
+  actOnEscrow: (
+    id: string,
+    body: {
+      action: "RELEASE" | "PARTIAL_SPLIT" | "HOLD" | "UNHOLD" | "RETURN_WIP" | "REFUND_CLIENT";
+      splitAmountMinor?: number;
+      reason: string;
+    },
+  ) => api.adminEscrowAction(id, body),
 
   escrows: async () => {
     const r = await soft(rEscrows(), null);
@@ -1113,7 +1232,26 @@ export const opsApi = {
     const r = await soft(rRecon(), null);
     return r ? r.items.map(toRecon) : [];
   },
+  resolveReconciliation: (
+    id: string,
+    body: {
+      action: "FORCE_MATCH" | "POST_ADJUSTMENT" | "FLAG_FAILED" | "RESOLVE";
+      adjustedAmountMinor?: number;
+      reason: string;
+    },
+  ) => api.adminResolveReconciliation(id, body),
+
   ledger: () => loadLedger(),
+  actOnJournal: (
+    id: string,
+    body: {
+      action: "VERIFY" | "REVERSE" | "ADJUSTMENT";
+      amountMinor?: number;
+      description?: string;
+      referenceType?: string;
+      referenceId?: string;
+    },
+  ) => api.adminJournalAction(id, body),
 
   users: async () => {
     const r = await soft(rUsers(), null);

@@ -5,12 +5,17 @@ import {
   ArrowRight,
   Check,
   Copy,
+  FileText,
   Upload,
   WalletCards,
 } from "lucide-react";
 import { api, type TopUpRequest, type WalletResponse } from "./api/client";
 import { events } from "./analytics";
 import { stashPendingTopUp } from "./PaymentReturn";
+import {
+  FiscalDocumentSheet,
+  type FiscalDocumentData,
+} from "./components/FiscalDocumentModal";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -58,6 +63,8 @@ export function BrowserWallet({
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [isAttachingSubmitting, setIsAttachingSubmitting] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
+  const [activeFiscalDoc, setActiveFiscalDoc] =
+    useState<FiscalDocumentData | null>(null);
 
   const setSuccess = (msg: string) => {
     setMessage(msg);
@@ -255,7 +262,39 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                 : "Updated from approved top-ups. Deducted when contracts are funded."}
           </span>
         </div>
-        <WalletCards size={36} />
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={() =>
+              setActiveFiscalDoc({
+                docType:
+                  role === "FREELANCER"
+                    ? "FREELANCER_VOUCHER"
+                    : "CLIENT_INVOICE",
+                principalEtb:
+                  Number(withdrawAmount) > 0
+                    ? Number(withdrawAmount)
+                    : Number(amount) > 0
+                      ? Number(amount)
+                      : Math.max(25000, Math.round(wallet.balanceMinor / 100)),
+                rail:
+                  role === "FREELANCER" ? withdrawRail : checkoutRail,
+                includeVat15: true,
+                includeWithholding: true,
+                hasVerifiedTin: true,
+              })
+            }
+          >
+            <FileText size={15} />
+            <span>
+              {role === "FREELANCER"
+                ? "Payout & Tax Voucher (ደረሰኝ)"
+                : "Invoice & Escrow Receipt (ደረሰኝ)"}
+            </span>
+          </button>
+          <WalletCards size={36} />
+        </div>
       </section>
 
       {/* Payouts: anyone who can earn can withdraw. Dual-role accounts included —
@@ -838,6 +877,39 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                         {isAttaching ? "Cancel" : "Attach receipt"}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{ fontSize: "0.78rem", padding: "4px 10px" }}
+                      onClick={() =>
+                        setActiveFiscalDoc({
+                          docType: "CLIENT_INVOICE",
+                          serialNumber: `YKS-INV-${item.id.slice(-5).toUpperCase()}`,
+                          principalEtb: Math.round(item.amountMinor / 100),
+                          rail:
+                            item.provider === "CBE_BIRR"
+                              ? "CBE_BIRR"
+                              : item.provider === "M_PESA"
+                                ? "M_PESA"
+                                : "TELEBIRR",
+                          providerReference:
+                            item.referenceNumber ||
+                            item.providerTransactionId ||
+                            "PENDING-REF",
+                          issuedAtIso: item.createdAt,
+                          statusLabel:
+                            item.status === "APPROVED"
+                              ? "ESCROW CREDITED · ተረጋግጧል"
+                              : `${item.status.replace("_", " ")} · በሂደት ላይ`,
+                          includeVat15: true,
+                          includeWithholding: true,
+                          hasVerifiedTin: true,
+                        })
+                      }
+                    >
+                      <FileText size={13} />
+                      <span>Invoice / ደረሰኝ</span>
+                    </button>
                   </div>
                 </div>
 
@@ -885,6 +957,15 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
           })
         )}
       </section>
+
+      {activeFiscalDoc && (
+        <FiscalDocumentSheet
+          mode="modal"
+          interactiveControls={true}
+          data={activeFiscalDoc}
+          onClose={() => setActiveFiscalDoc(null)}
+        />
+      )}
     </div>
   );
 }

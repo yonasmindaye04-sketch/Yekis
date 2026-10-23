@@ -2827,5 +2827,548 @@ img, video, iframe, canvas {
   }
 }
 
+/* ============================================================================
+   Bilingual ERCA Fiscal Document Sheet & Printable Modal (.yk-fiscal-*)
+   ============================================================================ */
+
+.yk-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.yk-fiscal-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(9, 13, 18, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 28px 16px;
+  overflow-y: auto;
+}
+
+.yk-fiscal-modal-container {
+  width: min(100%, 960px);
+  margin: auto;
+}
+
+.yk-fiscal-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.yk-fiscal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.yk-fiscal-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.yk-fiscal-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.yk-fiscal-tab small {
+  font-size: 0.74rem;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.yk-fiscal-tab.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.yk-fiscal-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yk-fiscal-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.yk-fiscal-chip.is-on {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.yk-fiscal-chip.is-warn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.yk-fiscal-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.yk-fiscal-action-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.yk-fiscal-action-btn.is-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.yk-fiscal-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.yk-fiscal-sheet {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 28px 32px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.yk-fiscal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.yk-fiscal-brand-lockup {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.yk-fiscal-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.yk-fiscal-company-name {
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.yk-fiscal-company-sub {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.yk-fiscal-company-tin {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.yk-fiscal-doc-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  text-align: right;
+}
+
+.yk-fiscal-doc-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.yk-fiscal-doc-badge span {
+  font-family: var(--font-heading);
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+
+.yk-fiscal-doc-badge small {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.yk-fiscal-serial-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(140px, auto));
+  gap: 8px 18px;
+  text-align: right;
+  font-size: 0.76rem;
+}
+
+.yk-fiscal-serial-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.yk-fiscal-serial-grid span {
+  color: var(--color-text-secondary);
+}
+
+.yk-fiscal-status-text {
+  color: var(--color-primary);
+  font-weight: 800;
+}
+
+/* Counterparty 2-column grid */
+.yk-fiscal-parties {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.yk-fiscal-party-box {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.yk-fiscal-party-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  letter-spacing: 0.02em;
+}
+
+.yk-fiscal-party-name {
+  font-size: 0.94rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.yk-fiscal-party-detail {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.79rem;
+  color: var(--color-text-secondary);
+}
+
+.yk-fiscal-party-detail label {
+  margin: 0;
+  font-size: 0.79rem;
+  color: var(--color-text-secondary);
+  display: inline;
+}
+
+.yk-fiscal-tin-input {
+  width: 145px !important;
+  height: 26px !important;
+  padding: 2px 8px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700;
+  border-radius: 6px !important;
+  border: 1px solid var(--color-border) !important;
+  background: var(--color-bg-elevated) !important;
+  color: var(--color-text) !important;
+}
+
+/* Fiscal Table */
+.yk-fiscal-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.yk-fiscal-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.yk-fiscal-table thead tr {
+  background: var(--color-bg-subtle);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.yk-fiscal-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.yk-fiscal-table th small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: 1px;
+}
+
+.yk-fiscal-table tbody tr {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.yk-fiscal-table td {
+  padding: 12px 14px;
+  vertical-align: top;
+}
+
+.yk-fiscal-line-en {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.yk-fiscal-line-am {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.yk-neg {
+  color: var(--color-error, #dc2626);
+  font-weight: 700;
+}
+
+.yk-fiscal-total-row {
+  background: var(--color-bg-subtle);
+  border-top: 2px solid var(--color-border-strong);
+}
+
+.yk-fiscal-total-en {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.yk-fiscal-total-am {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.yk-fiscal-grand-num {
+  font-size: 1.08rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* Bottom Rail & ERCA Certificate Split */
+.yk-fiscal-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 16px;
+}
+
+.yk-fiscal-rail-card,
+.yk-fiscal-compliance-card {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.yk-fiscal-rail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yk-fiscal-rail-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.yk-fiscal-rail-title {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.yk-fiscal-rail-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.yk-fiscal-rail-kv {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.78rem;
+}
+
+.yk-fiscal-rail-kv > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.yk-fiscal-rail-kv span {
+  color: var(--color-text-secondary);
+}
+
+.yk-fiscal-compliance-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.yk-fiscal-compliance-copy {
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.yk-fiscal-compliance-copy strong {
+  color: var(--color-text);
+}
+
+.yk-fiscal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .yk-fiscal-sheet {
+    padding: 18px 16px;
+  }
+  .yk-fiscal-parties,
+  .yk-fiscal-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+  .yk-fiscal-doc-meta,
+  .yk-fiscal-serial-grid {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .yk-fiscal-sheet,
+  .yk-fiscal-sheet * {
+    visibility: visible;
+  }
+  .yk-fiscal-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    padding: 20px !important;
+  }
+}
+
+
 
 

@@ -56,6 +56,8 @@ export default function UsersPage() {
   const [detailRaw, setDetailRaw] = useState<Awaited<ReturnType<typeof opsApi.userDetail>> | null>(null);
   const [detailBusy, setDetailBusy] = useState(false);
   const [detailErr, setDetailErr] = useState<string | null>(null);
+  const [suspendPromptOpen, setSuspendPromptOpen] = useState(false);
+  const [suspendReason, setSuspendReason] = useState("");
 
   const openDetail = useCallback(
     async (id: string) => {
@@ -63,11 +65,31 @@ export default function UsersPage() {
       setDetail(null);
       setDetailBusy(true);
       setDetailErr(null);
+      setSuspendPromptOpen(false);
+      setSuspendReason("");
       try {
         const raw = await opsApi.userDetail(id);
         setDetailRaw(raw);
         const row = rows.find((u) => u.id === id);
-        if (row) setDetail(withUserDetail(row, raw));
+        if (row) {
+          setDetail(withUserDetail(row, raw));
+        } else if (raw?.user) {
+          const fallbackRow: User = {
+            id: raw.user.id,
+            ucid: (raw.user as { ucid?: string }).ucid ?? `YEK-${raw.user.id.slice(-4).toUpperCase()}`,
+            email: raw.user.email,
+            phone: raw.user.phone,
+            name: raw.user.displayName ?? "",
+            role: (raw.user as { role?: User["role"] }).role ?? "FREELANCER",
+            kyc: "PENDING",
+            created: (raw.user as { createdAt?: string }).createdAt ?? new Date().toISOString(),
+            suspended: Boolean((raw.user as { isSuspended?: boolean }).isSuspended),
+            completeness: raw.user.profileCompleteness ?? 0,
+            wallet: 0,
+            act: { jobs: 0, props: 0, cClient: 0, cFree: 0, gigs: 0, orders: 0 },
+          };
+          setDetail(withUserDetail(fallbackRow, raw));
+        }
       } catch (e) {
         setDetailErr(e instanceof Error ? e.message : "Could not load profile");
       } finally {
@@ -82,20 +104,25 @@ export default function UsersPage() {
     setDetail(null);
     setDetailRaw(null);
     setDetailErr(null);
+    setSuspendPromptOpen(false);
+    setSuspendReason("");
   }, []);
 
   const moderate = async (u: User, action: "suspend" | "unsuspend" | "rereview") => {
     try {
       if (action === "suspend") {
-        const reason = window.prompt(`Suspend ${u.email} — reason (min 5 characters):`) ?? "";
-        if (reason.trim().length < 5) {
+        if (suspendReason.trim().length < 5) {
           toast("A reason of at least 5 characters is required.");
           return;
         }
-        await opsApi.suspendUser(u.id, reason.trim());
+        await opsApi.suspendUser(u.id, suspendReason.trim());
+        setSuspendPromptOpen(false);
+        setSuspendReason("");
+        setDetail((prev) => (prev && prev.id === u.id ? { ...prev, suspended: true } : prev));
         toast(`${u.email} suspended.`);
       } else if (action === "unsuspend") {
         await opsApi.unsuspendUser(u.id);
+        setDetail((prev) => (prev && prev.id === u.id ? { ...prev, suspended: false } : prev));
         toast(`${u.email} reinstated.`);
       } else {
         const r = await opsApi.forceKycRereview(u.id);
@@ -127,6 +154,8 @@ export default function UsersPage() {
         </div>
       );
     if (!detail) return <LoadingBox />;
+    const recentConversations = detailRaw?.recentConversations ?? [];
+    const recentAudit = detailRaw?.recentAudit ?? [];
     return (
       <div className="fade">
         <button className="back-link" onClick={closeDetail}>
@@ -170,13 +199,13 @@ export default function UsersPage() {
           </div>
 
           <div className="sec-title" style={{ marginTop: 22 }}>Moderation</div>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
             {detail.suspended ? (
               <Button size="sm" onClick={() => void moderate(detail, "unsuspend")}>
                 <UserCheck size={13} /> Reinstate account
               </Button>
             ) : (
-              <Button variant="destructive" size="sm" onClick={() => void moderate(detail, "suspend")}>
+              <Button variant="destructive" size="sm" onClick={() => setSuspendPromptOpen((v) => !v)}>
                 <UserX size={13} /> Suspend account
               </Button>
             )}
@@ -184,11 +213,28 @@ export default function UsersPage() {
               <ShieldAlert size={13} /> Force KYC re-review
             </Button>
           </div>
+          {suspendPromptOpen && !detail.suspended ? (
+            <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", maxWidth: 560 }}>
+              <input
+                className="inp"
+                style={{ flex: 1, minWidth: 240 }}
+                placeholder={`Suspension reason for ${detail.email} (min 5 chars)…`}
+                value={suspendReason}
+                onChange={(e) => setSuspendReason(e.target.value)}
+              />
+              <Button variant="destructive" size="sm" onClick={() => void moderate(detail, "suspend")}>
+                Confirm Suspend
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => { setSuspendPromptOpen(false); setSuspendReason(""); }}>
+                Cancel
+              </Button>
+            </div>
+          ) : null}
           {detailRaw ? <>
             <div className="sec-title" style={{ marginTop: 22 }}>Recent support conversations</div>
-            {detailRaw.recentConversations.length ? detailRaw.recentConversations.map((c) => <div className="q-sub" key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{c.subject} · {c.status}</span><span>{dt(c.updatedAt)}</span></div>) : <div className="muted">No support conversations.</div>}
+            {recentConversations.length ? recentConversations.map((c) => <div className="q-sub" key={c.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{c.subject} · {c.status}</span><span>{dt(c.updatedAt)}</span></div>) : <div className="muted">No support conversations.</div>}
             <div className="sec-title" style={{ marginTop: 22 }}>Recent account activity</div>
-            {detailRaw.recentAudit.length ? detailRaw.recentAudit.map((a) => <div className="q-sub" key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{a.eventType} · {a.entityType}</span><span>{dt(a.createdAt)}</span></div>) : <div className="muted">No audit activity recorded for this user.</div>}
+            {recentAudit.length ? recentAudit.map((a) => <div className="q-sub" key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "7px 0" }}><span>{a.eventType} · {a.entityType}</span><span>{dt(a.createdAt)}</span></div>) : <div className="muted">No audit activity recorded for this user.</div>}
           </> : null}
           <div className="kbd-hint" style={{ marginTop: 8 }}>
             Suspension requires <span className="mono">users.suspend</span>; forcing re-review requires{" "}

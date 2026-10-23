@@ -80,20 +80,27 @@ export interface HealthState {
 
 export interface Payout {
   id: string;
-  user: { displayName: string; email: string };
+  user: { displayName: string; email: string; id?: string };
   acct: string;
   provider: Rail;
   ref: string | null;
+  gross?: number;
+  fee?: number;
   net: number;
   status: PayoutStatus;
   err: string | null;
+  created?: string;
 }
 
 export interface Payment {
   id: string;
   txId: string;
   job: string;
+  milestoneTitle?: string;
+  contractId?: string;
   client: string;
+  clientEmail?: string;
+  freelancer?: string;
   provider: Rail;
   status: PaymentStatus;
   amount: number;
@@ -101,6 +108,7 @@ export interface Payment {
 }
 
 export interface Milestone {
+  id?: string;
   t: string;
   s: MilestoneState;
   a: number;
@@ -128,10 +136,16 @@ export interface Escrow {
   amt: number;
   state: MilestoneState;
   job: string;
+  contractId?: string;
+  client?: string;
+  clientEmail?: string;
   fl: string;
+  flEmail?: string;
   rail: string;
+  txId?: string;
   created: string;
   held: boolean;
+  holdReason?: string | null;
 }
 
 export interface UserActivity {
@@ -180,6 +194,7 @@ export interface JournalEntry {
   id: string;
   desc: string;
   ref: string;
+  refId?: string | null;
   dr: number;
   cr: number;
   posted: string;
@@ -198,6 +213,7 @@ export interface ReconRow {
   rec: ReconStatus;
   diff: number | null;
   esc: MilestoneState;
+  created?: string;
 }
 
 export interface RiskFlag {
@@ -338,20 +354,48 @@ export type DisputeOutcome =
   | "REFUND_TO_CLIENT";
 
 export type ReportReason =
+  | "OFF_PLATFORM_CONTACT"
   | "IMPERSONATION"
   | "SPAM"
   | "ABUSIVE_LANGUAGE"
   | "FRAUD";
 export type ReportResolution =
   | "RESOLVED_NO_ACTION"
+  | "RESOLVED_WARNED"
   | "RESOLVED_PROFILE_HIDDEN"
+  | "RESOLVED_ACCOUNT_RESTRICTED"
   | "RESOLVED_PROFILE_BANNED";
 export interface ProfileReport {
   id: string;
   reported: string;
+  reportedUserId: string;
+  reportedEmail: string;
+  reportedUcid: string;
+  reportedRole: UserRole;
+  reportedKycTier: "TIER_1" | "TIER_2" | "TIER_3";
+  reportedKycStatus: KycState;
   reporter: string;
+  reporterEmail: string;
+  reporterUcid: string;
+  reporterRole: UserRole;
   reason: ReportReason;
+  severity: RiskLevel;
+  sourceContext: string;
   details: string;
+  flaggedExcerpt: string;
+  priorReportsCount: number;
+  priorWarningsCount: number;
+  activeContractsCount: number;
+  escrowExposureMinor: number;
+  checks: {
+    regexFlagged: boolean;
+    repeatOffender: boolean;
+    escrowAtRisk: boolean;
+    faydaVerified: boolean;
+  };
+  evidence: KycDoc[];
+  history: KycHistory[];
+  staffNotes: string | null;
   created: string;
   status: "OPEN" | ReportResolution;
 }

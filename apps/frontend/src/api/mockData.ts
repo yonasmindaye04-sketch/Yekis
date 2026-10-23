@@ -1695,20 +1695,36 @@ class MockStore {
 
   withholdingReports = [
     {
-      id: "wh-2026-09",
-      periodMonth: "2026-09",
-      totalWithholdingMinor: 6850000,
-      transactionCount: 42,
-      filedAt: isoDaysAgo(18),
-      eraReferenceNumber: "ERCA-WH-202609-88412",
-    },
-    {
       id: "wh-2026-10",
       periodMonth: "2026-10",
       totalWithholdingMinor: 5550000,
       transactionCount: 31,
-      filedAt: null,
-      eraReferenceNumber: null,
+      filedAt: null as string | null,
+      eraReferenceNumber: null as string | null,
+    },
+    {
+      id: "wh-2026-09",
+      periodMonth: "2026-09",
+      totalWithholdingMinor: 6850000,
+      transactionCount: 42,
+      filedAt: isoDaysAgo(18) as string | null,
+      eraReferenceNumber: "ERCA-WH-202609-88412" as string | null,
+    },
+    {
+      id: "wh-2026-08",
+      periodMonth: "2026-08",
+      totalWithholdingMinor: 6120000,
+      transactionCount: 38,
+      filedAt: isoDaysAgo(48) as string | null,
+      eraReferenceNumber: "ERCA-WH-202608-77109" as string | null,
+    },
+    {
+      id: "wh-2026-07",
+      periodMonth: "2026-07",
+      totalWithholdingMinor: 4980000,
+      transactionCount: 29,
+      filedAt: isoDaysAgo(79) as string | null,
+      eraReferenceNumber: "ERCA-WH-202607-64902" as string | null,
     },
   ];
 
@@ -2896,237 +2912,485 @@ class MockStore {
       };
     }
 
-    if (cleanPath === "/admin/payments") {
-      const items = [
-        {
-          id: "pay-1",
-          provider: "TELEBIRR",
-          providerTransactionId: "TB26101899201",
-          amountMinor: 5000000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(0.5),
-          milestone: {
+    if (cleanPath === "/admin/payments" || cleanPath.match(/^\/admin\/payments\/[^/]+\/action$/)) {
+      const storeWithPayments = this as unknown as {
+        adminPaymentsStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithPayments.adminPaymentsStore) {
+        storeWithPayments.adminPaymentsStore = [
+          {
+            id: "pay-1",
+            provider: "TELEBIRR",
+            providerTransactionId: "TB26101899201",
+            amountMinor: 5000000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(0.5),
+            milestone: {
+              id: "ms-202",
+              title: "Phase 2: Multi-Rail Escrow Checkout",
+              contract: {
+                id: "ctr-301",
+                client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+                freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
+                job: { title: "Telebirr SuperApp Mini-Program" },
+              },
+            },
+          },
+          {
+            id: "pay-2",
+            provider: "CBE_BIRR",
+            providerTransactionId: "FT26289C8831",
+            amountMinor: 6200000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(2),
+            milestone: {
+              id: "ms-203",
+              title: "Supply Chain Lot Tracking Schema",
+              contract: {
+                id: "ctr-302",
+                client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+                freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+                job: { title: "Addis Coffee Export ERP" },
+              },
+            },
+          },
+          {
+            id: "pay-3",
+            provider: "M_PESA",
+            providerTransactionId: "RJK91M28LP",
+            amountMinor: 3800000,
+            status: "PENDING",
+            createdAt: isoDaysAgo(0.35),
+            milestone: {
+              id: "ms-206",
+              title: "Fayda Biometric Liveness Wireframes",
+              contract: {
+                id: "ctr-304",
+                client: { id: "usr-client-02", email: "solomon@zemenbank.et", displayName: "Solomon T." },
+                freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+                job: { title: "Fayda National ID KYC Onboarding" },
+              },
+            },
+          },
+          {
+            id: "pay-4",
+            provider: "TELEBIRR",
+            providerTransactionId: "TB26101144109",
+            amountMinor: 4500000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(9),
+            milestone: {
+              id: "ms-201",
+              title: "Phase 1: Architecture & Telebirr H5 SDK",
+              contract: {
+                id: "ctr-301",
+                client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+                freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
+                job: { title: "Telebirr SuperApp Mini-Program" },
+              },
+            },
+          },
+          {
+            id: "pay-5",
+            provider: "CBE_BIRR",
+            providerTransactionId: "FT26290ERR44",
+            amountMinor: 2750000,
+            status: "FAILED",
+            createdAt: isoDaysAgo(1.2),
+            milestone: {
+              id: "ms-208",
+              title: "Legacy Inventory ERP API Connector",
+              contract: {
+                id: "ctr-306",
+                client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+                freelancer: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile" },
+                job: { title: "Legacy Inventory ERP API Connector" },
+              },
+            },
+          },
+        ];
+      }
+      if (cleanPath.endsWith("/action") && method === "POST") {
+        const pid = cleanPath.split("/")[3];
+        const act = String(parsedBody?.action || "VERIFY");
+        storeWithPayments.adminPaymentsStore = storeWithPayments.adminPaymentsStore.map((p) => {
+          if (p.id !== pid) return p;
+          const nextStatus =
+            act === "VERIFY" || act === "RESYNC"
+              ? "SUCCESS"
+              : act === "REFUND"
+                ? "FAILED"
+                : "PENDING";
+          return {
+            ...p,
+            status: nextStatus,
+            providerTransactionId: parsedBody?.ref ? String(parsedBody.ref) : p.providerTransactionId,
+          };
+        });
+        return { ok: true };
+      }
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const q = (query.get("q") || "").trim().toLowerCase();
+      const st = (query.get("status") || "").trim().toUpperCase();
+      const pr = (query.get("provider") || "").trim().toUpperCase();
+      const items = storeWithPayments.adminPaymentsStore.filter((p) => {
+        if (st && p.status !== st) return false;
+        if (pr && p.provider !== pr) return false;
+        if (q) {
+          const hay = JSON.stringify(p).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+      return { items, total: items.length, page: 1, pageSize: 25 };
+    }
+
+    if (cleanPath === "/admin/escrows" || cleanPath.match(/^\/admin\/escrows\/[^/]+\/(release|hold|unhold|action)$/)) {
+      const storeWithEscrows = this as unknown as {
+        adminEscrowsStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithEscrows.adminEscrowsStore) {
+        storeWithEscrows.adminEscrowsStore = [
+          {
             id: "ms-202",
             title: "Phase 2: Multi-Rail Escrow Checkout",
+            amountMinor: 5000000,
+            escrowState: "SUBMITTED_FOR_REVIEW",
+            createdAt: isoDaysAgo(3),
             contract: {
               id: "ctr-301",
+              job: { title: "Telebirr SuperApp Mini-Program" },
               client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
               freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
-              job: { title: "Telebirr SuperApp Mini-Program" },
             },
+            paymentTransactions: [{ provider: "TELEBIRR", providerTransactionId: "TB26101899201", status: "SUCCESS" }],
+            escrowHolds: [],
           },
-        },
-        {
-          id: "pay-2",
-          provider: "CBE_BIRR",
-          providerTransactionId: "FT26289C8831",
-          amountMinor: 6200000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(2),
-          milestone: {
+          {
             id: "ms-203",
             title: "Supply Chain Lot Tracking Schema",
+            amountMinor: 6200000,
+            escrowState: "WORK_IN_PROGRESS",
+            createdAt: isoDaysAgo(5),
             contract: {
               id: "ctr-302",
-              client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-              freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
               job: { title: "Addis Coffee Export ERP" },
-            },
-          },
-        },
-        {
-          id: "pay-3",
-          provider: "M_PESA",
-          providerTransactionId: "RJK91M28LP",
-          amountMinor: 3800000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(4),
-          milestone: {
-            id: "ms-206",
-            title: "Fayda Biometric Liveness Wireframes",
-            contract: {
-              id: "ctr-304",
-              client: { id: "usr-client-02", email: "solomon@zemenbank.et", displayName: "Solomon T." },
-              freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
-              job: { title: "Fayda National ID KYC Onboarding" },
-            },
-          },
-        },
-        {
-          id: "pay-4",
-          provider: "TELEBIRR",
-          providerTransactionId: "TB26101144109",
-          amountMinor: 4500000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(9),
-          milestone: {
-            id: "ms-201",
-            title: "Phase 1: Architecture & Telebirr H5 SDK",
-            contract: {
-              id: "ctr-301",
               client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-              freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
-              job: { title: "Telebirr SuperApp Mini-Program" },
+              freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
             },
+            paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8831", status: "SUCCESS" }],
+            escrowHolds: [],
           },
-        },
-      ];
+          {
+            id: "ms-204",
+            title: "Executive ECX Analytics & Container Map",
+            amountMinor: 5800000,
+            escrowState: "ESCROW_HELD",
+            createdAt: isoDaysAgo(6),
+            contract: {
+              id: "ctr-302",
+              job: { title: "Addis Coffee Export ERP" },
+              client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+              freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+            },
+            paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8839", status: "SUCCESS" }],
+            escrowHolds: [],
+          },
+          {
+            id: "ms-208",
+            title: "Legacy Inventory ERP API Connector",
+            amountMinor: 2750000,
+            escrowState: "DISPUTED",
+            createdAt: isoDaysAgo(8),
+            contract: {
+              id: "ctr-306",
+              job: { title: "Legacy Inventory ERP API Connector" },
+              client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
+              freelancer: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile" },
+            },
+            paymentTransactions: [{ provider: "M_PESA", providerTransactionId: "RJK88A12LP", status: "SUCCESS" }],
+            escrowHolds: [{ id: "hold-1", reason: "Dispute mediation active", createdAt: isoDaysAgo(4) }],
+          },
+          {
+            id: "ms-205",
+            title: "Full i18n JSON Bundles & Terminology Glossary",
+            amountMinor: 2800000,
+            escrowState: "RELEASED",
+            createdAt: isoDaysAgo(10),
+            contract: {
+              id: "ctr-303",
+              job: { title: "Amharic & Afaan Oromo FinTech App Localization" },
+              client: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+              freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
+            },
+            paymentTransactions: [{ provider: "TELEBIRR", providerTransactionId: "TB26100774120", status: "SUCCESS" }],
+            escrowHolds: [],
+          },
+        ];
+      }
+      if (method === "POST") {
+        const msId = cleanPath.split("/")[3];
+        const verb = cleanPath.split("/")[4];
+        const reason = String(parsedBody?.reason || "Administrative escrow action executed.");
+        const customAction = String(parsedBody?.action || "").toUpperCase();
+        storeWithEscrows.adminEscrowsStore = storeWithEscrows.adminEscrowsStore.map((e) => {
+          if (e.id !== msId) return e;
+          if (verb === "release" || customAction === "RELEASE") {
+            return { ...e, escrowState: "RELEASED", escrowHolds: [] };
+          }
+          if (verb === "hold" || customAction === "HOLD") {
+            return {
+              ...e,
+              escrowHolds: [{ id: `hold-${Date.now()}`, reason, createdAt: new Date().toISOString() }],
+            };
+          }
+          if (verb === "unhold" || customAction === "UNHOLD") {
+            return { ...e, escrowHolds: [] };
+          }
+          if (customAction === "PARTIAL_SPLIT") {
+            return { ...e, escrowState: "PARTIAL_REFUND", escrowHolds: [] };
+          }
+          if (customAction === "REFUND_CLIENT") {
+            return { ...e, escrowState: "REFUNDED", escrowHolds: [] };
+          }
+          if (customAction === "RETURN_WIP") {
+            return { ...e, escrowState: "WORK_IN_PROGRESS", escrowHolds: [] };
+          }
+          return e;
+        });
+        return { ok: true };
+      }
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const q = (query.get("q") || "").trim().toLowerCase();
+      const st = (query.get("escrowState") || "").trim().toUpperCase();
+      const items = storeWithEscrows.adminEscrowsStore.filter((e) => {
+        if (st && e.escrowState !== st) return false;
+        if (q) {
+          const hay = JSON.stringify(e).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
 
-    if (cleanPath === "/admin/escrows") {
-      const items = [
-        {
-          id: "ms-202",
-          title: "Phase 2: Multi-Rail Escrow Checkout",
-          amountMinor: 5000000,
-          escrowState: "SUBMITTED_FOR_REVIEW",
-          createdAt: isoDaysAgo(3),
-          contract: {
-            id: "ctr-301",
-            job: { title: "Telebirr SuperApp Mini-Program" },
-            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-            freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
+    if (cleanPath === "/admin/payouts" || cleanPath.match(/^\/admin\/payouts\/[^/]+\/settle$/)) {
+      const storeWithPayouts = this as unknown as {
+        adminPayoutsStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithPayouts.adminPayoutsStore) {
+        storeWithPayouts.adminPayoutsStore = [
+          {
+            id: "po-902",
+            amountMinor: 2900000,
+            feeMinor: 290000,
+            netAmountMinor: 2610000,
+            provider: "CBE_BIRR",
+            providerPayoutId: null,
+            payoutAccountIdentifier: "1000449281723",
+            status: "PENDING",
+            errorMessage: null,
+            createdAt: isoDaysAgo(0.3),
+            user: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
           },
-          paymentTransactions: [{ provider: "TELEBIRR", providerTransactionId: "TB26101899201", status: "SUCCESS" }],
-          escrowHolds: [],
-        },
-        {
-          id: "ms-203",
-          title: "Supply Chain Lot Tracking Schema",
-          amountMinor: 6200000,
-          escrowState: "WORK_IN_PROGRESS",
-          createdAt: isoDaysAgo(5),
-          contract: {
-            id: "ctr-302",
-            job: { title: "Addis Coffee Export ERP" },
-            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-            freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+          {
+            id: "po-903",
+            amountMinor: 3400000,
+            feeMinor: 340000,
+            netAmountMinor: 3060000,
+            provider: "M_PESA",
+            providerPayoutId: null,
+            payoutAccountIdentifier: "+251711904812",
+            status: "PENDING",
+            errorMessage: null,
+            createdAt: isoDaysAgo(0.1),
+            user: { id: "usr-free-03", email: "meron.alemu@lexethiopia.et", displayName: "Meron Alemu" },
           },
-          paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8831", status: "SUCCESS" }],
-          escrowHolds: [],
-        },
-        {
-          id: "ms-204",
-          title: "Executive ECX Analytics & Container Map",
-          amountMinor: 5800000,
-          escrowState: "ESCROW_HELD",
-          createdAt: isoDaysAgo(6),
-          contract: {
-            id: "ctr-302",
-            job: { title: "Addis Coffee Export ERP" },
-            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-            freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
+          {
+            id: "po-904",
+            amountMinor: 5100000,
+            feeMinor: 510000,
+            netAmountMinor: 4590000,
+            provider: "TELEBIRR",
+            providerPayoutId: "TB-PROC-9012",
+            payoutAccountIdentifier: "+251911665544",
+            status: "PROCESSING",
+            errorMessage: null,
+            createdAt: isoDaysAgo(0.45),
+            user: { id: "usr-free-04", email: "yohannes.t@addiscloud.et", displayName: "Yohannes Tesfaye" },
           },
-          paymentTransactions: [{ provider: "CBE_BIRR", providerTransactionId: "FT26289C8839", status: "SUCCESS" }],
-          escrowHolds: [],
-        },
-        {
-          id: "ms-208",
-          title: "Legacy Inventory ERP API Connector",
-          amountMinor: 2750000,
-          escrowState: "DISPUTED",
-          createdAt: isoDaysAgo(8),
-          contract: {
-            id: "ctr-306",
-            job: { title: "Legacy Inventory ERP API Connector" },
-            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-            freelancer: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile" },
+          {
+            id: "po-901",
+            amountMinor: 4500000,
+            feeMinor: 450000,
+            netAmountMinor: 4050000,
+            provider: "TELEBIRR",
+            providerPayoutId: "TB-OUT-88219",
+            payoutAccountIdentifier: "+251922345678",
+            status: "CONFIRMED",
+            errorMessage: null,
+            createdAt: isoDaysAgo(1),
+            user: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
           },
-          paymentTransactions: [{ provider: "M_PESA", providerTransactionId: "RJK88A12LP", status: "SUCCESS" }],
-          escrowHolds: [{ id: "hold-1", reason: "Dispute mediation active" }],
-        },
-      ];
+          {
+            id: "po-905",
+            amountMinor: 2750000,
+            feeMinor: 275000,
+            netAmountMinor: 2475000,
+            provider: "CBE_BIRR",
+            providerPayoutId: null,
+            payoutAccountIdentifier: "10009918200",
+            status: "FAILED",
+            errorMessage: "Beneficiary CBE account name mismatch / dormant wallet",
+            createdAt: isoDaysAgo(1.6),
+            user: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile" },
+          },
+        ];
+      }
+      if (cleanPath.endsWith("/settle") && method === "POST") {
+        const poId = cleanPath.split("/")[3];
+        const decision = String(parsedBody?.decision || "CONFIRMED");
+        const nextProvider = parsedBody?.provider ? String(parsedBody.provider) : null;
+        const nextAcct = parsedBody?.payoutAccountIdentifier ? String(parsedBody.payoutAccountIdentifier) : null;
+        storeWithPayouts.adminPayoutsStore = storeWithPayouts.adminPayoutsStore.map((p) => {
+          if (p.id !== poId) return p;
+          if (decision === "RETRY" || decision === "SWITCH_RAIL") {
+            return {
+              ...p,
+              status: "PROCESSING",
+              provider: nextProvider || p.provider,
+              payoutAccountIdentifier: nextAcct || p.payoutAccountIdentifier,
+              providerPayoutId: parsedBody?.providerPayoutId || `RETRY-${Date.now().toString().slice(-5)}`,
+              errorMessage: null,
+            };
+          }
+          if (decision === "HOLD") {
+            return {
+              ...p,
+              status: "PENDING",
+              errorMessage: String(parsedBody?.failureReason || "Compliance review hold placed by Finance Admin"),
+            };
+          }
+          return {
+            ...p,
+            status: decision === "CONFIRMED" ? "CONFIRMED" : "FAILED",
+            provider: nextProvider || p.provider,
+            payoutAccountIdentifier: nextAcct || p.payoutAccountIdentifier,
+            providerPayoutId:
+              decision === "CONFIRMED"
+                ? String(parsedBody?.providerPayoutId || `SETTLED-${Date.now().toString().slice(-6)}`)
+                : p.providerPayoutId,
+            errorMessage:
+              decision === "FAILED"
+                ? String(parsedBody?.failureReason || "Failed on rail — wallet re-credited")
+                : null,
+          };
+        });
+        return { ok: true, settledAt: new Date().toISOString() };
+      }
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const q = (query.get("q") || "").trim().toLowerCase();
+      const st = (query.get("status") || "").trim().toUpperCase();
+      const pr = (query.get("provider") || "").trim().toUpperCase();
+      const items = storeWithPayouts.adminPayoutsStore.filter((p) => {
+        if (st && p.status !== st) return false;
+        if (pr && p.provider !== pr) return false;
+        if (q) {
+          const hay = JSON.stringify(p).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
-    if (cleanPath.match(/^\/admin\/escrows\/[^/]+\/(release|hold|unhold)$/) && method === "POST") {
-      return { ok: true };
-    }
 
-    if (cleanPath === "/admin/payouts") {
-      const items = [
-        {
-          id: "po-901",
-          amountMinor: 4500000,
-          feeMinor: 450000,
-          netAmountMinor: 4050000,
-          provider: "TELEBIRR",
-          providerPayoutId: "TB-OUT-88219",
-          payoutAccountIdentifier: "+251922345678",
-          status: "CONFIRMED",
-          errorMessage: null,
-          createdAt: isoDaysAgo(1),
-          user: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
-        },
-        {
-          id: "po-902",
-          amountMinor: 2900000,
-          feeMinor: 290000,
-          netAmountMinor: 2610000,
-          provider: "CBE_BIRR",
-          providerPayoutId: null,
-          payoutAccountIdentifier: "1000449281723",
-          status: "PENDING",
-          errorMessage: null,
-          createdAt: isoDaysAgo(0.3),
-          user: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen" },
-        },
-        {
-          id: "po-903",
-          amountMinor: 3400000,
-          feeMinor: 340000,
-          netAmountMinor: 3060000,
-          provider: "M_PESA",
-          providerPayoutId: null,
-          payoutAccountIdentifier: "+251711904812",
-          status: "PENDING",
-          errorMessage: null,
-          createdAt: isoDaysAgo(0.1),
-          user: { id: "usr-free-03", email: "meron.alemu@lexethiopia.et", displayName: "Meron Alemu" },
-        },
-      ];
-      return { items, total: items.length, page: 1, pageSize: 25 };
-    }
-    if (cleanPath.match(/^\/admin\/payouts\/[^/]+\/settle$/) && method === "POST") {
-      return { ok: true, settledAt: new Date().toISOString() };
-    }
-
-    if (cleanPath === "/admin/reconciliation") {
-      const items = [
-        {
-          id: "rec-1",
-          provider: "TELEBIRR",
-          providerTransactionId: "TB26101899201",
-          amountMinor: 5000000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(0.5),
-          reconciliationStatus: "MATCHED",
-          differenceMinor: 0,
-          milestone: { escrowState: "SUBMITTED_FOR_REVIEW" },
-        },
-        {
-          id: "rec-2",
-          provider: "CBE_BIRR",
-          providerTransactionId: "FT26289C8831",
-          amountMinor: 6200000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(2),
-          reconciliationStatus: "MATCHED",
-          differenceMinor: 0,
-          milestone: { escrowState: "WORK_IN_PROGRESS" },
-        },
-        {
-          id: "rec-3",
-          provider: "M_PESA",
-          providerTransactionId: "RJK91M28LP",
-          amountMinor: 3800000,
-          status: "SUCCESS",
-          createdAt: isoDaysAgo(4),
-          reconciliationStatus: "PENDING",
-          differenceMinor: null,
-          milestone: { escrowState: "ESCROW_HELD" },
-        },
-      ];
+    if (cleanPath === "/admin/reconciliation" || cleanPath.match(/^\/admin\/reconciliation\/[^/]+\/resolve$/)) {
+      const storeWithRecon = this as unknown as {
+        adminReconStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithRecon.adminReconStore) {
+        storeWithRecon.adminReconStore = [
+          {
+            id: "rec-4",
+            provider: "CBE_BIRR",
+            providerTransactionId: "FT26291VAR902",
+            amountMinor: 5800000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(0.3),
+            reconciliationStatus: "MISMATCH",
+            differenceMinor: -45000, // ETB -450.00 unrecorded bank gateway fee
+            milestone: { escrowState: "ESCROW_HELD" },
+          },
+          {
+            id: "rec-5",
+            provider: "TELEBIRR",
+            providerTransactionId: "TB26101990442",
+            amountMinor: 4200000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(0.8),
+            reconciliationStatus: "MISMATCH",
+            differenceMinor: 120000, // ETB +1,200.00 duplicate callback credit
+            milestone: { escrowState: "WORK_IN_PROGRESS" },
+          },
+          {
+            id: "rec-3",
+            provider: "M_PESA",
+            providerTransactionId: "RJK91M28LP",
+            amountMinor: 3800000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(1.4),
+            reconciliationStatus: "PENDING",
+            differenceMinor: null,
+            milestone: { escrowState: "ESCROW_HELD" },
+          },
+          {
+            id: "rec-1",
+            provider: "TELEBIRR",
+            providerTransactionId: "TB26101899201",
+            amountMinor: 5000000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(0.5),
+            reconciliationStatus: "MATCHED",
+            differenceMinor: 0,
+            milestone: { escrowState: "SUBMITTED_FOR_REVIEW" },
+          },
+          {
+            id: "rec-2",
+            provider: "CBE_BIRR",
+            providerTransactionId: "FT26289C8831",
+            amountMinor: 6200000,
+            status: "SUCCESS",
+            createdAt: isoDaysAgo(2),
+            reconciliationStatus: "MATCHED",
+            differenceMinor: 0,
+            milestone: { escrowState: "WORK_IN_PROGRESS" },
+          },
+        ];
+      }
+      if (cleanPath.endsWith("/resolve") && method === "POST") {
+        const recId = cleanPath.split("/")[3];
+        const act = String(parsedBody?.action || "FORCE_MATCH");
+        storeWithRecon.adminReconStore = storeWithRecon.adminReconStore.map((r) => {
+          if (r.id !== recId) return r;
+          if (act === "FLAG_FAILED") {
+            return { ...r, reconciliationStatus: "FAILED" };
+          }
+          return {
+            ...r,
+            reconciliationStatus: "MATCHED",
+            differenceMinor: 0,
+          };
+        });
+        return { ok: true };
+      }
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const pr = (query.get("provider") || "").trim().toUpperCase();
+      const rs = (query.get("recStatus") || "").trim().toUpperCase();
+      const items = storeWithRecon.adminReconStore.filter((r) => {
+        if (pr && r.provider !== pr) return false;
+        if (rs && r.reconciliationStatus !== rs) return false;
+        return true;
+      });
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
 
@@ -3151,36 +3415,94 @@ class MockStore {
       };
     }
 
-    if (cleanPath === "/admin/ledger/journals") {
-      const items = [
-        {
-          id: "jrn-101",
-          description: "Escrow Lock — Telebirr SuperApp Phase 2 (TB26101899201)",
-          referenceType: "MILESTONE_ESCROW",
-          referenceId: "ms-202",
-          postedAt: isoDaysAgo(0.5),
-          totalDebitsMinor: 5000000,
-          totalCreditsMinor: 5000000,
-        },
-        {
-          id: "jrn-102",
-          description: "Milestone Release & Commission Split — Phase 1 SDK",
-          referenceType: "PAYOUT_SETTLEMENT",
-          referenceId: "po-901",
-          postedAt: isoDaysAgo(1),
-          totalDebitsMinor: 4500000,
-          totalCreditsMinor: 4500000,
-        },
-        {
-          id: "jrn-103",
-          description: "CBE Birr Custody Deposit — Addis Coffee Export ERP",
-          referenceType: "MILESTONE_ESCROW",
-          referenceId: "ms-203",
-          postedAt: isoDaysAgo(2),
-          totalDebitsMinor: 6200000,
-          totalCreditsMinor: 6200000,
-        },
-      ];
+    if (cleanPath === "/admin/ledger/journals" || cleanPath.match(/^\/admin\/ledger\/journals\/[^/]+\/action$/)) {
+      const storeWithJournals = this as unknown as {
+        adminJournalsStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithJournals.adminJournalsStore) {
+        storeWithJournals.adminJournalsStore = [
+          {
+            id: "jrn-101",
+            description: "Escrow Lock — Telebirr SuperApp Phase 2 (TB26101899201)",
+            referenceType: "MILESTONE_ESCROW",
+            referenceId: "ms-202",
+            postedAt: isoDaysAgo(0.5),
+            totalDebitsMinor: 5000000,
+            totalCreditsMinor: 5000000,
+          },
+          {
+            id: "jrn-102",
+            description: "Milestone Release & Commission Split — Phase 1 SDK (3% WHT Deducted)",
+            referenceType: "PAYOUT_SETTLEMENT",
+            referenceId: "po-901",
+            postedAt: isoDaysAgo(1),
+            totalDebitsMinor: 4500000,
+            totalCreditsMinor: 4500000,
+          },
+          {
+            id: "jrn-103",
+            description: "CBE Birr Custody Deposit — Addis Coffee Export ERP (FT26289C8831)",
+            referenceType: "MILESTONE_ESCROW",
+            referenceId: "ms-203",
+            postedAt: isoDaysAgo(2),
+            totalDebitsMinor: 6200000,
+            totalCreditsMinor: 6200000,
+          },
+          {
+            id: "jrn-104",
+            description: "ERCA Monthly Withholding Accrual Transfer — Period 2026-09",
+            referenceType: "WITHHOLDING_TAX",
+            referenceId: "wh-2026-09",
+            postedAt: isoDaysAgo(4),
+            totalDebitsMinor: 6850000,
+            totalCreditsMinor: 6850000,
+          },
+          {
+            id: "jrn-105",
+            description: "Platform Service Fee Realization (10% Marketplace Commission)",
+            referenceType: "PLATFORM_FEE",
+            referenceId: "ctr-303",
+            postedAt: isoDaysAgo(6),
+            totalDebitsMinor: 280000,
+            totalCreditsMinor: 280000,
+          },
+        ];
+      }
+      if (method === "POST") {
+        const act = String(parsedBody?.action || "ADJUSTMENT");
+        const amt = Number(parsedBody?.amountMinor || 45000);
+        const desc = String(
+          parsedBody?.description ||
+            (act === "REVERSE"
+              ? `Contra-Reversal Entry for ${cleanPath.split("/")[4]}`
+              : "Manual Ledger Adjustment Entry — Finance Admin"),
+        );
+        const refType = String(parsedBody?.referenceType || "MANUAL_ADJUSTMENT");
+        storeWithJournals.adminJournalsStore = [
+          {
+            id: `jrn-${Date.now().toString().slice(-4)}`,
+            description: desc,
+            referenceType: refType,
+            referenceId: String(parsedBody?.referenceId || "adj-01"),
+            postedAt: new Date().toISOString(),
+            totalDebitsMinor: amt,
+            totalCreditsMinor: amt,
+          },
+          ...storeWithJournals.adminJournalsStore,
+        ];
+        return { ok: true };
+      }
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const q = (query.get("q") || "").trim().toLowerCase();
+      const rt = (query.get("referenceType") || "").trim().toUpperCase();
+      const items = storeWithJournals.adminJournalsStore.filter((j) => {
+        if (rt && rt !== "ALL" && j.referenceType !== rt) return false;
+        if (q) {
+          const hay = JSON.stringify(j).toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
 
@@ -3209,7 +3531,7 @@ class MockStore {
     }
 
     if (cleanPath === "/admin/users") {
-      const items = [
+      const allUsers = [
         {
           id: "usr-client-01",
           ucid: "YEK-CL-1042",
@@ -3218,7 +3540,7 @@ class MockStore {
           displayName: "Abebe Kebede",
           role: "CLIENT",
           staffRole: null,
-          isSuspended: false,
+          isSuspended: Boolean((this as unknown as { suspendedUsers?: Record<string, boolean> }).suspendedUsers?.["usr-client-01"]),
           cachedKycTier: "TIER_2",
           cachedKycStatus: "VERIFIED",
           createdAt: isoDaysAgo(45),
@@ -3231,7 +3553,7 @@ class MockStore {
           displayName: "Hanna Tadesse",
           role: "FREELANCER",
           staffRole: null,
-          isSuspended: false,
+          isSuspended: Boolean((this as unknown as { suspendedUsers?: Record<string, boolean> }).suspendedUsers?.["usr-free-01"]),
           cachedKycTier: "TIER_2",
           cachedKycStatus: "VERIFIED",
           createdAt: isoDaysAgo(60),
@@ -3244,7 +3566,7 @@ class MockStore {
           displayName: "Dawit Mekonnen",
           role: "BOTH",
           staffRole: null,
-          isSuspended: false,
+          isSuspended: Boolean((this as unknown as { suspendedUsers?: Record<string, boolean> }).suspendedUsers?.["usr-both-01"]),
           cachedKycTier: "TIER_3",
           cachedKycStatus: "VERIFIED",
           createdAt: isoDaysAgo(30),
@@ -3257,45 +3579,204 @@ class MockStore {
           displayName: "Meron Alemu",
           role: "FREELANCER",
           staffRole: null,
-          isSuspended: false,
+          isSuspended: Boolean((this as unknown as { suspendedUsers?: Record<string, boolean> }).suspendedUsers?.["usr-free-03"]),
           cachedKycTier: "TIER_3",
           cachedKycStatus: "VERIFIED",
           createdAt: isoDaysAgo(75),
         },
       ];
+      const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+      const q = (query.get("q") || "").trim().toLowerCase();
+      const roleFilter = (query.get("role") || "").trim().toUpperCase();
+      const items = allUsers.filter((u) => {
+        if (roleFilter && u.role !== roleFilter) return false;
+        if (q) {
+          const hay = `${u.displayName} ${u.email} ${u.phone} ${u.ucid}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
       return { items, total: items.length, page: 1, pageSize: 25 };
     }
     if (cleanPath.match(/^\/admin\/users\/[^/]+\/(suspend|unsuspend|force-kyc-rereview)$/) && method === "POST") {
       const uid = cleanPath.split("/")[3];
+      const storeWithSusp = this as unknown as { suspendedUsers?: Record<string, boolean> };
+      if (!storeWithSusp.suspendedUsers) storeWithSusp.suspendedUsers = {};
+      if (cleanPath.endsWith("/suspend")) storeWithSusp.suspendedUsers[uid] = true;
+      if (cleanPath.endsWith("/unsuspend")) storeWithSusp.suspendedUsers[uid] = false;
       return {
         id: uid,
-        isSuspended: cleanPath.endsWith("/suspend"),
+        isSuspended: Boolean(storeWithSusp.suspendedUsers[uid]),
         kycRecordId: "kyc-1",
         periodicReviewPending: true,
         nextReviewDueAt: isoDaysFromNow(14),
       };
     }
     if (cleanPath.startsWith("/admin/users/")) {
-      return {
+      const uid = cleanPath.split("/")[3] || "usr-free-01";
+      const storeWithSusp = this as unknown as { suspendedUsers?: Record<string, boolean> };
+      const isSuspended = Boolean(storeWithSusp.suspendedUsers?.[uid]);
+      const profiles: Record<string, {
         user: {
-          id: "usr-free-01",
-          email: "hanna.tadesse@addisdev.et",
-          phone: "+251922345678",
-          displayName: "Hanna Tadesse",
-          cachedKycTier: "TIER_2",
-          cachedKycStatus: "VERIFIED",
-          profileCompleteness: 98,
-        },
-        walletBalance: 14280000,
+          id: string;
+          ucid: string;
+          email: string;
+          phone: string;
+          displayName: string;
+          role: "CLIENT" | "FREELANCER" | "BOTH";
+          isSuspended: boolean;
+          cachedKycTier: string;
+          cachedKycStatus: string;
+          profileCompleteness: number;
+          createdAt: string;
+        };
+        walletBalance: number;
+        walletBalanceMinor: number;
         activity: {
-          jobsPosted: 2,
-          proposalsSubmitted: 19,
-          contractsAsClient: 1,
-          contractsAsFreelancer: 14,
-          gigsOwned: 3,
-          gigOrders: 38,
+          jobsPosted: number;
+          proposalsSubmitted: number;
+          contractsAsClient: number;
+          contractsAsFreelancer: number;
+          gigsOwned: number;
+          gigOrders: number;
+        };
+        recentConversations: Array<{ id: string; subject: string; status: string; updatedAt: string }>;
+        recentAudit: Array<{ id: string; eventType: string; entityType: string; action: string | null; createdAt: string }>;
+      }> = {
+        "usr-client-01": {
+          user: {
+            id: "usr-client-01",
+            ucid: "YEK-CL-1042",
+            email: "abebe.kebede@abyssinia-tech.et",
+            phone: "+251911234567",
+            displayName: "Abebe Kebede",
+            role: "CLIENT",
+            isSuspended,
+            cachedKycTier: "TIER_2",
+            cachedKycStatus: "VERIFIED",
+            profileCompleteness: 95,
+            createdAt: isoDaysAgo(45),
+          },
+          walletBalance: 24500000,
+          walletBalanceMinor: 24500000,
+          activity: {
+            jobsPosted: 8,
+            proposalsSubmitted: 0,
+            contractsAsClient: 6,
+            contractsAsFreelancer: 0,
+            gigsOwned: 0,
+            gigOrders: 4,
+          },
+          recentConversations: [
+            { id: "sup-101", subject: "Telebirr Corporate Escrow Deposit Receipt Inquiry", status: "CLOSED", updatedAt: isoDaysAgo(3) },
+            { id: "sup-102", subject: "VAT Fiscal Invoice TIN Verification for Abyssinia Tech", status: "OPEN", updatedAt: isoDaysAgo(0.8) },
+          ],
+          recentAudit: [
+            { id: "aud-u1", eventType: "ESCROW_FUNDED", entityType: "Milestone", action: "TELEBIRR_H5_DEPOSIT", createdAt: isoDaysAgo(0.5) },
+            { id: "aud-u2", eventType: "MILESTONE_RELEASED", entityType: "Milestone", action: "CLIENT_APPROVAL", createdAt: isoDaysAgo(4) },
+            { id: "aud-u3", eventType: "KYC_VERIFIED", entityType: "KycRecord", action: "TIER_2_APPROVED", createdAt: isoDaysAgo(40) },
+          ],
+        },
+        "usr-free-01": {
+          user: {
+            id: "usr-free-01",
+            ucid: "YEK-FL-2089",
+            email: "hanna.tadesse@addisdev.et",
+            phone: "+251922345678",
+            displayName: "Hanna Tadesse",
+            role: "FREELANCER",
+            isSuspended,
+            cachedKycTier: "TIER_2",
+            cachedKycStatus: "VERIFIED",
+            profileCompleteness: 98,
+            createdAt: isoDaysAgo(60),
+          },
+          walletBalance: 14280000,
+          walletBalanceMinor: 14280000,
+          activity: {
+            jobsPosted: 2,
+            proposalsSubmitted: 19,
+            contractsAsClient: 1,
+            contractsAsFreelancer: 14,
+            gigsOwned: 3,
+            gigOrders: 38,
+          },
+          recentConversations: [
+            { id: "sup-2", subject: "Fayda TIN Certificate Tier 2 Upgrade Inquiry", status: "OPEN", updatedAt: isoDaysAgo(0.6) },
+          ],
+          recentAudit: [
+            { id: "aud-f1", eventType: "PAYOUT_SETTLED", entityType: "Payout", action: "TELEBIRR_DISBURSEMENT", createdAt: isoDaysAgo(1) },
+            { id: "aud-f2", eventType: "DELIVERABLE_SUBMITTED", entityType: "Milestone", action: "UPLOAD_BUILD_ARCHIVE", createdAt: isoDaysAgo(2) },
+            { id: "aud-f3", eventType: "KYC_VERIFIED", entityType: "KycRecord", action: "FAYDA_TIER2_APPROVED", createdAt: isoDaysAgo(15) },
+          ],
+        },
+        "usr-both-01": {
+          user: {
+            id: "usr-both-01",
+            ucid: "YEK-DL-3015",
+            email: "dawit.mekonnen@ethio-digital.et",
+            phone: "+251933456789",
+            displayName: "Dawit Mekonnen",
+            role: "BOTH",
+            isSuspended,
+            cachedKycTier: "TIER_3",
+            cachedKycStatus: "VERIFIED",
+            profileCompleteness: 100,
+            createdAt: isoDaysAgo(30),
+          },
+          walletBalance: 31850000,
+          walletBalanceMinor: 31850000,
+          activity: {
+            jobsPosted: 5,
+            proposalsSubmitted: 24,
+            contractsAsClient: 4,
+            contractsAsFreelancer: 11,
+            gigsOwned: 4,
+            gigOrders: 29,
+          },
+          recentConversations: [
+            { id: "sup-1", subject: "CBE Birr Receipt Reference Verification", status: "OPEN", updatedAt: isoDaysAgo(0.2) },
+          ],
+          recentAudit: [
+            { id: "aud-b1", eventType: "TOPUP_SUBMITTED", entityType: "WalletTopUp", action: "CBE_RECEIPT_UPLOAD", createdAt: isoDaysAgo(0.3) },
+            { id: "aud-b2", eventType: "CONTRACT_SIGNED", entityType: "Contract", action: "ESCROW_ACTIVE", createdAt: isoDaysAgo(5) },
+            { id: "aud-b3", eventType: "KYC_VERIFIED", entityType: "KycRecord", action: "TIER_3_BUSINESS_APPROVED", createdAt: isoDaysAgo(25) },
+          ],
+        },
+        "usr-free-03": {
+          user: {
+            id: "usr-free-03",
+            ucid: "YEK-FL-3890",
+            email: "meron.alemu@lexethiopia.et",
+            phone: "+251944112233",
+            displayName: "Meron Alemu",
+            role: "FREELANCER",
+            isSuspended,
+            cachedKycTier: "TIER_3",
+            cachedKycStatus: "VERIFIED",
+            profileCompleteness: 96,
+            createdAt: isoDaysAgo(75),
+          },
+          walletBalance: 8940000,
+          walletBalanceMinor: 8940000,
+          activity: {
+            jobsPosted: 0,
+            proposalsSubmitted: 15,
+            contractsAsClient: 0,
+            contractsAsFreelancer: 9,
+            gigsOwned: 2,
+            gigOrders: 21,
+          },
+          recentConversations: [
+            { id: "sup-301", subject: "M-Pesa Safaricom Payout Settlement Confirmation", status: "CLOSED", updatedAt: isoDaysAgo(4) },
+          ],
+          recentAudit: [
+            { id: "aud-m1", eventType: "PAYOUT_REQUESTED", entityType: "Payout", action: "MPESA_WITHDRAWAL", createdAt: isoDaysAgo(0.1) },
+            { id: "aud-m2", eventType: "WHT_CERTIFICATE_ISSUED", entityType: "TaxVoucher", action: "ERCA_3PCT_WHT", createdAt: isoDaysAgo(6) },
+          ],
         },
       };
+      return profiles[uid] ?? profiles["usr-free-01"];
     }
 
     if (cleanPath === "/admin/staff") {
@@ -3368,62 +3849,178 @@ class MockStore {
       return { id: gigId, status: nextStatus };
     }
 
-    if (cleanPath === "/admin/contracts") {
-      const items = [
-        {
-          id: "ctr-301",
-          status: "ACTIVE",
-          createdAt: isoDaysAgo(14),
-          client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede", role: "CLIENT" },
-          freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse", role: "FREELANCER" },
-          job: { id: "job-101", title: "Telebirr SuperApp Mini-Program", category: "WEB_APP_DEVELOPMENT" },
-          _count: { milestones: 2 },
-        },
-        {
-          id: "ctr-302",
-          status: "ACTIVE",
-          createdAt: isoDaysAgo(9),
-          client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede", role: "CLIENT" },
-          freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
-          job: { id: "job-102", title: "Addis Coffee Export ERP", category: "WEB_APP_DEVELOPMENT" },
-          _count: { milestones: 2 },
-        },
-        {
-          id: "ctr-303",
-          status: "COMPLETED",
-          createdAt: isoDaysAgo(12),
-          client: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
-          freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse", role: "FREELANCER" },
-          job: { id: "job-104", title: "Amharic & Afaan Oromo FinTech App Localization", category: "TRANSLATION" },
-          _count: { milestones: 1 },
-        },
-      ];
-      return { items, total: items.length, page: 1, pageSize: 25 };
-    }
+    if (cleanPath === "/admin/contracts" || cleanPath.startsWith("/admin/contracts/")) {
+      const storeWithContracts = this as unknown as {
+        adminContractsStore?: Array<{
+          id: string;
+          status: string;
+          createdAt: string;
+          client: { id: string; email: string; displayName: string; role: string };
+          freelancer: { id: string; email: string; displayName: string; role: string };
+          job: { id: string; title: string; category: string };
+          milestones: Array<{ id: string; title: string; amountMinor: number; escrowState: string }>;
+          payments: Array<{ provider: string; amountMinor: number; status: string; createdAt: string; milestone: { title: string } }>;
+          disputes: Array<{ id: string; stage: string; category: string }>;
+        }>;
+      };
+      if (!storeWithContracts.adminContractsStore) {
+        storeWithContracts.adminContractsStore = [
+          {
+            id: "ctr-301",
+            status: "ACTIVE",
+            createdAt: isoDaysAgo(14),
+            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede", role: "CLIENT" },
+            freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse", role: "FREELANCER" },
+            job: { id: "job-101", title: "Telebirr SuperApp Mini-Program", category: "WEB_APP_DEVELOPMENT" },
+            milestones: [
+              { id: "ms-201", title: "Phase 1: Architecture & Telebirr H5 SDK", amountMinor: 4500000, escrowState: "RELEASED" },
+              { id: "ms-202", title: "Phase 2: Multi-Rail Escrow Checkout", amountMinor: 5000000, escrowState: "SUBMITTED_FOR_REVIEW" },
+            ],
+            payments: [
+              { provider: "TELEBIRR", amountMinor: 4500000, status: "SUCCESS", createdAt: isoDaysAgo(12), milestone: { title: "Phase 1" } },
+              { provider: "TELEBIRR", amountMinor: 5000000, status: "SUCCESS", createdAt: isoDaysAgo(3), milestone: { title: "Phase 2" } },
+            ],
+            disputes: [],
+          },
+          {
+            id: "ctr-302",
+            status: "ACTIVE",
+            createdAt: isoDaysAgo(9),
+            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede", role: "CLIENT" },
+            freelancer: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
+            job: { id: "job-102", title: "Addis Coffee Export ERP", category: "WEB_APP_DEVELOPMENT" },
+            milestones: [
+              { id: "ms-203", title: "Supply Chain Lot Tracking Schema", amountMinor: 6200000, escrowState: "WORK_IN_PROGRESS" },
+              { id: "ms-204", title: "Executive ECX Analytics & Container Map", amountMinor: 5800000, escrowState: "ESCROW_HELD" },
+            ],
+            payments: [
+              { provider: "CBE_BIRR", amountMinor: 6200000, status: "SUCCESS", createdAt: isoDaysAgo(5), milestone: { title: "Lot Tracking Schema" } },
+              { provider: "CBE_BIRR", amountMinor: 5800000, status: "SUCCESS", createdAt: isoDaysAgo(2), milestone: { title: "ECX Analytics" } },
+            ],
+            disputes: [],
+          },
+          {
+            id: "ctr-306",
+            status: "ACTIVE",
+            createdAt: isoDaysAgo(8),
+            client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede", role: "CLIENT" },
+            freelancer: { id: "usr-free-02", email: "bereket@coders.et", displayName: "Bereket Haile", role: "FREELANCER" },
+            job: { id: "job-106", title: "Legacy Inventory ERP API Connector", category: "WEB_APP_DEVELOPMENT" },
+            milestones: [
+              { id: "ms-208", title: "ERP API Connector & SKU Batch Sync", amountMinor: 2750000, escrowState: "DISPUTED" },
+            ],
+            payments: [
+              { provider: "M_PESA", amountMinor: 2750000, status: "SUCCESS", createdAt: isoDaysAgo(7), milestone: { title: "ERP API Connector" } },
+            ],
+            disputes: [{ id: "dsp-601", stage: "STAGE_3_MEDIATION", category: "QUALITY_OF_WORK" }],
+          },
+          {
+            id: "ctr-303",
+            status: "COMPLETED",
+            createdAt: isoDaysAgo(12),
+            client: { id: "usr-both-01", email: "dawit.mekonnen@ethio-digital.et", displayName: "Dawit Mekonnen", role: "BOTH" },
+            freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse", role: "FREELANCER" },
+            job: { id: "job-104", title: "Amharic & Afaan Oromo FinTech App Localization", category: "TRANSLATION" },
+            milestones: [
+              { id: "ms-205", title: "Full i18n JSON Bundles & Terminology Glossary", amountMinor: 2800000, escrowState: "RELEASED" },
+            ],
+            payments: [
+              { provider: "TELEBIRR", amountMinor: 2800000, status: "SUCCESS", createdAt: isoDaysAgo(10), milestone: { title: "Full i18n JSON Bundles" } },
+            ],
+            disputes: [],
+          },
+        ];
+      }
 
-    if (cleanPath.startsWith("/admin/contracts/")) {
+      if (cleanPath.match(/^\/admin\/contracts\/[^/]+\/intervene$/) && method === "POST") {
+        const cid = cleanPath.split("/")[3];
+        const act = String(parsedBody?.action || "RELEASE_MILESTONE");
+        storeWithContracts.adminContractsStore = storeWithContracts.adminContractsStore.map((c) => {
+          if (c.id !== cid) return c;
+          if (act === "RELEASE_MILESTONE") {
+            return {
+              ...c,
+              milestones: c.milestones.map((m, idx) =>
+                idx === c.milestones.length - 1 || m.escrowState !== "RELEASED"
+                  ? { ...m, escrowState: "RELEASED" }
+                  : m,
+              ),
+              status: "COMPLETED",
+            };
+          }
+          if (act === "TERMINATE_REFUND") {
+            return {
+              ...c,
+              status: "TERMINATED",
+              milestones: c.milestones.map((m) =>
+                m.escrowState !== "RELEASED" ? { ...m, escrowState: "REFUNDED" } : m,
+              ),
+            };
+          }
+          if (act === "OPEN_MEDIATION") {
+            return {
+              ...c,
+              disputes: [
+                ...c.disputes,
+                { id: `dsp-${Date.now().toString().slice(-3)}`, stage: "STAGE_3_MEDIATION", category: "ADMIN_ESCALATION" },
+              ],
+            };
+          }
+          if (act === "COMPLETE_CONTRACT") {
+            return { ...c, status: "COMPLETED" };
+          }
+          return c;
+        });
+        return { ok: true };
+      }
+
+      if (cleanPath === "/admin/contracts") {
+        const query = new URLSearchParams(path.includes("?") ? path.split("?")[1] : "");
+        const q = (query.get("q") || "").trim().toLowerCase();
+        const st = (query.get("status") || "").trim().toUpperCase();
+        const filtered = storeWithContracts.adminContractsStore.filter((c) => {
+          if (st && c.status !== st) return false;
+          if (q) {
+            const hay = `${c.id} ${c.job.title} ${c.client.displayName} ${c.freelancer.displayName}`.toLowerCase();
+            if (!hay.includes(q)) return false;
+          }
+          return true;
+        });
+        const items = filtered.map((c) => ({
+          id: c.id,
+          status: c.status,
+          createdAt: c.createdAt,
+          client: c.client,
+          freelancer: c.freelancer,
+          job: c.job,
+          _count: { milestones: c.milestones.length },
+        }));
+        return { items, total: items.length, page: 1, pageSize: 25 };
+      }
+
+      const cid = cleanPath.split("/")[3] || "ctr-301";
+      const found =
+        storeWithContracts.adminContractsStore.find((c) => c.id === cid) ||
+        storeWithContracts.adminContractsStore[0];
+      const escrowHeldMinor = found.milestones
+        .filter((m) => m.escrowState !== "RELEASED" && m.escrowState !== "REFUNDED")
+        .reduce((acc, m) => acc + m.amountMinor, 0);
       return {
         contract: {
-          id: "ctr-301",
-          status: "ACTIVE",
-          createdAt: isoDaysAgo(14),
-          jobTitle: "Telebirr SuperApp Mini-Program",
-          jobCategory: "WEB_APP_DEVELOPMENT",
+          id: found.id,
+          status: found.status,
+          createdAt: found.createdAt,
+          jobTitle: found.job.title,
+          jobCategory: found.job.category,
         },
         parties: {
-          client: { id: "usr-client-01", email: "abebe.kebede@abyssinia-tech.et", displayName: "Abebe Kebede" },
-          freelancer: { id: "usr-free-01", email: "hanna.tadesse@addisdev.et", displayName: "Hanna Tadesse" },
+          client: found.client,
+          freelancer: found.freelancer,
         },
-        milestones: [
-          { id: "ms-201", title: "Phase 1: Architecture & Telebirr H5 SDK", amountMinor: 4500000, escrowState: "RELEASED" },
-          { id: "ms-202", title: "Phase 2: Multi-Rail Escrow Checkout", amountMinor: 5000000, escrowState: "SUBMITTED_FOR_REVIEW" },
-        ],
-        payments: [
-          { provider: "TELEBIRR", amountMinor: 4500000, status: "SUCCESS", createdAt: isoDaysAgo(12), milestone: { title: "Phase 1" } },
-          { provider: "TELEBIRR", amountMinor: 5000000, status: "SUCCESS", createdAt: isoDaysAgo(3), milestone: { title: "Phase 2" } },
-        ],
-        disputes: [],
-        totals: { escrowHeldMinor: 5000000, milestoneCount: 2 },
+        milestones: found.milestones,
+        payments: found.payments,
+        disputes: found.disputes,
+        totals: { escrowHeldMinor, milestoneCount: found.milestones.length },
       };
     }
 
@@ -3559,24 +4156,299 @@ class MockStore {
       return { ok: true };
     }
 
-    if (cleanPath === "/staff/reports") {
-      return {
-        data: [
+    if (cleanPath === "/staff/reports" || (cleanPath.match(/^\/staff\/reports\/[^/]+$/) && method === "PATCH")) {
+      const storeWithReports = this as unknown as {
+        profileReportsStore?: Array<Record<string, unknown>>;
+      };
+      if (!storeWithReports.profileReportsStore) {
+        storeWithReports.profileReportsStore = [
           {
             id: "rep-1",
             reason: "OFF_PLATFORM_CONTACT",
-            details: "Requested direct Telegram handle in proposal cover letter.",
+            severity: "HIGH",
+            sourceContext: "Proposal #PRP-884 · Telebirr SuperApp Mini-Program",
+            details:
+              "Requested direct Telegram handle (@natnael_dev_et) and direct CBE bank transfer in proposal cover letter to bypass the 10% platform commission.",
+            flaggedExcerpt:
+              "Selam Abebe, we can skip the Yekis escrow fee if you message me directly on Telegram @natnael_dev_et and transfer 50% upfront to my CBE account 100038492011.",
             status: "PENDING",
             staffNotes: null,
             createdAt: isoDaysAgo(1),
-            reportedUser: { id: "usr-free-08", ucid: "YEK-FL-2911", displayName: "Natnael G." },
+            priorReportsCount: 2,
+            priorWarningsCount: 1,
+            activeContractsCount: 1,
+            escrowExposureMinor: 4500000,
+            reportedUser: {
+              id: "usr-free-01",
+              ucid: "YEK-FL-2911",
+              displayName: "Natnael Girma",
+              email: "natnael.g@codersaddis.et",
+              role: "FREELANCER",
+              kycTier: "TIER_2",
+              kycStatus: "VERIFIED",
+            },
+            reporter: {
+              id: "usr-client-01",
+              ucid: "YEK-CL-1042",
+              displayName: "Abebe Kebede",
+              email: "abebe.kebede@abyssinia-tech.et",
+              role: "CLIENT",
+            },
+            checks: {
+              regexFlagged: true,
+              repeatOffender: true,
+              escrowAtRisk: true,
+              faydaVerified: true,
+            },
+            evidence: [
+              { id: "doc-1", t: "PROPOSAL_COVER_LETTER", k: "id-front" },
+              { id: "doc-2", t: "REGEX_FILTER_LOG", k: "tin" },
+            ],
+            history: [
+              {
+                d: "RESOLVED_WARNED",
+                by: "kaleb.mediation@yekis.et",
+                at: isoDaysAgo(18),
+                reason: "First strike warning issued for sharing phone number in gig FAQ.",
+              },
+            ],
           },
-        ],
-        pagination: { page: 1, limit: 25, total: 1, totalPages: 1 },
+          {
+            id: "rep-2",
+            reason: "IMPERSONATION",
+            severity: "CRITICAL",
+            sourceContext: "Public Portfolio & Gig Listing #GIG-512",
+            details:
+              "Copied portfolio UI screenshots, ECX coffee export case study metrics, and Bole trade registration number from Hanna Tadesse's verified Tier 3 profile.",
+            flaggedExcerpt:
+              "Lead Architect of the Addis Coffee Export ERP (Reg: AA/BOLE/2025/99104) — 100% verified ECX logistics platform builder.",
+            status: "PENDING",
+            staffNotes: null,
+            createdAt: isoDaysAgo(0.4),
+            priorReportsCount: 3,
+            priorWarningsCount: 2,
+            activeContractsCount: 0,
+            escrowExposureMinor: 0,
+            reportedUser: {
+              id: "usr-free-03",
+              ucid: "YEK-FL-4402",
+              displayName: "Biniyam Tekle",
+              email: "biniyam.ethio@devmail.et",
+              role: "FREELANCER",
+              kycTier: "TIER_1",
+              kycStatus: "PENDING",
+            },
+            reporter: {
+              id: "usr-free-01",
+              ucid: "YEK-FL-2089",
+              displayName: "Hanna Tadesse",
+              email: "hanna.tadesse@addisdev.et",
+              role: "FREELANCER",
+            },
+            checks: {
+              regexFlagged: true,
+              repeatOffender: true,
+              escrowAtRisk: false,
+              faydaVerified: false,
+            },
+            evidence: [
+              { id: "doc-3", t: "PORTFOLIO_HASH_MATCH", k: "id-front" },
+              { id: "doc-4", t: "STOLEN_TIN_REG_CLAIM", k: "tin" },
+            ],
+            history: [
+              {
+                d: "AUTOMATED_SIMILARITY_FLAG",
+                by: "system.trust@yekis.et",
+                at: isoDaysAgo(1.2),
+                reason: "98.4% image perceptual hash match against verified freelancer YEK-FL-2089.",
+              },
+            ],
+          },
+          {
+            id: "rep-3",
+            reason: "FRAUD",
+            severity: "CRITICAL",
+            sourceContext: "Direct Chat #CONV-741 · ERP Inventory Sync",
+            details:
+              "Sent an unverified CBE Birr receipt screenshot in direct chat claiming Milestone #2 was funded, pressuring freelancer to hand over production SSH credentials before escrow state transitioned to ESCROW_HELD.",
+            flaggedExcerpt:
+              "I already transferred ETB 65,000 via CBE Birr (Ref FT26000UNVERIFIED). The admin queue is slow—send me the production database dump now or I will cancel.",
+            status: "PENDING",
+            staffNotes: null,
+            createdAt: isoDaysAgo(0.7),
+            priorReportsCount: 1,
+            priorWarningsCount: 0,
+            activeContractsCount: 2,
+            escrowExposureMinor: 6200000,
+            reportedUser: {
+              id: "usr-client-01",
+              ucid: "YEK-CL-3190",
+              displayName: "Robel Assefa",
+              email: "robel.imports@boletrade.et",
+              role: "CLIENT",
+              kycTier: "TIER_2",
+              kycStatus: "VERIFIED",
+            },
+            reporter: {
+              id: "usr-both-01",
+              ucid: "YEK-DL-3015",
+              displayName: "Dawit Mekonnen",
+              email: "dawit.mekonnen@ethio-digital.et",
+              role: "BOTH",
+            },
+            checks: {
+              regexFlagged: true,
+              repeatOffender: false,
+              escrowAtRisk: true,
+              faydaVerified: true,
+            },
+            evidence: [
+              { id: "doc-1", t: "CHAT_TRANSCRIPT_SNAPSHOT", k: "id-front" },
+              { id: "doc-2", t: "UNMATCHED_CBE_RECEIPT", k: "license" },
+            ],
+            history: [
+              {
+                d: "ESCALATED_FROM_SUPPORT",
+                by: "yonael.ops@yekis.et",
+                at: isoDaysAgo(0.6),
+                reason: "Receipt reference FT26000UNVERIFIED not found in CBE custody settlement ledger.",
+              },
+            ],
+          },
+          {
+            id: "rep-4",
+            reason: "ABUSIVE_LANGUAGE",
+            severity: "MEDIUM",
+            sourceContext: "Contract #CTR-304 · Milestone Revision Thread",
+            details:
+              "Used hostile language in milestone revision thread after client requested an RTL/Amharic typography alignment fix.",
+            flaggedExcerpt:
+              "Stop wasting my time with nitpicky Figma alignment checks or I will wipe the staging branch tonight.",
+            status: "PENDING",
+            staffNotes: null,
+            createdAt: isoDaysAgo(2.3),
+            priorReportsCount: 1,
+            priorWarningsCount: 0,
+            activeContractsCount: 1,
+            escrowExposureMinor: 3800000,
+            reportedUser: {
+              id: "usr-both-01",
+              ucid: "YEK-FL-3318",
+              displayName: "Samuel Bekele",
+              email: "samuel.b@hawassadevs.et",
+              role: "FREELANCER",
+              kycTier: "TIER_2",
+              kycStatus: "VERIFIED",
+            },
+            reporter: {
+              id: "usr-client-01",
+              ucid: "YEK-CL-1804",
+              displayName: "Solomon T.",
+              email: "solomon@zemenbank.et",
+              role: "CLIENT",
+            },
+            checks: {
+              regexFlagged: false,
+              repeatOffender: false,
+              escrowAtRisk: true,
+              faydaVerified: true,
+            },
+            evidence: [
+              { id: "doc-3", t: "REVISION_THREAD_LOG", k: "id-front" },
+            ],
+            history: [],
+          },
+          {
+            id: "rep-5",
+            reason: "SPAM",
+            severity: "LOW",
+            sourceContext: "Direct Message Broadcast",
+            details:
+              "Sent unsolicited bulk messages to 14 freelancers offering paid Telegram channel promotions and artificial gig review swaps.",
+            flaggedExcerpt:
+              "Boost your Yekis gig ranking in 24 hours! Join our Addis review exchange group for ETB 500.",
+            status: "RESOLVED_PROFILE_HIDDEN",
+            staffNotes: "Profile hidden until promotional links removed from bio.",
+            createdAt: isoDaysAgo(5),
+            priorReportsCount: 2,
+            priorWarningsCount: 1,
+            activeContractsCount: 0,
+            escrowExposureMinor: 0,
+            reportedUser: {
+              id: "usr-free-03",
+              ucid: "YEK-FL-5012",
+              displayName: "Kirubel M.",
+              email: "kirubel.seo@addispromo.et",
+              role: "FREELANCER",
+              kycTier: "TIER_1",
+              kycStatus: "VERIFIED",
+            },
+            reporter: {
+              id: "usr-free-03",
+              ucid: "YEK-FL-3890",
+              displayName: "Meron Alemu",
+              email: "meron.alemu@lexethiopia.et",
+              role: "FREELANCER",
+            },
+            checks: {
+              regexFlagged: true,
+              repeatOffender: true,
+              escrowAtRisk: false,
+              faydaVerified: true,
+            },
+            evidence: [
+              { id: "doc-4", t: "BULK_DM_RATE_LOG", k: "tin" },
+            ],
+            history: [
+              {
+                d: "RESOLVED_PROFILE_HIDDEN",
+                by: "yonael.ops@yekis.et",
+                at: isoDaysAgo(4.2),
+                reason: "Profile hidden until promotional links removed from bio.",
+              },
+            ],
+          },
+        ];
+      }
+
+      if (method === "PATCH") {
+        const repId = cleanPath.split("/")[3];
+        const nextStatus = String(parsedBody?.status || "RESOLVED_NO_ACTION");
+        const staffNotes = String(parsedBody?.staffNotes || "Reviewed by Trust & Safety.");
+        storeWithReports.profileReportsStore = storeWithReports.profileReportsStore.map((r) => {
+          if (r.id !== repId) return r;
+          const prevHist = Array.isArray(r.history) ? (r.history as Array<Record<string, unknown>>) : [];
+          return {
+            ...r,
+            status: nextStatus,
+            staffNotes,
+            priorWarningsCount:
+              nextStatus === "RESOLVED_WARNED"
+                ? Number(r.priorWarningsCount ?? 0) + 1
+                : r.priorWarningsCount,
+            history: [
+              {
+                d: nextStatus,
+                by: this.getCurrentUser().email || "yonael.ops@yekis.et",
+                at: new Date().toISOString(),
+                reason: staffNotes,
+              },
+              ...prevHist,
+            ],
+          };
+        });
+        return { ok: true };
+      }
+
+      return {
+        data: storeWithReports.profileReportsStore,
+        pagination: {
+          page: 1,
+          limit: 25,
+          total: storeWithReports.profileReportsStore.length,
+          totalPages: 1,
+        },
       };
-    }
-    if (cleanPath.match(/^\/staff\/reports\/[^/]+$/) && method === "PATCH") {
-      return { ok: true };
     }
 
     if (cleanPath === "/wallet/topups/queue") {
