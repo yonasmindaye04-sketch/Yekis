@@ -110,7 +110,7 @@ export default function ReportsQueue() {
   const applyApproach = useCallback(
     async (action: ReportResolution) => {
       if (!sel || busy) return;
-      let finalNote =
+      const finalNote =
         templateNote === "custom"
           ? customNote.trim()
           : templateNote.trim() || DEFAULT_NOTES_BY_ACTION[action];

@@ -405,7 +405,7 @@
    the V2 header stuck on the white-text rule above, invisible on the light
    hero. */
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled),
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) {
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) {
   color: var(--color-text);
 }
 
@@ -413,17 +413,17 @@
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost,
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-brand strong,
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .theme-toggle,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .btn-ghost,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-brand strong,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .theme-toggle {
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .btn-ghost,
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-brand strong,
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .theme-toggle {
   color: var(--color-text);
 }
 
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
 :root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost:hover,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
-:root[data-theme="light"] body:has(.yk-v2) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
+:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
   color: var(--color-primary);
 }
 
@@ -1053,8 +1053,12 @@
 .marketing-mobile-backdrop {
   position: fixed;
   inset: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
   background: rgba(6, 10, 14, 0.62);
   backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   z-index: 120;
 }
 
@@ -1063,6 +1067,8 @@
   top: 0;
   right: 0;
   bottom: 0;
+  height: 100vh;
+  height: 100dvh;
   width: min(86vw, 340px);
   background: var(--yekis-bg, #0b1116);
   border-left: 1px solid var(--yekis-border);
@@ -1072,9 +1078,14 @@
   padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
   gap: 20px;
   transform: translateX(105%);
-  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    visibility 0.22s;
   box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 :root[data-theme="light"] .marketing-mobile-drawer {
@@ -1083,6 +1094,8 @@
 
 .marketing-mobile-drawer.open {
   transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .marketing-mobile-drawer-head {
