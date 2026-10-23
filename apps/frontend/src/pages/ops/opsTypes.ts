@@ -296,6 +296,21 @@ export interface ViewerDoc {
   name?: string;
   doc?: string;
   tin?: string;
+  contractId?: string;
+  status?: string;
+  createdAt?: string;
+  clientName?: string;
+  clientEmail?: string;
+  freelancerName?: string;
+  freelancerEmail?: string;
+  milestones?: Array<{
+    id?: string;
+    title: string;
+    state: string;
+    amount: string;
+    net: string;
+  }>;
+  extraRows?: Array<{ label: string; value: string }>;
 }
 export interface KycHistory {
   d: string;
