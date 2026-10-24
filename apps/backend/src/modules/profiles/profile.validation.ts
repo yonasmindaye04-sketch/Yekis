@@ -18,6 +18,11 @@ export const updateProfileSchema = z.object({
     .optional(),
   isAvailableForWork: z.boolean().optional(),
   profileVisibility: z.enum(["PUBLIC", "PROPOSERS", "PRIVATE"]).optional(),
+  avatarUrl: z
+    .string()
+    .max(1_500_000, "Avatar image data is too large")
+    .nullable()
+    .optional(),
 });
 
 export const reportProfileSchema = z.object({

@@ -1,616 +1,818 @@
-import { useState } from "react";
-import {
-  ShieldCheck,
-  Calculator,
-  CheckCircle2,
-  ArrowRight,
-  Briefcase,
-  Award,
-  Wallet,
-  Scale,
-  AlertTriangle,
-  HelpCircle,
-  FileText,
-} from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useI18n } from "./i18n";
 import { openSupportChat } from "./components/supportChatEvents";
+import { FiscalDocumentSheet, type FiscalDocType } from "./components/FiscalDocumentModal";
 import {
-  FiscalDocumentSheet,
-  type FiscalDocType,
-} from "./components/FiscalDocumentModal";
-import "./landing-v2.css";
+  AnimatedCountUpStrip,
+  ScrollIlluminatedHeadline,
+  ScrollParallaxDiptych,
+  StickyScrollServicesStage,
+  type StickyStackItem,
+} from "./components/StudioScrollMotion";
 
-type FeesPageProps = {
-  onNavigate: (page: string) => void;
-  onStart: (mode: "login" | "register") => void;
-};
+interface FeesPageProps {
+  onNavigate?: (view: "landing" | "about" | "faq" | "fees" | "casestudies") => void;
+  onStart?: (mode: "login" | "register") => void;
+}
 
-type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+type PaymentRailId = "telebirr" | "cbebirr" | "mpesa" | "erca";
 
-const PRESET_AMOUNTS = [5000, 15000, 25000, 50000, 100000];
+interface RailServiceItem {
+  id: PaymentRailId;
+  label: { en: string; am: string };
+  topChip: string;
+  badge: string;
+  rows: { label: string; badge: string }[];
+}
 
-export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
-  const { t } = useI18n();
+const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-  const [amountEtb, setAmountEtb] = useState<number>(25000);
-  const [rolePerspective, setRolePerspective] = useState<"client" | "freelancer">("freelancer");
-  const [selectedRail, setSelectedRail] = useState<PaymentRail>("TELEBIRR");
-  const [includeVat15, setIncludeVat15] = useState<boolean>(true);
-  const [includeWithholding, setIncludeWithholding] = useState<boolean>(true);
-  const [hasVerifiedTin, setHasVerifiedTin] = useState<boolean>(true);
+const PRESET_AMOUNTS = [15000, 50000, 120000, 350000];
 
-  const safeAmount = Number.isFinite(amountEtb) && amountEtb > 0 ? amountEtb : 0;
-  const clientFee = Math.round(safeAmount * 0.025);
-  const freelancerFee = Math.round(safeAmount * 0.025);
-  const vatAmount = includeVat15 ? Math.round(safeAmount * 0.15) : 0;
-  const clientTotalDeposit = safeAmount + clientFee + vatAmount;
+const RAIL_SERVICES: RailServiceItem[] = [
+  {
+    id: "telebirr",
+    label: { en: "Telebirr", am: "ቴሌብር" },
+    topChip: "ETHIO TELECOM RAIL",
+    badge: "0 ETB PAYOUT FEE",
+    rows: [
+      { label: "ESCROW DEPOSIT", badge: "INSTANT" },
+      { label: "WALLET PAYOUT", badge: "< 45 SEC" },
+      { label: "RAIL SURCHARGE", badge: "0.0% ETB" },
+    ],
+  },
+  {
+    id: "cbebirr",
+    label: { en: "CBE Birr", am: "ሲቢኢ ብር" },
+    topChip: "COMMERCIAL BANK ET",
+    badge: "UP TO 5M ETB",
+    rows: [
+      { label: "CBE BIRR WALLET", badge: "< 90 SEC" },
+      { label: "BANK RTGS LIMIT", badge: "5,000,000 ETB" },
+      { label: "ESCROW FEE", badge: "2.5% FLAT" },
+    ],
+  },
+  {
+    id: "mpesa",
+    label: { en: "M-Pesa ET", am: "ኤም-ፔሳ" },
+    topChip: "SAFARICOM · AWASH",
+    badge: "MULTI-RAIL",
+    rows: [
+      { label: "M-PESA (07)", badge: "< 60 SEC" },
+      { label: "AWASH / ABYSSINIA", badge: "< 3 MIN" },
+      { label: "FX CONVERSION LOSS", badge: "0.00 ETB" },
+    ],
+  },
+  {
+    id: "erca",
+    label: { en: "ERCA Tax", am: "የገቢዎች ታክስ" },
+    topChip: "FISCAL LEDGER",
+    badge: "FREE PDF & CSV",
+    rows: [
+      { label: "15% VAT SCHEDULE", badge: "AUTO" },
+      { label: "2% WITHHOLDING", badge: "> 10,000 ETB" },
+      { label: "AUDIT EXPORT", badge: "0 ETB" },
+    ],
+  },
+];
 
-  const withholdingRate = includeWithholding && safeAmount >= 10000
-    ? hasVerifiedTin
-      ? 0.03
-      : 0.30
-    : 0;
-  const withholdingTax = Math.round(safeAmount * withholdingRate);
-  const freelancerNetPayout = Math.max(
-    0,
-    safeAmount + vatAmount - freelancerFee - withholdingTax,
-  );
+const PLATFORM_COMPARISONS = [
+  {
+    id: "comp-yekis",
+    name: "YeKis Studio Escrow (2.5%)",
+    role: "97.5% FREELANCER TAKE-HOME · NATIVE ETB",
+    quote:
+      "On a 100,000 ETB software contract, the freelancer receives 97,500 ETB directly into Telebirr or CBE Birr in under two minutes.",
+    metric: "97.5% KEPT",
+  },
+  {
+    id: "comp-global",
+    name: "Overseas Portals (15%–20%)",
+    role: "UPWORK / FIVERR + WIRE & FX SPREAD",
+    quote:
+      "Global platforms deduct 10% to 20% in marketplace commissions plus $30–$50 USD wire fees before a single Birr reaches Addis Ababa.",
+    metric: "~78% KEPT",
+  },
+  {
+    id: "comp-informal",
+    name: "Informal Transfers (0% Protection)",
+    role: "UNPROTECTED BANK TRANSFERS · HIGH RISK",
+    quote:
+      "Unsecured 50% upfront transfers leave clients exposed to vanished deliverables and leave freelancers chasing final invoices without mediation.",
+    metric: "HIGH RISK",
+  },
+];
 
-  const formatEtb = (val: number) => `${val.toLocaleString("en-US")} ETB`;
+function TiltVisualSurface({
+  children,
+  className = "",
+  onClick,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  onClick?: () => void;
+}) {
+  const [tilt, setTilt] = useState({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false });
 
-  const feeItems = [
-    t.marketing.fees.feeItem1,
-    t.marketing.fees.feeItem2,
-    t.marketing.fees.feeItem3,
-    t.marketing.fees.feeItem4,
-    t.marketing.fees.feeItem5,
-  ];
-
-  const activeDocType: FiscalDocType =
-    rolePerspective === "client" ? "CLIENT_INVOICE" : "FREELANCER_VOUCHER";
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width;
+    const py = (e.clientY - rect.top) / rect.height;
+    setTilt({
+      rotateX: (0.5 - py) * 11,
+      rotateY: (px - 0.5) * 11,
+      glareX: px * 100,
+      glareY: py * 100,
+      active: true,
+    });
+  };
 
   return (
-    <div className="yk-v2 yk-v2-subpage">
-      <div className="v2-container">
-        {/* Hero Section */}
-        <header className="v2-sub-hero">
-          <div className="v2-sub-hero-grid">
-            <div>
-              <h1 className="v2-sub-title">{t.marketing.fees.title}</h1>
-              <p className="v2-sub-lead">{t.marketing.fees.subheadline}</p>
-            </div>
+    <motion.div
+      className={`${className} cs-tilt-surface`}
+      onClick={onClick}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setTilt({ rotateX: 0, rotateY: 0, glareX: 50, glareY: 50, active: false })}
+      animate={{
+        rotateX: tilt.rotateX,
+        rotateY: tilt.rotateY,
+        scale: tilt.active ? 1.015 : 1,
+      }}
+      transition={{ type: "spring", stiffness: 260, damping: 22, mass: 0.6 }}
+      style={{ transformPerspective: 1100, transformStyle: "preserve-3d" }}
+    >
+      {children}
+      <div
+        className="cs-tilt-glare"
+        style={{
+          opacity: tilt.active ? 0.22 : 0,
+          background: `radial-gradient(circle at ${tilt.glareX}% ${tilt.glareY}%, rgba(255,255,255,0.55), transparent 58%)`,
+        }}
+      />
+    </motion.div>
+  );
+}
 
-            <div className="v2-sub-kpis">
-              <div className="v2-sub-kpi-card">
-                <div className="v2-sub-kpi-val">97.5%</div>
-                <div className="v2-sub-kpi-lbl">{t.marketing.fees.talentShare}</div>
-              </div>
-              <div className="v2-sub-kpi-card">
-                <div className="v2-sub-kpi-val">2.5% + 2.5%</div>
-                <div className="v2-sub-kpi-lbl">{t.marketing.fees.clientFee} / {t.marketing.fees.freelancerFee}</div>
-              </div>
-              <div className="v2-sub-kpi-card">
-                <div className="v2-sub-kpi-val">0 ETB</div>
-                <div className="v2-sub-kpi-lbl">Signup &amp; Job Posting Fee</div>
-              </div>
-              <div className="v2-sub-kpi-card">
-                <div className="v2-sub-kpi-val">&lt; 48h</div>
-                <div className="v2-sub-kpi-lbl">Human Escrow Mediation SLA</div>
-              </div>
-            </div>
-          </div>
-        </header>
+function renderRailArtwork(railId: PaymentRailId, variant: "hero-left" | "hero-right" | "fluted") {
+  const uid = `${railId}-${variant}`;
 
-        {/* Interactive Calculator + Policy Breakdown */}
-        <section className="v2-fees-grid" aria-label="Fee calculator and policy">
-          {/* Left: Interactive ETB Milestone Calculator */}
-          <div className="v2-calc-card">
-            <div className="v2-calc-header">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span className="v2-policy-icon">
-                  <Calculator size={16} />
+  if (variant === "hero-left" || railId === "telebirr") {
+    return (
+      <svg viewBox="0 0 600 420" className="cs-hero-art-svg" aria-hidden="true">
+        <defs>
+          <radialGradient id={`bg-${uid}`} cx="50%" cy="45%" r="72%">
+            <stop offset="0%" stopColor="#1d4227" />
+            <stop offset="58%" stopColor="#0a160e" />
+            <stop offset="100%" stopColor="#050806" />
+          </radialGradient>
+          <linearGradient id={`disc-${uid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#a7f370" />
+            <stop offset="55%" stopColor="#5fa032" />
+            <stop offset="100%" stopColor="#1e4918" />
+          </linearGradient>
+        </defs>
+        <rect width="600" height="420" fill={`url(#bg-${uid})`} />
+        <circle cx="300" cy="210" r="160" fill="none" stroke="rgba(155,229,100,0.22)" strokeDasharray="6 10" className="cs-svg-orbit" />
+        <g className="cs-svg-float">
+          <ellipse cx="300" cy="225" rx="135" ry="62" fill="#132c1b" stroke="#5fa032" strokeWidth="3" />
+          <ellipse cx="300" cy="198" rx="135" ry="62" fill={`url(#disc-${uid})`} />
+          <ellipse cx="300" cy="170" rx="74" ry="34" fill="#0b1710" stroke="#f5c518" strokeWidth="10" />
+        </g>
+        <g className="cs-svg-float-alt">
+          <circle cx="410" cy="135" r="22" fill="#f5c518" />
+          <circle cx="195" cy="275" r="15" fill="#9be564" />
+        </g>
+      </svg>
+    );
+  }
+
+  if (variant === "hero-right" || railId === "cbebirr") {
+    return (
+      <svg viewBox="0 0 600 420" className="cs-hero-art-svg" aria-hidden="true">
+        <rect width="600" height="420" fill="#08130d" />
+        <circle cx="300" cy="210" r="150" fill="none" stroke="rgba(245,197,24,0.22)" strokeWidth="1.5" className="cs-svg-orbit" />
+        <g className="cs-svg-float">
+          <rect x="170" y="150" width="64" height="165" rx="14" fill="#1e4918" stroke="#9be564" strokeWidth="2.5" />
+          <rect x="268" y="110" width="64" height="205" rx="14" fill="#5fa032" stroke="#ffffff" strokeWidth="2" />
+          <rect x="366" y="80" width="64" height="235" rx="14" fill="#f5c518" />
+        </g>
+      </svg>
+    );
+  }
+
+  if (railId === "mpesa") {
+    return (
+      <svg viewBox="0 0 600 420" className="cs-hero-art-svg" aria-hidden="true">
+        <rect width="600" height="420" fill="#09150e" />
+        <g className="cs-svg-float">
+          <circle cx="235" cy="210" r="78" fill="rgba(95,160,50,0.32)" stroke="#9be564" strokeWidth="4" />
+          <circle cx="365" cy="210" r="78" fill="rgba(245,197,24,0.25)" stroke="#f5c518" strokeWidth="4" />
+          <circle cx="300" cy="210" r="32" fill="#fafaf7" />
+        </g>
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 600 420" className="cs-hero-art-svg" aria-hidden="true">
+      <rect width="600" height="420" fill="#08120c" />
+      <g className="cs-svg-float">
+        <rect x="180" y="95" width="240" height="230" rx="20" fill="#fafaf7" stroke="#f5c518" strokeWidth="4" />
+        <rect x="210" y="130" width="180" height="22" rx="5" fill="#141715" />
+        <rect x="210" y="170" width="130" height="16" rx="4" fill="#5fa032" />
+        <rect x="210" y="205" width="180" height="42" rx="8" fill="#f5c518" />
+        <rect x="210" y="265" width="105" height="14" rx="4" fill="#8b948e" />
+      </g>
+    </svg>
+  );
+}
+
+export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
+  const { language } = useI18n();
+  const lang: "en" | "am" = language === "am" ? "am" : "en";
+  const [amount, setAmount] = useState<number>(50000);
+  const [selectedRail, setSelectedRail] = useState<"telebirr" | "cbebirr" | "mpesa">("telebirr");
+  const [includeVat, setIncludeVat] = useState<boolean>(true);
+  const [includeWithholding, setIncludeWithholding] = useState<boolean>(true);
+  const [activeDocPreview, setActiveDocPreview] = useState<FiscalDocType | null>(null);
+  const [activeRailServiceId, setActiveRailServiceId] = useState<PaymentRailId>("telebirr");
+  const [activeCompIdx, setActiveCompIdx] = useState<number>(0);
+
+  const calculatorRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  const calc = useMemo(() => {
+    const clientFee = Math.round(amount * 0.025);
+    const freelancerFee = Math.round(amount * 0.025);
+    const vatAmount = includeVat ? Math.round(amount * 0.15) : 0;
+    const whtEligible = amount > 10000;
+    const whtAmount = includeWithholding && whtEligible ? Math.round(amount * 0.02) : 0;
+
+    const totalClientEscrowFunding = amount + clientFee + vatAmount - whtAmount;
+    const netFreelancerTakeHome = amount - freelancerFee + vatAmount - whtAmount;
+
+    return {
+      clientFee,
+      freelancerFee,
+      vatAmount,
+      whtEligible,
+      whtAmount,
+      totalClientEscrowFunding,
+      netFreelancerTakeHome,
+    };
+  }, [amount, includeVat, includeWithholding]);
+
+  const stickyItems: StickyStackItem[] = useMemo(
+    () =>
+      RAIL_SERVICES.map((rail) => ({
+        id: rail.id,
+        title: rail.label[lang],
+        topChip: rail.topChip,
+        kickerBadge: rail.badge,
+        artNode: renderRailArtwork(rail.id, "fluted"),
+        rows: rail.rows,
+        onCardClick: () => calculatorRef.current?.scrollIntoView({ behavior: "smooth" }),
+      })),
+    [lang]
+  );
+
+  const activeComp = PLATFORM_COMPARISONS[activeCompIdx] ?? PLATFORM_COMPARISONS[0];
+
+  return (
+    <div className="yk-v2 yk-v2-subpage yk-cs-studio">
+      {/* ================================================================
+          BAND 1 — DARK OBSIDIAN STUDIO HERO (#070a08)
+          ================================================================ */}
+      <section className="cs-hero-band">
+        <div className="cs-band-inner">
+          <motion.div
+            className="cs-hero-top"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75, ease: EASE_OUT_EXPO }}
+          >
+            <h1 className="cs-hero-display">
+              <span className="cs-hero-line">
+                {lang === "am" ? "የድካምዎን" : "we keep"}{" "}
+                <span className="cs-hero-brace">{"{97.5%}"}</span>
+              </span>
+              <span className="cs-hero-line">
+                <span className="cs-hero-arrow" aria-hidden="true">
+                  →
                 </span>
-                <div>
-                  <h2 style={{ fontSize: 20, fontWeight: 800 }}>
-                    ETB Milestone &amp; Payout Calculator
-                  </h2>
-                  <p style={{ fontSize: 13, color: "var(--v2-text2)", marginTop: 2 }}>
-                    Simulate exact escrow deposits, platform split fees, and net payout
-                  </p>
-                </div>
-              </div>
+                {lang === "am" ? "በኪስዎ እናስቀራለን" : "in your pocket"}
+              </span>
+            </h1>
+          </motion.div>
 
-              <div className="v2-role-switch" role="group" aria-label="Perspective selector">
-                <button
-                  type="button"
-                  className={`v2-role-btn ${rolePerspective === "freelancer" ? "is-active" : ""}`}
-                  onClick={() => setRolePerspective("freelancer")}
-                >
-                  Freelancer View
-                </button>
-                <button
-                  type="button"
-                  className={`v2-role-btn ${rolePerspective === "client" ? "is-active" : ""}`}
-                  onClick={() => setRolePerspective("client")}
-                >
-                  Client View
-                </button>
-              </div>
-            </div>
-
-            {/* Milestone Amount Input */}
-            <div className="v2-calc-input-group">
-              <div className="v2-calc-label-row">
-                <label htmlFor="yekis-fee-amount" className="v2-calc-label">
-                  Agreed Milestone Amount
-                </label>
-                <span style={{ fontSize: 12, color: "var(--v2-text2)" }}>
-                  Drag slider or type exact ETB
-                </span>
-              </div>
-              <div className="v2-calc-amount-box">
-                <input
-                  id="yekis-fee-amount"
-                  type="number"
-                  min={500}
-                  max={1000000}
-                  step={500}
-                  value={amountEtb}
-                  onChange={(e) => setAmountEtb(Math.max(0, Number(e.target.value)))}
-                />
-                <span className="v2-calc-currency">ETB</span>
-              </div>
-              <input
-                type="range"
-                className="v2-calc-slider"
-                min={1000}
-                max={200000}
-                step={1000}
-                value={Math.min(200000, Math.max(1000, safeAmount))}
-                onChange={(e) => setAmountEtb(Number(e.target.value))}
-                aria-label="Milestone amount slider in ETB"
-              />
-              <div className="v2-calc-presets">
-                {PRESET_AMOUNTS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    className={`v2-calc-preset ${safeAmount === preset ? "is-active" : ""}`}
-                    onClick={() => setAmountEtb(preset)}
-                  >
-                    {preset.toLocaleString("en-US")} ETB
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Payment Rail Selector */}
-            <div className="v2-calc-input-group">
-              <div className="v2-calc-label-row">
-                <span className="v2-calc-label">Settlement Payment Rail</span>
-                <span style={{ fontSize: 12, color: "var(--v2-teal)", fontWeight: 600 }}>
-                  Instant Wallet Release
-                </span>
-              </div>
-              <div className="v2-filter-tabs">
-                {(
-                  [
-                    { id: "TELEBIRR", label: "Telebirr" },
-                    { id: "CBE_BIRR", label: "CBE Birr" },
-                    { id: "M_PESA", label: "M-Pesa Ethiopia" },
-                  ] as const
-                ).map((rail) => (
-                  <button
-                    key={rail.id}
-                    type="button"
-                    className={`v2-filter-tab ${selectedRail === rail.id ? "is-active" : ""}`}
-                    onClick={() => setSelectedRail(rail.id)}
-                  >
-                    <Wallet size={14} />
-                    {rail.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Optional ERCA Withholding Tax & 15% VAT Estimator */}
-            <div className="v2-calc-options">
-              <button
-                type="button"
-                className={`v2-calc-toggle-card ${includeVat15 ? "is-active" : ""}`}
-                onClick={() => setIncludeVat15((prev) => !prev)}
+          {/* Scroll-Parallax Pure-Visual 2-Frame Diptych */}
+          <ScrollParallaxDiptych
+            leftFrame={
+              <TiltVisualSurface
+                className="cs-hero-art-frame"
+                onClick={() => calculatorRef.current?.scrollIntoView({ behavior: "smooth" })}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--v2-text)" }}>
-                    15% Ethiopian VAT (ተ.እ.ታ)
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: includeVat15 ? "var(--v2-primary)" : "var(--v2-text2)",
-                    }}
-                  >
-                    {includeVat15 ? "15% INCLUDED" : "EXEMPT"}
-                  </span>
-                </div>
-                <span style={{ fontSize: 12, color: "var(--v2-text2)" }}>
-                  Standard ERCA commercial tax invoice for VAT-registered entities
+                {renderRailArtwork("telebirr", "hero-left")}
+                <span className="cs-hero-hover-pill">
+                  {lang === "am" ? "{ የክፍያ ማስያ } ↗" : "{ ETB Calculator } ↗"}
                 </span>
-              </button>
-
-              <button
-                type="button"
-                className={`v2-calc-toggle-card ${includeWithholding ? "is-active" : ""}`}
-                onClick={() => setIncludeWithholding((prev) => !prev)}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--v2-text)" }}>
-                    ERCA Withholding Tax
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: includeWithholding ? "var(--v2-primary)" : "var(--v2-text2)",
-                    }}
-                  >
-                    {includeWithholding ? "ENABLED" : "OPTIONAL"}
-                  </span>
-                </div>
-                <span style={{ fontSize: 12, color: "var(--v2-text2)" }}>
-                  Applies to Ethiopian business service contracts &ge; 10,000 ETB
-                </span>
-              </button>
-
-              <button
-                type="button"
-                className={`v2-calc-toggle-card ${includeWithholding && hasVerifiedTin ? "is-active" : ""}`}
+              </TiltVisualSurface>
+            }
+            rightFrame={
+              <TiltVisualSurface
+                className="cs-hero-art-frame"
                 onClick={() => {
-                  setIncludeWithholding(true);
-                  setHasVerifiedTin((prev) => !prev);
+                  setActiveDocPreview("CLIENT_INVOICE");
+                  calculatorRef.current?.scrollIntoView({ behavior: "smooth" });
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--v2-text)" }}>
-                    TIN Verification Status
-                  </span>
+                {renderRailArtwork("cbebirr", "hero-right")}
+                <span className="cs-hero-hover-pill">
+                  {lang === "am" ? "{ የERCA ደረሰኝ } ↗" : "{ ERCA Tax Dossier } ↗"}
+                </span>
+              </TiltVisualSurface>
+            }
+          />
+
+          <div className="cs-hero-foot" style={{ justifyContent: "flex-end" }}>
+            <button
+              type="button"
+              className="cs-scroll-pill"
+              onClick={() => calculatorRef.current?.scrollIntoView({ behavior: "smooth" })}
+            >
+              {lang === "am" ? "ማስያውን ይመልከቱ ↓" : "Open calculator ↓"}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================
+          BAND 2 — CRISP WHITE { 2.5% } MANIFESTO (ZERO SUB-PARAGRAPHS)
+          ================================================================ */}
+      <section className="cs-manifesto-band">
+        <div className="cs-band-inner">
+          <div className="cs-manifesto-grid">
+            <motion.div
+              className="cs-brace-emblem"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <span className="cs-brace-emblem-char">{"{"}</span>
+              <span className="cs-brace-emblem-word">2.5%</span>
+              <span className="cs-brace-emblem-char">{"}"}</span>
+            </motion.div>
+
+            <div>
+              <ScrollIlluminatedHeadline
+                segments={
+                  lang === "am"
+                    ? [
+                        { text: "ዓለም አቀፍ ፕላትፎርሞች 20% ሲቆርጡ፣ YeKis ግን" },
+                        { text: "97.5% ክፍያዎ በቀጥታ", highlight: true },
+                        { text: "ወደ ቴሌብር ወይም ንግድ ባንክ እንዲገባ ያደርጋል።" },
+                      ]
+                    : [
+                        { text: "While global portals take up to 20%, YeKis charges a symmetric" },
+                        { text: "2.5% escrow fee per side", highlight: true },
+                        { text: "—with native ETB payouts and free ERCA tax schedules." },
+                      ]
+                }
+              />
+
+              <AnimatedCountUpStrip
+                metrics={[
+                  { value: 97.5, decimals: 1, suffix: "%", label: "FREELANCER TAKE-HOME" },
+                  { value: 2.5, decimals: 1, suffix: "%", label: "FLAT ESCROW FEE" },
+                  { value: 0, suffix: " ETB", label: "SUBSCRIPTION COST" },
+                ]}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================
+          BAND 3 — WARM ALABASTER INTERACTIVE ETB & TAX WORKBENCH (#eff2ee)
+          ================================================================ */}
+      <section className="cs-works-band" ref={calculatorRef}>
+        <div className="cs-band-inner">
+          <div className="cs-works-topbar">
+            <span className="cs-kicker" style={{ color: "#0b0f0c" }}>
+              {"{"} {lang === "am" ? "የክፍያ እና የታክስ ማስያ" : "ETB ESCROW SIMULATOR"} {"}"}
+            </span>
+
+            <div className="cs-calc-presets">
+              {PRESET_AMOUNTS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  className={`cs-works-tab ${amount === preset ? "is-active" : ""}`}
+                  onClick={() => setAmount(preset)}
+                >
+                  {preset.toLocaleString()} ETB
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="cs-fees-workbench">
+            {/* Left Dark Obsidian Interactive Controls */}
+            <div className="cs-calc-panel">
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
                   <span
                     style={{
                       fontFamily: "var(--v2-font-mono)",
                       fontSize: 11,
-                      fontWeight: 700,
-                      color: hasVerifiedTin ? "var(--v2-primary)" : "#eab308",
+                      letterSpacing: "0.1em",
+                      color: "rgba(244,247,244,0.65)",
+                      textTransform: "uppercase",
                     }}
                   >
-                    {hasVerifiedTin ? "3% (TIN VERIFIED)" : "30% (UNVERIFIED)"}
+                    {lang === "am" ? "የምዕራፍ ዋጋ (ETB)" : "MILESTONE VALUE"}
                   </span>
+                  <span className="cs-calc-amount-display">{amount.toLocaleString()} ETB</span>
                 </div>
-                <span style={{ fontSize: 12, color: "var(--v2-text2)" }}>
-                  {hasVerifiedTin
-                    ? "Verified TIN + license reduces withholding to 3%"
-                    : "Unverified TIN incurs 30% statutory withholding"}
-                </span>
-              </button>
-            </div>
 
-            {/* Live Receipt Breakdown */}
-            <div className="v2-calc-receipt" aria-live="polite">
-              <div className="v2-calc-row">
-                <span>Agreed Milestone Scope</span>
-                <strong>{formatEtb(safeAmount)}</strong>
-              </div>
-              <div className="v2-calc-row">
-                <span>Client Escrow Fee (+2.5%)</span>
-                <strong>+{formatEtb(clientFee)}</strong>
-              </div>
-              {includeVat15 && (
-                <div className="v2-calc-row">
-                  <span>Ethiopian VAT (+15% ተ.እ.ታ)</span>
-                  <strong>+{formatEtb(vatAmount)}</strong>
+                <input
+                  type="range"
+                  min={2000}
+                  max={500000}
+                  step={1000}
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  className="cs-calc-slider"
+                  aria-label="Milestone contract amount in ETB"
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    fontFamily: "var(--v2-font-mono)",
+                    fontSize: 11,
+                    color: "rgba(244,247,244,0.5)",
+                    marginTop: 6,
+                  }}
+                >
+                  <span>2,000 ETB</span>
+                  <span>250,000 ETB</span>
+                  <span>500,000 ETB</span>
                 </div>
-              )}
-              <div className="v2-calc-row">
-                <span>Total Client Escrow Deposit</span>
-                <strong>{formatEtb(clientTotalDeposit)}</strong>
               </div>
-              <div className="v2-calc-row">
-                <span>Freelancer Service Fee (-2.5%)</span>
-                <strong>-{formatEtb(freelancerFee)}</strong>
-              </div>
-              {includeWithholding && (
-                <div className="v2-calc-row">
-                  <span>
-                    ERCA Withholding Tax (
-                    {safeAmount >= 10000
-                      ? hasVerifiedTin
-                        ? "3% Verified TIN"
-                        : "30% Unverified"
-                      : "0% under 10k ETB"}
-                    )
-                  </span>
-                  <strong>-{formatEtb(withholdingTax)}</strong>
+
+              {/* Settlement Rail Selector */}
+              <div>
+                <span
+                  style={{
+                    display: "block",
+                    fontFamily: "var(--v2-font-mono)",
+                    fontSize: 11,
+                    letterSpacing: "0.08em",
+                    color: "rgba(244,247,244,0.65)",
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {lang === "am" ? "የክፍያ መስመር" : "SETTLEMENT RAIL"}
+                </span>
+                <div className="cs-calc-rail-grid">
+                  {(
+                    [
+                      { id: "telebirr", name: "Telebirr", speed: "< 45 sec" },
+                      { id: "cbebirr", name: "CBE Birr", speed: "< 90 sec" },
+                      { id: "mpesa", name: "M-Pesa ET", speed: "< 60 sec" },
+                    ] as const
+                  ).map((rail) => (
+                    <button
+                      key={rail.id}
+                      type="button"
+                      className={`cs-calc-rail-btn ${selectedRail === rail.id ? "is-active" : ""}`}
+                      onClick={() => setSelectedRail(rail.id)}
+                    >
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{rail.name}</div>
+                      <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 11, color: "#78c841", marginTop: 2 }}>
+                        {rail.speed}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              )}
-              <div className="v2-calc-row is-total">
-                <span>
-                  {rolePerspective === "client"
-                    ? `Total Client Deposit (${selectedRail.replace("_", " ")})`
-                    : `Net Freelancer Take-Home (${selectedRail.replace("_", " ")})`}
-                </span>
-                <strong>
-                  {rolePerspective === "client"
-                    ? formatEtb(clientTotalDeposit)
-                    : formatEtb(freelancerNetPayout)}
-                </strong>
               </div>
-            </div>
-          </div>
 
-          {/* Right: Official Fee Policy & Visual Split */}
-          <div className="v2-policy-card">
-            <h2 style={{ fontSize: 26, fontWeight: 800 }}>
-              {t.marketing.fees.panelTitle}
-            </h2>
-            <p style={{ fontSize: 14.5, color: "var(--v2-text2)", marginTop: 8, lineHeight: 1.6 }}>
-              {t.marketing.fees.note}
-            </p>
-
-            {/* Visual Split Bar */}
-            <div className="v2-split-meter">
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, fontWeight: 700 }}>
-                <span style={{ color: "var(--v2-primary)" }}>
-                  97.5% Freelancer Take-Home
-                </span>
-                <span style={{ color: "#eab308" }}>
-                  2.5% + 2.5% Escrow Split
-                </span>
-              </div>
-              <div className="v2-split-bar" role="img" aria-label="97.5% freelancer take-home vs 2.5% fee">
-                <div className="v2-split-seg-keep" />
-                <div className="v2-split-seg-fee" />
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--v2-text2)" }}>
-                <span>{t.marketing.fees.clientFee}</span>
-                <span>{t.marketing.fees.freelancerFee}</span>
-                <span>{t.marketing.fees.talentShare}</span>
-              </div>
-            </div>
-
-            {/* 5 Core Policy Items from i18n */}
-            <ul className="v2-policy-list">
-              {feeItems.map((item, idx) => (
-                <li key={idx} className="v2-policy-item">
-                  <span className="v2-policy-icon" aria-hidden="true">
-                    <CheckCircle2 size={16} />
-                  </span>
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 24 }}>
-              <button
-                type="button"
-                className="v2-btn v2-btn-primary"
-                onClick={() => onStart("register")}
-              >
-                <span>{t.nav.getStarted}</span>
-                <ArrowRight size={16} />
-              </button>
-              <button
-                type="button"
-                className="v2-btn"
+              {/* Compact ERCA Tax Toggles */}
+              <div
                 style={{
-                  borderColor: "var(--v2-border2)",
-                  background: "var(--v2-surface)",
-                  color: "var(--v2-text)",
-                }}
-                onClick={() => onNavigate("faq")}
-              >
-                <HelpCircle size={16} />
-                <span>{t.marketing.fees.readFaq}</span>
-              </button>
-            </div>
-          </div>
-        </section>
-
-        {/* Live Bilingual Client Invoice & Freelancer Payout Receipt Preview */}
-        <section
-          style={{ marginBottom: 72 }}
-          aria-labelledby="fees-invoice-preview-heading"
-        >
-          <div className="v2-center" style={{ marginBottom: 28 }}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--v2-primary)",
-                marginBottom: 8,
-              }}
-            >
-              <FileText size={16} />
-              <span>OFFICIAL ERCA &amp; AACCSA FISCAL DOCUMENTS · የክፍያ እና የታክስ ደረሰኞች</span>
-            </div>
-            <h2 className="v2-sec-title" id="fees-invoice-preview-heading">
-              Client Invoice &amp; Freelancer Payout Receipt Preview
-            </h2>
-            <p className="v2-sec-sub">
-              Every funded milestone and released payout generates a bilingual (English / አማርኛ) fiscal document with TIN, 15% VAT, and 3%/30% Withholding Tax breakdown—ready to print or save as PDF.
-            </p>
-          </div>
-
-          <FiscalDocumentSheet
-            mode="embedded"
-            interactiveControls={true}
-            data={{
-              docType: activeDocType,
-              principalEtb: safeAmount,
-              rail: selectedRail,
-              includeVat15,
-              includeWithholding: includeWithholding && safeAmount >= 10000,
-              hasVerifiedTin,
-              clientFeeRate: 0.025,
-              freelancerFeeRate: 0.025,
-            }}
-            onChangeDocType={(next) =>
-              setRolePerspective(next === "CLIENT_INVOICE" ? "client" : "freelancer")
-            }
-            onToggleVat={setIncludeVat15}
-            onToggleWithholding={setIncludeWithholding}
-            onToggleVerifiedTin={setHasVerifiedTin}
-          />
-        </section>
-
-        {/* 3-Column Comparison Matrix */}
-        <section style={{ marginBottom: 72 }} aria-labelledby="fees-compare-heading">
-          <div className="v2-center" style={{ marginBottom: 36 }}>
-            <h2 className="v2-sec-title" id="fees-compare-heading">
-              {t.marketing.fees.compareTitle}
-            </h2>
-            <p className="v2-sec-sub">
-              Compare how Yekis milestone escrow protects both sides against informal bank transfers or expensive legal retainers.
-            </p>
-          </div>
-
-          <div className="v2-compare-grid">
-            {/* Column 1: Yekis (Featured) */}
-            <article className="v2-compare-card is-featured">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <ShieldCheck size={26} color="var(--v2-primary)" />
-                <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.yekisCol}</h3>
-              </div>
-              <div className="v2-compare-rows">
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row1Feature}</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-primary)" }}>
-                    {t.marketing.fees.row1Yekis}
-                  </div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row2Feature}</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-primary)" }}>
-                    {t.marketing.fees.row2Yekis}
-                  </div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Identity &amp; Tax Compliance</div>
-                  <div className="v2-compare-row-val">
-                    Fayda ID &amp; TIN verification built-in with automated receipts
-                  </div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Local Payout Speed</div>
-                  <div className="v2-compare-row-val">
-                    Instant wallet credit on milestone approval via Telebirr &amp; CBE Birr
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            {/* Column 2: Informal Trust */}
-            <article className="v2-compare-card">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <AlertTriangle size={24} color="#eab308" />
-                <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.informalCol}</h3>
-              </div>
-              <div className="v2-compare-rows">
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row1Feature}</div>
-                  <div className="v2-compare-row-val">{t.marketing.fees.row1Informal}</div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row2Feature}</div>
-                  <div className="v2-compare-row-val">{t.marketing.fees.row2Informal}</div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Identity &amp; Tax Compliance</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-text2)" }}>
-                    Unverified Telegram/phone transfers with no audit trail
-                  </div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Local Payout Speed</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-text2)" }}>
-                    Weeks of invoice chasing after final files are delivered
-                  </div>
-                </div>
-              </div>
-            </article>
-
-            {/* Column 3: Hiring a Lawyer */}
-            <article className="v2-compare-card">
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <Scale size={24} color="var(--v2-text2)" />
-                <h3 style={{ fontSize: 22, fontWeight: 800 }}>{t.marketing.fees.lawyerCol}</h3>
-              </div>
-              <div className="v2-compare-rows">
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row1Feature}</div>
-                  <div className="v2-compare-row-val">{t.marketing.fees.row1Lawyer}</div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">{t.marketing.fees.row2Feature}</div>
-                  <div className="v2-compare-row-val">{t.marketing.fees.row2Lawyer}</div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Identity &amp; Tax Compliance</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-text2)" }}>
-                    Manual paper contracts &amp; separate accounting filings
-                  </div>
-                </div>
-                <div className="v2-compare-row">
-                  <div className="v2-compare-row-label">Local Payout Speed</div>
-                  <div className="v2-compare-row-val" style={{ color: "var(--v2-text2)" }}>
-                    No automated milestone holding or instant release
-                  </div>
-                </div>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        {/* Bottom CTA Spotlight */}
-        <section className="v2-outro-cta" style={{ borderRadius: 28, minHeight: 340 }}>
-          <span className="v2-outro-ambient" aria-hidden />
-          <div className="v2-outro-cta-inner" style={{ paddingTop: 44, paddingBottom: 44 }}>
-            <h2>{t.marketing.cta.title}</h2>
-            <p>{t.marketing.cta.subtitle}</p>
-            <div className="v2-outro-actions">
-              <button
-                type="button"
-                className="v2-outro-btn v2-outro-btn-primary"
-                onClick={() => onStart("register")}
-              >
-                <span className="v2-outro-shine" aria-hidden />
-                <Briefcase />
-                <span>{t.marketing.cta.postJob}</span>
-              </button>
-              <button
-                type="button"
-                className="v2-outro-btn v2-outro-btn-ghost"
-                onClick={() => onStart("register")}
-              >
-                <Award />
-                <span>{t.marketing.cta.findWork}</span>
-              </button>
-              <button
-                type="button"
-                className="v2-outro-btn v2-outro-btn-ghost"
-                onClick={() => {
-                  if (!openSupportChat()) onNavigate("faq");
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 16,
+                  padding: 16,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 12,
                 }}
               >
-                <HelpCircle />
-                <span>Ask Billing Support</span>
-              </button>
+                <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>
+                    {lang === "am" ? "15% ተጨማሪ እሴት ታክስ (VAT)" : "15% Ethiopian VAT"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={includeVat}
+                    onChange={(e) => setIncludeVat(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: "#78c841" }}
+                  />
+                </label>
+
+                <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
+                  <span style={{ fontWeight: 600, fontSize: 14 }}>
+                    {lang === "am" ? "2% ዊዝሆልዲንግ (WHT > 10K ETB)" : "2% Withholding Tax (> 10K ETB)"}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={includeWithholding}
+                    onChange={(e) => setIncludeWithholding(e.target.checked)}
+                    style={{ width: 18, height: 18, accentColor: "#78c841" }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Right Editorial Dossier Receipt Card */}
+            <div className="cs-dossier-receipt">
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    borderBottom: "2px solid #141715",
+                    paddingBottom: 14,
+                    marginBottom: 18,
+                  }}
+                >
+                  <div>
+                    <span
+                      style={{
+                        fontFamily: "var(--v2-font-mono)",
+                        fontSize: 10.5,
+                        letterSpacing: "0.1em",
+                        color: "#5a5f5b",
+                        display: "block",
+                      }}
+                    >
+                      RAIL: {selectedRail.toUpperCase()}
+                    </span>
+                    <h3
+                      style={{
+                        fontFamily: "var(--v2-font-display)",
+                        fontSize: 22,
+                        fontWeight: 700,
+                        margin: "4px 0 0",
+                      }}
+                    >
+                      {lang === "am" ? "የክፍያ ሰነድ" : "Settlement Dossier"}
+                    </h3>
+                  </div>
+                  <span
+                    style={{
+                      background: "#f5c518",
+                      color: "#141715",
+                      fontFamily: "var(--v2-font-mono)",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "6px 12px",
+                      borderRadius: 6,
+                    }}
+                  >
+                    97.5% NET
+                  </span>
+                </div>
+
+                <table className="cs-ledger-table">
+                  <thead>
+                    <tr>
+                      <th>{lang === "am" ? "መደብ" : "LINE"}</th>
+                      <th>{lang === "am" ? "ተመን" : "RATE"}</th>
+                      <th style={{ textAlign: "right" }}>ETB</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><strong>Gross Milestone</strong></td>
+                      <td>Base</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)", fontWeight: 700 }}>
+                        {amount.toLocaleString()} ETB
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Client Escrow Fee</td>
+                      <td>+2.5%</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
+                        +{calc.clientFee.toLocaleString()} ETB
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Freelancer Fee</td>
+                      <td>−2.5%</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
+                        −{calc.freelancerFee.toLocaleString()} ETB
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>ERCA VAT</td>
+                      <td>{includeVat ? "+15%" : "0%"}</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
+                        {includeVat ? `+${calc.vatAmount.toLocaleString()} ETB` : "0 ETB"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>ERCA Withholding</td>
+                      <td>{calc.whtAmount > 0 ? "−2%" : "0%"}</td>
+                      <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
+                        {calc.whtAmount > 0 ? `−${calc.whtAmount.toLocaleString()} ETB` : "0 ETB"}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="cs-findings-kpi-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                <div className="cs-findings-kpi" style={{ background: "#141715", color: "#fafaf7", borderRadius: 12 }}>
+                  <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10, color: "rgba(250,250,247,0.65)" }}>
+                    {lang === "am" ? "ደንበኛው የሚያስይዘው" : "CLIENT DEPOSIT"}
+                  </span>
+                  <strong style={{ fontFamily: "var(--v2-font-display)", fontSize: 22, color: "#f5c518" }}>
+                    {calc.totalClientEscrowFunding.toLocaleString()} ETB
+                  </strong>
+                </div>
+
+                <div className="cs-findings-kpi" style={{ borderRadius: 12 }}>
+                  <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10 }}>
+                    {lang === "am" ? "ባለሙያው የሚቀበለው" : "FREELANCER PAYOUT"}
+                  </span>
+                  <strong style={{ fontFamily: "var(--v2-font-display)", fontSize: 22 }}>
+                    {calc.netFreelancerTakeHome.toLocaleString()} ETB
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="cs-see-all-btn"
+                  style={{ flex: 1, justifyContent: "center", fontSize: 15 }}
+                  onClick={() => setActiveDocPreview((prev) => (prev === "CLIENT_INVOICE" ? null : "CLIENT_INVOICE"))}
+                >
+                  {lang === "am" ? "የደንበኛ ደረሰኝ ↗" : "Client Tax Invoice ↗"}
+                </button>
+                <button
+                  type="button"
+                  className="cs-see-all-btn"
+                  style={{ flex: 1, justifyContent: "center", fontSize: 15 }}
+                  onClick={() =>
+                    setActiveDocPreview((prev) => (prev === "FREELANCER_VOUCHER" ? null : "FREELANCER_VOUCHER"))
+                  }
+                >
+                  {lang === "am" ? "የባለሙያ ሰነድ ↗" : "Payout Voucher ↗"}
+                </button>
+              </div>
             </div>
           </div>
-        </section>
-      </div>
+
+          {activeDocPreview && (
+            <div style={{ marginTop: 28 }}>
+              <FiscalDocumentSheet
+                data={{
+                  docType: activeDocPreview,
+                  principalEtb: amount,
+                  rail:
+                    selectedRail === "telebirr"
+                      ? "TELEBIRR"
+                      : selectedRail === "cbebirr"
+                        ? "CBE_BIRR"
+                        : "M_PESA",
+                  includeVat15: includeVat,
+                  includeWithholding,
+                  hasVerifiedTin: true,
+                }}
+                mode="embedded"
+                interactiveControls={true}
+                onClose={() => setActiveDocPreview(null)}
+                onChangeDocType={(doc) => setActiveDocPreview(doc)}
+                onToggleVat={(next) => setIncludeVat(next)}
+                onToggleWithholding={(next) => setIncludeWithholding(next)}
+              />
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ================================================================
+          BAND 4 — STICKY SCROLL-PINNED { RAILS } 3-COLUMN STAGE (FIXED)
+          ================================================================ */}
+      <section className="cs-services-band">
+        <StickyScrollServicesStage
+          kicker={lang === "am" ? "{ መስመሮች }" : "{ RAILS }"}
+          items={stickyItems}
+          activeId={activeRailServiceId}
+          onSelect={(id) => setActiveRailServiceId(id as PaymentRailId)}
+        />
+      </section>
+
+      {/* ================================================================
+          BAND 5 — VIBRANT STUDIO GREEN COMPARISON BAND (#5fa032)
+          ================================================================ */}
+      <section className="cs-testi-band">
+        <div className="cs-band-inner">
+          <div className="cs-testi-grid">
+            <div className="cs-testi-left">
+              <span className="cs-kicker" style={{ color: "#070a08" }}>
+                {"{"} {lang === "am" ? "ንጽጽር" : "COMPARISON"} {"}"}
+              </span>
+
+              <div className="cs-testi-authors">
+                {PLATFORM_COMPARISONS.map((item, idx) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`cs-testi-author-btn ${idx === activeCompIdx ? "is-active" : ""}`}
+                    onClick={() => setActiveCompIdx(idx)}
+                  >
+                    <span>{item.name}</span>
+                    <span className="cs-testi-metric-pill">{item.metric}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="cs-testi-right">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeComp.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
+                >
+                  <p className="cs-testi-quote">“{activeComp.quote}”</p>
+                  <div className="cs-testi-role">{activeComp.role}</div>
+                  <button type="button" className="cs-testi-link" onClick={() => onNavigate?.("faq")}>
+                    {lang === "am" ? "የኤስክሮ ደንቦችን ያንብቡ ↗" : "Read escrow & tax FAQ ↗"}
+                  </button>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================
+          BAND 6 — DARK OBSIDIAN STUDIO OUTRO CTA (#070a08)
+          ================================================================ */}
+      <section className="cs-outro-band">
+        <div className="cs-band-inner">
+          <div className="cs-outro-grid">
+            <div>
+              <span className="cs-kicker" style={{ color: "#78c841" }}>
+                {"{"} {lang === "am" ? "በነጻ ይጀምሩ" : "0 ETB SUBSCRIPTION"} {"}"}
+              </span>
+              <h2 className="cs-outro-title">
+                {lang === "am" ? "የመጀመሪያ የኤስክሮ ውልዎን በ0 ብር ይክፈቱ።" : "Open your workspace for 0 ETB today."}
+              </h2>
+            </div>
+
+            <div className="cs-outro-brace-stage">
+              <span className="cs-outro-giant-brace">{"{"}</span>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
+                <button type="button" className="cs-outro-pill-btn" onClick={() => onStart?.("register")}>
+                  {lang === "am" ? "እንደ ደንበኛ ይጀምሩ ↗" : "Hire with Escrow ↗"}
+                </button>
+                <button
+                  type="button"
+                  className="cs-outro-pill-btn"
+                  style={{ background: "transparent", color: "#f4f7f4", border: "1px solid rgba(255,255,255,0.28)" }}
+                  onClick={() => onStart?.("register")}
+                >
+                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 97.5% as Talent"}
+                </button>
+                <button
+                  type="button"
+                  className="cs-outro-pill-btn"
+                  style={{ background: "transparent", color: "#9be564", border: "1px solid rgba(155,229,100,0.35)" }}
+                  onClick={() => openSupportChat()}
+                >
+                  {lang === "am" ? "የታክስ ምክክር" : "Tax Desk"}
+                </button>
+              </div>
+              <span className="cs-outro-giant-brace">{"}"}</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }
+export default FeesPage;

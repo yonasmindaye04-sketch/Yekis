@@ -32,7 +32,8 @@ export type TourTab =
   | "contracts"
   | "wallet"
   | "cases"
-  | "profile";
+  | "profile"
+  | "profile-edit";
 
 export interface TourFacts {
   userId?: string;
@@ -68,11 +69,11 @@ const STEPS: StepDef[] = [
   },
   {
     id: "complete-profile",
-    title: "Add your skills and bio",
-    why: "A complete profile is the first thing clients look at before reading a proposal.",
-    cta: "Edit profile",
-    tab: "profile",
-    roles: ["FREELANCER", "BOTH"],
+    title: "Complete your profile & upload a photo",
+    why: "New accounts start with a default Blobatar. Upload a custom profile picture and add your bio so clients and freelancers recognize you.",
+    cta: "Edit profile & photo",
+    tab: "profile-edit",
+    roles: ["CLIENT", "FREELANCER", "BOTH"],
     done: (f) => f.hasProfile,
   },
   {

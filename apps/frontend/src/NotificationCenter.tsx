@@ -12,6 +12,7 @@ const ROUTABLE = new Set([
   "jobs",
   "gigs",
   "contracts",
+  "escrow",
   "wallet",
   "chat",
   "verification",

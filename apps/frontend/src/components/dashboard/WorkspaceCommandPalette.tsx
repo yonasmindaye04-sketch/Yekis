@@ -146,10 +146,18 @@ export function WorkspaceCommandPalette({
       {
         id: "nav-contracts",
         group: "Workspace Navigation",
-        label: "Contracts & Escrow Room",
-        hint: "Sign agreements, fund milestones, release payouts",
+        label: "Contracts & Service Agreements",
+        hint: "Review and sign AACCSA agreements & download contract PDFs",
         icon: <FileText size={15} />,
         run: () => onNavigateView("contracts"),
+      },
+      {
+        id: "nav-escrow",
+        group: "Workspace Navigation",
+        label: "Escrow Center & Milestones",
+        hint: "Fund milestone vaults, submit deliverables & release payouts",
+        icon: <ShieldCheck size={15} />,
+        run: () => onNavigateView("escrow"),
       },
       {
         id: "nav-wallet",

@@ -6,13 +6,9 @@
     "apps/frontend"
   ],
   "scripts": {
-    "dev": "pnpm --filter frontend run dev",
-    "build": "pnpm --filter frontend run build",
-    "lint": "pnpm --filter frontend run lint",
-    "preview": "pnpm --filter frontend run preview",
-    "dev:frontend": "pnpm --filter frontend run dev",
-    "dev:backend": "pnpm --filter backend run dev",
-    "dev:tunnel": "node scripts/dev-with-tunnel.mjs",
-    "tunnel:cloudflare": "powershell -ExecutionPolicy Bypass -File scripts/start-cloudflare-tunnel.ps1"
+    "dev": "npm run dev --workspace=apps/frontend",
+    "build": "npm run build --workspace=apps/frontend",
+    "lint": "npm run lint --workspace=apps/frontend",
+    "preview": "npm run preview --workspace=apps/frontend"
   }
 }

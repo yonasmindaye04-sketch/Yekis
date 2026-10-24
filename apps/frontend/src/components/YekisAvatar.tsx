@@ -1,5 +1,56 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Blobatar } from "@blobatar/react";
+
+const AVATAR_OVERRIDE_PREFIX = "yekis_avatar_override_";
+export const AVATAR_UPDATED_EVENT = "yekis:avatar-updated";
+
+export interface StoredAvatarOverride {
+  /** Custom uploaded photo data URL / URL, or null when explicitly reverted to Blobatar */
+  avatarUrl?: string | null;
+  /** Custom shuffled Blobatar seed */
+  seed?: string | null;
+  updatedAt?: string;
+}
+
+export function loadAvatarOverride(userId?: string | null): StoredAvatarOverride | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const keys = [
+      userId ? `${AVATAR_OVERRIDE_PREFIX}${userId}` : null,
+      `${AVATAR_OVERRIDE_PREFIX}me`,
+    ].filter(Boolean) as string[];
+    for (const k of keys) {
+      const raw = window.localStorage.getItem(k);
+      if (raw) {
+        return JSON.parse(raw) as StoredAvatarOverride;
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+}
+
+export function saveAvatarOverride(
+  userId: string,
+  override: StoredAvatarOverride,
+): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: StoredAvatarOverride = {
+      ...override,
+      updatedAt: new Date().toISOString(),
+    };
+    const serialized = JSON.stringify(payload);
+    window.localStorage.setItem(`${AVATAR_OVERRIDE_PREFIX}${userId}`, serialized);
+    window.localStorage.setItem(`${AVATAR_OVERRIDE_PREFIX}me`, serialized);
+    window.dispatchEvent(
+      new CustomEvent(AVATAR_UPDATED_EVENT, { detail: { userId, ...payload } }),
+    );
+  } catch {
+    // ignore storage errors
+  }
+}
 
 export interface YekisAvatarProps {
   /** User's unique ID — preferred deterministic seed for Blobatar */
@@ -11,6 +62,8 @@ export interface YekisAvatarProps {
   seed?: string | null;
   /** Uploaded custom profile picture URL (if present, renders before Blobatar) */
   avatarUrl?: string | null;
+  /** If true, uses exact avatarUrl prop without reading stored override (used in live editor preview) */
+  disableStoredOverride?: boolean;
   /** Size in pixels (width & height). Defaults to 36px. */
   size?: number;
   /** Animation mode: "hover" (subtle interaction), "always", or false (static) */
@@ -33,6 +86,7 @@ export function YekisAvatar({
   email,
   seed: customSeed,
   avatarUrl,
+  disableStoredOverride = false,
   size = 36,
   animate = "hover",
   className = "",
@@ -42,10 +96,37 @@ export function YekisAvatar({
   onClick,
 }: YekisAvatarProps) {
   const [imgError, setImgError] = useState(false);
+  const [storedOverride, setStoredOverride] = useState<StoredAvatarOverride | null>(() =>
+    disableStoredOverride ? null : loadAvatarOverride(userId),
+  );
+
+  useEffect(() => {
+    if (disableStoredOverride) return;
+    setStoredOverride(loadAvatarOverride(userId));
+    const handleUpdate = () => {
+      setImgError(false);
+      setStoredOverride(loadAvatarOverride(userId));
+    };
+    window.addEventListener(AVATAR_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(AVATAR_UPDATED_EVENT, handleUpdate);
+  }, [userId, disableStoredOverride]);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [avatarUrl, storedOverride?.avatarUrl]);
+
+  const effectiveAvatarUrl = disableStoredOverride
+    ? avatarUrl
+    : avatarUrl !== undefined && avatarUrl !== null
+      ? avatarUrl
+      : storedOverride && "avatarUrl" in storedOverride
+        ? storedOverride.avatarUrl
+        : avatarUrl;
 
   // Recommendation 1: userId is the primary stable seed, falling back to email or displayName
   const seed = (
     customSeed?.trim() ||
+    (!disableStoredOverride && storedOverride?.seed?.trim()) ||
     userId?.trim() ||
     email?.trim() ||
     displayName?.trim() ||
@@ -56,7 +137,7 @@ export function YekisAvatar({
   const borderRadius = shape === "circle" ? "50%" : "12px";
 
   // If a valid custom photo is uploaded and has not failed loading
-  if (avatarUrl && !imgError) {
+  if (effectiveAvatarUrl && !imgError) {
     return (
       <div
         className={`yk-avatar-wrap ${className}`}
@@ -76,7 +157,7 @@ export function YekisAvatar({
         title={fallbackTitle}
       >
         <img
-          src={avatarUrl}
+          src={effectiveAvatarUrl}
           alt={fallbackTitle}
           onError={() => setImgError(true)}
           style={{

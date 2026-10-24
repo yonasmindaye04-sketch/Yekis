@@ -183,15 +183,12 @@
 .yk-v2 p { margin: 0; }
 .yk-v2 button { font-family: inherit; }
 
-/* ── layout ── */
-.yk-v2 .v2-container {
-  width: 100%;
-  padding: 0 6%;
-  box-sizing: border-box;
-}
-/* Aligned with the same 6% horizontal gutter system as the header */
+/* ── layout (Permanent Design Rule: Content width equals Header width left & right) ── */
+.yk-v2 .v2-container,
 .yk-v2 .v2-container-wide {
   width: 100%;
+  max-width: 100%;
+  margin: 0;
   padding: 0 6%;
   box-sizing: border-box;
 }
@@ -2533,7 +2530,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 
 /* Tablet landscape */
 @media (max-width: 1024px) {
-  .yk-v2 .v2-container { padding: 0 5%; }
+  .yk-v2 .v2-container,
+  .yk-v2 .v2-container-wide,
+  .yk-cs-studio .cs-band-inner { padding: 0 5%; }
+  .yk-v2 .v2-hero-inner { padding-left: 5%; padding-right: 5%; }
   /* stats — flatten the cascade and go 2-up */
   .yk-v2 .v2-stats { padding-top: 64px; padding-bottom: 72px; }
   .yk-v2 .v2-stat { min-width: 14rem; }
@@ -2552,7 +2552,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 
 /* Tablet portrait */
 @media (max-width: 820px) {
-  .yk-v2 .v2-container { padding: 0 5%; }
+  .yk-v2 .v2-container,
+  .yk-v2 .v2-container-wide,
+  .yk-cs-studio .cs-band-inner { padding: 0 5%; }
   .yk-v2 .v2-section { padding: 74px 0; }
   .yk-v2 .v2-cats-grid { grid-template-columns: repeat(2, 1fr); }
   .yk-v2 .v2-fees-card { padding: 32px 28px; }
@@ -2561,7 +2563,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 
 /* Mobile */
 @media (max-width: 600px) {
-  .yk-v2 .v2-container { padding: 0 5%; }
+  .yk-v2 .v2-container,
+  .yk-v2 .v2-container-wide,
+  .yk-cs-studio .cs-band-inner { padding: 0 5%; }
   .yk-v2 .v2-section { padding: 60px 0; }
   /* stats — single column, unskewed for a clean stack */
   .yk-v2 .v2-stats { padding-top: 56px; padding-bottom: 60px; }
@@ -3425,7 +3429,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 
 @media (max-width: 768px) {
   .yk-v2 .v2-hero-inner {
-    padding: 5.5rem 16px 2.5rem;
+    padding: 5.5rem 5% 2.5rem;
     width: 100%;
   }
   .yk-v2 .v2-hero-title {
@@ -3450,8 +3454,12 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 
 @media (max-width: 480px) {
   .yk-v2 .v2-container,
-  .yk-v2 .v2-container-wide {
+  .yk-v2 .v2-container-wide,
+  .yk-cs-studio .cs-band-inner {
     padding: 0 16px;
+  }
+  .yk-v2 .v2-hero-inner {
+    padding: 5.5rem 16px 2.5rem;
   }
   .yk-v2 .v2-faq {
     padding: 40px 16px;
@@ -4364,10 +4372,12 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   color: #f4f7f4;
 }
 
+/* PERMANENT DESIGN RULE: Content width must equal Header (.marketing-header) width
+   on both left and right edges (100% fluid width, 0 max-width cap, 6% desktop gutter) */
 .yk-cs-studio .cs-band-inner {
   width: 100%;
-  max-width: 1380px;
-  margin: 0 auto;
+  max-width: 100%;
+  margin: 0;
   padding: 0 6%;
   box-sizing: border-box;
 }
@@ -5223,7 +5233,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 14px 4%;
+  padding: 14px 6%;
   background: #141715;
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   color: #f4f7f4;
@@ -5507,6 +5517,535 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
     padding: 22px 18px;
   }
 }
+
+/* ==========================================================================
+   STUDIO SUBPAGE EXTENSIONS (FAQ, FEES, ABOUT)
+   ========================================================================== */
+
+/* FAQ Search & Editorial Accordion */
+.yk-cs-studio .cs-search-shell {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f5f7f4;
+  border: 1.5px solid #0b0f0c;
+  border-radius: 999px;
+  padding: 8px 10px 8px 20px;
+  max-width: 560px;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.yk-cs-studio .cs-search-shell:focus-within {
+  border-color: #5fa032;
+  box-shadow: 0 0 0 4px rgba(95, 160, 50, 0.16);
+}
+
+.yk-cs-studio .cs-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-family: var(--v2-font-body);
+  font-size: 14.5px;
+  color: #0b0f0c;
+  outline: none;
+}
+
+.yk-cs-studio .cs-search-kbd {
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: #0b0f0c;
+  color: #ffffff;
+  letter-spacing: 0.06em;
+}
+
+.yk-cs-studio .cs-faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+.yk-cs-studio .cs-faq-card {
+  background: #ffffff;
+  border: 1px solid rgba(11, 15, 12, 0.1);
+  border-radius: 22px;
+  overflow: hidden;
+  transition: border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s ease;
+}
+
+.yk-cs-studio .cs-faq-card:hover {
+  border-color: rgba(95, 160, 50, 0.55);
+  box-shadow: 0 18px 40px -24px rgba(7, 10, 8, 0.16);
+}
+
+.yk-cs-studio .cs-faq-card.is-open {
+  border-color: #0b0f0c;
+  box-shadow: 0 22px 46px -22px rgba(7, 10, 8, 0.22);
+}
+
+.yk-cs-studio .cs-faq-trigger {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 22px 24px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.yk-cs-studio .cs-faq-num {
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #5fa032;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.yk-cs-studio .cs-faq-q {
+  font-family: var(--v2-font-display);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: #0b0f0c;
+  margin: 0;
+}
+
+.yk-cs-studio .cs-faq-brace-toggle {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 15, 12, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--v2-font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: #0b0f0c;
+  background: #f5f7f4;
+  transition: all 0.2s ease;
+}
+
+.yk-cs-studio .cs-faq-card.is-open .cs-faq-brace-toggle {
+  background: #5fa032;
+  color: #ffffff;
+  border-color: #5fa032;
+}
+
+.yk-cs-studio .cs-faq-body {
+  padding: 0 24px 24px;
+  border-top: 1px dashed rgba(11, 15, 12, 0.12);
+}
+
+.yk-cs-studio .cs-faq-a {
+  margin: 16px 0 14px;
+  font-size: 14.5px;
+  line-height: 1.68;
+  color: #38403a;
+}
+
+/* Fees Interactive Workbench & Editorial Dossier Receipt */
+.yk-cs-studio .cs-fees-workbench {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 28px;
+  align-items: stretch;
+}
+
+.yk-cs-studio .cs-calc-panel {
+  background: #0b0f0c;
+  color: #f4f7f4;
+  border-radius: 26px;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  box-shadow: 0 26px 60px -28px rgba(7, 10, 8, 0.5);
+}
+
+.yk-cs-studio .cs-calc-amount-display {
+  font-family: var(--v2-font-display);
+  font-size: clamp(32px, 4vw, 48px);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  color: #78c841;
+  line-height: 1;
+}
+
+.yk-cs-studio .cs-calc-slider {
+  width: 100%;
+  accent-color: #78c841;
+  height: 8px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.yk-cs-studio .cs-calc-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.yk-cs-studio .cs-calc-preset-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(244, 247, 244, 0.8);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: var(--v2-font-mono);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.yk-cs-studio .cs-calc-preset-btn.is-active,
+.yk-cs-studio .cs-calc-preset-btn:hover {
+  background: #78c841;
+  border-color: #78c841;
+  color: #070a08;
+  font-weight: 700;
+}
+
+.yk-cs-studio .cs-calc-rail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.yk-cs-studio .cs-calc-rail-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px;
+  text-align: left;
+  color: #f4f7f4;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.yk-cs-studio .cs-calc-rail-btn.is-active {
+  background: rgba(120, 200, 65, 0.15);
+  border-color: #78c841;
+}
+
+.yk-cs-studio .cs-dossier-receipt {
+  background: #fafaf7;
+  color: #141715;
+  border-radius: 26px;
+  padding: 32px;
+  border: 1px solid rgba(20, 23, 21, 0.14);
+  box-shadow: 0 24px 52px -28px rgba(7, 10, 8, 0.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+/* About Studio Contact Dispatch Form */
+.yk-cs-studio .cs-contact-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.yk-cs-studio .cs-contact-input,
+.yk-cs-studio .cs-contact-select,
+.yk-cs-studio .cs-contact-textarea {
+  width: 100%;
+  background: rgba(7, 10, 8, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 14px;
+  padding: 12px 15px;
+  color: #f4f7f4;
+  font-family: var(--v2-font-body);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.yk-cs-studio .cs-contact-input:focus,
+.yk-cs-studio .cs-contact-select:focus,
+.yk-cs-studio .cs-contact-textarea:focus {
+  border-color: #78c841;
+}
+
+@media (max-width: 1024px) {
+  .yk-cs-studio .cs-faq-grid,
+  .yk-cs-studio .cs-fees-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .yk-cs-studio .cs-calc-rail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   CNRRES-INSPIRED SCROLL MOTION & STICKY 3-COLUMN { STACK } STAGE
+   ========================================================================== */
+
+/* Animated Count-Up KPI Strip (Replaces dense manifesto sub-paragraphs) */
+.yk-cs-studio .cs-scroll-kpi-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.yk-cs-studio .cs-scroll-kpi-pill {
+  background: #f5f7f4;
+  border: 1px solid rgba(11, 15, 12, 0.1);
+  border-radius: 18px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.yk-cs-studio .cs-scroll-kpi-num {
+  font-family: var(--v2-font-display);
+  font-size: clamp(26px, 3vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #0b0f0c;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.05;
+}
+
+.yk-cs-studio .cs-scroll-kpi-label {
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5fa032;
+}
+
+/* Sticky Scroll-Pinned { SERVICES / RAILS / TOPICS / PILLARS } Track */
+.yk-cs-studio .cs-services-band {
+  padding: 0;
+  position: relative;
+}
+
+.yk-cs-studio .cs-sticky-services-track {
+  min-height: 195vh;
+  position: relative;
+}
+
+.yk-cs-studio .cs-sticky-services-pin {
+  position: sticky;
+  top: 76px;
+  min-height: calc(100vh - 76px);
+  display: flex;
+  align-items: center;
+  padding: 56px 0;
+}
+
+.yk-cs-studio .cs-services-grid {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 390px;
+  gap: 40px;
+  align-items: center;
+  width: 100%;
+}
+
+.yk-cs-studio .cs-services-col-kicker {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 28px;
+  align-self: stretch;
+  padding: 12px 0;
+}
+
+.yk-cs-studio .cs-scroll-step-indicator {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.yk-cs-studio .cs-scroll-step-num {
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #0b0f0c;
+  font-variant-numeric: tabular-nums;
+}
+
+.yk-cs-studio .cs-scroll-step-rail {
+  width: 3px;
+  height: 120px;
+  background: rgba(11, 15, 12, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.yk-cs-studio .cs-scroll-step-fill {
+  width: 100%;
+  background: #5fa032;
+  border-radius: 999px;
+}
+
+.yk-cs-studio .cs-service-item {
+  font-size: clamp(1.85rem, 3.4vw, 3.1rem);
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.yk-cs-studio .cs-service-idx {
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: #8b958e;
+  letter-spacing: 0.08em;
+  transform: translateY(-8px);
+}
+
+.yk-cs-studio .cs-service-item.is-active .cs-service-idx {
+  color: #5fa032;
+}
+
+/* Clean Fluted Green Card Interior (Bold Stats Only, Zero Tiny Sentences) */
+.yk-cs-studio .cs-fluted-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.yk-cs-studio .cs-fluted-chip {
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #d8f5c4;
+  text-transform: uppercase;
+}
+
+.yk-cs-studio .cs-fluted-gold-badge {
+  background: #f5c518;
+  color: #141715;
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 800;
+  padding: 5px 11px;
+  border-radius: 999px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.yk-cs-studio .cs-fluted-art-stage {
+  height: 215px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.yk-cs-studio .cs-fluted-stat-list {
+  background: rgba(7, 10, 8, 0.88);
+  border: 1px solid rgba(155, 229, 100, 0.22);
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.yk-cs-studio .cs-fluted-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.yk-cs-studio .cs-fluted-stat-row:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.yk-cs-studio .cs-fluted-stat-label {
+  font-family: var(--v2-font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #f4f7f4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.yk-cs-studio .cs-fluted-stat-badge {
+  font-family: var(--v2-font-mono);
+  font-size: 12px;
+  font-weight: 800;
+  color: #ffe47a;
+  background: rgba(245, 197, 24, 0.14);
+  border: 1px solid rgba(245, 197, 24, 0.35);
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Band Curtain Elevation Effect */
+.yk-cs-studio .cs-manifesto-band,
+.yk-cs-studio .cs-works-band,
+.yk-cs-studio .cs-services-band,
+.yk-cs-studio .cs-testi-band,
+.yk-cs-studio .cs-outro-band {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 -18px 42px -24px rgba(7, 10, 8, 0.18);
+}
+
+@media (max-width: 1024px) {
+  .yk-cs-studio .cs-sticky-services-track {
+    min-height: auto;
+  }
+  .yk-cs-studio .cs-sticky-services-pin {
+    position: relative;
+    top: 0;
+    min-height: auto;
+    padding: 64px 0;
+  }
+  .yk-cs-studio .cs-services-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .yk-cs-studio .cs-scroll-step-rail {
+    display: none;
+  }
+  .yk-cs-studio .cs-scroll-kpi-strip {
+    grid-template-columns: 1fr;
+  }
+  .yk-cs-studio .cs-service-item {
+    white-space: normal;
+  }
+}
+
+
 
 
 

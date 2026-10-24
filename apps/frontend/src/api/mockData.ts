@@ -1731,14 +1731,55 @@ class MockStore {
   customEmail: string | null = null;
   customPhone: string | null = null;
   customStaffRole: string | null = null;
+  customAvatarUrl: string | null = null;
+  customFirstName: string | null = null;
+  customLastName: string | null = null;
+  customBio: string | null = null;
+  customPrimarySkillId: string | null = null;
+  customProfileCompleteness: number | null = null;
   registeredRolesByEmail: Record<string, DemoWorkspaceRole> = {};
 
   getCurrentUser(): MeResponse {
     const base = DEMO_USERS[this.activeRole] ?? DEMO_USERS.BOTH;
+    let storedAvatar: string | null | undefined = this.customAvatarUrl;
+    if (storedAvatar === null && typeof window !== "undefined") {
+      try {
+        const raw =
+          window.localStorage.getItem(`yekis_avatar_override_${base.id}`) ||
+          window.localStorage.getItem("yekis_avatar_override_me");
+        if (raw) {
+          const parsed = JSON.parse(raw) as { avatarUrl?: string | null };
+          if (parsed && "avatarUrl" in parsed) {
+            storedAvatar = parsed.avatarUrl ?? null;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    const defaultDisplayName =
+      this.activeRole === "CLIENT"
+        ? "Abebe Kebede"
+        : this.activeRole === "FREELANCER"
+          ? "Hanna Tadesse"
+          : this.activeRole === "ADMIN"
+            ? "Yonael Ops Lead"
+            : "Dawit Mekonnen";
+    const fullName =
+      this.customFirstName || this.customLastName
+        ? `${this.customFirstName ?? ""} ${this.customLastName ?? ""}`.trim()
+        : defaultDisplayName;
+    const completeness =
+      this.customProfileCompleteness ?? (storedAvatar ? 96 : 75);
     return {
       ...base,
       email: this.customEmail || base.email,
       phone: this.customPhone || base.phone,
+      firstName: this.customFirstName ?? fullName.split(" ")[0],
+      lastName: this.customLastName ?? fullName.split(" ").slice(1).join(" "),
+      displayName: fullName,
+      avatarUrl: storedAvatar ?? null,
+      profileCompleteness: completeness,
       staffRole:
         this.activeRole === "ADMIN"
           ? (this.customStaffRole ?? base.staffRole)
@@ -1945,6 +1986,12 @@ class MockStore {
         } else {
           this.setRole("BOTH");
         }
+      }
+      if (cleanPath === "/auth/register") {
+        // New user registration starts with an incomplete profile and default Blobatar
+        this.customAvatarUrl = null;
+        this.customProfileCompleteness = 35;
+        this.customBio = "";
       }
       const user = this.getCurrentUser();
       return {
@@ -2352,7 +2399,8 @@ class MockStore {
       return { items: activeGigs, data: activeGigs, total: activeGigs.length, page: 1, pageSize: 20 };
     }
     if (cleanPath === "/users/me/profile/completeness") {
-      return { profileCompleteness: 96 };
+      const u = this.getCurrentUser();
+      return { profileCompleteness: u.profileCompleteness ?? 75 };
     }
 
     // Skills, Featured, Portfolio, Reviews, Profile
@@ -2437,8 +2485,34 @@ class MockStore {
       return this.portfolioItems;
     }
     if (cleanPath.includes("/profile")) {
+      if (method === "PATCH" && parsedBody) {
+        if (typeof parsedBody.firstName === "string") {
+          this.customFirstName = parsedBody.firstName.trim();
+        }
+        if (typeof parsedBody.lastName === "string") {
+          this.customLastName = parsedBody.lastName.trim();
+        }
+        if (typeof parsedBody.bio === "string") {
+          this.customBio = parsedBody.bio;
+        }
+        if (typeof parsedBody.primarySkillId === "string") {
+          this.customPrimarySkillId = parsedBody.primarySkillId;
+        }
+        if ("avatarUrl" in parsedBody) {
+          this.customAvatarUrl =
+            typeof parsedBody.avatarUrl === "string" && parsedBody.avatarUrl.trim()
+              ? parsedBody.avatarUrl.trim()
+              : null;
+        }
+        let score = 40;
+        if (this.customFirstName && this.customLastName) score += 15;
+        if (this.customBio && this.customBio.trim().length >= 20) score += 20;
+        if (this.customPrimarySkillId) score += 10;
+        if (this.customAvatarUrl) score += 15;
+        this.customProfileCompleteness = Math.min(100, score);
+      }
       const u = this.getCurrentUser();
-      const displayName =
+      const defaultDisplayName =
         this.activeRole === "CLIENT"
           ? "Abebe Kebede"
           : this.activeRole === "FREELANCER"
@@ -2446,21 +2520,27 @@ class MockStore {
             : this.activeRole === "ADMIN"
               ? "Yonael Ops Lead"
               : "Dawit Mekonnen";
-      const [firstName, lastName] = displayName.split(" ");
+      const [defaultFirst, defaultLast] = defaultDisplayName.split(" ");
+      const firstName = this.customFirstName || String(parsedBody?.firstName || defaultFirst || "Dawit");
+      const lastName = this.customLastName || String(parsedBody?.lastName || defaultLast || "Mekonnen");
+      const displayName = `${firstName} ${lastName}`.trim() || defaultDisplayName;
       return {
         id: u.id,
         displayName,
-        firstName: String(parsedBody?.firstName || firstName || "Dawit"),
-        lastName: String(parsedBody?.lastName || lastName || "Mekonnen"),
-        bio: String(
-          parsedBody?.bio ||
-            "Building resilient escrow-backed software, Telebirr integrations, and digital products across Ethiopia.",
-        ),
-        avatarUrl: null,
-        profileCompleteness: 96,
+        firstName,
+        lastName,
+        bio:
+          this.customBio !== null
+            ? this.customBio
+            : String(
+                parsedBody?.bio ||
+                  "Building resilient escrow-backed software, Telebirr integrations, and digital products across Ethiopia.",
+              ),
+        avatarUrl: u.avatarUrl ?? null,
+        profileCompleteness: u.profileCompleteness ?? 75,
         isAvailableForWork: parsedBody?.isAvailableForWork !== undefined ? Boolean(parsedBody.isAvailableForWork) : true,
         profileVisibility: (parsedBody?.profileVisibility as "PUBLIC" | "PROPOSERS" | "PRIVATE") || "PUBLIC",
-        primarySkillId: String(parsedBody?.primarySkillId || "sk-1"),
+        primarySkillId: this.customPrimarySkillId || String(parsedBody?.primarySkillId || "sk-1"),
         skills: this.skills.slice(0, 6),
         portfolio: this.portfolioItems,
         kyc: { tier: u.kyc?.tier ?? "TIER_2", status: u.kyc?.status ?? "VERIFIED", badgeType: "FAYDA_VERIFIED" },

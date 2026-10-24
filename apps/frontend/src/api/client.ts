@@ -39,6 +39,11 @@ export interface MeResponse {
   role: string;
   staffRole: string | null;
   languagePreference: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  profileCompleteness?: number | null;
   kyc: { tier: string; status: string } | null;
   wallet: { balanceMinor: number } | null;
 }
@@ -59,6 +64,7 @@ export interface UpdateProfilePayload {
   skillIds?: string[];
   isAvailableForWork?: boolean;
   profileVisibility?: "PUBLIC" | "PROPOSERS" | "PRIVATE";
+  avatarUrl?: string | null;
 }
 
 /** The signed-in user's own profile (GET /users/:id/profile with viewer === self). */

@@ -20,6 +20,7 @@ import { PhoneVerification } from "./PhoneVerification";
 import {
   ContractsWorkspace,
   DisputesWorkspace,
+  EscrowWorkspace,
   JobsWorkspace,
 } from "./WorkflowWorkspace";
 import {
@@ -27,6 +28,7 @@ import {
   Briefcase,
   Search,
   FileText,
+  FileSignature,
   Wallet,
   MessageCircle,
   ShieldCheck,
@@ -46,9 +48,17 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
+  Camera,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
+import {
+  YekisAvatar,
+  AVATAR_UPDATED_EVENT,
+  loadAvatarOverride,
+} from "./components/YekisAvatar";
 import { FAQPage } from "./FAQPage";
 import { FeesPage } from "./FeesPage";
 import { PrivacyPage } from "./PrivacyPage";
@@ -130,6 +140,7 @@ type View =
   | "gigs"
   | "my-gigs"
   | "contracts"
+  | "escrow"
   | "wallet"
   | "chat"
   | "verification"
@@ -183,7 +194,8 @@ const navIconMap: Record<string, React.ReactNode> = {
   jobs: <Briefcase size={18} />,
   "find-work": <Search size={18} />,
   gigs: <Package size={18} />,
-  contracts: <FileText size={18} />,
+  contracts: <FileSignature size={18} />,
+  escrow: <FileText size={18} />,
   wallet: <Wallet size={18} />,
   chat: <MessageCircle size={18} />,
   verification: <ShieldCheck size={18} />,
@@ -326,6 +338,14 @@ function FullPlatformAppInner() {
   const [profileCompleteness, setProfileCompleteness] = useState<number | null>(
     null,
   );
+  const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+
+  useEffect(() => {
+    const onAvatarUpdated = () => setAvatarVersion((v) => v + 1);
+    window.addEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
+    return () => window.removeEventListener(AVATAR_UPDATED_EVENT, onAvatarUpdated);
+  }, []);
   // Granular PDPP consents (Master Design §12.2) — optional purposes default
   // unticked (no pre-ticked boxes); required purposes are implied by the
   // terms checkbox + mandatory kyc/financial literals sent on register.
@@ -342,6 +362,7 @@ function FullPlatformAppInner() {
   const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
   const [viewUserId, setViewUserId] = useState<string | null>(null);
+  const [focusContractId, setFocusContractId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -652,6 +673,10 @@ if (authMode === "register") {
         events.signupCompleted(
           role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
         );
+        setProfileNudgeDismissed(false);
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("yekis_new_user_nudge_me", "1");
+        }
       } else {
         events.login("email");
       }
@@ -750,6 +775,15 @@ if (authMode === "register") {
   // has never posted anything. Steps needing data this screen does not load are
   // left out of the tour rather than hardcoded to false, which would render a
   // step the user could never tick off.
+  const activeAvatarOverride = useMemo(
+    () => loadAvatarOverride(user?.id),
+    [user?.id, avatarVersion],
+  );
+  const effectiveUserAvatarUrl =
+    activeAvatarOverride && "avatarUrl" in activeAvatarOverride
+      ? activeAvatarOverride.avatarUrl
+      : user?.avatarUrl ?? null;
+
   const tourFacts = useMemo(
     () => ({
       userId: user?.id,
@@ -763,10 +797,12 @@ if (authMode === "register") {
       hasPostedJob: myJobCount === null ? undefined : myJobCount > 0,
       hasSubmittedProposal:
       myProposalCount === null ? undefined : myProposalCount > 0,
-      // Completeness is a percentage. Anything below half-built still counts as
-      // unfinished; a bare account sitting at 0 is not "profile complete".
+      // Profile step stays visible until the user has both >= 80% completeness
+      // and a custom uploaded photo (or has explicitly completed their profile).
       hasProfile:
-      profileCompleteness === null ? undefined : profileCompleteness >= 60,
+        profileCompleteness === null
+          ? undefined
+          : profileCompleteness >= 85 && Boolean(effectiveUserAvatarUrl),
     }),
     [
       user?.id,
@@ -778,6 +814,7 @@ if (authMode === "register") {
       myJobCount,
       myProposalCount,
       profileCompleteness,
+      effectiveUserAvatarUrl,
     ],
   );
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
@@ -794,7 +831,8 @@ if (authMode === "register") {
       { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
       { view: "gigs" as View, iconKey: "gigs", label: t.workspace.nav.gigs },
-      { view: "contracts" as View, iconKey: "contracts", label: t.nav.escrow },
+      { view: "contracts" as View, iconKey: "contracts", label: t.nav.contracts },
+      { view: "escrow" as View, iconKey: "escrow", label: t.nav.escrow },
       { view: "wallet" as View, iconKey: "wallet", label: t.nav.wallet },
       { view: "chat" as View, iconKey: "chat", label: t.workspace.nav.chat },
       { view: "profile" as View, iconKey: "profile", label: t.workspace.nav.profile },
@@ -1702,23 +1740,52 @@ if (authMode === "register") {
           </span>
           <span className="nav-label">{t.nav.settings}</span>
         </button>
-        {isMobileViewport && (
-          <button
-            type="button"
-            className="sidebar-settings"
-            style={{ marginTop: 4 }}
-            onClick={() => {
-              setMobileDrawerOpen(false);
-              logout();
-            }}
-            title={t.nav.signOut}
-          >
-            <span className="nav-icon">
-              <LogOut size={18} />
-            </span>
-            <span className="nav-label">{t.nav.signOut}</span>
-          </button>
-        )}
+
+        <div className="sidebar-foot workspace-sidebar-foot">
+          <div className="user-chip">
+            <button
+              type="button"
+              className="user-chip-main"
+              onClick={() => {
+                setView("profile");
+                setMobileDrawerOpen(false);
+              }}
+              title={`${roleLabel(platformRole)} — ${user.email}`}
+              aria-label={`View profile — signed in as ${roleLabel(platformRole)} (${user.email})`}
+            >
+              <span className="avatar yk-chip-avatar">
+                <YekisAvatar
+                  userId={user.id}
+                  email={user.email}
+                  displayName={user.displayName}
+                  avatarUrl={user.avatarUrl}
+                  size={34}
+                  animate="hover"
+                />
+              </span>
+              {(!sidebarCollapsed || isMobileViewport) && (
+                <span className="user-chip-id">
+                  <span className="nm">{roleLabel(platformRole)}</span>
+                  <span className="em">{user.email || "—"}</span>
+                </span>
+              )}
+            </button>
+            {(!sidebarCollapsed || isMobileViewport) && (
+              <button
+                type="button"
+                className="icon-btn"
+                onClick={() => {
+                  setMobileDrawerOpen(false);
+                  logout();
+                }}
+                title={t.nav.signOut}
+                aria-label={t.nav.signOut}
+              >
+                <LogOut size={15} />
+              </button>
+            )}
+          </div>
+        </div>
       </aside>
 
       <main className="platform-main">
@@ -1819,16 +1886,77 @@ if (authMode === "register") {
             <button
               type="button"
               className="user-menu"
-              onClick={() => setView("settings")}
-              title={t.nav.settings}
-              aria-label={t.nav.settings}
+              onClick={() => setView("profile")}
+              title={`${roleLabel(platformRole)} — ${user.email}`}
+              aria-label={`Open profile (${user.email})`}
             >
-              <span className="avatar">
-                {user.email.slice(0, 1).toUpperCase()}
+              <span className="avatar yk-topbar-avatar">
+                <YekisAvatar
+                  userId={user.id}
+                  email={user.email}
+                  displayName={user.displayName}
+                  avatarUrl={user.avatarUrl}
+                  size={32}
+                  animate="hover"
+                />
               </span>
             </button>
           </div>
         </header>
+
+        {view !== "profile-edit" &&
+          !profileNudgeDismissed &&
+          (!effectiveUserAvatarUrl ||
+            (profileCompleteness !== null && profileCompleteness < 85)) && (
+            <div className="sh-profile-setup-banner" role="region" aria-label="Complete your profile">
+              <div className="sh-profile-setup-left">
+                <div className="sh-profile-setup-avatar-wrap">
+                  <YekisAvatar
+                    userId={user.id}
+                    email={user.email}
+                    displayName={user.displayName}
+                    avatarUrl={user.avatarUrl}
+                    size={44}
+                    animate="hover"
+                  />
+                  <span className="sh-profile-setup-cam" aria-hidden="true">
+                    <Camera size={12} />
+                  </span>
+                </div>
+                <div className="sh-profile-setup-copy">
+                  <div className="sh-profile-setup-title-row">
+                    <strong>Complete your profile &amp; upload a profile picture</strong>
+                    <span className="sh-profile-setup-badge sh-mono">
+                      <Sparkles size={12} />
+                      {profileCompleteness ?? user.profileCompleteness ?? 75}% complete ·{" "}
+                      {effectiveUserAvatarUrl ? "Custom Photo" : "Default Blobatar"}
+                    </span>
+                  </div>
+                  <p>
+                    New accounts use a generated Blobatar by default. Upload your own profile photo and review your bio &amp; details so clients and freelancers recognize and trust you across contracts.
+                  </p>
+                </div>
+              </div>
+              <div className="sh-profile-setup-actions">
+                <button
+                  type="button"
+                  className="sh-btn sh-btn-primary"
+                  onClick={() => setView("profile-edit")}
+                >
+                  <Camera size={14} /> Edit Profile &amp; Upload Photo <ArrowRight size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="sh-icon-only-btn"
+                  onClick={() => setProfileNudgeDismissed(true)}
+                  title="Dismiss for this session"
+                  aria-label="Dismiss profile setup banner"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+          )}
 
         {view === "overview" && (
           <div className="sh-workspace-view">
@@ -2015,15 +2143,52 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Contracts & Escrow Milestones
+                  Contracts & Service Agreements
                 </h2>
                 <p className="sh-card-desc">
-                  Execute bilingual AACCSA agreements, fund escrow vaults, submit deliverables, and release verified payouts.
+                  Review and sign bilingual AACCSA agreements, inspect bilateral e-signatures, and download executed contract PDFs.
                 </p>
               </div>
               <span className="sh-kbd">AACCSA Standard v2.4</span>
             </div>
-            <ContractsWorkspace userId={user.id} onChanged={loadWorkspace} />
+            <ContractsWorkspace
+              userId={user.id}
+              onChanged={loadWorkspace}
+              focusContractId={focusContractId}
+              onOpenEscrow={(contractId) => {
+                setFocusContractId(contractId || null);
+                setView("escrow");
+              }}
+            />
+          </section>
+        )}
+
+        {view === "escrow" && (
+          <section className="sh-dashboard-wrap">
+            <div className="sh-card-header">
+              <div>
+                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+                  {t.escrow.title}
+                </h2>
+                <p className="sh-card-desc">
+                  Fund milestone escrow vaults, submit deliverables for review, approve payouts, and inspect withholding tax breakdowns.
+                </p>
+              </div>
+              <span className="sh-kbd">7-Day Auto-Release Protection</span>
+            </div>
+            <EscrowWorkspace
+              userId={user.id}
+              onChanged={loadWorkspace}
+              focusContractId={focusContractId}
+              onOpenContract={(contractId) => {
+                if (!contractId) {
+                  setFocusContractId(null);
+                } else {
+                  setFocusContractId(contractId);
+                  setView("contracts");
+                }
+              }}
+            />
           </section>
         )}
 
@@ -2138,7 +2303,7 @@ if (authMode === "register") {
                 <ArrowLeft size={14} /> {t.workspace.profile.backToProfileBtn}
               </button>
             </div>
-            <ProfileEditPage />
+            <ProfileEditPage onSaved={() => void loadWorkspace()} />
           </section>
         )}
 

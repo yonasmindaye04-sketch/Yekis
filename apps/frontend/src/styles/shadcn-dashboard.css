@@ -236,6 +236,227 @@
   margin-top: auto;
 }
 
+/* ── Sidebar Footer User Badge (Matching Admin OpsConsole User Chip) ────── */
+.platform-shell.sh-shell .workspace-sidebar-foot {
+  border-top: 1px solid var(--color-border);
+  margin-top: 10px;
+  padding-top: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  transition: background-color 150ms ease;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip:hover {
+  background: var(--color-bg-subtle);
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 8px;
+  color: var(--color-text);
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip-main:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.platform-shell.sh-shell .user-menu .yk-topbar-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 0;
+}
+
+/* ── Persistent New User Profile Setup & Photo Banner ──────────────────── */
+.sh-profile-setup-banner {
+  margin: 14px 24px 0;
+  padding: 14px 18px;
+  border-radius: calc(var(--sh-radius) + 4px);
+  border: 1px solid rgba(22, 163, 74, 0.32);
+  background: linear-gradient(
+    90deg,
+    rgba(22, 163, 74, 0.09) 0%,
+    var(--color-bg-elevated) 65%
+  );
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.sh-profile-setup-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 360px;
+  min-width: 0;
+}
+
+.sh-profile-setup-avatar-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sh-profile-setup-cam {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: #ffffff;
+  border: 2px solid var(--color-bg-elevated);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sh-profile-setup-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sh-profile-setup-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sh-profile-setup-title-row strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sh-profile-setup-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.sh-profile-setup-copy p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-profile-setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip-id {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip .nm {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .user-chip .em {
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--color-neutral-text, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .icon-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease, background-color 150ms ease;
+}
+
+.platform-shell.sh-shell .workspace-sidebar-foot .icon-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
 /* Collapsed 68px Icon-Rail Mode: uniform 40x40 centered squares on X=34px axis */
 .platform-shell.sh-shell.sh-collapsed .platform-sidebar {
   padding: 12px 0 16px;
@@ -264,6 +485,22 @@
   margin-inline: auto;
   gap: 0;
   border-radius: var(--sh-radius);
+}
+
+.platform-shell.sh-shell.sh-collapsed .workspace-sidebar-foot {
+  padding: 10px 0 0;
+  display: flex;
+  justify-content: center;
+}
+
+.platform-shell.sh-shell.sh-collapsed .workspace-sidebar-foot .user-chip {
+  padding: 3px;
+  justify-content: center;
+}
+
+.platform-shell.sh-shell.sh-collapsed .workspace-sidebar-foot .user-chip-main {
+  justify-content: center;
+  flex: 0 0 auto;
 }
 
 .platform-shell.sh-shell.sh-collapsed .sidebar-brand-name,

@@ -191,6 +191,8 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
       userUpdateData.isAvailableForWork = data.isAvailableForWork;
     if (data.profileVisibility !== undefined)
       userUpdateData.profileVisibility = data.profileVisibility;
+    if (data.avatarUrl !== undefined)
+      userUpdateData.avatarUrl = data.avatarUrl || null;
 
     const updatedUser = await tx.user.update({
       where: { id: userId },

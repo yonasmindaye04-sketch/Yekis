@@ -36,6 +36,7 @@ type AppView =
   | "jobs"
   | "gigs"
   | "contracts"
+  | "escrow"
   | "wallet"
   | "chat"
   | "verification"

@@ -15,6 +15,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useI18n } from "./i18n";
+import {
+  AnimatedCountUpStrip,
+  ScrollIlluminatedHeadline,
+  StickyScrollServicesStage,
+} from "./components/StudioScrollMotion";
 import "./landing-v2.css";
 
 type CaseStudiesPageProps = {
@@ -726,11 +731,6 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
     if (activeCategory === "ALL") return CASE_STUDIES;
     return CASE_STUDIES.filter((item) => item.category === activeCategory);
   }, [activeCategory]);
-
-  const currentDiscipline = useMemo(
-    () => DISCIPLINES.find((d) => d.id === activeDiscipline) ?? DISCIPLINES[0],
-    [activeDiscipline],
-  );
 
   const activeTestimonial = CASE_STUDIES[activeTestimonialIdx] ?? CASE_STUDIES[0];
 
@@ -1966,28 +1966,20 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             </motion.div>
 
             <div>
-              <h2 className="cs-manifesto-title">
-                Great delivery is more than just promises—it’s about clear milestones, verified work, and measurable impact.
-              </h2>
+              <ScrollIlluminatedHeadline
+                segments={[
+                  { text: "Great delivery is more than just promises—it’s about" },
+                  { text: "clear milestones, verified work, and measurable impact.", highlight: true },
+                ]}
+              />
 
-              <div className="cs-manifesto-subgrid">
-                <div className="cs-manifesto-kicker">&rarr; OUR APPROACH</div>
-                <div>
-                  <p className="cs-manifesto-copy">
-                    We connect ambitious Ethiopian enterprises and NGOs with verified specialists who deliver on schedule. Whether you’re{" "}
-                    <span className="cs-green-highlight">
-                      launching a new product or modernizing regional operations, every birr is protected in escrow until milestone approval.
-                    </span>
-                  </p>
-                  <button
-                    type="button"
-                    className="cs-inline-underline-btn"
-                    onClick={() => openStudyDossier(CASE_STUDIES[0])}
-                  >
-                    <span>(See how we structure milestone dossiers)</span>
-                  </button>
-                </div>
-              </div>
+              <AnimatedCountUpStrip
+                metrics={[
+                  { value: 394, suffix: "K ETB", label: "FEATURED ESCROW VOLUME" },
+                  { value: 21, suffix: " PHASES", label: "VERIFIED MILESTONES" },
+                  { value: 100, suffix: "%", label: "ON-TIME RELEASE" },
+                ]}
+              />
             </div>
           </motion.div>
         </div>
@@ -2120,209 +2112,30 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
         </div>
       </section>
 
-      {/* ── SECTION 4: Crisp White { DISCIPLINES } Interactive Stack (Image 2 Fourth Band) ── */}
+      {/* ── SECTION 4: Sticky Scroll-Pinned { SERVICES } 3-Column Stage ── */}
       <section className="cs-services-band" aria-label="Marketplace Disciplines">
-        <div className="cs-band-inner">
-          <motion.div
-            className="cs-services-grid"
-            variants={sectionRevealVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.2 }}
-          >
-            <div className="cs-kicker" style={{ color: "#0e1410", alignSelf: "start", paddingTop: 14 }}>
-              &#123; SERVICES &#125;
-            </div>
-
-            <div className="cs-services-stack" role="tablist" aria-label="Select discipline">
-              {DISCIPLINES.map((disc) => {
-                const isActive = disc.id === activeDiscipline;
-                return (
-                  <motion.button
-                    key={disc.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={isActive}
-                    className={`cs-service-item ${isActive ? "is-active" : ""}`}
-                    onClick={() => setActiveDiscipline(disc.id)}
-                    onMouseEnter={() => setActiveDiscipline(disc.id)}
-                    whileHover={{ x: 8 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                  >
-                    {isActive && <span className="cs-service-brace">&#123;</span>}
-                    <span>{disc.title}</span>
-                    {isActive && <span className="cs-service-brace">&#125;</span>}
-                  </motion.button>
-                );
-              })}
-            </div>
-
-            <AnimatePresence mode="wait">
-              {(() => {
-                const featuredStudy =
-                  CASE_STUDIES.find((s) => s.id === currentDiscipline.featuredStudyId) ?? CASE_STUDIES[0];
-                return (
-                  <motion.div
-                    key={currentDiscipline.id}
-                    className="cs-service-preview"
-                    initial={{ opacity: 0, y: 14, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -12, scale: 0.98 }}
-                    transition={{ duration: 0.28 }}
-                  >
-                    <div
-                      className="cs-fluted-card"
-                      onClick={() => openStudyDossier(featuredStudy)}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Inspect ${currentDiscipline.title} featured dossier: ${featuredStudy.clientShort}`}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          openStudyDossier(featuredStudy);
-                        }
-                      }}
-                    >
-                      {/* Distinct 3D Sculptural Artwork per Discipline */}
-                      <div style={{ position: "absolute", inset: 0, opacity: 0.72, zIndex: 0 }}>
-                        <ProjectSculpturalArt variant={featuredStudy.artVariant} />
-                      </div>
-
-                      {/* Top Metadata Row */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          gap: 8,
-                          fontFamily: "var(--v2-font-mono)",
-                          fontSize: 10.5,
-                          letterSpacing: "0.12em",
-                        }}
-                      >
-                        <span>&#123; {currentDiscipline.avgTranches.toUpperCase()} &#125;</span>
-                        <span
-                          style={{
-                            background: "rgba(9, 16, 7, 0.75)",
-                            border: "1px solid rgba(163, 230, 104, 0.35)",
-                            padding: "3px 8px",
-                            borderRadius: 4,
-                            color: "#a3e668",
-                          }}
-                        >
-                          DOSSIER #{featuredStudy.index}
-                        </span>
-                      </div>
-
-                      {/* Center Discipline Showcase: Featured Project, Outcome Metric & Milestone Tranches */}
-                      <div
-                        style={{
-                          background: "rgba(8, 15, 7, 0.76)",
-                          border: "1px solid rgba(163, 230, 104, 0.24)",
-                          backdropFilter: "blur(8px)",
-                          WebkitBackdropFilter: "blur(8px)",
-                          borderRadius: 6,
-                          padding: "14px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 10,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                          <div>
-                            <div style={{ fontSize: 10.5, fontFamily: "var(--v2-font-mono)", color: "#a3e668", textTransform: "uppercase" }}>
-                              Featured {currentDiscipline.title} Proof
-                            </div>
-                            <div style={{ fontWeight: 800, fontSize: 14, color: "#ffffff", marginTop: 2 }}>
-                              {featuredStudy.clientShort} &middot; {featuredStudy.city}
-                            </div>
-                          </div>
-                          <span
-                            style={{
-                              background: "#f5c518",
-                              color: "#141715",
-                              fontFamily: "var(--v2-font-mono)",
-                              fontSize: 10.5,
-                              fontWeight: 800,
-                              padding: "4px 8px",
-                              borderRadius: 4,
-                            }}
-                          >
-                            {featuredStudy.outcomeMetric}
-                          </span>
-                        </div>
-
-                        {/* Live Milestone Tranche Breakdown for this Service */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 6, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-                          {featuredStudy.milestones.slice(0, 3).map((ms, i) => (
-                            <div
-                              key={ms.title}
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                gap: 8,
-                                fontSize: 11.5,
-                              }}
-                            >
-                              <span style={{ color: "rgba(244,247,244,0.88)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                <strong style={{ fontFamily: "var(--v2-font-mono)", color: "#a3e668", marginRight: 6 }}>
-                                  0{i + 1}
-                                </strong>
-                                {ms.title}
-                              </span>
-                              <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 11, fontWeight: 700, color: "#ffffff", flexShrink: 0 }}>
-                                {ms.amount}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Bottom Price & Rail Row */}
-                      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-                        <div>
-                          <div style={{ fontSize: 11, opacity: 0.82, marginBottom: 3 }}>Typical Escrow Range</div>
-                          <div style={{ fontFamily: "var(--v2-font-head)", fontSize: 21, fontWeight: 800, lineHeight: 1.1 }}>
-                            {currentDiscipline.escrowRange}
-                          </div>
-                          <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, marginTop: 6, color: "#a3e668" }}>
-                            {currentDiscipline.rails}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 4,
-                            fontFamily: "var(--v2-font-mono)",
-                            fontSize: 10.5,
-                            fontWeight: 800,
-                            color: "#f5c518",
-                            flexShrink: 0,
-                          }}
-                        >
-                          <span>OPEN</span>
-                          <ArrowUpRight size={13} />
-                        </span>
-                      </div>
-                    </div>
-
-                    <p className="cs-service-preview-copy">{currentDiscipline.description}</p>
-                    <button
-                      type="button"
-                      className="cs-inline-underline-btn"
-                      style={{ marginTop: 4, alignSelf: "flex-start" }}
-                      onClick={() => openStudyDossier(featuredStudy)}
-                    >
-                      <span>Inspect {currentDiscipline.title} dossier ({featuredStudy.clientShort}) &rarr;</span>
-                    </button>
-                  </motion.div>
-                );
-              })()}
-            </AnimatePresence>
-          </motion.div>
-        </div>
+        <StickyScrollServicesStage
+          kicker="{ SERVICES }"
+          activeId={activeDiscipline}
+          onSelect={(id) => setActiveDiscipline(id as Exclude<CaseCategory, "ALL">)}
+          items={DISCIPLINES.map((disc) => {
+            const featuredStudy =
+              CASE_STUDIES.find((s) => s.id === disc.featuredStudyId) ?? CASE_STUDIES[0];
+            return {
+              id: disc.id,
+              title: disc.title,
+              topChip: featuredStudy.clientShort,
+              kickerBadge: featuredStudy.outcomeMetric,
+              artNode: <ProjectSculpturalArt variant={featuredStudy.artVariant} />,
+              rows: [
+                { label: "ESCROW RANGE", badge: disc.escrowRange },
+                { label: "SETTLEMENT", badge: disc.rails },
+                { label: "TRANCHES", badge: disc.avgTranches.toUpperCase() },
+              ],
+              onCardClick: () => openStudyDossier(featuredStudy),
+            };
+          })}
+        />
       </section>
 
       {/* ── SECTION 5: Vibrant Studio Green { TESTIMONIALS } Band (Image 2 Fifth Band) ── */}

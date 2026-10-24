@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
-import { Save, Check, RefreshCw, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Save, Check, RefreshCw, Plus, Trash2, Upload, Camera, Sparkles } from "lucide-react";
 import { api, type UpdateProfilePayload } from "./api/client";
-import { YekisAvatar } from "./components/YekisAvatar";
+import {
+  YekisAvatar,
+  loadAvatarOverride,
+  saveAvatarOverride,
+} from "./components/YekisAvatar";
 import { useI18n } from "./i18n";
 import "./ProfilePage.css";
 
@@ -45,6 +49,49 @@ export function saveLocalPortfolio(
   }
 }
 
+/** Resize and compress an uploaded image file into a clean square-friendly data URL */
+function compressProfileImage(file: File, maxDim = 320): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("Please choose a valid image file (JPG, PNG, WEBP, or GIF)."));
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      reject(new Error("Image must be smaller than 10 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Could not read image file."));
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new Image();
+      img.onerror = () => resolve(dataUrl);
+      img.onload = () => {
+        try {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          const sx = Math.max(0, Math.floor((img.width - size) / 2));
+          const sy = Math.max(0, Math.floor((img.height - size) / 2));
+          const target = Math.min(maxDim, size || maxDim);
+          canvas.width = target;
+          canvas.height = target;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
+          resolve(canvas.toDataURL("image/jpeg", 0.88));
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 interface ProfileFormState {
   firstName?: string;
   lastName?: string;
@@ -58,13 +105,20 @@ interface ProfileFormState {
   profileCompleteness?: number;
 }
 
-export const ProfileEditPage = () => {
+export interface ProfileEditPageProps {
+  onSaved?: () => void;
+}
+
+export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
   const { t, language: lang } = useI18n();
   const pr = t.workspace.profile;
   const [userId, setUserId] = useState<string>("me");
   const [formData, setFormData] = useState<ProfileFormState>({ skillIds: [] });
   const [portfolioItems, setPortfolioItems] = useState<PortfolioProjectDraft[]>([]);
   const [avatarSeed, setAvatarSeed] = useState<string>("");
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [skillTaxonomy, setSkillTaxonomy] = useState<SkillTaxonomy[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -89,7 +143,8 @@ export const ProfileEditPage = () => {
       .then(({ me, profileRes, skillsRes }) => {
         if (cancelled) return;
         setUserId(me.id);
-        setAvatarSeed(me.id);
+        const storedOverride = loadAvatarOverride(me.id);
+        setAvatarSeed(storedOverride?.seed || me.id);
         const p = profileRes as {
           firstName?: string;
           lastName?: string;
@@ -107,16 +162,21 @@ export const ProfileEditPage = () => {
           profileCompleteness?: number;
         };
 
+        const resolvedAvatarUrl =
+          storedOverride && "avatarUrl" in storedOverride
+            ? (storedOverride.avatarUrl ?? null)
+            : (p.avatarUrl ?? me.avatarUrl ?? null);
+
         setFormData({
-          firstName: p.firstName ?? "",
-          lastName: p.lastName ?? "",
+          firstName: p.firstName ?? me.firstName ?? "",
+          lastName: p.lastName ?? me.lastName ?? "",
           bio: p.bio ?? "",
           primarySkillId: p.primarySkillId ?? "",
           skillIds: (p.skills ?? []).map((s) => s.id),
           isAvailableForWork: p.isAvailableForWork ?? false,
           profileVisibility: "PUBLIC",
-          avatarUrl: p.avatarUrl ?? null,
-          profileCompleteness: p.profileCompleteness,
+          avatarUrl: resolvedAvatarUrl,
+          profileCompleteness: p.profileCompleteness ?? me.profileCompleteness ?? undefined,
         });
 
         const serverPortfolio: PortfolioProjectDraft[] = (p.portfolio ?? []).map(
@@ -151,6 +211,44 @@ export const ProfileEditPage = () => {
       cancelled = true;
     };
   }, []);
+
+  const liveCompleteness = useMemo(() => {
+    let score = 15; // Base account verified/created
+    if (formData.avatarUrl) score += 15;
+    if (formData.firstName?.trim() && formData.lastName?.trim()) score += 15;
+    if ((formData.bio?.trim().length ?? 0) >= 30) score += 20;
+    if (formData.primarySkillId) score += 10;
+    if ((formData.skillIds?.length ?? 0) >= 2) score += 15;
+    if (portfolioItems.some((item) => item.title.trim().length > 0)) score += 10;
+    return Math.min(100, score);
+  }, [formData, portfolioItems]);
+
+  const handlePhotoFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoError(null);
+    setUploadingPhoto(true);
+    try {
+      const dataUrl = await compressProfileImage(file);
+      setFormData((prev) => ({ ...prev, avatarUrl: dataUrl }));
+      saveAvatarOverride(userId, { avatarUrl: dataUrl, seed: avatarSeed });
+    } catch (err) {
+      setPhotoError(
+        err instanceof Error ? err.message : "Could not process image.",
+      );
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemoveCustomPhoto = () => {
+    setPhotoError(null);
+    setFormData((prev) => ({ ...prev, avatarUrl: null }));
+    saveAvatarOverride(userId, { avatarUrl: null, seed: avatarSeed });
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -229,6 +327,11 @@ export const ProfileEditPage = () => {
         saveLocalPortfolio("me", cleanedPortfolio);
       }
 
+      saveAvatarOverride(userId, {
+        avatarUrl: formData.avatarUrl ?? null,
+        seed: avatarSeed,
+      });
+
       await api.updateProfile({
         firstName: formData.firstName,
         lastName: formData.lastName,
@@ -237,8 +340,18 @@ export const ProfileEditPage = () => {
         skillIds: formData.skillIds,
         isAvailableForWork: formData.isAvailableForWork,
         profileVisibility: formData.profileVisibility,
+        avatarUrl: formData.avatarUrl ?? null,
       });
       setPortfolioItems(cleanedPortfolio);
+      setFormData((prev) => ({
+        ...prev,
+        profileCompleteness: liveCompleteness,
+      }));
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(`yekis_new_user_nudge_${userId}`);
+        window.localStorage.removeItem("yekis_new_user_nudge_me");
+      }
+      onSaved?.();
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -265,77 +378,227 @@ export const ProfileEditPage = () => {
   }
   if (loadError) return <div className="profile-error">{loadError}</div>;
 
+  const hasCustomPhoto = Boolean(formData.avatarUrl);
+
   return (
     <div className="profile-edit-page">
       <div className="profile-edit-container">
         <div className="completeness-card">
           <div className="completeness-info">
             <strong>{pr.completenessTitle}</strong>
-            <span>{pr.completenessDesc}</span>
+            <span>
+              {hasCustomPhoto
+                ? pr.completenessDesc
+                : "Upload a profile picture and complete your details to reach 100% trust readiness."}
+            </span>
           </div>
           <div className="completeness-meter">
             <div className="completeness-bar">
               <div
                 className="completeness-fill"
-                style={{ width: `${formData.profileCompleteness || 0}%` }}
+                style={{ width: `${liveCompleteness}%` }}
               />
             </div>
             <span className="completeness-pct sh-mono">
-              {formData.profileCompleteness || 0}%
+              {liveCompleteness}%
             </span>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="profile-edit-form panel">
-          {/* Section 0: Profile Character (Blobatar) */}
+          {/* Section 0: Custom Profile Picture & Default Blobatar */}
           <div className="form-section">
-            <h3 className="form-section-title">{pr.avatarTitle}</h3>
-            <p className="form-section-desc">{pr.avatarDesc}</p>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                gap: 12,
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <h3 className="form-section-title">
+                  Profile Picture &amp; Default Blobatar
+                </h3>
+                <p className="form-section-desc">
+                  Upload your own photo whenever you want. New users and anyone without a custom picture automatically use a unique Yekis Blobatar.
+                </p>
+              </div>
+              <span
+                className={`status-pill ${hasCustomPhoto ? "success" : "info"}`}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+              >
+                {hasCustomPhoto ? (
+                  <>
+                    <Camera size={13} /> Custom Photo Active
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={13} /> Default Blobatar Active
+                  </>
+                )}
+              </span>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              style={{ display: "none" }}
+              onChange={handlePhotoFileChange}
+            />
+
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 20,
-                marginTop: 14,
+                marginTop: 16,
                 flexWrap: "wrap",
+                padding: "16px 18px",
+                borderRadius: 14,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-bg-subtle)",
               }}
             >
-              <YekisAvatar
-                seed={avatarSeed}
-                avatarUrl={formData.avatarUrl}
-                size={84}
-                animate="hover"
-                className="hero-avatar"
-              />
-              <div>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <YekisAvatar
+                  userId={userId}
+                  seed={avatarSeed}
+                  avatarUrl={formData.avatarUrl}
+                  disableStoredOverride={true}
+                  size={88}
+                  animate="hover"
+                  className="hero-avatar"
+                />
                 <button
                   type="button"
-                  className="btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Upload custom profile picture"
+                  aria-label="Upload custom profile picture"
                   style={{
+                    position: "absolute",
+                    right: -4,
+                    bottom: -4,
+                    width: 32,
+                    height: 32,
+                    borderRadius: "50%",
+                    border: "2px solid var(--color-bg-elevated)",
+                    background: "var(--color-primary)",
+                    color: "#fff",
                     display: "inline-flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "8px 16px",
-                    fontSize: "0.88rem",
+                    justifyContent: "center",
                     cursor: "pointer",
-                  }}
-                  onClick={() => {
-                    const base = avatarSeed.split("#")[0] || "Yekis";
-                    setAvatarSeed(`${base}#v${Math.floor(Math.random() * 10000)}`);
+                    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
                   }}
                 >
-                  <RefreshCw size={15} />
-                  {pr.shuffleAvatarBtn}
+                  <Camera size={14} />
                 </button>
+              </div>
+
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={uploadingPhoto}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 16px",
+                      fontSize: "0.86rem",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload size={15} />
+                    {uploadingPhoto
+                      ? "Processing photo..."
+                      : hasCustomPhoto
+                        ? "Change Profile Picture"
+                        : "Upload Profile Picture"}
+                  </button>
+
+                  {hasCustomPhoto ? (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 14px",
+                        fontSize: "0.86rem",
+                        cursor: "pointer",
+                      }}
+                      onClick={handleRemoveCustomPhoto}
+                    >
+                      <Trash2 size={15} />
+                      Remove Photo (Use Blobatar)
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 14px",
+                        fontSize: "0.86rem",
+                        cursor: "pointer",
+                      }}
+                      onClick={() => {
+                        const base = avatarSeed.split("#")[0] || userId || "Yekis";
+                        const nextSeed = `${base}#v${Math.floor(Math.random() * 10000)}`;
+                        setAvatarSeed(nextSeed);
+                        saveAvatarOverride(userId, {
+                          avatarUrl: null,
+                          seed: nextSeed,
+                        });
+                      }}
+                    >
+                      <RefreshCw size={15} />
+                      {pr.shuffleAvatarBtn}
+                    </button>
+                  )}
+                </div>
+
                 <div
                   style={{
                     fontSize: "0.8rem",
                     color: "var(--color-text-secondary)",
-                    marginTop: 6,
+                    marginTop: 8,
+                    lineHeight: 1.45,
                   }}
                 >
-                  {pr.shuffleAvatarHint}
+                  {hasCustomPhoto
+                    ? "Your custom photo is displayed across your profile, contracts, top header, and sidebar badge. Remove it anytime to switch back to your Blobatar."
+                    : "Supports JPG, PNG, WEBP, or GIF (auto-cropped). If you don't upload a photo, your generated Blobatar will be shown by default."}
                 </div>
+
+                {photoError && (
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "var(--color-danger, #ef4444)",
+                      marginTop: 6,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {photoError}
+                  </div>
+                )}
               </div>
             </div>
           </div>

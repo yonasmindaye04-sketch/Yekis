@@ -1067,13 +1067,23 @@ export function JobsWorkspace({
 export function ContractsWorkspace({
   userId,
   onChanged,
+  focusContractId,
+  onOpenEscrow,
 }: {
   userId: string;
   onChanged: () => Promise<void>;
+  focusContractId?: string | null;
+  onOpenEscrow?: (contractId: string) => void;
 }) {
+  const { t } = useI18n();
+  const statuses = t.workspace.statuses;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<
+    "ALL" | "AWAITING_SIGNATURES" | "EXECUTED" | "CANCELLED"
+  >("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [disputeMilestoneId, setDisputeMilestoneId] = useState<string | null>(
     null,
   );
@@ -1155,22 +1165,152 @@ export function ContractsWorkspace({
     setDisputeMilestoneId(null);
   };
 
+  const totalContracts = contracts.length;
+  const awaitingSignatureCount = contracts.filter(
+    (c) => c.status !== "CANCELLED" && !c.fullyExecuted,
+  ).length;
+  const executedCount = contracts.filter(
+    (c) => c.status !== "CANCELLED" && c.fullyExecuted,
+  ).length;
+  const cancelledCount = contracts.filter(
+    (c) => c.status === "CANCELLED",
+  ).length;
+
+  const filteredContracts = contracts.filter((contract) => {
+    if (statusFilter === "AWAITING_SIGNATURES") {
+      if (contract.status === "CANCELLED" || contract.fullyExecuted) return false;
+    } else if (statusFilter === "EXECUTED") {
+      if (contract.status === "CANCELLED" || !contract.fullyExecuted) return false;
+    } else if (statusFilter === "CANCELLED") {
+      if (contract.status !== "CANCELLED") return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      const matchesTitle = contract.job.title.toLowerCase().includes(q);
+      const matchesId = contract.id.toLowerCase().includes(q);
+      if (!matchesTitle && !matchesId) return false;
+    }
+    return true;
+  });
+
   return (
     <div className="workflow-stack">
+      <div className="sh-kpi-grid" style={{ marginBottom: 4 }}>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Total Contracts</span>
+            <FileText size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{totalContracts}</div>
+          <div className="sh-kpi-sub">Bilingual AACCSA service agreements</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Awaiting Signatures</span>
+            <FileText size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{awaitingSignatureCount}</div>
+          <div className="sh-kpi-sub">Pending bilateral e-signature execution</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Active & Executed</span>
+            <Check size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{executedCount}</div>
+          <div className="sh-kpi-sub">Legally binding & milestone-backed</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Cancelled / Closed</span>
+            <X size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{cancelledCount}</div>
+          <div className="sh-kpi-sub">Terminated or cooling-off withdrawn</div>
+        </div>
+      </div>
+
+      <div
+        className="sh-card"
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="sh-segmented" role="tablist" aria-label="Filter contracts by status">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === "ALL"}
+            className={`sh-seg-btn ${statusFilter === "ALL" ? "active" : ""}`}
+            onClick={() => setStatusFilter("ALL")}
+          >
+            All ({totalContracts})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === "AWAITING_SIGNATURES"}
+            className={`sh-seg-btn ${statusFilter === "AWAITING_SIGNATURES" ? "active" : ""}`}
+            onClick={() => setStatusFilter("AWAITING_SIGNATURES")}
+          >
+            Awaiting Signatures ({awaitingSignatureCount})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === "EXECUTED"}
+            className={`sh-seg-btn ${statusFilter === "EXECUTED" ? "active" : ""}`}
+            onClick={() => setStatusFilter("EXECUTED")}
+          >
+            Executed ({executedCount})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === "CANCELLED"}
+            className={`sh-seg-btn ${statusFilter === "CANCELLED" ? "active" : ""}`}
+            onClick={() => setStatusFilter("CANCELLED")}
+          >
+            Cancelled ({cancelledCount})
+          </button>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flex: "1 1 240px", maxWidth: 340 }}>
+          <div className="search-input-wrap" style={{ width: "100%" }}>
+            <Search size={15} />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search contract by title or ID..."
+              aria-label="Search contracts"
+            />
+          </div>
+        </div>
+      </div>
+
       {message && (
         <p className="workflow-message">
           <Check size={16} />
           {message}
         </p>
       )}
-      {contracts.length === 0 ? (
+      {filteredContracts.length === 0 ? (
         <div className="sh-card">
           <p className="empty-state">
-            No contracts yet. Accepting a proposal creates one here.
+            {contracts.length === 0
+              ? "No contracts yet. Accepting a proposal creates one here."
+              : "No contracts match your current filter."}
           </p>
         </div>
       ) : (
-        contracts.map((contract) => {
+        filteredContracts.map((contract) => {
           const viewerIsClient =
             contract.clientId === userId || userId === "usr-both-addis-03";
           const viewerIsFreelancer =
@@ -1182,12 +1322,25 @@ export function ContractsWorkspace({
               ? contract.freelancerAcceptedAt
               : null;
           const isCancelled = contract.status === "CANCELLED";
+          const totalContractMinor = contract.milestones.reduce(
+            (sum, m) => sum + m.amountMinor,
+            0,
+          );
+          const isFocused = focusContractId === contract.id;
 
           return (
-            <article className="sh-card" key={contract.id}>
+            <article
+              className="sh-card"
+              key={contract.id}
+              style={
+                isFocused
+                  ? { borderColor: "var(--color-primary)", boxShadow: "0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent)" }
+                  : undefined
+              }
+            >
               <div className="sh-card-header">
                 <div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", flexWrap: "wrap" }}>
                     <span
                       className={`sh-status-inline ${
                         isCancelled
@@ -1203,11 +1356,18 @@ export function ContractsWorkspace({
                           ? "FULLY EXECUTED"
                           : "AWAITING SIGNATURES"}
                     </span>
-                    <span className="sh-kbd">{contract.id.toUpperCase()}</span>
+                    <span className="sh-kbd sh-mono">{contract.id.toUpperCase()}</span>
+                    <span className="sh-cell-meta sh-mono">
+                      · Total Value: <strong style={{ color: "var(--color-text)" }}>{money(totalContractMinor)}</strong>
+                    </span>
+                    <span className="sh-cell-meta">
+                      · {viewerIsClient && viewerIsFreelancer ? "Dual-Role Party" : viewerIsClient ? "Your Role: Client" : "Your Role: Freelancer"}
+                    </span>
                   </div>
                   <h3 className="sh-card-title">{contract.job.title}</h3>
                   <p className="sh-card-desc">
-                    Agreement {contract.templateVersion}
+                    Agreement {contract.templateVersion} · {contract.milestones.length}{" "}
+                    {contract.milestones.length === 1 ? "Milestone" : "Milestones"}
                   </p>
                 </div>
                 <div className="workflow-actions">
@@ -1217,6 +1377,15 @@ export function ContractsWorkspace({
                   >
                     <FileText size={14} /> Agreement PDF
                   </button>
+                  {onOpenEscrow && (
+                    <button
+                      type="button"
+                      className="sh-btn sh-btn-secondary"
+                      onClick={() => onOpenEscrow(contract.id)}
+                    >
+                      <WalletCards size={14} /> Manage in Escrow Center
+                    </button>
+                  )}
                   {!isCancelled && !acceptedByMe && (
                     <button
                       className="sh-btn sh-btn-primary"
@@ -1302,7 +1471,7 @@ export function ContractsWorkspace({
                               : "amber"
                         }`}
                       >
-                        {label(milestone.escrowState)}
+                        {label(milestone.escrowState, statuses)}
                       </span>
                       <div className="workflow-actions">
                         {!isCancelled &&
@@ -1486,6 +1655,476 @@ export function ContractsWorkspace({
             </article>
           );
         })
+      )}
+    </div>
+  );
+}
+
+export function EscrowWorkspace({
+  userId,
+  onChanged,
+  focusContractId,
+  onOpenContract,
+}: {
+  userId: string;
+  onChanged: () => Promise<void>;
+  focusContractId?: string | null;
+  onOpenContract?: (contractId: string) => void;
+}) {
+  const { t } = useI18n();
+  const statuses = t.workspace.statuses;
+  const fb = t.workspace.feeBreakdown;
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [stateFilter, setStateFilter] = useState<
+    | "ALL"
+    | "PAYMENT_PENDING"
+    | "ESCROW_HELD"
+    | "SUBMITTED_FOR_REVIEW"
+    | "RELEASED"
+    | "DISPUTED"
+  >("ALL");
+  const [expandedBreakdownId, setExpandedBreakdownId] = useState<string | null>(
+    null,
+  );
+  const [disputeMilestoneId, setDisputeMilestoneId] = useState<string | null>(
+    null,
+  );
+  const [category, setCategory] = useState("QUALITY_ISSUE");
+  const [description, setDescription] = useState("");
+
+  const refresh = useCallback(async () => {
+    try {
+      const list = await api.getContracts();
+      setContracts(list);
+    } catch {
+      // Retain current state on transient network error
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const act = async (
+    operation: () => Promise<unknown>,
+    _fallbackUpdate: () => void,
+    success: string,
+  ) => {
+    setBusy(true);
+    setMessage("");
+    try {
+      await operation();
+      setMessage(success);
+      await Promise.all([refresh(), onChanged().catch(() => {})]);
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Action failed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const raise = async (contractId: string, milestoneId: string) => {
+    if (description.trim().length < 20) {
+      setMessage("Describe the issue in at least 20 characters.");
+      return;
+    }
+    await act(
+      () =>
+        api.raiseDispute({
+          contractId,
+          milestoneId,
+          category,
+          description: description.trim(),
+        }),
+      () => {},
+      "Dispute opened and auto-release timer paused.",
+    );
+    setDescription("");
+    setDisputeMilestoneId(null);
+  };
+
+  const allMilestones = contracts.flatMap((contract) =>
+    contract.milestones.map((m) => ({
+      ...m,
+      contract,
+    })),
+  );
+
+  const heldMinor = allMilestones
+    .filter((m) =>
+      ["ESCROW_HELD", "WORK_IN_PROGRESS", "SUBMITTED_FOR_REVIEW"].includes(
+        m.escrowState,
+      ),
+    )
+    .reduce((sum, m) => sum + m.amountMinor, 0);
+
+  const pendingMinor = allMilestones
+    .filter((m) => m.escrowState === "PAYMENT_PENDING")
+    .reduce((sum, m) => sum + m.amountMinor, 0);
+
+  const releasedMinor = allMilestones
+    .filter((m) => m.escrowState === "RELEASED")
+    .reduce((sum, m) => sum + m.amountMinor, 0);
+
+  const disputedMinor = allMilestones
+    .filter((m) => m.escrowState === "DISPUTED")
+    .reduce((sum, m) => sum + m.amountMinor, 0);
+
+  const filteredMilestones = allMilestones.filter((m) => {
+    if (focusContractId && m.contract.id !== focusContractId) return false;
+    if (stateFilter === "ALL") return true;
+    if (stateFilter === "ESCROW_HELD") {
+      return (
+        m.escrowState === "ESCROW_HELD" || m.escrowState === "WORK_IN_PROGRESS"
+      );
+    }
+    return m.escrowState === stateFilter;
+  });
+
+  return (
+    <div className="workflow-stack">
+      <div className="sh-kpi-grid" style={{ marginBottom: 4 }}>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">{t.escrow.heldTotal}</span>
+            <WalletCards size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{money(heldMinor)}</div>
+          <div className="sh-kpi-sub">Locked in milestone escrow vaults</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">{t.escrow.states.PAYMENT_PENDING}</span>
+            <Briefcase size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{money(pendingMinor)}</div>
+          <div className="sh-kpi-sub">Awaiting client wallet funding</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">{t.escrow.releasedTotal}</span>
+            <Check size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{money(releasedMinor)}</div>
+          <div className="sh-kpi-sub">Disbursed to freelancer wallets</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">{t.escrow.disputedTotal}</span>
+            <AlertTriangle size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{money(disputedMinor)}</div>
+          <div className="sh-kpi-sub">Frozen pending mediation review</div>
+        </div>
+      </div>
+
+      <div
+        className="sh-card"
+        style={{
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div className="sh-segmented" role="tablist" aria-label="Filter escrow milestones">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "ALL"}
+            className={`sh-seg-btn ${stateFilter === "ALL" ? "active" : ""}`}
+            onClick={() => setStateFilter("ALL")}
+          >
+            All Milestones ({allMilestones.length})
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "PAYMENT_PENDING"}
+            className={`sh-seg-btn ${stateFilter === "PAYMENT_PENDING" ? "active" : ""}`}
+            onClick={() => setStateFilter("PAYMENT_PENDING")}
+          >
+            {t.escrow.states.PAYMENT_PENDING}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "ESCROW_HELD"}
+            className={`sh-seg-btn ${stateFilter === "ESCROW_HELD" ? "active" : ""}`}
+            onClick={() => setStateFilter("ESCROW_HELD")}
+          >
+            {t.escrow.states.ESCROW_HELD}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "SUBMITTED_FOR_REVIEW"}
+            className={`sh-seg-btn ${stateFilter === "SUBMITTED_FOR_REVIEW" ? "active" : ""}`}
+            onClick={() => setStateFilter("SUBMITTED_FOR_REVIEW")}
+          >
+            {t.escrow.states.SUBMITTED_FOR_REVIEW}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "RELEASED"}
+            className={`sh-seg-btn ${stateFilter === "RELEASED" ? "active" : ""}`}
+            onClick={() => setStateFilter("RELEASED")}
+          >
+            {t.escrow.states.RELEASED}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={stateFilter === "DISPUTED"}
+            className={`sh-seg-btn ${stateFilter === "DISPUTED" ? "active" : ""}`}
+            onClick={() => setStateFilter("DISPUTED")}
+          >
+            {t.escrow.states.DISPUTED}
+          </button>
+        </div>
+
+        {focusContractId && onOpenContract && (
+          <button
+            type="button"
+            className="sh-btn sh-btn-secondary"
+            onClick={() => onOpenContract("")}
+          >
+            <X size={13} /> Clear contract filter
+          </button>
+        )}
+      </div>
+
+      {message && (
+        <p className="workflow-message">
+          <Check size={16} />
+          {message}
+        </p>
+      )}
+
+      {filteredMilestones.length === 0 ? (
+        <div className="sh-card">
+          <p className="empty-state">
+            No escrow milestones match the selected filter.
+          </p>
+        </div>
+      ) : (
+        <div className="sh-card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="milestone-list" style={{ margin: 0 }}>
+            {filteredMilestones.map((item) => {
+              const { contract } = item;
+              const viewerIsClient =
+                contract.clientId === userId || userId === "usr-both-addis-03";
+              const viewerIsFreelancer =
+                contract.freelancerId === userId ||
+                userId === "usr-both-addis-03";
+              const isCancelled = contract.status === "CANCELLED";
+              const canDispute =
+                !isCancelled &&
+                (viewerIsClient || viewerIsFreelancer) &&
+                [
+                  "ESCROW_HELD",
+                  "WORK_IN_PROGRESS",
+                  "SUBMITTED_FOR_REVIEW",
+                ].includes(item.escrowState);
+              const showBreakdown = expandedBreakdownId === item.id;
+
+              return (
+                <div
+                  className="milestone-row"
+                  key={item.id}
+                  style={{ padding: "16px 20px" }}
+                >
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginBottom: 4,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <strong className="sh-cell-primary">{item.title}</strong>
+                      <span className="sh-kbd sh-mono">
+                        #{contract.id.toUpperCase()}
+                      </span>
+                    </div>
+                    <span className="sh-cell-meta">
+                      Contract: <strong>{contract.job.title}</strong> · Amount:{" "}
+                      <strong
+                        className="sh-mono"
+                        style={{ color: "var(--color-text)" }}
+                      >
+                        {money(item.amountMinor)}
+                      </strong>{" "}
+                      · Due <span className="sh-mono">{date(item.dueDate)}</span>
+                    </span>
+                  </div>
+
+                  <span
+                    className={`sh-status-inline ${
+                      item.escrowState === "RELEASED"
+                        ? "emerald"
+                        : item.escrowState === "DISPUTED"
+                          ? "crimson"
+                          : "amber"
+                    }`}
+                  >
+                    {label(item.escrowState, statuses)}
+                  </span>
+
+                  <div className="workflow-actions">
+                    <button
+                      type="button"
+                      className="sh-btn sh-btn-secondary"
+                      onClick={() =>
+                        setExpandedBreakdownId(showBreakdown ? null : item.id)
+                      }
+                    >
+                      {showBreakdown ? "Hide Tax & Fee" : "Tax & Fee Split"}
+                    </button>
+                    {onOpenContract && (
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-secondary"
+                        onClick={() => onOpenContract(contract.id)}
+                      >
+                        <FileText size={14} /> View Contract
+                      </button>
+                    )}
+                    {!isCancelled &&
+                      viewerIsClient &&
+                      contract.fullyExecuted &&
+                      item.escrowState === "PAYMENT_PENDING" && (
+                        <button
+                          className="sh-btn sh-btn-primary"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(
+                              async () => {
+                                await api.fundMilestoneFromWallet(item.id);
+                                events.escrowFunded("contract_milestone");
+                              },
+                              () => {},
+                              "Escrow funded from your wallet. Work can begin!",
+                            )
+                          }
+                        >
+                          <WalletCards size={14} /> {t.escrow.fundMilestone}
+                        </button>
+                      )}
+                    {viewerIsFreelancer &&
+                      ["ESCROW_HELD", "WORK_IN_PROGRESS"].includes(
+                        item.escrowState,
+                      ) && (
+                        <button
+                          className="sh-btn sh-btn-primary"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(
+                              async () => {
+                                await api.submitMilestone(item.id);
+                                events.milestoneDelivered();
+                              },
+                              () => {},
+                              "Milestone submitted for client QA review.",
+                            )
+                          }
+                        >
+                          {t.escrow.submitWork}
+                        </button>
+                      )}
+                    {viewerIsClient &&
+                      item.escrowState === "SUBMITTED_FOR_REVIEW" && (
+                        <button
+                          className="sh-btn sh-btn-primary"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(
+                              async () => {
+                                await api.acceptMilestone(item.id);
+                                events.milestoneAccepted();
+                              },
+                              () => {},
+                              "Milestone accepted and escrow released.",
+                            )
+                          }
+                        >
+                          {t.escrow.releaseFunds}
+                        </button>
+                      )}
+                    {canDispute && (
+                      <button
+                        className="sh-row-action-btn"
+                        onClick={() =>
+                          setDisputeMilestoneId(
+                            disputeMilestoneId === item.id ? null : item.id,
+                          )
+                        }
+                      >
+                        <AlertTriangle size={13} /> Dispute
+                      </button>
+                    )}
+                  </div>
+
+                  {showBreakdown && (
+                    <div style={{ gridColumn: "1 / -1", marginTop: 10 }}>
+                      <EscrowFeeBreakdown
+                        grossEtb={Math.round(item.amountMinor / 100)}
+                        labels={fb}
+                      />
+                    </div>
+                  )}
+
+                  {disputeMilestoneId === item.id && (
+                    <div className="inline-workflow-form dispute-form">
+                      <label>
+                        Category
+                        <select
+                          value={category}
+                          onChange={(event) => setCategory(event.target.value)}
+                        >
+                          <option value="NON_DELIVERY">Non-delivery</option>
+                          <option value="LATE_DELIVERY">Late delivery</option>
+                          <option value="QUALITY_ISSUE">Quality issue</option>
+                          <option value="SCOPE_CREEP">Scope creep</option>
+                          <option value="NON_PAYMENT">Non-payment</option>
+                          <option value="COMMUNICATION_BREAKDOWN">
+                            Communication breakdown
+                          </option>
+                        </select>
+                      </label>
+                      <label className="form-wide">
+                        What happened?
+                        <textarea
+                          value={description}
+                          onChange={(event) =>
+                            setDescription(event.target.value)
+                          }
+                          minLength={20}
+                          placeholder="Provide factual context and deliverable references..."
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-primary"
+                        disabled={busy}
+                        onClick={() => void raise(contract.id, item.id)}
+                      >
+                        Open Dispute Case
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
     </div>
   );
