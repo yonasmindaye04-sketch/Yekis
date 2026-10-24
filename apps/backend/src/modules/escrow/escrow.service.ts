@@ -1,4 +1,4 @@
-import type { PaymentProvider } from "@marketplace/schemas";
+import type { PaymentProvider } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { autoReleaseQueue, notificationQueue } from "../../queue/queues.js";
@@ -76,7 +76,7 @@ export async function assertEscrowNotHeld(milestoneId: string): Promise<void> {
 
 /**
  * Client funds a milestone. Requires the contract to be fully executed
- * (both parties digitally accepted — see contracts.service.ts) before any
+ * (both parties digitally accepted â€” see contracts.service.ts) before any
  * money moves, per the trust-loop sequencing.
  */
 export async function fundMilestone(params: {
@@ -151,7 +151,7 @@ export async function fundMilestone(params: {
 }
 
 /**
- * T1-E: Direct wallet funding — debits client wallet balance immediately.
+ * T1-E: Direct wallet funding â€” debits client wallet balance immediately.
  */
 export async function fundMilestoneFromWallet(params: {
   clientId: string;
@@ -263,7 +263,7 @@ export async function fundMilestoneFromWallet(params: {
     userId: milestone.contract.freelancerId,
     milestoneId: milestone.id,
     message:
-      "Escrow has been funded from the client's wallet — you can begin work.",
+      "Escrow has been funded from the client's wallet â€” you can begin work.",
   });
 
   // Dispatch formal order invoice receipt email to the client
@@ -332,7 +332,7 @@ export async function handlePaymentWebhook(params: {
   if (!transaction) {
     logger.warn(
       { providerTransactionId: params.providerTransactionId },
-      "Webhook received for unknown transaction — ignoring.",
+      "Webhook received for unknown transaction â€” ignoring.",
     );
     return;
   }
@@ -340,7 +340,7 @@ export async function handlePaymentWebhook(params: {
   if (transaction.provider !== params.provider) {
     logger.error(
       { transactionId: transaction.id, expectedProvider: transaction.provider, receivedProvider: params.provider },
-      "Payment callback provider does not match the stored transaction — rejecting.",
+      "Payment callback provider does not match the stored transaction â€” rejecting.",
     );
     throw new Error("PAYMENT_PROVIDER_MISMATCH");
   }
@@ -378,7 +378,7 @@ export async function handlePaymentWebhook(params: {
       return "FAILED" as const;
     }
 
-    // The money DID arrive — the provider says so and the transaction row now
+    // The money DID arrive â€” the provider says so and the transaction row now
     // records that. But it must not be parked in escrow on a milestone that is
     // no longer fundable.
     //
@@ -386,7 +386,7 @@ export async function handlePaymentWebhook(params: {
     // move a milestone to ESCROW_HELD whatever state it was in. The concrete
     // case: a client cancels during the cooling-off window, which marks the
     // contract CANCELLED and deliberately leaves the milestone in
-    // PAYMENT_PENDING — the payment they had already started then succeeds. The
+    // PAYMENT_PENDING â€” the payment they had already started then succeeds. The
     // old code locked it in escrow on a cancelled contract, where no accept,
     // dispute or refund path can ever reach it. The client's money, held, with
     // no route out.
@@ -503,7 +503,7 @@ export async function handlePaymentWebhook(params: {
   await notificationQueue.add("escrow-funded", {
     userId: transaction.milestone.contract.freelancerId,
     milestoneId: transaction.milestoneId,
-    message: "Escrow has been funded — you can begin work.",
+    message: "Escrow has been funded â€” you can begin work.",
   });
 
   try {
@@ -588,7 +588,7 @@ export async function submitMilestone(params: {
   return updated;
 }
 
-/** Client explicitly accepts and releases funds — the non-auto path. */
+/** Client explicitly accepts and releases funds â€” the non-auto path. */
 export async function acceptMilestone(params: {
   clientId: string;
   milestoneId: string;
@@ -747,7 +747,7 @@ export async function releaseMilestoneFunds(
   freelancerId: string,
   amountMinor: number,
   /**
-   * F-04 — compose into a caller's transaction.
+   * F-04 â€” compose into a caller's transaction.
    *
    * When `tx` is supplied the claim and the credits run inside that
    * transaction, and a lost claim THROWS instead of being swallowed. Callers
@@ -804,7 +804,7 @@ export async function releaseMilestoneFunds(
       data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
     });
 
-    // Platform-side ledger entries — without these, platform revenue and
+    // Platform-side ledger entries â€” without these, platform revenue and
     // withholding remittance reports would permanently read zero.
     await recordPlatformEarnings(tx, fees, milestoneId);
 
@@ -831,7 +831,7 @@ export async function releaseMilestoneFunds(
     if (err instanceof MilestoneReleaseClaimLostError) {
       logger.info(
         { milestoneId, freelancerId },
-        "Release claim lost — another path (explicit accept / auto-release / dispute) settled this milestone first.",
+        "Release claim lost â€” another path (explicit accept / auto-release / dispute) settled this milestone first.",
       );
       return;
     }
@@ -858,7 +858,7 @@ export async function releaseMilestoneFunds(
 }
 
 /**
- * Freelancer withdrawal — gated by Tier 2 KYC at the route layer.
+ * Freelancer withdrawal â€” gated by Tier 2 KYC at the route layer.
  */
 export async function withdrawFromWallet(params: {
   userId: string;
@@ -872,7 +872,7 @@ export async function withdrawFromWallet(params: {
 
   // The payout destination is `user.phone`. Sending bank money to a number the
   // platform never proved the account holder controls means sending it to
-  // whoever that number belongs to — and the SMS OTP flow that would have
+  // whoever that number belongs to â€” and the SMS OTP flow that would have
   // caught that existed but wrote its result nowhere.
   //
   // Placed before every balance and contract check: an unverified destination
@@ -886,7 +886,7 @@ export async function withdrawFromWallet(params: {
   }
 
 // F-22: the "you are holding money for someone else" check must not be gated
-  // on the role STRING — a BOTH account can hire, so `user.role === "CLIENT"`
+  // on the role STRING â€” a BOTH account can hire, so `user.role === "CLIENT"`
   // let it skip the check entirely. It is instead gated on the FACT that
   // matters: being the paying party on a contract that holds funded money.
   //
@@ -958,7 +958,7 @@ export async function withdrawFromWallet(params: {
   });
   if (!identityMatches) {
     throw new WithdrawalHeldForReviewError(
-      "Withdrawal destination does not match the identity on file — held for compliance review.",
+      "Withdrawal destination does not match the identity on file â€” held for compliance review.",
     );
   }
 
@@ -980,8 +980,8 @@ export async function withdrawFromWallet(params: {
 
   // The debit, the audit event and the payout row are ONE transaction.
   //
-  // They were three separate auto-commit statements. A crash — or a throw from
-  // anything between them — left the money debited with no PayoutTransaction
+  // They were three separate auto-commit statements. A crash â€” or a throw from
+  // anything between them â€” left the money debited with no PayoutTransaction
   // row at all: no provider reference, no status, nothing to reconcile against,
   // and no way for finance to discover that the balance is wrong. The user
   // sees a smaller wallet and no withdrawal.
@@ -1033,7 +1033,7 @@ export async function withdrawFromWallet(params: {
 
   const providerClient = getProviderClient(params.provider);
   if (!providerClient.initiateDisbursement) {
-    // Provider does not support automated disbursements — roll back wallet
+    // Provider does not support automated disbursements â€” roll back wallet
     await prisma.wallet.update({
       where: { userId: params.userId },
       data: { balanceMinor: { increment: params.amountMinor } },
@@ -1170,13 +1170,13 @@ export async function refundMilestoneToClient(
   milestoneId: string,
   clientId: string,
   amountMinor: number,
-  /** F-04 — compose into a caller's transaction; see releaseMilestoneFunds. */
+  /** F-04 â€” compose into a caller's transaction; see releaseMilestoneFunds. */
   opts: { tx?: Prisma.TransactionClient } = {},
 ) {
   const outerTx = opts.tx;
 
   const refund = async (tx: Prisma.TransactionClient) => {
-    // F-04 — the state change is a CONDITIONAL claim, taken before the wallet
+    // F-04 â€” the state change is a CONDITIONAL claim, taken before the wallet
     // is credited and inside the same transaction. Previously this was an
     // unconditional update, so a refund could be issued for a milestone that
     // had already been RELEASED, paying the client for money the freelancer

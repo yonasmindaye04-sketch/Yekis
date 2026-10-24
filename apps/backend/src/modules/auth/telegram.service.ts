@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import argon2 from "argon2";
+import { hashPassword, verifyPassword } from "../../lib/password";
 import { z } from "zod";
 import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
@@ -218,7 +218,7 @@ export async function resolveOrProvisionTelegramUser(
   // Sentinel hash of a random secret: the account has no platform password.
   // passwordSetAt stays NULL to mark it federated-owned, which is what lets a
   // later social sign-in on the same address merge into it safely.
-  const sentinelHash = await argon2.hash(randomBytes(32).toString("hex"));
+  const sentinelHash = await hashPassword(randomBytes(32).toString("hex"));
 
   return withPlaceholderPhone((phone) =>
     prisma.user.create({
@@ -293,7 +293,7 @@ export async function registerTelegramUser(telegram: TgUser, role: string) {
     throw new Error("Invalid role");
   }
 
-  const sentinelHash = await argon2.hash(randomBytes(32).toString("hex"));
+  const sentinelHash = await hashPassword(randomBytes(32).toString("hex"));
   const profile = profileFields(telegram);
 
   const user = await withPlaceholderPhone((phone) =>

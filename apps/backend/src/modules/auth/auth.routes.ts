@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { RegisterInput, LoginInput } from "@marketplace/schemas";
+import { RegisterInput, LoginInput } from "../../schemas";
 import {
   registerUser,
   loginUser,
@@ -85,7 +85,7 @@ const passwordResetLimiter = rateLimit({
  *
  * /register, /login and the reset routes already had their own limiters, which
  * left the rest of the unauthenticated surface with only the shared per-IP API
- * limiter in app.ts — 2000 requests per 15 minutes, which is an availability
+ * limiter in app.ts â€” 2000 requests per 15 minutes, which is an availability
  * budget, not an abuse control.
  *
  * These are the endpoints where an unauthenticated caller causes real work:
@@ -192,7 +192,7 @@ import {
  * (`initData` string) and the Login Widget (flat object). New work goes to
  * /telegram/miniapp, /telegram/widget or /telegram/web-login.
  *
- * The verifier is chosen by payload SHAPE — a URL-encoded string is Mini App
+ * The verifier is chosen by payload SHAPE â€” a URL-encoded string is Mini App
  * initData, a flat object is a Login Widget payload. Never try one and fall
  * back to the other: a payload that fails its own scheme's check must be
  * rejected, not retried against the other algorithm.
@@ -333,14 +333,14 @@ authRouter.delete("/telegram/link", requireAuth, requireFreshAuth(300), async (r
 
 
 // Redeems the one-time code the bot mints via /login. This is the path that
-// works when the Login Widget cannot render — the domain is not registered
+// works when the Login Widget cannot render â€” the domain is not registered
 // with @BotFather, or telegram.org is blocked by the network/ad blocker.
 //
 // The code is a bearer credential, so this endpoint is rate limited far more
 // tightly than the generic /api limiter: 10 attempts per 15 minutes. Codes are
 // single-use, expire in 10 minutes, and only their SHA-256 is stored, so the
 // attempt budget is comfortably above legitimate typo rates while keeping a
-// brute force infeasible (32^8 ≈ 1.1e12 candidates).
+// brute force infeasible (32^8 â‰ˆ 1.1e12 candidates).
 const telegramCodeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
@@ -412,7 +412,7 @@ authRouter.post("/telegram/web-login/redeem", telegramCodeLimiter, async (req, r
 });
 
 // NOTE: A previous "/google" endpoint accepted a bare email and issued full
-// JWTs without verifying any Google credential — an authentication bypass.
+// JWTs without verifying any Google credential â€” an authentication bypass.
 // It was removed. Reintroduce Google sign-in ONLY behind real ID-token
 // verification (e.g. google-auth-library verifying the id_token against
 // Google's JWKS), never on client-supplied profile fields.
@@ -615,7 +615,7 @@ authRouter.post("/refresh", refreshLimiter, async (req, res) => {
 authRouter.post("/logout", requireAuth, async (req: AuthedRequest, res) => {
   // Until this existed, "log out" was a client-side deletion of two
   // localStorage keys. The tokens themselves stayed valid until they expired,
-  // so a token lifted from the machine — or from a shared browser's history —
+  // so a token lifted from the machine â€” or from a shared browser's history â€”
   // kept working for the remaining JWT_REFRESH_TTL (default 30 days). Bumping
   // sessionVersion is what actually ends the session server-side.
   await logoutSession(req.user!.id);

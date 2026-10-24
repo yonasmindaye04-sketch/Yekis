@@ -7,7 +7,7 @@ export default defineConfig({
     // "forks", not "threads". The threads pool crashes the whole run with
     // 0xC0000005 (exit -1073741819) partway through, with no test summary
     // printed -- an access violation in native code inside a worker thread.
-    // The native modules in play are argon2 0.41.1 and the Prisma query
+    // The native modules in play are @node-rs/argon2 and the Prisma query
     // engine; bcrypt, sharp and canvas are not present. The exact culprit was
     // not identified.
     //

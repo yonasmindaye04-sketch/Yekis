@@ -1,0 +1,22 @@
+Processed,Method,URI,Flags
+true,GET,http://localhost:3000/,Seed
+true,GET,http://localhost:3000/robots.txt,Seed
+true,GET,http://localhost:3000/sitemap.xml,Seed
+true,GET,http://localhost:3000/api/,
+true,GET,http://localhost:3000/admin/,
+true,GET,http://localhost:3000/favicon/apple-touch-icon.png,
+true,GET,http://localhost:3000/favicon/favicon-32x32.png,
+true,GET,http://localhost:3000/favicon/favicon-16x16.png,
+true,GET,http://localhost:3000/favicon/site.webmanifest,
+true,GET,http://localhost:3000/@vite/client,
+false,GET,https://telegram.org/js/telegram-web-app.js,Out of Scope
+true,GET,http://localhost:3000/src/main.tsx,
+false,GET,https://yekis.com/,Out of Scope
+false,GET,https://yekis.com/faq,Out of Scope
+false,GET,https://yekis.com/fees,Out of Scope
+false,GET,https://yekis.com/about,Out of Scope
+false,GET,https://yekis.com/case-studies,Out of Scope
+false,GET,https://yekis.com/privacy,Out of Scope
+false,GET,https://yekis.com/terms,Out of Scope
+false,GET,https://vite.dev/config/server-options.html,Out of Scope
+false,GET,http://vite.dev/,Out of Scope

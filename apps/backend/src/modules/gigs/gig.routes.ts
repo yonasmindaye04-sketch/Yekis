@@ -8,7 +8,7 @@ import {
   SubmitGigDeliveryInput,
   RequestGigRevisionInput,
   CreateGigReviewInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import {
   requireAuth,
   requireFreshAuth,
@@ -174,7 +174,7 @@ gigsRouter.patch(
 );
 
 // Owner-driven: PAUSED and ARCHIVED only. ACTIVE/REJECTED are refused with a
-// 400 rather than a 403 — this is a contract detail, not a permissions problem,
+// 400 rather than a 403 â€” this is a contract detail, not a permissions problem,
 // and the allowed set is part of the published API.
 gigsRouter.post(
   "/:gigId/status",
@@ -204,12 +204,12 @@ gigsRouter.post(
   },
 );
 
-// Staff moderation — the only route to ACTIVE.
+// Staff moderation â€” the only route to ACTIVE.
 gigsRouter.post(
   "/:gigId/moderation",
   requireAuth,
   // This is the only route to ACTIVE, and the role list granted it to
-  // COMPLIANCE_OFFICER, COMPLIANCE_ADMIN and OPERATIONS_ADMIN — none of which
+  // COMPLIANCE_OFFICER, COMPLIANCE_ADMIN and OPERATIONS_ADMIN â€” none of which
   // hold gigs.moderate in the matrix. A canonical copy exists at
   // POST /api/v1/admin/gigs/:gigId/moderation, guarded by
   // requireFreshAuth(300) + requirePermission("gigs.moderate"), which REFUSES
@@ -501,7 +501,7 @@ gigsRouter.post(
   requireAuth,
   // Settles a gig dispute, which moves escrowed money to one party or the
   // other. The role list granted it to COMPLIANCE_OFFICER and COMPLIANCE_ADMIN,
-  // who hold disputes.mediate but not disputes.resolve — they can review and
+  // who hold disputes.mediate but not disputes.resolve â€” they can review and
   // mediate gig disputes but should not decide who gets the money.
   requirePermission("disputes.resolve"),
   requireFreshAuth(300),

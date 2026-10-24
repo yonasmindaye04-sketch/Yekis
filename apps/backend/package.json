@@ -4,7 +4,10 @@
   "private": true,
   "main": "dist/server.js",
   "scripts": {
+    "predev": "pnpm prisma:generate && docker compose -f ../../docker-compose.yml up -d",
     "dev": "tsx watch src/server.ts",
+    "infra:up": "docker compose -f ../../docker-compose.yml up -d",
+    "prebuild": "pnpm prisma:generate",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
@@ -17,7 +20,8 @@
     "prisma:migrate": "prisma migrate dev",
     "db:check-fresh": "node ../../scripts/check-fresh-database.js",
     "prisma:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "demo-activity:migration": "tsx scripts/generate-demo-activity-migration.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

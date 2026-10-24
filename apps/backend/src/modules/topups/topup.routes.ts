@@ -7,7 +7,7 @@ import {
   FlagTopUpInput,
   AmountMinor,
   PaymentProvider,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
@@ -74,7 +74,7 @@ topupsRouter.post(
     if (!req.file)
       return res.status(400).json({ error: "MISSING_RECEIPT_FILE" });
 
-    // amountMinor arrives as a string over multipart form fields — coerce
+    // amountMinor arrives as a string over multipart form fields â€” coerce
     // before validating, same pattern as the KYC document submission route.
     const parsed = SubmitTopUpInput.safeParse({
       provider: req.body.provider,
@@ -127,7 +127,7 @@ const CheckoutTopUpAmount = z.object({
 topupsRouter.post("/checkout", requireAuth, async (req: AuthedRequest, res) => {
   // A schema, not hand-rolled checks. The previous guard was
   // `typeof amountMinor !== "number" || amountMinor <= 0`, which accepted
-  // 100.5 — a value that cannot be written to an Int column, so it reached
+  // 100.5 â€” a value that cannot be written to an Int column, so it reached
   // initiateCheckoutTopUp, created a provider order, and then failed at the
   // database. Nothing anywhere in the money chain declared a maximum either,
   // so a value above Int32 did the same at a larger scale.
@@ -204,7 +204,7 @@ topupsRouter.post(
   requireAuth,
   async (req: AuthedRequest, res) => {
     // SECURITY: sandbox/dev convenience ONLY. This endpoint credits a wallet
-    // without any payment verification, so it must never exist in production —
+    // without any payment verification, so it must never exist in production â€”
     // in production, wallets may only be credited by a signature-verified
     // provider webhook or a staff approval in the manual review queue.
     if (env.NODE_ENV === "production") {
@@ -244,30 +244,13 @@ topupsRouter.post(
 // protected.
 //
 // Scoped to req.user.id, so one user cannot poll another's payment status.
-topupsRouter.get("/:topUpId", requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const topUp = await prisma.walletTopUp.findFirst({
-      where: { id: req.params.topUpId as string, userId: req.user!.id },
-      select: {
-        id: true,
-        amountMinor: true,
-        provider: true,
-        status: true,
-        providerTransactionId: true,
-        createdAt: true,
-      },
-    });
-    // 404 rather than 403: a top-up belonging to somebody else should be
-    // indistinguishable from one that does not exist.
-    if (!topUp) return res.status(404).json({ error: "NOT_FOUND" });
-
-    // Convenience for the caller: only APPROVED means the wallet was credited.
-    return res.json({ ...topUp, credited: topUp.status === "APPROVED" });
-  } catch (err) {
-    logger.error({ err }, "Failed to read top-up status");
-    return res.status(500).json({ error: "INTERNAL_ERROR" });
-  }
-});
+//
+// NOTE: the handler itself lives BELOW the static routes on purpose.
+// "/:topUpId" also matches "/queue", so registering it first made the staff
+// review queue unreachable: the request was answered by this handler, which
+// looked for a top-up with the literal id "queue", found none and returned
+// 404. Express matches routes in registration order, so every static path has
+// to come before the dynamic one that could swallow it.
 
 // ---------- Staff-only ----------
 
@@ -287,6 +270,35 @@ topupsRouter.get(
 
     const queue = await getTopUpQueue({ page, pageSize, search, status });
     return res.json(queue);
+  },
+);
+
+topupsRouter.get(
+  "/:topUpId",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const topUp = await prisma.walletTopUp.findFirst({
+        where: { id: req.params.topUpId as string, userId: req.user!.id },
+        select: {
+          id: true,
+          amountMinor: true,
+          provider: true,
+          status: true,
+          providerTransactionId: true,
+          createdAt: true,
+        },
+      });
+      // 404 rather than 403: a top-up belonging to somebody else should be
+      // indistinguishable from one that does not exist.
+      if (!topUp) return res.status(404).json({ error: "NOT_FOUND" });
+
+      // Convenience for the caller: only APPROVED means the wallet was credited.
+      return res.json({ ...topUp, credited: topUp.status === "APPROVED" });
+    } catch (err) {
+      logger.error({ err }, "Failed to read top-up status");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
   },
 );
 
@@ -330,7 +342,7 @@ topupsRouter.post(
   requireAuth,
   requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
   async (req: AuthedRequest, res) => {
-    // The outcome of this endpoint is REJECTED by definition — it is decided by
+    // The outcome of this endpoint is REJECTED by definition â€” it is decided by
     // the URL, not the body. The previous
     // `{ decision: "REJECTED", ...req.body }` spread AFTER the literal, so a
     // body of `{ decision: "APPROVED" }` silently overrode it. TopUpRejectInput

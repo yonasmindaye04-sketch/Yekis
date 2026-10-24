@@ -1,4 +1,4 @@
-import type { KycDocumentType, KycStatus, KycTier } from "@marketplace/schemas";
+import type { KycDocumentType, KycStatus, KycTier } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
@@ -18,7 +18,7 @@ export class DuplicateIdentityError extends Error {}
 export class KycNotFoundError extends Error {}
 export class InvalidTierTransitionError extends Error {}
 
-const REVIEW_CYCLE_MONTHS = 12; // periodic refresh cadence for Tier 2/3 — confirm exact cadence with counsel
+const REVIEW_CYCLE_MONTHS = 12; // periodic refresh cadence for Tier 2/3 â€” confirm exact cadence with counsel
 
 function monthsFromNow(months: number): Date {
   const d = new Date();
@@ -30,7 +30,7 @@ function monthsFromNow(months: number): Date {
  * Cache values to write when a record enters manual review.
  *
  * A user with prior verified standing keeps their public badge while a *new*
- * application waits for a Compliance Officer — the cache tracks their actual
+ * application waits for a Compliance Officer â€” the cache tracks their actual
  * standing, not the newest request. Only a first-time applicant (no
  * highestVerifiedTier) genuinely has nothing to show, so only they regress.
  */
@@ -47,13 +47,13 @@ function cacheDataForPendingReview(kyc: { highestVerifiedTier: KycTier | null })
  * and the resulting biometric ID isn't already attached to another account.
  * Everything else routes to manual review and alerts staff:
  *
- *  - Fayda UNAVAILABLE (down / timeout / 5xx) → UNDER_REVIEW. No evidence was
+ *  - Fayda UNAVAILABLE (down / timeout / 5xx) â†’ UNDER_REVIEW. No evidence was
  *    returned, so neither approving nor denying is defensible.
- *  - Fayda REJECTED / NOT_FOUND → UNDER_REVIEW. A definitive non-match is not
+ *  - Fayda REJECTED / NOT_FOUND â†’ UNDER_REVIEW. A definitive non-match is not
  *    ours to adjudicate; a Compliance Officer sees the reason.
- *  - Dedup hit → UNDER_REVIEW, flagged. A stale or reused biometric ID must
+ *  - Dedup hit â†’ UNDER_REVIEW, flagged. A stale or reused biometric ID must
  *    not silently lock out a legitimate user.
- *  - Resubmission after a prior rejection → reopened to UNDER_REVIEW.
+ *  - Resubmission after a prior rejection â†’ reopened to UNDER_REVIEW.
  *
  * Every one of these paths calls notifyStaffOfEvent, which is what makes the
  * case actually surface in the Ops console queue.
@@ -108,7 +108,7 @@ export async function submitKycDocument(params: {
   });
 
   // Only attempt Fayda verification once per record (on first meaningful
-  // document), not on every subsequent document upload — a re-upload is fresh
+  // document), not on every subsequent document upload â€” a re-upload is fresh
   // evidence for a human, not a fresh API call.
   //
   // The reopen branch is what makes resubmissions reviewable: without it a
@@ -141,7 +141,7 @@ export async function submitKycDocument(params: {
 
     await notifyStaffOfEvent({
       eventType: "kyc-resubmission-pending-review",
-      message: `User ${params.userId} resubmitted KYC evidence after rejection — manual review required.`,
+      message: `User ${params.userId} resubmitted KYC evidence after rejection â€” manual review required.`,
       metadata: { kycRecordId: kyc.id, targetUserId: params.userId },
     });
 
@@ -168,7 +168,7 @@ export async function submitKycDocument(params: {
 
   if (!faydaResult.success) {
     // Manual review fallback. An unavailable Fayda says nothing about this
-    // person, and a definitive non-match is not ours to adjudicate — neither
+    // person, and a definitive non-match is not ours to adjudicate â€” neither
     // auto-approving (no evidence was returned) nor leaving the record
     // PENDING (nobody would be alerted that work is waiting). A human decides.
     const failureKind = faydaResult.failureKind ?? "UNAVAILABLE";
@@ -193,7 +193,7 @@ export async function submitKycDocument(params: {
       eventType: "kyc-pending-review",
       message:
         `KYC Tier 1 submission from user ${params.userId} needs manual review` +
-        ` — Fayda ${failureKind === "UNAVAILABLE" ? "service unavailable" : `returned ${failureKind}`}.`,
+        ` â€” Fayda ${failureKind === "UNAVAILABLE" ? "service unavailable" : `returned ${failureKind}`}.`,
       metadata: {
         kycRecordId: kyc.id,
         targetUserId: params.userId,
@@ -205,7 +205,7 @@ export async function submitKycDocument(params: {
     return prisma.kycRecord.findUniqueOrThrow({ where: { id: kyc.id } });
   }
 
-  // Fayda succeeded — check for duplicate accounts BEFORE auto-verifying.
+  // Fayda succeeded â€” check for duplicate accounts BEFORE auto-verifying.
   const existingWithSameBiometric = await prisma.user.findFirst({
     where: {
       faydaPsut: faydaResult.biometricId,
@@ -222,7 +222,7 @@ export async function submitKycDocument(params: {
       metadata: { conflictingUserId: existingWithSameBiometric.id },
     });
 
-    // Route to manual review rather than auto-rejecting — a false positive
+    // Route to manual review rather than auto-rejecting â€” a false positive
     // here (e.g. Fayda API returning a stale/reused ID) shouldn't silently
     // lock out a legitimate user.
     const [flagged] = await prisma.$transaction([
@@ -244,7 +244,7 @@ export async function submitKycDocument(params: {
       eventType: "kyc-duplicate-identity-pending-review",
       message:
         `User ${params.userId} submitted a Fayda identity already linked to user ` +
-        `${existingWithSameBiometric.id} — manual review required.`,
+        `${existingWithSameBiometric.id} â€” manual review required.`,
       metadata: {
         kycRecordId: kyc.id,
         targetUserId: params.userId,
@@ -291,7 +291,7 @@ export async function submitKycDocument(params: {
 
 /**
  * Step 2: upgrade to Tier 2 (required for withdrawal). Requires Tier 1
- * already VERIFIED. Always routes through manual review — TIN/business-reg
+ * already VERIFIED. Always routes through manual review â€” TIN/business-reg
  * verification and PEP screening both need a human in the loop, even
  * though the screening call itself is automated.
  */
@@ -360,7 +360,7 @@ export async function upgradeToTier2(params: {
       isPepMatch: pepResult.isMatch,
       pepScreenedAt: new Date(),
       // A PEP match forces Tier 3 enhanced review instead of a standard
-    // Tier 2 review — never silently approve a flagged user.
+    // Tier 2 review â€” never silently approve a flagged user.
     tier: pepResult.isMatch ? "TIER_3" : "TIER_2",
     status: "UNDER_REVIEW",
     },
@@ -368,10 +368,10 @@ export async function upgradeToTier2(params: {
 
   // Deliberately NOT touching User.cachedKycTier/cachedKycStatus here.
   // The user is still in good standing at their highestVerifiedTier
-  // (TIER_1) while this upgrade is pending — their public badge should
+  // (TIER_1) while this upgrade is pending â€” their public badge should
   // keep showing that, not flicker to "under review" or an unverified
   // higher tier, while a Compliance Officer decides. The cache only
-  // changes on a final decision — see reviewKycRecord below.
+  // changes on a final decision â€” see reviewKycRecord below.
 
   await recordAuditEvent({
     userId: params.userId,
@@ -395,7 +395,7 @@ export async function upgradeToTier2(params: {
 }
 
 /**
- * Compliance Officer / Admin action — the human decision point for anything
+ * Compliance Officer / Admin action â€” the human decision point for anything
  * that didn't auto-verify: Fayda failures, duplicate-identity flags, and
  * every Tier 2/3 upgrade.
  */
@@ -410,7 +410,7 @@ export async function reviewKycRecord(params: {
   });
   if (!kyc) throw new KycNotFoundError();
 
-  // On rejection, `tier` reverts to the last tier that actually passed —
+  // On rejection, `tier` reverts to the last tier that actually passed â€”
   // NOT left sitting at the rejected, never-verified tier. If this is a
   // first-time review (no prior verified tier at all), there's nothing to
   // revert to, so it stays as requested but the status makes clear it
@@ -458,7 +458,7 @@ export async function reviewKycRecord(params: {
     },
   });
 
-  // Preserved permanently — the KycRecord row above only ever holds the
+  // Preserved permanently â€” the KycRecord row above only ever holds the
   // LATEST decision, so a reviewer looking at a resubmission after a prior
   // rejection has no way to see that history without this table.
   await prisma.kycReviewEvent.create({
@@ -521,7 +521,7 @@ export async function getReviewQueue(filters?: {
   // Deliberately no `else` coercing to UNDER_REVIEW. An absent status filter
   // means "every status". It previously defaulted to UNDER_REVIEW, which made
   // the console's "All statuses" option return byte-identical rows to the
-  // explicit UNDER_REVIEW filter — PENDING records were unreachable from the
+  // explicit UNDER_REVIEW filter â€” PENDING records were unreachable from the
   // UI through any normal selection.
   const page = Math.max(1, filters?.page ?? 1);
   const limit = Math.min(100, Math.max(1, filters?.limit ?? 25));
@@ -576,7 +576,7 @@ export async function getReviewQueue(filters?: {
 
 /**
  * Staff-only. Generates a short-lived signed URL for one submitted document
- * so a reviewer's browser can actually render the image — the raw
+ * so a reviewer's browser can actually render the image â€” the raw
  * storagePath is an internal object-store key, never a URL a browser can
  * load directly.
  */
@@ -591,7 +591,7 @@ export async function getDocumentViewUrl(documentId: string) {
 }
 
 /**
- * Full decision history for a user's KYC record — what Prompt 2's detail
+ * Full decision history for a user's KYC record â€” what Prompt 2's detail
  * pane needs to show "this user was rejected before, here's why" instead
  * of a reviewer starting blind on a resubmission.
  */

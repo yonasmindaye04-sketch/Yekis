@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MilestonePlanItem } from "@marketplace/schemas";
+import { MilestonePlanItem } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { uploadContractDocument } from "./contractStorage.js";
@@ -21,11 +21,11 @@ const MilestoneBreakdown = z.array(MilestonePlanItem).min(1);
 /**
  * The handoff point referenced by the TODO in proposals.service.ts. Called
  * right after a proposal is marked ACCEPTED (same request, same logical
- * transaction boundary at the call site) — not on a queue, since the client
+ * transaction boundary at the call site) â€” not on a queue, since the client
  * is waiting to see the generated contract immediately.
  *
  * Seeds Milestone rows from the freelancer's accepted milestoneBreakdown
- * (not the client's original proposedMilestones on the Job) — that's what
+ * (not the client's original proposedMilestones on the Job) â€” that's what
  * the two parties actually agreed to via the accepted proposal.
  */
 export async function createContractFromProposal(proposalId: string) {
@@ -118,7 +118,7 @@ export async function getContract(userId: string, contractId: string) {
 }
 
 /**
- * Digital acceptance — required from BOTH parties before escrow funding
+ * Digital acceptance â€” required from BOTH parties before escrow funding
  * can begin (enforced by the Escrow module checking both timestamps, not
  * by this function). Each acceptance is independently timestamped and
  * immutable, per the Electronic Transactions Proclamation No. 1205/2020
@@ -189,7 +189,7 @@ export async function acceptContract(userId: string, contractId: string) {
 /**
  * Recomputes and persists Contract.status. Called from escrow.service.ts
  * whenever a milestone reaches a terminal escrow state (RELEASED, REFUNDED,
- * or PARTIAL_REFUND) — a contract is COMPLETED once every one of its
+ * or PARTIAL_REFUND) â€” a contract is COMPLETED once every one of its
  * milestones has landed in one of those three states. This is what
  * Review.isEligible (profiles/reviews feature) should actually check
  * instead of a Contract.status field that didn't previously exist.
@@ -197,7 +197,7 @@ export async function acceptContract(userId: string, contractId: string) {
 const TERMINAL_ESCROW_STATES = ["RELEASED", "REFUNDED", "PARTIAL_REFUND"];
 
 /**
- * T2-E: Statutory 7-day cooling-off cancellation — Electronic Transactions
+ * T2-E: Statutory 7-day cooling-off cancellation â€” Electronic Transactions
  * Proclamation No. 1205/2020 grants the consumer (client) a right to cancel
  * without penalty before service begins. The auto-release worker already
  * defers to `cancellableUntil`; this is the client-side exercise path the
@@ -206,7 +206,7 @@ const TERMINAL_ESCROW_STATES = ["RELEASED", "REFUNDED", "PARTIAL_REFUND"];
  * Rules enforced here:
  *   1. Only the CLIENT party of the contract may invoke it.
  *   2. Only while cancellableUntil is in the future.
- *   3. ONLY while every milestone is still PAYMENT_PENDING — the instant any
+ *   3. ONLY while every milestone is still PAYMENT_PENDING â€” the instant any
  *      funds are held (provider or wallet funding), "service has begun" and
  *      the statutory right no longer applies.
  * No money moves: by rule 3 there is nothing in escrow to refund.

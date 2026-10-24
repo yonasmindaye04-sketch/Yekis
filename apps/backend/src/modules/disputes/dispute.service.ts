@@ -2,7 +2,7 @@
 import type {
   DisputeCategory,
   DisputeResolutionOutcome,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
@@ -27,13 +27,13 @@ export class InvalidEscrowStateForDisputeError extends Error {}
 export class MutualWithdrawalOutcomeMismatchError extends Error {}
 export class DisputeAlreadyClaimedError extends Error {}
 /**
- * F-04 — the dispute was already resolved by someone else, either a concurrent
+ * F-04 â€” the dispute was already resolved by someone else, either a concurrent
  * resolution or an earlier one. Thrown BEFORE any money moves, so a losing
  * caller cannot pay a party twice.
  */
 export class DisputeAlreadyResolvedError extends Error {}
 /**
- * F-04 — the milestone backing this dispute is not in a state that can still be
+ * F-04 â€” the milestone backing this dispute is not in a state that can still be
  * settled (e.g. already RELEASED or REFUNDED). Without this guard a
  * REFUND_TO_CLIENT award could credit a wallet for money that has already been
  * released to the other party.
@@ -41,7 +41,7 @@ export class DisputeAlreadyResolvedError extends Error {}
 export class MilestoneNotSettleableError extends Error {}
 
 /**
- * F-04 — escrow states from which a dispute resolution can still move money.
+ * F-04 â€” escrow states from which a dispute resolution can still move money.
  * Deliberately excludes RELEASED and REFUNDED: those mean the money already
  * went somewhere, and a second movement would duplicate it.
  */
@@ -52,7 +52,7 @@ const SETTLEABLE_ESCROW_STATES = [
   "WORK_IN_PROGRESS",
 ] as const;
 
-const NEGOTIATION_WINDOW_DAYS = 7; // Stage 1 — matches the roadmap's dispute-flow design
+const NEGOTIATION_WINDOW_DAYS = 7; // Stage 1 â€” matches the roadmap's dispute-flow design
 const MEDIATION_WINDOW_DAYS = 5; // Stage 3 target SLA (3-5 business days)
 
 function daysFromNow(days: number): Date {
@@ -62,9 +62,9 @@ function daysFromNow(days: number): Date {
 }
 
 /**
- * Stage 0 → 1. Either party can raise a dispute against a milestone that's
+ * Stage 0 â†’ 1. Either party can raise a dispute against a milestone that's
  * actively in flight (funded, being worked on, or submitted for review).
- * Critically: this cancels the scheduled auto-release jobs — a milestone
+ * Critically: this cancels the scheduled auto-release jobs â€” a milestone
  * under dispute must never auto-release out from under the process, even
  * as a defense-in-depth on top of the auto-release worker's own state check.
  */
@@ -121,7 +121,7 @@ export async function raiseDispute(params: {
     }),
   ]);
 
-  // Defense in depth — see function docstring. Safe to call even if the
+  // Defense in depth â€” see function docstring. Safe to call even if the
   // jobs already fired or don't exist; BullMQ no-ops on an unknown jobId.
   await autoReleaseQueue.remove(`warn-${params.milestoneId}`);
   await autoReleaseQueue.remove(`release-${params.milestoneId}`);
@@ -155,9 +155,9 @@ export async function raiseDispute(params: {
 }
 
 /**
- * Stage 1 → 2. Either party may escalate once the negotiation window has
+ * Stage 1 â†’ 2. Either party may escalate once the negotiation window has
  * passed without resolution. (A "both parties agree to resolve directly"
- * path would close the dispute entirely rather than escalate it — that's
+ * path would close the dispute entirely rather than escalate it â€” that's
  * the withdrawDispute action below.)
  */
 export async function escalateToEvidence(params: {
@@ -241,13 +241,13 @@ export async function submitEvidence(params: {
     entityId: dispute.id,
   });
 
-  // T2-G: Compile evidence bundle asynchronously — do not block the evidence
+  // T2-G: Compile evidence bundle asynchronously â€” do not block the evidence
   // submission response if the object-store upload fails. The mediator queue
   // shows cases even without a compiled bundle; bundle just enriches the view.
   compileEvidenceBundle(dispute.id).catch((err) =>
     logger.error(
       { err, disputeId: dispute.id },
-      "Evidence bundle compilation failed — mediator will see raw statements only",
+      "Evidence bundle compilation failed â€” mediator will see raw statements only",
     ),
   );
 
@@ -289,7 +289,7 @@ export async function compileEvidenceBundle(disputeId: string): Promise<void> {
   );
 
   // Pull direct message thread if one exists for this job+parties combination.
-  // DirectThread is scoped to (jobId, clientId, freelancerId) — exactly what we need.
+  // DirectThread is scoped to (jobId, clientId, freelancerId) â€” exactly what we need.
   const messageThread = await prisma.directThread.findFirst({
     where: {
       jobId: dispute.contract.jobId,
@@ -349,7 +349,7 @@ export async function compileEvidenceBundle(disputeId: string): Promise<void> {
   logger.info({ disputeId, storageKey }, "Evidence bundle compiled and stored");
 }
 
-/** Compliance Officer / mediator dashboard — everything awaiting a decision. */
+/** Compliance Officer / mediator dashboard â€” everything awaiting a decision. */
 export async function getMediationQueue(params?: {
   page?: number;
   limit?: number;
@@ -437,7 +437,7 @@ export async function resolveDispute(params: {
     where: { id: dispute.milestoneId },
   });
 
-  // F-05 — validate the PARTIAL_SPLIT share before the claim, so a malformed
+  // F-05 â€” validate the PARTIAL_SPLIT share before the claim, so a malformed
   // award is rejected while the dispute is still open and nothing has moved.
   // Routed input is a `number | undefined`; here it must be a real integer
   // inside the escrow amount, or the split is undefined and paying it would
@@ -462,7 +462,7 @@ export async function resolveDispute(params: {
   // callback below, which is a fresh closure scope.
   const contract = dispute.contract;
 
-  // F-04 — the claim, the settleability check and EVERY money movement share a
+  // F-04 â€” the claim, the settleability check and EVERY money movement share a
   // single transaction.
   //
   // Previously the claim was its own auto-committed statement and the payout
@@ -516,7 +516,7 @@ try {
         // The milestone must still hold the money. A dispute can reach a
         // resolver while the milestone has already been released (auto-release,
         // or a competing settlement), and paying out again duplicates funds.
-        // Throwing here rolls the claim back with it — no compensating write.
+        // Throwing here rolls the claim back with it â€” no compensating write.
         if (
           !(SETTLEABLE_ESCROW_STATES as readonly string[]).includes(
             milestone.escrowState,
@@ -542,7 +542,7 @@ try {
             { tx },
           );
         } else {
-          // F-05 — the share is validated above, BEFORE the claim and before any
+          // F-05 â€” the share is validated above, BEFORE the claim and before any
           // movement. `params.freelancerShareMinor!` used to be trusted, and a
           // missing value produced `amountMinor - undefined` = NaN, so neither
           // branch ran and the escrow was silently marked PARTIAL_REFUND with
@@ -588,7 +588,7 @@ try {
       },
       // Default READ COMMITTED isolation, deliberately. Under SERIALIZABLE the two
       // racing transactions abort each other, so whichever one had already
-      // moved money could still lose and retry — then both callers would fail
+      // moved money could still lose and retry â€” then both callers would fail
       // and nobody would be told they were the second resolver. Under READ
       // COMMITTED the loser's conditional `updateMany` simply blocks on the
       // row lock, re-evaluates its WHERE after the winner commits, matches 0
@@ -656,14 +656,14 @@ try {
 }
 
 /**
- * Stage 3 → 4.
+ * Stage 3 â†’ 4.
  */
 export async function escalateToArbitration(params: {
   userId: string;
   disputeId: string;
 }) {
   const dispute = await getDisputeForParty(params.disputeId, params.userId);
-  // F-04 — only a dispute that is genuinely still open may be escalated. This
+  // F-04 â€” only a dispute that is genuinely still open may be escalated. This
   // edge used to accept RESOLVED, which let a settled dispute be pushed back
   // to arbitration and then resolved (and paid) a second time.
   if (dispute.stage === "RESOLVED" || dispute.resolvedAt) {
@@ -688,13 +688,13 @@ export async function escalateToArbitration(params: {
     entityType: "Dispute",
     entityId: dispute.id,
     metadata: {
-      note: "AACCSA filing is a manual, human step — not automated by this platform.",
+      note: "AACCSA filing is a manual, human step â€” not automated by this platform.",
     },
   });
 
   logger.warn(
     { disputeId: dispute.id },
-    "Dispute escalated to arbitration — a human must now actually file with AACCSA; this is not automated.",
+    "Dispute escalated to arbitration â€” a human must now actually file with AACCSA; this is not automated.",
   );
 
   return updated;
@@ -721,7 +721,7 @@ export async function applyArbitrationAward(params: {
       `Can only apply an award when stage is STAGE_4_ARBITRATION, current stage: ${dispute.stage}.`,
     );
   }
-  // F-04 — refuse an award on an already-resolved dispute before the stage
+  // F-04 â€” refuse an award on an already-resolved dispute before the stage
   // rewind below can put it back in play.
   if (dispute.resolvedAt || dispute.resolutionOutcome) {
     throw new DisputeAlreadyResolvedError(
@@ -729,7 +729,7 @@ export async function applyArbitrationAward(params: {
     );
   }
 
-  // F-04 — the rewind is conditional, so a concurrent resolution that lands
+  // F-04 â€” the rewind is conditional, so a concurrent resolution that lands
   // between the stage read and this write cannot be silently undone.
   const rewind = await prisma.dispute.updateMany({
     where: {
@@ -890,7 +890,7 @@ export async function withdrawDisputeMutually(params: {
 
   if (dispute.withdrawalRequestedByUserId === params.userId) {
     throw new InvalidDisputeStageError(
-      "You already proposed withdrawal — waiting for the other party to confirm.",
+      "You already proposed withdrawal â€” waiting for the other party to confirm.",
     );
   }
 
@@ -917,7 +917,7 @@ export async function withdrawDisputeMutually(params: {
     disputeId: dispute.id,
     outcome: params.proposedOutcome,
     recommendation:
-      "Mutual settlement agreed by both parties — no staff mediation required.",
+      "Mutual settlement agreed by both parties â€” no staff mediation required.",
     freelancerShareMinor: params.proposedFreelancerShareMinor,
   });
 

@@ -5,7 +5,7 @@ import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import {
   CreatePortfolioItemInput,
   UpdatePortfolioItemInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import {
   listPortfolioItems,
   createPortfolioItem,

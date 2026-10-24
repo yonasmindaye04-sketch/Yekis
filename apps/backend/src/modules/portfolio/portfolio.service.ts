@@ -3,7 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import type {
   CreatePortfolioItemInput,
   UpdatePortfolioItemInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 
 // === TYPES ===
 /** Hard cap from the product rules; unchanged by F-17. */
@@ -50,7 +50,7 @@ export async function createPortfolioItem(
 }
 
 /**
- * F-17: the ownership check below protected the ITEM but not its FIELDS — the
+ * F-17: the ownership check below protected the ITEM but not its FIELDS â€” the
  * whole body was passed to `update`, so `{"userId": "<someone else>"}` moved the
  * item to another account. Only explicitly named columns are written now.
  *

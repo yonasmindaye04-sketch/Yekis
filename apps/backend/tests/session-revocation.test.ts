@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import request from "supertest";
 import { createHash } from "node:crypto";
 import type { Express } from "express";
-import argon2 from "argon2";
+import { hashPassword } from "../src/lib/password.js";
 import { prisma } from "../src/lib/prisma.js";
 import { buildApp } from "../src/app.js";
 import { loginUser, refreshSession, resetPassword, createAuthTokens } from "../src/modules/auth/auth.service.js";
@@ -71,7 +71,7 @@ async function makeUser() {
     data: {
       email: EMAIL,
       phone: `+2519${String(70000000 + (STAMP % 9000000))}`,
-      passwordHash: await argon2.hash(password),
+      passwordHash: await hashPassword(password),
       role: "CLIENT",
       wallet: { create: { balanceMinor: 0 } },
     } as never,

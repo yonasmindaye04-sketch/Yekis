@@ -44,8 +44,8 @@ import {
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 
 const PAYOUT_NOTES = [
   "Disbursement confirmed on provider rail; bank/mobile money reference recorded.",

@@ -36,10 +36,10 @@ import {
   isTyping,
   useHotkeys,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
 
 const OUTCOMES: { id: DisputeOutcome; label: string }[] = [
   { id: "RELEASE_TO_FREELANCER", label: "Release to Freelancer" },

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from "vitest";
-import argon2 from "argon2";
+import { hashPassword } from "../src/lib/password.js";
 import {
   loginUser,
   registerUser,
@@ -120,7 +120,7 @@ describe("Password login", () => {
     ).rejects.toThrow(AgeRestrictionError);
   });
 
-  // argon2.verify throws on a malformed hash instead of returning false. A
+  // verifyPassword throws on a malformed hash instead of returning false. A
   // 500 from the login endpoint (rather than a clean 401) is what the failure
   // looked like before this was caught.
   it("treats a malformed password hash as a failed login, not a server error", async () => {
@@ -145,7 +145,7 @@ describe("Password login", () => {
         email: TEST_EMAILS[3],
         phone: `+25109${String((SUFFIX + 3) % 1000000).padStart(6, "0")}`,
         // Federated sentinel: random secret, no real password yet.
-        passwordHash: await argon2.hash("placeholder"),
+        passwordHash: await hashPassword("placeholder"),
         role: "CLIENT",
         passwordSetAt: null,
       },

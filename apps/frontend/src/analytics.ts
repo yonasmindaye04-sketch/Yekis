@@ -119,7 +119,14 @@ export function initAnalytics(): void {
   gtag("js", new Date());
   gtag("config", GA_MEASUREMENT_ID, {
     send_page_view: false, // SPA — page views are sent explicitly on view changes
-    cookie_flags: "SameSite=None;Secure",
+    // SameSite=Lax, not GA's default "SameSite=None;Secure".
+    //
+    // GA4 defaults its _ga cookies to SameSite=None, which sends them on
+    // every cross-site request — a cookie scoped wider than the site needs,
+    // and a finding an OWASP ZAP scan flags on every page load. The
+    // measurement here is first-party only (no cross-site tagging), so Lax
+    // keeps the same first-party behaviour with a far smaller blast radius.
+    cookie_flags: "SameSite=Lax",
     ...(debugMode ? { debug_mode: true } : {}),
   });
 

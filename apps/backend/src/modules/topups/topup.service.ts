@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import type { PaymentProvider } from "@marketplace/schemas";
+import type { PaymentProvider } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
@@ -67,7 +67,7 @@ export async function submitTopUp(params: {
 }
 
 /**
- * Compliance/ops queue — includes each user's prior top-up track record
+ * Compliance/ops queue â€” includes each user's prior top-up track record
  * (count and total approved) directly on every row, so a reviewer can see
  * at a glance whether this is a first-time submission or an established
  * pattern, without a separate lookup per item.
@@ -142,7 +142,7 @@ export async function getTopUpQueue(params?: {
   return { items: withHistory, total, page, pageSize: limit };
 }
 
-/** Powers the EvidenceViewer for the receipt photo — same short-lived-URL pattern as KYC documents. */
+/** Powers the EvidenceViewer for the receipt photo â€” same short-lived-URL pattern as KYC documents. */
 export async function getReceiptViewUrl(topUpId: string) {
   const topUp = await prisma.walletTopUp.findUnique({ where: { id: topUpId } });
   if (!topUp) throw new TopUpNotFoundError();
@@ -179,7 +179,7 @@ export async function approveTopUp(params: {
   // approve at the same time must not both credit the wallet. The status
   // predicate makes exactly one of them the winner. Callback form (rather than
   // the array form) because the journal must be in the SAME transaction as the
-  // balance — posted separately it can fail after the money is already spent.
+  // balance â€” posted separately it can fail after the money is already spent.
   const claimed = await prisma.$transaction(async (tx) => {
     const claim = await tx.walletTopUp.updateMany({
       where: { id: topUp.id, status: "PENDING" },
@@ -265,7 +265,7 @@ export async function rejectTopUp(params: {
 }
 
 /**
- * Distinct from a plain rejection — this is for a receipt that looks like
+ * Distinct from a plain rejection â€” this is for a receipt that looks like
  * it might be fraudulent or manipulated, not just unclear/mismatched. Marks
  * the top-up FLAGGED (not APPROVED or REJECTED, so it doesn't silently
  * disappear from view as merely "handled") and creates a TransactionFlag
@@ -315,7 +315,7 @@ export async function flagTopUpSuspicious(params: {
 
   logger.warn(
     { topUpId: topUp.id },
-    "Top-up flagged as suspicious — routed to compliance queue",
+    "Top-up flagged as suspicious â€” routed to compliance queue",
   );
 
   return updated;
@@ -455,13 +455,13 @@ export async function initiateCheckoutTopUp(params: {
   );
 
   // SECURITY: never fabricate a successful payment. When the provider has no
-  // live hosted checkout (mock/sandbox mode — null redirectUrl), the top-up
+  // live hosted checkout (mock/sandbox mode â€” null redirectUrl), the top-up
   // MUST stay CHECKOUT_PENDING until money movement is verified, either by
   //   (a) a signature-verified provider webhook, or
   //   (b) the user attaching a receipt and staff approving it in the manual
   //       review queue (attachReceiptToTopUp below).
   // CBE Birr and M-Pesa currently have NO live verification path, so their
-  // top-ups always follow that verified-only manual path — auto-approving
+  // top-ups always follow that verified-only manual path â€” auto-approving
   // them would credit unbacked money to the wallet.
   //
   // The ONLY exception is the local Telebirr dev sandbox, and only when the
@@ -488,7 +488,7 @@ export async function initiateCheckoutTopUp(params: {
     } else {
       logger.info(
         { topUpId: topUp.id, provider: params.provider },
-        "No live checkout for provider — top-up stays CHECKOUT_PENDING until a verified webhook or manual receipt review confirms payment.",
+        "No live checkout for provider â€” top-up stays CHECKOUT_PENDING until a verified webhook or manual receipt review confirms payment.",
       );
     }
   }
@@ -576,7 +576,7 @@ export async function handleTopUpWebhook(params: {
   if (!topUp) {
     logger.warn(
       { providerTransactionId: params.providerTransactionId },
-      "Top-up webhook received for unknown transaction — ignoring.",
+      "Top-up webhook received for unknown transaction â€” ignoring.",
     );
     return;
   }
@@ -584,13 +584,13 @@ export async function handleTopUpWebhook(params: {
   if (topUp.status !== "CHECKOUT_PENDING") {
     logger.info(
       { topUpId: topUp.id, status: topUp.status },
-      "Top-up webhook for already-settled top-up — ignoring.",
+      "Top-up webhook for already-settled top-up â€” ignoring.",
     );
     return;
   }
 
   if (params.status === "PENDING") {
-    logger.info({ topUpId: topUp.id }, "Top-up still pending — no action.");
+    logger.info({ topUpId: topUp.id }, "Top-up still pending â€” no action.");
     return;
   }
 
@@ -623,7 +623,7 @@ export async function handleTopUpWebhook(params: {
   // the CBE webhook, and the reconciliation sweep all reach this function.
   assertTopUpIsCreditable({ providerTransactionId: params.providerTransactionId });
 
-  // SUCCESS — atomically claim the pending top-up and credit exactly once.
+  // SUCCESS â€” atomically claim the pending top-up and credit exactly once.
   // Duplicate callbacks can arrive concurrently; the status predicate makes
   // only one delivery the winner.
   const credited = await prisma.$transaction(async (tx) => {
@@ -641,7 +641,7 @@ export async function handleTopUpWebhook(params: {
     // balance only ever falls (payouts) and the DB CHECK that forbids a
     // negative asset aborts the first disbursement. auditLedgerIntegrity()
     // still reported "balanced" because it only compares total debits to
-    // total credits — a whole missing flow is invisible to it.
+    // total credits â€” a whole missing flow is invisible to it.
     await recordWalletTopUpLedger(tx, {
       userId: topUp.userId,
       topUpId: topUp.id,
@@ -670,6 +670,6 @@ export async function handleTopUpWebhook(params: {
 
   logger.info(
     { topUpId: topUp.id, amountMinor: topUp.amountMinor },
-    "Telebirr checkout top-up auto-approved — wallet credited.",
+    "Telebirr checkout top-up auto-approved â€” wallet credited.",
   );
 }

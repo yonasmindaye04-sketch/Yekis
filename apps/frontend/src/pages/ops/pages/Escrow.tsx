@@ -44,8 +44,8 @@ import { ESCROW_STATES, HELD_STATES } from "../opsConst";
 import type { Escrow } from "../opsTypes";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 
 const ESCROW_REASON_TEMPLATES = [
   "Deliverable verified against milestone acceptance criteria; releasing full escrow to freelancer.",

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { assertProductionSafety } from "../src/config/env.js";
 
 /**
@@ -314,7 +315,10 @@ describe("LOCK (source text) — staff console URL has no hardcoded fallback", (
 });
 
 describe("LOCK (source text) — the new variables are documented in .env.example", () => {
-  const example = readFileSync(resolve(process.cwd(), ".env.example"), "utf8");
+  // The example file lives at the repository root; the backend-local copy was
+  // removed when the workspace was flattened.
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const example = readFileSync(resolve(repoRoot, ".env.example"), "utf8");
 
   it("documents API_PUBLIC_URL", () => {
     expect(example).toContain("API_PUBLIC_URL");

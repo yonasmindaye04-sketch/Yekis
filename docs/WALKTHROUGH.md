@@ -1,6 +1,32 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-10-17
+Last validated: 2026-10-20
+
+> **`pnpm dev:tunnel` infrastructure created (2026-10-20):**
+> - **Problem**: `pnpm dev:tunnel` failed with `Command "dev:tunnel" not found` because the root
+>   `package.json` was missing the script and the supporting files were never created.
+> - **Root causes**:
+>   1. `package.json` only had `dev`, `build`, `lint`, `preview` — no `dev:tunnel`, `dev:backend`,
+>      `dev:frontend`, or `tunnel:cloudflare` scripts.
+>   2. `scripts/dev-with-tunnel.mjs` (the launcher) and `scripts/start-cloudflare-tunnel.ps1`
+>      (the helper) did not exist, despite being documented in `CLOUDFLARE_TUNNEL_PLAYBOOK.md`.
+>   3. `pnpm-workspace.yaml` was missing — pnpm was using the npm-style `workspaces` field in
+>      `package.json`, which pnpm doesn't support, causing the recurring `[WARN]` and triggering
+>      a full `node_modules` recreation on every invocation.
+>   4. The `workspaces` array only listed `apps/frontend`; `apps/backend` was excluded from the
+>      pnpm workspace graph.
+>   5. The playbook referenced Vite port `5173` but the actual Vite config uses port `3000`.
+> - **Fixes applied**:
+>   - Created `pnpm-workspace.yaml` declaring both `apps/frontend` and `apps/backend`.
+>   - Created `scripts/dev-with-tunnel.mjs`: starts cloudflared → captures `*.trycloudflare.com`
+>     URL → injects it as `FRONTEND_URL` → boots backend (`tsx watch`) and frontend (`vite`)
+>     concurrently. Handles graceful shutdown on `SIGINT`/`SIGTERM`.
+>   - Created `scripts/start-cloudflare-tunnel.ps1`: standalone tunnel helper with multi-path
+>     binary lookup and a clear install prompt if `cloudflared` is not found.
+>   - Updated root `package.json`: removed `workspaces` field; switched existing scripts to
+>     `pnpm --filter`; added `dev:frontend`, `dev:backend`, `dev:tunnel`, `tunnel:cloudflare`.
+>   - Corrected all `5173` → `3000` port references in `CLOUDFLARE_TUNNEL_PLAYBOOK.md`.
+
 
 > **Landing V2 FAQ section rebuilt from the "Earth & Cream" reference (2026-10-17):**
 > - **`LandingPageV2.tsx`** — `FAQSection` is a direct port of the supplied HTML reference: the centred bordered card, the lens + `/` kbd filter, the serif `FAQ` wordmark with its pulsing dot, the self-drawing arc with an orbiting dot, the rounded-square chips, the `grid-template-rows` answer morph, the drifting leaves, the ambient blobs and the pointer parallax are all kept as authored. Only two things differ, both forced by the content: the real questions are grouped by the three existing `marketing.faq.*Title` categories, and their text comes from the translations.

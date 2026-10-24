@@ -1,8 +1,8 @@
 // === IMPORTS ===
-import argon2 from "argon2";
+import { hashPassword, verifyPassword } from "../../lib/password";
 import { SignJWT, jwtVerify } from "jose";
 import { randomBytes, createHash } from "crypto";
-import type { RegisterInput, LoginInput } from "@marketplace/schemas";
+import type { RegisterInput, LoginInput } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 import { recordAuditEvent } from "../../lib/audit.js";
@@ -46,7 +46,7 @@ function calculateAge(dob: Date): number {
  *
  * Both access and refresh tokens carry the version they were minted at, and
  * `requireAuth` / `refreshSession` compare it against the stored value. One
- * increment therefore retires every outstanding token at once — access tokens
+ * increment therefore retires every outstanding token at once â€” access tokens
  * on their next request, refresh tokens on their next refresh.
  *
  * This is the only revocation primitive in the system, and it is deliberately
@@ -72,7 +72,7 @@ export async function logoutSession(userId: string): Promise<void> {
 export async function registerUser(input: RegisterInput) {
   const dob = new Date(input.dateOfBirth);
 
-  // Contractual-capacity gate — confirmed with counsel in Phase 0.
+  // Contractual-capacity gate â€” confirmed with counsel in Phase 0.
   if (calculateAge(dob) < env.MINIMUM_CONTRACTING_AGE) {
     throw new AgeRestrictionError(
       `Must be at least ${env.MINIMUM_CONTRACTING_AGE} years old to register.`,
@@ -85,7 +85,7 @@ export async function registerUser(input: RegisterInput) {
   if (existing)
     throw new DuplicateUserError("Email or phone already registered.");
 
-  const passwordHash = await argon2.hash(input.password);
+  const passwordHash = await hashPassword(input.password);
 
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven
@@ -108,7 +108,7 @@ export async function registerUser(input: RegisterInput) {
         kyc: { create: { tier: "TIER_1", status: "PENDING" } },
         wallet: { create: { balanceMinor: 0 } },
         consents: {
-          // Master Design §12.2: granular, unbundled consent — two purposes
+          // Master Design Â§12.2: granular, unbundled consent â€” two purposes
           // are legally required (no opt-out), three are optional opt-ins
           // recorded individually with timestamps (PDPP Arts. 8 & 11).
           create: [
@@ -150,7 +150,7 @@ export async function registerUser(input: RegisterInput) {
  * Mints an access/refresh pair.
  *
  * `auth_time` is the Unix time of the last moment a credential was actually
- * presented or proven — NOT the time this token was signed. Step-up checks read
+ * presented or proven â€” NOT the time this token was signed. Step-up checks read
  * `auth_time` and must never read `iat`: `iat` moves forward on every silent
  * refresh, so an `iat`-based check would happily pass a session whose owner
  * last typed a password an hour ago and merely left a tab open.
@@ -255,13 +255,13 @@ export async function loginUser(input: LoginInput) {
 
   if (!user) throw new InvalidCredentialsError();
 
-  // argon2.verify THROWS on a malformed hash rather than returning false.
+  // verifyPassword THROWS on a malformed hash rather than returning false.
   // Legacy/seeded/corrupted rows would otherwise surface as a 500 on the
   // login endpoint, which both misleads the caller and turns a data problem
   // into an availability one. An unverifiable hash is simply not a match.
   let valid = false;
   try {
-    valid = await argon2.verify(user.passwordHash, input.password);
+    valid = await verifyPassword(user.passwordHash, input.password);
   } catch (err) {
     logger.warn(
       { userId: user.id, err },
@@ -287,7 +287,7 @@ export async function loginUser(input: LoginInput) {
 }
 
 /**
- * Session refresh — exchanges a still-valid refresh token for a fresh
+ * Session refresh â€” exchanges a still-valid refresh token for a fresh
  * access/refresh pair. Added because the refresh token was previously issued
  * at login but never usable (no endpoint consumed it), which forced users to
  * re-authenticate every JWT_ACCESS_TTL (15 minutes by default).
@@ -318,7 +318,7 @@ export async function refreshSession(refreshToken: string) {
   }
 
   // A token minted before auth_time existed has no credential timestamp. We do
-  // NOT fall back to `iat` — that would let a 30-day-old session look freshly
+  // NOT fall back to `iat` â€” that would let a 30-day-old session look freshly
   // authenticated. The session stays usable; step-up simply demands a real
   // sign-in, which is the fail-closed outcome.
   if (carriedAuthTime === undefined) {
@@ -439,7 +439,7 @@ export async function resetPassword(token: string, newPassword: string) {
     throw new InvalidTokenError("Invalid or expired reset token");
   }
 
-  const passwordHash = await argon2.hash(newPassword);
+  const passwordHash = await hashPassword(newPassword);
 
   await prisma.$transaction(async (tx) => {
     // Conditionally claim the bearer token before changing the password. Only

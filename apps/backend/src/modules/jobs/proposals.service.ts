@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import type { CreateProposalInput } from "@marketplace/schemas";
+import type { CreateProposalInput } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import {
@@ -107,7 +107,7 @@ export async function listProposalsForJob(params: {
  * The client's decision on a proposal. ACCEPTED is the significant branch:
  * it closes out every other proposal on the job and flips the job to
  * IN_PROGRESS. This function deliberately stops short of creating the
- * Contract itself — that's the Contract module's job (not yet built).
+ * Contract itself â€” that's the Contract module's job (not yet built).
  * The TODO below is the explicit handoff point.
  */
 export async function decideProposal(params: {
@@ -153,7 +153,7 @@ export async function decideProposal(params: {
     return updated;
   }
 
-  // ACCEPTED — reject every other proposal on this job, and move the job
+  // ACCEPTED â€” reject every other proposal on this job, and move the job
   // to IN_PROGRESS in the same transaction so there's never a moment where
   // two proposals could both look "accepted" under concurrent requests.
   const acceptedProposal = await prisma.$transaction(
@@ -208,7 +208,7 @@ export async function decideProposal(params: {
   });
 
   // Contract generation is synchronous and part of the same logical
-  // operation as accepting the proposal — the client should see the
+  // operation as accepting the proposal â€” the client should see the
   // generated Service Agreement immediately, not poll for it. If this
   // throws, the accepted proposal still stands (contract creation is
   // idempotent-retryable via a future "regenerate contract" admin action;

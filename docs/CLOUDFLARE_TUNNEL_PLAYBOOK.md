@@ -24,7 +24,7 @@ the app. You never change a URL in BotFather or in `.env` again.
 
 `cloudflared` is the Cloudflare Tunnel client. A **quick tunnel** (no account required) runs
 locally and creates an outbound-only connection to Cloudflare's edge, which publishes a
-public `https://<random>.trycloudflare.com` URL that forwards to a local port (e.g. 5173).
+public `https://<random>.trycloudflare.com` URL that forwards to a local port (e.g. 3000).
 
 What it does for Yekis:
 
@@ -45,7 +45,7 @@ How the data flows:
 Telegram client
    -> https://<random>.trycloudflare.com  (Cloudflare edge)
    -> cloudflared (local process)
-   -> http://localhost:5173 (Vite dev server)
+   -> http://localhost:3000 (Vite dev server)
    -> Vite proxy /api -> http://localhost:4000 (Express backend)
 ```
 
@@ -94,6 +94,30 @@ pnpm dev:tunnel
 That single command starts the Cloudflare Tunnel, captures the public
 `https://<random>.trycloudflare.com` URL, injects it as `FRONTEND_URL`, and boots the
 backend and frontend. Nothing to copy, nothing to paste, no `.env` edits.
+
+The URL is only announced once the tunnel has actually registered a connection with
+a Cloudflare edge, and the frontend boots first — so by the time the URL is printed,
+opening it works. (cloudflared allocates the URL before the edge connection exists;
+announcing it earlier handed out links that answered 502 while the handshake was
+still running.)
+
+### Transport: HTTP/2 by default
+
+`pnpm dev:tunnel` runs cloudflared with `--protocol http2` rather than QUIC.
+
+On links where UDP 7844 is filtered or lossy, QUIC registers a connection and then
+drops it a minute or two later with
+`failed to accept QUIC stream: timeout: no recent network activity`, after which the
+public URL starts answering **530**. HTTP/2 rides on TCP 7844 and stays up. This is
+also what cloudflared's own precheck advises: *"Allow outbound QUIC traffic on port
+7844 or use HTTP2."*
+
+Override it if your network prefers QUIC:
+
+```powershell
+$env:CLOUDFLARED_PROTOCOL = "quic"   # or "auto" to let cloudflared decide
+pnpm dev:tunnel
+```
 
 On every backend boot the bot re-points the Telegram **chat menu button** at that live
 URL (`setChatMenuButton`), and every Mini App button the bot sends (`/start`, `/menu`,
@@ -155,7 +179,7 @@ The chat menu button and every in-app button are maintained automatically from
 ### Important notes
 
 - **No backend tunnel needed** for the Mini App flow. Vite proxies `/api` to
-  `http://localhost:4000`. Tunneling only port 5173 keeps a single public origin.
+  `http://127.0.0.1:4000`. Tunneling only port 3000 keeps a single public origin.
 - **Ephemeral URLs**: quick-tunnel hostnames change on every run.
 - **Zero-manual-link mode**: run `pnpm dev:tunnel` instead of starting servers by
   hand. It starts cloudflared, captures the `*.trycloudflare.com` URL, injects it as
@@ -173,9 +197,12 @@ The chat menu button and every in-app button are maintained automatically from
   (this is why you saw `ERR_NGROK_3200` on the old ngrok address). The Bot API has no
   method to change it, so set it **once** in BotFather (or clear it) and never again —
   the in-chat menu button is the one to use, and it is automatic.
-- **Allowed hosts**: `apps/frontend/vite.config.ts` sets `allowedHosts: true`, so
-  `*.trycloudflare.com` Host headers are accepted. If you tighten this to an explicit
-  list, add `.trycloudflare.com`.
+- **Allowed hosts**: `apps/frontend/vite.config.ts` sets an explicit
+  `server.allowedHosts` list (`.trycloudflare.com`, `.ngrok-free.dev`,
+  `.ngrok.app`, `.ngrok.io`, `.loca.lt`, `localhost`, `127.0.0.1`). `*.trycloudflare.com`
+  Host headers are accepted; anything else is rejected, which is what stops a
+  DNS-rebinding Host header from being served. Add another host with
+  `VITE_ALLOWED_HOSTS=my.host,other.host`.
 
 ## 3. Webhook testing
 
@@ -198,10 +225,20 @@ configured, the bot falls back to polling (dev only).
 
 `apps/frontend/vite.config.ts`:
 
-- `server.host: true` — binds `0.0.0.0` so the tunnel can reach it.
-- `server.allowedHosts: true` — accepts any tunnel Host header.
-- `server.proxy['/api']` — forwards to `http://localhost:4000`.
-- Headers: `X-Frame-Options: ALLOWALL` (Telegram iframe), `Access-Control-Allow-Origin: *`.
+- `server.host` — `127.0.0.1` by default; the tunnel launcher passes
+  `--host=0.0.0.0` explicitly because cloudflared needs a reachable listener.
+  Set `VITE_DEV_HOST=0.0.0.0` to do the same outside the tunnel script.
+- `server.port: 3000` — frontend runs on port 3000.
+- `server.allowedHosts` — explicit allowlist; see the note in section 2.
+- `server.fs.deny` — the dev server refuses to serve `backups/`, `*.dump`,
+  `*.sql`, `resource_to_read/`, `docs/security/`, `uploads/` and the local
+  credential scripts over `/@fs/`. Do not remove these: an OWASP ZAP scan
+  confirmed that `/@fs/` served a full PostgreSQL dump before they were added.
+- `/api` proxy — forwarded to `http://127.0.0.1:4000` via `resilientApiProxyPlugin`.
+- Headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: no-referrer`, `Strict-Transport-Security`,
+  `Cross-Origin-Opener-Policy: same-origin-allow-popups`,
+  `Cross-Origin-Resource-Policy: same-origin`, `Permissions-Policy`.
 
 No `ngrok-skip-browser-warning` header is needed with Cloudflare.
 
@@ -221,7 +258,7 @@ Quick tunnels change hostname every run. For a stable dev URL, create a named tu
 cloudflared tunnel login
 cloudflared tunnel create yekis-dev
 cloudflared tunnel route dns yekis-dev dev.yekis.et
-cloudflared tunnel run --url http://localhost:5173 yekis-dev
+cloudflared tunnel run --url http://localhost:3000 yekis-dev
 ```
 
 Then `dev.yekis.et` (or your chosen hostname) stays constant across runs; update
@@ -237,8 +274,19 @@ BotFather once.
   the stale profile button, clear or repoint the Main App URL in BotFather once.
 - **`cloudflared` not found** — install it and ensure it is on `PATH`; the helper
   script also checks common install paths.
-- **502 / connection refused** — Vite must be running on `5173` with `host: true`.
+- **502 / connection refused** — Vite must be running on `3000` with `host: "0.0.0.0"`.
   Start `pnpm run dev:frontend` first.
+- **530 from the tunnel URL** — the edge connection dropped. The usual cause is QUIC
+  (UDP 7844) being filtered on your link; `pnpm dev:tunnel` already defaults to
+  HTTP/2 for that reason, so re-run it and confirm the log says `protocol=http2`. If
+  it says `protocol=quic`, something set `CLOUDFLARED_PROTOCOL`.
+- **"failed to accept QUIC stream: timeout: no recent network activity"** — same
+  cause: UDP 7844 is not usable on this network. Use HTTP/2.
+- **"Telegram Bot API is UNREACHABLE after retries"** — outbound access to
+  `api.telegram.org` failed. The platform keeps serving, and the bot now retries in
+  the background (`15s → 30s → 60s → 2m → 5m`), so it comes up by itself once the
+  link recovers — no restart needed. "Telegram bot token validation failed" is a
+  different problem: the token itself is wrong, and retrying will not help.
 - **Invalid Host header** — `allowedHosts` must include the tunnel host. With
   `allowedHosts: true` this is already handled.
 - **Telegram Mini App blank / blocked iframe** — `X-Frame-Options` must allow

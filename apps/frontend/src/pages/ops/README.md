@@ -8,6 +8,9 @@ Stack matches the app: React 19 + TS, one scoped CSS file, `lucide-react`
 icons, dependency-free SVG charts, the shared `api` client, and the global
 `ThemeContext`.
 
+The console now builds its shared primitives on top of **shadcn/ui** (see
+"shadcn/ui layer" below) instead of hand-rolled markup.
+
 ## Mounting
 
 Already wired — `FullPlatformApp.tsx` renders it for any account with a
@@ -56,7 +59,40 @@ src/pages/ops/
 src/styles/ops-console.css
 ```
 
+## shadcn/ui layer
+
+The console does not ship its own component kit. The primitives live in
+`src/components/ui/` (ported from
+[shadcn-dashboard-landing-template](https://github.com/shadcnstore/shadcn-dashboard-landing-template),
+MIT) and are driven by `@base-ui/react` rather than Radix.
+
+Two rules make them fit the existing design system:
+
+1. **One palette.** `src/index.css` derives every shadcn semantic token
+   (`--background`, `--card`, `--muted`, `--sidebar`, `--chart-*`, …) from the
+   app's own `--color-*` tokens, so primitives render in the Yekis palette and
+   flip with `data-theme` for free. The same file registers those tokens in
+   `@theme inline` so `bg-card`, `text-muted-foreground`, `border-border` and
+   friends resolve correctly.
+2. **The console still owns its skin.** `components/ui.tsx` re-exports
+   `Button`, `Card`, `Pill`, `OpsTable`, `FilterSelect`, `Banner`, `ErrorBox`
+   and `LoadingBox`, each wrapping the shadcn primitive while keeping the
+   `.ops-root` class names. `ops-console.css` therefore still decides the
+   console's look — `.ops-root .card` neutralises the primitive's built-in
+   padding with `--card-spacing: 0px`, for example.
+
+So a page can adopt a primitive directly when it wants the plain shadcn look:
+
+```tsx
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+```
+
+Imports use the `@/*` alias (`@/*` → `src/*`), configured in
+`tsconfig.app.json` and `vite.config.ts`. `components.json` at the app root
+makes `npx shadcn@latest add <primitive>` work against this setup.
+
 ## Navigation
+
 
 The 3-bar button in the **sidebar's brand row** collapses the sidebar so wide
 tables and charts get the full viewport; the preference persists in
@@ -172,4 +208,6 @@ back to the first permitted one during render.
 - Styling: one scoped stylesheet under `.ops-root`, dark mode via
   `:root[data-theme="dark"] .ops-root`. Theme-conditional rules only touch
   colour tokens — layout stays theme-invariant per `.agents/AGENTS.md`.
+- Components: shadcn/ui primitives from `src/components/ui/`, wrapped by
+  `components/ui.tsx` so the console keeps its own skin.
 - Charts and tables guard against empty data rather than rendering `NaN`.

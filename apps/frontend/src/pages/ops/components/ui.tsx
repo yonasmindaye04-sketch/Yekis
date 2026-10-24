@@ -3,8 +3,13 @@
    All class names are scoped under .ops-root by ops-console.css.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ButtonHTMLAttributes,
+  ComponentProps,
+  KeyboardEvent as ReactKeyboardEvent,
+  ReactNode,
+} from "react";
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -19,8 +24,48 @@ import type { LucideIcon } from "lucide-react";
 import { fmt } from "../opsApi";
 import type { Rail as RailT } from "../opsTypes";
 import { Sparkline } from "./charts";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button as ShadcnButton } from "@/components/ui/button";
+import { Card as ShadcnCard } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+/* ── button ──
+   The shadcn primitive underneath, wearing the console's own `.ui-button`
+   skin so every existing admin page keeps its current look. */
+export function Button({
+  variant = "default",
+  size = "default",
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "default" | "outline" | "ghost" | "destructive";
+  size?: "default" | "sm" | "icon";
+}) {
+  return (
+    <ShadcnButton
+      variant={variant}
+      size={size}
+      className={cn("ui-button", `ui-button-${variant}`, `ui-button-${size}`, className)}
+      {...props}
+    />
+  );
+}
+
+/* ── card ──
+   Same idea: the shadcn card carries the structure, `.card` keeps the
+   console's panel styling. `--card-spacing: 0` neutralises the primitive's
+   built-in padding so layouts are unchanged (see ops-console.css). */
+export function Card({ className, ...props }: ComponentProps<"div">) {
+  return <ShadcnCard className={cn("card", className)} {...props} />;
+}
 
 /* ── toast ─ */
 export const ToastContext = createContext<(msg: string) => void>(() => {});
@@ -109,10 +154,10 @@ export function formatStatusLabel(
 
 export function Pill({ s, dict }: { s: string; dict?: Record<string, string> }) {
   return (
-    <span className={`pill ${PILL[s] ?? "p-gray"}`}>
+    <Badge variant="outline" className={cn("pill", PILL[s] ?? "p-gray")}>
       <span className="pdot" />
       {formatStatusLabel(s, dict)}
-    </span>
+    </Badge>
   );
 }
 
@@ -186,14 +231,14 @@ export function Banner({
   rest: string;
 }) {
   return (
-    <div className={`banner ${tone}`}>
+    <Alert className={cn("banner", tone)}>
       <span className="banner-ic">
         <Icon size={18} />
       </span>
-      <div>
-        <b>{strong}</b> {rest}
-      </div>
-    </div>
+      <AlertDescription>
+        <AlertTitle>{strong}</AlertTitle> {rest}
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -248,18 +293,39 @@ export function FilterSelect({
   label?: string;
   humanise?: boolean;
 }) {
+  const items = useMemo(() => {
+    const map: Record<string, string> = { "": allLabel };
+    for (const o of options) map[o] = humanise ? o.replace(/_/g, " ") : o;
+    /* A filter can briefly hold a value that is no longer in the option list
+       (the data changed underneath it) — keep it selectable so the trigger
+       never renders blank. */
+    if (value && !(value in map)) map[value] = humanise ? value.replace(/_/g, " ") : value;
+    return map;
+  }, [options, allLabel, humanise, value]);
+
+  const visible = useMemo(
+    () => (value && !options.includes(value) ? [...options, value] : [...options]),
+    [options, value],
+  );
+
   return (
-    <select
-      className="sel"
+    <Select
+      items={items}
       value={value}
-      aria-label={label}
-      onChange={(e) => onChange(e.target.value)}
+      onValueChange={(v) => onChange((v as string) ?? "")}
     >
-      <option value="">{allLabel}</option>
-      {options.map((o) => (
-        <option key={o} value={o}>{humanise ? o.replace(/_/g, " ") : o}</option>
-      ))}
-    </select>
+      <SelectTrigger className="sel" aria-label={label}>
+        <SelectValue>{items[value] ?? allLabel}</SelectValue>
+      </SelectTrigger>
+      <SelectContent align="start">
+        <SelectItem value="">{allLabel}</SelectItem>
+        {visible.map((o) => (
+          <SelectItem key={o} value={o}>
+            {humanise ? o.replace(/_/g, " ") : o}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -411,26 +477,26 @@ export function Empty({
 
 export function ErrorBox({ error, reload }: { error: string; reload: () => void }) {
   return (
-    <div className="banner b-red">
+    <Alert className="banner b-red">
       <span className="banner-ic">
         <XCircle size={18} />
       </span>
-      <div>
-        <b>Could not load data.</b> {error}{" "}
+      <AlertDescription>
+        <AlertTitle>Could not load data.</AlertTitle> {error}{" "}
         <Button variant="ghost" size="sm" onClick={reload}>Retry</Button>
-      </div>
-    </div>
+      </AlertDescription>
+    </Alert>
   );
 }
 
 export function LoadingBox() {
   return (
-    <div className="card" style={{ padding: 48, textAlign: "center" }}>
+    <Card className="card" style={{ padding: 48, textAlign: "center" }}>
       <span className="pill p-sky">
         <span className="pdot" />
         <Clock size={13} /> loading…
       </span>
-    </div>
+    </Card>
   );
 }
 

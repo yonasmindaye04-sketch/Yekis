@@ -5,7 +5,7 @@ import {
   KycDocumentType,
   UpgradeToTier2Input,
   KycReviewDecisionInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requirePermission } from "../admin/permissions.js";
 import {
@@ -26,7 +26,7 @@ import { logger } from "../../lib/logger.js";
 
 export const kycRouter = Router();
 
-// 8MB cap, memory storage — files are streamed straight to object storage,
+// 8MB cap, memory storage â€” files are streamed straight to object storage,
 // never written to local disk on the API server.
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -100,7 +100,7 @@ kycRouter.post(
     }
 
     // fullName / dateOfBirth / documentNumber accompany the first document
-    // to feed Fayda verification — required fields, validated inline here
+    // to feed Fayda verification â€” required fields, validated inline here
     // rather than via the shared schema since they travel alongside a
     // multipart file rather than a JSON body.
     const { fullName, dateOfBirth, documentNumber } = req.body;
@@ -150,7 +150,7 @@ kycRouter.post(
       where: { userId: req.user!.id },
     });
     // PEP screening matches on the legal name, so it must never be handed an
-    // email address — screening "user@example.com" against a PEP watchlist
+    // email address â€” screening "user@example.com" against a PEP watchlist
     // silently returns no match and defeats the AML control. The name captured
     // at Tier 1 submission is the authoritative one.
     const screeningName =
@@ -219,7 +219,7 @@ kycRouter.get(
   },
 );
 
-// Powers the EvidenceViewer component — the frontend never receives or
+// Powers the EvidenceViewer component â€” the frontend never receives or
 // stores a raw storagePath, only a time-boxed URL fetched on demand.
 kycRouter.get(
   "/documents/:documentId/url",

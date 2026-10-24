@@ -158,7 +158,11 @@ const EnvSchema = z.object({
   APPLE_CLIENT_ID: z.string().optional(),
   FACEBOOK_APP_ID: z.string().optional(),
   FACEBOOK_APP_SECRET: z.string().optional(),
-  FRONTEND_URL: z.string().default("http://localhost:5173"),
+  // The dev frontend runs on port 3000 (apps/frontend/vite.config.ts). The
+  // old default of 5173 pointed at a port this project does not use, so the
+  // API's CORS allowlist rejected the SPA's cross-origin calls in a setup
+  // where VITE_API_BASE_URL points straight at the API.
+  FRONTEND_URL: z.string().default("http://localhost:3000"),
   /**
    * Public https origin of THIS API, with no trailing path.
    *

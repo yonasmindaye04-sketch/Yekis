@@ -17,7 +17,7 @@ import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { initWebSocketServer } from "./lib/socket.js";
 import { ensureObjectStoreReady } from "./lib/objectStore.js";
-import { startBot, stopBot } from "./modules/bot/bot.service.js";
+import { startBotDetailed, stopBot } from "./modules/bot/bot.service.js";
 // Importing the worker file starts it listening on the queue as a side effect.
 // In production, run workers as a separate process/container from the API
 // server so a traffic spike on one doesn't starve the other.
@@ -102,14 +102,72 @@ const server = app.listen(env.PORT, async () => {
   // unreachable api.telegram.org must never delay or wedge the HTTP server.
   // startBot() fails fast on its own (see TELEGRAM_API_TIMEOUT_MS) and logs a
   // precise reason, so fire-and-forget is safe here.
-  startBot()
-    .then((started) => {
-      if (started) logger.info("🤖 Telegram bot started");
+  startBotDetailed()
+    .then((outcome) => {
+      if (outcome.ok) {
+        logger.info("🤖 Telegram bot started");
+        return;
+      }
+      if (outcome.reason === "unreachable") scheduleBotStartRetry();
     })
     .catch((error) => {
       logger.error({ error }, "Failed to start Telegram bot");
     });
 });
+
+/**
+ * Retry the bot start in the background until Telegram answers.
+ *
+ * api.telegram.org is reachable only over links that are not always reliable
+ * — a flaky ISP route, a mobile hotspot or a captive network is enough. The
+ * platform itself keeps serving, but the bot stayed down until the process
+ * was restarted by hand, which reads as "the bot is broken" rather than "the
+ * network was down for a minute".
+ *
+ * Only an UNREACHABLE api is retried: an invalid token never becomes valid,
+ * and retrying it would just spam the log.
+ */
+const BOT_START_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 300_000];
+
+function scheduleBotStartRetry(): void {
+  let attempt = 0;
+
+  const tick = async () => {
+    attempt += 1;
+    const delay = BOT_START_RETRY_DELAYS_MS[attempt - 1];
+    if (delay === undefined) return;
+
+    await new Promise((resolve) => setTimeout(resolve, delay));
+
+    try {
+      const outcome = await startBotDetailed();
+      if (outcome.ok) {
+        logger.info("🤖 Telegram bot started (background retry)");
+        return;
+      }
+      if (outcome.reason !== "unreachable") {
+        logger.warn(
+          { reason: outcome.reason, error: outcome.message },
+          "Telegram bot retry gave up — this will not fix itself by waiting",
+        );
+        return;
+      }
+      logger.warn(
+        { attempt },
+        "Telegram Bot API still unreachable — will retry again in the background",
+      );
+    } catch (error) {
+      logger.error({ error }, "Telegram bot retry failed");
+    }
+
+    void tick();
+  };
+
+  logger.info(
+    "Telegram Bot API is unreachable — the bot will retry in the background",
+  );
+  void tick();
+}
 
 scheduleRecurringJobs().catch((err) =>
   logger.error({ err }, "Failed to schedule KYC refresh jobs"),

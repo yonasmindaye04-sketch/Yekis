@@ -12,7 +12,7 @@ import {
 } from "../src/modules/disputes/dispute.service.js";
 
 /**
- * F-04 / F-05 — a dispute resolves exactly once.
+ * F-04 / F-05 â€” a dispute resolves exactly once.
  *
  * Two defects, one cause: nothing claimed the dispute before money moved.
  *
@@ -34,7 +34,7 @@ const ids: { clientId?: string; freelancerId?: string; contractId?: string; mile
 
 /**
  * A real staff user, because resolveDispute writes an AuditLog row keyed to
- * staffUserId — a fabricated string violates the AuditLog_userId FK.
+ * staffUserId â€” a fabricated string violates the AuditLog_userId FK.
  */
 const STAFF = { id: "" as string, role: "ADMIN" as const };
 
@@ -377,7 +377,7 @@ describe("F-04 the claim and the money movement are one transaction", () => {
   it("a settled dispute that can no longer pay is left unresolved, not compensated", async () => {
     // The milestone is released by a competing path, so the payout throws.
     // The old code claimed the dispute, then hand-wrote a compensating
-    // `dispute.update` back to stage 3 — a non-atomic fix that a crash
+    // `dispute.update` back to stage 3 â€” a non-atomic fix that a crash
     // between the two writes would defeat entirely.
     const { disputeId } = await seed("STAGE_3_MEDIATION");
     await prisma.milestone.updateMany({
@@ -429,7 +429,7 @@ describe("F-04 the refund path cannot credit an already-settled milestone", () =
 
 describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
   it("the shared schema requires the share, and the local copy is gone", async () => {
-    const { ArbitrationAwardInput } = await import("@marketplace/schemas");
+    const { ArbitrationAwardInput } = await import("../src/schemas");
 
     // Missing share is rejected at the edge.
     const missing = ArbitrationAwardInput.safeParse({
@@ -486,7 +486,7 @@ describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
         disputeId,
         outcome: "PARTIAL_SPLIT",
         recommendation: "Split it somehow.",
-        // freelancerShareMinor omitted — the F-05 payload.
+        // freelancerShareMinor omitted â€” the F-05 payload.
       } as never),
     ).rejects.toBeTruthy();
 

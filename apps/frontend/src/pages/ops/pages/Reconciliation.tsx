@@ -26,8 +26,8 @@ import { dts, fmt, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { RECON_STATUSES, RAILS } from "../opsConst";
 import type { ReconRow } from "../opsTypes";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 import {
   Banner,
   Empty,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { UserRole } from "@marketplace/schemas";
+import { UserRole } from "../src/schemas";
 
 /**
  * The dual-role contract.
@@ -10,7 +10,7 @@ import { UserRole } from "@marketplace/schemas";
  * dashboard counts BOTH in both tallies).
  *
  * The frontend used to collapse it. PlatformRole omitted "BOTH" entirely, and
- * four workspaces received `platformRole as "CLIENT" | "FREELANCER"` — an `as`
+ * four workspaces received `platformRole as "CLIENT" | "FREELANCER"` â€” an `as`
  * cast the compiler cannot check. "BOTH" reached those components at runtime,
  * making every `role === "CLIENT"` false *and* every `role === "FREELANCER"`
  * false, so both decisive branches rendered nothing at all.

@@ -415,12 +415,19 @@ function FullPlatformAppInner() {
 
     // Deep link from the password-reset email: /reset-password?token=...
     // Land the user directly on the reset form with the token prefilled.
+    //
+    // The token is scrubbed out of the address bar immediately afterwards. A
+    // reset token sitting in the URL leaks through the history entry, through
+    // the Referer header of any third-party request the page makes (the page
+    // loads telegram.org/js/telegram-web-app.js), and through any screenshot
+    // or support ticket that includes the URL.
     if (window.location.pathname === "/reset-password") {
       const urlToken = new URLSearchParams(window.location.search).get("token");
       if (urlToken) {
         setResetToken(urlToken);
         setAuthMode("reset-password");
         setShowLanding(false);
+        window.history.replaceState(null, "", "/reset-password");
       }
     }
 

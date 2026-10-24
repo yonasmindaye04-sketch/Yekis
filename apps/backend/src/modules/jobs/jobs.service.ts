@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import type { CreateJobInput, JobSearchQuery } from "@marketplace/schemas";
+import type { CreateJobInput, JobSearchQuery } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import {
@@ -44,7 +44,7 @@ export async function createJob(params: {
     metadata: { category: job.category },
   });
 
-  // Search index upsert — no-op unless OPENSEARCH_URL is configured.
+  // Search index upsert â€” no-op unless OPENSEARCH_URL is configured.
   await indexJob(job);
 
   return job;

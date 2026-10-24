@@ -5,7 +5,7 @@ import {
   JobSearchQuery,
   CreateProposalInput,
   ProposalDecisionInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
 import { prisma } from "../../lib/prisma.js";
@@ -33,7 +33,7 @@ import {
 
 export const jobsRouter = Router();
 
-// Small local helper — every route below needs the caller's role, and the
+// Small local helper â€” every route below needs the caller's role, and the
 // JWT payload only carries role at issuance time, which can go stale if a
 // user's role changes mid-session. Re-reading it per request keeps
 // authorization decisions correct at the cost of one extra query.

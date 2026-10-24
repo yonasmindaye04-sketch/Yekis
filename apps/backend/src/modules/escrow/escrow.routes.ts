@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { Router } from "express";
-import { FundEscrowInput, PaymentProvider, WithdrawInput } from "@marketplace/schemas";
+import { FundEscrowInput, PaymentProvider, WithdrawInput } from "../../schemas";
 import { z } from "zod";
 import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireKycVerified } from "../../middleware/hardBlock.js";
@@ -130,8 +130,49 @@ function handleKnownErrors(
 // position before touching money, and these handlers never make an
 // authorisation decision of their own.
 
+// Client funds a milestone with a payment provider (Telebirr / CBE / M-Pesa).
+//
+// The service function existed but the route did not: the frontend client
+// calls POST /api/v1/escrow/fund and got a 404, so the only way money could
+// enter escrow was the wallet path. Funding through a provider is what a
+// client without wallet balance uses, so without this route that flow was
+// unreachable over HTTP.
+//
+// Auth is delegated to the service: it re-reads the milestone and checks the
+// caller's party position before initiating a payment.
+escrowRouter.post(
+  "/fund",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({
+        milestoneId: z.string().min(1),
+        contractId: z.string().min(1).optional(),
+        provider: z.enum(["TELEBIRR", "CBE_BIRR", "M_PESA"]),
+      })
+      .safeParse(req.body);
+    if (!parsed.success)
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+
+    try {
+      const result = await fundMilestone({
+        clientId: req.user!.id,
+        milestoneId: parsed.data.milestoneId,
+        provider: parsed.data.provider,
+      });
+      return res.json(result);
+    } catch (err) {
+      if (handleKnownErrors(err, res)) return;
+      logger.error({ err }, "Failed to fund milestone via provider");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 // Client funds a milestone. Requires at least Tier 1 (already required to
-// have a contract at all) — funding itself doesn't need Tier 2, only
+// have a contract at all) â€” funding itself doesn't need Tier 2, only
 // withdrawal does.
 escrowRouter.post(
   "/fund-from-wallet",

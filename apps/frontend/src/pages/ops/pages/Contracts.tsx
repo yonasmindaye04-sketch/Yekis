@@ -41,8 +41,8 @@ import {
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 
 const CONTRACT_INTERVENTION_TEMPLATES = [
   "Milestone deliverable verified by Operations Admin; releasing escrow funds to freelancer.",

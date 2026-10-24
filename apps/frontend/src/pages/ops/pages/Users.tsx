@@ -20,8 +20,6 @@ import { dt, fmt, opsApi, opsListApi, withUserDetail } from "../opsApi";
 import { useListPage } from "../opsList";
 import { USER_ROLES } from "../opsConst";
 import type { User } from "../opsTypes";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
 import {
   Empty,
   ErrorBox,
@@ -33,6 +31,8 @@ import {
   Pager,
   Pill,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 
 const roleColor = (r: string) =>

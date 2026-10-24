@@ -5,7 +5,7 @@ import type {
   CreateGigReviewInput,
   GigSearchQuery,
   UpdateGigInput,
-} from "@marketplace/schemas";
+} from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { calculateFees, type FeeBreakdown } from "../escrow/fees.js";
@@ -115,7 +115,7 @@ export async function createGig(params: {
     metadata: { category: gig.category, status: gig.status },
   });
 
-  // Search index upsert — no-op unless OPENSEARCH_URL is configured.
+  // Search index upsert â€” no-op unless OPENSEARCH_URL is configured.
   await indexGig(gig);
 
   return gig;
@@ -155,7 +155,7 @@ export async function searchGigs(query: GigSearchQuery) {
   }
 
   const where = {
-    // Hard-coded, never caller-supplied — see the note in the OpenSearch branch
+    // Hard-coded, never caller-supplied â€” see the note in the OpenSearch branch
     // above. GigSearchQuery has no `status` field for the same reason.
     status: "ACTIVE" as const,
     ...(query.category ? { category: query.category } : {}),
@@ -189,7 +189,7 @@ export async function searchGigs(query: GigSearchQuery) {
 }
 
 /**
- * Staff moderation decision on a gig listing — the only path to ACTIVE.
+ * Staff moderation decision on a gig listing â€” the only path to ACTIVE.
  *
  * Split from the owner-driven setGigStatus so the audit trail records who
  * published or rejected the gig. Deliberately available now, before the ops
@@ -234,7 +234,7 @@ export async function moderateGigStatus(params: {
  * Owner-driven status changes.
  *
  * ACTIVE and REJECTED are deliberately NOT owner-settable: publication is a
- * staff moderation decision (GIG_MODEL_PLAN.md §8 decision 3), and letting a
+ * staff moderation decision (GIG_MODEL_PLAN.md Â§8 decision 3), and letting a
  * seller self-approve or self-reject defeats it. `status` is narrowed by the
  * route's allow-list, and this guard re-checks so a future caller cannot widen
  * it by passing a cast value straight to the service.
@@ -244,7 +244,7 @@ const OWNER_SETTABLE_STATUS = ["PAUSED", "ARCHIVED"] as const;
 /**
  * A gig is public only once ACTIVE. DRAFT / REJECTED / ARCHIVED listings stay
  * visible to their owner (so they can edit or resubmit) and to staff, and are
- * reported as not-found to everyone else — 404 rather than 403, because
+ * reported as not-found to everyone else â€” 404 rather than 403, because
  * confirming that a draft id exists is itself a disclosure.
  */
 export async function getGigById(gigId: string, viewer?: { userId?: string | null; staffRole?: string | null }) {
@@ -467,7 +467,7 @@ export async function fundGigOrderFromWallet(params: {
   await notificationQueue.add("gig-order-funded", {
     userId: order.gig.freelancerId,
     gigOrderId: order.id,
-    message: "A gig order has been funded — you can begin work.",
+    message: "A gig order has been funded â€” you can begin work.",
   });
 
   return prisma.gigOrder.findUniqueOrThrow({ where: { id: order.id } });
@@ -579,7 +579,7 @@ export async function requestGigRevision(params: {
   return updated;
 }
 
-/** Explicit client acceptance — releases funds minus fees/withholding. */
+/** Explicit client acceptance â€” releases funds minus fees/withholding. */
 export async function acceptGigOrder(params: {
   clientId: string;
   orderId: string;

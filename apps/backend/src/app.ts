@@ -47,7 +47,45 @@ export function buildApp() {
     app.set("trust proxy", env.TRUST_PROXY_HOPS);
   }
 
-  app.use(helmet());
+  // Security headers.
+  //
+  // helmet's DEFAULT content-security-policy is written for a page that loads
+  // stylesheets and scripts, but this service only ever returns JSON — the
+  // only HTML it produces goes out by email. The default also shipped
+  // `style-src 'self' https: 'unsafe-inline'` (a wildcard scheme source plus
+  // unsafe-inline) and `upgrade-insecure-requests`, which in a browser
+  // rewrites plain-http API calls to https and breaks local development.
+  //
+  // The policy below is explicit instead: no wildcards, no unsafe-inline, no
+  // unsafe-eval, and `default-src 'none'` gives every other directive a
+  // fallback, so no directive is left open by omission.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: {
+          "default-src": ["'none'"],
+          "base-uri": ["'none'"],
+          "form-action": ["'none'"],
+          "frame-ancestors": ["'none'"],
+          "object-src": ["'none'"],
+          "script-src": ["'none'"],
+          "style-src": ["'none'"],
+          "img-src": ["'none'"],
+          "font-src": ["'none'"],
+          "connect-src": ["'none'"],
+          "manifest-src": ["'none'"],
+          "media-src": ["'none'"],
+          "worker-src": ["'none'"],
+          "frame-src": ["'none'"],
+        },
+      },
+      // Nothing frames the API, so deny it outright rather than allowing
+      // same-origin framing.
+      frameguard: { action: "deny" },
+      strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
+    }),
+  );
   // Keep browser access explicit so future cookie-based flows cannot silently
   // become cross-origin readable.
   app.use(cors({ origin: env.FRONTEND_URL, credentials: false }));
@@ -65,6 +103,17 @@ export function buildApp() {
   app.use("/api/v1/telegram", botRouter);
 
   app.use(express.json({ limit: "1mb" }));
+
+  // API responses are user-specific or machine-specific and must never be
+  // written to a shared cache. Without an explicit Cache-Control a proxy or
+  // corporate cache is free to keep a copy of one user's balance, profile or
+  // wallet response and hand it to the next person who asks for the same URL
+  // — which is the "Re-examine Cache-control Directives" finding, and a real
+  // account-mixing risk rather than a cosmetic one.
+  app.use((_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
 
   // Generic API rate limit â€” payment webhook routes get their own, stricter
   // limit defined alongside the webhook handlers themselves.

@@ -31,8 +31,8 @@ import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/ch
 import { ErrorBox, Kv, LoadingBox, PageHead, Pill, SecTitle, useToast } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, etb } from "../opsExport";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Button } from "../../../components/ui/button";
+import { Card } from "../../../components/ui/card";
 import type { TimeRangeKey } from "../../../components/dashboard/dashboardData";
 
 const ST_C: Record<string, string> = {

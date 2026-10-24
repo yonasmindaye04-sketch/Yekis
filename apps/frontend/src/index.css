@@ -1,6 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
+@import "tw-animate-css";
 @import "blobatar/motion.css";
+
+/* shadcn/ui drives its dark variants off the `dark` class on <html>,
+   which ThemeContext keeps in sync with `data-theme`. */
+@custom-variant dark (&:is(.dark *));
 
 :root {
   --font-sans: "DM Sans", "Noto Sans Ethiopic", sans-serif;
@@ -155,6 +160,56 @@
   --color-backdrop: rgba(0, 0, 0, 0.8);
 }
 
+/* === shadcn/ui token bridge ===============================================
+   The shadcn primitives expect a neutral semantic palette (--background,
+   --card, --muted, --sidebar, …). Rather than shipping a second, competing
+   palette, every shadcn token is derived from the Yekis tokens above, so the
+   primitives inherit the existing light/dark theme for free.
+   The `var(--x, fallback)` pair keeps the values valid on the very first
+   paint, before ThemeContext has stamped `data-theme` onto <html>.
+   ========================================================================= */
+
+:root {
+  --background: var(--color-bg, #f8fafc);
+  --foreground: var(--color-text, #0f172a);
+  --card: var(--color-bg-elevated, #ffffff);
+  --card-foreground: var(--color-text, #0f172a);
+  --popover: var(--color-bg-elevated, #ffffff);
+  --popover-foreground: var(--color-text, #0f172a);
+  --primary: var(--color-primary, #16a34a);
+  --primary-foreground: var(--color-primary-text, #ffffff);
+  --secondary: var(--color-bg-subtle, #f1f5f9);
+  --secondary-foreground: var(--color-text, #0f172a);
+  --muted: var(--color-bg-subtle, #f1f5f9);
+  --muted-foreground: var(--color-neutral-text, #64748b);
+  --accent: var(--color-bg-hover, #e2e8f0);
+  --accent-foreground: var(--color-text, #0f172a);
+  --destructive: var(--color-error, #dc2626);
+  --destructive-foreground: #ffffff;
+  --success: var(--color-success, #16a34a);
+  --success-foreground: var(--color-primary-text, #ffffff);
+  --warning: var(--color-warning, #d97706);
+  --warning-foreground: #ffffff;
+  --info: var(--color-info, #2563eb);
+  --info-foreground: #ffffff;
+  --border: var(--color-border, #e2e8f0);
+  --input: var(--color-border, #e2e8f0);
+  --ring: var(--color-border-focus, #16a34a);
+  --chart-1: var(--color-primary, #16a34a);
+  --chart-2: var(--color-info, #2563eb);
+  --chart-3: var(--color-warning, #d97706);
+  --chart-4: var(--color-teal, #0d9488);
+  --chart-5: var(--color-lime, #16a34a);
+  --sidebar: var(--color-bg-elevated, #ffffff);
+  --sidebar-foreground: var(--color-text, #0f172a);
+  --sidebar-primary: var(--color-primary, #16a34a);
+  --sidebar-primary-foreground: var(--color-primary-text, #ffffff);
+  --sidebar-accent: var(--color-bg-hover, #e2e8f0);
+  --sidebar-accent-foreground: var(--color-text, #0f172a);
+  --sidebar-border: var(--color-border, #e2e8f0);
+  --sidebar-ring: var(--color-border-focus, #16a34a);
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -252,71 +307,54 @@ img {
 }
 /* === RESTORED COMPONENTS === */
 
-@theme {
-  --color-bg: var(--color-bg);
-  --color-bg-elevated: var(--color-bg-elevated);
-  --color-bg-subtle: var(--color-bg-subtle);
-  --color-bg-hover: var(--color-bg-hover);
-  --color-bg-active: var(--color-bg-active);
-
-  --color-border: var(--color-border);
-  --color-border-strong: var(--color-border-strong);
-  --color-border-focus: var(--color-border-focus);
-
-  --color-text: var(--color-text);
-  --color-text-secondary: var(--color-text-secondary);
-  --color-text-tertiary: var(--color-text-tertiary);
-  --color-text-inverse: var(--color-text-inverse);
-  --color-text-link: var(--color-text-link);
-
-  --color-primary: var(--color-primary);
-  --color-primary-hover: var(--color-primary-hover);
-  --color-primary-active: var(--color-primary-active);
-  --color-primary-light: var(--color-primary-light);
-  --color-primary-text: var(--color-primary-text);
-
-  --color-teal: var(--color-teal);
-  --color-teal-hover: var(--color-teal-hover);
-  --color-teal-light: var(--color-teal-light);
-  --color-teal-text: var(--color-teal-text);
-
-  --color-lime: var(--color-lime);
-  --color-lime-hover: var(--color-lime-hover);
-  --color-lime-light: var(--color-lime-light);
-  --color-lime-text: var(--color-lime-text);
-
-  --color-success: var(--color-success);
-  --color-success-light: var(--color-success-light);
-  --color-success-text: var(--color-success-text);
-
-  --color-warning: var(--color-warning);
-  --color-warning-light: var(--color-warning-light);
-  --color-warning-text: var(--color-warning-text);
-
-  --color-error: var(--color-error);
-  --color-error-light: var(--color-error-light);
-  --color-error-text: var(--color-error-text);
-
-  --color-info: var(--color-info);
-  --color-info-light: var(--color-info-light);
-  --color-info-text: var(--color-info-text);
-
-  --font-sans: var(--font-sans);
-  --font-heading: var(--font-heading);
-  --font-mono: var(--font-mono);
-
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --radius-full: var(--radius-full);
-
-  --shadow-xs: var(--shadow-xs);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-xl: var(--shadow-xl);
+/* The Yekis palette above already lives in unlayered `:root`, which outranks
+   Tailwind's own `@layer theme` — so no duplicate declarations are needed
+   here. Only the shadcn semantic names are registered, each pointing at a
+   plain (non-theme) custom property so Tailwind can tree-shake them and no
+   circular `--color-x: var(--color-x)` reference is ever emitted. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-border-strong: var(--border);
+  --color-border-focus: var(--ring);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
+
 
 ﻿
 

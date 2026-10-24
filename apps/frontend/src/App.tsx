@@ -607,7 +607,7 @@ export function App() {
         if (tg && typeof tg.openLink === "function") {
           tg.openLink(redirectUrl);
         } else {
-          window.open(redirectUrl, "_blank");
+          window.open(redirectUrl, "_blank", "noopener");
         }
       }
     } catch (err) {
@@ -1671,7 +1671,7 @@ export function App() {
                         if (tg && typeof tg.openLink === "function") {
                           tg.openLink(telebirrModal.redirectUrl!);
                         } else {
-                          window.open(telebirrModal.redirectUrl!, "_blank");
+                          window.open(telebirrModal.redirectUrl!, "_blank", "noopener");
                         }
                       }}
                     >

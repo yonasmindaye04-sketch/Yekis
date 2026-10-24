@@ -4,7 +4,7 @@ import { env } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { logger } from "../../lib/logger.js";
-import argon2 from "argon2";
+import { hashPassword, verifyPassword } from "../../lib/password";
 import { randomBytes } from "node:crypto";
 import {
   AccountLinkRequiredError,
@@ -246,7 +246,7 @@ export async function loginWithOAuthProfile(
   if (!user) {
     // Sentinel password hash (same pattern as Telegram signup): OAuth
     // accounts have no platform password until they set one via reset flow.
-    const sentinelHash = await argon2.hash(randomBytes(32).toString("hex"));
+    const sentinelHash = await hashPassword(randomBytes(32).toString("hex"));
 
     const names = (profile.name ?? "").trim().split(" ");
     const firstName = names[0] || "Member";

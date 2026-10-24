@@ -37,6 +37,14 @@ resource_to_read/
 # Scratch files produced by editors, installers and test runs.
 *.tmp
 
+# OWASP ZAP scan reports. The request/response evidence in these files can
+# contain captured session cookies, bearer tokens and request bodies, so they
+# stay local. Force-add a redacted report only if you want it in history.
+docs/security/zap/*.xml
+docs/security/zap/*.json
+docs/security/zap/*.html
+docs/security/zap/*.md
+
 # One-off local scripts that embed real credentials. fix_env.js writes a
 # TELEBIRR_PRIVATE_KEY into .env, so it must never be tracked.
 apps/backend/fix_env.js

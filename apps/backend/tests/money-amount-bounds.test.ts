@@ -5,13 +5,13 @@ import {
   Money,
   SubmitTopUpInput,
   WithdrawInput,
-} from "@marketplace/schemas";
+} from "../src/schemas";
 
 /**
  * Every amount is an integer number of minor units in a Postgres `Int`.
  *
  * The hosted-checkout route validated with
- * `typeof amountMinor !== "number" || amountMinor <= 0`, which accepts 100.5 —
+ * `typeof amountMinor !== "number" || amountMinor <= 0`, which accepts 100.5 â€”
  * a value that cannot be written to an Int column. It reached
  * initiateCheckoutTopUp, created a real provider order, and only then failed at
  * the database: the route returned 500 and left an order sitting at the

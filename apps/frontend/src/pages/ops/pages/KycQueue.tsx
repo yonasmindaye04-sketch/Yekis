@@ -23,10 +23,10 @@ import {
   isTyping,
   useHotkeys,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
 
 const KYC_REASONS = [
   "Photo is unclear, blurry, or cropped. Please re-upload a clear image.",

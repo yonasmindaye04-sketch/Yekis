@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { Router, raw } from "express";
 import rateLimit from "express-rate-limit";
-import type { PaymentProvider } from "@marketplace/schemas";
+import type { PaymentProvider } from "../../schemas";
 import { getProviderClient, handlePaymentWebhook } from "./escrow.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
@@ -9,7 +9,7 @@ import { handleTopUpWebhook } from "../topups/topup.service.js";
 
 export const webhooksRouter = Router();
 
-// Stricter, provider-specific rate limit — separate from the general /api
+// Stricter, provider-specific rate limit â€” separate from the general /api
 // limit, since these are unauthenticated-by-design endpoints and a more
 // likely abuse target.
 const webhookLimiter = rateLimit({
@@ -44,7 +44,7 @@ function buildWebhookHandler(
     if (!isValid) {
       logger.warn(
         { provider },
-        "Webhook signature verification failed — rejecting.",
+        "Webhook signature verification failed â€” rejecting.",
       );
       return res.status(401).json({ error: "INVALID_SIGNATURE" });
     }
@@ -58,7 +58,7 @@ function buildWebhookHandler(
 
     // NOTE: the exact field names below are placeholders pending each
     // provider's real webhook payload shape (confirm at integration time
-    // once sandbox credentials exist) — this mapping is the one thing that
+    // once sandbox credentials exist) â€” this mapping is the one thing that
     // WILL need adjusting per real provider docs, everything around it
     // (signature check, idempotency, state transition) will not.
     try {
@@ -103,7 +103,7 @@ async function handleTelebirrWebhook(
   });
 
   if (!isValid) {
-    logger.warn("Telebirr webhook signature verification failed — rejecting.");
+    logger.warn("Telebirr webhook signature verification failed â€” rejecting.");
     return res.status(401).json({ code: -1, msg: "INVALID_SIGNATURE" });
   }
 
@@ -149,7 +149,7 @@ async function handleTelebirrWebhook(
       !expected || expected.provider !== "TELEBIRR" || currency !== "ETB" ||
       !Number.isSafeInteger(callbackMinor) || callbackMinor !== expected.amountMinor
     ) {
-      logger.error({ merchOrderId, currency, totalAmount }, "Telebirr success callback does not match a local ETB order — rejecting.");
+      logger.error({ merchOrderId, currency, totalAmount }, "Telebirr success callback does not match a local ETB order â€” rejecting.");
       return res.status(400).json({ code: -1, msg: "PAYMENT_DETAILS_MISMATCH" });
     }
   }
@@ -224,7 +224,7 @@ webhooksRouter.post(
 );
 
 // CBE uses the generic handler (HTTP-header-based HMAC signature).
-// PAY-002: Chapa was removed from the approved payment architecture —
+// PAY-002: Chapa was removed from the approved payment architecture â€”
 // its webhook route and client adapter were deleted in the 2026-08-26
 // unification (see migrations/20260826090000_tms_rules_and_chapa_removal).
 webhooksRouter.post(

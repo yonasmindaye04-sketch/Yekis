@@ -9,8 +9,6 @@ import { FileText, RefreshCw, Search } from "lucide-react";
 import { dts, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { RawAuditLog } from "../opsBackend";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
 import {
   Empty,
   ErrorBox,
@@ -20,6 +18,8 @@ import {
   PageHead,
   Pager,
   Pill,
+  Button,
+  Card,
 } from "../components/ui";
 
 export default function AuditLogs() {

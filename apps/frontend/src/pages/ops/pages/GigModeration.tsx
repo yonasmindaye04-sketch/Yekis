@@ -3,9 +3,7 @@ import { Check, RefreshCw, Search, X } from "lucide-react";
 import { opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { RawGigModeration } from "../opsBackend";
-import { Empty, ErrorBox, FilterSelect, LoadingBox, PageHead, Pager, Pill, useToast } from "../components/ui";
-import { Button } from "../../../components/ui/Button";
-import { Card } from "../../../components/ui/Card";
+import { Empty, ErrorBox, FilterSelect, LoadingBox, PageHead, Pager, Pill, useToast, Button, Card } from "../components/ui";
 
 const money = (minor: number) => `${(minor / 100).toLocaleString()} ETB`;
 

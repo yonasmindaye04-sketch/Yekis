@@ -281,12 +281,49 @@ async function verifyBotIdentity(
   return { ok: false, timedOut: lastTimedOut, message: lastMessage };
 }
 
-export async function startBot(): Promise<boolean> {
+/**
+ * Why a bot start attempt ended the way it did.
+ *
+ * `unreachable` is the only outcome worth retrying: an invalid token never
+ * becomes valid, and a missing token is a configuration decision. The
+ * distinction matters because api.telegram.org is an external dependency on a
+ * link that is not always reliable.
+ */
+export type BotStartOutcome =
+  | { ok: true; username: string }
+  | {
+      ok: false;
+      reason: "not-configured" | "invalid-token" | "unreachable" | "failed";
+      message: string;
+    };
+
+/**
+ * Whether a URL still answers.
+ *
+ * Used to decide if the Mini App URL Telegram has stored is still live. A
+ * quick tunnel from a previous run is dead the moment that run stops, but a
+ * tunnel that is still up (another dev session, or this one) is not — and the
+ * difference is invisible from the bot's side without asking.
+ */
+async function isUrlReachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function startBotDetailed(): Promise<BotStartOutcome> {
   if (!env.TELEGRAM_BOT_TOKEN) {
     logger.warn(
       "TELEGRAM_BOT_TOKEN is not configured. Skipping Telegram bot initialization.",
     );
-    return false;
+    return { ok: false, reason: "not-configured", message: "TELEGRAM_BOT_TOKEN is not set" };
   }
   const bot = getBot() || createBot();
 
@@ -316,7 +353,11 @@ export async function startBot(): Promise<boolean> {
         : "Telegram bot token validation failed. Bot will not start. Verify " +
           "TELEGRAM_BOT_TOKEN in .env.",
     );
-    return false;
+    return {
+      ok: false,
+      reason: identity.timedOut ? "unreachable" : "invalid-token",
+      message: identity.message,
+    };
   }
 
   try {
@@ -339,15 +380,50 @@ export async function startBot(): Promise<boolean> {
       });
       logger.info({ menuButtonUrl }, "Chat menu button -> Mini App");
     } else {
-      await bot.api.setChatMenuButton({ menu_button: { type: "commands" } });
-      logger.warn(
-        { frontendUrl: env.FRONTEND_URL },
-        "FRONTEND_URL is not a public https origin, so the Mini App menu button " +
-          "was RESET to the commands menu. Telegram requires https for web_app " +
-          "buttons, and any previously configured (possibly dead) tunnel URL " +
-          "would otherwise keep launching a Mini App that cannot load. Set " +
-          "FRONTEND_URL to your public origin to re-enable it.",
-      );
+      // FRONTEND_URL is not a public https origin, so THIS backend was started
+      // without a tunnel (a bare `pnpm dev:backend`). Telegram's menu button is
+      // server-side state that outlives the process, and it may still point at
+      // a LIVE tunnel from an earlier `pnpm dev:tunnel` run.
+      //
+      // Resetting it unconditionally destroyed a working Mini App: one local
+      // boot turned Telegram's menu into a plain commands menu, and the Mini App
+      // then looked broken until some later tunnel run happened to fix it —
+      // with no indication of why the button had disappeared.
+      //
+      // So only reset when the URL Telegram actually has is dead. A live one is
+      // left alone; the next `pnpm dev:tunnel` re-points it at the new tunnel
+      // anyway.
+      //
+      // If the button cannot even be READ (a transient Bot API error), nothing
+      // is changed: a failed read is not evidence that the button is stale,
+      // and wiping a working Mini App over a hiccup is worse than leaving it.
+      const current = await bot.api.getChatMenuButton().catch(() => null);
+      if (current === null) {
+        logger.warn(
+          "Could not read the current chat menu button — leaving it untouched.",
+        );
+      } else {
+        const currentUrl =
+          current.type === "web_app" ? current.web_app.url : undefined;
+
+        if (currentUrl && (await isUrlReachable(currentUrl))) {
+          logger.info(
+            { menuButtonUrl: currentUrl },
+            "FRONTEND_URL is not a public https origin (no tunnel in this run), " +
+              "but the Mini App menu button still points at a live URL — left as is.",
+          );
+        } else {
+          await bot.api.setChatMenuButton({ menu_button: { type: "commands" } });
+          logger.warn(
+            { frontendUrl: env.FRONTEND_URL },
+            "FRONTEND_URL is not a public https origin, so the Mini App menu button " +
+              "was RESET to the commands menu. Telegram requires https for web_app " +
+              "buttons, and any previously configured (possibly dead) tunnel URL " +
+              "would otherwise keep launching a Mini App that cannot load. Set " +
+              "FRONTEND_URL to your public origin to re-enable it.",
+          );
+        }
+      }
     }
 
     // 2. Set Commands for Autocompletion
@@ -447,7 +523,15 @@ export async function startBot(): Promise<boolean> {
       });
   }
 
-  return true;
+  return { ok: true, username: identity.username };
+}
+
+/**
+ * Start the bot. Kept as a boolean for the existing call sites; use
+ * `startBotDetailed()` when the reason for a failure matters.
+ */
+export async function startBot(): Promise<boolean> {
+  return (await startBotDetailed()).ok;
 }
 
 export async function stopBot(): Promise<void> {

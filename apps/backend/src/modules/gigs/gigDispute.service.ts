@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import type { DisputeCategory, DisputeResolutionOutcome } from "@marketplace/schemas";
+import type { DisputeCategory, DisputeResolutionOutcome } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notificationQueue, gigAutoReleaseQueue } from "../../queue/queues.js";
@@ -8,12 +8,12 @@ import { recordGigPlatformEarnings } from "../gigs/gig.service.js";
 import { logger } from "../../lib/logger.js";
 
 /**
- * Gig-order disputes — the polymorphic Dispute refactor (migration
+ * Gig-order disputes â€” the polymorphic Dispute refactor (migration
  * 20260829233000). Mirrors the milestone dispute semantics from
  * dispute.service.ts, but the escrow subject is a GigOrder and parties are
  * the order's client and the gig's freelancer.
  *
- * Stages are reused (negotiation → evidence → mediation → arbitration →
+ * Stages are reused (negotiation â†’ evidence â†’ mediation â†’ arbitration â†’
  * resolved); the resolution actions move money through the same wallet and
  * platform-fee ledger as acceptGigOrder.
  */
@@ -31,7 +31,7 @@ function daysFromNow(days: number): Date {
   return d;
 }
 
-/** Stage 0 → 1 for a gig order in flight (funded, working, or submitted). */
+/** Stage 0 â†’ 1 for a gig order in flight (funded, working, or submitted). */
 export async function raiseGigDispute(params: {
   raisedByUserId: string;
   gigOrderId: string;
@@ -116,7 +116,7 @@ export async function raiseGigDispute(params: {
   return dispute;
 }
 
-/** Party evidence submission — advances negotiation → evidence on first post. */
+/** Party evidence submission â€” advances negotiation â†’ evidence on first post. */
 export async function submitGigDisputeEvidence(params: {
   userId: string;
   disputeId: string;
@@ -160,7 +160,7 @@ export async function submitGigDisputeEvidence(params: {
 }
 
 /**
- * Staff resolution — mirrors resolveDispute's financial semantics:
+ * Staff resolution â€” mirrors resolveDispute's financial semantics:
  *  - RELEASE_TO_FREELANCER: fees/withholding-aware wallet credit + platform ledger
  *  - REFUND_TO_CLIENT: full order charge back to the client wallet
  *  - PARTIAL_SPLIT: bounded split of the package price

@@ -1,10 +1,13 @@
 // === IMPORTS ===
 import { PrismaClient } from "@prisma/client";
-import * as bcrypt from "argon2";
+import { hashPassword } from "../src/lib/password";
+import { seedDemoActivity } from "./demoActivity";
 
 const prisma = new PrismaClient();
 
 // === SEED DATA ===
+
+const DEMO_PASSWORD = "test1234";
 
 const SKILLS = [
   { id: "web-development", nameEn: "Web Development", nameAm: "ድር መስሪያ", category: "DEVELOPMENT" as const, displayOrder: 1 },
@@ -43,13 +46,24 @@ async function main() {
 
   console.log("🌱 Seeding admin user...");
 
+  // The `update` branch matters as much as `create`: a row left behind by an
+  // earlier run (or by a test) can exist with the wrong role or a password
+  // nobody knows. Re-running the seed must repair that row, not skip it.
   await prisma.user.upsert({
     where: { email: "admin@yekis.et" },
-    update: {},
+    update: {
+      role: "CLIENT",
+      staffRole: "ADMIN",
+      passwordHash: await hashPassword(DEMO_PASSWORD),
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "VERIFIED",
+      kyc: { upsert: { create: { tier: "TIER_1", status: "VERIFIED" }, update: { tier: "TIER_1", status: "VERIFIED" } } },
+      wallet: { upsert: { create: { balanceMinor: 0 }, update: {} } },
+    },
     create: {
       email: "admin@yekis.et",
       phone: "+251910011818",
-      passwordHash: await bcrypt.hash("test1234"),
+      passwordHash: await hashPassword(DEMO_PASSWORD),
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "ADMIN",
@@ -66,14 +80,24 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "compliance@yekis.et" },
-    update: { staffRole: "COMPLIANCE_OFFICER" },
+    update: {
+      role: "CLIENT",
+      staffRole: "COMPLIANCE_OFFICER",
+      passwordHash: await hashPassword(DEMO_PASSWORD),
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "VERIFIED",
+      kyc: { upsert: { create: { tier: "TIER_1", status: "VERIFIED" }, update: { tier: "TIER_1", status: "VERIFIED" } } },
+      wallet: { upsert: { create: { balanceMinor: 0 }, update: {} } },
+    },
     create: {
       email: "compliance@yekis.et",
       phone: "+251910011819",
-      passwordHash: await bcrypt.hash("test1234"),
+      passwordHash: await hashPassword(DEMO_PASSWORD),
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "COMPLIANCE_OFFICER",
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "VERIFIED",
       firstName: "Compliance",
       lastName: "Yekis",
       kyc: { create: { tier: "TIER_1", status: "VERIFIED" } },
@@ -87,14 +111,24 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: "support@yekis.et" },
-    update: { staffRole: "SUPPORT" },
+    update: {
+      role: "CLIENT",
+      staffRole: "SUPPORT",
+      passwordHash: await hashPassword(DEMO_PASSWORD),
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "PENDING",
+      kyc: { upsert: { create: { tier: "TIER_1", status: "PENDING" }, update: { tier: "TIER_1" } } },
+      wallet: { upsert: { create: { balanceMinor: 0 }, update: {} } },
+    },
     create: {
       email: "support@yekis.et",
       phone: "+251910011820",
-      passwordHash: await bcrypt.hash("test1234"),
+      passwordHash: await hashPassword(DEMO_PASSWORD),
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "SUPPORT",
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "PENDING",
       firstName: "Support",
       lastName: "Yekis",
       kyc: { create: { tier: "TIER_1", status: "PENDING" } },
@@ -112,13 +146,25 @@ async function main() {
   // and seed data has already had that decision applied.
   const seller = await prisma.user.upsert({
     where: { email: "seller@yekis.et" },
-    update: {},
+    update: {
+      role: "FREELANCER",
+      passwordHash: await hashPassword(DEMO_PASSWORD),
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "VERIFIED",
+      bio: "Brand and web designer helping Ethiopian businesses look established.",
+      profileVisibility: "PUBLIC",
+      isAvailableForWork: true,
+      kyc: { upsert: { create: { tier: "TIER_1", status: "VERIFIED" }, update: { tier: "TIER_1", status: "VERIFIED" } } },
+      wallet: { upsert: { create: { balanceMinor: 0 }, update: {} } },
+    },
     create: {
       email: "seller@yekis.et",
       phone: "+251910011821",
-      passwordHash: await bcrypt.hash("test1234"),
+      passwordHash: await hashPassword(DEMO_PASSWORD),
       role: "FREELANCER",
       dateOfBirth: new Date("1993-04-12"),
+      cachedKycTier: "TIER_1",
+      cachedKycStatus: "VERIFIED",
       firstName: "Selam",
       lastName: "Tadesse",
       bio: "Brand and web designer helping Ethiopian businesses look established.",
@@ -183,33 +229,66 @@ async function main() {
     },
   ];
 
+  let gigsCreated = 0;
+  let gigsUpdated = 0;
+
   for (const g of GIGS) {
-    // Keyed on the slug in the title so re-running the seed is idempotent
-    // without needing a dedicated slug column on the model.
+    // Keyed on the title so re-running the seed is idempotent without needing
+    // a dedicated slug column on the model.
     const existing = await prisma.gig.findFirst({
       where: { freelancerId: seller.id, title: g.title },
     });
-    if (existing) continue;
+
+    const data = {
+      category: g.category,
+      description: g.description,
+      tags: g.tags,
+      requirements: [],
+      mediaUrls: [],
+      // Seed data is treated as already-approved.
+      status: "ACTIVE" as const,
+      autoAcceptOrders: true,
+      maxRevisions: 2,
+    };
+
+    if (existing) {
+      // Repair instead of skip: a gig left in DRAFT, or one whose packages
+      // were lost, would silently keep the demo data wrong.
+      await prisma.gig.update({ where: { id: existing.id }, data });
+
+      for (const pkg of g.packages) {
+        await prisma.gigPackage.upsert({
+          where: { gigId_tier: { gigId: existing.id, tier: pkg.tier } },
+          update: pkg,
+          create: { ...pkg, gigId: existing.id },
+        });
+      }
+      gigsUpdated += 1;
+      continue;
+    }
 
     await prisma.gig.create({
       data: {
         freelancerId: seller.id,
         title: g.title,
-        category: g.category,
-        description: g.description,
-        tags: g.tags,
-        requirements: [],
-        mediaUrls: [],
-        // Seed data is treated as already-approved.
-        status: "ACTIVE",
-        autoAcceptOrders: true,
-        maxRevisions: 2,
+        ...data,
         packages: { create: g.packages },
       },
     });
+    gigsCreated += 1;
   }
 
-  console.log(`  ✅ ${GIGS.length} gigs seeded`);
+  console.log(`  ✅ ${GIGS.length} gigs seeded (${gigsCreated} created, ${gigsUpdated} repaired)`);
+
+  console.log("🌱 Seeding demo activity (contracts, escrow, payments, payouts, receipts, disputes)...");
+
+  const activity = await seedDemoActivity(prisma);
+
+  console.log(
+    `  ✅ ${activity.contracts} contracts / ${activity.milestones} milestones / ` +
+      `${activity.payments} payments / ${activity.payouts} payouts / ${activity.topUps} top-ups / ` +
+      `${activity.disputes} disputes / ${activity.conversations} support threads`,
+  );
 
   console.log("🎉 Seeding complete!");
 }

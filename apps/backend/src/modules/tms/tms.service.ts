@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import type { TransactionFlagType } from "@marketplace/schemas";
+import type { TransactionFlagType } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
@@ -44,7 +44,7 @@ async function createFlag(params: {
 
   logger.warn(
     { flagId: flag.id, type: params.type, userId: params.userId },
-    "AML rule triggered — flag created",
+    "AML rule triggered â€” flag created",
   );
 
   // Staff alert: flags previously landed in a dashboard nobody watched.
@@ -62,7 +62,7 @@ async function createFlag(params: {
 }
 
 /**
- * Structuring check — Master Design §11.4: multiple deposits totaling
+ * Structuring check â€” Master Design Â§11.4: multiple deposits totaling
  * >ETB 500k within 7 days. Checked on the funding (client) side, since
  * that's who controls transaction sizing. Evaluated both inline after
  * each successful funding and by the periodic TMS scanner, so splitting
@@ -104,7 +104,7 @@ export async function runStructuringCheck(clientId: string) {
 }
 
 /**
- * Round-amounts check — Master Design §11.4: repeated transactions of exact
+ * Round-amounts check â€” Master Design Â§11.4: repeated transactions of exact
  * round figures (e.g. 50k). Flags clients with several successful payments
  * in the window where every amount lands exactly on a round-unit multiple.
  */
@@ -144,15 +144,15 @@ export async function runRoundAmountsCheck(clientId: string) {
 }
 
 /**
- * Velocity check — Master Design §11.4: volume >300% of the 90-day average.
+ * Velocity check â€” Master Design Â§11.4: volume >300% of the 90-day average.
  *
  * Baseline = the freelancer's release rate over the prior TMS_VELOCITY_BASELINE_DAYS
  * (excluding the recent window), expressed as the expected number of releases
  * in the recent window. A flag fires when actual releases exceed
- * max(TMS_VELOCITY_FLOOR_RELEASES, multiplier × expected).
+ * max(TMS_VELOCITY_FLOOR_RELEASES, multiplier Ã— expected).
  *
  * The absolute floor exists so an account with little or no baseline history
- * cannot quietly release unlimited volume — new accounts bursting past the
+ * cannot quietly release unlimited volume â€” new accounts bursting past the
  * floor still get human review.
  */
 export async function runVelocityCheck(freelancerId: string) {
@@ -209,7 +209,7 @@ export async function runVelocityCheck(freelancerId: string) {
 }
 
 /**
- * Pass-through check — funds released and then (nearly) fully withdrawn
+ * Pass-through check â€” funds released and then (nearly) fully withdrawn
  * shortly after, with no other active contract work in between. Called
  * from the withdrawal flow, not on every webhook, since it only makes
  * sense to evaluate at withdrawal time.
@@ -255,9 +255,9 @@ export async function runPassThroughCheck(params: {
 }
 
 /**
- * Wallet mismatch — the withdrawal destination doesn't match the identity
+ * Wallet mismatch â€” the withdrawal destination doesn't match the identity
  * on file (registered phone). A mismatch here is worth holding the
- * withdrawal for, not just logging after the fact — see the route layer's
+ * withdrawal for, not just logging after the fact â€” see the route layer's
  * use of WithdrawalHeldForReviewError.
  */
 export async function checkWalletMismatch(params: {
@@ -297,7 +297,7 @@ export async function checkWalletMismatch(params: {
 
 /**
  * Convenience wrapper called after a milestone is successfully funded.
- * Failures here must never break the webhook's own success response —
+ * Failures here must never break the webhook's own success response â€”
  * callers should wrap this in try/catch (see escrow.service.ts).
  */
 export async function runPostFundingChecks(clientId: string) {
@@ -306,7 +306,7 @@ export async function runPostFundingChecks(clientId: string) {
 }
 
 /**
- * Periodic TMS scan — invoked by the tms-scan BullMQ worker every 15
+ * Periodic TMS scan â€” invoked by the tms-scan BullMQ worker every 15
  * minutes (master design: "automated background queue scans database
  * entries every 15 minutes"). Re-runs the windowed rules across every
  * user with recent activity, catching patterns the inline event hooks
@@ -398,7 +398,7 @@ export async function runTmsScan() {
 }
 
 /**
- * STR SLA enforcement — Master Design §11.4 / compliance calendar: STRs must
+ * STR SLA enforcement â€” Master Design Â§11.4 / compliance calendar: STRs must
  * reach the FIC within 24 hours of suspicion. Flags still PENDING_REVIEW past
  * their detection-time deadline raise a one-time audit event + staff alert so
  * the breach is visible and reportable, without spamming alerts on every scan.
@@ -434,7 +434,7 @@ async function sweepOverdueStrFlags(): Promise<number> {
 
     await notifyStaffOfEvent({
       eventType: "str-sla-breach",
-      message: `STR filing deadline breached for flag ${flag.id} — file with the FIC immediately.`,
+      message: `STR filing deadline breached for flag ${flag.id} â€” file with the FIC immediately.`,
       metadata: {
         flagId: flag.id,
         flagType: flag.type,
@@ -444,7 +444,7 @@ async function sweepOverdueStrFlags(): Promise<number> {
 
     logger.error(
       { flagId: flag.id },
-      "STR SLA breached — flag still unfiled past the 24-hour deadline.",
+      "STR SLA breached â€” flag still unfiled past the 24-hour deadline.",
     );
     newlyBreached++;
   }
@@ -536,18 +536,18 @@ export async function getActivityFeed() {
 
 /**
  * Records that a Compliance Officer has manually filed an STR with the
- * FIC. There is no FIC filing API — Ethiopia's suspicious-transaction
+ * FIC. There is no FIC filing API â€” Ethiopia's suspicious-transaction
  * reporting is a real regulatory filing a human completes through
  * official channels; this endpoint records that it happened, the
- * reference number received, and whether it met the 24-hour SLA — it does
+ * reference number received, and whether it met the 24-hour SLA â€” it does
  * not automate something that isn't automatable.
  *
- * Per Master Design §11.4, filing an STR means suspicion was confirmed:
+ * Per Master Design Â§11.4, filing an STR means suspicion was confirmed:
  * "if confirmed, freeze funds, suspend the account, and preserve records."
  * When suspendAccount is set, the user account is suspended immediately
  * (login + all authenticated actions blocked via the auth middleware's
  * per-request suspension check) with a dedicated audit event. Escrow-held
- * milestone funds are untouched — they resolve through the dispute path.
+ * milestone funds are untouched â€” they resolve through the dispute path.
  */
 export async function fileStr(params: {
   staffUserId: string;
@@ -615,7 +615,7 @@ export async function fileStr(params: {
   if (!withinSla) {
     logger.error(
       { flagId: flag.id, createdAt: flag.createdAt, filedAt },
-      "STR filed outside the 24-hour SLA window — compliance process gap to review.",
+      "STR filed outside the 24-hour SLA window â€” compliance process gap to review.",
     );
   }
 

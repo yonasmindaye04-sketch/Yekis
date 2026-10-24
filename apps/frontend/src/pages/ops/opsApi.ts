@@ -824,246 +824,240 @@ type ListFilters = ListFetchParams & {
  */
 export const opsListApi = {
   payments: async ({ page, limit, q, status, provider }: ListFilters) => {
-    try {
-      const r = (await api.adminListPayments({
-        page,
-        limit,
-        q: q || undefined,
-        status: status || undefined,
-        provider: provider || undefined,
-      })) as { items: RawPayment[]; total: number; page: number; pageSize: number };
-      return { rows: r.items.map(toPayment), total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListPayments({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+      provider: provider || undefined,
+    })) as { items: RawPayment[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toPayment), total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   payouts: async ({ page, limit, q, status, provider }: ListFilters) => {
-    try {
-      const r = (await api.adminListPayouts({
-        page,
-        limit,
-        q: q || undefined,
-        status: status || undefined,
-        provider: provider || undefined,
-      })) as { items: RawPayout[]; total: number; page: number; pageSize: number };
-      return { rows: r.items.map(toPayout), total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListPayouts({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+      provider: provider || undefined,
+    })) as { items: RawPayout[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toPayout), total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   escrows: async ({ page, limit, q, escrowState }: ListFilters) => {
-    try {
-      const r = (await api.adminListEscrows({
-        page,
-        limit,
-        q: q || undefined,
-        escrowState: escrowState || undefined,
-      })) as { items: RawEscrow[]; total: number; page: number; pageSize: number };
-      return { rows: r.items.map(toEscrow), total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListEscrows({
+      page,
+      limit,
+      q: q || undefined,
+      escrowState: escrowState || undefined,
+    })) as { items: RawEscrow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toEscrow), total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   reconciliation: async ({ page, limit, q, provider, recStatus }: ListFilters) => {
-    try {
-      const r = (await api.adminListReconciliation({
-        page,
-        limit,
-        provider: provider || undefined,
-      })) as { items: RawReconRow[]; total: number; page: number; pageSize: number };
-      const needle = q.trim().toLowerCase();
-      const rows = r.items
-        .filter((x) => !needle || x.providerTransactionId.toLowerCase().includes(needle))
-        .filter((x) => !recStatus || x.reconciliationStatus === recStatus)
-        .map(toRecon);
-      return { rows, total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListReconciliation({
+      page,
+      limit,
+      provider: provider || undefined,
+    })) as { items: RawReconRow[]; total: number; page: number; pageSize: number };
+    const needle = q.trim().toLowerCase();
+    const rows = r.items
+      .filter((x) => !needle || x.providerTransactionId.toLowerCase().includes(needle))
+      .filter((x) => !recStatus || x.reconciliationStatus === recStatus)
+      .map(toRecon);
+    return { rows, total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   contracts: async ({ page, limit, q, status }: ListFilters) => {
-    try {
-      const r = (await api.adminListContracts({
-        page,
-        limit,
-        q: q || undefined,
-        status: status || undefined,
-      })) as { items: RawContractRow[]; total: number; page: number; pageSize: number };
-      return { rows: r.items.map(toContract), total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListContracts({
+      page,
+      limit,
+      q: q || undefined,
+      status: status || undefined,
+    })) as { items: RawContractRow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toContract), total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   users: async ({ page, limit, q, role }: ListFilters) => {
-    try {
-      const r = (await api.adminListUsers({
-        page,
-        limit,
-        q: q || undefined,
-        role: role || undefined,
-      })) as { items: RawUserRow[]; total: number; page: number; pageSize: number };
-      return { rows: r.items.map(toUser), total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminListUsers({
+      page,
+      limit,
+      q: q || undefined,
+      role: role || undefined,
+    })) as { items: RawUserRow[]; total: number; page: number; pageSize: number };
+    return { rows: r.items.map(toUser), total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   staff: async ({ page, limit }: ListFetchParams) => {
-    try {
-      const r = (await api.getStaffUsers({ page })) as {
-        items: RawStaffRow[];
-        total: number;
-        page: number;
-        limit: number;
-      };
-      void limit;
-      return {
-        rows: r.items.map(
-          (x): StaffMember => ({
-            id: x.id,
-            email: x.email,
-            ucid: x.ucid,
-            userRole: x.role,
-            staffRole: x.staffRole,
-            suspended: x.isSuspended,
-          }),
-        ),
-        total: r.total,
-        page: r.page,
-        pageSize: r.limit,
-      };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getStaffUsers({ page })) as {
+      items: RawStaffRow[];
+      total: number;
+      page: number;
+      limit: number;
+    };
+    void limit;
+    return {
+      rows: r.items.map(
+        (x): StaffMember => ({
+          id: x.id,
+          email: x.email,
+          ucid: x.ucid,
+          userRole: x.role,
+          staffRole: x.staffRole,
+          suspended: x.isSuspended,
+        }),
+      ),
+      total: r.total,
+      page: r.page,
+      pageSize: r.limit,
+    };
   },
 
   riskFlags: async ({ page, limit, q, flagType, status }: ListFilters) => {
-    try {
-      const r = (await api.getTmsQueue({
-        page,
-        pageSize: limit,
-        search: q || undefined,
-        flagType: flagType || undefined,
-        status: status || undefined,
-      })) as { items: RawRiskFlag[]; total: number; page: number; pageSize: number };
-      return {
-        rows: r.items.map(toRiskFlag),
-        total: r.total,
-        page: r.page,
-        pageSize: r.pageSize,
-      };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getTmsQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      flagType: flagType || undefined,
+      status: status || undefined,
+    })) as { items: RawRiskFlag[]; total: number; page: number; pageSize: number };
+    return {
+      rows: r.items.map(toRiskFlag),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
   },
 
   kycQueue: async ({ page, limit, q, status }: ListFilters) => {
-    try {
-      const r = (await api.getKycReviewQueue({
-        page,
-        pageSize: limit,
-        search: q || undefined,
-        status: status || undefined,
-      })) as unknown as {
-        items: RawKycItem[];
-        total: number;
-        page: number;
-        limit: number;
-        counts?: { pending: number; underReview: number; actionable?: number };
-      };
-      return {
-        rows: r.items.map(toKyc),
-        total: r.total,
-        page: r.page,
-        pageSize: r.limit,
-        extra: {
-          pending: r.counts?.pending ?? 0,
-          underReview: r.counts?.underReview ?? r.total,
-          actionable: r.counts?.actionable ?? r.total,
-        },
-      };
-    } catch {
-      return {
-        rows: [],
-        total: 0,
-        page: 1,
-        pageSize: limit,
-        extra: { pending: 0, underReview: 0, actionable: 0 },
-      };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getKycReviewQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || undefined,
+    })) as unknown as {
+      items: RawKycItem[];
+      total: number;
+      page: number;
+      limit: number;
+      counts?: { pending: number; underReview: number; actionable?: number };
+    };
+    return {
+      rows: r.items.map(toKyc),
+      total: r.total,
+      page: r.page,
+      pageSize: r.limit,
+      extra: {
+        pending: r.counts?.pending ?? 0,
+        underReview: r.counts?.underReview ?? r.total,
+        actionable: r.counts?.actionable ?? r.total,
+      },
+    };
   },
 
   disputes: async ({ page, limit, q, status }: ListFilters) => {
-    try {
-      const r = (await api.getDisputeQueue({ page, pageSize: limit, search: q || undefined, status: status || undefined })) as unknown as {
-        items: RawDisputeItem[];
-        total: number;
-        page: number;
-        pageSize: number;
-      };
-      return {
-        rows: r.items.map(toDispute),
-        total: r.total,
-        page: r.page,
-        pageSize: r.pageSize,
-      };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getDisputeQueue({ page, pageSize: limit, search: q || undefined, status: status || undefined })) as unknown as {
+      items: RawDisputeItem[];
+      total: number;
+      page: number;
+      pageSize: number;
+    };
+    return {
+      rows: r.items.map(toDispute),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
   },
 
   auditLogs: async ({ page, limit, q }: ListFetchParams) => {
-    try {
-      const r = await api.getAuditLogs({ page, limit });
-      const needle = q.trim().toLowerCase();
-      const rows = needle
-        ? r.items.filter((x) =>
-            [x.eventType, x.entityType, x.entityId, x.action, x.actorRole, x.userId]
-              .filter(Boolean)
-              .some((f) => String(f).toLowerCase().includes(needle)),
-          )
-        : r.items;
-      return { rows, total: r.total, page: r.page, pageSize: r.limit };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = await api.getAuditLogs({ page, limit });
+    const needle = q.trim().toLowerCase();
+    const rows = needle
+      ? r.items.filter((x) =>
+          [x.eventType, x.entityType, x.entityId, x.action, x.actorRole, x.userId]
+            .filter(Boolean)
+            .some((f) => String(f).toLowerCase().includes(needle)),
+        )
+      : r.items;
+    return { rows, total: r.total, page: r.page, pageSize: r.limit };
   },
 
   /** Receives wallet top-ups awaiting receipt verification. */
   topUps: async ({ page, limit, q, status }: ListFilters) => {
-    try {
-      const r = (await api.getTopUpReviewQueue({
-        page,
-        pageSize: limit,
-        search: q || undefined,
-        status: status || "PENDING",
-      })) as RawTopUpPage;
-      return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getTopUpReviewQueue({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || "PENDING",
+    })) as RawTopUpPage;
+    return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   /** Staff support queue. */
   conversations: async ({ page, limit, q, status, assignment, sort }: ListFilters) => {
-    try {
-      const r = (await api.getStaffConversations({
-        page,
-        pageSize: limit,
-        search: q || undefined,
-        status: status || "OPEN",
-        assignment: assignment ? assignment.toLowerCase() : undefined,
-        sort: sort || "newest",
-      })) as RawConversationPage;
-      return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getStaffConversations({
+      page,
+      pageSize: limit,
+      search: q || undefined,
+      status: status || "OPEN",
+      assignment: assignment ? assignment.toLowerCase() : undefined,
+      sort: sort || "newest",
+    })) as RawConversationPage;
+    return { rows: r.items, total: r.total, page: r.page, pageSize: r.pageSize };
   },
 
   gigs: async ({ page, limit, q, status }: ListFilters) => {
@@ -1085,78 +1079,73 @@ export const opsListApi = {
     flagType,
     role,
   }: ListFilters) => {
-    try {
-      const r = (await api.getProfileReports({ page, limit })) as RawProfileReportPage;
-      const mapped = (r.data ?? []).map(toProfileReport);
-      const needle = (q || "").trim().toLowerCase();
-      const filtered = mapped.filter((item) => {
-        if (status && status !== "ALL") {
-          if (status === "OPEN" && item.status !== "OPEN") return false;
-          if (status === "RESOLVED" && item.status === "OPEN") return false;
-          if (status !== "OPEN" && status !== "RESOLVED" && item.status !== status) return false;
-        }
-        if (flagType && item.reason !== flagType) return false;
-        if (role && item.severity !== role) return false;
-        if (needle) {
-          const hay = [
-            item.reported,
-            item.reportedEmail,
-            item.reportedUcid,
-            item.reporter,
-            item.reporterEmail,
-            item.reporterUcid,
-            item.reason,
-            item.sourceContext,
-            item.details,
-            item.flaggedExcerpt,
-          ]
-            .join(" ")
-            .toLowerCase();
-          if (!hay.includes(needle)) return false;
-        }
-        return true;
-      });
-      return {
-        rows: filtered,
-        total: filtered.length,
-        page: r.pagination?.page ?? 1,
-        pageSize: r.pagination?.limit ?? limit,
-      };
-    } catch {
-      return { rows: [], total: 0, page: 1, pageSize: limit };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.getProfileReports({ page, limit })) as RawProfileReportPage;
+    const mapped = (r.data ?? []).map(toProfileReport);
+    const needle = (q || "").trim().toLowerCase();
+    const filtered = mapped.filter((item) => {
+      if (status && status !== "ALL") {
+        if (status === "OPEN" && item.status !== "OPEN") return false;
+        if (status === "RESOLVED" && item.status === "OPEN") return false;
+        if (status !== "OPEN" && status !== "RESOLVED" && item.status !== status) return false;
+      }
+      if (flagType && item.reason !== flagType) return false;
+      if (role && item.severity !== role) return false;
+      if (needle) {
+        const hay = [
+          item.reported,
+          item.reportedEmail,
+          item.reportedUcid,
+          item.reporter,
+          item.reporterEmail,
+          item.reporterUcid,
+          item.reason,
+          item.sourceContext,
+          item.details,
+          item.flaggedExcerpt,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+    return {
+      rows: filtered,
+      total: filtered.length,
+      page: r.pagination?.page ?? 1,
+      pageSize: r.pagination?.limit ?? limit,
+    };
   },
 
   ledgerJournals: async ({ page, limit, q, referenceType }: ListFilters) => {
-    try {
-      const r = (await api.adminLedgerJournals({
-        page,
-        limit,
-        q: q || undefined,
-        referenceType: referenceType || "ALL",
-      })) as { items: RawJournal[]; total: number; page: number; pageSize: number };
-      return {
-        rows: r.items.map((j) => ({
-          id: j.id,
-          desc: j.description,
-          ref: j.referenceType,
-          refId: j.referenceId,
-          dr: j.totalDebitsMinor,
-          cr: j.totalCreditsMinor,
-          posted: j.postedAt,
-        })),
-        total: r.total,
-        page: r.page,
-        pageSize: r.pageSize,
-      };
-    } catch {
-      return {
-        rows: [],
-        total: 0,
-        page: 1,
-        pageSize: limit,
-      };
-    }
+    // Errors are NOT swallowed: the page renders an ErrorBox from the
+    // rejection, so a missing or shadowed route shows up as a failure
+    // instead of looking exactly like "there is no data" — which is how
+    // the top-up queue 404 went unnoticed.
+    const r = (await api.adminLedgerJournals({
+      page,
+      limit,
+      q: q || undefined,
+      referenceType: referenceType || "ALL",
+    })) as { items: RawJournal[]; total: number; page: number; pageSize: number };
+    return {
+      rows: r.items.map((j) => ({
+        id: j.id,
+        desc: j.description,
+        ref: j.referenceType,
+        refId: j.referenceId,
+        dr: j.totalDebitsMinor,
+        cr: j.totalCreditsMinor,
+        posted: j.postedAt,
+      })),
+      total: r.total,
+      page: r.page,
+      pageSize: r.pageSize,
+    };
   },
 };
 

@@ -64,3 +64,23 @@ createRoot(document.getElementById("root")!).render(
     </ThemeProvider>
   </StrictMode>,
 );
+
+// Telegram Mini App bootstrap.
+//
+// This used to live as an inline <script> block in index.html. Moving it into
+// the module keeps index.html free of inline script, which is what lets the
+// production Content-Security-Policy keep `script-src` strict — no
+// 'unsafe-inline', no 'unsafe-eval'. The SDK itself is still loaded from
+// telegram.org via a <script src> tag, which the CSP allow-lists.
+//
+// The ordering is safe: the SDK tag in index.html is a classic (non-async,
+// non-defer) script, so it has already executed by the time this module runs.
+try {
+  const webApp = window.Telegram?.WebApp;
+  if (webApp) {
+    webApp.ready();
+    webApp.expand();
+  }
+} catch (e) {
+  console.error("Telegram WebApp init error", e);
+}
