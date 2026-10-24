@@ -7,6 +7,7 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useMemo, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
   Activity,
   BarChart3,
@@ -545,6 +546,15 @@ export default function Overview() {
 
   const onOpen = (it: ActionItem) => ui.navigate(it.page, it.refId);
 
+  /* The KPI cards are divs with role="button": Enter/Space must activate them
+     the same way a click does, otherwise the drill-down is mouse-only. */
+  const onKpiKey = (e: ReactKeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      e.currentTarget.click();
+    }
+  };
+
   return (
     <div className="fade">
       {/* Sub-navigation bar with Dual-Dashboard Mode Switcher */}
@@ -617,6 +627,7 @@ export default function Overview() {
           onClick={() => ui.navigate("users")}
           role="button"
           tabIndex={0}
+          onKeyDown={onKpiKey}
         >
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">Registered Platform Users</span>
@@ -638,6 +649,7 @@ export default function Overview() {
           onClick={() => ui.navigate("escrow")}
           role="button"
           tabIndex={0}
+          onKeyDown={onKpiKey}
         >
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">Custodial Funds in Escrow</span>
@@ -659,6 +671,7 @@ export default function Overview() {
           onClick={() => ui.navigate("payouts")}
           role="button"
           tabIndex={0}
+          onKeyDown={onKpiKey}
         >
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">Pending Disbursement Queue</span>
@@ -677,6 +690,7 @@ export default function Overview() {
           onClick={() => ui.navigate("dispute-queue")}
           role="button"
           tabIndex={0}
+          onKeyDown={onKpiKey}
         >
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">Open Mediation & KYC Triage</span>

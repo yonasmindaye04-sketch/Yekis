@@ -156,6 +156,9 @@
 
 .ops-root .stat{padding:18px 20px;position:relative;overflow:hidden;transition:transform .15s,box-shadow .15s}
 .ops-root .stat:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(16,24,40,.08)}
+.ops-root .stat-clickable{cursor:pointer}
+.ops-root .stat-clickable:focus-visible{outline:2px solid var(--ops-blue);outline-offset:2px}
+.ops-root .stat-active{border-color:var(--ops-blue);box-shadow:0 0 0 1px var(--ops-blue) inset}
 .ops-root .stat-ic{margin-bottom:12px;display:flex;align-items:center}
 .ops-root .stat-v{font-size:22px;font-weight:800;letter-spacing:-.02em}
 .ops-root .stat-l{font-size:12px;color:var(--ops-text-2);margin-top:2px;font-weight:600}
@@ -165,6 +168,7 @@
 /* pills — solid filled semantic badges with crisp borders */
 .ops-root .pill{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:.03em;line-height:1.2;white-space:nowrap;flex-shrink:0;border:1px solid transparent}
 .ops-root .pill .pdot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.ops-root .pill .pdot.urgent{background:var(--ops-red);box-shadow:0 0 0 3px rgba(220,38,38,.22);animation:opsPulse 1.8s ease-in-out infinite}
 .ops-root .p-green{background:#dcfce7;color:#166534;border-color:#86efac}
 .ops-root .p-amber{background:#fef3c7;color:#92400e;border-color:#fcd34d}
 .ops-root .p-red{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
@@ -272,7 +276,12 @@
 .ops-root .acct-code{font-size:11px;color:var(--ops-text-3);margin-top:3px}
 
 .ops-root .kv{background:var(--ops-kv);border:1px solid var(--ops-border-soft);border-radius:10px;padding:14px}
-.ops-root .kv-k{font-size:10px;font-weight:800;color:var(--ops-text-3);text-transform:uppercase;letter-spacing:.08em}
+.ops-root .kv-k{font-size:10px;font-weight:800;color:var(--ops-text-3);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:4px}
+.ops-root .kv-go{opacity:.5}
+.ops-root .kv-clickable{cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.ops-root .kv-clickable:hover{border-color:var(--ops-blue)}
+.ops-root .kv-clickable:focus-visible{outline:2px solid var(--ops-blue);outline-offset:2px}
+.ops-root .kv-active{border-color:var(--ops-blue);box-shadow:0 0 0 1px var(--ops-blue) inset}
 .ops-root .kv-v{font-size:16px;font-weight:800;margin-top:5px}
 
 .ops-root .matrix th,.ops-root .matrix td{padding:9px 10px;border-bottom:1px solid var(--ops-border-soft);font-size:12px}
@@ -509,6 +518,8 @@
 .ops-root .toast .t-ic{display:flex}
 
 .ops-root .fade{animation:opsFadeUp .28s ease}
+
+@keyframes opsPulse{0%,100%{box-shadow:0 0 0 3px rgba(220,38,38,.22)}50%{box-shadow:0 0 0 6px rgba(220,38,38,.05)}}
 @keyframes opsFadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .ops-root .overlay{display:none;position:fixed;inset:0;background:rgba(10,15,30,.45);z-index:55}
 .ops-root .overlay.show{display:block}

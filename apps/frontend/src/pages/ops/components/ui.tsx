@@ -152,10 +152,47 @@ export function formatStatusLabel(
   return s.replace(/_/g, " ");
 }
 
+/**
+ * Statuses that must stand out in a queue: money or identity is at risk and
+ * someone has to act on it within a SLA.
+ */
+const URGENT_STATUSES = new Set([
+  "MISMATCH",
+  "VARIANCE",
+  "FAILED",
+  "DISPUTED",
+  "ADMIN_HOLD",
+  "STAGE_3_MEDIATION",
+  "STAGE_4_ARBITRATION",
+  "ESCALATED",
+  "CRITICAL",
+  "HIGH",
+  "SUSPENDED",
+  "OVERDUE",
+  "REVERSED",
+  "FRAUD",
+  "IMPERSONATION",
+  "STRUCTURING",
+  "WALLET_MISMATCH",
+  "PASS_THROUGH",
+  "VELOCITY",
+  "VELOCITIES",
+]);
+
+export function isUrgentStatus(s: string | null | undefined): boolean {
+  if (!s) return false;
+  return URGENT_STATUSES.has(s.toUpperCase().replace(/\s+/g, "_"));
+}
+
 export function Pill({ s, dict }: { s: string; dict?: Record<string, string> }) {
+  // Normalise before lookup: some endpoints hand back "stage 1 negotiation"
+  // or "pending" rather than the SCREAMING_SNAKE enum, and an unnormalised
+  // lookup silently rendered every such status as neutral grey.
+  const key = (s || "").toUpperCase().replace(/\s+/g, "_");
+  const urgent = isUrgentStatus(key);
   return (
-    <Badge variant="outline" className={cn("pill", PILL[s] ?? "p-gray")}>
-      <span className="pdot" />
+    <Badge variant="outline" className={cn("pill", PILL[key] ?? PILL[s] ?? "p-gray")}>
+      <span className={cn("pdot", urgent && "urgent")} />
       {formatStatusLabel(s, dict)}
     </Badge>
   );
@@ -250,6 +287,9 @@ export function StatCard({
   trend,
   trendValue,
   spark,
+  onClick,
+  active,
+  title,
 }: {
   label: string;
   value: string;
@@ -258,9 +298,32 @@ export function StatCard({
   trend?: "up" | "dn";
   trendValue?: string;
   spark?: number[];
+  onClick?: () => void;
+  active?: boolean;
+  title?: string;
 }) {
   return (
-    <Card className="card stat">
+    <Card
+      className={cn(
+        "card stat",
+        onClick && "stat-clickable",
+        active && "stat-active",
+      )}
+      onClick={onClick}
+      title={title}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
       {trend ? (
         <span className={`stat-t ${trend === "up" ? "t-up" : "t-dn"}`}>
           {trend === "up" ? <ArrowUpRight size={13} /> : <ArrowDownRight size={13} />}
@@ -442,16 +505,41 @@ export function Kv({
   k,
   v,
   warn,
+  onClick,
+  active,
+  title,
   children,
 }: {
   k: string;
   v?: ReactNode;
   warn?: boolean;
+  onClick?: () => void;
+  active?: boolean;
+  title?: string;
   children?: ReactNode;
 }) {
   return (
-    <div className="kv">
-      <div className="kv-k">{k}</div>
+    <div
+      className={cn("kv", onClick && "kv-clickable", active && "kv-active")}
+      onClick={onClick}
+      title={title}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+    >
+      <div className="kv-k">
+        <span>{k}</span>
+        {onClick ? <ArrowUpRight size={11} className="kv-go" /> : null}
+      </div>
       <div className="kv-v" style={warn ? { color: "var(--ops-red)" } : undefined}>
         {v ?? children}
       </div>
