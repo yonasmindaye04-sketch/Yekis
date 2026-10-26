@@ -26,8 +26,6 @@ import { dts, fmt, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { RECON_STATUSES, RAILS } from "../opsConst";
 import type { ReconRow } from "../opsTypes";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
 import {
   Banner,
   Empty,
@@ -42,6 +40,8 @@ import {
   isTyping,
   useHotkeys,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";

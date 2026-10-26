@@ -35,10 +35,10 @@ import {
   Pager,
   Pill,
   useToast,
+  Button,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
-import { Button } from "../../../components/ui/button";
 
 interface LedgerLeg {
   code: string;

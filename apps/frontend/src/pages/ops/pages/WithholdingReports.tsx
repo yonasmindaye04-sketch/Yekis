@@ -19,10 +19,9 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { dt, fmt, opsApi } from "../opsApi";
-import { Empty, Kv, LoadingBox, PageHead, Pill, useToast } from "../components/ui";
+import { Empty, Kv, LoadingBox, PageHead, Pill, useToast, Button } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
-import { Button } from "../../../components/ui/button";
 
 type Report = {
   id: string;

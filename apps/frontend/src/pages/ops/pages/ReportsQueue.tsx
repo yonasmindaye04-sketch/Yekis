@@ -36,10 +36,10 @@ import {
   isTyping,
   useHotkeys,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
 
 const ENFORCEMENT_TEMPLATES = [
   "First offense: formal compliance warning issued; off-platform contact handle redacted.",

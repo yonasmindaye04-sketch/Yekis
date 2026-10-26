@@ -24,8 +24,6 @@ import { dts, fmt, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { PAYMENT_STATUSES, RAILS } from "../opsConst";
 import type { Payment } from "../opsTypes";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
 import {
   Empty,
   ErrorBox,
@@ -39,6 +37,8 @@ import {
   isTyping,
   useHotkeys,
   useToast,
+  Button,
+  Card,
 } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";

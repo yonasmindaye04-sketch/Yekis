@@ -28,11 +28,9 @@ import { fmt, opsApi, useApi } from "../opsApi";
 import type { OpsPageId } from "../opsPerms";
 import type { ReportsBundle } from "../opsTypes";
 import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
-import { ErrorBox, Kv, LoadingBox, PageHead, Pill, SecTitle, useToast } from "../components/ui";
+import { ErrorBox, Kv, LoadingBox, PageHead, Pill, SecTitle, useToast, Button, Card } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, etb } from "../opsExport";
-import { Button } from "../../../components/ui/button";
-import { Card } from "../../../components/ui/card";
 import type { TimeRangeKey } from "../../../components/dashboard/dashboardData";
 
 const ST_C: Record<string, string> = {
