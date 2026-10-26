@@ -6,6 +6,7 @@ import "./telegram/miniApp.css";
 import "./website-icons.css";
 import { ThemeProvider } from "./theme/ThemeContext";
 import { LanguageProvider } from "./i18n";
+import { HashRouter } from "./router/HashRouter";
 import App from "./App.tsx";
 
 // === MAIN COMPONENT ===
@@ -55,13 +56,15 @@ class AppErrorBoundary extends Component<
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <LanguageProvider>
-        <AppErrorBoundary>
-          <App />
-        </AppErrorBoundary>
-      </LanguageProvider>
-    </ThemeProvider>
+    <HashRouter>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AppErrorBoundary>
+            <App />
+          </AppErrorBoundary>
+        </LanguageProvider>
+      </ThemeProvider>
+    </HashRouter>
   </StrictMode>,
 );
 

@@ -59,6 +59,12 @@ import {
   AVATAR_UPDATED_EVENT,
   loadAvatarOverride,
 } from "./components/YekisAvatar";
+import {
+  ProfileCompletionDialog,
+  evaluateProfileCompletion,
+  hasCompletedFirstLoginCheck,
+} from "./components/ProfileCompletionDialog";
+import { useLocation, useNavigate } from "./router/HashRouter";
 import { FAQPage } from "./FAQPage";
 import { FeesPage } from "./FeesPage";
 import { PrivacyPage } from "./PrivacyPage";
@@ -308,6 +314,8 @@ function FullPlatformAppInner() {
     sidebarCollapsed,
     toggleSidebarCollapsed,
   } = useShadcnLayout();
+  const hashLocation = useLocation();
+  const hashNavigate = useNavigate();
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [showLanding, setShowLanding] = useState(true);
   const [user, setUser] = useState<MeResponse | null>(null);
@@ -545,9 +553,10 @@ const loadWorkspace = async () => {
       api.getProfileCompleteness(),
     ]);
     if (meResult.status === "rejected") throw meResult.reason;
-    setUser(meResult.value);
-    if (isLanguage(meResult.value?.languagePreference)) {
-      setLanguage(meResult.value.languagePreference);
+    const me = meResult.value;
+    setUser(me);
+    if (isLanguage(me?.languagePreference)) {
+      setLanguage(me.languagePreference);
     }
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
@@ -562,6 +571,49 @@ const loadWorkspace = async () => {
     if (completenessResult.status === "fulfilled")
     setProfileCompleteness(completenessResult.value.profileCompleteness);
     setLastUpdatedAt(new Date());
+
+    // First-login profile completion check via HashRouter state:
+    // Inspect the user's public profile for missing required data (profile picture, bio, skills)
+    // and push `{ showProfileCompletion: true }` into HashRouter state if not yet checked.
+    if (me && !me.staffRole && !hasCompletedFirstLoginCheck(me.id)) {
+      try {
+        const pub = (await api.getPublicProfile(me.id).catch(() => null)) as {
+          firstName?: string | null;
+          lastName?: string | null;
+          bio?: string | null;
+          avatarUrl?: string | null;
+          primarySkillId?: string | null;
+          skills?: Array<{ id: string }>;
+        } | null;
+        const storedOverride = loadAvatarOverride(me.id);
+        const resolvedAvatar =
+          storedOverride && "avatarUrl" in storedOverride
+            ? (storedOverride.avatarUrl ?? null)
+            : (pub?.avatarUrl ?? me.avatarUrl ?? null);
+        const completion = evaluateProfileCompletion({
+          role: me.role,
+          avatarUrl: resolvedAvatar,
+          firstName: pub?.firstName ?? me.firstName,
+          lastName: pub?.lastName ?? me.lastName,
+          bio: pub?.bio ?? "",
+          primarySkillId: pub?.primarySkillId ?? null,
+          skillIds: (pub?.skills ?? []).map((s) => s.id),
+        });
+        if (!completion.isComplete) {
+          hashNavigate(`/${view}`, {
+            replace: true,
+            state: {
+              ...hashLocation.state,
+              showProfileCompletion: true,
+              fromFirstLogin: true,
+              missingFields: completion.missingItems,
+            },
+          });
+        }
+      } catch {
+        // non-blocking
+      }
+    }
   };
 
   // Ref-synced alias so the polling/socket effect can stay keyed on [user]
@@ -1940,6 +1992,22 @@ if (authMode === "register") {
               <div className="sh-profile-setup-actions">
                 <button
                   type="button"
+                  className="sh-btn sh-btn-secondary"
+                  onClick={() =>
+                    hashNavigate(`/${view}`, {
+                      replace: true,
+                      state: {
+                        ...hashLocation.state,
+                        showProfileCompletion: true,
+                        fromFirstLogin: false,
+                      },
+                    })
+                  }
+                >
+                  <Sparkles size={14} /> Open Checklist
+                </button>
+                <button
+                  type="button"
                   className="sh-btn sh-btn-primary"
                   onClick={() => setView("profile-edit")}
                 >
@@ -1957,6 +2025,13 @@ if (authMode === "register") {
               </div>
             </div>
           )}
+
+        <ProfileCompletionDialog
+          user={user}
+          role={platformRole}
+          onSaved={() => void loadWorkspace()}
+          onOpenFullEditor={() => setView("profile-edit")}
+        />
 
         {view === "overview" && (
           <div className="sh-workspace-view">

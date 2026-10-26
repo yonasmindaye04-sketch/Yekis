@@ -4,10 +4,10 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --port=3000",
+    "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview --port=3000 --host=0.0.0.0"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
