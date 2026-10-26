@@ -209,11 +209,40 @@ export default function Payments() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Confirmed volume (page)" v={fmt(confirmedVolume)} />
-        <Kv k="Total transactions" v={total.toLocaleString()} />
-        <Kv k="Pending verification" v={String(pendingCount)} warn={pendingCount > 0} />
-        <Kv k="Failed / Reversed" v={String(failedCount)} warn={failedCount > 0} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Confirmed volume (page)"
+          v={fmt(confirmedVolume)}
+          active={status === "SUCCESS"}
+          title="Filter to confirmed inbound payments"
+          onClick={() => setStatus((s) => (s === "SUCCESS" ? "" : "SUCCESS"))}
+        />
+        <Kv
+          k="Total transactions"
+          v={total.toLocaleString()}
+          active={status === "" && provider === ""}
+          title="Show all inbound payment transactions"
+          onClick={() => {
+            setStatus("");
+            setProvider("");
+          }}
+        />
+        <Kv
+          k="Pending verification"
+          v={String(pendingCount)}
+          warn={pendingCount > 0}
+          active={status === "PENDING"}
+          title="Filter to pending inbound payments"
+          onClick={() => setStatus((s) => (s === "PENDING" ? "" : "PENDING"))}
+        />
+        <Kv
+          k="Failed / Reversed"
+          v={String(failedCount)}
+          warn={failedCount > 0}
+          active={status === "FAILED"}
+          title="Filter to failed inbound payments"
+          onClick={() => setStatus((s) => (s === "FAILED" ? "" : "FAILED"))}
+        />
       </div>
 
       <Card className="card filters">

@@ -208,11 +208,49 @@ export default function SupportDesk() {
           </button>
         }
       />
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching tickets" v={total.toLocaleString()} />
-        <Kv k="On this page" v={String(rows.length)} />
-        <Kv k="Unassigned" v={String(rows.filter((c) => !c.assignedStaff).length)} />
-        <Kv k="Waiting &gt; 24h" v={String(breached)} warn={breached > 0} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching tickets"
+          v={total.toLocaleString()}
+          active={scope === "" && assignment === ""}
+          title="Show all support conversations"
+          onClick={() => {
+            setScope("");
+            setAssignment("");
+            setSort("newest");
+          }}
+        />
+        <Kv
+          k="On this page"
+          v={String(rows.length)}
+          active={scope === "OPEN" && assignment === "" && sort !== "waiting"}
+          title="Show open tickets on this page"
+          onClick={() => {
+            setScope("OPEN");
+            setAssignment("");
+            setSort("newest");
+          }}
+        />
+        <Kv
+          k="Unassigned"
+          v={String(rows.filter((c) => !c.assignedStaff).length)}
+          active={assignment === "UNASSIGNED"}
+          title="Filter to unassigned tickets"
+          onClick={() =>
+            setAssignment((a) => (a === "UNASSIGNED" ? "" : "UNASSIGNED"))
+          }
+        />
+        <Kv
+          k="Waiting &gt; 24h"
+          v={String(breached)}
+          warn={breached > 0}
+          active={sort === "waiting"}
+          title="Sort by longest-waiting open conversations"
+          onClick={() => {
+            setScope("OPEN");
+            setSort((s) => (s === "waiting" ? "newest" : "waiting"));
+          }}
+        />
       </div>
 
       <div className="card filters">
@@ -281,11 +319,14 @@ export default function SupportDesk() {
                   ) : null}
                   {c.status === "OPEN" && wait > 24 ? (
                     <div style={{ marginTop: 7 }}>
-                      <span className="sla breach">● waiting {Math.floor(wait)}h</span>
+                      <span className="sla breach">
+                        <span className="pdot urgent" aria-hidden="true" />
+                        waiting {Math.floor(wait)}h
+                      </span>
                     </div>
                   ) : c.status === "OPEN" && wait > 2 ? (
                     <div style={{ marginTop: 7 }}>
-                      <span className="sla warn">● waiting {Math.floor(wait)}h</span>
+                      <span className="sla warn">waiting {Math.floor(wait)}h</span>
                     </div>
                   ) : null}
                 </button>
@@ -296,7 +337,7 @@ export default function SupportDesk() {
         </div>
 
         {active ? (
-          <div className="queue-detail card">
+          <div className="queue-detail card chat-panel">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                 <div>
@@ -306,7 +347,7 @@ export default function SupportDesk() {
                     {active.assignedStaff ? `assigned to ${active.assignedStaff.name}` : "unassigned"}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   {!active.assignedStaff ? (
                     <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void claim()}>
                       Claim
@@ -325,7 +366,7 @@ export default function SupportDesk() {
               </div>
             </div>
 
-            <div className="qd-body">
+            <div className="qd-body chat-scroll">
               <div className="ev-chat">
                 {msgLoading ? (
                   <div className="empty" style={{ padding: 20 }}>Loading thread…</div>
@@ -367,12 +408,13 @@ export default function SupportDesk() {
                 )}
                 <div ref={endRef} />
               </div>
+            </div>
 
-              <div style={{ display: "flex", gap: 8, marginTop: 14, alignItems: "center" }}>
+            <div className="qd-actions chat-composer">
+              <div className="chat-composer-row">
                 <input
-                  className="inp"
-                  style={{ flex: 1 }}
-                  placeholder="Type a reply…"
+                  className="inp chat-composer-inp"
+                  placeholder={internal ? "Write an internal staff-only note…" : "Type a reply…"}
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
                   onKeyDown={(e) => {
@@ -382,44 +424,49 @@ export default function SupportDesk() {
                     }
                   }}
                 />
-                <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer", margin: 0 }}>
-                  <Paperclip size={13} />
+                <label
+                  className="btn btn-ghost chat-attach-btn"
+                  title="Attach file"
+                >
+                  <Paperclip size={15} />
                   <input type="file" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
                 </label>
-                <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void send()}>
-                  <Send size={13} /> {busy ? "Sending…" : "Send"}
+                <button
+                  className="btn btn-primary chat-send-btn"
+                  disabled={busy}
+                  onClick={() => void send()}
+                >
+                  <Send size={14} /> {busy ? "Sending…" : "Send"}
                 </button>
               </div>
-              <label
-                style={{
-                  display: "inline-flex",
-                  gap: 8,
-                  alignItems: "center",
-                  marginTop: 10,
-                  fontSize: 12,
-                  color: "var(--ops-text-2)",
-                  cursor: "pointer",
-                  width: "fit-content",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={internal}
-                  onChange={(e) => setInternal(e.target.checked)}
-                  style={{ width: 15, height: 15, margin: 0, accentColor: "var(--ops-primary)" }}
-                />
-                <span>Internal note (staff only)</span>
-              </label>
-              {file ? (
-                <div style={{ fontSize: 12, color: "var(--ops-text-2)", marginTop: 6 }}>
-                  Attaching: {file.name}
-                </div>
-              ) : null}
+              <div className="chat-composer-meta">
+                <label className="chat-internal-toggle">
+                  <input
+                    type="checkbox"
+                    checked={internal}
+                    onChange={(e) => setInternal(e.target.checked)}
+                  />
+                  <span>Internal note (staff only)</span>
+                </label>
+                {file ? (
+                  <div className="chat-file-pill">
+                    <Paperclip size={12} />
+                    <span>{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFile(null)}
+                      aria-label="Remove attachment"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="queue-detail card">
-            <div className="qd-body">
+          <div className="queue-detail card chat-panel">
+            <div className="empty-detail">
               <Empty icon={MessageSquare}>Select a conversation to read and reply.</Empty>
             </div>
           </div>

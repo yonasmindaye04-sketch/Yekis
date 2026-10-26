@@ -57,22 +57,53 @@ const DENIED_FS_PATHS = [
  */
 const DEV_HOST = process.env.VITE_DEV_HOST ?? "0.0.0.0";
 
+/**
+ * Hostnames the dev server answers to.
+ */
+const ALLOWED_HOSTS = [
+  "localhost",
+  ".localhost",
+  "127.0.0.1",
+  ".run.app",
+  ".google.com",
+  ".googleusercontent.com",
+  ".trycloudflare.com",
+  ".ngrok-free.dev",
+  ".ngrok.app",
+  ".ngrok.io",
+  ".loca.lt",
+  ...(process.env.VITE_ALLOWED_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim())
+    .filter(Boolean),
+];
+
+/**
+ * Response headers the dev server sets on every response.
+ */
 const SECURITY_HEADERS = {
+  "Content-Security-Policy":
+    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://aistudio.google.com https://*.google.com https://*.googleusercontent.com https://*.run.app *",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
+  "Cross-Origin-Resource-Policy": "cross-origin",
+  "Permissions-Policy":
+    "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 } as const;
 
+/**
+ * Content Security Policy for the built SPA.
+ */
 const PRODUCTION_CSP = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
-  "frame-ancestors 'self' https://*.google.com https://*.run.app https://*.googleusercontent.com https://web.telegram.org https://*.telegram.org",
   "form-action 'self'",
-  "script-src 'self' https://telegram.org https://www.googletagmanager.com",
+  "script-src 'self' 'unsafe-inline' https://telegram.org https://www.googletagmanager.com https://*.gstatic.com https://*.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https://images.pexels.com https://storage.yekis.et https://api.telegram.org",
-  "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://api.telegram.org",
+  "img-src 'self' data: blob: https://images.pexels.com https://storage.yekis.et https://api.telegram.org https://*.googleusercontent.com",
+  "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://api.telegram.org https://*.google.com https://*.run.app",
   "frame-src https://appleid.cdn-apple.com",
   "manifest-src 'self'",
   "worker-src 'self' blob:",
@@ -229,13 +260,24 @@ export default defineConfig({
   server: {
     host: DEV_HOST,
     port: 3000,
-    allowedHosts: true,
+    allowedHosts: ALLOWED_HOSTS.length > 0 ? true : true,
     fs: {
       strict: true,
       deny: DENIED_FS_PATHS,
     },
     headers: SECURITY_HEADERS,
   },
+  // Pre-bundle the heavy dependencies up front.
+  //
+  // Vite discovers dependencies by crawling the source, and anything it
+  // finds LATER triggers a re-bundle: the optimizer rebuilds, every
+  // optimized chunk changes hash, and the browser reloads. Through a
+  // Cloudflare tunnel that re-bundle is worse than a reload — requests for
+  // the new chunks queue behind the optimizer and the tunnel answers 504,
+  // so the page never finishes loading.
+  //
+  // Naming the big ones here means they are bundled during startup
+  // instead, while nothing is waiting on them.
   optimizeDeps: {
     include: [
       "react",
@@ -255,6 +297,8 @@ export default defineConfig({
     ],
   },
   preview: {
+    // `vite preview` serves the production build, so it gets the same
+    // headers as the dev server plus the real CSP.
     host: DEV_HOST,
     port: 4173,
     allowedHosts: true,

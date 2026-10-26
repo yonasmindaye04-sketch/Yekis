@@ -305,11 +305,34 @@ export default function Contracts() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching contracts" v={total.toLocaleString()} />
-        <Kv k="Active contracts" v={String(activeCount)} />
-        <Kv k="Completed on page" v={String(completedCount)} />
-        <Kv k="Total milestones" v={String(totalMilestonesOnPage)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching contracts"
+          v={total.toLocaleString()}
+          active={status === ""}
+          title="Show all contracts"
+          onClick={() => setStatus("")}
+        />
+        <Kv
+          k="Active contracts"
+          v={String(activeCount)}
+          active={status === "ACTIVE"}
+          title="Filter to active contracts"
+          onClick={() => setStatus((s) => (s === "ACTIVE" ? "" : "ACTIVE"))}
+        />
+        <Kv
+          k="Completed on page"
+          v={String(completedCount)}
+          active={status === "COMPLETED"}
+          title="Filter to completed contracts"
+          onClick={() => setStatus((s) => (s === "COMPLETED" ? "" : "COMPLETED"))}
+        />
+        <Kv
+          k="Total milestones"
+          v={String(totalMilestonesOnPage)}
+          title="Open Escrow Oversight Workbench"
+          onClick={() => ui.navigate("escrow")}
+        />
       </div>
 
       <Card className="card filters">

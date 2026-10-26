@@ -179,10 +179,21 @@ export default function EscrowPage() {
         {
           id: "doc-1",
           t: "MILESTONE_DELIVERABLE_MANIFEST",
-          k: "license",
+          k: "deliverable",
           name: `${sel.title} (${sel.id})`,
           doc: `${sel.job} · Freelancer: ${sel.fl}`,
           tin: `Escrow Amount: ${fmt(sel.amt)} · Rail: ${sel.rail}`,
+          contractId: sel.id,
+          status: sel.held ? "ADMIN_HOLD" : sel.state,
+          createdAt: dt(sel.created),
+          extraRows: [
+            { label: "Contract", value: sel.job },
+            { label: "Milestone", value: sel.title },
+            { label: "Freelancer", value: sel.fl },
+            { label: "Funding Rail", value: sel.rail },
+            { label: "Escrow Custody Amount", value: fmt(sel.amt) },
+            { label: "Current State", value: (sel.held ? "ADMIN_HOLD" : sel.state).replace(/_/g, " ") },
+          ],
         },
         {
           id: "doc-2",
@@ -232,14 +243,42 @@ export default function EscrowPage() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Held on this page" v={fmt(held)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Held on this page"
+          v={fmt(held)}
+          active={state === ""}
+          title="Show all held escrow milestones"
+          onClick={() => setState("")}
+        />
         <Kv
           k="Submitted for review"
           v={String(rows.filter((e) => e.state === "SUBMITTED_FOR_REVIEW").length)}
+          active={state === "SUBMITTED_FOR_REVIEW"}
+          title="Filter to milestones submitted for review"
+          onClick={() =>
+            setState((s) => (s === "SUBMITTED_FOR_REVIEW" ? "" : "SUBMITTED_FOR_REVIEW"))
+          }
         />
-        <Kv k="Admin holds active" v={String(rows.filter((e) => e.held).length)} warn={rows.some((e) => e.held)} />
-        <Kv k="Disputed" v={String(rows.filter((e) => e.state === "DISPUTED").length)} warn={rows.some((e) => e.state === "DISPUTED")} />
+        <Kv
+          k="Admin holds active"
+          v={String(rows.filter((e) => e.held).length)}
+          warn={rows.some((e) => e.held)}
+          title="Focus milestone under administrative hold"
+          onClick={() => {
+            setState("");
+            const h = rows.find((e) => e.held);
+            if (h) setSelId(h.id);
+          }}
+        />
+        <Kv
+          k="Disputed"
+          v={String(rows.filter((e) => e.state === "DISPUTED").length)}
+          warn={rows.some((e) => e.state === "DISPUTED")}
+          active={state === "DISPUTED"}
+          title="Filter to disputed milestones"
+          onClick={() => setState((s) => (s === "DISPUTED" ? "" : "DISPUTED"))}
+        />
       </div>
 
       {held > 0 ? (

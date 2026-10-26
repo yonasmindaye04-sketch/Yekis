@@ -192,28 +192,42 @@ export function ActionCenter({
       {items.length === 0 ? (
         <div className="empty">Nothing requires attention right now.</div>
       ) : (
-        items.map((it, i) => (
-          <div className={`ac-item ${done[i] ? "done" : ""}`} key={`${it.page}-${it.refId ?? i}-${it.t}`}>
-            <span className="ac-sev" style={{ background: SEV_C[it.sev] }} />
-            <div className="ac-body">
-              <div className="ac-t">
-                {it.t}
-                <span className="ac-tag" style={{ color: SEV_C[it.sev] }}>
-                  {it.tag}
-                </span>
+        <div className="ac-grid">
+          {items.map((it, i) => {
+            const isUrgent = it.sev >= 2 && !done[i];
+            return (
+              <div
+                className={`ac-item ${done[i] ? "done" : ""}`}
+                key={`${it.page}-${it.refId ?? i}-${it.t}`}
+              >
+                {isUrgent && (
+                  <span
+                    className="ac-sev urgent"
+                    style={{ background: SEV_C[it.sev], color: SEV_C[it.sev] }}
+                    aria-hidden="true"
+                  />
+                )}
+                <div className="ac-body">
+                  <div className="ac-t">
+                    {it.t}
+                    <span className="ac-tag" style={{ color: SEV_C[it.sev] }}>
+                      {it.tag}
+                    </span>
+                  </div>
+                  <div className="ac-w">{it.why}</div>
+                </div>
+                <div className="ac-acts">
+                  <button className="btn btn-ghost btn-sm" onClick={() => onToggle(i)}>
+                    {done[i] ? "Undo" : "Done"}
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={() => onOpen(it)}>
+                    Open <ChevronRight size={12} />
+                  </button>
+                </div>
               </div>
-              <div className="ac-w">{it.why}</div>
-            </div>
-            <div className="ac-acts">
-              <button className="btn btn-ghost btn-sm" onClick={() => onToggle(i)}>
-                {done[i] ? "Undo" : "Done"}
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={() => onOpen(it)}>
-                Open <ChevronRight size={12} />
-              </button>
-            </div>
-          </div>
-        ))
+            );
+          })}
+        </div>
       )}
     </div>
   );

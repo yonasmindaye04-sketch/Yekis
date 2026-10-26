@@ -51,6 +51,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   const ui = useOpsUi();
   const toast = useToast();
   const [stage, setStage] = useState("STAGE_3_MEDIATION");
+  const [kpiFilter, setKpiFilter] = useState<"ALL" | "BREACHED">("ALL");
   const [selId, setSelId] = useState<string | null>(focusId ?? null);
   const [outcome, setOutcome] = useState<DisputeOutcome | "">("");
   const [split, setSplit] = useState(50);
@@ -64,21 +65,23 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
-  const sel = rows.find((d) => d.id === selId) ?? null;
+  const visibleRows =
+    kpiFilter === "BREACHED" ? rows.filter((d) => d.slaH < 0) : rows;
+  const sel = visibleRows.find((d) => d.id === selId) ?? rows.find((d) => d.id === selId) ?? null;
 
   useHotkeys(
     useCallback(
       (e: KeyboardEvent) => {
-        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !rows.length) return;
-        const idx = rows.findIndex((d) => d.id === selId);
-        if (e.key === "ArrowDown" && idx >= 0 && idx < rows.length - 1) {
-          e.preventDefault(); setSelId(rows[idx + 1].id); setOutcome("");
+        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !visibleRows.length) return;
+        const idx = visibleRows.findIndex((d) => d.id === selId);
+        if (e.key === "ArrowDown" && idx >= 0 && idx < visibleRows.length - 1) {
+          e.preventDefault(); setSelId(visibleRows[idx + 1].id); setOutcome("");
         }
         if (e.key === "ArrowUp" && idx > 0) {
-          e.preventDefault(); setSelId(rows[idx - 1].id); setOutcome("");
+          e.preventDefault(); setSelId(visibleRows[idx - 1].id); setOutcome("");
         }
       },
-      [rows, selId, ui.viewerOpen, ui.paletteOpen],
+      [visibleRows, selId, ui.viewerOpen, ui.paletteOpen],
     ),
   );
 
@@ -164,17 +167,55 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
           </span>
         }
       />
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching disputes" v={total.toLocaleString()} />
-        <Kv k="On this page" v={String(rows.length)} />
-        <Kv k="Escrow in view" v={fmt2(rows.reduce((s, d) => s + d.amt, 0))} />
-        <Kv k="SLA breached" v={String(rows.filter((d) => d.slaH < 0).length)} warn={rows.some((d) => d.slaH < 0)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching disputes"
+          v={total.toLocaleString()}
+          active={stage === "" && kpiFilter === "ALL"}
+          title="Show all dispute stages"
+          onClick={() => {
+            setStage("");
+            setKpiFilter("ALL");
+          }}
+        />
+        <Kv
+          k="On this page"
+          v={String(visibleRows.length)}
+          active={stage === "STAGE_3_MEDIATION" && kpiFilter === "ALL"}
+          title="Filter to Stage 3 Mediation queue"
+          onClick={() => {
+            setStage("STAGE_3_MEDIATION");
+            setKpiFilter("ALL");
+            if (rows.length > 0) setSelId(rows[0].id);
+          }}
+        />
+        <Kv
+          k="Escrow in view"
+          v={fmt2(visibleRows.reduce((s, d) => s + d.amt, 0))}
+          title="Open Escrow Oversight Workbench"
+          onClick={() => ui.navigate("escrow")}
+        />
+        <Kv
+          k="SLA breached"
+          v={String(rows.filter((d) => d.slaH < 0).length)}
+          warn={rows.some((d) => d.slaH < 0)}
+          active={kpiFilter === "BREACHED"}
+          title="Filter to SLA-breached disputes"
+          onClick={() => {
+            const next = kpiFilter === "BREACHED" ? "ALL" : "BREACHED";
+            setKpiFilter(next);
+            const firstBreached = rows.find((d) => d.slaH < 0);
+            if (next === "BREACHED" && firstBreached) {
+              setSelId(firstBreached.id);
+            }
+          }}
+        />
       </div>
       {rows.some((d) => d.slaH < 0) ? (
         <Banner tone="b-red" icon={Clock} strong="SLA breach detected." rest="At least one dispute exceeded its mediation deadline — resolve it first." />
       ) : null}
 
-      <Card className="card filters" style={{ marginBottom: 16 }}>
+      <Card className="card filters" style={{ marginBottom: 14 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -185,7 +226,10 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         </div>
         <FilterSelect
           value={stage}
-          onChange={setStage}
+          onChange={(v) => {
+            setStage(v);
+            setKpiFilter("ALL");
+          }}
           options={DISPUTE_STAGES}
           allLabel="All stages"
           label="Dispute stage"
@@ -195,12 +239,12 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
 
       <div className="queue-wrap">
         <div className="queue-list">
-          {rows.length === 0 ? (
+          {visibleRows.length === 0 ? (
             <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={Scale}>No active disputes in this view.</Empty>
             </Card>
           ) : (
-            rows.map((d) => (
+            visibleRows.map((d) => (
               <button
                 key={d.id}
                 className={`q-card ${selId === d.id ? "selected" : ""}`}
@@ -251,14 +295,40 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                   {sel.hasDel ? (
                     <div className="doc-tiles">
                       <button
+                        type="button"
                         className="doc-tile"
                         onClick={() =>
                           ui.openViewer(
                             [
                               {
-                                t: `Deliverable — ${sel.ms}`,
-                                k: "tin",
-                                url: sel.deliverableUrl ?? undefined,
+                                id: `del-${sel.id}`,
+                                t: `MILESTONE_DELIVERABLE — ${sel.ms}`,
+                                k: "deliverable",
+                                url: sel.deliverableUrl ?? "/uploads/deliverables/milestone-release-bundle.zip",
+                                name: `${sel.job} (${sel.id})`,
+                                doc: `Disputed Milestone: ${sel.ms}`,
+                                tin: `Escrow Held: ${fmt2(sel.amt)}`,
+                                scope: sel.scope,
+                                contractId: sel.id,
+                                status: sel.stage,
+                                createdAt: dt(sel.created),
+                                extraRows: [
+                                  { label: "Dispute Category", value: sel.cat.replace(/_/g, " ") },
+                                  { label: "Mediation Stage", value: sel.stage.replace(/_/g, " ") },
+                                  { label: "Milestone Escrow Value", value: fmt2(sel.amt) },
+                                  { label: "Evidence Statements", value: `${sel.ev.length} attached` },
+                                  {
+                                    label: "Artifact Location",
+                                    value: sel.deliverableUrl || "/uploads/deliverables/milestone-release-bundle.zip",
+                                  },
+                                  {
+                                    label: "SLA Status",
+                                    value:
+                                      sel.slaH < 0
+                                        ? `Breached ${Math.abs(sel.slaH)}h ago`
+                                        : `Due in ${sel.slaH}h`,
+                                  },
+                                ],
                               },
                             ],
                             0,

@@ -115,11 +115,42 @@ export default function Risk() {
           </button>
         }
       />
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching flags" v={total.toLocaleString()} />
-        <Kv k="Awaiting review" v={String(open.length)} warn={open.length > 0} />
-        <Kv k="Critical (on page)" v={String(critical)} warn={critical > 0} />
-        <Kv k="STR filed" v={String(rows.filter((f) => f.status === "REVIEWING").length)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching flags"
+          v={total.toLocaleString()}
+          active={status === "" && flagType === ""}
+          title="Show all compliance risk flags"
+          onClick={() => {
+            setStatus("");
+            setFlagType("");
+          }}
+        />
+        <Kv
+          k="Awaiting review"
+          v={String(open.length)}
+          warn={open.length > 0}
+          active={status === "OPEN"}
+          title="Filter to open risk flags"
+          onClick={() => setStatus((s) => (s === "OPEN" ? "" : "OPEN"))}
+        />
+        <Kv
+          k="Critical (on page)"
+          v={String(critical)}
+          warn={critical > 0}
+          active={flagType === "WALLET_MISMATCH"}
+          title="Filter to critical WALLET_MISMATCH flags"
+          onClick={() =>
+            setFlagType((t) => (t === "WALLET_MISMATCH" ? "" : "WALLET_MISMATCH"))
+          }
+        />
+        <Kv
+          k="STR filed"
+          v={String(rows.filter((f) => f.status === "REVIEWING").length)}
+          active={status === "REVIEWING"}
+          title="Filter to flags under STR review"
+          onClick={() => setStatus((s) => (s === "REVIEWING" ? "" : "REVIEWING"))}
+        />
       </div>
       {open.length ? (
         <Banner

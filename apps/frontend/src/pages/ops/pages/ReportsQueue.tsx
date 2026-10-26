@@ -244,11 +244,47 @@ export default function ReportsQueue() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching reports" v={total.toLocaleString()} />
-        <Kv k="Awaiting moderation" v={String(openCount)} warn={openCount > 0} />
-        <Kv k="Critical / High severity" v={String(criticalOrHighCount)} warn={criticalOrHighCount > 0} />
-        <Kv k="Repeat offenders" v={String(repeatOffendersCount)} warn={repeatOffendersCount > 0} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching reports"
+          v={total.toLocaleString()}
+          active={status === "ALL" && reasonFilter === ""}
+          title="Show all profile reports"
+          onClick={() => {
+            setStatus("ALL");
+            setReasonFilter("");
+          }}
+        />
+        <Kv
+          k="Awaiting moderation"
+          v={String(openCount)}
+          warn={openCount > 0}
+          active={status === "OPEN"}
+          title="Filter to open profile reports"
+          onClick={() => setStatus("OPEN")}
+        />
+        <Kv
+          k="Critical / High severity"
+          v={String(criticalOrHighCount)}
+          warn={criticalOrHighCount > 0}
+          title="Focus highest-severity profile report"
+          onClick={() => {
+            const c = rows.find(
+              (r) => r.severity === "CRITICAL" || r.severity === "HIGH",
+            );
+            if (c) setSelId(c.id);
+          }}
+        />
+        <Kv
+          k="Repeat offenders"
+          v={String(repeatOffendersCount)}
+          warn={repeatOffendersCount > 0}
+          title="Focus repeat offender report"
+          onClick={() => {
+            const rep = rows.find((r) => r.checks.repeatOffender);
+            if (rep) setSelId(rep.id);
+          }}
+        />
       </div>
 
       <Card className="card filters">

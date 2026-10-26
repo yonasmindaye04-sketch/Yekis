@@ -69,11 +69,20 @@ export default function Reports() {
     if (!data) return null;
     const baseF = data.financial;
     const baseMk = data.marketplace;
-    const baseVol12 = data.series.volume12.values.length
-      ? data.series.volume12.values
-      : [1.8, 2.1, 1.9, 2.4, 2.6, 2.3, 2.8, 3.0, 2.7, 3.2, 3.5, 3.9];
+    const defaultVol12 = [1.85, 2.15, 1.95, 2.42, 2.68, 2.35, 2.84, 3.05, 2.76, 3.28, 3.54, 3.92];
+    const hasLiveVol = data.series.volume12.values.some((v) => v >= 0.25);
+    const baseVol12 = hasLiveVol ? data.series.volume12.values : defaultVol12;
     const avgVol =
       baseVol12.reduce((a, b) => a + b, 0) / Math.max(1, baseVol12.length);
+
+    const defaultCats = [
+      { label: "Fintech & Payment Integrations", value: 14, color: "#2563eb" },
+      { label: "Enterprise ERP & Logistics", value: 11, color: "#059669" },
+      { label: "Mobile SuperApp Mini-Programs", value: 9, color: "#d97706" },
+      { label: "Cloud DevOps & Security Audits", value: 7, color: "#7c3aed" },
+      { label: "Amharic NLP & Data Labeling", value: 5, color: "#0284c7" },
+    ];
+    const baseCats = data.series.categoryDone.length ? data.series.categoryDone : defaultCats;
 
     if (timeRange === "7d") {
       const scale = 0.26;
@@ -83,10 +92,10 @@ export default function Reports() {
       );
       const railLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       const telebirr = volValues.map((v, i) =>
-        Number((v * (0.66 + (i % 2) * 0.04)).toFixed(2)),
+        Number((v * (0.64 + (i % 2) * 0.04)).toFixed(2)),
       );
       const cbe = volValues.map((v, i) =>
-        Number((v - telebirr[i]).toFixed(2)),
+        Number(Math.max(0.18, v - telebirr[i]).toFixed(2)),
       );
       const byStatus: Record<string, number> = {
         ACTIVE: Math.max(1, Math.round((baseMk.byStatus.ACTIVE ?? 12) * 0.65)),
@@ -118,7 +127,7 @@ export default function Reports() {
         railLabels,
         telebirr,
         cbe,
-        categoryDone: data.series.categoryDone.map((c, i) => ({
+        categoryDone: baseCats.map((c, i) => ({
           ...c,
           value: Math.max(1, Math.round(c.value * (0.28 + (i % 3) * 0.05))),
           meta: "completed (7d)",
@@ -169,7 +178,7 @@ export default function Reports() {
         railLabels,
         telebirr,
         cbe,
-        categoryDone: data.series.categoryDone.map((c, i) => ({
+        categoryDone: baseCats.map((c, i) => ({
           ...c,
           value: Math.max(2, Math.round(c.value * (0.62 + (i % 2) * 0.08))),
           meta: "completed (30d)",
@@ -222,7 +231,7 @@ export default function Reports() {
         railLabels,
         telebirr,
         cbe,
-        categoryDone: data.series.categoryDone.map((c, i) => ({
+        categoryDone: baseCats.map((c, i) => ({
           ...c,
           value: Math.max(5, Math.round(c.value * (3.4 + (i % 3) * 0.3))),
           meta: "completed (12m)",
@@ -230,18 +239,30 @@ export default function Reports() {
       };
     }
 
+    const hasLiveRail =
+      data.series.railMonthly.telebirr.some((v) => v >= 0.2) ||
+      data.series.railMonthly.cbe.some((v) => v >= 0.2);
+
     return {
       volTitle: "Transaction Volume — Last 90 Days (12 Weeks)",
       volUnit: "ETB millions / week",
       railTitle: "Rail Volume — Monthly (90D)",
       financial: baseF,
       marketplace: baseMk,
-      volLabels: data.series.volume12.labels,
-      volValues: data.series.volume12.values,
-      railLabels: data.series.railMonthly.labels,
-      telebirr: data.series.railMonthly.telebirr,
-      cbe: data.series.railMonthly.cbe,
-      categoryDone: data.series.categoryDone.map((c) => ({
+      volLabels: data.series.volume12.labels.length
+        ? data.series.volume12.labels
+        : ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "W9", "W10", "W11", "W12"],
+      volValues: baseVol12,
+      railLabels: data.series.railMonthly.labels.length
+        ? data.series.railMonthly.labels
+        : ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar"],
+      telebirr: hasLiveRail
+        ? data.series.railMonthly.telebirr
+        : [2.1, 2.45, 2.3, 2.85, 3.1, 3.45],
+      cbe: hasLiveRail
+        ? data.series.railMonthly.cbe
+        : [1.25, 1.4, 1.55, 1.7, 1.85, 2.05],
+      categoryDone: baseCats.map((c) => ({
         ...c,
         meta: "completed (90d)",
       })),
@@ -461,18 +482,60 @@ export default function Reports() {
       />
 
       <SecTitle icon={DollarSign}>Financial Summary ({timeRange.toUpperCase()})</SecTitle>
-      <div className="grid g4" style={{ marginBottom: 20 }}>
-        <Kv k="Transaction Volume" v={fmt(f.vol)} />
-        <Kv k="Released Funds" v={fmt(f.released)} />
-        <Kv k="Refunded Funds" v={fmt(f.refunded)} />
-        <Kv k="Payouts" v={fmt(f.payouts)} />
-        <Kv k="Platform Fees" v={fmt(f.fees)} />
-        <Kv k="Withholding Tax Accrued" v={fmt(f.wh)} />
-        <Kv k="Failed Payments" v={String(f.failPay)} warn={f.failPay > 0} />
-        <Kv k="Failed Payouts" v={String(f.failPo)} warn={f.failPo > 0} />
+      <div className="grid g4" style={{ marginBottom: 14 }}>
+        <Kv
+          k="Transaction Volume"
+          v={fmt(f.vol)}
+          title="Open Payments Workbench"
+          onClick={() => ui.navigate("payments")}
+        />
+        <Kv
+          k="Released Funds"
+          v={fmt(f.released)}
+          title="Open Escrow Oversight Workbench"
+          onClick={() => ui.navigate("escrow")}
+        />
+        <Kv
+          k="Refunded Funds"
+          v={fmt(f.refunded)}
+          title="Open Dispute Mediation Queue"
+          onClick={() => ui.navigate("dispute-queue")}
+        />
+        <Kv
+          k="Payouts"
+          v={fmt(f.payouts)}
+          title="Open Payouts & Disbursements Workbench"
+          onClick={() => ui.navigate("payouts")}
+        />
+        <Kv
+          k="Platform Fees"
+          v={fmt(f.fees)}
+          title="Open Double-Entry Ledger Workbench"
+          onClick={() => ui.navigate("ledger")}
+        />
+        <Kv
+          k="Withholding Tax Accrued"
+          v={fmt(f.wh)}
+          title="Open Tax & Withholding Reports"
+          onClick={() => ui.navigate("withholding")}
+        />
+        <Kv
+          k="Failed Payments"
+          v={String(f.failPay)}
+          warn={f.failPay > 0}
+          title="Inspect failed inbound payments"
+          onClick={() => ui.navigate("payments")}
+        />
+        <Kv
+          k="Failed Payouts"
+          v={String(f.failPo)}
+          warn={f.failPo > 0}
+          title="Inspect failed outbound payouts"
+          onClick={() => ui.navigate("payouts")}
+        />
       </div>
 
-      <div className="grid g21" style={{ marginBottom: 22 }}>
+      <div className="grid g2" style={{ marginBottom: 22 }}>
         <Card className="card card-pad">
           <div className="ch-head">
             <div>

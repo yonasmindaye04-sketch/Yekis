@@ -227,11 +227,40 @@ export default function WithholdingReports() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Total WHT accrued" v={fmt(totalAccruedMinor)} />
-        <Kv k="Pending ERA remittance" v={fmt(pendingRemittanceMinor)} warn={pendingRemittanceMinor > 0} />
-        <Kv k="Filed tax periods" v={`${filedCount} / ${rows.length}`} />
-        <Kv k="Withholding transactions" v={String(rows.reduce((s, r) => s + r.transactionCount, 0))} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Total WHT accrued"
+          v={fmt(totalAccruedMinor)}
+          title="Select latest withholding period"
+          onClick={() => {
+            if (rows[0]) setSelId(rows[0].id);
+          }}
+        />
+        <Kv
+          k="Pending ERA remittance"
+          v={fmt(pendingRemittanceMinor)}
+          warn={pendingRemittanceMinor > 0}
+          title="Select unfiled withholding period"
+          onClick={() => {
+            const unfiled = rows.find((r) => !r.filedAt);
+            if (unfiled) setSelId(unfiled.id);
+          }}
+        />
+        <Kv
+          k="Filed tax periods"
+          v={`${filedCount} / ${rows.length}`}
+          title="Select most recent filed tax period"
+          onClick={() => {
+            const filed = rows.find((r) => Boolean(r.filedAt));
+            if (filed) setSelId(filed.id);
+          }}
+        />
+        <Kv
+          k="Withholding transactions"
+          v={String(rows.reduce((s, r) => s + r.transactionCount, 0))}
+          title="Open Payouts & Disbursements Workbench"
+          onClick={() => ui.navigate("payouts")}
+        />
       </div>
 
       {rows.length === 0 ? (

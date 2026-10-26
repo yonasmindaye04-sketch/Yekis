@@ -101,7 +101,7 @@ export default function StaffPage() {
                 <span style={{ color: "var(--ops-text-3)" }}>—</span>
               )}
             </td>
-            <td>{s.suspended ? <Pill s="SUSPENDED" /> : <span className="pill p-green"><span className="pdot" />Active</span>}</td>
+            <td>{s.suspended ? <Pill s="SUSPENDED" /> : <Pill s="ACTIVE" />}</td>
             <td>
               {editId === s.id ? (
                 <span style={{ display: "flex", gap: 6 }}>

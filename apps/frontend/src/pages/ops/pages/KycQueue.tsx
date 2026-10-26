@@ -181,11 +181,46 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           </span>
         }
       />
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching applications" v={total.toLocaleString()} />
-        <Kv k="On this page" v={String(rows.length)} />
-        <Kv k="PEP matches" v={String(rows.filter((k) => k.pep).length)} warn={rows.some((k) => k.pep)} />
-        <Kv k="With documents" v={String(rows.filter((k) => k.docs.length > 0).length)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching applications"
+          v={total.toLocaleString()}
+          active={status === ""}
+          title="Show all KYC applications"
+          onClick={() => {
+            setStatus("");
+            setSelId(null);
+          }}
+        />
+        <Kv
+          k="On this page"
+          v={String(rows.length)}
+          active={status === "UNDER_REVIEW"}
+          title="Filter to pending KYC reviews"
+          onClick={() => {
+            setStatus("UNDER_REVIEW");
+            setSelId(rows[0]?.id ?? null);
+          }}
+        />
+        <Kv
+          k="PEP matches"
+          v={String(rows.filter((k) => k.pep).length)}
+          warn={rows.some((k) => k.pep)}
+          title="Focus applicant with PEP screening alert"
+          onClick={() => {
+            const p = rows.find((k) => k.pep);
+            if (p) setSelId(p.id);
+          }}
+        />
+        <Kv
+          k="With documents"
+          v={String(rows.filter((k) => k.docs.length > 0).length)}
+          title="Focus applicant with identity documents ready for inspection"
+          onClick={() => {
+            const d = rows.find((k) => k.docs.length > 0);
+            if (d) setSelId(d.id);
+          }}
+        />
       </div>
       {status === "UNDER_REVIEW" && counts ? (
         <Card className="card" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>

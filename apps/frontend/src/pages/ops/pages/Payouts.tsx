@@ -220,11 +220,38 @@ export default function Payouts() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Awaiting settlement" v={String(pendingOnPage)} warn={pendingOnPage > 0} />
-        <Kv k="Pending net volume" v={fmt(pendingVolume)} />
-        <Kv k="Settled net volume" v={fmt(confirmedVolume)} />
-        <Kv k="Total payouts" v={total.toLocaleString()} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Awaiting settlement"
+          v={String(pendingOnPage)}
+          warn={pendingOnPage > 0}
+          active={status === "PENDING"}
+          title="Filter to pending payouts awaiting settlement"
+          onClick={() => setStatus((s) => (s === "PENDING" ? "" : "PENDING"))}
+        />
+        <Kv
+          k="Pending net volume"
+          v={fmt(pendingVolume)}
+          title="Filter to pending payouts"
+          onClick={() => setStatus("PENDING")}
+        />
+        <Kv
+          k="Settled net volume"
+          v={fmt(confirmedVolume)}
+          active={status === "CONFIRMED"}
+          title="Filter to confirmed settled payouts"
+          onClick={() => setStatus((s) => (s === "CONFIRMED" ? "" : "CONFIRMED"))}
+        />
+        <Kv
+          k="Total payouts"
+          v={total.toLocaleString()}
+          active={status === "" && provider === ""}
+          title="Show all payouts across all rails"
+          onClick={() => {
+            setStatus("");
+            setProvider("");
+          }}
+        />
       </div>
 
       {pendingOnPage ? (

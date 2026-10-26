@@ -107,11 +107,37 @@ export default function Receipts() {
           </button>
         }
       />
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Matching transfers" v={total.toLocaleString()} />
-        <Kv k="Pending on page" v={String(pending.length)} warn={pending.length > 0} />
-        <Kv k="Pending value" v={fmt(pendingValue)} />
-        <Kv k="Without a receipt" v={String(rows.filter((r) => !r.receiptImagePath).length)} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Matching transfers"
+          v={total.toLocaleString()}
+          active={status === ""}
+          title="Show all manual transfer top-ups"
+          onClick={() => setStatus("")}
+        />
+        <Kv
+          k="Pending on page"
+          v={String(pending.length)}
+          warn={pending.length > 0}
+          active={status === "PENDING"}
+          title="Filter to pending receipt reviews"
+          onClick={() => setStatus((s) => (s === "PENDING" ? "" : "PENDING"))}
+        />
+        <Kv
+          k="Pending value"
+          v={fmt(pendingValue)}
+          title="Filter to pending transfers"
+          onClick={() => setStatus("PENDING")}
+        />
+        <Kv
+          k="Without a receipt"
+          v={String(rows.filter((r) => !r.receiptImagePath).length)}
+          title="Expand first transfer missing a receipt"
+          onClick={() => {
+            const m = rows.find((r) => !r.receiptImagePath);
+            if (m) setOpenId(m.id);
+          }}
+        />
       </div>
 
       <div className="card filters">

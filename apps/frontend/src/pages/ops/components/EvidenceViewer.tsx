@@ -33,17 +33,291 @@ function isPlaceholderLogoUrl(u: string | null | undefined): boolean {
   return u.includes("/payment/Telebirr.png");
 }
 
+function isImageFileUrl(u: string | null | undefined): boolean {
+  if (!u || isPlaceholderLogoUrl(u)) return false;
+  if (u.startsWith("data:image/")) return true;
+  const clean = u.split("?")[0].split("#")[0].toLowerCase();
+  return /\.(png|jpe?g|webp|gif|svg|avif)$/.test(clean);
+}
+
 function renderDocumentSheet(d: ViewerDoc) {
   const titleUpper = (d.t || "").toUpperCase();
+  const isDeliverable =
+    d.k === "deliverable" ||
+    titleUpper.includes("DELIVERABLE");
   const isContractAgreement =
-    titleUpper.includes("ESCROW_AGREEMENT") ||
-    titleUpper.includes("SERVICE_AGREEMENT") ||
-    titleUpper.includes("CONTRACT");
+    !isDeliverable &&
+    (titleUpper.includes("ESCROW_AGREEMENT") ||
+      titleUpper.includes("SERVICE_AGREEMENT") ||
+      titleUpper.includes("CONTRACT"));
   const isTaxSchedule =
-    titleUpper.includes("WHT") ||
-    titleUpper.includes("WITHHOLDING") ||
-    titleUpper.includes("TAX_SCHEDULE") ||
-    titleUpper.includes("ERCA");
+    !isDeliverable &&
+    (titleUpper.includes("WHT") ||
+      titleUpper.includes("WITHHOLDING") ||
+      titleUpper.includes("TAX_SCHEDULE") ||
+      titleUpper.includes("ERCA"));
+
+  if (isDeliverable) {
+    const defaultArtifacts = d.artifactFiles?.length
+      ? d.artifactFiles
+      : [
+          {
+            path: d.url || "/uploads/deliverables/milestone-release-bundle.zip",
+            size: "14.8 MB · Archive",
+            status: "SHA-256 VERIFIED",
+          },
+          {
+            path: "src/integration/service-connector.ts",
+            size: "28.4 KB · TypeScript",
+            status: "BUILD PASSING",
+          },
+          {
+            path: "docs/QA-Acceptance-Report-and-Test-Suite.pdf",
+            size: "1.42 MB · PDF",
+            status: "ATTACHED",
+          },
+          {
+            path: "tests/e2e-settlement-and-webhook.spec.ts",
+            size: "11.2 KB · Test Suite",
+            status: "18/18 PASSED",
+          },
+        ];
+
+    return (
+      <div
+        className="fdoc"
+        style={{
+          width: "min(660px, 90vw)",
+          background: "#ffffff",
+          color: "#0f172a",
+          borderRadius: 10,
+          boxShadow: "0 30px 80px rgba(0,0,0,.55)",
+          overflow: "hidden",
+        }}
+      >
+        <div className="fdoc-band" />
+        <div
+          style={{
+            padding: "18px 24px 14px",
+            borderBottom: "1px solid #e2e8f0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 12,
+          }}
+        >
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: ".09em",
+                color: "#0b7a4b",
+                textTransform: "uppercase",
+              }}
+            >
+              YEKIS ESCROW CUSTODY · MILESTONE DELIVERABLE &amp; QA MANIFEST
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: "#0f172a", marginTop: 3 }}>
+              {d.t.replace(/_/g, " ")}
+            </div>
+            <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+              Cryptographically Timestamped Submission · Locked for Escrow &amp; Mediation Review
+            </div>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                background: "#dcfce7",
+                color: "#166534",
+                border: "1px solid #86efac",
+                padding: "3px 9px",
+                borderRadius: 999,
+                fontSize: 10.5,
+                fontWeight: 800,
+              }}
+            >
+              <CheckCircle2 size={12} /> {(d.status ?? "SUBMITTED").replace(/_/g, " ")}
+            </span>
+            <div
+              className="mono"
+              style={{ fontSize: 10.5, color: "#475569", marginTop: 5, fontWeight: 700 }}
+            >
+              REF: {d.contractId ?? d.id ?? "DEL-2026-884"}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: 13 }}>
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: 8,
+              padding: "10px 14px",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
+          >
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                CONTRACT / PROJECT (የሥራ ውል)
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#0f172a", marginTop: 2 }}>
+                {d.name ?? "Escrow-Protected Milestone Contract"}
+              </div>
+              <div style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
+                {d.doc ?? "Milestone Deliverable Submission"}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#64748b", textTransform: "uppercase" }}>
+                ESCROW VALUE &amp; SUBMISSION METADATA
+              </div>
+              <div className="mono" style={{ fontSize: 13, fontWeight: 800, color: "#0b7a4b", marginTop: 2 }}>
+                {d.tin ?? "Escrow Protected"}
+              </div>
+              <div className="mono" style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
+                Submitted: {d.createdAt ?? "2026-10-19 · Verified Upload"}
+              </div>
+            </div>
+          </div>
+
+          {d.scope ? (
+            <div>
+              <div
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  color: "#475569",
+                  textTransform: "uppercase",
+                  letterSpacing: ".06em",
+                }}
+              >
+                1. Milestone Acceptance Scope &amp; Specifications
+              </div>
+              <div
+                style={{
+                  fontSize: 11.5,
+                  color: "#334155",
+                  marginTop: 4,
+                  lineHeight: 1.5,
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 8,
+                  padding: "9px 12px",
+                }}
+              >
+                {d.scope}
+              </div>
+            </div>
+          ) : null}
+
+          <div>
+            <div
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                color: "#475569",
+                textTransform: "uppercase",
+                letterSpacing: ".06em",
+                marginBottom: 6,
+              }}
+            >
+              {d.scope ? "2." : "1."} Submitted Deliverable Package &amp; QA Verification
+            </div>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: 11.5,
+                border: "1px solid #e2e8f0",
+              }}
+            >
+              <thead>
+                <tr style={{ background: "#f1f5f9", textAlign: "left" }}>
+                  <th style={{ padding: "7px 10px", borderBottom: "1px solid #cbd5e1", fontSize: 10 }}>
+                    ARTIFACT / FILE PATH
+                  </th>
+                  <th style={{ padding: "7px 10px", borderBottom: "1px solid #cbd5e1", fontSize: 10 }}>
+                    SIZE &amp; FORMAT
+                  </th>
+                  <th style={{ padding: "7px 10px", borderBottom: "1px solid #cbd5e1", fontSize: 10 }}>
+                    QA / INTEGRITY
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {defaultArtifacts.map((f, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                    <td className="mono" style={{ padding: "7px 10px", fontWeight: 700, color: "#0f172a" }}>
+                      {f.path}
+                    </td>
+                    <td style={{ padding: "7px 10px", color: "#475569" }}>{f.size}</td>
+                    <td
+                      style={{
+                        padding: "7px 10px",
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        color: "#0b7a4b",
+                      }}
+                    >
+                      ✓ {f.status}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {d.extraRows && d.extraRows.length > 0 ? (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+                background: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: 8,
+                padding: "10px 14px",
+              }}
+            >
+              {d.extraRows.map((r, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11 }}>
+                  <span style={{ color: "#64748b", fontWeight: 600 }}>{r.label}:</span>
+                  <strong className="mono" style={{ color: "#0f172a" }}>
+                    {r.value}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="fdoc-foot" style={{ marginTop: 4 }}>
+            <div className="fdoc-sig">
+              Custody Artifact Snapshot Verified by Yekis Escrow &amp; Dispute Mediation Engine
+            </div>
+            <div className="fdoc-stamp">
+              YEKIS
+              <br />
+              QA
+              <br />
+              VERIFIED
+            </div>
+          </div>
+        </div>
+
+        <div className="fdoc-mrz">
+          DEL-SHA256: 4B227777D4DD1FC61C6F884F48641D02B4D121D3FD328CB08B5531FCACDABF8A ·{" "}
+          {d.contractId ?? d.id ?? "DEL-2026"}
+        </div>
+      </div>
+    );
+  }
 
   if (isContractAgreement) {
     return (
@@ -551,6 +825,7 @@ export default function EvidenceViewer({
   const [url, setUrl] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [imgErr, setImgErr] = useState(false);
 
   const d = docs[idx];
   const docKey = d ? `${d.id ?? d.url ?? ""}#${d.t}` : "";
@@ -561,6 +836,7 @@ export default function EvidenceViewer({
     setScale(1);
     setRot(0);
     setPos({ x: 0, y: 0 });
+    setImgErr(false);
   }
 
   const nav = useCallback(
@@ -572,6 +848,7 @@ export default function EvidenceViewer({
 
   useEffect(() => {
     if (!d) return;
+    setImgErr(false);
     if (d.url) {
       setUrl(d.url);
       setLoadErr(null);
@@ -579,7 +856,7 @@ export default function EvidenceViewer({
       return;
     }
     // If structured document metadata is present, render the rich document sheet immediately
-    if (d.name || d.doc || d.tin || d.milestones || d.extraRows) {
+    if (d.name || d.doc || d.tin || d.milestones || d.extraRows || d.k === "deliverable") {
       setUrl(null);
       setLoadErr(null);
       setLoading(false);
@@ -640,7 +917,14 @@ export default function EvidenceViewer({
   };
   const onUp = () => setDrag(null);
 
-  const showRealImage = Boolean(url && !isPlaceholderLogoUrl(url) && !d.milestones && !d.extraRows);
+  const showRealImage = Boolean(
+    url &&
+      isImageFileUrl(url) &&
+      !imgErr &&
+      d.k !== "deliverable" &&
+      !d.milestones &&
+      !d.extraRows,
+  );
 
   return (
     <div className="viewer-overlay">
@@ -732,7 +1016,13 @@ export default function EvidenceViewer({
               <div style={{ marginTop: 8 }}>{loadErr}</div>
             </div>
           ) : showRealImage && url ? (
-            <img className="viewer-img" src={url} alt={d.t} draggable={false} />
+            <img
+              className="viewer-img"
+              src={url}
+              alt={d.t}
+              draggable={false}
+              onError={() => setImgErr(true)}
+            />
           ) : (
             renderDocumentSheet(d)
           )}

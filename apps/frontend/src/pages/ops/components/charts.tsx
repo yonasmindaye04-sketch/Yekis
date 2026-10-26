@@ -59,6 +59,12 @@ export function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
+function fmtAxisM(v: number, max: number): string {
+  if (v === 0) return "0M";
+  if (max < 8) return `${v.toFixed(1)}M`;
+  return `${v.toFixed(0)}M`;
+}
+
 /* ── area / line chart ── */
 export interface AreaChartProps {
   labels: string[];
@@ -71,8 +77,9 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
   if (values.length < 2) {
     return <div className="empty">Not enough history to plot yet.</div>;
   }
-  const W = 640, H = 250, L = 46, R = 12, T = 14, B = 30;
-  const max = Math.max(...values, 0) * 1.15 || 1;
+  const W = 580, H = 195, L = 48, R = 14, T = 14, B = 28;
+  const rawMax = Math.max(...values, 0);
+  const max = rawMax > 0 ? rawMax * 1.16 : 4;
   const X = (i: number) => L + (i * (W - L - R)) / (values.length - 1);
   const Y = (v: number) => T + (1 - v / max) * (H - T - B);
   const line = values
@@ -80,7 +87,7 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
     .join(" ");
   const area = `${line} L${X(values.length - 1).toFixed(1)} ${H - B} L${X(0).toFixed(1)} ${H - B} Z`;
   const gid = `ops-g${color.slice(1)}`;
-  const step = Math.ceil(labels.length / 7);
+  const step = Math.max(1, Math.ceil(labels.length / 7));
   const grid: ReactElement[] = [];
   for (let t = 0; t <= 4; t++) {
     const v = (max * t) / 4;
@@ -89,7 +96,7 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
       <g key={t}>
         <line x1={L} y1={y} x2={W - R} y2={y} stroke="#eef1f6" className="ops-gridline" />
         <text x={L - 8} y={y + 4} textAnchor="end" className="ax">
-          {v.toFixed(0)}M
+          {fmtAxisM(v, max)}
         </text>
       </g>,
     );
@@ -105,7 +112,7 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
       {grid}
       {labels.map((l, i) =>
         i % step === 0 || i === labels.length - 1 ? (
-          <text key={i} x={X(i)} y={H - 8} textAnchor="middle" className="ax">
+          <text key={i} x={X(i)} y={H - 7} textAnchor="middle" className="ax">
             {l}
           </text>
         ) : null,
@@ -125,10 +132,10 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
           key={i}
           cx={X(i)}
           cy={Y(v)}
-          r={3.2}
+          r={3.5}
           className="pt"
           stroke={color}
-          {...tipProps(tip, `${labels[i]} · ${unit} ${v.toFixed(1)}M`)}
+          {...tipProps(tip, `${labels[i]} · ${unit} ${v.toFixed(2)}M`)}
         />
       ))}
     </svg>
@@ -146,10 +153,11 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
   if (labels.length < 1 || series.every((s) => s.values.length < 1)) {
     return <div className="empty">Not enough history to plot yet.</div>;
   }
-  const W = 640, H = 250, L = 46, R = 12, T = 14, B = 30;
-  const max = Math.max(...series.flatMap((s) => s.values), 0) * 1.15 || 1;
+  const W = 580, H = 195, L = 48, R = 14, T = 14, B = 28;
+  const rawMax = Math.max(...series.flatMap((s) => s.values), 0);
+  const max = rawMax > 0 ? rawMax * 1.16 : 4;
   const gw = (W - L - R) / labels.length;
-  const bw = Math.min(26, (gw - 18) / series.length);
+  const bw = Math.min(24, Math.max(8, (gw - 16) / series.length));
   const grid: ReactElement[] = [];
   for (let t = 0; t <= 4; t++) {
     const v = (max * t) / 4;
@@ -158,7 +166,7 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
       <g key={t}>
         <line x1={L} y1={y} x2={W - R} y2={y} stroke="#eef1f6" className="ops-gridline" />
         <text x={L - 8} y={y + 4} textAnchor="end" className="ax">
-          {v.toFixed(0)}M
+          {fmtAxisM(v, max)}
         </text>
       </g>,
     );
@@ -170,14 +178,14 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
         const cx = L + gw * i + gw / 2;
         return (
           <g key={lb}>
-            <text x={cx} y={H - 8} textAnchor="middle" className="ax">
+            <text x={cx} y={H - 7} textAnchor="middle" className="ax">
               {lb}
             </text>
             {series.map((s, si) => {
               const v = s.values[i] ?? 0;
-              const bh = (v / max) * (H - T - B);
+              const bh = Math.max(v > 0 ? 3 : 0, (v / max) * (H - T - B));
               const x =
-                cx - (series.length * bw + 6 * (series.length - 1)) / 2 + si * (bw + 6);
+                cx - (series.length * bw + 5 * (series.length - 1)) / 2 + si * (bw + 5);
               return (
                 <rect
                   key={s.name}
@@ -189,7 +197,7 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
                   fill={s.color}
                   className="bar"
                   style={{ animationDelay: `${(i * series.length + si) * 45}ms` }}
-                  {...tipProps(tip, `${lb} · ${s.name}: ETB ${v}M`)}
+                  {...tipProps(tip, `${lb} · ${s.name}: ETB ${v.toFixed(2)}M`)}
                 />
               );
             })}

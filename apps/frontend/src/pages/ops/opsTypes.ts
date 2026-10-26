@@ -292,10 +292,11 @@ export interface ViewerDoc {
   id?: string;
   url?: string;
   t: string;
-  k: "id-front" | "id-back" | "tin" | "license" | "selfie";
+  k: "id-front" | "id-back" | "tin" | "license" | "selfie" | "deliverable";
   name?: string;
   doc?: string;
   tin?: string;
+  scope?: string;
   contractId?: string;
   status?: string;
   createdAt?: string;
@@ -309,6 +310,11 @@ export interface ViewerDoc {
     state: string;
     amount: string;
     net: string;
+  }>;
+  artifactFiles?: Array<{
+    path: string;
+    size: string;
+    status: string;
   }>;
   extraRows?: Array<{ label: string; value: string }>;
 }

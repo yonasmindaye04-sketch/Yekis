@@ -1629,19 +1629,19 @@
 .sh-kpi-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .sh-kpi-card {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: var(--sh-radius);
-  padding: 16px 18px;
+  padding: 10px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
   cursor: pointer;
-  transition: border-color 140ms ease;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .sh-kpi-card:hover,
@@ -1653,18 +1653,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 
 .sh-kpi-label {
-  font-size: 0.78rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--color-neutral-text, #64748b);
 }
 
 .sh-kpi-value {
-  font-size: 1.45rem;
-  font-weight: 700;
+  font-size: 1.2rem;
+  font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--color-text);
   line-height: 1.2;
@@ -1673,9 +1675,9 @@
 .sh-kpi-foot {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
-  font-size: 0.75rem;
+  gap: 6px;
+  margin-top: 1px;
+  font-size: 0.72rem;
 }
 
 .sh-kpi-chev {
@@ -3050,9 +3052,6 @@
 }
 
 @media (max-width: 1120px) {
-  .sh-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .sh-charts-split,
   .sh-cal-split {
     grid-template-columns: 1fr;

@@ -228,11 +228,39 @@ export default function Reconciliation() {
         }
       />
 
-      <div className="grid g4" style={{ marginBottom: 16 }}>
-        <Kv k="Mismatches on page" v={String(mism.length)} warn={mism.length > 0} />
-        <Kv k="Matched on page" v={String(rows.filter((r) => r.rec === "MATCHED").length)} />
-        <Kv k="Awaiting settlement" v={String(rows.filter((r) => r.rec === "PENDING").length)} />
-        <Kv k="Absolute variance" v={fmt(totalVarianceMinor)} warn={totalVarianceMinor > 0} />
+      <div className="grid g4" style={{ marginBottom: 12 }}>
+        <Kv
+          k="Mismatches on page"
+          v={String(mism.length)}
+          warn={mism.length > 0}
+          active={recStatus === "MISMATCH"}
+          title="Filter to mismatched settlement rows"
+          onClick={() => setRecStatus((s) => (s === "MISMATCH" ? "" : "MISMATCH"))}
+        />
+        <Kv
+          k="Matched on page"
+          v={String(rows.filter((r) => r.rec === "MATCHED").length)}
+          active={recStatus === "MATCHED"}
+          title="Filter to reconciled matched rows"
+          onClick={() => setRecStatus((s) => (s === "MATCHED" ? "" : "MATCHED"))}
+        />
+        <Kv
+          k="Awaiting settlement"
+          v={String(rows.filter((r) => r.rec === "PENDING").length)}
+          active={recStatus === "PENDING"}
+          title="Filter to pending settlement rows"
+          onClick={() => setRecStatus((s) => (s === "PENDING" ? "" : "PENDING"))}
+        />
+        <Kv
+          k="Absolute variance"
+          v={fmt(totalVarianceMinor)}
+          warn={totalVarianceMinor > 0}
+          title="Focus first mismatched transaction"
+          onClick={() => {
+            setRecStatus("MISMATCH");
+            if (mism[0]) setSelId(mism[0].id);
+          }}
+        />
       </div>
 
       {mism.length ? (
