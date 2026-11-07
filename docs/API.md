@@ -1,4 +1,4 @@
-﻿# API Reference
+# API Reference
 
 Last updated: 2026-08-15
 
@@ -562,3 +562,117 @@ These use `requireStaffRole(...)` rather than `requirePermission(...)`, so a rol
 - **Visibility:** Full staff (`ADMIN`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `SUPPORT`) can view all open tickets across all staff or filter by `staffId`.
 - **Guest Inquiries (`POST /api/v1/chat/guest`):** Public entry point. Creates a guest account, assigns the ticket across active staff roles, adds assigned staff to participants, and triggers real-time fan-out notifications to staff via `notifyStaffOfEvent("SUPPORT_REQUEST_CREATED", ...)`.
 
+
+
+---
+
+*Last updated: 2026-11-07 — sections below were added to bring API.md current with the codebase.*
+
+## Authentication (Full Route List)
+
+The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents |
+| `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
+| `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange refresh token for new access+refresh pair. Suspended accounts refused. |
+| `POST` | `/api/v1/auth/logout` | Authenticated | Invalidates the current session |
+| `GET` | `/api/v1/auth/me` | Authenticated | Returns current user profile |
+| `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
+| `POST` | `/api/v1/auth/telegram/miniapp` | Public | Alias for Mini App login |
+| `POST` | `/api/v1/auth/telegram/miniapp/register` | Public | Register a new account via Telegram Mini App |
+| `POST` | `/api/v1/auth/telegram/widget` | Public | Verify Telegram Login Widget payload (browser-based) |
+| `POST` | `/api/v1/auth/telegram/link` | Authenticated + fresh session | Link a Telegram account to an existing session |
+| `DELETE` | `/api/v1/auth/telegram/link` | Authenticated + fresh session | Unlink Telegram from account |
+| `POST` | `/api/v1/auth/telegram/code` | Public | Request a login code (Telegram QR/web-login) |
+| `POST` | `/api/v1/auth/telegram/web-login/start` | Public | Start a Telegram web-login polling session |
+| `GET` | `/api/v1/auth/telegram/web-login/:sid/status` | Public | Poll for session completion |
+| `POST` | `/api/v1/auth/telegram/web-login/redeem` | Public | Redeem a completed Telegram web-login session for JWTs |
+| `GET` | `/api/v1/auth/oauth/providers` | Public | Returns available OAuth provider list |
+| `POST` | `/api/v1/auth/oauth/google` | Public | Google OAuth sign-in / register |
+| `POST` | `/api/v1/auth/oauth/apple` | Public | Apple OAuth sign-in / register |
+| `POST` | `/api/v1/auth/oauth/facebook` | Public | Facebook OAuth sign-in / register |
+| `POST` | `/api/v1/auth/reset-password-request` | Public | Send password reset email |
+| `POST` | `/api/v1/auth/reset-password` | Public (valid reset token) | Set new password |
+
+## KYC (Full Route List)
+
+Additional routes not in the original table:
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/kyc/documents/:documentId/url` | Staff (`kyc.review`) | Get a temporary signed URL for an identity document (evidence viewer) |
+| `GET` | `/api/v1/kyc/:userId/history` | Staff (`kyc.review`) | KYC decision history for a user |
+
+## Finance (Staff Only)
+
+All finance routes require `requireAuth` + `requireStaffRole("ADMIN", "COMPLIANCE_OFFICER")`.
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/finance/reconciliation` | Platform-wide finance reconciliation. Optional `periodMonth` query param (`YYYY-MM`) |
+| `GET` | `/api/v1/finance/ledger/fees` | Paginated platform fee credit ledger (`page`, `limit`) |
+| `GET` | `/api/v1/finance/withholding` | Paginated monthly withholding tax remittance reports (`page`, `limit`) |
+| `POST` | `/api/v1/finance/withholding/:reportId/file` | Mark a withholding report as filed with the Ethiopian Revenue Authority (ERA); body: `{ eraReferenceNumber: string }` |
+
+## Gigs — Corrected Route Access
+
+> [!WARNING]
+> `API.md` previously documented `POST /api/v1/gigs/:gigId/status` as accepting `ACTIVE`, `PAUSED`, `ARCHIVED`, and `REJECTED` for the gig owner. **This is incorrect.** The owner can only set `PAUSED` or `ARCHIVED`. Setting a gig to `ACTIVE` or `REJECTED` requires staff moderation via the separate route below.
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/gigs/:gigId/status` | Owner | Owner-driven status change — allowed values: `PAUSED`, `ARCHIVED` only |
+| `POST` | `/api/v1/gigs/:gigId/moderation` | Staff (`gigs.moderate` permission) | Staff-only publish (`ACTIVE`) or reject (`REJECTED`) — the only path to `ACTIVE` status |
+
+## Bot Management
+
+All bot management routes require `requireAuth` + `requireStaffRole("ADMIN")` unless noted. The bot webhook itself is public (authenticated by secret token header).
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/telegram/webhook` | Public (secret-token header auth) | Receives Telegram updates. Fails closed if `TELEGRAM_WEBHOOK_SECRET` is unset |
+| `GET` | `/api/v1/telegram/health` | Public | Returns bot status, transport mode (webhook/polling), pending update count, last error |
+| `GET` | `/api/v1/telegram/info` | Admin staff | Returns bot identity (id, username) |
+| `POST` | `/api/v1/telegram/set-webhook` | Admin staff + fresh session | Sets the webhook URL. Must be a public HTTPS URL pointing at this deployment's origin (`API_PUBLIC_URL`). `secretToken` from request body is refused — server-only config |
+| `POST` | `/api/v1/telegram/delete-webhook` | Admin staff | Deletes the webhook registration |
+| `POST` | `/api/v1/telegram/start-polling` | Admin staff | Starts polling mode (dev-only; blocked in production) |
+| `POST` | `/api/v1/telegram/stop` | Admin staff | Stops the bot |
+
+## TMS (Full Route List)
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/v1/tms/queue` | List `PENDING_REVIEW` flags |
+| `POST` | `/api/v1/tms/:flagId/file-str` | Record external STR reference and notes; optional `suspendAccount` suspends the user |
+| `POST` | `/api/v1/tms/:flagId/dismiss` | Dismiss false positive with notes |
+| `GET` | `/api/v1/tms/activity` | Recent TMS activity feed |
+| `POST` | `/api/v1/tms/users/:userId/lift-hold` | Lift a compliance hold from a user's account |
+
+## Support Chat — PATCH Status Route
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `PATCH` | `/api/v1/chat/admin/conversations/:id/status` | Staff | Staff can close (`CLOSED`) or reopen (`OPEN`) a support conversation |
+
+## OpenSearch Integration
+
+When `OPENSEARCH_URL` is configured, the gig and job search endpoints (`GET /api/v1/gigs/search`, `GET /api/v1/jobs`) benefit from full-text OpenSearch queries across two indices:
+
+- `yekis-gigs` — indexed on `POST /api/v1/gigs` and `PATCH /api/v1/gigs/:gigId`
+- `yekis-jobs` — indexed when jobs are created/updated
+
+The search module uses `fuzziness: "AUTO"` for typo tolerance and boosts `title^3`. **If `OPENSEARCH_URL` is unset or any OpenSearch call fails, the platform falls back to PostgreSQL silently** — search never hard-fails because the cluster is unavailable.
+
+
+## Reviews (`/api/v1/reviews`)
+
+Mounted at `/api/v1/reviews`.
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `POST` | `/api/v1/reviews/contracts/:id/review` | Contract party | Submit double-blind review for completed contract |
+| `GET` | `/api/v1/reviews/users/:userId/reviews` | Public / Authenticated | List published reviews for a user |
+| `POST` | `/api/v1/reviews/:reviewId/response` | Review target | Post a public response to a received review |
+| `POST` | `/api/v1/reviews/:reviewId/dispute` | Review target | Dispute an unfair review for staff mediation |

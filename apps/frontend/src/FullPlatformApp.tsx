@@ -49,8 +49,6 @@ import {
   PanelLeftOpen,
   Menu,
   Camera,
-  Sparkles,
-  ArrowRight,
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
@@ -1977,15 +1975,14 @@ if (authMode === "register") {
                 </div>
                 <div className="sh-profile-setup-copy">
                   <div className="sh-profile-setup-title-row">
-                    <strong>Complete your profile &amp; upload a profile picture</strong>
+                    <strong>Finish your profile</strong>
                     <span className="sh-profile-setup-badge sh-mono">
-                      <Sparkles size={12} />
-                      {profileCompleteness ?? user.profileCompleteness ?? 75}% complete ·{" "}
-                      {effectiveUserAvatarUrl ? "Custom Photo" : "Default Blobatar"}
+                      {profileCompleteness ?? user.profileCompleteness ?? 75}% complete
                     </span>
                   </div>
                   <p>
-                    New accounts use a generated Blobatar by default. Upload your own profile photo and review your bio &amp; details so clients and freelancers recognize and trust you across contracts.
+                    Add a photo and a short bio so clients and collaborators
+                    know who they are working with.
                   </p>
                 </div>
               </div>
@@ -2004,14 +2001,14 @@ if (authMode === "register") {
                     })
                   }
                 >
-                  <Sparkles size={14} /> Open Checklist
+                  View checklist
                 </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-primary"
                   onClick={() => setView("profile-edit")}
                 >
-                  <Camera size={14} /> Edit Profile &amp; Upload Photo <ArrowRight size={14} />
+                  <Camera size={14} /> Edit profile
                 </button>
                 <button
                   type="button"

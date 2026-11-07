@@ -12,7 +12,6 @@ import {
   Handshake,
   Landmark,
   Lock,
-  Sparkles,
   UserCheck,
   Wallet,
   X,
@@ -69,9 +68,9 @@ const STEPS: StepDef[] = [
   },
   {
     id: "complete-profile",
-    title: "Complete your profile & upload a photo",
-    why: "New accounts start with a default Blobatar. Upload a custom profile picture and add your bio so clients and freelancers recognize you.",
-    cta: "Edit profile & photo",
+    title: "Complete your profile and add a photo",
+    why: "Add a profile picture and a short bio so clients and freelancers recognize you on every contract.",
+    cta: "Edit profile",
     tab: "profile-edit",
     roles: ["CLIENT", "FREELANCER", "BOTH"],
     done: (f) => f.hasProfile,
@@ -196,30 +195,29 @@ function CardArtwork({
 }) {
   return (
     <div className={`yk-wt-art yk-wt-art-${icon}`} aria-hidden="true">
-      <div className="yk-wt-art-glow" />
       <div className="yk-wt-art-main">
-        {icon === "welcome" && <Handshake size={32} strokeWidth={1.8} />}
+        {icon === "welcome" && <Handshake size={22} strokeWidth={1.8} />}
         {icon === "trust" &&
           (flowRole === "FREELANCER" ? (
-            <BadgeCheck size={32} strokeWidth={1.8} />
+            <BadgeCheck size={22} strokeWidth={1.8} />
           ) : (
-            <Briefcase size={32} strokeWidth={1.8} />
+            <Briefcase size={22} strokeWidth={1.8} />
           ))}
         {icon === "work" &&
           (flowRole === "FREELANCER" ? (
-            <Sparkles size={32} strokeWidth={1.8} />
+            <Briefcase size={22} strokeWidth={1.8} />
           ) : (
-            <FileCheck2 size={32} strokeWidth={1.8} />
+            <FileCheck2 size={22} strokeWidth={1.8} />
           ))}
-        {icon === "escrow" && <Lock size={32} strokeWidth={1.8} />}
+        {icon === "escrow" && <Lock size={22} strokeWidth={1.8} />}
         {icon === "payout" &&
           (flowRole === "FREELANCER" ? (
-            <Wallet size={32} strokeWidth={1.8} />
+            <Wallet size={22} strokeWidth={1.8} />
           ) : (
-            <Landmark size={32} strokeWidth={1.8} />
+            <Landmark size={22} strokeWidth={1.8} />
           ))}
       </div>
-      <div className="yk-wt-art-Chips">
+      <div className="yk-wt-art-chips">
         {icon === "welcome" && (
           <span className="yk-wt-chip">
             <BadgeCheck size={13} /> Escrow Protected · ETB
@@ -232,7 +230,7 @@ function CardArtwork({
             </span>
           ) : (
             <span className="yk-wt-chip">
-              <Sparkles size={13} /> 0 ETB Posting Fee · Verified Talent
+              <BadgeCheck size={13} /> 0 ETB Posting Fee · Verified Talent
             </span>
           ))}
         {icon === "work" &&

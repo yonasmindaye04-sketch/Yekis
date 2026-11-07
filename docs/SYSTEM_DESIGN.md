@@ -2,7 +2,7 @@
 
 > **Status:** Authoritative System Design Document  
 > **Source Code Basis:** Derived directly from `apps/backend/src/`, `apps/frontend/src/`, `apps/backend/prisma/schema.prisma`, and `packages/schemas/`  
-> **Last Verified:** 2026-08-16  
+> **Last Verified:** 2026-11-07  
 
 ---
 
@@ -11,12 +11,23 @@
 1. [System Overview](#1-system-overview)
 2. [Data Model](#2-data-model)
 3. [Per-Module Deep Dive (Backend)](#3-per-module-deep-dive)
+   - 3.13 [Module: Gig Marketplace](#313-module-gig-marketplace-appsbackendsrcmodulesgigs)
+   - 3.14 [Module: Finance, General Ledger & Tax Accounting](#314-module-finance-general-ledger--tax-accounting-appsbackendsrcmodulesfinance)
+   - 3.15 [Module: Search & OpenSearch Integration](#315-module-search--opensearch-integration-appsbackendsrcmodulessearch)
+   - 3.16 [Module: Admin & Role-Based Access Control](#316-module-admin--role-based-access-control-appsbackendsrcmodulesadmin)
 4. [Cross-Cutting Concerns](#4-cross-cutting-concerns)
 5. [The End-to-End Trust Loop](#5-the-end-to-end-trust-loop)
 6. [Master Relationship & Dependency Diagram](#6-master-relationship--dependency-diagram)
 7. [Known Inconsistencies, Stubs & Gaps](#7-known-inconsistencies-stubs--gaps)
 8. [Frontend Architecture](#8-frontend-architecture)
+   - 8.8 [Operations Console v2 Architecture](#88-operations-console-v2-architecture-appsfrontendsrcpagesops)
+   - 8.9 [Multilingual Translation Framework](#89-multilingual-translation-framework-appsfrontendsrci18nts)
+   - 8.10 [Real-Time WebSocket Infrastructure](#810-real-time-websocket-infrastructure-apiv1ws)
 9. [Platform Section-by-Section Functional Reference](#9-platform-section-by-section-functional-reference)
+   - 9.15 [Gig Marketplace Functional Reference](#915-gig-marketplace)
+   - 9.16 [Operations Console Functional Reference](#916-operations-console-v2)
+   - 9.17 [Multilingual & Localization Workflow](#917-multilingual--localization-workflow)
+   - 9.18 [Telebirr B2C Automated Disbursement & Ledger Rollback](#918-telebirr-b2c-automated-disbursement--ledger-rollback)
 10. [Glossary](#10-glossary)
 
 ---
@@ -56,12 +67,19 @@ flowchart TD
         ChatMod["Support & Direct Chat Module"]
         ProfileMod["Profiles, Skills & Reviews"]
         BotMod["Bot Handlers & Scenes Module"]
+        GigMod["Gig Marketplace Module"]
+        FinanceMod["Finance & Ledger Module"]
+        AdminMod["Admin & RBAC Module"]
+        SearchMod["Search & OpenSearch Module"]
     end
 
     subgraph AsyncProcessing["Asynchronous Processing Layer (BullMQ)"]
         Q_Auto["auto-release Queue & Worker"]
+        Q_GigAuto["gig-auto-release Queue & Worker"]
         Q_Kyc["kyc-refresh Queue & Worker"]
         Q_Notif["notifications Queue & Worker"]
+        Q_Tms["tms-scan Queue & Worker"]
+        Q_Withholding["withholding-report Queue & Worker"]
         Q_Rev["review-reveal Queue & Worker"]
         Q_Feat["featured-refresh Queue & Worker"]
     end
@@ -70,16 +88,17 @@ flowchart TD
         PG[("PostgreSQL\n(Prisma ORM)")]
         RedisDB[("Redis\n(BullMQ & Token Cache)")]
         ObjectStore[("MinIO / S3 WORM\n(Encrypted Private Bucket)")]
+        OpenSearchDB[("OpenSearch\n(Faceted Gig & Job Search)")]
     end
 
     subgraph ExternalServices["External & Integration Adapters"]
-        TelebirrGW["Telebirr Payment Gateway\n(RSA-PSS C2B Checkout)"]
-        CbeGW["CBE Birr Adapter\n[STUBBED]"]
-        ChapaGW["Chapa Aggregator\n[STUBBED]"]
+        TelebirrGW["Telebirr Gateway\n(C2B Checkout + B2C Disbursement)"]
+        CbeGW["CBE Birr Adapter\n(Merchant API & Webhook)"]
+        MpesaGW["Safaricom M-Pesa\n(B2C Disbursement & Checkout)"]
         SmsEth["SMSEthiopia Gateway\n(HTTP REST)"]
-        TgApi["Telegram Bot API\n(Grammy Engine)"]
-        FaydaAPI["Fayda National ID API\n[STUBBED]"]
-        PepAPI["PEP Watchlist Engine\n[STUBBED]"]
+        TgApi["Telegram Bot API\n(Grammy 4-Language Engine)"]
+        FaydaAPI["Fayda National ID / eSignet\n(OIDC/PAR Integration)"]
+        PepAPI["PEP Watchlist Engine\n(Sanctions Screening)"]
     end
 
     %% Client to API

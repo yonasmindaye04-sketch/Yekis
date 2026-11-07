@@ -1,37 +1,38 @@
-# Yekis Payment Flow
+# Yekis Payment & Transaction Lifecycle Flow
 
-> This document describes the canonical, production-intended wallet-first payment lifecycle. All stages listed here reflect locally-verified behavior unless explicitly marked as **[PLANNED]** or **[STUB]**.
+> This document describes the canonical, wallet-first transaction lifecycle across custom milestone contracts and Fiverr-style gig orders. All stages listed here reflect verified implementation behavior.
 
 ---
 
 ## Overview
 
-Yekis uses an **in-platform wallet** as the single source of truth for all money movements. External payment providers (Telebirr, CBE) are only used to **deposit into** and **withdraw from** the platform — never to move money directly between clients and freelancers. All escrow, milestone funding, and payouts happen within the platform wallet layer.
+Yekis uses an **in-platform wallet and transaction ledger** as the single source of truth for all money movements. External payment providers (**Telebirr**, **Commercial Bank of Ethiopia (CBE)**, and **Safaricom M-Pesa**) are used to **deposit into** and **disburse from** the platform. All milestone escrow holds, gig orders, platform fee recognitions, and withholding tax pools operate within the internal financial ledger.
 
 ---
 
-## Full Flow Diagram
+## 1. Custom Contract Milestone Flow
 
-```
+```text
 CLIENT                          PLATFORM                        FREELANCER
   │                                │                                │
   │  1. Top-up wallet              │                                │
-  ├─ Send to Telebirr/CBE ────────►│                                │
-  │    Upload receipt              │ Staff reviews receipt          │
-  │                                │ → Approve: wallet credited     │
+  ├─ Telebirr / CBE / M-Pesa ─────►│                                │
+  │    (Automated checkout or      │ Staff reviews manual receipts  │
+  │     manual receipt fallback)   │ → Approve: wallet credited     │
   │                                │ → Reject: no change            │
   │                                │                                │
   │  2. Post job                   │                                │
   ├────────────────────────────────►                                │
   │                                │                                │
   │                                │◄─── 3. Submit proposal ────────┤
-  │                                │      (cover letter, quote,     │
+  │                                │      (quote, estimated days,   │
   │                                │       milestone breakdown)     │
   │                                │                                │
   │  4. Accept proposal            │                                │
   ├────────────────────────────────►                                │
   │                                │ Contract + milestones created  │
   │                                │ PDF agreement generated        │
+  │                                │ 7-day cooling-off timer starts │
   │                                │                                │
   │  5. Both parties sign          │                                │
   ├─ Client signs ────────────────►│◄─── Freelancer signs ──────────┤
@@ -46,117 +47,124 @@ CLIENT                          PLATFORM                        FREELANCER
   │                   │            │                                │
   │◄── Notify: top up─┘── Insufficient balance                     │
   │                                │ Contract still signed (valid)  │
-  │                                │ Client must top up + manually  │
-  │                                │ fund from Contracts page       │
+  │                                │ Client tops up + manual fund   │
   │                                │                                │
   │                                │            6. Do the work ─────┤
   │                                │                                │
   │                                │◄─── 7. Submit delivery ────────┤
   │                                │ Milestone → SUBMITTED_FOR_REVIEW
-  │                                │ Auto-release timer starts      │
-  │                                │   (5 days, configurable)       │
+  │                                │ 7-day auto-release timer starts│
   │                                │                                │
   │  8. Review & approve           │                                │
   ├────────────────────────────────►                                │
   │                                │ Milestone → RELEASED           │
   │                                │ Freelancer wallet credited     │
-  │                                │   (net of platform fee +       │
-  │                                │    withholding tax if ≥10kETB) │
+  │                                │ Atomic platform fee & tax credit
   │                                │                                │
-  │  Can re-hire if wallet has     │         9. Withdraw ───────────►
-  │  leftover balance              │         Choose: Telebirr or CBE│
+  │                                │         9. Withdraw ───────────►
+  │                                │         Telebirr / CBE / M-Pesa│
   │                                │         (Tier 2 KYC required)  │
-  │                                │                                │
-  │                                │    OR top up own wallet to ────►
-  │                                │    hire someone else           │
+  │                                │         Automated B2C transfer │
 ```
 
 ---
 
-## Stage Details
+## 2. Gig Marketplace Order Flow
 
-### Stage 1 — Client Top-Up
-- Client sends money to Yekis Telebirr (0911 223 344) or CBE (1000 223 344)
-- Uploads receipt with reference number in the Wallet tab
-- Staff (Compliance Officer or Admin) reviews in the staff dashboard
-- On approval: `wallet.balanceMinor` is incremented by the submitted amount
-- On rejection: no balance change; client is notified
+Alongside custom contracts, Yekis supports instant gig orders:
 
-### Stage 2 — Job Posting
-- Client fills in title, category, description, budget range, deadline
-- A `Job` record is created with status `OPEN`
-
-### Stage 3 — Proposal
-- Freelancer submits a cover letter, quote (ETB), estimated days, milestone breakdown
-- `Proposal` record created with status `SUBMITTED`
-
-### Stage 4 — Proposal Acceptance
-- Client reviews proposals and clicks Accept
-- `Proposal` → `ACCEPTED`; all other proposals → `REJECTED`
-- `Contract` created with milestones from the accepted proposal's breakdown
-- PDF agreement generated and stored in MinIO
-- Both parties see a "Sign agreement" button in their Contracts tab
-
-### Stage 5 — Contract Signing & Auto-Fund
-- Each party clicks "Accept agreement" independently
-- When **both** have signed (`fullyExecuted = true`):
-  - **If client wallet ≥ total milestone charge:** atomic transaction debits wallet + sets all milestones to `ESCROW_HELD`. Freelancer notified.
-  - **If client wallet insufficient:** contract remains signed (legally valid); client receives a notification to top up. They can then manually fund each milestone from the Contracts page using the "Fund from wallet" button.
-
-> **Fee calculation at funding:**
-> - Client pays: `milestoneAmount × (1 + PLATFORM_FEE_RATE_CLIENT)`  (currently 5%)
-> - Freelancer receives: `milestoneAmount × (1 - PLATFORM_FEE_RATE_FREELANCER)` minus withholding tax if milestone ≥ ETB 10,000  (currently 5% fee, 3% withholding with TIN / 30% without TIN)
-
-### Stage 6 — Work
-- Freelancer works. Milestone stays in `ESCROW_HELD` (or `WORK_IN_PROGRESS` if updated).
-
-### Stage 7 — Submission
-- Freelancer clicks "Submit delivery"
-- Milestone → `SUBMITTED_FOR_REVIEW`
-- Auto-release timer is scheduled (5 days by default, set by `AUTO_RELEASE_WINDOW_DAYS`)
-- Client is notified
-
-### Stage 8 — Approval & Fund Release
-- **Client approves:** milestone → `RELEASED`; freelancer wallet credited (net of fees)
-- **Auto-release:** if client does nothing for 5 days, worker auto-releases funds
-- **Client disputes:** milestone frozen; dispute flow begins (negotiation → evidence → mediation → arbitration)
-
-### Stage 9 — Freelancer Withdrawal
-- Freelancer visits Wallet tab, picks **Telebirr** or **CBE Bank** payout destination
-- Enters amount and phone/account number (must match verified identity — Tier 2 KYC required)
-- `wallet.balanceMinor` debited immediately
-- **[STUB]** Actual payout API to provider not yet implemented — balance is debited but funds are not sent in the current dev build. Do not use in production.
+```text
+CLIENT                          PLATFORM                        FREELANCER
+  │                                │                                │
+  │  1. Browse & select gig package│                                │
+  │     (Basic / Standard / Premium)                                │
+  ├────────────────────────────────►                                │
+  │                                │                                │
+  │  2. Order & fund escrow        │                                │
+  │     (requireFreshAuth step-up) │ GigOrder created               │
+  ├────────────────────────────────► Wallet debited (Price + 5% fee)│
+  │                                │ GigOrder → ESCROW_HELD         │
+  │                                │ Freelancer notified to start   │
+  │                                │                                │
+  │                                │◄─── 3. Submit deliverables ────┤
+  │                                │ Order → SUBMITTED_FOR_REVIEW   │
+  │                                │ 7-day auto-release scheduled   │
+  │                                │                                │
+  │  4. Client review:             │                                │
+  │     - Request revision ───────►│ Revisions counter decremented │
+  │     - Raise dispute ──────────►│ Escrow frozen; mediator queue  │
+  │     - Accept delivery ────────►│ Order → COMPLETED              │
+  │                                │ Freelancer wallet credited net │
+  │                                │ Platform fee credited to ledger│
+  │                                │ Prompt 4-category gig review   │
+```
 
 ---
 
-## Withdrawal Rules
+## 3. Detailed Stage Mechanics
 
-| Role | Can withdraw? | Condition |
-|------|---------------|-----------|
-| Freelancer | ✅ Yes | Must have Tier 2 KYC; payout account must match verified identity |
-| Client | ✅ Yes | Only if **no** active contract milestones in `[PAYMENT_PENDING, ESCROW_HELD, WORK_IN_PROGRESS, SUBMITTED_FOR_REVIEW]` **and** no open disputes |
+### Stage 1 — Client Top-Up & Multi-Rail Ingestion
+- **Automated Gateway Checkout:** Client initiates checkout (`POST /api/v1/wallet/topups/checkout`) using Telebirr, CBE Birr, or Safaricom M-Pesa. Successful provider webhook updates the top-up and credits wallet balance.
+- **Manual Verification Fallback:** If gateway APIs experience latency or client transfers directly, client attaches the transfer reference and receipt image (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`).
+- **Staff Review:** Staff review pending requests in the Operations Console (`TopUpQueue`). Approval atomically increments `wallet.balanceMinor`, updates top-up status, and logs a `TOPUP_APPROVED` audit event.
+
+### Stage 2 & 3 — Job Posting & Proposal Submission
+- Client publishes job with category, description, budget range, and proposed milestones (`POST /api/v1/jobs`).
+- Freelancers submit proposals with cover letters, quotes, timelines, and proposed milestone breakdowns (`POST /api/v1/jobs/:jobId/proposals`).
+- Anti-self-bidding and serializable isolation prevent race conditions or duplicate awards.
+
+### Stage 4 & 5 — Contract Execution, Cooling-Off, and Auto-Funding
+- Client acceptance rejects competing proposals, updates job to `IN_PROGRESS`, and auto-generates the Master Service Agreement PDF.
+- **Statutory 7-Day Cooling-Off Right:** Client retains statutory right to cancel (`POST /api/v1/contracts/:contractId/cancel-cooling-off`) per ECA Proclamation No. 1205/2020 while milestones remain in `PAYMENT_PENDING`.
+- **Digital Signatures:** Both parties click "Accept agreement" independently (`POST /api/v1/contracts/:contractId/accept`).
+- **Auto-Escrow Funding:** The moment the second signature commits:
+  - If client wallet balance ≥ total milestone charge: atomically debits client wallet, sets all milestones to `ESCROW_HELD`, and notifies freelancer.
+  - If wallet balance is insufficient: contract remains legally valid; client is notified to top up and fund milestones manually.
+
+### Stage 6 & 7 — Work Delivery & Review Timers
+- Freelancer completes work and uploads deliverables (`POST /api/v1/escrow/milestones/:milestoneId/submit`).
+- Milestone transitions to `SUBMITTED_FOR_REVIEW`.
+- BullMQ worker queues a 24-hour warning alert and schedules automatic release at 7 calendar days (`AUTO_RELEASE_WINDOW_DAYS = 7`).
+
+### Stage 8 — Acceptance, Atomic Fee Recognition & Tax Withholding
+- Upon client acceptance (or auto-release timer expiry):
+  - Milestone transitions to `RELEASED`.
+  - Net earnings credited to freelancer's wallet.
+  - **Atomic Platform Fee Recognition (LED-002):** Platform commission (5% client + 5% freelancer) is credited to `PlatformOperatingAccount` with a `PlatformFeeCredit` record.
+  - **Withholding Tax Deduction:** On milestones ≥ ETB 10,000, deducts 3% if verified TIN is on file, or 30% if TIN is missing, crediting `accumulatedWithholdingMinor` for monthly ERA reporting.
+  - When all milestones on a contract reach terminal states (`RELEASED`, `REFUNDED`, `PARTIAL_REFUND`), the contract is marked `COMPLETED`.
+
+### Stage 9 — Payout & Automated B2C Disbursement
+- Freelancer requests withdrawal to Telebirr, CBE, or M-Pesa (`POST /api/v1/escrow/wallet/withdraw`).
+- **Tier 2 KYC Requirement:** Payouts require verified Tier 2 KYC (ID + TIN/business registration).
+- **TMS Identity Matching:** Destination account must match verified user identity; mismatches return `202 HELD_FOR_REVIEW` and hold funds without debiting.
+- **Provider Disbursement:**
+  - Creates `PayoutTransaction` in `PROCESSING` state.
+  - Initiates automated B2C payout API call (with deterministic sandbox simulation in development).
+  - On provider success: transitions to `CONFIRMED` and posts double-entry general ledger records.
+  - On provider rejection: transitions to `FAILED`, automatically rolls back the wallet balance, and writes a security audit event.
 
 ---
 
-## Re-hire / Leftover Balance
-- If the client's wallet has a remaining balance after a contract completes, they can:
-  - Post a new job and accept a new proposal (funds deducted at contract signing again)
-  - Withdraw the remaining balance (subject to the no-active-contracts rule above)
-- Freelancers with earnings in their wallet can:
-  - Withdraw via Telebirr or CBE
-  - Top up their wallet additionally and act as a **client** to hire other freelancers
+## 4. Withdrawal Rules & Governance
+
+| Role | Permitted? | Conditions & Gates |
+|---|---|---|
+| **Freelancer** | ✅ Yes | Tier 2 KYC verified; destination phone/account matches KYC identity; account not compliance-held or suspended. |
+| **Client** | ✅ Yes | Permitted only if user has **zero active contract milestones** in non-terminal states and **no open disputes**. |
 
 ---
 
-## Error States
+## 5. Standard Error Codes
 
-| Error code | Meaning | User message |
-|------------|---------|--------------|
-| `INSUFFICIENT_BALANCE` | Client wallet < milestone charge | "Insufficient wallet balance. Top up your wallet first." |
-| `ACTIVE_CONTRACT_BLOCKS_WITHDRAWAL` | Client has active milestones or open disputes | "You cannot withdraw while you have active contracts or open disputes." |
-| `HELD_FOR_REVIEW` | Withdrawal flagged by TMS (wallet mismatch) | "Withdrawal held for compliance review." |
-| `CONTRACT_NOT_FULLY_EXECUTED` | Fund attempted before both signatures | "Both parties must sign the contract first." |
+| Error Code | HTTP Status | Description |
+|---|---|---|
+| `INSUFFICIENT_BALANCE` | 422 | Client wallet has insufficient funds to complete escrow funding. |
+| `ACTIVE_CONTRACT_BLOCKS_WITHDRAWAL` | 403 | Client attempted withdrawal while holding active contracts or disputes. |
+| `HELD_FOR_REVIEW` | 202 | Payout destination mismatched KYC identity; held for compliance review without wallet debit. |
+| `CONTRACT_NOT_FULLY_EXECUTED` | 409 | Milestone funding attempted prior to dual digital contract signatures. |
+| `COOLING_OFF_EXPIRED` | 409 | Statutory 7-day cancellation window has expired or work commenced. |
 
 ---
 
-*Last updated: 2026-08-15 — reflects wallet-first escrow implementation.*
+*Last updated: 2026-11-07 — fully aligned with multi-rail payments, gig marketplace, general ledger, and automated disbursements.*

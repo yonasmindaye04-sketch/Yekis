@@ -15,7 +15,8 @@
     "build:all": "pnpm -r build",
     "lint": "npm --prefix apps/frontend run lint",
     "lint:all": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "check:doc-parity": "node scripts/check-doc-parity.mjs"
   },
   "engines": {
     "node": ">=20.0.0"

@@ -1,22 +1,20 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Camera,
-  CheckCircle2,
-  Circle,
-  ExternalLink,
-  RefreshCw,
-  Save,
-  Sparkles,
-  Trash2,
-  Upload,
-  UserCheck,
   Briefcase,
-  FileText,
-  ShieldCheck,
-  Eye,
-  Star,
+  Camera,
+  Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Circle,
+  ExternalLink,
+  FileText,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  Star,
+  Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { api, type MeResponse } from "../api/client";
@@ -394,13 +392,6 @@ export function ProfileCompletionDialog({
     user.email?.split("@")[0] ||
     "Your Full Name";
 
-  const roleBadgeText =
-    role === "FREELANCER"
-      ? "Freelancer"
-      : role === "BOTH"
-        ? "Client & Freelancer"
-        : "Client";
-
   const primarySkillObj = skillsCatalog.find((s) => s.id === primarySkillId);
   const selectedSkillObjects = skillsCatalog.filter((s) =>
     skillIds.includes(s.id),
@@ -418,41 +409,32 @@ export function ProfileCompletionDialog({
         className="sh-profile-completion-dialog sh-pcd-wide"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Pinned Header */}
         <div className="sh-pcd-header">
           <div className="sh-pcd-header-left">
-            <span className="sh-pcd-eyebrow">
-              <Sparkles size={13} />
-              {location.state?.fromFirstLogin
-                ? "Welcome to Yekis · First-Login Setup"
-                : "Profile Trust & Readiness Checklist"}
-            </span>
+            <span className="sh-pcd-eyebrow">Profile setup</span>
             <h2 id="profile-completion-dialog-title" className="sh-pcd-title">
-              Complete your marketplace profile
+              Complete your profile
             </h2>
             <p className="sh-pcd-subtitle">
-              New accounts start with a generated Blobatar. Upload a custom profile picture and complete the checklist — watch your live client preview update in real time.
+              Add a photo and a few details so clients and collaborators
+              know who they are working with.
             </p>
           </div>
           <button
             type="button"
             className="sh-icon-only-btn"
             onClick={closeDialog}
-            aria-label="Close profile completion dialog"
+            aria-label="Close profile setup"
             title="Close"
           >
             <X size={17} />
           </button>
         </div>
 
-        {/* Pinned Checklist Progress Bar & Interactive Pills */}
         <div className="sh-pcd-checklist-bar">
           <div className="sh-pcd-progress-row">
             <span className="sh-pcd-progress-label">
-              Checklist Progress:{" "}
-              <strong>
-                {summary.completedCount} of {summary.totalCount} completed
-              </strong>
+              {summary.completedCount} of {summary.totalCount} complete
             </span>
             <span className="sh-pcd-progress-pct sh-mono">
               {summary.percentage}%
@@ -477,19 +459,15 @@ export function ProfileCompletionDialog({
                 });
               }}
             >
-              {summary.hasCustomPhoto ? (
-                <CheckCircle2 size={15} className="sh-pcd-icon-done" />
-              ) : (
-                <Circle size={15} className="sh-pcd-icon-missing" />
-              )}
-              <div className="sh-pcd-check-text">
-                <strong>Profile Picture</strong>
-                <small>
-                  {summary.hasCustomPhoto
-                    ? "Custom photo uploaded"
-                    : "Missing · Using default Blobatar"}
-                </small>
-              </div>
+              <span className="sh-pcd-check-icon">
+                {summary.hasCustomPhoto ? (
+                  <Check size={12} />
+                ) : (
+                  <Circle size={12} />
+                )}
+              </span>
+              <span className="sh-pcd-check-name">Profile photo</span>
+              <small>{summary.hasCustomPhoto ? "Added" : "Required"}</small>
             </button>
 
             <button
@@ -503,19 +481,15 @@ export function ProfileCompletionDialog({
                 });
               }}
             >
-              {summary.hasBioAndName ? (
-                <CheckCircle2 size={15} className="sh-pcd-icon-done" />
-              ) : (
-                <Circle size={15} className="sh-pcd-icon-missing" />
-              )}
-              <div className="sh-pcd-check-text">
-                <strong>Full Name &amp; Bio</strong>
-                <small>
-                  {summary.hasBioAndName
-                    ? "Name & bio ready"
-                    : "Missing · Min 20 chars bio"}
-                </small>
-              </div>
+              <span className="sh-pcd-check-icon">
+                {summary.hasBioAndName ? (
+                  <Check size={12} />
+                ) : (
+                  <Circle size={12} />
+                )}
+              </span>
+              <span className="sh-pcd-check-name">Name &amp; bio</span>
+              <small>{summary.hasBioAndName ? "Added" : "Required"}</small>
             </button>
 
             {summary.requiresSkills && (
@@ -530,50 +504,40 @@ export function ProfileCompletionDialog({
                   });
                 }}
               >
-                {summary.hasRequiredSkills ? (
-                  <CheckCircle2 size={15} className="sh-pcd-icon-done" />
-                ) : (
-                  <Circle size={15} className="sh-pcd-icon-missing" />
-                )}
-                <div className="sh-pcd-check-text">
-                  <strong>Skills &amp; Expertise</strong>
-                  <small>
-                    {summary.hasRequiredSkills
-                      ? `${skillIds.length} skills selected`
-                      : "Missing · Pick primary + 2 skills"}
-                  </small>
-                </div>
+                <span className="sh-pcd-check-icon">
+                  {summary.hasRequiredSkills ? (
+                    <Check size={12} />
+                  ) : (
+                    <Circle size={12} />
+                  )}
+                </span>
+                <span className="sh-pcd-check-name">Skills</span>
+                <small>
+                  {summary.hasRequiredSkills
+                    ? `${skillIds.length} selected`
+                    : "Choose 2+"}
+                </small>
               </button>
             )}
           </div>
         </div>
 
-        {/* Form Container with Dedicated Scrollable Split-Grid & Pinned Footer */}
         <form onSubmit={handleSave} className="sh-pcd-form">
           <div className="sh-pcd-scroll-area">
             {loadingProfile ? (
-              <div style={{ display: "grid", gap: 12, padding: "12px 0" }}>
+              <div className="sh-pcd-loading">
                 <div className="sh-skeleton" style={{ height: 76, width: "100%" }} />
                 <div className="sh-skeleton" style={{ height: 140, width: "100%" }} />
               </div>
             ) : (
               <div className="sh-pcd-split-grid">
-                {/* LEFT COLUMN: Checklist Editor */}
                 <div className="sh-pcd-editor-col">
-                  {/* 1. Profile Picture Section */}
-                  <div ref={photoSectionRef} className="sh-pcd-section">
+                  <section ref={photoSectionRef} className="sh-pcd-section">
                     <div className="sh-pcd-section-head">
                       <div className="sh-pcd-section-title">
-                        <Camera size={15} />
-                        <span>1. Profile Picture</span>
+                        <Camera size={16} />
+                        <h3>Profile photo</h3>
                       </div>
-                      <span
-                        className={`sh-pcd-status-tag ${summary.hasCustomPhoto ? "done" : "pending"}`}
-                      >
-                        {summary.hasCustomPhoto
-                          ? "Custom Photo Active"
-                          : "Default Blobatar (Upload Recommended)"}
-                      </span>
                     </div>
 
                     <input
@@ -617,8 +581,8 @@ export function ProfileCompletionDialog({
                             {uploadingPhoto
                               ? "Processing..."
                               : summary.hasCustomPhoto
-                                ? "Change Photo"
-                                : "Upload Profile Picture"}
+                                ? "Change photo"
+                                : "Upload photo"}
                           </button>
 
                           {summary.hasCustomPhoto ? (
@@ -627,7 +591,7 @@ export function ProfileCompletionDialog({
                               className="sh-btn sh-btn-secondary"
                               onClick={handleRevertToBlobatar}
                             >
-                              <Trash2 size={14} /> Use Default Blobatar
+                              <Trash2 size={14} /> Remove
                             </button>
                           ) : (
                             <button
@@ -644,64 +608,58 @@ export function ProfileCompletionDialog({
                                 });
                               }}
                             >
-                              <RefreshCw size={14} /> Shuffle Blobatar
+                              <RefreshCw size={14} /> Shuffle
                             </button>
                           )}
                         </div>
                         <p className="sh-pcd-hint">
-                          Blobatars are generated automatically for new users or anyone who prefers not to upload a photo. Upload a JPG, PNG, or WEBP image anytime.
+                          JPG, PNG or WEBP, up to 10 MB. Without a photo, we
+                          use a generated avatar.
                         </p>
                         {photoError && (
                           <p className="sh-pcd-error-inline">{photoError}</p>
                         )}
                       </div>
                     </div>
-                  </div>
+                  </section>
 
-                  {/* 2. Full Name & Bio Section */}
-                  <div ref={bioSectionRef} className="sh-pcd-section">
+                  <section ref={bioSectionRef} className="sh-pcd-section">
                     <div className="sh-pcd-section-head">
                       <div className="sh-pcd-section-title">
-                        <FileText size={15} />
-                        <span>2. Full Name &amp; Professional Bio</span>
+                        <FileText size={16} />
+                        <h3>Name &amp; bio</h3>
                       </div>
-                      <span
-                        className={`sh-pcd-status-tag ${summary.hasBioAndName ? "done" : "pending"}`}
-                      >
-                        {summary.hasBioAndName
-                          ? "Completed"
-                          : `${Math.min(20, bio.trim().length)}/20 min bio chars`}
-                      </span>
                     </div>
 
                     <div className="sh-pcd-grid-2">
                       <label className="sh-pcd-field">
-                        <span>First Name</span>
+                        <span>First name</span>
                         <input
                           type="text"
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          placeholder="e.g., Dawit"
+                          placeholder="Dawit"
                           required
                         />
                       </label>
                       <label className="sh-pcd-field">
-                        <span>Last Name</span>
+                        <span>Last name</span>
                         <input
                           type="text"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          placeholder="e.g., Mekonnen"
+                          placeholder="Mekonnen"
                           required
                         />
                       </label>
                     </div>
 
-                    <label className="sh-pcd-field" style={{ marginTop: 10 }}>
-                      <span>
-                        {role === "CLIENT"
-                          ? "Company / Hiring Bio (min 20 characters)"
-                          : "Professional Bio & Experience (min 20 characters)"}
+                    <label className="sh-pcd-field sh-pcd-field-bio">
+                      <span className="sh-pcd-field-row">
+                        <span>Bio</span>
+                        <small className={bio.trim().length >= 20 ? "ok" : ""}>
+                          {Math.min(20, bio.trim().length)}/20
+                        </small>
                       </span>
                       <textarea
                         rows={3}
@@ -709,39 +667,31 @@ export function ProfileCompletionDialog({
                         onChange={(e) => setBio(e.target.value)}
                         placeholder={
                           role === "CLIENT"
-                            ? "Describe your organization or the types of projects you hire for on Yekis..."
-                            : "Summarize your core stack, Ethiopian industry experience, and how you deliver milestone work..."
+                            ? "What does your company hire for?"
+                            : "What do you do, and what are you known for?"
                         }
                       />
                     </label>
-                  </div>
+                  </section>
 
-                  {/* 3. Skills Section (Freelancer & Dual-Role) */}
                   {summary.requiresSkills && (
-                    <div ref={skillsSectionRef} className="sh-pcd-section">
+                    <section ref={skillsSectionRef} className="sh-pcd-section">
                       <div className="sh-pcd-section-head">
                         <div className="sh-pcd-section-title">
-                          <Briefcase size={15} />
-                          <span>3. Core Skills &amp; Expertise</span>
+                          <Briefcase size={16} />
+                          <h3>Skills</h3>
                         </div>
-                        <span
-                          className={`sh-pcd-status-tag ${summary.hasRequiredSkills ? "done" : "pending"}`}
-                        >
-                          {summary.hasRequiredSkills
-                            ? `${skillIds.length} Selected`
-                            : "Select Primary + 2 Skills"}
-                        </span>
                       </div>
 
                       <label className="sh-pcd-field">
-                        <span>Primary Specialization</span>
+                        <span>Primary skill</span>
                         <select
                           value={primarySkillId}
                           onChange={(e) =>
                             handlePrimarySkillSelect(e.target.value)
                           }
                         >
-                          <option value="">Choose your primary skill...</option>
+                          <option value="">Select your primary skill</option>
                           {skillsCatalog.map((skill) => (
                             <option key={skill.id} value={skill.id}>
                               {skillLabel(skill)}
@@ -750,8 +700,11 @@ export function ProfileCompletionDialog({
                         </select>
                       </label>
 
-                      <div className="sh-pcd-field" style={{ marginTop: 10 }}>
-                        <span>Select at least 2 skills (click to toggle)</span>
+                      <div className="sh-pcd-field">
+                        <span>Additional skills</span>
+                        <p className="sh-pcd-hint">
+                          Select at least two. Click a skill to add or remove it.
+                        </p>
                         <div className="sh-pcd-skill-tags">
                           {skillsCatalog.map((skill) => {
                             const active = skillIds.includes(skill.id);
@@ -762,18 +715,17 @@ export function ProfileCompletionDialog({
                                 className={`sh-pcd-skill-tag ${active ? "active" : ""}`}
                                 onClick={() => toggleSkill(skill.id)}
                               >
-                                {active && <UserCheck size={12} />}
+                                {active && <Check size={11} />}
                                 {skillLabel(skill)}
                               </button>
                             );
                           })}
                         </div>
                       </div>
-                    </div>
+                    </section>
                   )}
                 </div>
 
-                {/* Mobile Bottom-Sheet Scrim Backdrop */}
                 {mobileSheetOpen && (
                   <div
                     className="sh-pcd-sheet-scrim"
@@ -782,12 +734,10 @@ export function ProfileCompletionDialog({
                   />
                 )}
 
-                {/* RIGHT COLUMN (Sticky on Desktop / Docked Bottom-Sheet on Mobile) */}
                 <aside
                   className={`sh-pcd-preview-col ${mobileSheetOpen ? "sheet-open" : "sheet-collapsed"}`}
-                  aria-label="Live Profile Preview"
+                  aria-label="Profile preview"
                 >
-                  {/* Mobile Bottom-Sheet Grab Handle & Docked Mini-Bar */}
                   <div
                     className="sh-pcd-sheet-bar"
                     onClick={() => setMobileSheetOpen((v) => !v)}
@@ -803,60 +753,30 @@ export function ProfileCompletionDialog({
                   >
                     <div className="sh-pcd-sheet-pill" aria-hidden="true" />
                     <div className="sh-pcd-sheet-bar-row">
-                      <div className="sh-pcd-sheet-bar-left">
-                        <YekisAvatar
-                          userId={user.id}
-                          seed={avatarSeed}
-                          avatarUrl={avatarUrl}
-                          disableStoredOverride={true}
-                          size={28}
-                          animate={false}
-                        />
-                        <div className="sh-pcd-sheet-bar-meta">
-                          <strong>{liveDisplayName}</strong>
-                          <span>
-                            Live Preview · {summary.percentage}% ready
-                          </span>
-                        </div>
-                      </div>
+                      <span className="sh-pcd-sheet-bar-title">
+                        Profile preview
+                      </span>
                       <span className="sh-pcd-sheet-toggle-chip">
-                        <Eye size={13} />
                         {mobileSheetOpen ? (
                           <>
-                            Collapse <ChevronDown size={13} />
+                            Hide <ChevronDown size={13} />
                           </>
                         ) : (
                           <>
-                            Preview Card <ChevronUp size={13} />
+                            Show <ChevronUp size={13} />
                           </>
                         )}
                       </span>
                     </div>
                   </div>
 
-                  {/* Desktop Sticky Header */}
-                  <div className="sh-pcd-preview-top">
-                    <div className="sh-pcd-preview-badge">
-                      <Eye size={13} />
-                      <span>Live Profile Preview</span>
-                    </div>
-                    <span className="sh-pcd-preview-live-dot">
-                      <span className="dot" /> Updates in real time
-                    </span>
+                  <div className="sh-pcd-preview-head">
+                    <span>Preview</span>
+                    <small>Public profile</small>
                   </div>
 
-                  {/* Preview Card Content */}
                   <div className="sh-pcd-preview-card">
-                    <div className="sh-pcd-preview-banner">
-                      <span className="sh-pcd-preview-role-pill">
-                        {roleBadgeText}
-                      </span>
-                      <span className="sh-pcd-preview-avatar-mode">
-                        {summary.hasCustomPhoto
-                          ? "Custom Photo"
-                          : "Default Blobatar"}
-                      </span>
-                    </div>
+                    <div className="sh-pcd-preview-banner" />
 
                     <div className="sh-pcd-preview-body">
                       <div className="sh-pcd-preview-identity">
@@ -875,67 +795,45 @@ export function ProfileCompletionDialog({
                             <strong className="sh-pcd-preview-name">
                               {liveDisplayName}
                             </strong>
-                            <span
-                              className="sh-pcd-preview-kyc"
-                              title="Fayda Identity Verified"
-                            >
-                              <ShieldCheck size={14} />
-                              {user.kyc?.tier ?? "TIER_2"}
-                            </span>
+                            {user.kyc?.tier && (
+                              <span
+                                className="sh-pcd-preview-kyc"
+                                title="Identity verified"
+                              >
+                                <ShieldCheck size={12} />
+                                Verified
+                              </span>
+                            )}
                           </div>
                           <span className="sh-pcd-preview-headline">
-                            <Briefcase size={12} />
                             {primarySkillObj
                               ? skillLabel(primarySkillObj)
                               : role === "CLIENT"
-                                ? "Verified Escrow Client · Ethiopia"
-                                : "Select your primary specialization"}
+                                ? "Client · Ethiopia"
+                                : "Freelancer · Ethiopia"}
                           </span>
-                          <div className="sh-pcd-preview-avail-row">
-                            <span className="sh-pcd-preview-avail-pill">
-                              <span className="avail-dot" />
-                              {role === "CLIENT"
-                                ? "Escrow Protected Hiring"
-                                : "Available for Milestone Work"}
-                            </span>
-                          </div>
                         </div>
                       </div>
 
-                      {/* Live Bio Block */}
                       <div className="sh-pcd-preview-block">
                         <div className="sh-pcd-preview-block-head">
                           <span>About</span>
-                          <small
-                            className={
-                              bio.trim().length >= 20 ? "ready" : "pending"
-                            }
-                          >
-                            {bio.trim().length >= 20
-                              ? "Ready for clients"
-                              : `${bio.trim().length}/20 chars`}
-                          </small>
                         </div>
                         {bio.trim() ? (
                           <p className="sh-pcd-preview-bio-text">{bio.trim()}</p>
                         ) : (
                           <p className="sh-pcd-preview-bio-placeholder">
-                            Start typing your bio on the left to preview how your introduction looks to clients and counterparties...
+                            Your bio will appear here.
                           </p>
                         )}
                       </div>
 
-                      {/* Live Skills Block */}
                       {(summary.requiresSkills ||
                         selectedSkillObjects.length > 0) && (
                         <div className="sh-pcd-preview-block">
                           <div className="sh-pcd-preview-block-head">
-                            <span>Verified Skills &amp; Stack</span>
-                            <small
-                              className={
-                                summary.hasRequiredSkills ? "ready" : "pending"
-                              }
-                            >
+                            <span>Skills</span>
+                            <small>
                               {selectedSkillObjects.length} selected
                             </small>
                           </div>
@@ -948,7 +846,7 @@ export function ProfileCompletionDialog({
                                     key={sk.id}
                                     className={`sh-pcd-preview-skill-chip ${isPrimary ? "primary" : ""}`}
                                   >
-                                    {isPrimary && <Star size={11} />}
+                                    {isPrimary && <Star size={10} />}
                                     {skillLabel(sk)}
                                   </span>
                                 );
@@ -956,41 +854,16 @@ export function ProfileCompletionDialog({
                             </div>
                           ) : (
                             <p className="sh-pcd-preview-bio-placeholder">
-                              Choose your primary specialization and at least 2 skills to showcase on your public card.
+                              Selected skills will appear here.
                             </p>
                           )}
                         </div>
                       )}
 
-                      {/* Trust Readiness Footer inside Preview Card */}
-                      <div className="sh-pcd-preview-trust-foot">
-                        <div className="sh-pcd-preview-trust-top">
-                          <span>Client Impression Readiness</span>
-                          <strong className="sh-mono">
-                            {summary.percentage}%
-                          </strong>
-                        </div>
-                        <div className="sh-pcd-preview-trust-tags">
-                          <span
-                            className={`sh-pcd-mini-tag ${summary.hasCustomPhoto ? "ok" : "warn"}`}
-                          >
-                            {summary.hasCustomPhoto ? "✓ Photo" : "○ Photo"}
-                          </span>
-                          <span
-                            className={`sh-pcd-mini-tag ${summary.hasBioAndName ? "ok" : "warn"}`}
-                          >
-                            {summary.hasBioAndName ? "✓ Name & Bio" : "○ Name & Bio"}
-                          </span>
-                          {summary.requiresSkills && (
-                            <span
-                              className={`sh-pcd-mini-tag ${summary.hasRequiredSkills ? "ok" : "warn"}`}
-                            >
-                              {summary.hasRequiredSkills
-                                ? "✓ Skills"
-                                : "○ Skills"}
-                            </span>
-                          )}
-                        </div>
+                      <div className="sh-pcd-preview-foot">
+                        {role === "CLIENT"
+                          ? "Escrow-protected hiring"
+                          : "Available for milestone work"}
                       </div>
                     </div>
                   </div>
@@ -1001,17 +874,17 @@ export function ProfileCompletionDialog({
             {saveError && <div className="sh-pcd-alert-error">{saveError}</div>}
             {saveSuccess && (
               <div className="sh-pcd-alert-success">
-                <CheckCircle2 size={15} /> Profile updated! Syncing workspace...
+                <CheckCircle2 size={15} /> Profile saved. Updating your
+                workspace...
               </div>
             )}
           </div>
 
-          {/* Pinned Footer Actions */}
           <div className="sh-pcd-footer">
             <div className="sh-pcd-footer-left">
               <button
                 type="button"
-                className="sh-btn sh-btn-secondary"
+                className="sh-pcd-text-btn"
                 onClick={closeDialog}
               >
                 Skip for now
@@ -1025,7 +898,7 @@ export function ProfileCompletionDialog({
                     onOpenFullEditor();
                   }}
                 >
-                  <ExternalLink size={13} /> Full Profile Editor
+                  <ExternalLink size={13} /> Full profile editor
                 </button>
               )}
             </div>
@@ -1037,10 +910,10 @@ export function ProfileCompletionDialog({
             >
               <Save size={14} />
               {saving
-                ? "Saving Profile..."
+                ? "Saving..."
                 : summary.isComplete
-                  ? "Save & Complete Profile"
-                  : "Save Progress"}
+                  ? "Save and finish"
+                  : "Save changes"}
             </button>
           </div>
         </form>

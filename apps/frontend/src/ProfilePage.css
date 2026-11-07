@@ -746,6 +746,27 @@
   line-height: 1.45;
 }
 
+/* Neutral status label for the profile photo section. */
+.profile-photo-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.profile-photo-status.custom {
+  border-color: rgba(22, 163, 74, 0.3);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
 .form-divider {
   height: 1px;
   background: var(--color-border);

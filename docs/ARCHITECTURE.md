@@ -1,18 +1,20 @@
 # Architecture
 
-Last updated: 2026-08-15
+Last updated: 2026-11-07
 
 ## System Overview
 
 ```mermaid
 flowchart TB
-  U["Browser or Telegram Mini App"] --> F["React + Vite frontend"]
+  U1["Browser (React SPA)"] --> F["React + Vite frontend"]
+  U2["Telegram Mini App"] --> F
+  U3["Grammy Telegram Bot (@ye_kis_bot)"] --> A
   F --> A["Express + TypeScript API"]
   A --> P["PostgreSQL via Prisma"]
   A --> R["Redis + BullMQ"]
   A --> O["MinIO / S3-compatible object store"]
-  A --> X["Fayda, PEP, payment, SMS and Telegram adapters"]
-  R --> W["Auto-release, KYC refresh and notification workers"]
+  A --> X["Fayda, PEP, Telebirr, CBE, M-Pesa, SMS and Telegram adapters"]
+  R --> W["Auto-release, gig-auto-release, KYC refresh, TMS scan, notifications, withholding-report workers"]
   W --> P
   W --> X
 ```
@@ -24,6 +26,7 @@ The API is the authority for roles, KYC gates, contract signatures, state transi
 | Path | Responsibility |
 |---|---|
 | `apps/frontend/src` | Browser/Telegram UI, API client, role-aware workspaces |
+| `apps/frontend/src/pages/ops/` | Operations Console v2 — single staff console (19 pages, command palette, RBAC-driven nav) |
 | `apps/backend/src/app.ts` | Middleware order and route registration |
 | `apps/backend/src/modules` | Domain routes, services, provider adapters |
 | `apps/backend/src/queue` | BullMQ queues and workers |
@@ -37,10 +40,11 @@ The API is the authority for roles, KYC gates, contract signatures, state transi
 ```text
 request
   -> Helmet and CORS
-  -> raw webhook router (provider routes only)
+  -> raw webhook router (provider routes only, before express.json())
+  -> Telegram bot router (raw body for secret-token verification)
   -> JSON body parser
-  -> structured request logging
-  -> API rate limiter
+  -> Cache-Control: no-store header
+  -> API rate limiter (2,000 req/15m prod, 10,000 dev)
   -> route authentication and role/KYC/party guards
   -> Zod validation
   -> domain service
@@ -53,17 +57,30 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 
 ## Domain Modules
 
-| Module | Main responsibility |
-|---|---|
-| `auth` | Registration, login, JWTs (role + staffRole in payload), Telegram init-data verification |
-| `kyc` | Document upload, Fayda/PEP boundary, tier transitions, staff review |
-| `jobs` | Job search/creation, proposals, atomic proposal decisions |
-| `contracts` | Contract creation, PDF storage, party access, signatures |
-| `escrow` | Funding, webhook handling, submission, release, wallet, top-ups |
-| `disputes` | Party cases, evidence, escalation, staff resolution |
-| `tms` | AML flags, review queue, STR record, dismissal |
-| `notifications` | In-app notification ledger and read state |
-| `chat` | Guest/authenticated support conversations, auto staff assignment (load-balanced), file attachments, staff-scoped access control |
+| Module | Mount path | Main responsibility |
+|---|---|---|
+| `auth` | `/api/v1/auth` | Registration, login, JWTs, Google/Apple/Facebook/Telegram OAuth, password reset, session refresh, Telegram Mini App & Widget verification |
+| `kyc` | `/api/v1/kyc` | Document upload, Fayda eSignet OIDC/PAR, PEP screening, tier transitions, staff review queue |
+| `jobs` | `/api/v1/jobs` | Job search/creation, proposals, atomic serializable proposal decisions |
+| `contracts` | `/api/v1/contracts` | Contract creation, PDF storage, party access, independent signatures, 7-day cooling-off cancellation |
+| `escrow` | `/api/v1/escrow` | Wallet-first milestone funding, delivery submission, client acceptance, auto-release, wallet balance |
+| `topups` | `/api/v1/wallet/topups` | Manual top-up submission & receipt attachment, automated checkout (Telebirr/CBE/M-Pesa), staff approval queue |
+| `webhooks` | `/api/v1/webhooks` | Signed Telebirr and CBE provider callback ingestion (RSA-PSS + HMAC-SHA256) |
+| `disputes` | `/api/v1/disputes` | 5-stage dispute lifecycle (negotiation → evidence → mediation → arbitration → resolved), evidence bundles, staff resolution |
+| `gigs` | `/api/v1/gigs` | Fiverr-style gig creation (packages/tiers), ordering, funding, delivery, revision loop, acceptance, reviews, gig disputes |
+| `tms` | `/api/v1/tms` | AML flags (structuring, velocity, round-amounts), review queue, STR recording, hold lift |
+| `notifications` | `/api/v1/notifications` | In-app notification ledger, read state |
+| `chat` | `/api/v1/chat` | Guest/authenticated support conversations, direct 2-party negotiation threads, auto staff assignment, file attachments, Mini-Me AI co-pilot |
+| `profiles` | `/api/v1/users` | Public profiles, bio/skills/portfolio, visibility gates, completeness score, profile reporting |
+| `skills` | `/api/v1/skills` | Standardized skill taxonomy |
+| `reviews` | `/api/v1/reviews` | Double-blind contract review system, Bayesian rating averages, public responses |
+| `featured` | `/api/v1/featured` | Talent carousel (staff-pinned, top-rated, recently verified algorithm) |
+| `portfolio` | `/api/v1/portfolio` | Freelancer portfolio items |
+| `finance` | `/api/v1/finance` | Finance reconciliation read models, platform fee credit ledger, monthly withholding tax remittance reports |
+| `admin` | `/api/v1/admin` | Phase 1 RBAC permission matrix, users/contracts/payments/escrow/payouts/ledger/reconciliation/reports/risk/monitoring staff surfaces |
+| `staffProfile` | `/api/v1/staff` | Profile report management (list, resolve) |
+| `search` | N/A (Internal service) | OpenSearch cluster integration (`searchIndex.service.ts`), indexing gigs & jobs, resilient fallback to PostgreSQL |
+| `bot` | `/api/v1/telegram` | Grammy Telegram bot webhook handler (4-language support: en/am/om/ti, 243 i18n keys, push notifications) |
 
 The secured `disputes/dispute.routes.ts` router is the mounted dispute implementation. The older `disputes.routes.ts` file is not mounted and should be treated as legacy until removed.
 
@@ -86,15 +103,25 @@ Job: OPEN -> CANCELLED
 
 Proposal: SUBMITTED -> SHORTLISTED -> ACCEPTED | REJECTED
 Proposal: SUBMITTED | SHORTLISTED -> WITHDRAWN
+Proposal: SUBMITTED | SHORTLISTED -> COUNTER_OFFERED
 ```
 
 Accepting a proposal runs in a serializable transaction. It confirms the job is still open, accepts one proposal, rejects competitors, moves the job to `IN_PROGRESS`, and creates one contract.
 
+### Contract
+
+```text
+ACTIVE -> COMPLETED  (all milestones reach terminal escrow state)
+ACTIVE -> TERMINATED (staff action)
+ACTIVE -> CANCELLED  (client exercises 7-day cooling-off right per ECA Proclamation 1205/2020,
+                      only while all milestones remain PAYMENT_PENDING)
+```
+
 ### Escrow
 
 ```text
-PAYMENT_PENDING -> ESCROW_HELD -> SUBMITTED_FOR_REVIEW
-SUBMITTED_FOR_REVIEW -> RELEASED
+PAYMENT_PENDING -> ESCROW_HELD -> WORK_IN_PROGRESS -> SUBMITTED_FOR_REVIEW
+SUBMITTED_FOR_REVIEW -> RELEASED        (client acceptance or auto-release after 7 days)
 SUBMITTED_FOR_REVIEW -> DISPUTED
 DISPUTED -> RELEASED | REFUNDED | PARTIAL_REFUND
 ```
@@ -109,7 +136,17 @@ STAGE_3_MEDIATION -> RESOLVED
 STAGE_3_MEDIATION -> STAGE_4_ARBITRATION -> RESOLVED
 ```
 
-Each dispute has a unique `milestoneId`. Resolution can release to the freelancer, refund the client, or split the milestone amount; a split cannot exceed that amount.
+Each dispute has a unique `milestoneId` (or `gigOrderId` for gig order disputes — polymorphic since migration `20260829233000_gig_disputes_polymorphic`). Resolution can release to the freelancer, refund the client, or split the milestone amount; a split cannot exceed that amount.
+
+### Payout
+
+```text
+PENDING -> PROCESSING -> CONFIRMED
+PENDING -> PROCESSING -> FAILED   (wallet balance automatically rolled back)
+CONFIRMED -> REVERSED
+```
+
+Telebirr B2C disbursement is live; deterministic sandbox simulation is used when production credentials are absent. Double-entry ledger entries are posted on CONFIRMED; wallet is re-credited on FAILED.
 
 ## Financial Integrity Controls
 
@@ -123,6 +160,7 @@ Each dispute has a unique `milestoneId`. Resolution can release to the freelance
 - TMS rules mirror Master Design §11.4 (2026-08-26 alignment): structuring = deposits totaling >500k ETB within 7 days; velocity = release rate >300% of the user's 90-day baseline (with an absolute floor so new accounts cannot evade review); round amounts = repeated exact 10k-ETB-multiple payments within 7 days. Geographic-risk screening is deferred until any cross-border rail exists.
 - A periodic TMS scan (`tms-scan` queue, every 15 minutes) re-runs all windowed rules across users with recent activity and sweeps flags whose 24-hour STR filing SLA has been breached (`TransactionFlag.strDeadlineAt`), raising a one-time `STR_SLA_BREACH` audit event + staff alert per flag.
 - Filing an STR optionally suspends the account (`suspendAccount` on `POST /tms/:flagId/file-str`) per Master Design §11.4 — suspension blocks login and all authenticated actions via the per-request middleware check; escrow funds resolve through the dispute path.
+- Double-entry general ledger (`LedgerAccount`, `LedgerJournal`, `LedgerEntry`) enforces zero-sum invariant per journal. Escrow release automatically credits `PlatformOperatingAccount` and logs `PlatformFeeCredit`. VAT threshold alerts (`VAT_THRESHOLD_MINOR`) are emitted to Finance on release.
 
 ## Telebirr Payment Integration
 
@@ -190,11 +228,31 @@ sequenceDiagram
 
 | Queue/worker | Trigger | Behavior |
 |---|---|---|
-| Auto-release | Milestone submission | Warns before deadline and conditionally releases eligible escrow |
-| KYC refresh | Daily schedule | Marks periodic reviews due without revoking verified access |
-| Notifications | Domain events | Persists in-app notices and attempts configured SMS/Telegram delivery |
+| `auto-release` | Milestone submission | Schedules 24h warning before deadline and conditionally releases eligible escrow after 7 days |
+| `gig-auto-release` | Gig order delivery submission | Same 7-day auto-release logic for gig orders; gig dispute cancels the job |
+| `kyc-refresh` | Daily schedule | Marks periodic reviews due (`periodicReviewPending = true`) without revoking verified access |
+| `notifications` | Domain events | Persists in-app notices and attempts configured SMS/Telegram delivery |
+| `tms-scan` | Every 15 minutes | Re-runs structuring/velocity/round-amounts rules; sweeps flags with expired 24h STR SLA clock; raises `STR_SLA_BREACH` audit events |
+| `withholding-report` | Monthly schedule (BullMQ cron) | Generates monthly withholding tax remittance reports (`WithholdingRemittanceReport`) |
 
 Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
+
+## Multilingual System
+
+The platform supports four languages natively:
+
+| Code | Language | Script |
+|---|---|---|
+| `en` | English | Latin |
+| `am` | Amharic | Fidel (Ge'ez) |
+| `om` | Afaan Oromoo | Latin |
+| `ti` | Tigrigna | Fidel (Ge'ez) |
+
+**Frontend (314 keys):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. `Yekis_translations.csv` is the offline parity ledger.
+
+**Telegram Bot (243 keys):** Locale files at `apps/backend/src/modules/bot/locales/{en,am,om,ti}.json`. All 4 languages have exact 100% key parity. `getBotTranslation()` drives outbound push notifications so users receive localized alerts.
+
+Anti-circumvention: a multi-script engine strips Amharic Fidel numerals, spelled words, obfuscation, and leetspeak from chat messages before rule evaluation.
 
 ## Object Storage
 
@@ -205,20 +263,23 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 - JWT authentication and fresh database role checks for authorization-sensitive job actions.
 - Party checks prevent unrelated users from reading or changing contracts, milestones, and disputes.
 - Staff middleware protects KYC, top-up, mediation, and TMS queues.
+- Phase 1 RBAC permission matrix (`/admin/permissions/matrix`) drives granular `requirePermission(key)` checks for all admin surfaces. Nav visibility is derived from this matrix at render time.
+- WebSocket channel authorization: client-requested subscriptions and typing/read broadcasts verified against conversation membership before they take effect.
 - Helmet, CORS, body limits, upload limits, and separate webhook rate limiting are enabled.
 - `AuditLog` is append-only by application convention and supported by database grants/pgaudit initialization.
-- Secrets are environment validated and must not be committed.
+- Secrets are environment validated and must not be committed. Server refuses to boot in production with a mocked PEP provider.
 
 ## External Boundaries
 
 | Boundary | Local behavior | Production requirement |
 |---|---|---|
-| Fayda | Mock verification | Formal integration and credentials |
-| PEP | Stub screening | Approved sanctions/PEP source |
-| Payment collection | Telebirr C2B Web Checkout (RSA-PSS) + CBE adapter (PAY-002: Chapa removed) | Sandbox/live mapping and reconciliation; CBE webhook scheme confirmation (PAY-004) |
-| Payout | Wallet debit/audit only | Real disbursement and failure/reversal workflow |
-| SMS/Telegram | Worker clients | Credentials, templates, account linking, monitoring |
-| STR | Records a human filing | External human/regulatory process |
+| Fayda | Mock verification (eSignet OIDC/PAR stub) | Formal integration and approved credentials |
+| PEP/Sanctions | Stub screening | Approved sanctions/PEP source; server refuses production boot with mock |
+| Payment collection (C2B) | Telebirr C2B Web Checkout (RSA-PSS) + CBE HMAC adapter; M-Pesa stub | Sandbox/live mapping and reconciliation; CBE webhook scheme confirmation (PAY-004) |
+| Payout (B2C) | Telebirr B2C live with deterministic sandbox simulation; automatic wallet rollback on provider refusal | Production credentials, monitoring, reconciliation |
+| SMS | Worker client | Credentials, templates, delivery monitoring |
+| Telegram | Grammy bot + Mini App init-data verification | Production push verification, account linking |
+| STR | Records a human filing; does not submit to FIC | External human/regulatory process; confirm FIC operating procedure |
 
 ## Local Topology
 

@@ -1,9 +1,15 @@
-# Yekis_jobs Completeness Checklist
+﻿# Yekis_jobs Completeness Checklist
 
-Last reviewed: 2026-10-17
+Last reviewed: 2026-11-07
 
 `[x]` means implemented and verified locally. `[ ]` means production work, broader test coverage, or external validation is still required. This is the authoritative project checklist; `EXTENDED_COMPLETENESS_CHECKLIST.md` points here to prevent status drift.
 
+## Documentation Alignment (2026-11-07)
+
+- [x] `docs/ARCHITECTURE.md` updated: 12 missing modules added, 3 missing workers added, system diagram updated, External Boundaries corrected (B2C live), multilingual section added
+- [x] `docs/DATABASE.md` updated: 14 missing models added, full StaffRole enum (7 values), GigStatus/GigOrderStatus enums, ContractStatus.CANCELLED and ProposalStatus.COUNTER_OFFERED added, erDiagram extended
+- [x] `docs/API.md` updated: full auth route list (21 routes), finance module section, bot management section, gig moderation path corrected, TMS full routes, PATCH chat/status added, OpenSearch integration documented
+- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against November 2026 codebase scan
 ## Product Journey
 
 - [x] Registration, login, age gate, consent capture, and JWT sessions
@@ -53,8 +59,8 @@ Last reviewed: 2026-10-17
 - [x] Secured dispute router replaces the legacy unauthenticated router at mount time
 - [x] Zod validation for shared and route-local payloads
 - [x] Role, staff, party, ownership, KYC-tier, and state-transition checks
-- [x] `PATCH /chat/admin/conversations/:id/status` â€” staff can close and reopen support conversations
-- [x] `/chat` â€” Guest support with automated load-balanced staff assignment and staff-scoped access control
+- [x] `PATCH /chat/admin/conversations/:id/status` Ã¢â‚¬â€ staff can close and reopen support conversations
+- [x] `/chat` Ã¢â‚¬â€ Guest support with automated load-balanced staff assignment and staff-scoped access control
 - [x] Self-bid prevention and one proposal per freelancer/job
 - [x] Serializable proposal acceptance prevents multiple winners
 - [x] One contract per job
@@ -137,15 +143,15 @@ Last reviewed: 2026-10-17
 - [x] **Evidence Bundle Assembly & Storage** (SHA-256 hashed JSON)
 - [x] **Mandatory Cooling-Off / Deadlines** (7-day resolution SLAs)
 - [x] Real-time `ws` layer: JWT-authenticated channels, chat typing/read receipts, staff alerts, and live `notify:*` event fan-out from the BullMQ notification worker
-- [x] Admin operations platform (Phases 1â€“8): RBAC permission matrix, hardened audit log, Users/Contracts/Payments/Escrow/Payouts/Ledger/Reconciliation/Reports/Risk/Monitoring, real-metrics Overview, manual payout settlement workflow
+- [x] Admin operations platform (Phases 1Ã¢â‚¬â€œ8): RBAC permission matrix, hardened audit log, Users/Contracts/Payments/Escrow/Payouts/Ledger/Reconciliation/Reports/Risk/Monitoring, real-metrics Overview, manual payout settlement workflow
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system, persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem.
+- [x] Multilingual translation integration for Amharic (áŠ áˆ›áˆ­áŠ›), Oromiffa (Afaan Oromoo), and Tigrigna (á‰µáŒáˆ­áŠ›) alongside English with typed i18n system, persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem.
 
 ## Marketing Site (Public)
 
-- [x] Escrow explainer and 4-step trust process — rebuilt 2026-10-05 as a single-slogan stepper with one product screen per step (autoplaying tabs, keyboard-navigable, `inert` on inactive screens); the old pinned scroll board is gone
+- [x] Escrow explainer and 4-step trust process â€” rebuilt 2026-10-05 as a single-slogan stepper with one product screen per step (autoplaying tabs, keyboard-navigable, `inert` on inactive screens); the old pinned scroll board is gone
 - [x] Dual CTA hero section
 - [x] Transparent pricing and fees page
 - [x] FAQ accordion with deep-linking
@@ -155,7 +161,7 @@ Last reviewed: 2026-10-17
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv`.
+- [x] Multilingual translation integration â€” 4 languages supported: English (`en`), Amharic (`am` / áŠ áˆ›áˆ­áŠ›), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / á‰µáŒáˆ­áŠ›) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv`.
 
 ## Automated And Manual Verification
 

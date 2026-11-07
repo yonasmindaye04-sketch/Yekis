@@ -64,6 +64,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Documentation parity check
+        working-directory: .
+        run: node scripts/check-doc-parity.mjs
+
       # The scanner's own patterns are exercised first. It has twice reported
       # "clean" while being unable to match a shape GitGuardian matched, so a
       # green scan is only meaningful if the scanner can still fail.

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Save, Check, RefreshCw, Plus, Trash2, Upload, Camera, Sparkles } from "lucide-react";
+import { Save, Check, RefreshCw, Plus, Trash2, Upload, Camera, User } from "lucide-react";
 import { api, type UpdateProfilePayload } from "./api/client";
 import {
   YekisAvatar,
@@ -389,7 +389,7 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
             <span>
               {hasCustomPhoto
                 ? pr.completenessDesc
-                : "Upload a profile picture and complete your details to reach 100% trust readiness."}
+                : "Upload a profile picture and complete your details to finish your profile."}
             </span>
           </div>
           <div className="completeness-meter">
@@ -419,23 +419,22 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
             >
               <div>
                 <h3 className="form-section-title">
-                  Profile Picture &amp; Default Blobatar
+                  Profile photo
                 </h3>
                 <p className="form-section-desc">
-                  Upload your own photo whenever you want. New users and anyone without a custom picture automatically use a unique Yekis Blobatar.
+                  Upload a photo, or keep the generated avatar Yekis creates for you.
                 </p>
               </div>
               <span
-                className={`status-pill ${hasCustomPhoto ? "success" : "info"}`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                className={`profile-photo-status ${hasCustomPhoto ? "custom" : ""}`}
               >
                 {hasCustomPhoto ? (
                   <>
-                    <Camera size={13} /> Custom Photo Active
+                    <Camera size={13} /> Custom photo
                   </>
                 ) : (
                   <>
-                    <Sparkles size={13} /> Default Blobatar Active
+                    <User size={13} /> Default avatar
                   </>
                 )}
               </span>
@@ -491,7 +490,6 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
                     alignItems: "center",
                     justifyContent: "center",
                     cursor: "pointer",
-                    boxShadow: "0 4px 10px rgba(0,0,0,0.2)",
                   }}
                 >
                   <Camera size={14} />
@@ -544,7 +542,7 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
                       onClick={handleRemoveCustomPhoto}
                     >
                       <Trash2 size={15} />
-                      Remove Photo (Use Blobatar)
+                      Remove photo
                     </button>
                   ) : (
                     <button
@@ -583,8 +581,8 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
                   }}
                 >
                   {hasCustomPhoto
-                    ? "Your custom photo is displayed across your profile, contracts, top header, and sidebar badge. Remove it anytime to switch back to your Blobatar."
-                    : "Supports JPG, PNG, WEBP, or GIF (auto-cropped). If you don't upload a photo, your generated Blobatar will be shown by default."}
+                    ? "Your photo appears across your profile, contracts, and workspace. Remove it anytime to switch back to the generated avatar."
+                    : "JPG, PNG, WEBP, or GIF, up to 10 MB (auto-cropped). Without a photo, Yekis uses a generated avatar."}
                 </div>
 
                 {photoError && (
