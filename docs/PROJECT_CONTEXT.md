@@ -1,5 +1,18 @@
 # Project Context
 
+> **Update 2026-11-08 ("Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play):**
+> 1. **Motivation & Scope:** Refined the "Make ideas visible." editorial banner (`HandWrittenTitle`) so its space usage, vertical spacing, and typography integrate seamlessly with the full-screen escrow stage section above it.
+> 2. **Space Usage & Typography Alignment:**
+>    - Elevated the section to full-viewport scale (`min-height: 100vh; min-height: 100svh;`) with generous, open vertical breathing room (`padding: clamp(64px, 10vh, 120px) 6%`) and centered container width (`max-width: 1240px`).
+>    - Replaced the serif heading with platform-standard `var(--v2-font-head, "Hanken Grotesk", sans-serif)` with `font-weight: 800; letter-spacing: -0.04em; font-size: clamp(3.4rem, 7.8vw, 6.8rem)`. Subtitle aligned with `max-width: 680px; font-size: clamp(1.1rem, 1.45vw, 1.28rem)`.
+> 3. **Bold & Bigger "Yekis Jobs" Eyebrow Badge:**
+>    - Enlarged and emboldened "Yekis Jobs" (`font-size: clamp(14px, 1.35vw, 17px); font-weight: 800; letter-spacing: 0.14em; padding: 11px 26px; border-radius: 999px;`) with an active indicator dot.
+>    - Enforced `.agents/AGENTS.md` mandate by eliminating low-opacity background pills, applying bold solid color fills (`#16a34a` in light theme, `#22c55e` in dark theme).
+> 4. **Auto-Play Loop & Replay Button Removal:**
+>    - Removed the manual "Replay animation" button and its state handler.
+>    - Configured the hand-drawn SVG loop to auto-play continuously and instantly upon completion (`repeat: Infinity, repeatType: "loop", repeatDelay: 0.12s`). Added `prefers-reduced-motion` graceful fallback.
+> 5. **Theme Parity:** All layout properties (padding, margins, font sizing, dimensions) remain 100% theme-invariant, with dark/light themes strictly updating color and background properties.
+
 > **Update 2026-10-17 (Telegram Bot Multilingual Support & Translation Quality Audit):**
 > 1. **Motivation & Scope.** Following frontend multilingual integration, an audit revealed the Telegram bot had severe translation quality issues in Amharic, 81 missing translation keys causing raw key strings to be sent to users, no Afaan Oromoo or Tigrigna support, and push notifications bypassing translation via an identity stub.
 > 2. **Translation Quality Overhaul.** Corrected critical machine-translation artifacts in Amharic (`apps/backend/src/modules/bot/locales/am.json`), such as translating "accepted" as "ተቀብሯል" ("buried" -> "ተቀባይነት አግኝቷል"), "queue" as "ወርደት" ("humiliation" -> "ወረፋ"), "mediation/negotiation" as "ማሳቀፍ" ("hugging" -> "እርቅ እና ሽምግልና"), "close" as "ይዝቱ" ("threaten" -> "ዝጋ"), and corrupted session timeout copy.
