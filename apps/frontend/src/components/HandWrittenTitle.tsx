@@ -43,13 +43,11 @@ export function HandWrittenTitle({
       <motion.div
         key={animationKey}
         className="yk-hw-card"
-        initial={{ opacity: 0, scale: 0.985 }}
-        whileInView={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 16 }}
+        whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.15 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
       >
-        <div className="yk-hw-grain" />
-
         <motion.svg
           className="yk-hw-line"
           viewBox="0 0 1200 600"

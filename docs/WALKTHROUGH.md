@@ -1,6 +1,83 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-10-20
+Last validated: 2026-11-08
+
+> **"Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play (2026-11-08):**
+> - **`HandWrittenTitle.tsx` & `HandWrittenTitle.css`**:
+>   - **Layout & Space Usage Alignment**: Upgraded `.yk-hw` to full-viewport dimensions (`min-height: 100vh; min-height: 100svh;`) with generous, balanced vertical spacing (`padding: clamp(64px, 10vh, 120px) 6%`) and max-width alignment (`1240px`), seamlessly matching the spatial rhythm and column boundaries of the full-screen escrow stage section above it.
+>   - **Bold & Bigger "Yekis Jobs" Eyebrow**: Transformed the eyebrow kicker into a bold, high-contrast, prominent badge (`font-size: clamp(14px, 1.35vw, 17px); font-weight: 800; letter-spacing: 0.14em; padding: 11px 26px; border-radius: 999px;`) featuring a live emerald indicator dot (`.yk-hw-eyebrow-dot`). Strictly adheres to `.agents/AGENTS.md` by replacing low-opacity background pills with solid, vibrant color fills (`#16a34a` light with white text; `#22c55e` dark with dark-green text).
+>   - **Typography Harmonization**: Switched the headline font from serif (`Georgia / Times New Roman`) to `var(--v2-font-head, "Hanken Grotesk", sans-serif)` with `font-weight: 800; letter-spacing: -0.04em; line-height: 1.04; font-size: clamp(3.4rem, 7.8vw, 6.8rem)`, harmonizing with the bold modern typography of the adjacent sections. Subtitle refined with `font-size: clamp(1.1rem, 1.45vw, 1.28rem)` and `max-width: 680px`.
+>   - **Removed Replay Button & Instant Continuous Auto-Play**: Completely removed the manual "Replay animation" button and its unused state/styles. Configured the hand-drawn SVG loop (`<motion.path>`) to automatically and infinitely auto-play (`repeat: Infinity, repeatType: "loop", repeatDelay: 0.12s`), re-drawing seamlessly around "Make ideas visible." the moment each cycle finishes.
+>   - **Accessibility & Strict Theme Parity**: Honored `prefers-reduced-motion` with static stroke presentation. Strict theme parity enforced: layout geometry and dimensions are 100% theme-invariant, with theme selectors modifying only colors, backgrounds, and box-shadows.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **Hero Section Streamlining — Pure Editorial Headline, Subtitle & Action Buttons (2026-11-08):**
+> - **`LandingPageV2.tsx` (`HeroSection`) & `landing-v2.css`**:
+>   - Refined the Hero section to maintain a clean, distraction-free aesthetic with generous breathing room.
+>   - Removed the eyebrow pill badge (`"The Right Talent, Right Now" / "Fayda KYC"`), the milestone preview ticket card, and the bottom trust proof rail per user request.
+>   - Retained the interactive spring letter headline (`SpringTitle`), the grounded value-proposition subtitle (`t.marketing.hero.subheadline`), and the high-visibility action buttons (`Post a Job` and `Milestone escrow`).
+>   - Cleaned up obsolete CSS selectors and theme-conditional overrides in `landing-v2.css`.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **"Make ideas visible." — Open Canvas Editorial Redesign & Spacing Polish (2026-11-08):**
+> - **`HandWrittenTitle.tsx` & `HandWrittenTitle.css`**:
+>   - Completely removed the heavy card enclosure (`.yk-hw-card`), borders, background gradients, drop-shadows, and textured grain rectangle (`.yk-hw-grain`).
+>   - Transformed the section into an open, seamless editorial canvas that sits organically between the 440vh Escrow stage and the Categories deck.
+>   - **Spacious & Well-Placed Layout**: Generous vertical padding (`padding: clamp(96px, 14vh, 160px) 6%`), centered content container (`width: min(880px, 92%)`), and perfectly proportioned vertical rhythm across the kicker pill, title, subtitle, and replay trigger.
+>   - **Hand-Drawn Circle Animation**: Positioned `.yk-hw-line` centrally over the title (`top: 50%; left: 50%; transform: translate(-50%, -50%)`) so the animated SVG loop draws organically around "Make ideas visible." without card clipping or border constraints.
+>   - **Theme Parity Strictness**: Base layout dimensions and geometry are 100% theme-invariant. Dark and light themes seamlessly align backgrounds with surrounding sections (`#060907` dark / `#f8fafc` light) and only recolor text inks, ambient radial glows, and pill borders.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **Removal of Platform Metrics / Stat Cards Section (2026-11-08):**
+> - **`LandingPageV2.tsx`**:
+>   - Removed the skewed cascade metric stat cards section (`StatsSection` / `.v2-stats` / `Jobs Completed`, `Verified Freelancers`, `Secured in Escrow`, `Avg. Payout Time`) to create a direct, uncluttered narrative flow from the Hero section directly into the interactive "Pay for results, not promises" escrow stage.
+>   - Cleaned up unused component code (`CountUp`, `useInView`, and icons `Users`, `Zap`).
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **"Pay for Results, Not Promises" — Scroll-Driven Sticky Stage Upgrade (2026-11-08):**
+> - **`LandingPageV2.tsx` (`EscrowSection` & `EscrowSvgDefs`)**:
+>   - Rebuilt the escrow mechanism section (`#how-it-works`) with the scroll-driven sticky full-screen stage design (`height: 440vh` with `position: sticky; top: 0; height: 100vh`).
+>   - **4 Transparent Milestones**: Fund (01), Work (02), Approve (03), Protected (04) mapped dynamically from `t.marketing.escrow` with multi-language i18n support.
+>   - **Left Column**: Features massive outline background number ghosts ("01"-"04") and vertical line-mask text unrolls with custom step accent dot glow (`--wc`). Left topic words update immediately on step threshold.
+>   - **Right Column (Card-Free Design)**: Scoped cleanly with `.stage-panel` without artificial card containers, borders, or box-shadows. Features clay-style 3D vector icons (`#yk-i-wallet`, `#yk-i-folder`, `#yk-i-bolt`, `#yk-i-shield`) with hovering float animations (`@keyframes yk-stage-float`), radial color wash backings (`--i2`), and staged rows with progressive delays (`--d: .5s / .6s / .7s`). Details panel follows the topic with intentional micro-delay (`0.28s`).
+>   - **Ambient Crossfades**: Background glow layers (`.glow.g1` through `g4`) crossfade smoothly (`transition: opacity 1.1s ease`) per active step.
+>   - **Performance**: Zero per-frame React re-render overhead; rAF loop directly updates `data-pos` ("active" | "past" | "future") and class toggles on DOM nodes. Includes iframe auto-play mode (`?card`) and accessible `prefers-reduced-motion` flow.
+> - **`landing-v2.css` (`.stage*`, `.col-*`, `.word`, `.ghost`, `.stage-panel`, `.panel`, `.hero*`, `.rows`)**:
+>   - Clean replacement of legacy `.esc-*` classes with modern stage layout rules.
+>   - Scoped `.stage-panel` and reset `.panel` rules (`background: transparent; border: none; box-shadow: none; padding: 0`) to prevent collisions with global `.panel` styles in `index.css`.
+>   - Strict theme-parity compliance: dimensions, fonts, grid offsets, and transitions defined once; `:root[data-theme="dark"]` and `:root[data-theme="light"]` only change background tints, text inks, and ghost strokes.
+>   - Responsive design for `<= 960px` collapsing cleanly into mobile flow.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **"Find the Right Expertise" — Editorial Stack & Kinetic Outro Upgrade (2026-11-08):**
+> - **`LandingPageV2.tsx` (`CategoriesSection`)**:
+>   - Rebuilt with the pinned editorial card stack architecture (`Y_OFFSET = 5%`, `SCALE_STEP = 0.075`, segment progress calculation `segment = 1 / total`).
+>   - Cards deal upward sequentially as the front card lifts (`yPercent -50 → -200`, `rotateX 0 → 35deg`), while cards waiting behind rise and scale into focus. Cards already dealt sit parked above (`yPercent -250`, `rotateX 35deg`).
+>   - Preserves all Yekis category domains (Engineering, Design, Marketing, Content, Language, Data) via `t.marketing.categories` with kicker, title, background tones, and background image panels (`/stack/img-*.jpg`).
+>   - Supports iframe / gallery auto-play mode via `?card` URL parameter with 7000ms loop and reveal/hold curve.
+>   - Integrated pinned `.stk-chrome` header displaying `Yekis®` and `Stack · Scroll`.
+>   - **Automatic Smooth Bring-in Motion**: As cards finish dealing (`p >= 0.96`), the rAF loop automatically brings the viewport to the "Let's Build" outro section with smooth motion (`outro.scrollIntoView({ behavior: "smooth", block: "start" })`), resetting seamlessly when scrolling back up (`p < 0.82`).
+>   - **Kinetic Word Loading Animation**: Splits `outroTitle` into word spans with index variables (`--wi`, `--total`) and triggers staged 3D reveal (`translateY(118%) rotateX(-24deg)` to `translateY(0) rotateX(0)`), emerald text shimmer (`@keyframes stk-word-shimmer`), an ambient glow wash (`.stk-outro-ambient`), and an animated loading progress bar (`.stk-load-bar-fill` sweep) upon viewport activation.
+> - **`landing-v2.css` (`.stk-*`)**:
+>   - Cleaned up and updated to the new editorial card design (`width: 65%`, `height: 60%`, `padding: 2.4rem`, `border-radius: 1rem`, `box-shadow: 0 40px 80px -40px rgba(20, 16, 11, 0.55)`).
+>   - Responsive styles for `<= 1000px` (`width: calc(100% - 3rem)`, `height: 74%`, column orientation) and `<= 768px`.
+>   - Strict theme-parity compliance: base layout and dimensions defined once; theme overrides only set colors and backgrounds for both dark and light modes.
+>   - Accessibility: `prefers-reduced-motion` cleanly renders a static responsive grid with animations disabled.
+> - **Public Assets**:
+>   - Added `/stack/` image assets (`img-1.jpg` through `img-6.jpg`) in `apps/frontend/public/stack/` to back each category card.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
 
 > **`pnpm dev:tunnel` infrastructure created (2026-10-20):**
 > - **Problem**: `pnpm dev:tunnel` failed with `Command "dev:tunnel" not found` because the root
@@ -582,23 +659,23 @@ When implementation changes, update this walkthrough if the user journey, state 
 1. **Clickable Metric Cards & SLAs**: The top metric cards for Support, Receipts, Identity, and Disputes are now clickable, jumping directly to their respective queues. SLA aging timers (e.g., "< 1h", "24h") are displayed on each card, turning amber or red if queues become stagnant.
 2. **Queue Scoping**: A "My Queue" vs "All Queues" filter has been added. As items are currently unassigned globally in the backend schema, the "My Queue" toggle behaves as a UI mock to showcase personal views pending future backend assignment logic.
 
- # #   D i s p u t e Q u e u e   R e d e s i g n   ( a d d e d   2 0 2 6 - 0 8 - 0 9 ) 
- 
- 1 .   T h e   D i s p u t e Q u e u e   i n t e r f a c e   i s   n o w   a   t w o - p a n e   l a y o u t ,   p r o v i d i n g   f u l l   i n l i n e   c o n t e x t   f o r   m e d i a t o r s . 
- 2 .   M e d i a t o r s   c a n   v i e w   t h e   o r i g i n a l   c o n t r a c t   s c o p e   a l o n g s i d e   t h e   s u b m i t t e d   d e l i v e r a b l e   ( w i t h   i n l i n e   v i e w e r   f o r   U R L - b a s e d   d e l i v e r i e s ) . 
- 3 .   A d d e d   \ d e l i v e r a b l e U r l \   t o   t h e   \ M i l e s t o n e \   s c h e m a   t o   t r a c k   a n d   p r e s e n t   t h e   s u b m i t t e d   w o r k   d u r i n g   d i s p u t e s . 
- 4 .   S t a g e   2   E v i d e n c e   s t a t e m e n t s   f r o m   b o t h   c l i e n t   a n d   f r e e l a n c e r   a r e   r e n d e r e d   i n l i n e   a s   a   c h a t   f l o w . 
- 5 .   R e s o l v i n g   a   d i s p u t e   p r o v i d e s   a   l i v e ,   c a l c u l a t e d   p r e v i e w   o f   e x a c t   E T B   a m o u n t s   a l l o c a t e d   t o   t h e   f r e e l a n c e r   a n d   r e f u n d e d   t o   t h e   c l i e n t ,   f a c t o r i n g   i n   t h e   p l a t f o r m   f e e   ( 5 % )   a n d   e s t i m a t e d   w i t h h o l d i n g   t a x . 
- 
- 
- # #   S t a f f C o m p l i a n c e P a n e l   R e d e s i g n   ( a d d e d   2 0 2 6 - 0 8 - 0 9 ) 
- 
- 1 .   R e d e s i g n e d   t h e   T M S   A M L   q u e u e   t o   f e a t u r e   d e d i c a t e d   v i s u a l   b l o c k s   f o r   S T R U C T U R I N G ,   V E L O C I T Y ,   P A S S _ T H R O U G H ,   a n d   W A L L E T _ M I S M A T C H   f l a g s . 
- 2 .   C o m p l i a n c e   a c t i o n s   n o w   s t r i c t l y   e n f o r c e   a   1 0 - c h a r a c t e r   m i n i m u m   f o r   r e v i e w   n o t e s ,   a n d   d e m a n d   a   v a l i d   F I C   r e f e r e n c e   n u m b e r   w h e n   f i l i n g   a n   S T R . 
- 3 .   R e p l a c e d   g e n e r i c   t i m e s t a m p   d e t a i l s   w i t h   a   c r i t i c a l   2 4 - h o u r   S L A   c o u n t d o w n ,   a g g r e s s i v e l y   f l a g g i n g   b r e a c h e d   f i l i n g   d e a d l i n e s . 
- 4 .   I n t e g r a t e d   a   n e w   ' U s e r   C o m p l i a n c e   H i s t o r y '   s i d e b a r ,   d i r e c t l y   f e t c h i n g   p a s t   f l a g s ,   c u r r e n t   K Y C   T i e r ,   a n d   W a l l e t   b a l a n c e   f o r   h o l i s t i c   r i s k   a s s e s s m e n t   d u r i n g   m a n u a l   r e v i e w s . 
- 
- 
+## DisputeQueue Redesign (added 2026-08-09)
+
+1. The DisputeQueue interface is now a two-pane layout, providing full inline context for mediators.
+2. Mediators can view the original contract scope alongside the submitted deliverable (with inline viewer for URL-based deliveries).
+3. Added \deliverableUrl\ to the \Milestone\ schema to track and present the submitted work during disputes.
+4. Stage 2 Evidence statements from both client and freelancer are rendered inline as a chat flow.
+5. Resolving a dispute provides a live, calculated preview of exact ETB amounts allocated to the freelancer and refunded to the client, factoring in the platform fee (5%) and estimated withholding tax.
+
+
+## StaffCompliancePanel Redesign (added 2026-08-09)
+
+1. Redesigned the TMS AML queue to feature dedicated visual blocks for STRUCTURING, VELOCITY, PASS_THROUGH, and WALLET_MISMATCH flags.
+2. Compliance actions now strictly enforce a 10-character minimum for review notes, and demand a valid FIC reference number when filing an STR.
+3. Replaced generic timestamp details with a critical 24-hour SLA countdown, aggressively flagging breached filing deadlines.
+4. Integrated a new 'User Compliance History' sidebar, directly fetching past flags, current KYC Tier, and Wallet balance for holistic risk assessment during manual reviews.
+
+
 
 ## Updates
 - 2026-08-10: Fixed Telegram bot webhook deletion issues in development mode, added a 'Open Yekis Jobs' persistent Web App Menu Button, and updated welcome translations to guide users to the app.

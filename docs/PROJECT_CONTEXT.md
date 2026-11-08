@@ -13,6 +13,39 @@
 >
 > Last updated: 2026-10-17
 
+> **Update 2026-11-08 (Hero Section Streamlining — Pure Headline, Subtitle & Action Buttons):**
+> 1. **Motivation & Scope:** Refined the Hero section to maintain a clean, distraction-free aesthetic with generous breathing room.
+> 2. **Refinements:**
+>    - Removed the top eyebrow badge ("The Right Talent, Right Now" / "Fayda KYC"), the milestone preview ticket, and the bottom trust rail per user request.
+>    - Retained the interactive spring letter headline (`SpringTitle`), the grounded subtitle explaining escrow-backed hiring (`t.marketing.hero.subheadline`), and the primary action buttons (`Post a Job` and `Milestone escrow`).
+> 3. **Clean Code & Parity:** Purged unused CSS classes and theme-conditional rules from `landing-v2.css`. Full compliance with theme parity and 4-language i18n support maintained.
+
+> **Update 2026-11-08 ("Make ideas visible." — Open Canvas Editorial Redesign & Spacing Polish):**
+> 1. **Motivation & Scope:** The "Make ideas visible." editorial banner previously sat inside an enclosed card box (`.yk-hw-card`) with borders, heavy shadows, and separate background gradients, disrupting the flow between the full-bleed escrow stage and the categories card stack.
+> 2. **Card Removal & Open Canvas:** Stripped the card container styles (borders, background gradients, drop-shadows, and grain overlay). The section now floats freely on a seamless canvas matching the deep dark (`#060907`) and crisp light (`#f8fafc`) backgrounds of adjacent sections.
+> 3. **Refined Spacing & Fluid Typography:** Established generous vertical breathing room (`clamp(96px, 14vh, 160px)` padding), balanced margins between the kicker pill, editorial heading (`clamp(3.4rem, 7.5vw, 6.8rem)`), subtitle (`line-height: 1.68`), and animated replay button. The handwritten SVG loop frames the heading centrally without clipping.
+> 4. **Theme Parity Compliance:** All shape and layout properties are declared once in base rules; dark and light theme selectors strictly modify only background colors, text colors, and border colors.
+
+> **Update 2026-11-08 (Removal of Platform Metrics / Stat Cards Section):**
+> 1. **Motivation & Scope:** Removed the 4-card platform metrics section (`StatsSection` in `LandingPageV2.tsx`) between Hero and Escrow to streamline the narrative flow and lead directly from the value proposition into the interactive escrow journey.
+> 2. **Code Cleanliness:** Removed associated subcomponents and unused framer-motion/lucide dependencies (`CountUp`, `useInView`, `Users`, `Zap`).
+
+> **Update 2026-11-08 ("Pay for Results, Not Promises" — Scroll-Driven Sticky Stage Upgrade):**
+> 1. **Motivation & Scope:** Upgraded the "Pay for results, not promises." escrow mechanism section in `LandingPageV2.tsx` to the sticky full-screen stage design (`height: 440vh` with `position: sticky; top: 0; height: 100vh`).
+> 2. **Visual & Interaction Mechanics:** 
+>    - **Left Column:** Displays giant outline numbers ("01"-"04") as background ghosts alongside line-masked typography reveals with step accent dot glows (`--wc`).
+>    - **Right Column (Card-Free Design):** Free-floating details panels scoped with `.stage-panel` (with resets on `.panel` preventing collisions with global `index.css` card rules), floating clay-style 3D vector icons (`#yk-i-wallet`, `#yk-i-folder`, `#yk-i-bolt`, `#yk-i-shield`), radial wash highlights (`--i2`), and micro-delayed staggered list items (`--d: .5s / .6s / .7s`).
+>    - **Progress & Crossfades:** Controlled via smooth rAF scroll-progress calculation (`rect.top / total`) mapping directly to `data-pos` attributes ("active" | "past" | "future") without per-frame React re-render overhead. Background glow wash layers crossfade (`transition: opacity 1.1s ease`) per active step.
+>    - **Localization & Accessibility:** Dynamically resolves milestone titles via `t.marketing.escrow` across all 4 national languages (`en`, `am`, `om`, `ti`), supports iframe auto-play (`?card`), and honors `prefers-reduced-motion` with static unpinned presentation.
+> 3. **Theme Parity:** Complies strictly with `.agents/AGENTS.md`: layout dimensions and shapes are theme-invariant, varying only background, ink colors, and outline strokes between dark and light themes.
+
+> **Update 2026-11-08 ("Find the Right Expertise" — Editorial Stack & Kinetic Outro Upgrade):**
+> 1. **Motivation & Scope:** Upgraded the "Find the right expertise." category deck (`LandingPageV2.tsx`) to the latest pinned editorial card stack animation architecture.
+> 2. **Animation & Mechanics:** Implemented normalized progress computation with equal segment intervals (`segment = 1 / total`), lift-and-tilt exit transformations (`yPercent -50 → -200`, `rotateX 0 → 35deg`), and incoming card scale/rise dynamics (`Y_OFFSET = 5%`, `SCALE_STEP = 0.075`). Parked cards sit at `yPercent -250` and `rotateX 35deg`. Supports iframe auto-play via `?card` parameter (`7000ms` loop) and honors `prefers-reduced-motion` with an accessible responsive grid.
+> 3. **Automatic Bring-in & Kinetic Word Loading:** When cards finish dealing (`p >= 0.96`), the rAF loop smoothly brings the viewport to the "Let's Build" outro section (`outro.scrollIntoView({ behavior: 'smooth', block: 'start' })`). Words are split and rendered with individual CSS index variables (`--wi`), triggering a kinetic 3D un-tilt/slide-up reveal, continuous emerald shimmer sweep, ambient radial glow expansion, and synchronized progress loading bar.
+> 4. **Design & Identity:** Retains Yekis branding and company details (Ethiopian talent categories, 4-language i18n support, registration CTAs, and Yekis® chrome), replacing external agency details while adopting the clean two-column card aesthetic (kicker, title, rich background tones, and `/stack/img-*.jpg` media panels).
+> 5. **Theme Parity:** Complies strictly with `.agents/AGENTS.md` theme-parity rules (theme-invariant dimensions and layout; color/background changes only).
+
 > **Update 2026-10-14 (Four-Language Multilingual Translation System — Amharic, Oromiffa, Tigrigna, English):**
 > 1. **Motivation & Scope.** The platform previously lacked a complete and functional multilingual interface. In accordance with user requirements, comprehensive, native, culturally authentic translations were implemented across the website for Ethiopia's major national languages: **Amharic (`am` / አማርኛ)**, **Oromiffa (`om` / Afaan Oromoo)**, and **Tigrigna (`ti` / ትግርኛ)**, alongside **English (`en`)**.
 > 2. **i18n Architecture (`apps/frontend/src/i18n.ts`).** Implemented a typed React `LanguageProvider` and `useI18n()` hook with full `localStorage` persistence under key `yekis-language`, automatic synchronization with `<html lang="...">`, and real-time reactive rerendering across all subscribed components.

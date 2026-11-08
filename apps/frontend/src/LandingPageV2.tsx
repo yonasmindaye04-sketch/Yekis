@@ -15,38 +15,19 @@ import {
 import {
   motion,
   AnimatePresence,
-  useInView,
 } from "framer-motion";
 import {
-  Wallet,
   Briefcase,
   CheckCircle,
   Shield,
   ShieldCheck,
-  Clock,
-  Check,
-  Circle,
-  CircleDot,
-  Eye,
-  File,
-  MessageSquare,
-  Code,
-  Palette,
-  Megaphone,
-  PenTool,
-  Languages,
-  Database,
-  ArrowRight,
   ArrowUp,
   ArrowUpRight,
-  Users,
   Award,
   WalletCards,
-  Lock,
-  Zap,
   Star,
   BadgeCheck,
-  } from "lucide-react";
+} from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
 import { HandWrittenTitle } from "./components/HandWrittenTitle";
 import { events } from "./analytics";
@@ -309,52 +290,6 @@ function Reveal({
   );
 }
 
-function CountUp({
-  to,
-  decimals = 0,
-  prefix = "",
-  suffix = "",
-  duration = 0.55,
-}: {
-  to: number;
-  decimals?: number;
-  prefix?: string;
-  suffix?: string;
-  duration?: number;
-}) {
-  const ref = useRef<HTMLSpanElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.15 });
-  const [val, setVal] = useState(0);
-  useEffect(() => {
-    if (!inView) return;
-    if (prefersReduced()) {
-      setVal(to);
-      return;
-    }
-    let raf = 0;
-    let start = 0;
-    const tick = (ts: number) => {
-      if (!start) start = ts;
-      const p = Math.min(1, (ts - start) / (duration * 1000));
-      const eased = 1 - Math.pow(1 - p, 3);
-      setVal(to * eased);
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [inView, to, duration]);
-  return (
-    <span ref={ref}>
-      {prefix}
-      {val.toLocaleString(undefined, {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })}
-      {suffix}
-    </span>
-  );
-}
-
 /* Per-letter spring title with hover "pop" (Floating Paths hero) */
 function SpringTitle({
   text,
@@ -499,7 +434,7 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
   );
 }
 
-function HeroSection() {
+function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => void }) {
   const { t } = useI18n();
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
@@ -550,94 +485,30 @@ function HeroSection() {
 
       {/* hero content */}
       <div className="v2-hero-inner" ref={innerRef}>
-        {/* No hero CTAs: the header already carries "Sign in" and
-            "Get started", so repeating them here competed with the slogan. */}
+        {/* Dynamic Spring Title */}
         <SpringTitle text={t.marketing.hero.title} settled={settled} />
-      </div>
-    </section>
-  );
-}
 
+        {/* Grounded Subheadline (Zero AI Slop) */}
+        <p className="v2-hero-sub">
+          {t.marketing.hero.subheadline ||
+            "Hire verified Ethiopian developers, designers, and specialists with milestone escrow. Your funds stay locked safely until you review and approve the delivery."}
+        </p>
 
-/* ─────────────────────────────────────────────────
-   Stats
-───────────────────────────────────────────────── */
-function StatsSection() {
-  const { t } = useI18n();
-  const statCards = [
-    {
-      Icon: Briefcase,
-      tone: "blue" as const,
-      to: 12480,
-      suffix: "+",
-      label: t.marketing.stats.jobsCompleted,
-      desc: t.marketing.stats.jobsCompletedDesc,
-    },
-    {
-      Icon: Users,
-      tone: "purple" as const,
-      to: 3940,
-      suffix: "+",
-      label: t.marketing.stats.verifiedFreelancers,
-      desc: t.marketing.stats.verifiedFreelancersDesc,
-    },
-    {
-      Icon: ShieldCheck,
-      tone: "green" as const,
-      to: 84.6,
-      decimals: 1,
-      suffix: "M",
-      label: t.marketing.stats.securedEscrow,
-      desc: t.marketing.stats.securedEscrowDesc,
-    },
-    {
-      Icon: Zap,
-      tone: "amber" as const,
-      to: 6.5,
-      decimals: 1,
-      suffix: " hrs",
-      label: t.marketing.stats.avgPayout,
-      desc: t.marketing.stats.avgPayoutDesc,
-    },
-  ];
-
-  return (
-    <section className="v2-section-sm v2-stats" aria-label="Platform metrics">
-      <div className="v2-stats-spot" aria-hidden="true" />
-      <div className="v2-stats-grid" aria-hidden="true" />
-      <div className="v2-stats-noise" aria-hidden="true" />
-
-      <div className="v2-container">
-        <div className="v2-stats-row">
-          {statCards.map((s, i) => (
-            <motion.div
-              key={s.label}
-              className="v2-stat"
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.12 }}
-              transition={{ duration: 0.25, delay: i * 0.03, ease: EASE }}
-            >
-              <article className={`v2-stat-card v2-stat-card--${s.tone}`}>
-                <span className="v2-stat-orb" aria-hidden="true" />
-                <span className="v2-stat-shine" aria-hidden="true" />
-
-                <div className="v2-stat-inner">
-                  <div className="v2-stat-top">
-                    <span className="v2-stat-label">{s.label}</span>
-                    <span className="v2-stat-ico" aria-hidden="true">
-                      <s.Icon size={19} strokeWidth={1.9} />
-                    </span>
-                  </div>
-                  <div className="v2-stat-val">
-                    <CountUp to={s.to} decimals={s.decimals ?? 0} suffix={s.suffix ?? ""} />
-                  </div>
-                  <div className="v2-stat-rule" aria-hidden="true" />
-                  <span className="v2-stat-desc">{s.desc}</span>
-                </div>
-              </article>
-            </motion.div>
-          ))}
+        {/* Action Buttons */}
+        <div className="v2-hero-actions">
+          <button
+            type="button"
+            className="v2-btn v2-btn-primary"
+            onClick={() => onStart?.("register")}
+          >
+            <span>{t.marketing.hero.ctaHire || "Post a Job"}</span>
+            <ArrowUpRight size={17} aria-hidden="true" />
+            <span className="v2-shine" />
+          </button>
+          <a href="#how-it-works" className="v2-btn v2-btn-secondary">
+            <ShieldCheck size={17} aria-hidden="true" />
+            <span>{t.marketing.trustRail.milestoneEscrow || "Milestone escrow"}</span>
+          </a>
         </div>
       </div>
     </section>
@@ -645,327 +516,329 @@ function StatsSection() {
 }
 
 /* ─────────────────────────────────────────────────
-   Escrow / How it works — slogan, stepper + product stage
+   "PAY FOR RESULTS, NOT PROMISES." — scroll-driven section
+   Sticky full-screen stage, 4 steps: Fund / Work / Approve / Protected
+   LEFT  = bold topic word  → changes FIRST (line-mask reveal)
+   RIGHT = details with big free-floating 3D icons → FOLLOWS with a delay
    ───────────────────────────────────────────────── */
-const ESC_DUR = 4200;
-
-/* Status pill on a product screen. Solid tint, bold ink — never a
-   low-opacity wash (see .agents/AGENTS.md). */
-function EscBadge({ tone = "green", children }: { tone?: "green" | "gray"; children: React.ReactNode }) {
-  return <span className={`esc-badge${tone === "gray" ? " is-gray" : ""}`}>{children}</span>;
-}
-
-/* ---- 01 · Fund ---- */
-function EscScreenFund() {
+function EscrowSvgDefs() {
   return (
-    <div className="esc-p">
-      <div className="esc-p-head">
-        <span className="esc-p-label">Project budget</span>
-        <EscBadge><Lock size={14} />Locked in escrow</EscBadge>
-      </div>
-      <p className="esc-amount">$2,400<span>.00</span></p>
-      <div className="esc-card">
-        <div className="esc-row">
-          <span className="esc-ic"><Wallet size={20} /></span>
-          <span className="esc-txt">
-            <b>Escrow vault</b>
-            <small>Held safely &mdash; never sent until you approve</small>
-          </span>
-          <span className="esc-val">100%</span>
-        </div>
-        <div className="esc-bar" style={{ "--esc-w": "100%" } as React.CSSProperties}><i /></div>
-        <div className="esc-row esc-row-sub">
-          <span>Deposit &middot; Visa &bull;&bull; 4021</span>
-          <span className="esc-val">$2,400.00</span>
-        </div>
-      </div>
-      <div className="esc-chips">
-        <span className="esc-chip"><Lock size={14} />Balance locked</span>
-        <span className="esc-chip"><ShieldCheck size={14} />Protection on</span>
-      </div>
-    </div>
+    <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
+      <defs>
+        {/* FUND */}
+        <symbol id="yk-i-wallet" viewBox="0 0 64 64">
+          <circle cx="24" cy="14" r="8" fill="var(--i1)" />
+          <circle cx="36" cy="11" r="8" fill="var(--i2)" />
+          <rect x="6" y="16" width="52" height="38" rx="11" fill="var(--i2)" />
+          <rect x="6" y="44" width="52" height="10" rx="5" fill="#000" opacity=".16" />
+          <rect x="32" y="28" width="26" height="15" rx="7.5" fill="var(--i3)" />
+          <circle cx="45" cy="35.5" r="3.6" fill="var(--i1)" />
+          <ellipse cx="21" cy="24" rx="11" ry="4.5" fill="#fff" opacity=".3" />
+        </symbol>
+        {/* WORK */}
+        <symbol id="yk-i-folder" viewBox="0 0 64 64">
+          <path d="M8 20a6 6 0 0 1 6-6h11l6 6h19a6 6 0 0 1 6 6v5H8z" fill="var(--i3)" />
+          <rect x="21" y="21" width="24" height="14" rx="2.5" fill="#fff" opacity=".88" />
+          <rect x="25" y="25" width="16" height="2.4" rx="1.2" fill="var(--i3)" opacity=".55" />
+          <rect x="25" y="29.5" width="11" height="2.4" rx="1.2" fill="var(--i3)" opacity=".55" />
+          <path d="M8 29h48v17a6 6 0 0 1-6 6H14a6 6 0 0 1-6-6z" fill="var(--i2)" />
+          <path d="M8 46v0a6 6 0 0 0 6 6h32a6 6 0 0 0 6-6v-2H8z" fill="#000" opacity=".16" />
+          <ellipse cx="22" cy="34" rx="12" ry="3.4" fill="#fff" opacity=".3" />
+        </symbol>
+        {/* APPROVE */}
+        <symbol id="yk-i-bolt" viewBox="0 0 64 64">
+          <path d="M38 9L18 39h12l-4 22 22-32H34z" fill="var(--i3)" />
+          <path d="M34 5L14 35h12l-4 22 22-32H30z" fill="var(--i2)" />
+          <path d="M34 5L14 35h6L40 8z" fill="#fff" opacity=".32" />
+        </symbol>
+        {/* PROTECTED */}
+        <symbol id="yk-i-shield" viewBox="0 0 64 64">
+          <path d="M32 5l21 7.5V28c0 13.5-9 21.5-21 27.5C20 49.5 11 41.5 11 28V12.5z" fill="var(--i2)" />
+          <path d="M11 33c2.5 10.5 10 17 21 22.5 11-5.5 18.5-12 21-22.5-7 8.5-35 8.5-42 0z" fill="#000" opacity=".16" />
+          <path d="M32 5l21 7.5v5.5L11 18v-5.5z" fill="#fff" opacity=".22" />
+          <path d="M23 29.5l7 7 12-13" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity=".95" />
+        </symbol>
+      </defs>
+    </svg>
   );
 }
 
-/* ---- 02 · Work ---- */
-function EscScreenWork() {
-  return (
-    <div className="esc-p">
-      <div className="esc-p-head">
-        <span className="esc-p-label">Milestones</span>
-        <EscBadge><Briefcase size={14} />Milestone 2 of 3</EscBadge>
-      </div>
-      <div className="esc-mlist">
-        <div className="esc-mrow">
-          <span className="esc-st is-done"><Check size={15} strokeWidth={3} /></span>
-          <span className="esc-txt">
-            <b>Brand identity</b>
-            <small>Approved &middot; delivered Mar 6</small>
-          </span>
-        </div>
-        <div className="esc-mrow">
-          <span className="esc-st is-now"><CircleDot size={15} /></span>
-          <span className="esc-txt">
-            <b>Website build</b>
-            <small>Submitted for review &middot; deliverables &amp; notes attached</small>
-            <span className="esc-files">
-              <span className="esc-file"><File size={12} />homepage.fig</span>
-              <span className="esc-file"><File size={12} />style-guide.pdf</span>
-            </span>
-          </span>
-        </div>
-        <div className="esc-mrow">
-          <span className="esc-st is-wait"><Circle size={15} /></span>
-          <span className="esc-txt">
-            <b>Launch support</b>
-            <small>Queued &middot; starts after this approval</small>
-          </span>
-        </div>
-      </div>
-      <div className="esc-person">
-        <span className="esc-avatar">AK</span>
-        <span className="esc-txt">
-          <b>Ana Kova&#269;</b>
-          <small>Freelancer &middot; designer &amp; developer</small>
-        </span>
-        <span className="esc-online"><i />online</span>
-      </div>
-    </div>
-  );
-}
-
-/* ---- 03 · Approve ---- */
-function EscScreenApprove() {
-  return (
-    <div className="esc-p">
-      <div className="esc-p-head">
-        <span className="esc-p-label">Review delivery</span>
-        <EscBadge><CheckCircle size={14} />Ready to approve</EscBadge>
-      </div>
-      <div className="esc-card esc-preview">
-        <span className="esc-thumb"><Eye size={24} /></span>
-        <span className="esc-txt">
-          <b>Website build &mdash; v2</b>
-          <small>&ldquo;Final homepage, style guide and handoff docs. Staging link is in the notes &mdash; ready whenever you are.&rdquo; &middot; Ana</small>
-        </span>
-      </div>
-      <div className="esc-actions">
-        <button type="button" className="esc-btn">
-          Approve &amp; release $800 <ArrowRight size={16} />
-        </button>
-        <button type="button" className="esc-btn is-ghost">Request changes</button>
-      </div>
-      <div className="esc-count">
-        <Clock size={16} />
-        Auto-release in 5 days if you do nothing
-        <span className="esc-bar" style={{ "--esc-w": "22%" } as React.CSSProperties}><i /></span>
-      </div>
-    </div>
-  );
-}
-
-/* ---- 04 · Protected ---- */
-const ESC_CASES = [
-  { Icon: File, title: "Brief & scope uploaded", meta: "Mar 2 \u00b7 09:14" },
-  { Icon: MessageSquare, title: "Thread: scope change agreed", meta: "Mar 9 \u00b7 16:40 \u00b7 both parties confirmed" },
-  { Icon: CheckCircle, title: "Delivery v2 received", meta: "Mar 14 \u00b7 11:02" },
+const ESCROW_STEPS = [
+  {
+    n: "01",
+    wordKey: "step1Title" as const,
+    defaultWord: "Fund",
+    wc: "#3f8ef0",
+    iconId: "yk-i-wallet",
+    i1: "#bcd9ff",
+    i2: "#3f8ef0",
+    i3: "#1d5fc0",
+    rows: [
+      {
+        bold: "Balance locked in escrow",
+        small: "Held safely — never sent until you approve",
+        d: ".5s",
+      },
+      {
+        bold: "Deposit · Visa •• 4021",
+        small: "$2,400.00 reserved for milestone 2 of 4",
+        d: ".6s",
+      },
+      {
+        bold: "Protection on",
+        small: "Active from the second the deposit lands",
+        d: ".7s",
+      },
+    ],
+  },
+  {
+    n: "02",
+    wordKey: "step2Title" as const,
+    defaultWord: "Work",
+    wc: "#a06bf5",
+    iconId: "yk-i-folder",
+    i1: "#e6d1ff",
+    i2: "#a06bf5",
+    i3: "#7a3fd0",
+    rows: [
+      {
+        bold: "3 deliverables uploaded",
+        small: "homepage-v2.fig · copy-deck.pdf · launch-notes.md",
+        d: ".5s",
+      },
+      {
+        bold: "Review notes attached",
+        small: "Context for every file, so feedback stays sharp",
+        d: ".6s",
+      },
+      {
+        bold: "48h review window",
+        small: "Gentle reminders if a review goes quiet",
+        d: ".7s",
+      },
+    ],
+  },
+  {
+    n: "03",
+    wordKey: "step3Title" as const,
+    defaultWord: "Approve",
+    wc: "#2fce77",
+    iconId: "yk-i-bolt",
+    i1: "#b9f6d0",
+    i2: "#2fce77",
+    i3: "#128a4d",
+    rows: [
+      {
+        bold: "$2,400.00 released to @dana",
+        small: "One tap — funds leave escrow instantly",
+        d: ".5s",
+      },
+      {
+        bold: "Receipt issued automatically",
+        small: "Payout record saved to both sides",
+        d: ".6s",
+      },
+      {
+        bold: "0-day wait",
+        small: "No invoices, no chasing, no awkward emails",
+        d: ".7s",
+      },
+    ],
+  },
+  {
+    n: "04",
+    wordKey: "step4Title" as const,
+    defaultWord: "Protected",
+    wc: "#f0b429",
+    iconId: "yk-i-shield",
+    i1: "#fdeaa8",
+    i2: "#f0b429",
+    i3: "#b4690e",
+    rows: [
+      {
+        bold: "Support mediates with evidence",
+        small: "Brief, versions and messages auto-collected",
+        d: ".5s",
+      },
+      {
+        bold: "Full audit trail",
+        small: "Every revision and message, time-stamped",
+        d: ".6s",
+      },
+      {
+        bold: "Partial release only when fair",
+        small: "Money moves exactly as the resolution says",
+        d: ".7s",
+      },
+    ],
+  },
 ];
-
-function EscScreenProtected() {
-  return (
-    <div className="esc-p">
-      <div className="esc-p-head">
-        <span className="esc-p-label">Resolution center</span>
-        <EscBadge><ShieldCheck size={14} />Mediation open</EscBadge>
-      </div>
-      <div className="esc-card esc-flush">
-        <div className="esc-row">
-          <span className="esc-ic"><Shield size={20} /></span>
-          <span className="esc-txt">
-            <b>Evidence&#8209;backed review</b>
-            <small>Every file, message and approval is time&#8209;stamped and attached to this case.</small>
-          </span>
-        </div>
-      </div>
-      <div className="esc-tl">
-        {ESC_CASES.map((c) => (
-          <div key={c.title} className="esc-tl-item">
-            <span className="esc-ic is-gray"><c.Icon size={16} /></span>
-            <span className="esc-txt">
-              <b>{c.title}</b>
-              <small>{c.meta}</small>
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="esc-person">
-        <span className="esc-avatar">YS</span>
-        <span className="esc-txt">
-          <b>YEKIS Support</b>
-          <small>Mediator assigned &middot; replies in under 24h</small>
-        </span>
-      </div>
-    </div>
-  );
-}
-
-const ESC_SCREENS = [EscScreenFund, EscScreenWork, EscScreenApprove, EscScreenProtected];
 
 function EscrowSection() {
   const { t } = useI18n();
-  const moduleRef = useRef<HTMLDivElement>(null);
-  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
-  const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [still, setStill] = useState(false);
-  const seen = useInView(moduleRef, { amount: 0.25 });
+  const stageRef = useRef<HTMLElement>(null);
+  const wordRefs = useRef<(HTMLElement | null)[]>([]);
+  const panelRefs = useRef<(HTMLElement | null)[]>([]);
+  const ghostRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const glowRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const steps = [
-    {
-      n: "01",
-      tone: "blue" as const,
-      Icon: Wallet,
-      title: t.marketing.escrow.step1Title,
-      body: t.marketing.escrow.step1Desc,
-    },
-    {
-      n: "02",
-      tone: "purple" as const,
-      Icon: Briefcase,
-      title: t.marketing.escrow.step2Title,
-      body: t.marketing.escrow.step2Desc,
-    },
-    {
-      n: "03",
-      tone: "green" as const,
-      Icon: CheckCircle,
-      title: t.marketing.escrow.step3Title,
-      body: t.marketing.escrow.step3Desc,
-    },
-    {
-      n: "04",
-      tone: "amber" as const,
-      Icon: ShieldCheck,
-      title: t.marketing.escrow.step4Title,
-      body: t.marketing.escrow.step4Desc,
-    },
-  ];
+  const isCard =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("card");
 
-  /* honour a mid-session motion preference change */
   useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const sync = () => setStill(mq.matches);
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
+    const stage = stageRef.current;
+    if (!stage) return;
 
-  /* autoplay — only once the module is on screen, and never under
-     reduced motion or while the pointer/focus is inside it */
-  useEffect(() => {
-    if (still || !seen || paused) return;
-    const interval = window.setInterval(() => setActive((i) => (i + 1) % steps.length), ESC_DUR);
-    return () => window.clearInterval(interval);
-  }, [still, seen, paused, active, steps.length]);
+    const words = wordRefs.current.filter(Boolean) as HTMLElement[];
+    const panels = panelRefs.current.filter(Boolean) as HTMLElement[];
+    const ghosts = ghostRefs.current.filter(Boolean) as HTMLElement[];
+    const glows = glowRefs.current.filter(Boolean) as HTMLElement[];
+    const N = words.length;
+    if (N === 0) return;
 
-  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    let next: number;
-    if (e.key === "ArrowDown" || e.key === "ArrowRight") next = active + 1;
-    else if (e.key === "ArrowUp" || e.key === "ArrowLeft") next = active - 1;
-    else if (e.key === "Home") next = 0;
-    else if (e.key === "End") next = steps.length - 1;
-    else return;
-    e.preventDefault();
-    const i = (next + steps.length) % steps.length;
-    setActive(i);
-    tabRefs.current[i]?.focus();
-  };
+    let current = -1;
+
+    const apply = (step: number) => {
+      if (step === current) return;
+      current = step;
+      const setPos = (el: HTMLElement, i: number) => {
+        el.dataset.pos = i === step ? "active" : i < step ? "past" : "future";
+      };
+      words.forEach(setPos);
+      panels.forEach(setPos);
+      ghosts.forEach(setPos);
+      glows.forEach((g, i) => g.classList.toggle("on", i === step));
+    };
+
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      apply(0);
+      return;
+    }
+
+    let raf = 0;
+
+    if (isCard) {
+      const LOOP_MS = 6000;
+      const start = performance.now();
+      const autoTick = (now: number) => {
+        const t = ((now - start) % LOOP_MS) / LOOP_MS;
+        const step = Math.min(N - 1, Math.floor(t * N));
+        apply(step);
+        raf = requestAnimationFrame(autoTick);
+      };
+      raf = requestAnimationFrame(autoTick);
+      return () => cancelAnimationFrame(raf);
+    }
+
+    const progress = () => {
+      const rect = stage.getBoundingClientRect();
+      const total = stage.offsetHeight - window.innerHeight;
+      const passed = Math.min(Math.max(-rect.top, 0), Math.max(total, 0));
+      return total > 0 ? passed / total : 0;
+    };
+
+    const tick = () => {
+      apply(Math.min(N - 1, Math.floor(progress() * N + 1e-4)));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isCard]);
 
   return (
-    <section className="v2-section" id="how-it-works">
-      <div className="v2-container">
-        <div
-          ref={moduleRef}
-          className={`esc-module${paused ? " is-paused" : ""}`}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onFocus={() => setPaused(true)}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setPaused(false);
-          }}
-        >
-          <Reveal className="esc-slogan-wrap">
-            <h2 className="esc-slogan">{t.marketing.escrow.slogan}</h2>
-          </Reveal>
+    <>
+      <EscrowSvgDefs />
+      <section
+        ref={stageRef}
+        className="stage"
+        id="how-it-works"
+        aria-label="How YEKIS works, step by step"
+      >
+        <div className="stage-pin" id="pin">
+          <div ref={(el) => { glowRefs.current[0] = el; }} className="glow g1 on" />
+          <div ref={(el) => { glowRefs.current[1] = el; }} className="glow g2" />
+          <div ref={(el) => { glowRefs.current[2] = el; }} className="glow g3" />
+          <div ref={(el) => { glowRefs.current[3] = el; }} className="glow g4" />
 
-          <div
-            className="esc-steps"
-            role="tablist"
-            aria-label="How YEKIS works, four steps"
-            onKeyDown={onKey}
-          >
-            {steps.map((s, i) => (
-              <div
-                key={s.n}
-                className={`esc-step-wrap${i === active ? " is-active" : ""}`}
-              >
-                <button
-                  ref={(el) => { tabRefs.current[i] = el; }}
-                  type="button"
-                  role="tab"
-                  id={`esc-tab-${i}`}
-                  aria-selected={i === active}
-                  aria-controls={`esc-panel-${i}`}
-                  tabIndex={i === active ? 0 : -1}
-                  className={`esc-step v2-stat-card--${s.tone}${i === active ? " is-active" : ""}`}
-                  onClick={() => setActive(i)}
+          <div className="cols">
+            {/* LEFT : bold topic */}
+            <div className="col-left">
+              {ESCROW_STEPS.map((s, i) => (
+                <div
+                  key={`ghost-${s.n}`}
+                  ref={(el) => { ghostRefs.current[i] = el; }}
+                  className="ghost"
+                  data-pos={i === 0 ? "active" : "future"}
                 >
-                  <span className="v2-stat-orb" aria-hidden="true" />
-                  <span className="v2-stat-shine" aria-hidden="true" />
-                  <span className="esc-step-inner">
-                    <span className="esc-step-top">
-                      <span className="esc-step-label">STEP {s.n}</span>
-                      <span className="esc-step-ico" aria-hidden="true">
-                        <s.Icon size={19} strokeWidth={1.9} />
+                  {s.n}
+                </div>
+              ))}
+
+              {ESCROW_STEPS.map((s, i) => {
+                const word = t.marketing.escrow[s.wordKey] || s.defaultWord;
+                return (
+                  <article
+                    key={`word-${s.n}`}
+                    ref={(el) => { wordRefs.current[i] = el; }}
+                    className="word"
+                    data-pos={i === 0 ? "active" : "future"}
+                    style={{ "--wc": s.wc } as React.CSSProperties}
+                  >
+                    <span className="mask">
+                      <span className="mask-in">
+                        {word}
+                        <i className="dot" />
                       </span>
                     </span>
-                    <span className="esc-step-h">
-                      {s.title}
-                      <i className="esc-step-live" />
-                    </span>
-                    <span className="esc-step-rule" aria-hidden="true" />
-                    <span className="esc-step-p">{s.body}</span>
-                  </span>
-                  <span className="esc-step-track"><i /></span>
-                </button>
-              </div>
-            ))}
-          </div>
-
-          <div className="esc-stage">
-            <div className="esc-chrome" aria-hidden="true">
-              <span className="esc-dots"><i /><i /><i /></span>
-              <span className="esc-url">app.yekis.com / escrow / <b>YK-2481</b></span>
-              <span className="esc-chrome-gap" />
+                  </article>
+                );
+              })}
             </div>
-            <div className="esc-app">
-              {ESC_SCREENS.map((Screen, i) => (
-                <div
-                  key={steps[i].n}
-                  id={`esc-panel-${i}`}
-                  role="tabpanel"
-                  aria-labelledby={`esc-tab-${i}`}
-                  inert={i !== active}
-                  className={`esc-panel${i === active ? " is-active" : ""}`}
+
+            {/* RIGHT : details with 3D icons */}
+            <div className="col-right">
+              {ESCROW_STEPS.map((s, i) => (
+                <article
+                  key={`panel-${s.n}`}
+                  ref={(el) => { panelRefs.current[i] = el; }}
+                  className="stage-panel"
+                  data-pos={i === 0 ? "active" : "future"}
+                  style={{
+                    "--i1": s.i1,
+                    "--i2": s.i2,
+                    "--i3": s.i3,
+                  } as React.CSSProperties}
                 >
-                  <Screen />
-                </div>
+                  <div className="hero st" style={{ "--d": ".34s" } as React.CSSProperties}>
+                    <span className="float">
+                      <svg className="hero-icon" viewBox="0 0 64 64">
+                        <use href={`#${s.iconId}`} />
+                      </svg>
+                    </span>
+                  </div>
+                  <ul className="rows">
+                    {s.rows.map((r, ri) => (
+                      <li
+                        key={`row-${ri}`}
+                        className="st"
+                        style={{ "--d": r.d } as React.CSSProperties}
+                      >
+                        <div>
+                          <b>{r.bold}</b>
+                          <small>{r.small}</small>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </article>
               ))}
             </div>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -985,227 +858,216 @@ function FeesSection() {
 }
 
 /* ─────────────────────────────────────────────────
-   Categories — pinned scroll-stack deck
+   Categories — pinned editorial card stack
 ───────────────────────────────────────────────── */
+const STK_Y_OFFSET = 5; // % each waiting card sits below the one in front
+const STK_SCALE_STEP = 0.075; // each waiting card is this much smaller
+const STK_LOOP_MS = 7000;
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const clamp = (v: number, lo: number, hi: number) =>
+  v < lo ? lo : v > hi ? hi : v;
+
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
-  const wrapRef  = useRef<HTMLDivElement>(null);
-  const pinRef   = useRef<HTMLDivElement>(null);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const curRef   = useRef<HTMLSpanElement>(null);
-  const countRef = useRef<HTMLDivElement>(null);
-  const cueRef   = useRef<HTMLDivElement>(null);
+  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const wrapRef = useRef<HTMLDivElement>(null);
   const outroRef = useRef<HTMLDivElement>(null);
-  const rafRef   = useRef<number>(0);
 
-  useEffect(() => {
-    const wrap    = wrapRef.current;
-    const pin     = pinRef.current;
-    const stage   = stageRef.current;
-    const cur     = curRef.current;
-    const countEl = countRef.current;
-    const cue     = cueRef.current;
-    if (!wrap || !pin || !stage || !cur || !countEl || !cue) return;
+  const isCard =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).has("card");
 
-    const cards  = Array.from(stage.querySelectorAll<HTMLElement>(".stk-card"));
-    const copies = cards.map((c) => c.querySelector<HTMLElement>(".stk-copy")!);
-    const medias = cards.map((c) => c.querySelector<HTMLElement>(".stk-media")!);
-    const total  = cards.length;
-    const segment = 1 / (total - 1);
-
-    const Y_OFFSET   = 4;
-    const SCALE_STEP = 0.06;
-    const ENTER_Y    = 24, ENTER_RX = -6, ENTER_SCALE = 0.94;
-    const CARD_MS    = 260, STAGGER_MS = 30;
-    const TILT_X = 2.0, TILT_Y = 2.6;
-    const PARALLAX   = 5;
-    const introTotal = (total - 1) * STAGGER_MS + CARD_MS;
-    const reduced    = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const lerp  = (a: number, b: number, t: number) => a + (b - a) * t;
-    const clamp = (v: number, lo: number, hi: number) => (v < lo ? lo : v > hi ? hi : v);
-    const easeOutExpo = (t: number) => {
-      t = clamp(t, 0, 1);
-      return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
-    };
-
-    const pose = { y: 0, rx: 0, sc: 1, t: 0 };
-
-    function deckPose(i: number, p: number): number {
-      const active = Math.min(Math.floor(p / segment), total - 1);
-      const segP   = clamp((p - active * segment) / segment, 0, 1);
-      if (i < active) {
-        pose.y = -250; pose.rx = 35; pose.sc = 1; pose.t = 1;
-        return active;
-      }
-      if (i === active) {
-        pose.y  = lerp(-50, -200, segP);
-        pose.rx = lerp(0, 35, segP);
-        pose.sc = 1;
-        pose.t  = segP;
-        return active;
-      }
-      const behind = i - active;
-      pose.y  = -50 + (behind - segP) * Y_OFFSET;
-      pose.rx = 0;
-      pose.sc = 1 - (behind - segP) * SCALE_STEP;
-      pose.t  = 0;
-      return active;
-    }
-
-    function render(p: number, elapsed: number) {
-      let active = 0;
-      cards.forEach((card, i) => {
-        active = deckPose(i, p);
-        const e  = elapsed >= introTotal ? 1 : easeOutExpo((elapsed - i * STAGGER_MS) / CARD_MS);
-        const y  = lerp(ENTER_Y, pose.y, e);
-        const rx = lerp(ENTER_RX, pose.rx, e);
-        const sc = lerp(ENTER_SCALE, pose.sc, e);
-        card.style.opacity   = clamp(e * 1.8, 0, 1).toFixed(3);
-        card.style.transform = `translate(-50%, ${y.toFixed(2)}%) rotateX(${rx.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
-        const t = pose.t * e;
-        copies[i].style.transform = `translate3d(0,${(t * -PARALLAX).toFixed(2)}%,0)`;
-        medias[i].style.transform = `translate3d(0,${(t * PARALLAX).toFixed(2)}%,0) scale(${(1 - t * 0.04).toFixed(3)})`;
-      });
-      cur!.textContent = String(active + 1).padStart(2, "0");
-    }
-
-    /* outro reveal via IntersectionObserver */
-    const outro = outroRef.current;
-    if (outro) {
-      if (reduced) {
-        outro.classList.add("on");
-      } else if ("IntersectionObserver" in window) {
-        const io = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((en) => {
-              if (en.isIntersecting) { outro.classList.add("on"); io.disconnect(); }
-            });
-          },
-          { threshold: 0.12 },
-        );
-        io.observe(outro);
-      } else {
-        outro.classList.add("on");
-      }
-    }
-
-    /* reduced-motion: settle immediately, no rAF */
-    if (reduced) {
-      render(0, Infinity);
-      countEl.classList.add("on");
-      cue.classList.add("on");
-      const cueCheck = () => cue.classList.toggle("hide", window.scrollY > 60);
-      cueCheck();
-      window.addEventListener("scroll", cueCheck, { passive: true });
-      return () => window.removeEventListener("scroll", cueCheck);
-    }
-
-    let tx = 0, ty = 0;
-    const updateDeck = () => {
-      rafRef.current = 0;
-      const rect = wrap!.getBoundingClientRect();
-      if (rect.bottom < -200 || rect.top > window.innerHeight + 200) return;
-      const span = Math.max(1, wrap!.offsetHeight - window.innerHeight);
-      const p    = clamp(-rect.top / span, 0, 1);
-      stage!.style.transform =
-        `rotateX(${(-ty * TILT_X).toFixed(2)}deg) rotateY(${(tx * TILT_Y).toFixed(2)}deg)`;
-      render(p, Infinity);
-      countEl!.classList.add("on");
-      cue!.classList.add("on");
-      cue!.classList.toggle("hide", p > 0.02);
-    };
-
-    const scheduleUpdate = () => {
-      if (!rafRef.current) {
-        rafRef.current = requestAnimationFrame(updateDeck);
-      }
-    };
-
-    const onMove = (e: PointerEvent) => {
-      const r = pin.getBoundingClientRect();
-      tx = ((e.clientX - r.left) / r.width  - 0.5) * 2;
-      ty = ((e.clientY - r.top)  / r.height - 0.5) * 2;
-      scheduleUpdate();
-    };
-    const onLeave = () => { tx = 0; ty = 0; scheduleUpdate(); };
-
-    render(0, Infinity);
-    countEl.classList.add("on");
-    cue.classList.add("on");
-    updateDeck();
-
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
-    pin.addEventListener("pointermove", onMove, { passive: true });
-    pin.addEventListener("pointerleave", onLeave, { passive: true });
-
-    return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      window.removeEventListener("scroll", scheduleUpdate);
-      pin.removeEventListener("pointermove", onMove);
-      pin.removeEventListener("pointerleave", onLeave);
-    };
-  }, []);
-
-  const deckCards = [
+  const cards = [
     {
-      cardClass: "stk-card--1",
-      klass: t.marketing.categories.c1Class,
-      titleL1: t.marketing.categories.c1Title1,
-      titleL2: t.marketing.categories.c1Title2,
-      roles: t.marketing.categories.c1Roles,
-      tag: t.marketing.categories.c1Tag,
-      Icon: Code,
+      kicker: t.marketing.categories.c1Class,
+      title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
+      img: "/stack/img-1.jpg",
+      bg: "#c75a35",
     },
     {
-      cardClass: "stk-card--2",
-      klass: t.marketing.categories.c2Class,
-      titleL1: t.marketing.categories.c2Title1,
-      titleL2: t.marketing.categories.c2Title2,
-      roles: t.marketing.categories.c2Roles,
-      tag: t.marketing.categories.c2Tag,
-      Icon: Palette,
+      kicker: t.marketing.categories.c2Class,
+      title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
+      img: "/stack/img-2.jpg",
+      bg: "#1f4d4a",
     },
     {
-      cardClass: "stk-card--3",
-      klass: t.marketing.categories.c3Class,
-      titleL1: t.marketing.categories.c3Title1,
-      titleL2: t.marketing.categories.c3Title2,
-      roles: t.marketing.categories.c3Roles,
-      tag: t.marketing.categories.c3Tag,
-      Icon: Megaphone,
+      kicker: t.marketing.categories.c3Class,
+      title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
+      img: "/stack/img-3.jpg",
+      bg: "#2d2a66",
     },
     {
-      cardClass: "stk-card--4",
-      klass: t.marketing.categories.c4Class,
-      titleL1: t.marketing.categories.c4Title1,
-      titleL2: t.marketing.categories.c4Title2,
-      roles: t.marketing.categories.c4Roles,
-      tag: t.marketing.categories.c4Tag,
-      Icon: PenTool,
+      kicker: t.marketing.categories.c4Class,
+      title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
+      img: "/stack/img-4.jpg",
+      bg: "#0e3f36",
     },
     {
-      cardClass: "stk-card--5",
-      klass: t.marketing.categories.c5Class,
-      titleL1: t.marketing.categories.c5Title1,
-      titleL2: t.marketing.categories.c5Title2,
-      roles: t.marketing.categories.c5Roles,
-      tag: t.marketing.categories.c5Tag,
-      Icon: Languages,
+      kicker: t.marketing.categories.c5Class,
+      title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
+      img: "/stack/img-5.jpg",
+      bg: "#4a224f",
     },
     {
-      cardClass: "stk-card--6",
-      klass: t.marketing.categories.c6Class,
-      titleL1: t.marketing.categories.c6Title1,
-      titleL2: t.marketing.categories.c6Title2,
-      roles: t.marketing.categories.c6Roles,
-      tag: t.marketing.categories.c6Tag,
-      Icon: Database,
+      kicker: t.marketing.categories.c6Class,
+      title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
+      img: "/stack/img-6.jpg",
+      bg: "#1a1613",
     },
   ];
 
+  useEffect(() => {
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+    const cardEls = cardRefs.current.filter(Boolean) as HTMLDivElement[];
+    const total = cardEls.length;
+    if (total === 0) return;
+    const segment = 1 / total;
+    const outro = outroRef.current;
+
+    // Write the deck for a given normalised progress p∈[0,1].
+    const render = (p: number) => {
+      const active = Math.min(Math.floor(p / segment), total - 1);
+      const segP = (p - active * segment) / segment;
+
+      cardEls.forEach((card, i) => {
+        let y: number;
+        let rx: number;
+        let scale: number;
+        if (i < active) {
+          y = -250;
+          rx = 35;
+          scale = 1;
+        } else if (i === active) {
+          y = lerp(-50, -200, segP);
+          rx = lerp(0, 35, segP);
+          scale = 1;
+        } else {
+          const behind = i - active;
+          y = -50 + (behind - segP) * STK_Y_OFFSET;
+          rx = 0;
+          scale = 1 - (behind - segP) * STK_SCALE_STEP;
+        }
+        card.style.transform = `translate(-50%, ${y}%) rotateX(${rx.toFixed(
+          2
+        )}deg) scale(${scale.toFixed(3)})`;
+      });
+    };
+
+    if (reduced) {
+      render(0);
+      outro?.classList.add("is-active");
+      return;
+    }
+
+    let raf = 0;
+
+    if (isCard) {
+      // No scroll inside the card — auto-play the timeline on a loop.
+      const start = performance.now();
+      const tick = (now: number) => {
+        const t = ((now - start) % STK_LOOP_MS) / STK_LOOP_MS;
+        // ease through the reveal (first ~0.86), then hold on the last frame
+        const revealEnd = 6000 / STK_LOOP_MS;
+        const p = t < revealEnd ? t / revealEnd : 1;
+        render(clamp(p, 0, 1));
+        if (p >= 0.96) {
+          outro?.classList.add("is-active");
+        } else {
+          outro?.classList.remove("is-active");
+        }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      return () => cancelAnimationFrame(raf);
+    }
+
+    // IntersectionObserver triggers word loading animation as outro enters
+    let io: IntersectionObserver | null = null;
+    if (outro && "IntersectionObserver" in window) {
+      io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              outro.classList.add("is-active");
+            } else if (entry.boundingClientRect.top > (window.innerHeight || 800)) {
+              outro.classList.remove("is-active");
+            }
+          });
+        },
+        { threshold: 0.15 }
+      );
+      io.observe(outro);
+    }
+
+    // Standalone: drive by the pinned wrapper's scroll position.
+    let autoScrolled = false;
+    const wrap = wrapRef.current || document.getElementById("stk-wrap");
+    const tick = () => {
+      if (wrap) {
+        const top = wrap.getBoundingClientRect().top;
+        const span = wrap.offsetHeight - window.innerHeight;
+        const p = clamp(-top / span, 0, 1);
+        render(p);
+
+        // Bring the "Let's Build" section automatically with clean motion when the cards finish dealing
+        if (p >= 0.96 && !autoScrolled && outro) {
+          autoScrolled = true;
+          outro.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else if (p < 0.82) {
+          autoScrolled = false;
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      if (io) io.disconnect();
+    };
+  }, [isCard, cards.length]);
+
+  const stage = (
+    <div className="stk-stage">
+      {cards.map((c, i) => (
+        <div
+          key={c.kicker}
+          ref={(el) => {
+            cardRefs.current[i] = el;
+          }}
+          className="stk-card"
+          style={{ background: c.bg, zIndex: cards.length - i, cursor: "pointer" }}
+          onClick={() => onStart("register")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onStart("register");
+            }
+          }}
+          aria-label={`Browse ${c.kicker}: ${c.title}`}
+        >
+          <div className="stk-col stk-copy">
+            <p>{c.kicker}</p>
+            <h2>{c.title}</h2>
+          </div>
+          <div className="stk-col stk-media">
+            <div
+              className="stk-img"
+              style={{ backgroundImage: `url(${c.img})` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
-    <section className="v2-section" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
+    <section className="v2-section stk-root" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
       {/* section header */}
       <div className="v2-container">
         <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
@@ -1216,81 +1078,59 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
         </Reveal>
       </div>
 
-      {/* pinned deck — 800svh scroll space */}
-      <div className="stk-wrap" ref={wrapRef}>
-        <div className="stk-pin" ref={pinRef}>
-          <div className="stk-stage" ref={stageRef}>
-            {deckCards.map((card, i) => (
-              <div
-                key={card.cardClass}
-                className={`stk-card ${card.cardClass}`}
-                style={{ zIndex: deckCards.length - i }}
-              >
-                {/* copy column */}
-                <div className="stk-col stk-copy">
-                  <div>
-                    <p className="k">{card.klass}</p>
-                    <h2>
-                      {card.titleL1}
-                      <br />
-                      {card.titleL2}
-                    </h2>
-                  </div>
-                  <div className="row">
-                    <span className="roles">{card.roles}</span>
-                    <button
-                      className="stk-chip"
-                      onClick={() => onStart("register")}
-                      aria-label={`Browse ${card.klass}`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" stroke="currentColor">
-                        <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* media column */}
-                <div className="stk-col stk-media">
-                  <span className="tag">{card.tag}</span>
-                  <span className="ic">
-                    <card.Icon size={64} strokeWidth={1.3} />
-                  </span>
-                  <p className="num">{String(i + 1).padStart(2, "0")}</p>
-                </div>
-              </div>
-            ))}
+      <div id="stk-wrap" className="stk-wrap" ref={wrapRef}>
+        <section className="stk-pin">
+          <div className="stk-chrome">
+            <span className="stk-mark">Yekis®</span>
+            <span className="stk-tag">Stack · Scroll</span>
           </div>
-
-          {/* deck counter */}
-          <div className="stk-count" ref={countRef}>
-            <b ref={curRef}>01</b> / {String(deckCards.length).padStart(2, "0")}
-          </div>
-
-          {/* scroll cue */}
-          <div className="stk-scroll" ref={cueRef} aria-hidden="true">
-            <span className="stk-circle">
-              <span className="stk-ring" />
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 5v14" /><path d="m19 12-7 7-7-7" />
-              </svg>
-            </span>
-            <span className="lbl">{t.marketing.categories.scrollCue}</span>
-          </div>
-        </div>
+          {stage}
+        </section>
       </div>
 
-      {/* outro — always-dark "Let's build." panel */}
-      <div className="stk-flat stk-outro" ref={outroRef} role="complementary" aria-label="Call to action">
-        <h1 className="stk-rv"><span>{t.marketing.categories.outroTitle}</span></h1>
+      <section
+        id="stk-outro"
+        className="stk-flat stk-outro"
+        ref={outroRef}
+        role="complementary"
+        aria-label="Call to action"
+      >
+        <div className="stk-outro-ambient" aria-hidden="true" />
+
+        <h1
+          className="stk-outro-title"
+          aria-label={t.marketing.categories.outroTitle || "Let's Build"}
+        >
+          {(t.marketing.categories.outroTitle || "Let's Build").split(" ").map((word, wi, arr) => (
+            <span key={`${word}-${wi}`} className="stk-word-wrap" aria-hidden="true">
+              <span
+                className="stk-word"
+                style={{ "--wi": wi, "--total": arr.length } as React.CSSProperties}
+              >
+                {word}
+              </span>
+              {wi < arr.length - 1 && <span className="stk-word-space">&nbsp;</span>}
+            </span>
+          ))}
+        </h1>
+
+        <div className="stk-load-bar" aria-hidden="true">
+          <div className="stk-load-bar-fill" />
+        </div>
+
         <p className="stk-outro-sub">
           {t.marketing.categories.outroSubtitle}
         </p>
+
         <div className="stk-cta-row">
-          <button className="stk-outro-btn" onClick={() => onStart("register")}>{t.nav.getStarted}</button>
-          <button className="stk-outro-ghost" onClick={() => onStart("login")}>{t.nav.signIn}</button>
+          <button className="stk-outro-btn" onClick={() => onStart("register")}>
+            {t.nav.getStarted}
+          </button>
+          <button className="stk-outro-ghost" onClick={() => onStart("login")}>
+            {t.nav.signIn}
+          </button>
         </div>
-      </div>
+      </section>
     </section>
   );
 }
@@ -2063,11 +1903,7 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
   return (
     <div className="yk-v2">
       {/* Hero */}
-      <HeroSection />
-
-
-      {/* Stats */}
-      <StatsSection />
+      <HeroSection onStart={onStart} />
 
       {/* How it works / Escrow */}
       <EscrowSection />
