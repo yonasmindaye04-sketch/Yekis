@@ -1,5 +1,28 @@
 # Project Context
 
+> **Update 2026-11-09 (Hero Section Interactive Slogan Proximity Pop Text Animation):**
+> 1. **Motivation & Scope:** Replaced coarse block-level CSS hover effects on hero headlines with a high-fidelity interactive typography animation. Moving the cursor across the hero stage triggers individual letter popping with smooth proximity falloff and authentic purple glow styling.
+> 2. **Proximity Pop Physics & Rendering:**
+>    - Letter centers are pre-calculated relative to untransformed parent coordinates using recursive offset calculation (`getOffsetRelativeTo`), ensuring dynamic transforms do not induce coordinate jitter.
+>    - Cursor proximity evaluates within a `RADIUS = 110px` sphere with smoothstep Hermite falloff (`t * t * (3 - 2 * t)`) and `LERP = 0.16` velocity smoothing.
+>    - Popped letters translate vertically (`-0.22em`), scale up by 35% (`scale(1.35)`), interpolate to purple (`#a78bfa`), and project an ambient text glow (`rgba(167, 139, 250, 0.55)`).
+> 3. **Performance & Theme Parity:**
+>    - The animation loop executes via `requestAnimationFrame` only while active, self-suspending upon cursor departure and rest return.
+>    - Color interpolation adapts to current theme state (`#eaf2f4` dark / `#0f172a` light) and clears inline styles upon rest.
+>    - Theme CSS variables `--v2-pop` and `--v2-pop-glow` updated with strict theme invariance across all layout and geometry properties.
+
+> **Update 2026-11-09 (Holding TIN Requirement and Tax Withholding for MVP Launch):**
+> 1. **Motivation & Scope:** Informal Ethiopian freelancers represent the core supply demographic but primarily operate outside the formal commercial tax registry. Gating wallet withdrawals behind a TIN or imposing a 30% unverified-TIN statutory withholding penalty at launch creates severe supply friction and blocks legitimate freelancers from withdrawing earnings.
+> 2. **Single-Tier Verified Withdrawal Policy:**
+>    - Feature flag `TIN_FEATURE_ENABLED` configured in `apps/backend/src/config/env.ts` (default `false`).
+>    - `/api/v1/escrow/wallet/withdraw` requirement relaxed to `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")`. Tier 1 verified freelancers (National ID / Fayda biometric eSignet) can withdraw earnings directly.
+>    - Statutory platform withholding tax in `calculateFees` held at 0 ETB while `TIN_FEATURE_ENABLED=false` pending tax authority remittance procedure formalization (`TAX-002`). Freelancers receive 95% net milestone payouts (5% commission).
+>    - `UpgradeToTier2Input` schema updated to make `tin` and `businessRegNumber` optional fields.
+> 3. **UI & Legal Alignment:**
+>    - Service agreement contract template Clause 6 dynamically clarifies independent contractor tax responsibility when platform withholding is deferred.
+>    - `BrowserVerification.tsx` and `BrowserWallet.tsx` display transparent MVP launch notices indicating Tier 1 unlocks full access and withdrawals.
+> 4. **Roadmap & Phase 4:** The 3-tier KYC model with mandatory TIN/trade licenses and automated ERA tax remittance is deferred to Phase 4 (Growth & Scale).
+
 > **Update 2026-11-08 ("Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play):**
 > 1. **Motivation & Scope:** Refined the "Make ideas visible." editorial banner (`HandWrittenTitle`) so its space usage, vertical spacing, and typography integrate seamlessly with the full-screen escrow stage section above it.
 > 2. **Space Usage & Typography Alignment:**

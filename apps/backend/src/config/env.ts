@@ -247,6 +247,14 @@ const EnvSchema = z.object({
   // Legal-capacity gate — set once counsel confirms minimum contracting age
   MINIMUM_CONTRACTING_AGE: z.coerce.number().default(18),
 
+  // Feature flag: TIN (Tax Identification Number) collection & statutory withholding tax.
+  // Held / deferred for MVP launch; re-evaluated at Phase 4 (Growth & Scale).
+  // When false: Tier 1 verified users can withdraw, and withholding tax is held at 0%.
+  TIN_FEATURE_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   // Withholding tax thresholds/rates — confirm with accountant before changing
   WITHHOLDING_THRESHOLD_MINOR: z.coerce.number().default(1000000), // 10,000 ETB in cents
   WITHHOLDING_RATE_WITH_TIN: z.coerce.number().default(0.03),

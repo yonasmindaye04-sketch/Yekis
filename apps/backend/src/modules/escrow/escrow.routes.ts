@@ -1,5 +1,6 @@
 // === IMPORTS ===
 import { Router } from "express";
+import { env } from "../../config/env.js";
 import { FundEscrowInput, PaymentProvider, WithdrawInput } from "../../schemas";
 import { z } from "zod";
 import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
@@ -318,7 +319,7 @@ escrowRouter.post(
     "/wallet/withdraw",
     requireAuth,
     requireFreshAuth(300),
-    requireKycVerified("TIER_2"),
+    requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1"),
     async (req: AuthedRequest, res) => {
     const parsed = WithdrawInput.safeParse(req.body);
     if (!parsed.success)

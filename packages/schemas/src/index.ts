@@ -317,8 +317,6 @@ export type SubmitKycDocumentInput = z.infer<typeof SubmitKycDocumentInput>;
 export const UpgradeToTier2Input = z.object({
   tin: z.string().min(5).optional(),
   businessRegNumber: z.string().min(3).optional(),
-}).refine((data) => data.tin || data.businessRegNumber, {
-  message: "Either a TIN or a business registration number is required for Tier 2.",
 });
 export type UpgradeToTier2Input = z.infer<typeof UpgradeToTier2Input>;
 

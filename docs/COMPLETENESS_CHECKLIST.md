@@ -1,10 +1,16 @@
 ﻿# Yekis_jobs Completeness Checklist
 
-Last reviewed: 2026-11-07
+Last reviewed: 2026-11-09
 
 `[x]` means implemented and verified locally. `[ ]` means production work, broader test coverage, or external validation is still required. This is the authoritative project checklist; `EXTENDED_COMPLETENESS_CHECKLIST.md` points here to prevent status drift.
 
 ## Documentation Alignment (2026-11-07)
+
+## MVP Scope Adjustments (2026-11-09)
+
+- [x] **Hero Slogan Interactive Proximity Pop Animation**: Real-time cursor-proximity pop effect with smoothstep falloff, lerping, untransformed coordinate caching, purple `#a78bfa` hover glow, theme rest colors, and reduced motion safety in `LandingPageV2.tsx` and `LandingPage.tsx`.
+- [x] **TIN Requirement Held for MVP**: TIN collection and 30% withholding penalty held for launch (`TIN_FEATURE_ENABLED=false`); Tier 1 verified freelancers can withdraw directly.
+- [x] **Simplified Single-Tier Launch**: Tier 1 (National ID / Fayda) unlocks all core actions; Tier 2/TIN deferred to Phase 4.
 
 - [x] `docs/ARCHITECTURE.md` updated: 12 missing modules added, 3 missing workers added, system diagram updated, External Boundaries corrected (B2C live), multilingual section added
 - [x] `docs/DATABASE.md` updated: 14 missing models added, full StaffRole enum (7 values), GigStatus/GigOrderStatus enums, ContractStatus.CANCELLED and ProposalStatus.COUNTER_OFFERED added, erDiagram extended

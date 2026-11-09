@@ -54,7 +54,7 @@ Marketplace roles are `CLIENT`, `FREELANCER`, and `BOTH`.
 |---|---|---|---|
 | `POST` | `/api/v1/kyc/documents` | Authenticated | Upload one KYC document and trigger verification/review |
 | `GET` | `/api/v1/kyc/status` | Authenticated | Return tier, status, review metadata, and submitted documents |
-| `POST` | `/api/v1/kyc/upgrade-tier2` | Authenticated Tier 1 user | Submit TIN/business registration for Tier 2 review |
+| `POST` | `/api/v1/kyc/upgrade-tier2` | Authenticated Tier 1 user | Submit optional TIN/business registration for Tier 2 review (held/optional for MVP) |
 | `GET` | `/api/v1/kyc/review-queue` | Staff (`kyc.review`) | Paginated KYC records. Omit `status` for **all** statuses; pass `status=UNDER_REVIEW` for the actionable queue. Response also carries `counts: { underReview, pending }` |
 | `POST` | `/api/v1/kyc/:targetUserId/review` | Staff | Verify or reject KYC |
 
@@ -153,7 +153,7 @@ The 7-day cooling-off cancellation right may only be exercised by the client whi
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/submit` | Contract freelancer | Mark funded work delivered and schedule auto-release |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
-| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 2 verified | Request payout to provider account |
+| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 1 verified (Tier 2 if TIN enabled) | Request payout to provider account |
 
 Funding body (wallet-first):
 

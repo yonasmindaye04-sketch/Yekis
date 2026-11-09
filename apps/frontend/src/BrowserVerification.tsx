@@ -315,6 +315,9 @@ export function BrowserVerification() {
             <p style={{ color: "var(--color-text-secondary)", fontSize: "0.86rem", maxWidth: 680 }}>
               {k.requestTier2Desc}
             </p>
+            <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "var(--color-bg-subtle)", border: "1px solid var(--color-border)", fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
+              <span style={{ fontWeight: 800, color: "var(--color-primary)" }}>MVP Launch Notice:</span> Wallet withdrawals are unlocked with <strong>Tier 1 Verification</strong> (National ID / Fayda). TIN / Business Registration is held and optional for launch.
+            </div>
           </div>
           {tier2Done && (
             <span className="status-pill success">

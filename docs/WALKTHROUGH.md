@@ -1,6 +1,36 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-08
+Last validated: 2026-11-09
+
+> **Hero Section Interactive Slogan Proximity Pop Text Animation (2026-11-09):**
+> - **`ProximityPopTitle.tsx` & `LandingPageV2.tsx` (`SpringTitle`) / `LandingPage.tsx`**:
+>   - Implemented an interactive cursor-proximity pop animation for the hero section slogan/title replacing previous static hover effects.
+>   - As the pointer moves across the hero section stage, letters within an interactive radius (`RADIUS = 110px`) smoothly lift (`LIFT = 0.22em`), scale up (`GROW = 0.35`), turn vibrant purple (`#a78bfa` / `rgb(167, 139, 250)`), and emit a glowing text shadow (`rgba(167, 139, 250, 0.55)`).
+>   - Employs smoothstep falloff (`target = t * t * (3 - 2 * t)`) and smooth LERP interpolation (`LERP = 0.16`) for fluid, organic trailing motion that follows the cursor.
+>   - Untransformed letter center caching with `getOffsetRelativeTo(letter, head)` guarantees popping transforms never feed back into position measurements.
+>   - Theme-aware resting color detection (`rgb(244, 244, 245)` in dark theme, `rgb(15, 23, 42)` in light theme) smoothly interpolating to purple on hover, resetting inline styles when at rest to preserve pure CSS theme fidelity.
+>   - Performance-optimized RAF loop: sleeps when idle and awakens immediately upon pointer motion, preventing background CPU overhead.
+>   - Full accessibility & reduced-motion support (`aria-label` with `aria-hidden="true"` letter spans, and `prefers-reduced-motion: reduce` transform override).
+> - **CSS & Theme Parity (`landing-v2.css`, `marketing.css`)**:
+>   - Updated `--v2-pop` to `#a78bfa` and `--v2-pop-glow` to `rgba(167, 139, 250, 0.55)` (dark) and `rgba(167, 139, 250, 0.45)` (light).
+>   - Configured `.v2-hero-title` with `position: relative` and removed all-letter CSS `:hover` triggers.
+>   - Strictly adheres to theme parity rules: all layout/shape properties remain 100% theme-invariant in base un-themed rules.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+
+> **Holding TIN Requirement & Tax Withholding for MVP Launch (2026-11-09):**
+> - **Configuration & Scope**:
+>   - Introduced `TIN_FEATURE_ENABLED` in `apps/backend/src/config/env.ts` (default `false`).
+>   - Bypassed withholding tax (`withholdingTax = 0`) in `apps/backend/src/modules/escrow/fees.ts` when flag is disabled, preventing 30% penalties on unverified TINs for launch.
+>   - Gated `/api/v1/escrow/wallet/withdraw` behind `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")`, enabling Tier 1 (National ID / Fayda) verified freelancers to withdraw funds directly.
+>   - Relaxed `UpgradeToTier2Input` in `packages/schemas/src/index.ts` and `apps/backend/src/schemas.ts` to make `tin` and `businessRegNumber` optional.
+> - **Contracts & Frontend Notices**:
+>   - Service agreement Clause 6 (`serviceAgreement.template.ts`) dynamically clarifies independent contractor tax responsibility.
+>   - `BrowserVerification.tsx` and `BrowserWallet.tsx` display transparent MVP launch notices indicating Tier 1 verified payouts are active.
+> - **Verification**:
+>   - `npm --prefix apps/backend run type-check` passes with 0 errors.
+>   - `pnpm run check:doc-parity` passes with 100% parity across all models, modules, routes, and topics.
 
 > **"Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play (2026-11-08):**
 > - **`HandWrittenTitle.tsx` & `HandWrittenTitle.css`**:

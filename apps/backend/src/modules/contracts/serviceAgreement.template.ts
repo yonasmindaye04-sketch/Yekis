@@ -1,5 +1,6 @@
 // === IMPORTS ===
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { env } from "../../config/env.js";
 
 export const SERVICE_AGREEMENT_TEMPLATE_VERSION = "v1.0-2026";
 
@@ -160,9 +161,15 @@ export async function generateServiceAgreementPdf(
 
   // ---------- 6. Tax withholding ----------
   drawHeading("6. Tax Withholding");
-  drawParagraph(
-    "The platform acts as a withholding agent for payments of ETB 10,000 or more per project: 3% withholding tax if the Freelancer has provided a TIN, 30% otherwise. The Freelancer remains responsible for filing their own personal income tax.",
-  );
+  if (env.TIN_FEATURE_ENABLED) {
+    drawParagraph(
+      "The platform acts as a withholding agent for payments of ETB 10,000 or more per project: 3% withholding tax if the Freelancer has provided a TIN, 30% otherwise. The Freelancer remains responsible for filing their own personal income tax.",
+    );
+  } else {
+    drawParagraph(
+      "The Freelancer is engaged as an independent contractor and is solely responsible for personal tax compliance. Statutory platform tax withholding is deferred pending finalization of tax authority remittance procedures.",
+    );
+  }
 
   // ---------- 7. Intellectual property ----------
   drawHeading("7. Intellectual Property");

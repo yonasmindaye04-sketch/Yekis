@@ -63,7 +63,7 @@ CLIENT                          PLATFORM                        FREELANCER
   │                                │                                │
   │                                │         9. Withdraw ───────────►
   │                                │         Telebirr / CBE / M-Pesa│
-  │                                │         (Tier 2 KYC required)  │
+  │                                │         (Tier 1 KYC verified in MVP; TIN/Tier 2 deferred)  │
   │                                │         Automated B2C transfer │
 ```
 
@@ -150,7 +150,7 @@ CLIENT                          PLATFORM                        FREELANCER
 
 | Role | Permitted? | Conditions & Gates |
 |---|---|---|
-| **Freelancer** | ✅ Yes | Tier 2 KYC verified; destination phone/account matches KYC identity; account not compliance-held or suspended. |
+| **Freelancer** | ✅ Yes | Verified identity (Tier 1 verified in MVP; TIN/Tier 2 deferred); destination phone/account matches KYC identity; account not compliance-held or suspended. |
 | **Client** | ✅ Yes | Permitted only if user has **zero active contract milestones** in non-terminal states and **no open disputes**. |
 
 ---

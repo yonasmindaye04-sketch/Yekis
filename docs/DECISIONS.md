@@ -1,5 +1,15 @@
 # Architecture And Product Decisions
 
+## 2026-11-09
+
+### Holding TIN (Tax Identification Number) Requirement for MVP (Simplified Launch)
+Tax Identification Number (TIN) collection, mandatory Tier 2 gating on withdrawals, and statutory withholding tax deductions (3% / 30%) are held and deferred for the MVP launch (`TIN_FEATURE_ENABLED=false`). 
+- **Rationale:** Informal Ethiopian freelance talent operates primarily outside the formal commercial tax registry. Gating withdrawals behind a TIN or imposing a 30% unverified-TIN penalty deduction at launch would create insurmountable supply-side friction and exclude the platform's core target demographics.
+- **Policy & Architecture:**
+  1. Tier 1 KYC (National ID / Fayda biometric verification) is sufficient for all core actions, including wallet withdrawals (`requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")`).
+  2. Withholding tax calculation in `calculateFees` is held at 0 ETB while `TIN_FEATURE_ENABLED=false`, ensuring freelancers receive 95% of gross milestone funds (only the 5% platform commission is deducted).
+  3. The formal 3-tier KYC model with mandatory TIN/trade licenses and automated ERA withholding remittance remains an active roadmap workstream deferred to Phase 4 (Growth & Scale), pending final accountant confirmation of ERA remittance procedures (`TAX-002: OPEN ACTION`).
+
 ## 2026-10-17
 
 ### Telegram Bot 4-Language Localization & Push Alert Sync

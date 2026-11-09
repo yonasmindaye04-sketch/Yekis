@@ -303,7 +303,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
         <section className="panel withdraw-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Tier 2 payout</p>
+              <p className="eyebrow">Verified payout</p>
               <h2>Withdraw earnings</h2>
             </div>
             <WalletCards size={22} />

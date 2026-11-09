@@ -20,7 +20,7 @@ export interface FeeBreakdown {
 // === MAIN FUNCTIONS ===
 export function calculateFees(params: {
   milestoneAmountMinor: number;
-  freelancerHasTin: boolean;
+  freelancerHasTin?: boolean;
 }): FeeBreakdown {
   const gross = params.milestoneAmountMinor;
 
@@ -31,14 +31,13 @@ export function calculateFees(params: {
     gross * env.PLATFORM_FEE_RATE_CLIENT,
   );
 
-  const withholdingRate = params.freelancerHasTin
-    ? env.WITHHOLDING_RATE_WITH_TIN
-    : env.WITHHOLDING_RATE_WITHOUT_TIN;
-
-  const withholdingTax =
-    gross >= env.WITHHOLDING_THRESHOLD_MINOR
-      ? Math.round(gross * withholdingRate)
-      : 0;
+  let withholdingTax = 0;
+  if (env.TIN_FEATURE_ENABLED && gross >= env.WITHHOLDING_THRESHOLD_MINOR) {
+    const withholdingRate = params.freelancerHasTin
+      ? env.WITHHOLDING_RATE_WITH_TIN
+      : env.WITHHOLDING_RATE_WITHOUT_TIN;
+    withholdingTax = Math.round(gross * withholdingRate);
+  }
 
   const freelancerNet = gross - platformFeeFromFreelancer - withholdingTax;
   const clientTotalCharge = gross + platformFeeFromClient;
