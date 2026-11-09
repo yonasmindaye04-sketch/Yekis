@@ -285,7 +285,7 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 
 | Service | Address |
 |---|---|
-| Frontend | `http://127.0.0.1:5173` |
+| Frontend | `http://127.0.0.1:3000` |
 | API | `http://127.0.0.1:4000` |
 | PostgreSQL | `localhost:5433` -> container `5432` |
 | Redis | `localhost:6379` |

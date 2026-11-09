@@ -50,7 +50,7 @@ pnpm dev:backend
 pnpm --filter frontend dev
 ```
 
-- Frontend: `http://127.0.0.1:5173`
+- Frontend: `http://127.0.0.1:3000`
 - API health: `http://127.0.0.1:4000/health`
 - MinIO console: `http://127.0.0.1:9001`
 

@@ -84,7 +84,7 @@ pnpm --filter backend exec prisma db seed
 
 ## Step 2 — Log In
 
-1. Open the Yekis web app (default local: `http://localhost:5173`)
+1. Open the Yekis web app (default local: `http://localhost:3000`)
 2. Click **Sign in** (or "Get started" then "Sign in")
 3. Enter the staff email and password
 4. The app automatically detects `staffRole` from the `/api/v1/auth/me` response and redirects to

@@ -29,7 +29,7 @@ public `https://<random>.trycloudflare.com` URL that forwards to a local port (e
 What it does for Yekis:
 
 1. **Telegram Mini App testing** — Telegram requires a secure public HTTPS origin to
-   launch a Mini App. The tunnel gives the local Vite dev server (`localhost:5173`) a
+   launch a Mini App. The tunnel gives the local Vite dev server (`localhost:3000`) a
    public HTTPS URL without deploying anything.
 2. **Webhook testing** — payment gateways and the Telegram Bot API can deliver callbacks
    to the local backend through the same origin (via the Vite `/api` proxy) or a
@@ -145,7 +145,7 @@ pnpm run dev:frontend
 ```powershell
 # Terminal 3
 pnpm run tunnel:cloudflare
-# equivalent: cloudflared tunnel --url http://localhost:5173
+# equivalent: cloudflared tunnel --url http://localhost:3000
 ```
 
 cloudflared prints a line like:

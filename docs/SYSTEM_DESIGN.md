@@ -1760,7 +1760,7 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | CSS | Vanilla CSS (`index.css` — 110 KB design system) |
 | Icons | `lucide-react` |
 | Environment Variable | `VITE_API_BASE_URL` |
-| Dev Server | `npm run dev` → `http://localhost:5173` |
+| Dev Server | `pnpm dev` → `http://localhost:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
 | Internationalization | `i18n.ts` (Amharic + English string catalog) |
 

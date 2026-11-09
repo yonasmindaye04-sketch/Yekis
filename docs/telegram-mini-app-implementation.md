@@ -378,7 +378,7 @@ selfieWithId
 
    ```powershell
    pnpm run tunnel:cloudflare
-   # or: cloudflared tunnel --url http://localhost:5173
+   # or: cloudflared tunnel --url http://localhost:3000
    ```
 
 4. Copy the public HTTPS Cloudflare Tunnel URL from the cloudflared output.
@@ -418,7 +418,7 @@ The current implementation has completed these Telegram Mini App setup and local
 
 - Added `apps/frontend/vite.config.ts` proxy configuration to forward `/api` requests to `http://localhost:4000`.
 - Updated `apps/frontend/src/api/client.ts` and `apps/frontend/src/api/telegramAuth.ts` to default `VITE_API_BASE_URL` to `""`, enabling relative `/api` requests through the Vite proxy.
-- Confirmed local Telegram Mini App testing can use a single Cloudflare Tunnel to `5173`.
+- Confirmed local Telegram Mini App testing can use a single Cloudflare Tunnel to `3000`.
 - Confirmed BotFather `Main App` and menu button URLs should point to the same public Cloudflare Tunnel URL.
 - Confirmed `Same-Origin Restriction` should remain enabled for safe WebApp SDK usage.
 - Confirmed the frontend tunnels through Cloudflare while the backend continues to run on `localhost:4000`.

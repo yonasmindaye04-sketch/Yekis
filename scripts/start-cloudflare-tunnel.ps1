@@ -1,15 +1,15 @@
 # Start a Cloudflare quick tunnel (cloudflared) exposing the Vite dev server
-# (port 5173) on a public HTTPS URL. No account or auth token required.
+# (port 3000) on a public HTTPS URL. No account or auth token required.
 #
 # Usage:
-#   .\scripts\start-cloudflare-tunnel.ps1            # tunnel port 5173
+#   .\scripts\start-cloudflare-tunnel.ps1            # tunnel port 3000
 #   .\scripts\start-cloudflare-tunnel.ps1 -Port 4000 # tunnel the backend
 #
 # The public https://*.trycloudflare.com URL is printed by cloudflared; paste it
 # into BotFather (Main App + menu button) and into FRONTEND_URL / CORS origins.
 
 param(
-    [int]$Port = 5173
+    [int]$Port = 3000
 )
 
 $cf = Get-Command cloudflared -ErrorAction SilentlyContinue

@@ -122,7 +122,7 @@ pnpm --filter frontend dev
 
 ### Open in browser
 
-- Frontend: `http://127.0.0.1:5173`
+- Frontend: `http://127.0.0.1:3000`
 - API health: `http://127.0.0.1:4000/health`
 
 > Note: the root package currently has no generic `dev` script, and `dev:web` does not target the `frontend` package.

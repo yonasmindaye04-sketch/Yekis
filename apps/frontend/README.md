@@ -21,7 +21,7 @@ Start the backend and local infrastructure first, then:
 pnpm --filter frontend dev
 ```
 
-Open `http://127.0.0.1:5173`. During local development, Vite proxies relative `/api` requests to the backend.
+Open `http://127.0.0.1:3000`. During local development, Vite proxies relative `/api` requests to the backend.
 
 ## Build And Lint
 

@@ -4,7 +4,7 @@
 // so no manual BotFather URL updates are needed between runs.
 import { spawn } from "node:child_process";
 
-const PORT = Number(process.env.TUNNEL_PORT || 5173);
+const PORT = Number(process.env.TUNNEL_PORT || 3000);
 const URL_RE = /https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/;
 
 let tunnelProc = null;
