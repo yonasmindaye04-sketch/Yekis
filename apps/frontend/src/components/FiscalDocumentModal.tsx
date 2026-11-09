@@ -1,14 +1,11 @@
 import { useState } from "react";
 import {
-  Building2,
   Check,
   Copy,
   FileCheck2,
   FileText,
   Printer,
-  ShieldCheck,
   Stamp,
-  UserCheck,
   X,
 } from "lucide-react";
 
@@ -249,16 +246,16 @@ export function FiscalDocumentSheet({
   };
 
   const sheetContent = (
-    <div className="yk-fiscal-wrap">
+    <div className="excel-sheet-wrap yk-fiscal-wrap">
       {/* Interactive Toolbar (Hidden in @media print) */}
       {interactiveControls && (
-        <div className="yk-fiscal-toolbar no-print">
-          <div className="yk-fiscal-tabs" role="tablist" aria-label="Document recipient perspective">
+        <div className="excel-toolbar no-print">
+          <div className="excel-toolbar-left" role="tablist" aria-label="Document recipient perspective">
             <button
               type="button"
               role="tab"
               aria-selected={activeDocType === "CLIENT_INVOICE"}
-              className={`yk-fiscal-tab ${
+              className={`excel-tab-btn ${
                 activeDocType === "CLIENT_INVOICE" ? "is-active" : ""
               }`}
               onClick={() => setDocType("CLIENT_INVOICE")}
@@ -271,7 +268,7 @@ export function FiscalDocumentSheet({
               type="button"
               role="tab"
               aria-selected={activeDocType === "FREELANCER_VOUCHER"}
-              className={`yk-fiscal-tab ${
+              className={`excel-tab-btn ${
                 activeDocType === "FREELANCER_VOUCHER" ? "is-active" : ""
               }`}
               onClick={() => setDocType("FREELANCER_VOUCHER")}
@@ -282,10 +279,10 @@ export function FiscalDocumentSheet({
             </button>
           </div>
 
-          <div className="yk-fiscal-controls-right">
+          <div className="excel-toolbar-right">
             <button
               type="button"
-              className={`yk-fiscal-chip ${isVatEnabled ? "is-on" : ""}`}
+              className={`excel-chip-toggle ${isVatEnabled ? "is-on" : ""}`}
               onClick={toggleVat}
               title="Toggle 15% Ethiopian Value Added Tax (ተ.እ.ታ)"
             >
@@ -294,7 +291,7 @@ export function FiscalDocumentSheet({
 
             <button
               type="button"
-              className={`yk-fiscal-chip ${isWhtEnabled ? "is-on" : ""}`}
+              className={`excel-chip-toggle ${isWhtEnabled ? "is-on" : ""}`}
               onClick={toggleWht}
               title="Toggle ERCA Withholding Tax (ዊዝሆልዲንግ ታክስ)"
             >
@@ -304,7 +301,7 @@ export function FiscalDocumentSheet({
             {isWhtEnabled && (
               <button
                 type="button"
-                className={`yk-fiscal-chip ${isTinVerified ? "is-on" : "is-warn"}`}
+                className={`excel-chip-toggle ${isTinVerified ? "is-on" : ""}`}
                 onClick={toggleTinStatus}
                 title="Switch between 3% Verified TIN and 30% Unverified TIN rate"
               >
@@ -316,7 +313,7 @@ export function FiscalDocumentSheet({
 
             <button
               type="button"
-              className="yk-fiscal-action-btn"
+              className="excel-btn-action"
               onClick={copyReference}
             >
               {copiedSerial ? <Check size={14} /> : <Copy size={14} />}
@@ -325,7 +322,7 @@ export function FiscalDocumentSheet({
 
             <button
               type="button"
-              className="yk-fiscal-action-btn is-primary"
+              className="excel-btn-action is-primary"
               onClick={handlePrint}
             >
               <Printer size={14} />
@@ -335,7 +332,7 @@ export function FiscalDocumentSheet({
             {mode === "modal" && onClose && (
               <button
                 type="button"
-                className="yk-fiscal-close-btn"
+                className="excel-btn-close"
                 onClick={onClose}
                 aria-label="Close document preview"
               >
@@ -346,388 +343,354 @@ export function FiscalDocumentSheet({
         </div>
       )}
 
-      {/* Printable Bilingual A4 Fiscal Sheet */}
+      {/* Printable Bilingual Excel-Styled Fiscal Sheet */}
       <article
-        className="yk-fiscal-sheet"
+        className="excel-sheet-card yk-fiscal-sheet"
         aria-label={
           activeDocType === "CLIENT_INVOICE"
-            ? "Bilingual Client Commercial Invoice and Escrow Deposit Receipt"
-            : "Bilingual Freelancer Payout Remittance and ERCA Withholding Tax Voucher"
+            ? "Excel-Styled Bilingual Client Commercial Invoice and Escrow Deposit Receipt"
+            : "Excel-Styled Bilingual Freelancer Payout Remittance and ERCA Withholding Tax Voucher"
         }
       >
-        {/* Top Authority Banner */}
-        <header className="yk-fiscal-head">
-          <div className="yk-fiscal-brand-col">
-            <div className="yk-fiscal-brand-lockup">
-              <img
-                src="/logo.png"
-                alt="Yekis"
-                className="yk-fiscal-logo"
-                referrerPolicy="no-referrer"
-              />
-              <div>
-                <div className="yk-fiscal-company-name">
-                  YEKIS TECHNOLOGIES PLC · ዬኪስ ቴክኖሎጂስ ኃ/የተ/የግ/ማ
-                </div>
-                <div className="yk-fiscal-company-sub">
-                  Custodial Escrow &amp; Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ (Bole Sub-City, Woreda 03)
-                </div>
-                <div className="yk-fiscal-company-tin">
-                  ERCA Platform TIN / የድርጅት ቲን: <strong>0078492104</strong> · VAT Reg: <strong>ETH-VAT-99201</strong>
-                </div>
-              </div>
+        {/* Header (Matching Excel CSV Row 2-4: INVOICE / 24Billions PVT. lockup) */}
+        <header className="excel-header">
+          <div className="excel-header-left">
+            <h1 className="excel-doc-title">
+              {activeDocType === "CLIENT_INVOICE" ? "INVOICE" : "PAYOUT RECEIPT"}
+            </h1>
+            <div className="excel-doc-subtitle">
+              {activeDocType === "CLIENT_INVOICE"
+                ? "Commercial Invoice & Escrow Deposit Receipt · የንግድ ደረሰኝ እና የኢስክሮ ክፍያ ማረጋገጫ"
+                : "Freelancer Payout & Withholding Tax Voucher · የባለሙያ ክፍያ እና የዊዝሆልዲንግ ታክስ ደረሰኝ"}
             </div>
           </div>
 
-          <div className="yk-fiscal-doc-meta">
-            <div className="yk-fiscal-doc-badge">
-              {activeDocType === "CLIENT_INVOICE" ? (
-                <>
-                  <span>COMMERCIAL INVOICE &amp; ESCROW RECEIPT</span>
-                  <small>የንግድ ደረሰኝ እና የኢስክሮ ክፍያ ማረጋገጫ</small>
-                </>
-              ) : (
-                <>
-                  <span>PAYOUT REMITTANCE &amp; WHT VOUCHER</span>
-                  <small>የባለሙያ ክፍያ እና የዊዝሆልዲንግ ታክስ ምስክር ወረቀት</small>
-                </>
-              )}
+          <div className="excel-header-right">
+            <div className="excel-company-name">
+              24Billions PVT. · Yekis Technologies PLC
             </div>
-            <div className="yk-fiscal-serial-grid">
-              <div>
-                <span>Document No / የሰነድ ቁጥር</span>
-                <strong className="yk-mono">{serial}</strong>
-              </div>
-              <div>
-                <span>Gregorian Date / ቀን (እ.ኤ.አ)</span>
-                <strong className="yk-mono">{dates.greg}</strong>
-              </div>
-              <div>
-                <span>Ethiopian Date / ቀን (ዓ.ም)</span>
-                <strong>{dates.eth}</strong>
-              </div>
-              <div>
-                <span>Fiscal Status / ሁኔታ</span>
-                <strong className="yk-fiscal-status-text">
-                  {data.statusLabel ??
-                    (activeDocType === "CLIENT_INVOICE"
-                      ? "ESCROW FUNDED · በኢስክሮ የተያዘ"
-                      : "DISBURSED · የተከፈለ")}
-                </strong>
-              </div>
+            <div className="excel-company-tagline">
+              Leading the Way in Health and Fitness Innovation · Digital Escrow
+            </div>
+            <div className="excel-company-details">
+              ERCA Platform TIN: <strong>0078492104</strong> · VAT Reg: <strong>ETH-VAT-99201</strong> · Addis Ababa, Ethiopia
             </div>
           </div>
         </header>
 
-        {/* Counterparty & TIN Identification Strip */}
-        <section className="yk-fiscal-parties">
-          {activeDocType === "CLIENT_INVOICE" ? (
-            <>
-              <div className="yk-fiscal-party-box">
-                <div className="yk-fiscal-party-title">
-                  <Building2 size={14} />
-                  <span>BILLED TO (CLIENT) · ለደንበኛ (ከፋይ)</span>
-                </div>
-                <div className="yk-fiscal-party-name">{clientName}</div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Location / አድራሻ:</span>{" "}
-                  <b>{data.clientLocation ?? "Addis Ababa, Ethiopia · አዲስ አበባ"}</b>
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <label htmlFor="client-tin-field">
-                    Client TIN / የግብር ከፋይ መለያ ቁጥር:
-                  </label>
-                  <input
-                    id="client-tin-field"
-                    type="text"
-                    className="yk-fiscal-tin-input yk-mono"
-                    value={clientTinInput}
-                    onChange={(e) => setClientTinInput(e.target.value)}
-                    aria-label="Client TIN number"
-                  />
-                </div>
-              </div>
+        {/* Metadata Block 1 (Matching Excel CSV Rows 6-8: To David Dhawan / Date / Invoice # / Customer ID) */}
+        <section className="excel-meta-grid">
+          <div className="excel-meta-box">
+            <span className="excel-meta-box-label">To:</span>
+            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-text)" }}>
+              {activeDocType === "CLIENT_INVOICE" ? clientName : freelancerName}
+            </div>
+            <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
+              {activeDocType === "CLIENT_INVOICE"
+                ? (data.clientLocation ? `${data.clientLocation} · Radiant Elegance` : "Radiant Elegance")
+                : `Yekis Verified Talent · ${freelancerUcid}`}
+            </div>
+            <div className="excel-meta-line" style={{ marginTop: 4 }}>
+              <span>Phone / Contact:</span>
+              <strong>{activeDocType === "CLIENT_INVOICE" ? "875-423-4238" : "+251 911 012 345"}</strong>
+            </div>
+            <div className="excel-meta-line">
+              <label htmlFor="client-tin-field">
+                {activeDocType === "CLIENT_INVOICE" ? "Client TIN:" : "Freelancer TIN:"}
+              </label>
+              <input
+                id="client-tin-field"
+                type="text"
+                className="excel-tin-input"
+                value={activeDocType === "CLIENT_INVOICE" ? clientTinInput : freelancerTinInput}
+                onChange={(e) =>
+                  activeDocType === "CLIENT_INVOICE"
+                    ? setClientTinInput(e.target.value)
+                    : setFreelancerTinInput(e.target.value)
+                }
+                aria-label="TIN number"
+              />
+            </div>
+          </div>
 
-              <div className="yk-fiscal-party-box">
-                <div className="yk-fiscal-party-title">
-                  <ShieldCheck size={14} />
-                  <span>ESCROW CUSTODIAN &amp; CONTRACTOR · የኢስክሮ ጠባቂ እና ባለሙያ</span>
-                </div>
-                <div className="yk-fiscal-party-name">
-                  Yekis Escrow Trust Vault · FBO {freelancerName}
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Contractor ID / መለያ:</span>{" "}
-                  <b className="yk-mono">{freelancerUcid}</b> ·{" "}
-                  <b>{isTinVerified ? "Fayda & Tier 2 TIN Verified" : "Tier 1 Basic"}</b>
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Contract Reference / የውል ቁጥር:</span>{" "}
-                  <b className="yk-mono">{contractCode}</b> (AACCSA Bilingual Standard)
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="yk-fiscal-party-box">
-                <div className="yk-fiscal-party-title">
-                  <UserCheck size={14} />
-                  <span>PAYEE (FREELANCER) · ተከፋይ ባለሙያ</span>
-                </div>
-                <div className="yk-fiscal-party-name">{freelancerName}</div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Yekis UCID &amp; KYC / የማረጋገጫ ደረጃ:</span>{" "}
-                  <b className="yk-mono">{freelancerUcid}</b> ·{" "}
-                  <b>
-                    {isTinVerified
-                      ? "Tier 2 Fayda ID & TIN Verified (የተረጋገጠ)"
-                      : "Unverified TIN (ያልተረጋገጠ ቲን)"}
-                  </b>
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <label htmlFor="freelancer-tin-field">
-                    Freelancer TIN / የባለሙያ ቲን ቁጥር:
-                  </label>
-                  <input
-                    id="freelancer-tin-field"
-                    type="text"
-                    className="yk-fiscal-tin-input yk-mono"
-                    value={freelancerTinInput}
-                    onChange={(e) => setFreelancerTinInput(e.target.value)}
-                    aria-label="Freelancer TIN number"
-                  />
-                </div>
-              </div>
-
-              <div className="yk-fiscal-party-box">
-                <div className="yk-fiscal-party-title">
-                  <Building2 size={14} />
-                  <span>WITHHOLDING AGENT &amp; CLIENT · ግብር ቀናሽ ወኪል እና ደንበኛ</span>
-                </div>
-                <div className="yk-fiscal-party-name">
-                  Yekis Escrow Settlement Engine · OBO {clientName}
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Client TIN / የደንበኛ ቲን:</span>{" "}
-                  <b className="yk-mono">{clientTinInput}</b>
-                </div>
-                <div className="yk-fiscal-party-detail">
-                  <span>Contract &amp; Milestone / የውል ምዕራፍ:</span>{" "}
-                  <b className="yk-mono">{contractCode}</b>
-                </div>
-              </div>
-            </>
-          )}
+          <div className="excel-meta-box">
+            <div className="excel-meta-line">
+              <span>Date:</span>
+              <strong>{dates.greg} ({dates.eth})</strong>
+            </div>
+            <div className="excel-meta-line">
+              <span>Invoice #:</span>
+              <strong style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem" }}>{serial}</strong>
+            </div>
+            <div className="excel-meta-line">
+              <span>Customer ID:</span>
+              <strong style={{ fontFamily: "var(--font-mono)" }}>
+                {activeDocType === "CLIENT_INVOICE" ? (clientTinInput ? `GDE${clientTinInput.slice(-3).toUpperCase()}` : "GDE477") : freelancerUcid}
+              </strong>
+            </div>
+            <div className="excel-meta-line">
+              <span>Fiscal Status:</span>
+              <strong className="excel-status-bold completed">
+                {data.statusLabel ??
+                  (activeDocType === "CLIENT_INVOICE"
+                    ? "ESCROW FUNDED · በኢስክሮ የተያዘ"
+                    : "DISBURSED · የተከፈለ")}
+              </strong>
+            </div>
+          </div>
         </section>
 
-        {/* Bilingual Line-Item Fiscal Table */}
-        <section className="yk-fiscal-table-wrap">
-          <table className="yk-fiscal-table">
+        {/* Metadata Block 2 (Matching Excel CSV Rows 10-12: Shipping Address & Make all checks payable to) */}
+        <section className="excel-meta-grid">
+          <div className="excel-meta-box">
+            <span className="excel-meta-box-label">Shipping Address:</span>
+            <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+              789 Oak Street, Syracuse, NY 13210
+            </div>
+            <div style={{ color: "var(--color-text-secondary)", fontSize: "0.78rem" }}>
+              Digital Delivery &amp; Escrow Release Destination: {data.clientLocation || "Addis Ababa, Ethiopia"}
+            </div>
+          </div>
+
+          <div className="excel-meta-box">
+            <span className="excel-meta-box-label">Make all checks payable to Shadow Beauty:</span>
+            <div style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem", lineHeight: 1.45 }}>
+              1234 Tech Avenue, Austin, TX 73301, Phone: (512) 555-1234, Fax: (512) 555-5678, Email: info@24billions.com
+            </div>
+            <div style={{ fontSize: "0.78rem", color: "var(--color-text)", fontWeight: 700, marginTop: 2 }}>
+              Settlement Rail: {railInfo.nameEn} · Account: {railInfo.settlementAccount} · Ref: {providerRef}
+            </div>
+          </div>
+        </section>
+
+        {/* 7-Column Metadata Band (Matching Excel CSV Rows 14-15) */}
+        <section className="excel-band-wrap">
+          <table className="excel-band-table">
             <thead>
               <tr>
-                <th style={{ width: "12%" }}>
-                  <div>Code</div>
-                  <small>መለያ</small>
-                </th>
-                <th style={{ width: "48%" }}>
-                  <div>Description (English / አማርኛ)</div>
-                  <small>የክፍያ ዝርዝር መግለጫ</small>
-                </th>
-                <th style={{ width: "16%", textAlign: "right" }}>
-                  <div>Rate / Basis</div>
-                  <small>መጣኔ</small>
-                </th>
-                <th style={{ width: "24%", textAlign: "right" }}>
-                  <div>Amount (ETB)</div>
-                  <small>የገንዘብ መጠን (ብር)</small>
-                </th>
+                <th>Salesperson</th>
+                <th>Job</th>
+                <th>Shipping method</th>
+                <th>Shipping terms</th>
+                <th>Delivery date</th>
+                <th>Payment terms</th>
+                <th>Due date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Avery Morgan</td>
+                <td>{contractCode} · {milestoneTitle}</td>
+                <td>Air express · {railInfo.nameEn}</td>
+                <td>N/A (Escrow Protected)</td>
+                <td>{dates.greg}</td>
+                <td>On delivery</td>
+                <td>
+                  <strong className="excel-status-bold completed">
+                    {activeDocType === "CLIENT_INVOICE" ? "2026-11-16 (COMPLETED)" : "SETTLED"}
+                  </strong>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        {/* Line Items Table (Matching Excel CSV Rows 17-23) */}
+        <section className="excel-table-wrap">
+          <table className="excel-table">
+            <thead>
+              <tr>
+                <th style={{ width: "6%" }}>Qty</th>
+                <th style={{ width: "12%" }}>Item #</th>
+                <th style={{ width: "42%" }}>Description</th>
+                <th style={{ width: "14%" }}>Custom column</th>
+                <th style={{ width: "12%" }} className="num-col">Unit price</th>
+                <th style={{ width: "10%" }} className="num-col">Discount</th>
+                <th style={{ width: "14%" }} className="num-col">Line total</th>
               </tr>
             </thead>
             <tbody>
               {activeDocType === "CLIENT_INVOICE" ? (
                 <>
                   <tr>
-                    <td className="yk-mono">MS-01</td>
+                    <td>1</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
                     <td>
-                      <div className="yk-fiscal-line-en">
+                      <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Escrow Principal Deposit — {milestoneTitle}
                       </div>
-                      <div className="yk-fiscal-line-am">
+                      <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                         ዋና የምዕራፍ ክፍያ ተቀማጭ (በኢስክሮ የሚጠበቅ ክፍያ)
                       </div>
                     </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      100.0%
-                    </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      {formatEtbNum(principal)}
-                    </td>
+                    <td style={{ color: "var(--color-text-secondary)" }}>Milestone Escrow</td>
+                    <td className="num-col">{formatEtbNum(principal)}</td>
+                    <td className="num-col">0</td>
+                    <td className="num-col" style={{ fontWeight: 700 }}>{formatEtbNum(principal)}</td>
                   </tr>
                   <tr>
-                    <td className="yk-mono">FEE-CL</td>
+                    <td>1</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>2309</td>
                     <td>
-                      <div className="yk-fiscal-line-en">
-                        Yekis Client Escrow Protection &amp; Gateway Processing Fee
+                      <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                        Yekis Client Escrow Protection &amp; Gateway Fee ({(clientFeeRate * 100).toFixed(1)}%)
                       </div>
-                      <div className="yk-fiscal-line-am">
+                      <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                         የደንበኛ የኢስክሮ ጥበቃ እና የክፍያ ማስፈጸሚያ አገልግሎት ክፍያ
                       </div>
                     </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      +{(clientFeeRate * 100).toFixed(1)}%
-                    </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      +{formatEtbNum(clientEscrowFee)}
-                    </td>
+                    <td style={{ color: "var(--color-text-secondary)" }}>Platform Fee</td>
+                    <td className="num-col">{formatEtbNum(clientEscrowFee)}</td>
+                    <td className="num-col">0</td>
+                    <td className="num-col" style={{ fontWeight: 700 }}>+{formatEtbNum(clientEscrowFee)}</td>
                   </tr>
                   {isVatEnabled && (
                     <tr>
-                      <td className="yk-mono">TAX-VAT</td>
+                      <td>1</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>2390</td>
                       <td>
-                        <div className="yk-fiscal-line-en">
-                          Ethiopian Value Added Tax (ERCA Standard VAT)
+                        <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                          Ethiopian Value Added Tax (ERCA Standard VAT 15%)
                         </div>
-                        <div className="yk-fiscal-line-am">
+                        <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                           ተጨማሪ እሴት ታክስ (ተ.እ.ታ 15% — በገቢዎች ሚኒስቴር ደንብ መሠረት)
                         </div>
                       </td>
-                      <td className="yk-mono" style={{ textAlign: "right" }}>
-                        +15.0%
-                      </td>
-                      <td className="yk-mono" style={{ textAlign: "right" }}>
-                        +{formatEtbNum(clientVatAmount)}
-                      </td>
+                      <td style={{ color: "var(--color-text-secondary)" }}>Statutory VAT</td>
+                      <td className="num-col">{formatEtbNum(clientVatAmount)}</td>
+                      <td className="num-col">0</td>
+                      <td className="num-col" style={{ fontWeight: 700 }}>+{formatEtbNum(clientVatAmount)}</td>
                     </tr>
                   )}
                 </>
               ) : (
                 <>
                   <tr>
-                    <td className="yk-mono">MS-REL</td>
+                    <td>1</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
                     <td>
-                      <div className="yk-fiscal-line-en">
+                      <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Gross Milestone Amount Released from Escrow — {milestoneTitle}
                       </div>
-                      <div className="yk-fiscal-line-am">
+                      <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                         ከኢስክሮ የተለቀቀ ጠቅላላ የምዕራፍ የሥራ ክፍያ
                       </div>
                     </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      100.0%
-                    </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      {formatEtbNum(principal)}
-                    </td>
+                    <td style={{ color: "var(--color-text-secondary)" }}>Milestone Release</td>
+                    <td className="num-col">{formatEtbNum(principal)}</td>
+                    <td className="num-col">0</td>
+                    <td className="num-col" style={{ fontWeight: 700 }}>{formatEtbNum(principal)}</td>
                   </tr>
                   {isVatEnabled && (
                     <tr>
-                      <td className="yk-mono">TAX-VAT</td>
+                      <td>1</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>2309</td>
                       <td>
-                        <div className="yk-fiscal-line-en">
+                        <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                           Output VAT Collected (15% Registered Commercial Invoice)
                         </div>
-                        <div className="yk-fiscal-line-am">
+                        <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                           የተሰበሰበ ተጨማሪ እሴት ታክስ (ተ.እ.ታ 15%)
                         </div>
                       </td>
-                      <td className="yk-mono" style={{ textAlign: "right" }}>
-                        +15.0%
-                      </td>
-                      <td className="yk-mono" style={{ textAlign: "right" }}>
-                        +{formatEtbNum(freelancerVatCredit)}
-                      </td>
+                      <td style={{ color: "var(--color-text-secondary)" }}>Output VAT</td>
+                      <td className="num-col">{formatEtbNum(freelancerVatCredit)}</td>
+                      <td className="num-col">0</td>
+                      <td className="num-col" style={{ fontWeight: 700 }}>+{formatEtbNum(freelancerVatCredit)}</td>
                     </tr>
                   )}
                   <tr>
-                    <td className="yk-mono">FEE-FL</td>
+                    <td>1</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>943</td>
                     <td>
-                      <div className="yk-fiscal-line-en">
-                        Less: Yekis Freelancer Platform &amp; Settlement Service Fee
+                      <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                        Less: Yekis Freelancer Platform &amp; Settlement Service Fee ({(freelancerFeeRate * 100).toFixed(1)}%)
                       </div>
-                      <div className="yk-fiscal-line-am">
+                      <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
                         ሲቀነስ፦ የዬኪስ የባለሙያ አገልግሎት እና የክፍያ ማስተላለፊያ ክፍያ
                       </div>
                     </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      -{(freelancerFeeRate * 100).toFixed(1)}%
-                    </td>
-                    <td className="yk-mono yk-neg" style={{ textAlign: "right" }}>
-                      -{formatEtbNum(freelancerServiceFee)}
-                    </td>
+                    <td style={{ color: "var(--color-text-secondary)" }}>Platform Fee</td>
+                    <td className="num-col">{formatEtbNum(freelancerServiceFee)}</td>
+                    <td className="num-col" style={{ color: "#dc2626", fontWeight: 700 }}>{formatEtbNum(freelancerServiceFee)}</td>
+                    <td className="num-col" style={{ color: "#dc2626", fontWeight: 700 }}>-{formatEtbNum(freelancerServiceFee)}</td>
+                  </tr>
+                  {isWhtEnabled && (
+                    <tr>
+                      <td>1</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>92</td>
+                      <td>
+                        <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                          Less: ERCA Statutory Withholding Tax ({(whtRate * 100).toFixed(0)}% {isTinVerified ? "3% Verified TIN" : "30% Unverified TIN Rate"})
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
+                          ሲቀነስ፦ የገቢዎች ሚኒስቴር የዊዝሆልዲንግ ታክስ ተቀናሽ
+                        </div>
+                      </td>
+                      <td style={{ color: "var(--color-text-secondary)" }}>Withholding Tax</td>
+                      <td className="num-col">{formatEtbNum(whtAmount)}</td>
+                      <td className="num-col" style={{ color: "#dc2626", fontWeight: 700 }}>{formatEtbNum(whtAmount)}</td>
+                      <td className="num-col" style={{ color: "#dc2626", fontWeight: 700 }}>-{formatEtbNum(whtAmount)}</td>
+                    </tr>
+                  )}
+                </>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        {/* Totals Box (Matching Excel CSV Rows 25-30, Right Aligned Stacked Calculation) */}
+        <section className="excel-totals-wrap">
+          <table className="excel-totals-table">
+            <tbody>
+              {activeDocType === "CLIENT_INVOICE" ? (
+                <>
+                  <tr>
+                    <td>Total Discount:</td>
+                    <td>ETB 0.00</td>
                   </tr>
                   <tr>
-                    <td className="yk-mono">TAX-WHT</td>
+                    <td>Subtotal:</td>
+                    <td>{formatEtbNum(principal + clientEscrowFee)}</td>
+                  </tr>
+                  <tr>
+                    <td>Sales tax (15% VAT):</td>
+                    <td>{formatEtbNum(clientVatAmount)}</td>
+                  </tr>
+                  <tr className="excel-totals-grand">
+                    <td>Total:</td>
+                    <td>{formatEtbNum(clientTotalPayable)}</td>
+                  </tr>
+                </>
+              ) : (
+                <>
+                  <tr>
+                    <td>Total Discount / Fees:</td>
+                    <td>{formatEtbNum(freelancerServiceFee + whtAmount)}</td>
+                  </tr>
+                  <tr>
+                    <td>Subtotal:</td>
+                    <td>{formatEtbNum(principal)}</td>
+                  </tr>
+                  <tr>
+                    <td>Sales tax (VAT / WHT):</td>
                     <td>
-                      <div className="yk-fiscal-line-en">
-                        Less: ERCA Statutory Withholding Tax (
-                        {isWhtEnabled
-                          ? isTinVerified
-                            ? "3% Verified TIN & License"
-                            : "30% Unverified TIN Rate"
-                          : "0% Exempt"}
-                        )
-                      </div>
-                      <div className="yk-fiscal-line-am">
-                        ሲቀነስ፦ የገቢዎች ሚኒስቴር የዊዝሆልዲንግ ታክስ ተቀናሽ (
-                        {isWhtEnabled
-                          ? isTinVerified
-                            ? "3% የተረጋገጠ ቲን"
-                            : "30% ያልተረጋገጠ ቲን"
-                          : "0% ነጻ"}
-                        )
-                      </div>
+                      {isVatEnabled ? `+${formatEtbNum(freelancerVatCredit)}` : "ETB 0.00"}
+                      {isWhtEnabled ? ` / -${formatEtbNum(whtAmount)}` : ""}
                     </td>
-                    <td className="yk-mono" style={{ textAlign: "right" }}>
-                      -{(whtRate * 100).toFixed(1)}%
-                    </td>
-                    <td className="yk-mono yk-neg" style={{ textAlign: "right" }}>
-                      -{formatEtbNum(whtAmount)}
-                    </td>
+                  </tr>
+                  <tr className="excel-totals-grand">
+                    <td>Total (Net Payout):</td>
+                    <td>{formatEtbNum(freelancerNetDisbursed)}</td>
                   </tr>
                 </>
               )}
             </tbody>
-            <tfoot>
-              <tr className="yk-fiscal-total-row">
-                <td colSpan={2}>
-                  {activeDocType === "CLIENT_INVOICE" ? (
-                    <>
-                      <div className="yk-fiscal-total-en">
-                        TOTAL AMOUNT FUNDED INTO ESCROW
-                      </div>
-                      <div className="yk-fiscal-total-am">
-                        ወደ ኢስክሮ ካዝና የተከፈለ ጠቅላላ የገንዘብ መጠን
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="yk-fiscal-total-en">
-                        NET PAYOUT DISBURSED TO FREELANCER ACCOUNT
-                      </div>
-                      <div className="yk-fiscal-total-am">
-                        ወደ ባለሙያው ሂሳብ የተላለፈ የተጣራ ተከፋይ ብር
-                      </div>
-                    </>
-                  )}
-                </td>
-                <td className="yk-mono" style={{ textAlign: "right" }}>
-                  {activeDocType === "CLIENT_INVOICE"
-                    ? "PAID IN FULL"
-                    : "NET SETTLED"}
-                </td>
-                <td className="yk-mono yk-fiscal-grand-num" style={{ textAlign: "right" }}>
-                  {activeDocType === "CLIENT_INVOICE"
-                    ? formatEtbNum(clientTotalPayable)
-                    : formatEtbNum(freelancerNetDisbursed)}
-                </td>
-              </tr>
-            </tfoot>
           </table>
         </section>
 
-        {/* Payment Rail Proof + ERCA Tax Certificate Box */}
+        {/* Payment Rail Proof & Compliance Covenant Box */}
         <section className="yk-fiscal-bottom-grid">
-          {/* Left: Payment Rail Settlement Proof */}
           <div className="yk-fiscal-rail-card">
             <div className="yk-fiscal-rail-head">
               <img
@@ -759,7 +722,6 @@ export function FiscalDocumentSheet({
             </div>
           </div>
 
-          {/* Right: ERCA Tax & AACCSA Legal Covenant Box */}
           <div className="yk-fiscal-compliance-card">
             <div className="yk-fiscal-compliance-head">
               <Stamp size={15} />
@@ -790,16 +752,16 @@ export function FiscalDocumentSheet({
           </div>
         </section>
 
-        {/* Official Verification Footer */}
-        <footer className="yk-fiscal-footer">
-          <div>
-            <span>Digital Verification Hash: </span>
-            <code className="yk-mono">
-              SHA256:{serial.replace(/[^A-Z0-9]/g, "")}8F92A4C1E7B3
-            </code>
+        {/* Sign-off Footer (Matching Excel CSV Row 34: Thank you for your business!) */}
+        <footer className="excel-signoff">
+          <div className="excel-thank-you">
+            Thank you for your business! · ስለመረጡን እናመሰግናለን!
           </div>
-          <div>
-            <span>Issued by Yekis Escrow Ledger · </span>
+          <div className="excel-signoff-meta">
+            <span>SHA256:{serial.replace(/[^A-Z0-9]/g, "")}8F92A4C1</span>
+            <span>·</span>
+            <span>Issued by Yekis Escrow Ledger</span>
+            <span>·</span>
             <strong>yekis.et/verify/{serial.toLowerCase()}</strong>
           </div>
         </footer>

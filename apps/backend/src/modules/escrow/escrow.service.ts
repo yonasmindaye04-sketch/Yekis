@@ -26,6 +26,7 @@ import {
   recordMilestoneReleaseLedger,
   recordDisputeRefundLedger,
   recordWithdrawalDisbursementLedger,
+  getUserAccountCode,
 } from "../finance/ledger.service.js";
 
 export class MilestoneNotFoundError extends Error {}
@@ -223,14 +224,34 @@ export async function fundMilestoneFromWallet(params: {
       );
     }
 
-    /**
-     * Also claim the milestone. Without this, a second request that wins the
-     * wallet race would still flip an already-funded milestone, because
-     * escrowState was previously overwritten unconditionally.
-     */
+    // Immediate transfer: credit freelancer wallet immediately upon payment
+    await tx.wallet.upsert({
+      where: { userId: milestone.contract.freelancerId },
+      create: {
+        userId: milestone.contract.freelancerId,
+        balanceMinor: fees.freelancerNetMinor,
+      },
+      update: {
+        balanceMinor: { increment: fees.freelancerNetMinor },
+      },
+    });
+
+    await tx.user.update({
+      where: { id: milestone.contract.freelancerId },
+      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+    });
+
+    await tx.user.update({
+      where: { id: params.clientId },
+      data: { totalSpentGrossMinor: { increment: fees.clientTotalChargeMinor } },
+    });
+
     const claimed = await tx.milestone.updateMany({
       where: { id: milestone.id, escrowState: "PAYMENT_PENDING" },
-      data: { escrowState: "ESCROW_HELD" },
+      data: {
+        escrowState: "RELEASED",
+        releasedAt: new Date(),
+      },
     });
     if (claimed.count !== 1) {
       throw new InvalidEscrowStateError(
@@ -238,6 +259,7 @@ export async function fundMilestoneFromWallet(params: {
       );
     }
 
+    // Double-entry general ledger postings: funding + immediate release
     await recordEscrowFundingLedger(tx, {
       clientId: params.clientId,
       milestoneId: milestone.id,
@@ -245,25 +267,55 @@ export async function fundMilestoneFromWallet(params: {
       milestoneGrossMinor: fees.grossAmountMinor,
       platformFeeFromClientMinor: fees.platformFeeFromClientMinor,
     });
+
+    await recordPlatformEarnings(tx, fees, milestone.id);
+
+    await recordMilestoneReleaseLedger(tx, {
+      freelancerId: milestone.contract.freelancerId,
+      milestoneId: milestone.id,
+      milestoneGrossMinor: milestone.amountMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
+      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      withholdingTaxMinor: fees.withholdingTaxMinor,
+    });
   });
+
+  await checkVatThresholdAfterRelease(milestone.id);
+  await checkAndUpdateContractCompletion(milestone.id);
 
   await recordAuditEvent({
     userId: params.clientId,
-    eventType: "ESCROW_FUNDED_FROM_WALLET",
+    eventType: "ESCROW_FUNDED_AND_RELEASED",
     entityType: "Milestone",
     entityId: milestone.id,
     metadata: {
       chargedMinor: fees.clientTotalChargeMinor,
       grossMinor: fees.grossAmountMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
       platformFeeMinor: fees.platformFeeFromClientMinor,
     },
   });
 
-  await notificationQueue.add("escrow-funded", {
+  await notificationQueue.add("escrow-released", {
     userId: milestone.contract.freelancerId,
     milestoneId: milestone.id,
     message:
-      "Escrow has been funded from the client's wallet â€” you can begin work.",
+      "Payment of ETB " +
+      (fees.freelancerNetMinor / 100).toLocaleString() +
+      " for project '" +
+      milestone.title +
+      "' has been added to your wallet immediately!",
+  });
+
+  await notificationQueue.add("payment-debited", {
+    userId: params.clientId,
+    milestoneId: milestone.id,
+    message:
+      "Payment of ETB " +
+      (fees.clientTotalChargeMinor / 100).toLocaleString() +
+      " for '" +
+      milestone.title +
+      "' was deducted from your wallet and credited to the freelancer.",
   });
 
   // Dispatch formal order invoice receipt email to the client
@@ -784,7 +836,7 @@ export async function releaseMilestoneFunds(
     const claim = await tx.milestone.updateMany({
       where: {
         id: milestoneId,
-        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
+        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS", "DISPUTED"] },
         escrowHolds: { none: { active: true } },
       },
       data: { escrowState: "RELEASED", releasedAt: new Date() },
@@ -1227,4 +1279,356 @@ export function getProviderClient(
   provider: PaymentProvider,
 ): PaymentProviderClient {
   return PROVIDER_CLIENTS[provider];
+}
+
+export interface UserTransactionMovement {
+  id: string;
+  journalId?: string;
+  date: string;
+  title: string;
+  description: string;
+  category: "TOP_UP" | "PAYOUT" | "ESCROW_LOCK" | "MILESTONE_RELEASE" | "REFUND" | "OTHER";
+  direction: "IN" | "OUT";
+  amountMinor: number;
+  feeMinor: number;
+  netAmountMinor: number;
+  currency: string;
+  status: "COMPLETED" | "PENDING" | "PROCESSING" | "FAILED" | "REJECTED";
+  paymentRail?: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "INTERNAL_WALLET" | null;
+  reference?: string;
+  accountIdentifier?: string;
+  contractId?: string;
+  contractTitle?: string;
+  counterpartyName?: string;
+  counterpartyRole?: "CLIENT" | "FREELANCER" | "SYSTEM";
+  milestoneId?: string;
+  milestoneTitle?: string;
+  receiptUrl?: string;
+}
+
+export async function getUserTransactionMovements(
+  userId: string,
+): Promise<UserTransactionMovement[]> {
+  const userAccountCode = getUserAccountCode(userId);
+
+  const [userAccount, topUps, payouts, userMilestones] = await Promise.all([
+    prisma.ledgerAccount.findUnique({
+      where: { code: userAccountCode },
+      select: { id: true },
+    }),
+    prisma.walletTopUp.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.payoutTransaction.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.milestone.findMany({
+      where: {
+        contract: {
+          OR: [{ clientId: userId }, { freelancerId: userId }],
+        },
+      },
+      include: {
+        contract: {
+          select: {
+            id: true,
+            clientId: true,
+            freelancerId: true,
+            job: { select: { title: true } },
+            client: { select: { id: true, displayName: true, email: true, firstName: true, lastName: true } },
+            freelancer: { select: { id: true, displayName: true, email: true, firstName: true, lastName: true } },
+          },
+        },
+      },
+      take: 100,
+    }),
+  ]);
+
+  const ledgerEntries = userAccount
+    ? await prisma.ledgerEntry.findMany({
+        where: { accountId: userAccount.id },
+        include: {
+          journal: true,
+        },
+        orderBy: { postedAt: "desc" },
+        take: 100,
+      })
+    : [];
+
+  const movements: UserTransactionMovement[] = [];
+  const processedJournalKeys = new Set<string>();
+  const processedMilestones = new Set<string>();
+  const processedPayouts = new Set<string>();
+  const processedTopUps = new Set<string>();
+
+  // 1. Process double-entry general ledger postings
+  for (const entry of ledgerEntries) {
+    const j = entry.journal;
+    processedJournalKeys.add(j.idempotencyKey);
+    const isCredit = entry.creditMinor > 0;
+    const amountMinor = isCredit ? entry.creditMinor : entry.debitMinor;
+
+    let category: UserTransactionMovement["category"] = "OTHER";
+    let title = j.description;
+    let description = j.description;
+    let counterpartyName: string | undefined = undefined;
+    let counterpartyRole: UserTransactionMovement["counterpartyRole"] = undefined;
+    let contractId: string | undefined = undefined;
+    let contractTitle: string | undefined = undefined;
+    let milestoneId: string | undefined = undefined;
+    let milestoneTitle: string | undefined = undefined;
+    let paymentRail: UserTransactionMovement["paymentRail"] = null;
+    let accountIdentifier: string | undefined = undefined;
+    let feeMinor = 0;
+    let netAmountMinor = amountMinor;
+
+    if (j.referenceType === "WALLET_TOPUP") {
+      category = "TOP_UP";
+      const matchedTopUp = topUps.find((t) => t.id === j.referenceId);
+      if (matchedTopUp) {
+        processedTopUps.add(matchedTopUp.id);
+        paymentRail = matchedTopUp.provider as any;
+        accountIdentifier = matchedTopUp.referenceNumber || matchedTopUp.providerTransactionId || undefined;
+      }
+      title = "Wallet Top-Up · " + (paymentRail || "Direct");
+      description = "Approved top-up credited to wallet balance";
+    } else if (j.referenceType === "ESCROW_FUND") {
+      category = "ESCROW_LOCK";
+      milestoneId = j.referenceId || undefined;
+      const matchedM = userMilestones.find((m) => m.id === milestoneId);
+      if (matchedM) {
+        processedMilestones.add(matchedM.id);
+        contractId = matchedM.contractId;
+        contractTitle = matchedM.contract.job?.title;
+        milestoneTitle = matchedM.title;
+        counterpartyName =
+          matchedM.contract.freelancer?.displayName ||
+          matchedM.contract.freelancer?.firstName ||
+          matchedM.contract.freelancer?.email;
+        counterpartyRole = "FREELANCER";
+        title = "Escrow Lock · " + (matchedM.title || "Milestone");
+        description = 'Funds locked into escrow for "' + (contractTitle || "Contract") + '"';
+      } else {
+        title = "Milestone Escrow Funding";
+        description = "Funds transferred to escrow pool";
+      }
+    } else if (j.referenceType === "MILESTONE_RELEASE") {
+      category = "MILESTONE_RELEASE";
+      milestoneId = j.referenceId || undefined;
+      const matchedM = userMilestones.find((m) => m.id === milestoneId);
+      if (matchedM) {
+        processedMilestones.add(matchedM.id);
+        contractId = matchedM.contractId;
+        contractTitle = matchedM.contract.job?.title;
+        milestoneTitle = matchedM.title;
+        counterpartyName =
+          matchedM.contract.client?.displayName ||
+          matchedM.contract.client?.firstName ||
+          matchedM.contract.client?.email;
+        counterpartyRole = "CLIENT";
+        title = "Milestone Earnings · " + (matchedM.title || "Milestone");
+        description = 'Approved delivery release for "' + (contractTitle || "Contract") + '"';
+        if (matchedM.amountMinor > amountMinor) {
+          feeMinor = matchedM.amountMinor - amountMinor;
+        }
+      } else {
+        title = "Milestone Release Earnings";
+        description = "Funds released to wallet";
+      }
+    } else if (j.referenceType === "WITHDRAWAL_PAYOUT") {
+      category = "PAYOUT";
+      const matchedP = payouts.find((p) => p.id === j.referenceId);
+      if (matchedP) {
+        processedPayouts.add(matchedP.id);
+        paymentRail = matchedP.provider as any;
+        accountIdentifier = matchedP.payoutAccountIdentifier;
+        feeMinor = matchedP.feeMinor;
+        netAmountMinor = matchedP.netAmountMinor;
+      }
+      title = "Withdrawal Payout · " + (paymentRail || "Direct");
+      description = "Disbursement to account " + (accountIdentifier || "");
+    } else if (j.referenceType === "DISPUTE_REFUND") {
+      category = "REFUND";
+      milestoneId = j.referenceId || undefined;
+      const matchedM = userMilestones.find((m) => m.id === milestoneId);
+      if (matchedM) {
+        processedMilestones.add(matchedM.id);
+        contractId = matchedM.contractId;
+        contractTitle = matchedM.contract.job?.title;
+        milestoneTitle = matchedM.title;
+      }
+      title = "Dispute Refund · " + (milestoneTitle || "Milestone");
+      description = "Refund from escrow dispute resolution";
+    }
+
+    movements.push({
+      id: "ledger-" + entry.id,
+      journalId: j.id,
+      date: entry.postedAt.toISOString(),
+      title,
+      description,
+      category,
+      direction: isCredit ? "IN" : "OUT",
+      amountMinor,
+      feeMinor,
+      netAmountMinor,
+      currency: "ETB",
+      status: "COMPLETED",
+      paymentRail,
+      reference: j.idempotencyKey,
+      accountIdentifier,
+      contractId,
+      contractTitle,
+      counterpartyName,
+      counterpartyRole,
+      milestoneId,
+      milestoneTitle,
+    });
+  }
+
+  // 2. Add unjournaled top-ups (pending, checkout pending, rejected, or unjournaled approved)
+  for (const t of topUps) {
+    const journalKey = "topup-" + t.id;
+    if (!processedJournalKeys.has(journalKey) && !processedTopUps.has(t.id)) {
+      const isApproved = t.status === "APPROVED";
+      movements.push({
+        id: "topup-" + t.id,
+        date: t.createdAt.toISOString(),
+        title: "Wallet Top-Up · " + t.provider,
+        description:
+          t.status === "CHECKOUT_PENDING"
+            ? "Automated gateway checkout initiated"
+            : t.status === "PENDING"
+            ? "Receipt submitted, pending staff verification"
+            : t.status === "REJECTED"
+            ? "Top-up verification rejected by staff"
+            : "Top-up completed",
+        category: "TOP_UP",
+        direction: "IN",
+        amountMinor: t.amountMinor,
+        feeMinor: 0,
+        netAmountMinor: t.amountMinor,
+        currency: "ETB",
+        status: isApproved ? "COMPLETED" : t.status === "REJECTED" ? "REJECTED" : "PENDING",
+        paymentRail: t.provider as any,
+        reference: t.referenceNumber || t.providerTransactionId || t.id,
+        accountIdentifier: t.referenceNumber || t.providerTransactionId || undefined,
+        receiptUrl: t.receiptImagePath ? "/api/v1/wallet/topups/" + t.id + "/receipt-url" : undefined,
+      });
+    }
+  }
+
+  // 3. Add unjournaled payouts (pending, processing, failed, reversed, or unjournaled confirmed)
+  for (const p of payouts) {
+    const journalKey = "payout-" + p.id;
+    if (!processedJournalKeys.has(journalKey) && !processedPayouts.has(p.id)) {
+      const isConfirmed = p.status === "CONFIRMED";
+      movements.push({
+        id: "payout-" + p.id,
+        date: p.createdAt.toISOString(),
+        title: "Withdrawal Payout · " + p.provider,
+        description:
+          p.status === "PROCESSING"
+            ? "Disbursement processing to " + p.payoutAccountIdentifier
+            : p.status === "PENDING"
+            ? "Withdrawal requested to " + p.payoutAccountIdentifier
+            : p.status === "FAILED"
+            ? "Disbursement failed: " + (p.errorMessage || "Provider error")
+            : "Disbursement completed to " + p.payoutAccountIdentifier,
+        category: "PAYOUT",
+        direction: "OUT",
+        amountMinor: p.amountMinor,
+        feeMinor: p.feeMinor,
+        netAmountMinor: p.netAmountMinor,
+        currency: "ETB",
+        status: isConfirmed
+          ? "COMPLETED"
+          : p.status === "FAILED"
+          ? "FAILED"
+          : p.status === "REVERSED"
+          ? "REJECTED"
+          : p.status === "PROCESSING"
+          ? "PROCESSING"
+          : "PENDING",
+        paymentRail: p.provider as any,
+        reference: p.providerPayoutId || p.id,
+        accountIdentifier: p.payoutAccountIdentifier,
+      });
+    }
+  }
+
+  // 4. Fallback for historical milestones funded or released before ledger logging
+  for (const m of userMilestones) {
+    if (m.contract.clientId === userId && m.escrowState !== "PAYMENT_PENDING") {
+      const fundKey = "escrow-fund-" + m.id;
+      if (!processedJournalKeys.has(fundKey) && !processedMilestones.has(m.id)) {
+        const freelancerName =
+          m.contract.freelancer?.displayName ||
+          m.contract.freelancer?.firstName ||
+          m.contract.freelancer?.email;
+        movements.push({
+          id: "escrow-fund-" + m.id,
+          date: m.createdAt.toISOString(),
+          title: "Escrow Lock · " + (m.title || "Milestone"),
+          description: 'Funds held in escrow for "' + (m.contract.job?.title || "Contract") + '"',
+          category: "ESCROW_LOCK",
+          direction: "OUT",
+          amountMinor: m.amountMinor,
+          feeMinor: 0,
+          netAmountMinor: m.amountMinor,
+          currency: "ETB",
+          status: "COMPLETED",
+          paymentRail: "INTERNAL_WALLET",
+          reference: "milestone-" + m.id.slice(-6).toUpperCase(),
+          contractId: m.contractId,
+          contractTitle: m.contract.job?.title,
+          counterpartyName: freelancerName,
+          counterpartyRole: "FREELANCER",
+          milestoneId: m.id,
+          milestoneTitle: m.title,
+        });
+      }
+    }
+
+    if (m.contract.freelancerId === userId && m.escrowState === "RELEASED") {
+      const releaseKey = "escrow-release-" + m.id;
+      if (!processedJournalKeys.has(releaseKey) && !processedMilestones.has(m.id)) {
+        const clientName =
+          m.contract.client?.displayName ||
+          m.contract.client?.firstName ||
+          m.contract.client?.email;
+        const feeEst = Math.round(m.amountMinor * 0.07);
+        const netEst = m.amountMinor - feeEst;
+        movements.push({
+          id: "escrow-release-" + m.id,
+          date: (m.releasedAt || m.submittedAt || m.createdAt).toISOString(),
+          title: "Milestone Earnings · " + (m.title || "Milestone"),
+          description: 'Delivery approved for "' + (m.contract.job?.title || "Contract") + '"',
+          category: "MILESTONE_RELEASE",
+          direction: "IN",
+          amountMinor: m.amountMinor,
+          feeMinor: feeEst,
+          netAmountMinor: netEst,
+          currency: "ETB",
+          status: "COMPLETED",
+          paymentRail: "INTERNAL_WALLET",
+          reference: "milestone-" + m.id.slice(-6).toUpperCase(),
+          contractId: m.contractId,
+          contractTitle: m.contract.job?.title,
+          counterpartyName: clientName,
+          counterpartyRole: "CLIENT",
+          milestoneId: m.id,
+          milestoneTitle: m.title,
+        });
+      }
+    }
+  }
+
+  // Sort chronologically descending (newest first)
+  movements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  return movements;
 }

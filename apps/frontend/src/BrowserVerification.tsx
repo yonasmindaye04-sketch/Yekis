@@ -98,6 +98,7 @@ export function BrowserVerification() {
 
   const currentTier = status?.tier ?? "TIER_1";
   const currentStatus = status?.status ?? "PENDING";
+  const showTier2 = import.meta.env.VITE_TIN_FEATURE_ENABLED === "true";
   const tier1Done =
     currentStatus === "VERIFIED" &&
     (currentTier === "TIER_1" || currentTier === "TIER_2");
@@ -126,9 +127,11 @@ export function BrowserVerification() {
             </h3>
           </div>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <span className={`status-pill ${statusTone(currentTier)}`}>
-              {formatStatusLabel(currentTier, t.workspace.statuses)}
-            </span>
+            {showTier2 && (
+              <span className={`status-pill ${statusTone(currentTier)}`}>
+                {formatStatusLabel(currentTier, t.workspace.statuses)}
+              </span>
+            )}
             <span className={`status-pill ${statusTone(currentStatus)}`}>
               {formatStatusLabel(currentStatus, t.workspace.statuses)}
             </span>
@@ -138,7 +141,9 @@ export function BrowserVerification() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gridTemplateColumns: showTier2
+              ? "repeat(auto-fit, minmax(220px, 1fr))"
+              : "repeat(auto-fit, minmax(260px, 1fr))",
             gap: 12,
           }}
         >
@@ -189,35 +194,37 @@ export function BrowserVerification() {
             </p>
           </div>
 
-          <div
-            style={{
-              padding: "12px 14px",
-              borderRadius: 10,
-              border: tier2Done
-                ? "1px solid var(--color-primary)"
-                : "1px solid var(--color-border)",
-              background: tier2Done
-                ? "var(--color-primary-light)"
-                : "var(--color-bg-subtle)",
-            }}
-          >
+          {showTier2 && (
             <div
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontWeight: 700,
-                fontSize: "0.86rem",
-                color: tier2Done ? "var(--color-primary)" : "var(--color-text)",
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: tier2Done
+                  ? "1px solid var(--color-primary)"
+                  : "1px solid var(--color-border)",
+                background: tier2Done
+                  ? "var(--color-primary-light)"
+                  : "var(--color-bg-subtle)",
               }}
             >
-              <ShieldCheck size={16} />
-              <span>{k.tier2Step}</span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  fontWeight: 700,
+                  fontSize: "0.86rem",
+                  color: tier2Done ? "var(--color-primary)" : "var(--color-text)",
+                }}
+              >
+                <ShieldCheck size={16} />
+                <span>{k.tier2Step}</span>
+              </div>
+              <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
+                {k.tier2Desc}
+              </p>
             </div>
-            <p style={{ margin: "6px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)", lineHeight: 1.45 }}>
-              {k.tier2Desc}
-            </p>
-          </div>
+          )}
         </div>
       </section>
 
@@ -307,53 +314,52 @@ export function BrowserVerification() {
         </button>
       </section>
 
-      <section className="panel tier2-panel">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <p className="eyebrow">{k.withdrawalEyebrow}</p>
-            <h2>{k.requestTier2Heading}</h2>
-            <p style={{ color: "var(--color-text-secondary)", fontSize: "0.86rem", maxWidth: 680 }}>
-              {k.requestTier2Desc}
-            </p>
-            <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "var(--color-bg-subtle)", border: "1px solid var(--color-border)", fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-              <span style={{ fontWeight: 800, color: "var(--color-primary)" }}>MVP Launch Notice:</span> Wallet withdrawals are unlocked with <strong>Tier 1 Verification</strong> (National ID / Fayda). TIN / Business Registration is held and optional for launch.
+      {showTier2 && (
+        <section className="panel tier2-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <p className="eyebrow">{k.withdrawalEyebrow}</p>
+              <h2>{k.requestTier2Heading}</h2>
+              <p style={{ color: "var(--color-text-secondary)", fontSize: "0.86rem", maxWidth: 680 }}>
+                {k.requestTier2Desc}
+              </p>
             </div>
+            {tier2Done && (
+              <span className="status-pill success">
+                <CheckCircle2 size={14} /> {formatStatusLabel("TIER_2", t.workspace.statuses)}
+              </span>
+            )}
           </div>
-          {tier2Done && (
-            <span className="status-pill success">
-              <CheckCircle2 size={14} /> {formatStatusLabel("TIER_2", t.workspace.statuses)}
-            </span>
-          )}
-        </div>
-        <div className="form-grid" style={{ marginTop: 12 }}>
-          <label>
-            {k.tinLabel}
-            <input
-              value={tin}
-              onChange={(event) => setTin(event.target.value)}
-              placeholder={k.tinPlaceholder}
-              disabled={!canRequestTier2 && tier2Done}
-            />
-          </label>
-          <label>
-            {k.businessRegLabel}
-            <input
-              value={businessRegNumber}
-              onChange={(event) => setBusinessRegNumber(event.target.value)}
-              placeholder={k.businessRegPlaceholder}
-              disabled={!canRequestTier2 && tier2Done}
-            />
-          </label>
-        </div>
-        <button
-          className="btn-primary"
-          onClick={() => void requestTier2()}
-          disabled={sending || tier2Done}
-          style={{ width: "fit-content", marginTop: 16 }}
-        >
-          {sending ? k.submittingBtn : k.requestTier2Btn}
-        </button>
-      </section>
+          <div className="form-grid" style={{ marginTop: 12 }}>
+            <label>
+              {k.tinLabel}
+              <input
+                value={tin}
+                onChange={(event) => setTin(event.target.value)}
+                placeholder={k.tinPlaceholder}
+                disabled={!canRequestTier2 && tier2Done}
+              />
+            </label>
+            <label>
+              {k.businessRegLabel}
+              <input
+                value={businessRegNumber}
+                onChange={(event) => setBusinessRegNumber(event.target.value)}
+                placeholder={k.businessRegPlaceholder}
+                disabled={!canRequestTier2 && tier2Done}
+              />
+            </label>
+          </div>
+          <button
+            className="btn-primary"
+            onClick={() => void requestTier2()}
+            disabled={sending || tier2Done}
+            style={{ width: "fit-content", marginTop: 16 }}
+          >
+            {sending ? k.submittingBtn : k.requestTier2Btn}
+          </button>
+        </section>
+      )}
     </div>
   );
 }

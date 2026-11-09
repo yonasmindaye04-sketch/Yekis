@@ -9,8 +9,6 @@ import React, {
 
 export interface HashLocationState {
   showProfileCompletion?: boolean;
-  fromFirstLogin?: boolean;
-  missingFields?: Array<"photo" | "bio" | "skills">;
   [key: string]: unknown;
 }
 

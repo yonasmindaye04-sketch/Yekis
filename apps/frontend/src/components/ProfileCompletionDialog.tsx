@@ -45,26 +45,6 @@ export interface ProfileCompletionSummary {
   isComplete: boolean;
 }
 
-const FIRST_LOGIN_CHECKED_PREFIX = "yekis_first_login_profile_checked_";
-
-export function hasCompletedFirstLoginCheck(userId: string): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    return window.localStorage.getItem(`${FIRST_LOGIN_CHECKED_PREFIX}${userId}`) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function markFirstLoginCheckHandled(userId: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(`${FIRST_LOGIN_CHECKED_PREFIX}${userId}`, "1");
-  } catch {
-    // ignore storage errors
-  }
-}
-
 /** Compress & square-crop uploaded avatar image to a lightweight JPEG Data URL */
 function compressAvatarFile(file: File, maxDim = 320): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -250,7 +230,6 @@ export function ProfileCompletionDialog({
   }, [isOpen, user.id, user.firstName, user.lastName, user.avatarUrl]);
 
   const closeDialog = () => {
-    markFirstLoginCheckHandled(user.id);
     navigate(location.pathname || "/overview", {
       replace: true,
       state: {
@@ -364,7 +343,6 @@ export function ProfileCompletionDialog({
         avatarUrl: avatarUrl ?? null,
       });
 
-      markFirstLoginCheckHandled(user.id);
       if (typeof window !== "undefined") {
         window.localStorage.removeItem(`yekis_new_user_nudge_${user.id}`);
         window.localStorage.removeItem("yekis_new_user_nudge_me");

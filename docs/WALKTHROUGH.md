@@ -2,6 +2,98 @@
 
 Last validated: 2026-11-09
 
+> **Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul (2026-11-09):**
+> - **Excel Spreadsheet Design System (`index.css`, `FiscalDocumentModal.tsx`, `BrowserWallet.tsx`)**:
+>   - Re-architected both the printable Receipt view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.
+>   - **Spreadsheet Canvas & Layout (`.excel-sheet-*`)**: Crisp cell borders, high-contrast tabular typography (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-mode theme parity, and `@media print` white-paper styles.
+>   - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `24Billions PVT. · Yekis Technologies PLC` corporate lockup, tagline ("Leading the Way in Health and Fitness Innovation · Digital Escrow"), and ERCA Platform TIN/VAT metadata.
+>   - **Metadata Blocks (Rows 6–12)**:
+>     - Two-column structured grid pairing "To: <Counterparty Name>" (David Dhawan / Radiant Elegance / Freelancer), Address/Phone, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID (`GDE477` / UCID), and Fiscal Status.
+>     - Shipping/Service Address block paired with the "Make all checks payable to Shadow Beauty / Yekis Escrow Trust Vault" remittance block with provider rail settlement details.
+>   - **7-Column Metadata Band (Rows 14–15)**: Exact spreadsheet header band displaying `Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date / Status`.
+>   - **Line Items Table (Rows 17–23)**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
+>   - **Totals Box (Rows 25–30)**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.
+>   - **Sign-off Footer (Row 34)**: "Thank you for your business! · ስለመረጡን እናመሰግናለን!" with digital audit verification hash and verification link.
+>   - **Strict Rule Compliance**: Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs. Guaranteed 100% theme-invariant layout geometry with colors and borders driven by root theme variables.
+> - **Verification**:
+>   - `npm --prefix apps/frontend run build` passed with zero errors (`tsc -b && vite build` in 6.97s).
+>   - `node scripts/check-doc-parity.mjs` passed with 100% alignment.
+
+> **Contracts and Escrow Responsive & Accessibility Overhaul for Tablets & Mobile (2026-11-09):**
+> - **Comprehensive Mobile & Tablet Ergonomics (`WorkflowWorkspace.tsx`, `shadcn-dashboard.css`)**:
+>   - Optimized the Contracts and Escrow Center views for smooth touch accessibility across small mobile devices (320px–480px), large phones (640px), and tablets (iPad portrait 768px, iPad Air 820px, iPad Pro 834px).
+>   - Replaced fixed flex-basis on `.sh-filter-card-actions` with dynamic fluid layout (`flex: 0 1 auto; min-width: 0; height: auto`), eliminating vertical height inflation when stacked.
+>   - Enforced smooth momentum horizontal swipe on tab filters (`-webkit-overflow-scrolling: touch; scrollbar-width: none; overscroll-behavior-x: contain`) with non-squishing buttons (`flex-shrink: 0; white-space: nowrap`).
+>   - Calibrated tablet breakpoint (`@media (max-width: 960px)`) to convert KPI stats to an even 2x2 grid, stack filter card controls neatly with 10px spacing, and provide comfortable touch-friendly search inputs (`height: 42px`) with enlarged tap targets on clear buttons.
+>   - Configured responsive card headers and action buttons on mobile (`@media (max-width: 640px)` and `@media (max-width: 480px)`): action buttons stretch to 50% or 100% width with 44px min-height, signature tags wrap neatly, and milestone rows stack without horizontal viewport overflow.
+> - **Verification**:
+>   - Automated headless Chrome multi-device matrix validation across 375px (iPhone SE), 768px (iPad portrait), 820px (iPad Air), and 1280px (Desktop) confirmed zero unwanted blank gaps, natural wrapping, and 100% touch accessibility.
+>   - Frontend build (`npm run build --prefix apps/frontend`) passed cleanly.
+
+> **Contracts and Escrow Filter Toolbar Layout Restoration (2026-11-09):**
+> - **Visual Defect Resolution (`WorkflowWorkspace.tsx`, `shadcn-dashboard.css`)**:
+>   - Eliminated the excessive vertical blank gap (~280px tall) between the filter segmented control tabs and the search input in both the **Contracts** page and the **Escrow Center** page.
+>   - Root cause: `.sh-card` defines `display: flex; flex-direction: column; gap: 14px;`. The filter container passed inline `display: "flex"` without specifying `flexDirection: "row"`, causing the search input wrapper with `flex: "1 1 280px"` to treat `280px` as vertical height along the flex-column main axis while `justify-content: space-between` pushed the controls to opposite vertical ends.
+>   - Solution: Introduced the dedicated `.sh-card.sh-filter-card` and `.sh-filter-card-actions` CSS classes. Set `flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; flex-wrap: wrap; min-height: 0; height: auto;`.
+>   - Implemented responsive mobile stacking under 768px (`flex-direction: column; align-items: stretch; gap: 10px; width: 100%`) ensuring natural wrapping and 100% theme-invariant layout geometry.
+> - **Verification**:
+>   - Headless Chrome layout validation confirmed natural compact height (~48px) with tabs left-aligned and search right-aligned.
+>   - Frontend build (`npm run build --prefix apps/frontend`) passed with 0 errors.
+
+> **Documentation ↔ Codebase Alignment Pass (2026-11-09):**
+> - **What changed:** every documented count, constant, queue, port, route, and enum was re-verified against the running codebase and against the three governing source documents (*Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, *Master Design, Legal & Compliance Document (Draft 1)*). The documents are the intent baseline; the code is the truth for implementation status. Divergences are recorded explicitly rather than silently reconciled.
+> - **Corrected figures:**
+>   - Frontend i18n **625 keys** per language (43 nested objects), exact 4-language parity — previously documented as 314.
+>   - Operations Console v2 **23 page components** (23 page IDs) plus 6 shared primitives — previously documented as 19 pages.
+>   - **9** BullMQ queues: `auto-release`, `gig-auto-release`, `review-reveal`, `featured-refresh`, `payment-reconcile`, `kyc-refresh`, `notifications`, `tms-scan`, `withholding-remittance` — three were missing from the architecture table.
+>   - Vite dev server on **port 3000** (`vite.config.ts`), `vite preview` on 4173.
+>   - Platform fee **7% from the freelancer, 0% from the client**; withholding **0% at launch** (`TIN_FEATURE_ENABLED=false`), with 3% / 30% configured above 10,000 ETB. Auto-release **7 days**. VAT threshold **450,000 ETB**. JWT access **1h** / refresh **30d**. Chat attachment cap **15 MB**.
+>   - **Telebirr is the only live payment rail.** CBE and M-Pesa clients are throwing stubs; Chapa is fully removed from the application layer (only an inert PostgreSQL enum value remains).
+>   - **CI exists** and runs on every pull request (doc-parity, secret scan, type-check, route-audit gate, backend tests, fresh-db check, frontend build). `deploy.yml` is a **placeholder**. There are **zero frontend test files and no frontend test runner**.
+> - **Walkthrough-level corrections:** dispute-resolution preview now shows the 7% general fee (was documented as 5%); the 7-day cooling-off step is marked as **not available in practice** because `createContractFromProposal()` never sets `Contract.cancellableUntil`; the fee sections now describe the unified 7%/0% rule.
+> - **New references:** `docs/ROADMAP_ALIGNMENT.md`, `docs/DOCUMENT_UNIFICATION_2026-11-09.md`, regenerated `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md`, rewritten `docs/COMPLIANCE_BLOCKERS.md`.
+
+> **Direct Chat Credential Lookup & Contract Page Direct Chat Action (2026-11-09):**
+> - **Multi-Credential Recipient Lookup in Direct Chat (`chat.service.ts`)**:
+>   - Enhanced `createDirectConversation` in `apps/backend/src/modules/chat/chat.service.ts` to resolve recipients across user IDs (`id`), email addresses (`email` with case-insensitive matching), phone numbers (`phone` including domestic `09...` / `251...` / `+251...` normalization), and unique customer IDs (`ucid`).
+>   - Added safety guards preventing self-chat attempts and synthetic guest contact targeting.
+>   - Returns normalized `ChatConversation` objects with populated `otherParticipant` profiles and pushes real-time socket events via `sendToUser`.
+> - **Direct Chat Action on Contract Cards (`WorkflowWorkspace.tsx`, `FullPlatformApp.tsx`)**:
+>   - Added a dedicated direct chat button ("Chat with Freelancer" / "Chat with Client") with `MessageSquare` icon to executed and active contract cards.
+>   - Clicking the button automatically establishes or retrieves the direct conversation between the contract's client and freelancer with subject context (`Contract: <Job Title>`), sets `initialConversationId`, and navigates directly to the `chat` view.
+>   - `ChatWorkspace.tsx` automatically selects and opens the target contract thread on mount and on view transitions.
+>   - Contracts API (`GET /api/v1/contracts` and `GET /api/v1/contracts/:id`) updated to include bilateral client and freelancer user profiles (`id`, `email`, `firstName`, `lastName`, `displayName`, `avatarUrl`).
+> - **Verification**:
+>   - Backend type-check (`npm --prefix apps/backend run type-check`) passed with 0 errors.
+>   - Frontend build (`pnpm --filter frontend build`) passed with 0 errors.
+>   - Verified recipient lookup with case-insensitive email query against live DB.
+>   - `node scripts/check-doc-parity.mjs` passed with 100% parity.
+
+> **Platform-Wide 7% Only General Fee Rule (2026-11-09):**
+> - **Unified Fee Policy & Breakdown**:
+>   - Established a flat 7% general platform fee across the platform (`PLATFORM_FEE_RATE_CLIENT = 0`, `PLATFORM_FEE_RATE_FREELANCER = 0.07`).
+>   - In `EscrowFeeBreakdown` (`ui.tsx`), updated default fee rate to 7% and removed the withholding tax line. Proposals display Gross Amount, Yekis Fee (7%), and Estimated Net Payout (93% take-home).
+>   - In `FeesPage.tsx`, updated the live ETB calculator, comparisons, and manifesto to reflect the 7% platform fee / 93% freelancer take-home.
+>   - In `i18n.ts`, synchronized copy across all 4 languages (`en`, `am`, `om`, `ti`) to reference the transparent 7% general fee with zero withholding deductions for launch.
+> - **Verification**:
+>   - `npm --prefix apps/backend run type-check`: 0 errors.
+>   - `pnpm --filter frontend exec tsc -b`: 0 errors.
+>   - `pnpm run check:doc-parity`: 100% parity across all models, modules, routes, and topics.
+
+> **Hero Section Layout Restoration with Interactive Purple Proximity Pop (2026-11-09):**
+> - **Layout & Typography Restoration**:
+>   - Restored the hero section container (.v2-hero-inner) to its clean, centered layout (max-width: 1120px; padding: 3rem 6% 4.5rem; margin: 0 auto).
+>   - Restored headline scale (.v2-hero-title) to its balanced proportions (font-size: clamp(2.6rem, 7.6vw, 7.1rem); line-height: 1.1; letter-spacing: 0.005em).
+>   - Restored subheadline (.v2-hero-sub) to max-width: 680px; font-size: clamp(1.05rem, 1.45vw, 1.25rem); line-height: 1.65.
+>   - Restored hero actions (.v2-hero-actions) to gap: 14px; margin-top: 30px.
+> - **Proximity Pop Interactive Text Animation**:
+>   - Kept the requested interactive proximity pop animation active in ProximityPopTitle.tsx, LandingPageV2.tsx (SpringTitle), and LandingPage.tsx.
+>   - Tuned interaction radius back to default (radius = 110px) to match the restored typography scale.
+>   - Preserved purple hover glow (--v2-pop: #a78bfa; --v2-pop-glow: rgba(167, 139, 250, 0.55)) and theme rest colors.
+> - **Verification**:
+>   - pnpm --filter frontend build passes cleanly (tsc -b && vite build in 3.17s).
+>   - node scripts/check-doc-parity.mjs passes with 100% alignment.
+
 > **Hero Section Interactive Slogan Proximity Pop Text Animation (2026-11-09):**
 > - **`ProximityPopTitle.tsx` & `LandingPageV2.tsx` (`SpringTitle`) / `LandingPage.tsx`**:
 >   - Implemented an interactive cursor-proximity pop animation for the hero section slogan/title replacing previous static hover effects.
@@ -27,10 +119,23 @@ Last validated: 2026-11-09
 >   - Relaxed `UpgradeToTier2Input` in `packages/schemas/src/index.ts` and `apps/backend/src/schemas.ts` to make `tin` and `businessRegNumber` optional.
 > - **Contracts & Frontend Notices**:
 >   - Service agreement Clause 6 (`serviceAgreement.template.ts`) dynamically clarifies independent contractor tax responsibility.
->   - `BrowserVerification.tsx` and `BrowserWallet.tsx` display transparent MVP launch notices indicating Tier 1 verified payouts are active.
+>   - `BrowserVerification.tsx` and `BrowserWallet.tsx`: Completely eliminated meta-announcements ("MVP Launch Notice") and hidden the deferred Tier 2/TIN card entirely. Verified status (Fayda / National ID) cleanly unlocks withdrawals, bidding, and contracts directly.
+>   - `i18n.ts`: Updated 4-language locales (`en`, `am`, `om`, `ti`) to reflect that Fayda verification unlocks bidding, contracts, and wallet withdrawals, without confusing onboarding references to TIN withholding taxes.
 > - **Verification**:
 >   - `npm --prefix apps/backend run type-check` passes with 0 errors.
 >   - `pnpm run check:doc-parity` passes with 100% parity across all models, modules, routes, and topics.
+
+> **"Make ideas visible." — Design Overhaul & Minimized Replay Delay (2026-11-09):**
+> - **`HandWrittenTitle.tsx` & `HandWrittenTitle.css`**:
+>   - **Architectural Hierarchy Update (Pill Above Circle)**: Positioned the kicker pill (`.yk-hw-pill`) directly above the stage container (`.yk-hw-stage`), ensuring the hand-drawn circle SVG frames only the headline and subtitle. Enforced `.agents/AGENTS.md` rules with high-contrast, bold solid styling (`#22c55e` dark, `#16a34a` light, no low-opacity backgrounds).
+>   - **Compact Editorial Stage Dimensions**: Scaled the stage to a compact height (`380px` on desktop, `340px` on tablet, `310px` on mobile; section padding `56px 24px 48px` desktop, `40px 16px 36px` mobile) with content width `min(640px, 82%)`. Added specificity scoping under `.yk-v2` so it never collides with the 440vh escrow scroll stage.
+>   - **Typography & Font Integration**: Integrated Google Fonts `Plus Jakarta Sans` (weights 700/800) into `index.html` and `index.css`. Set headline `font-family: "Plus Jakarta Sans", "DM Sans", system-ui, sans-serif; font-weight: 800; font-size: clamp(2.6rem, 7vw, 4.9rem); line-height: 1; letter-spacing: -0.045em;`. Subtitle refined to `max-width: 520px; font-size: clamp(0.95rem, 1.7vw, 1.1rem); line-height: 1.65;`.
+>   - **Minimized Replay Delay Loop**: Replaced the prolonged 6.5s loop (which previously spent 2.52s in idle hold and >3.4s before redrawing) with a crisp, fluid 2.4s cycle. The circle draws in ~1.5s via `cubic-bezier(0.43, 0.13, 0.23, 0.96)`, pauses for a brief ~0.53s hold so the completed ring registers, cleanly fades in ~0.24s, and immediately redraws. Reduced the replay delay by ~77%.
+>   - **Interactive Click-to-Replay**: Added a click trigger to the section to instantly replay the animation sequence on demand.
+>   - **Strict Theme Parity**: Base geometry is 100% theme-invariant across light and dark themes. Theme overrides strictly modify only colors, backgrounds, borders, and box shadows.
+> - **Verification**:
+>   - `npm run build --prefix apps/frontend` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
 
 > **"Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play (2026-11-08):**
 > - **`HandWrittenTitle.tsx` & `HandWrittenTitle.css`**:
@@ -695,7 +800,7 @@ When implementation changes, update this walkthrough if the user journey, state 
 2. Mediators can view the original contract scope alongside the submitted deliverable (with inline viewer for URL-based deliveries).
 3. Added \deliverableUrl\ to the \Milestone\ schema to track and present the submitted work during disputes.
 4. Stage 2 Evidence statements from both client and freelancer are rendered inline as a chat flow.
-5. Resolving a dispute provides a live, calculated preview of exact ETB amounts allocated to the freelancer and refunded to the client, factoring in the platform fee (5%) and estimated withholding tax.
+5. Resolving a dispute provides a live, calculated preview of exact ETB amounts allocated to the freelancer and refunded to the client, factoring in the platform fee (7% general fee, deducted from the freelancer's release) and estimated withholding tax (currently 0% while `TIN_FEATURE_ENABLED=false`).
 
 
 ## StaffCompliancePanel Redesign (added 2026-08-09)
@@ -863,3 +968,29 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
 - List pages searched and filtered a fixed 100 rows in the browser, so anything outside that window was invisible and the pager never moved. Search, filters and paging now run on the server.
 - Filter option lists had drifted from the API: escrow offered "PENDING" (rejected by `/admin/escrows`) and `M_PESA` was missing from every rail filter.
 - Contracts "Export CSV" and Reports "Download" had no handler. Both emit real CSV of the rows on screen.
+
+
+---
+
+### Wallet & Payouts: Transaction Movements & Activity Details
+- **Overview & Reconciliation**:
+  - The "Wallet & Payouts" workspace tab now includes a comprehensive **Transaction Movement Details** section powered by `GET /api/v1/escrow/wallet/transactions`.
+  - Aggregates verified double-entry journal entries from `LedgerAccount` (`2100-USER-${userId}`) and reconciles them with in-flight or manual top-up requests (`WalletTopUp`) and pending withdrawal payouts (`PayoutTransaction`).
+- **Key Features**:
+  1. **Financial KPIs**: Real-time totals for Total Inflow (ገቢ), Total Outflow (ወጪ), Pending Settlements, and Total Ledger Movements.
+  2. **Multi-Rail Categorization & Filters**: Quick-filtering by All Movements, Money In, Money Out, Top-Ups, Payouts, and Escrow Operations, plus status dropdowns (`COMPLETED`, `PENDING`, `PROCESSING`, `FAILED`) and instant search across references, contract titles, counterparty names, and notes.
+  3. **Voucher & Movement Detail Modal**: Clicking any transaction movement launches an inspection modal detailing Gross Amount, Platform Fee (7%), Net Settlement, Provider Rails (`TELEBIRR`, `CBE_BIRR`, `M_PESA`), Reference IDs (with 1-click clipboard copy), and counterparties.
+  4. **Fiscal Receipt Integration**: Directly connected to `FiscalDocumentSheet` to generate official, bilingual (Amharic/English) AACCSA-compliant electronic receipts (`YKS-TX-...` / ደረሰኝ) with TIN and VAT breakdown.
+
+
+---
+
+### Immediate Project Payment Transfer (Client to Freelancer)
+- **Direct Settlement Architecture**:
+  - When a project milestone or gig order is paid by the client (`fundMilestoneFromWallet` / `fundGigOrderFromWallet`), funds are debited from the client's wallet and **credited to the freelancer's wallet immediately** (net of standard platform fee and withholding).
+  - The milestone or gig order transitions immediately to `RELEASED` / `COMPLETED`, stamping `releasedAt` in real time.
+  - Sibling milestones are evaluated via `checkAndUpdateContractCompletion` so contracts advance to `COMPLETED` seamlessly.
+- **Double-Entry General Ledger Integrity**:
+  - Automatically posts both `ESCROW_FUND` and `MILESTONE_RELEASE` general ledger journals in the atomic database transaction, ensuring the chart of accounts and the user's `2100-USER-${userId}` ledger accounts remain in balanced equilibrium.
+- **Flexible Direct Release**:
+  - Clients can also release funds at any time directly from `ESCROW_HELD` or `WORK_IN_PROGRESS` states via `acceptMilestone`, removing blocking review friction.

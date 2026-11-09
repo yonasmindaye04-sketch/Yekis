@@ -108,7 +108,30 @@ export async function createContractFromProposal(proposalId: string) {
 export async function getContract(userId: string, contractId: string) {
   const contract = await prisma.contract.findUnique({
     where: { id: contractId },
-    include: { milestones: true, job: true },
+    include: {
+      milestones: true,
+      job: true,
+      client: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      freelancer: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+    },
   });
   if (!contract) throw new ContractNotFoundError();
   if (contract.clientId !== userId && contract.freelancerId !== userId) {

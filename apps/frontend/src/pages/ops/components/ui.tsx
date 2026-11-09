@@ -734,14 +734,13 @@ export interface EscrowFeeBreakdownProps {
 
 export function EscrowFeeBreakdown({
   grossEtb,
-  feeRate = 0.1,
+  feeRate = 0.07,
   compact = false,
   labels,
 }: EscrowFeeBreakdownProps) {
   const safeGross = Number.isFinite(grossEtb) && grossEtb > 0 ? grossEtb : 0;
   const platformFee = Math.round(safeGross * feeRate * 100) / 100;
-  const tinTax = Math.round(safeGross * 0.03 * 100) / 100;
-  const netWithTin = Math.max(0, Math.round((safeGross - platformFee - tinTax) * 100) / 100);
+  const netPayout = Math.max(0, Math.round((safeGross - platformFee) * 100) / 100);
 
   return (
     <div className={`yk-fee-breakdown ${compact ? "compact" : ""}`}>
@@ -757,23 +756,19 @@ export function EscrowFeeBreakdown({
         <div className="yk-fee-row">
           <span>
             {labels?.platformFeeLabel ??
-              `Yekis Freelancer Fee (${Math.round(feeRate * 100)}%)`}
+              `Yekis Fee (${Math.round(feeRate * 100)}%)`}
           </span>
           <span className="sh-mono">− {formatEtbMajor(platformFee)}</span>
         </div>
-        <div className="yk-fee-row">
-          <span>{labels?.tinTaxLabel ?? "Withholding Tax (3% Verified TIN)"}</span>
-          <span className="sh-mono">− {formatEtbMajor(tinTax)}</span>
-        </div>
         <div className="yk-fee-row total">
-          <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout (with TIN)"}</strong>
-          <strong className="sh-mono yk-fee-net">{formatEtbMajor(netWithTin)}</strong>
+          <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout"}</strong>
+          <strong className="sh-mono yk-fee-net">{formatEtbMajor(netPayout)}</strong>
         </div>
       </div>
       {!compact && (
         <p className="yk-fee-guarantee">
           {labels?.escrowGuarantee ??
-            "100% funded in Yekis Escrow before work starts · 7-day auto-release after delivery (30% ERCA withholding applies only if TIN is unverified)."}
+            "100% funded in Yekis Escrow before work starts · 7-day auto-release after delivery."}
         </p>
       )}
     </div>

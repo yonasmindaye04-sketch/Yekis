@@ -82,7 +82,7 @@ CLIENT                          PLATFORM                        FREELANCER
   │                                │                                │
   │  2. Order & fund escrow        │                                │
   │     (requireFreshAuth step-up) │ GigOrder created               │
-  ├────────────────────────────────► Wallet debited (Price + 5% fee)│
+  ├────────────────────────────────► Wallet debited (Price, no surcharge)│
   │                                │ GigOrder → ESCROW_HELD         │
   │                                │ Freelancer notified to start   │
   │                                │                                │
@@ -130,8 +130,8 @@ CLIENT                          PLATFORM                        FREELANCER
 - Upon client acceptance (or auto-release timer expiry):
   - Milestone transitions to `RELEASED`.
   - Net earnings credited to freelancer's wallet.
-  - **Atomic Platform Fee Recognition (LED-002):** Platform commission (5% client + 5% freelancer) is credited to `PlatformOperatingAccount` with a `PlatformFeeCredit` record.
-  - **Withholding Tax Deduction:** On milestones ≥ ETB 10,000, deducts 3% if verified TIN is on file, or 30% if TIN is missing, crediting `accumulatedWithholdingMinor` for monthly ERA reporting.
+  - **Atomic Platform Fee Recognition (LED-002):** Platform commission (7% general platform fee, 0% client surcharge) is credited to `PlatformOperatingAccount` with a `PlatformFeeCredit` record.
+  - **Withholding Tax Status:** Held at 0% for MVP launch pending tax authority remittance formalization (`TAX-002`). Freelancers receive 93% net payout.
   - When all milestones on a contract reach terminal states (`RELEASED`, `REFUNDED`, `PARTIAL_REFUND`), the contract is marked `COMPLETED`.
 
 ### Stage 9 — Payout & Automated B2C Disbursement

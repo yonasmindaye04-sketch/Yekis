@@ -57,11 +57,7 @@ import {
   AVATAR_UPDATED_EVENT,
   loadAvatarOverride,
 } from "./components/YekisAvatar";
-import {
-  ProfileCompletionDialog,
-  evaluateProfileCompletion,
-  hasCompletedFirstLoginCheck,
-} from "./components/ProfileCompletionDialog";
+import { ProfileCompletionDialog } from "./components/ProfileCompletionDialog";
 import { useLocation, useNavigate } from "./router/HashRouter";
 import { FAQPage } from "./FAQPage";
 import { FeesPage } from "./FeesPage";
@@ -369,6 +365,7 @@ function FullPlatformAppInner() {
   const [view, setView] = useState<View>("overview");
   const [viewUserId, setViewUserId] = useState<string | null>(null);
   const [focusContractId, setFocusContractId] = useState<string | null>(null);
+  const [focusChatConversationId, setFocusChatConversationId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
@@ -569,49 +566,6 @@ const loadWorkspace = async () => {
     if (completenessResult.status === "fulfilled")
     setProfileCompleteness(completenessResult.value.profileCompleteness);
     setLastUpdatedAt(new Date());
-
-    // First-login profile completion check via HashRouter state:
-    // Inspect the user's public profile for missing required data (profile picture, bio, skills)
-    // and push `{ showProfileCompletion: true }` into HashRouter state if not yet checked.
-    if (me && !me.staffRole && !hasCompletedFirstLoginCheck(me.id)) {
-      try {
-        const pub = (await api.getPublicProfile(me.id).catch(() => null)) as {
-          firstName?: string | null;
-          lastName?: string | null;
-          bio?: string | null;
-          avatarUrl?: string | null;
-          primarySkillId?: string | null;
-          skills?: Array<{ id: string }>;
-        } | null;
-        const storedOverride = loadAvatarOverride(me.id);
-        const resolvedAvatar =
-          storedOverride && "avatarUrl" in storedOverride
-            ? (storedOverride.avatarUrl ?? null)
-            : (pub?.avatarUrl ?? me.avatarUrl ?? null);
-        const completion = evaluateProfileCompletion({
-          role: me.role,
-          avatarUrl: resolvedAvatar,
-          firstName: pub?.firstName ?? me.firstName,
-          lastName: pub?.lastName ?? me.lastName,
-          bio: pub?.bio ?? "",
-          primarySkillId: pub?.primarySkillId ?? null,
-          skillIds: (pub?.skills ?? []).map((s) => s.id),
-        });
-        if (!completion.isComplete) {
-          hashNavigate(`/${view}`, {
-            replace: true,
-            state: {
-              ...hashLocation.state,
-              showProfileCompletion: true,
-              fromFirstLogin: true,
-              missingFields: completion.missingItems,
-            },
-          });
-        }
-      } catch {
-        // non-blocking
-      }
-    }
   };
 
   // Ref-synced alias so the polling/socket effect can stay keyed on [user]
@@ -1996,7 +1950,6 @@ if (authMode === "register") {
                       state: {
                         ...hashLocation.state,
                         showProfileCompletion: true,
-                        fromFirstLogin: false,
                       },
                     })
                   }
@@ -2231,6 +2184,10 @@ if (authMode === "register") {
                 setFocusContractId(contractId || null);
                 setView("escrow");
               }}
+              onOpenChat={(conversationId) => {
+                setFocusChatConversationId(conversationId);
+                setView("chat");
+              }}
             />
           </section>
         )}
@@ -2295,6 +2252,7 @@ if (authMode === "register") {
               userId={user.id}
               role={marketplaceRole === "BOTH" ? "FREELANCER" : marketplaceRole}
               onNavigateToContracts={() => setView("contracts")}
+              initialConversationId={focusChatConversationId}
             />
           </section>
         )}

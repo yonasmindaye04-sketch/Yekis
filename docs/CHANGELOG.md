@@ -4,6 +4,15 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Changed
+- **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul (2026-11-09)**:
+  - Re-architected both the printable Receipt/Voucher view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.
+  - Added the `.excel-sheet-*` design system in `apps/frontend/src/index.css` with clean tabular spreadsheet borders, tabular numeric formatting (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-theme light/dark parity, and `@media print` paper styles.
+  - Implemented the prominent `INVOICE` / `PAYOUT RECEIPT` header with `24Billions PVT. · Yekis Technologies PLC` lockup and tagline (*"Leading the Way in Health and Fitness Innovation · Digital Escrow"*).
+  - Implemented 2-column key-value metadata blocks (To, Address, Phone, TIN, Date, Invoice #, Customer ID, and Payment Remittance) plus the classic 7-column metadata band (`Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date`).
+  - Added line-items spreadsheet table with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` and right-aligned stacked totals calculations with classic Excel double-underline grand total borders.
+  - Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs per project rules.
+
 ### Fixed
 - **ProfilePage horizontal scroll on Telegram Mini App (2026-10-17)** (`ProfilePage.css`): the profile section was overflowing horizontally on narrow (≤480 px) viewports such as the Telegram Mini App shell.
   - Added `overflow-x: hidden` + `box-sizing: border-box` on `.profile-view-page` and `.profile-view-container` to hard-contain any bleed.

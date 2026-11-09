@@ -13,6 +13,7 @@ import {
   submitMilestone,
   acceptMilestone,
   withdrawFromWallet,
+  getUserTransactionMovements,
   MilestoneNotFoundError,
   NotContractPartyError,
   InvalidEscrowStateError,
@@ -224,7 +225,6 @@ escrowRouter.post(
 escrowRouter.post(
   "/milestones/:milestoneId/accept",
   requireAuth,
-  requireFreshAuth(300),
   async (req: AuthedRequest, res) => {
     try {
       const milestone = await acceptMilestone({
@@ -312,6 +312,35 @@ escrowRouter.get(
       page,
       pageSize: limit,
     });
+  },
+);
+
+// User transaction movements and ledger statement feed
+escrowRouter.get(
+  "/wallet/transactions",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const movements = await getUserTransactionMovements(req.user!.id);
+      return res.json({ movements, total: movements.length });
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch user transaction movements");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+escrowRouter.get(
+  "/transactions",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const movements = await getUserTransactionMovements(req.user!.id);
+      return res.json({ movements, total: movements.length });
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch user transaction movements");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
   },
 );
 

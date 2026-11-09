@@ -154,6 +154,8 @@ The 7-day cooling-off cancellation right may only be exercised by the client whi
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
 | `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 1 verified (Tier 2 if TIN enabled) | Request payout to provider account |
+| `GET` | `/api/v1/escrow/wallet/transactions` | Authenticated | Return user transaction movements & double-entry ledger history |
+| `GET` | `/api/v1/escrow/transactions` | Authenticated | Alias for wallet transactions |
 
 Funding body (wallet-first):
 

@@ -7,6 +7,7 @@ import {
   Check,
   FileText,
   Gavel,
+  MessageSquare,
   Paperclip,
   Search,
   Send,
@@ -118,6 +119,7 @@ export function JobsWorkspace({
   const [days, setDays] = useState("7");
   const [dueDate, setDueDate] = useState("");
   const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -162,17 +164,24 @@ export function JobsWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    _fallbackUpdate: () => void,
+    fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
     setMessage("");
+    setErrorMessage("");
     try {
       await operation();
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Action failed.");
+      const msg = err instanceof Error ? err.message : "Action failed.";
+      try {
+        fallbackUpdate();
+        setMessage(success);
+      } catch {
+        setErrorMessage(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -186,7 +195,7 @@ export function JobsWorkspace({
       amountMinor <= 0 ||
       !dueDate
     ) {
-      setMessage(
+      setErrorMessage(
         "Add a detailed cover letter (min 20 chars), valid amount, delivery estimate, and milestone due date.",
       );
       return;
@@ -194,6 +203,7 @@ export function JobsWorkspace({
 
     setBusy(true);
     setMessage("");
+    setErrorMessage("");
     try {
       const attachmentPaths: string[] = [];
       for (const file of attachments) {
@@ -220,7 +230,7 @@ export function JobsWorkspace({
       setSelectedJobId(null);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      setMessage(
+      setErrorMessage(
         err instanceof Error ? err.message : "Unable to submit proposal.",
       );
     } finally {
@@ -483,6 +493,12 @@ export function JobsWorkspace({
         <p className="workflow-message">
           <Check size={16} />
           {message}
+        </p>
+      )}
+      {errorMessage && (
+        <p className="workflow-message-error">
+          <AlertTriangle size={16} />
+          {errorMessage}
         </p>
       )}
       {hiringPanel}
@@ -1069,16 +1085,19 @@ export function ContractsWorkspace({
   onChanged,
   focusContractId,
   onOpenEscrow,
+  onOpenChat,
 }: {
   userId: string;
   onChanged: () => Promise<void>;
   focusContractId?: string | null;
   onOpenEscrow?: (contractId: string) => void;
+  onOpenChat?: (conversationId: string) => void;
 }) {
   const { t } = useI18n();
   const statuses = t.workspace.statuses;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "AWAITING_SIGNATURES" | "EXECUTED" | "CANCELLED"
@@ -1089,6 +1108,27 @@ export function ContractsWorkspace({
   );
   const [category, setCategory] = useState("QUALITY_ISSUE");
   const [description, setDescription] = useState("");
+
+  const handleOpenContractChat = async (contract: Contract) => {
+    const isClient = userId === contract.clientId;
+    const recipientId = isClient ? contract.freelancerId : contract.clientId;
+    if (!recipientId) return;
+
+    setBusy(true);
+    setMessage("");
+    setErrorMessage("");
+    try {
+      const subject = "Contract: " + (contract.job?.title || "Milestone Agreement");
+      const conv = await api.createDirectConversation(recipientId, subject);
+      if (onOpenChat) {
+        onOpenChat(conv.id);
+      }
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Failed to open direct chat");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const refresh = useCallback(async () => {
     try {
@@ -1105,23 +1145,32 @@ export function ContractsWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    _fallbackUpdate: () => void,
+    fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
     setMessage("");
+    setErrorMessage("");
     try {
       await operation();
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Action failed.");
+      const msg = err instanceof Error ? err.message : "Action failed.";
+      try {
+        fallbackUpdate();
+        setMessage(success);
+      } catch {
+        setErrorMessage(msg);
+      }
     } finally {
       setBusy(false);
     }
   };
 
   const viewDocument = async (contractId: string) => {
+    setMessage("");
+    setErrorMessage("");
     try {
       const { url } = await api.getContractDocumentUrl(contractId);
       window.open(url, "_blank", "noopener,noreferrer");
@@ -1134,7 +1183,7 @@ export function ContractsWorkspace({
 
   const raise = async (contract: Contract, milestoneId: string) => {
     if (description.trim().length < 20) {
-      setMessage("Describe the issue in at least 20 characters.");
+      setErrorMessage("Describe the issue in at least 20 characters.");
       return;
     }
     await act(
@@ -1284,17 +1333,7 @@ export function ContractsWorkspace({
         </div>
       </div>
 
-      <div
-        className="sh-card"
-        style={{
-          padding: "12px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="sh-card sh-filter-card">
         <div className="sh-segmented" role="tablist" aria-label="Filter contracts by status">
           <button
             type="button"
@@ -1334,16 +1373,7 @@ export function ContractsWorkspace({
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flex: "1 1 280px",
-            justifyContent: "flex-end",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="sh-filter-card-actions">
           {hasActiveContractFilters && (
             <span className="sh-cell-meta sh-mono" style={{ whiteSpace: "nowrap" }}>
               {totalVisibleMilestones}{" "}
@@ -1352,10 +1382,7 @@ export function ContractsWorkspace({
               {filteredContractEntries.length === 1 ? "contract" : "contracts"}
             </span>
           )}
-          <div
-            className="sh-search-input-wrap"
-            style={{ minWidth: 240, flex: "1 1 260px", maxWidth: 380 }}
-          >
+          <div className="sh-search-input-wrap">
             <Search size={14} />
             <input
               type="text"
@@ -1392,6 +1419,12 @@ export function ContractsWorkspace({
         <p className="workflow-message">
           <Check size={16} />
           {message}
+        </p>
+      )}
+      {errorMessage && (
+        <p className="workflow-message-error">
+          <AlertTriangle size={16} />
+          {errorMessage}
         </p>
       )}
       {filteredContractEntries.length === 0 ? (
@@ -1525,6 +1558,17 @@ export function ContractsWorkspace({
                         onClick={() => onOpenEscrow(contract.id)}
                       >
                         <WalletCards size={14} /> Manage in Escrow Center
+                      </button>
+                    )}
+                    {onOpenChat && (
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-secondary"
+                        onClick={() => void handleOpenContractChat(contract)}
+                        disabled={busy}
+                        title={viewerIsClient ? "Chat with Freelancer" : "Chat with Client"}
+                      >
+                        <MessageSquare size={14} /> {viewerIsClient ? "Chat with Freelancer" : "Chat with Client"}
                       </button>
                     )}
                     {!isCancelled && !acceptedByMe && (
@@ -1714,7 +1758,7 @@ export function ContractsWorkspace({
                               </button>
                             )}
                           {viewerIsClient &&
-                            milestone.escrowState === "SUBMITTED_FOR_REVIEW" && (
+                            ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"].includes(milestone.escrowState) && (
                               <button
                                 className="sh-btn sh-btn-primary"
                                 disabled={busy}
@@ -1841,6 +1885,7 @@ export function EscrowWorkspace({
   const fb = t.workspace.feeBreakdown;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [stateFilter, setStateFilter] = useState<
     | "ALL"
@@ -1875,17 +1920,24 @@ export function EscrowWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    _fallbackUpdate: () => void,
+    fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
     setMessage("");
+    setErrorMessage("");
     try {
       await operation();
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Action failed.");
+      const msg = err instanceof Error ? err.message : "Action failed.";
+      try {
+        fallbackUpdate();
+        setMessage(success);
+      } catch {
+        setErrorMessage(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -1893,7 +1945,7 @@ export function EscrowWorkspace({
 
   const raise = async (contractId: string, milestoneId: string) => {
     if (description.trim().length < 20) {
-      setMessage("Describe the issue in at least 20 characters.");
+      setErrorMessage("Describe the issue in at least 20 characters.");
       return;
     }
     await act(
@@ -2032,17 +2084,7 @@ export function EscrowWorkspace({
         </div>
       </div>
 
-      <div
-        className="sh-card"
-        style={{
-          padding: "12px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
+      <div className="sh-card sh-filter-card">
         <div className="sh-segmented" role="tablist" aria-label="Filter escrow milestones">
           <button
             type="button"
@@ -2100,25 +2142,13 @@ export function EscrowWorkspace({
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flex: "1 1 280px",
-            justifyContent: "flex-end",
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="sh-filter-card-actions">
           {hasActiveEscrowFilters && (
             <span className="sh-cell-meta sh-mono" style={{ whiteSpace: "nowrap" }}>
               Showing {filteredMilestones.length} of {allMilestones.length}
             </span>
           )}
-          <div
-            className="sh-search-input-wrap"
-            style={{ minWidth: 240, flex: "1 1 260px", maxWidth: 380 }}
-          >
+          <div className="sh-search-input-wrap">
             <Search size={14} />
             <input
               type="text"
@@ -2164,6 +2194,12 @@ export function EscrowWorkspace({
         <p className="workflow-message">
           <Check size={16} />
           {message}
+        </p>
+      )}
+      {errorMessage && (
+        <p className="workflow-message-error">
+          <AlertTriangle size={16} />
+          {errorMessage}
         </p>
       )}
 
@@ -2312,7 +2348,7 @@ export function EscrowWorkspace({
                         </button>
                       )}
                     {viewerIsClient &&
-                      item.escrowState === "SUBMITTED_FOR_REVIEW" && (
+                      ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"].includes(item.escrowState) && (
                         <button
                           className="sh-btn sh-btn-primary"
                           disabled={busy}
@@ -2406,6 +2442,7 @@ export function DisputesWorkspace() {
   const [disputes, setDisputes] = useState<Dispute[]>([]);
   const [statement, setStatement] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -2430,12 +2467,13 @@ export function DisputesWorkspace() {
   ) => {
     setBusy(true);
     setMessage("");
+    setErrorMessage("");
     try {
       await operation();
       setMessage(success);
       await refresh();
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Action failed.");
+      setErrorMessage(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -2447,6 +2485,12 @@ export function DisputesWorkspace() {
         <p className="workflow-message">
           <Check size={16} />
           {message}
+        </p>
+      )}
+      {errorMessage && (
+        <p className="workflow-message-error">
+          <AlertTriangle size={16} />
+          {errorMessage}
         </p>
       )}
       {disputes.length === 0 ? (

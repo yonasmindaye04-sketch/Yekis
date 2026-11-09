@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+Ethiopic:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Hanken+Grotesk:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;700&family=Noto+Sans+Ethiopic:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "blobatar/motion.css";
@@ -1590,6 +1590,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .workflow-item-head small, .proposal-row span, .milestone-row span, .deadline-note { color: var(--color-text-secondary); font-size: .82rem; }
 .workflow-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .workflow-message { display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid var(--color-primary-light); border-radius: 6px; background: var(--color-primary-light); color: var(--color-primary); font-size: .85rem; font-weight: 600; }
+.workflow-message-error { display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid var(--color-error); border-radius: 6px; background: var(--color-error-light); color: var(--color-error-text); font-size: .85rem; font-weight: 600; }
 .proposal-list, .milestone-list { display: grid; border-top: 1px solid var(--color-border); }
 .proposal-row, .milestone-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; padding: 15px 0; border-bottom: 1px solid var(--color-border); }
 .proposal-row > div:first-child, .milestone-row > div:first-child { display: grid; gap: 4px; }
@@ -2866,6 +2867,521 @@ img, video, iframe, canvas {
 }
 
 /* ============================================================================
+   Excel Spreadsheet Invoice & Detail Sheet Design System (.excel-*)
+   Directly modeled on the Excel invoice reference template:
+   - Header: INVOICE / 24Billions PVT. lockup
+   - Metadata blocks: To / Date / Invoice # / Customer ID / Shipping / Payable to
+   - 7-Column Metadata Band: Salesperson, Job, Shipping method/terms, Delivery date, Payment terms, Status
+   - Line Items Table: Qty, Item #, Description, Custom column, Unit price, Discount, Line total
+   - Totals Box: Total Discount, Subtotal, Sales tax, Total
+   - Sign-off: Thank you for your business!
+   ============================================================================ */
+
+.excel-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(9, 13, 18, 0.76);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  overflow-y: auto;
+}
+
+.excel-sheet-modal-container {
+  width: min(100%, 980px);
+  margin: auto;
+}
+
+.excel-sheet-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
+.excel-sheet-card {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 32px 36px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow-xl);
+  font-family: var(--font-sans);
+}
+
+/* Sheet Top Toolbar (Action Controls) */
+.excel-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.excel-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.excel-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.excel-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+
+.excel-tab-btn.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.excel-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.excel-chip-toggle.is-on {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.excel-btn-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.excel-btn-action:hover {
+  border-color: var(--color-primary);
+}
+
+.excel-btn-action.is-primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.excel-btn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+/* Excel Sheet Header (Row 1-4 in CSV) */
+.excel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.excel-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.excel-doc-title {
+  font-family: var(--font-heading);
+  font-size: 2.1rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--color-text);
+  margin: 0;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+.excel-doc-subtitle {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.excel-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  text-align: right;
+  gap: 3px;
+}
+
+.excel-company-name {
+  font-family: var(--font-heading);
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.excel-company-tagline {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.excel-company-details {
+  font-size: 0.76rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+/* 2-Column Excel Metadata Blocks (Rows 6-12 in CSV) */
+.excel-meta-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 16px;
+}
+
+.excel-meta-box {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.83rem;
+}
+
+.excel-meta-box-label {
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  margin-bottom: 2px;
+}
+
+.excel-meta-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.82rem;
+}
+
+.excel-meta-line span:first-child {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.excel-meta-line strong,
+.excel-meta-line span:last-child {
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.excel-tin-input {
+  width: 140px;
+  height: 24px;
+  padding: 2px 6px;
+  font-size: 0.78rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+}
+
+/* The Classic 7-Column Metadata Band (Row 14-15 in CSV) */
+.excel-band-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.excel-band-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.79rem;
+}
+
+.excel-band-table th {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  padding: 8px 12px;
+  font-weight: 800;
+  text-align: left;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.excel-band-table td {
+  border: 1px solid var(--color-border);
+  padding: 9px 12px;
+  color: var(--color-text);
+  font-weight: 600;
+  vertical-align: middle;
+  background: var(--color-bg);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status Indicator rule compliance: Bold text with bold color, NO low opacity pills */
+.excel-status-bold {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 0.82rem;
+}
+.excel-status-bold.completed,
+.excel-status-bold.settled {
+  color: #16a34a;
+}
+.excel-status-bold.processing,
+.excel-status-bold.blue {
+  color: #2563eb;
+}
+.excel-status-bold.pending,
+.excel-status-bold.amber {
+  color: #d97706;
+}
+.excel-status-bold.rejected,
+.excel-status-bold.refunded,
+.excel-status-bold.crimson {
+  color: #dc2626;
+}
+
+/* The Line Items Table (Rows 17-23 in CSV) */
+.excel-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.excel-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+}
+
+.excel-table th {
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  padding: 9px 12px;
+  font-weight: 800;
+  color: var(--color-text);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.excel-table th.num-col,
+.excel-table td.num-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+.excel-table td {
+  border: 1px solid var(--color-border);
+  padding: 10px 12px;
+  color: var(--color-text);
+  vertical-align: middle;
+  background: var(--color-bg);
+}
+
+.excel-table tbody tr:hover td {
+  background: var(--color-bg-subtle);
+}
+
+/* Totals Box (Rows 25-30 in CSV, Right Aligned Stacked Calculation) */
+.excel-totals-wrap {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.excel-totals-table {
+  width: min(360px, 100%);
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.excel-totals-table td {
+  padding: 6px 14px;
+  vertical-align: middle;
+}
+
+.excel-totals-table td:first-child {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  text-align: right;
+  width: 55%;
+}
+
+.excel-totals-table td:last-child {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  text-align: right;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  width: 45%;
+}
+
+.excel-totals-grand {
+  border-top: 1px solid var(--color-border);
+  border-bottom: 3px double var(--color-text);
+}
+
+.excel-totals-grand td {
+  padding: 10px 14px;
+  font-size: 1.08rem;
+}
+
+.excel-totals-grand td:first-child {
+  color: var(--color-text);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.excel-totals-grand td:last-child {
+  color: var(--color-primary);
+  font-weight: 900;
+}
+
+/* Sign-off & Verification Footer (Row 34 in CSV) */
+.excel-signoff {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.excel-thank-you {
+  font-size: 1rem;
+  font-weight: 800;
+  font-style: italic;
+  color: var(--color-text);
+}
+
+.excel-signoff-meta {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Actions Bar inside details modal */
+.excel-actions-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .excel-sheet-card {
+    padding: 20px 16px;
+    gap: 16px;
+  }
+  .excel-meta-grid {
+    grid-template-columns: 1fr;
+  }
+  .excel-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .excel-header-right {
+    align-items: flex-start;
+    text-align: left;
+  }
+  .excel-totals-table {
+    width: 100%;
+  }
+}
+
+@media print {
+  .excel-sheet-card,
+  .excel-sheet-card * {
+    visibility: visible;
+  }
+  .excel-sheet-card {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    box-shadow: none !important;
+    padding: 24px !important;
+  }
+}
+
+/* ============================================================================
    Bilingual ERCA Fiscal Document Sheet & Printable Modal (.yk-fiscal-*)
    ============================================================================ */
 
@@ -3406,7 +3922,339 @@ img, video, iframe, canvas {
     padding: 20px !important;
   }
 }
+/* ==========================================================================
+   Transaction Movements & Payout Details (Theme Invariant)
+   ========================================================================== */
 
+.tx-movements-panel {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
 
+.tx-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
 
+@media (max-width: 900px) {
+  .tx-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
 
+@media (max-width: 500px) {
+  .tx-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tx-kpi-card {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-subtle);
+}
+
+.tx-kpi-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tx-kpi-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-kpi-val.inflow {
+  color: var(--color-primary);
+}
+
+.tx-kpi-val.outflow {
+  color: var(--color-text);
+}
+
+.tx-filter-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tx-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.tx-search-box {
+  position: relative;
+  flex: 1;
+  min-width: 240px;
+}
+
+.tx-search-box svg {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+.tx-search-box input {
+  width: 100%;
+  padding-left: 36px;
+  height: 38px;
+  font-size: 0.85rem;
+}
+
+.tx-tab-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tx-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tx-tab-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.tx-tab-btn.active {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border-color: var(--color-primary);
+}
+
+.tx-table {
+  display: grid;
+  gap: 8px;
+}
+
+.tx-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg-elevated);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.tx-row:hover {
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border-strong);
+}
+
+.tx-icon-circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tx-icon-circle.inflow {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.tx-icon-circle.outflow {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.tx-icon-circle.pending {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.tx-icon-circle.rejected {
+  background: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.tx-meta-col {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tx-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tx-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tx-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+}
+
+.tx-amount-col {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-amount {
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.tx-amount.inflow {
+  color: var(--color-primary);
+}
+
+.tx-amount.outflow {
+  color: var(--color-text);
+}
+
+.tx-amount-sub {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+}
+
+.tx-actions-col {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Detail Modal */
+.tx-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  padding: 16px;
+}
+
+.tx-modal-card {
+  width: min(980px, 100%);
+  max-height: 92vh;
+  overflow-y: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 32px 36px;
+}
+
+.tx-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tx-modal-amount-hero {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 12px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.tx-modal-amount {
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.tx-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 500px) {
+  .tx-modal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tx-modal-item {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+}
+
+.tx-modal-item-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.03em;
+}
+
+.tx-modal-item-val {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  word-break: break-all;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}

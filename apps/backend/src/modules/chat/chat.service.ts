@@ -253,16 +253,36 @@ export async function createDirectConversation(params: {
   recipientId: string;
   subject: string;
 }) {
-  if (params.userId === params.recipientId) {
-    throw new InvalidMessageError("Cannot start conversation with yourself.");
-  }
+  const query = params.recipientId.trim();
 
-  const recipient = await prisma.user.findUnique({
-    where: { id: params.recipientId },
+  // Normalize Ethiopian phone number format if applicable
+  const normalizedPhone = query.startsWith("0")
+    ? `+251${query.slice(1)}`
+    : query.startsWith("251")
+    ? `+${query}`
+    : query;
+
+  // Find recipient by id, email (case-insensitive), phone, or ucid
+  const recipient = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { id: query },
+        { email: { equals: query, mode: "insensitive" } },
+        { phone: query },
+        { phone: normalizedPhone },
+        { ucid: query },
+      ],
+      isGuestContact: false,
+    },
     select: USER_CARD_SELECT,
   });
+
   if (!recipient) {
     throw new InvalidMessageError("Recipient user not found.");
+  }
+
+  if (params.userId === recipient.id) {
+    throw new InvalidMessageError("Cannot start conversation with yourself.");
   }
 
   const subject = params.subject.trim();
@@ -275,7 +295,7 @@ export async function createDirectConversation(params: {
     where: {
       AND: [
         { participants: { some: { userId: params.userId } } },
-        { participants: { some: { userId: params.recipientId } } },
+        { participants: { some: { userId: recipient.id } } },
         { assignedStaffId: null },
       ],
     },
@@ -299,9 +319,16 @@ export async function createDirectConversation(params: {
     const otherParticipant =
       existing.participants.find((p: { userId: string; user: typeof recipient }) => p.userId !== params.userId)?.user ?? null;
     return {
-      ...existing,
-      otherParticipant,
+      id: existing.id,
+      subject: existing.subject,
+      status: existing.status,
+      createdAt: existing.createdAt,
+      updatedAt: existing.updatedAt,
       latestMessage: existing.messages[0] ?? null,
+      otherParticipant,
+      isSupport: false,
+      unread: false,
+      assignedStaff: null,
     };
   }
 
@@ -310,7 +337,7 @@ export async function createDirectConversation(params: {
       creatorId: params.userId,
       subject,
       participants: {
-        create: [{ userId: params.userId }, { userId: params.recipientId }],
+        create: [{ userId: params.userId }, { userId: recipient.id }],
       },
     },
     include: {
@@ -329,14 +356,34 @@ export async function createDirectConversation(params: {
     eventType: "DIRECT_CONVERSATION_CREATED",
     entityType: "Conversation",
     entityId: conversation.id,
+    metadata: {
+      recipientId: recipient.id,
+      subject,
+    },
+  });
+
+  sendToUser(recipient.id, "chat:new_conversation", {
+    conversationId: conversation.id,
+    subject: conversation.subject,
+    status: conversation.status,
+    requesterId: params.userId,
+    createdAt: conversation.createdAt,
   });
 
   const otherParticipant =
     conversation.participants.find((p: { userId: string; user: typeof recipient }) => p.userId !== params.userId)?.user ?? null;
+
   return {
-    ...conversation,
-    otherParticipant,
+    id: conversation.id,
+    subject: conversation.subject,
+    status: conversation.status,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
     latestMessage: null,
+    otherParticipant,
+    isSupport: false,
+    unread: false,
+    assignedStaff: null,
   };
 }
 

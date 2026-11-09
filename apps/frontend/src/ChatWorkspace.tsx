@@ -42,6 +42,7 @@ interface ChatWorkspaceProps {
   user?: MeResponse;
   role?: "CLIENT" | "FREELANCER";
   onNavigateToContracts?: () => void;
+  initialConversationId?: string | null;
 }
 
 export function ChatWorkspace({
@@ -49,12 +50,13 @@ export function ChatWorkspace({
   user,
   role = "CLIENT",
   onNavigateToContracts,
+  initialConversationId,
 }: ChatWorkspaceProps) {
   const currentUserId = userId || user?.id || "";
 
   // Conversation & message state
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(initialConversationId || null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -113,7 +115,9 @@ export function ChatWorkspace({
     try {
       const convList = await api.getChatConversations();
       setConversations(convList);
-      if (convList.length > 0 && !activeConversationId) {
+      if (initialConversationId && convList.some((c) => c.id === initialConversationId)) {
+        setActiveConversationId(initialConversationId);
+      } else if (convList.length > 0 && !activeConversationId) {
         setActiveConversationId(convList[0].id);
       }
     } catch (err) {
@@ -124,6 +128,13 @@ export function ChatWorkspace({
   useEffect(() => {
     void loadConversations();
   }, []);
+
+  useEffect(() => {
+    if (initialConversationId) {
+      setActiveConversationId(initialConversationId);
+      setShowMobileChatView(true);
+    }
+  }, [initialConversationId]);
 
   // A short visible-tab fallback keeps messages fresh while a WebSocket is
   // reconnecting or a proxy does not support upgrades.

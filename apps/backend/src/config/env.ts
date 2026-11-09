@@ -271,10 +271,10 @@ const EnvSchema = z.object({
   PAYMENT_RECONCILE_GIVE_UP_HOURS: z.coerce.number().default(3),
   PAYMENT_RECONCILE_BATCH_SIZE: z.coerce.number().default(50),
 
-  // Take-rate — proposed 10% total, split evenly. Confirm final % with the
-  // Phase 0 decision log before this stops being a placeholder default.
-  PLATFORM_FEE_RATE_CLIENT: z.coerce.number().default(0.05),
-  PLATFORM_FEE_RATE_FREELANCER: z.coerce.number().default(0.05),
+  // Take-rate — unified 7% general platform fee across the platform.
+  // 0% client deposit surcharge; 7% deducted from milestone release.
+  PLATFORM_FEE_RATE_CLIENT: z.coerce.number().default(0),
+  PLATFORM_FEE_RATE_FREELANCER: z.coerce.number().default(0.07),
 
   // TMS / AML rule thresholds — aligned with the Master Design document
   // (§11.4 Transaction monitoring red flags) as of the 2026-08-26 unification.

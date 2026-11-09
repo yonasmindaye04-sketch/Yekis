@@ -199,6 +199,31 @@ export interface Milestone {
   releasedAt: string | null;
 }
 
+export interface TransactionMovement {
+  id: string;
+  journalId?: string;
+  date: string;
+  title: string;
+  description: string;
+  category: "TOP_UP" | "PAYOUT" | "ESCROW_LOCK" | "MILESTONE_RELEASE" | "REFUND" | "OTHER";
+  direction: "IN" | "OUT";
+  amountMinor: number;
+  feeMinor: number;
+  netAmountMinor: number;
+  currency: string;
+  status: "COMPLETED" | "PENDING" | "PROCESSING" | "FAILED" | "REJECTED";
+  paymentRail?: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "INTERNAL_WALLET" | null;
+  reference?: string;
+  accountIdentifier?: string;
+  contractId?: string;
+  contractTitle?: string;
+  counterpartyName?: string;
+  counterpartyRole?: "CLIENT" | "FREELANCER" | "SYSTEM";
+  milestoneId?: string;
+  milestoneTitle?: string;
+  receiptUrl?: string;
+}
+
 export interface Contract {
   id: string;
   jobId: string;
@@ -213,6 +238,22 @@ export interface Contract {
   createdAt: string;
   job: { id: string; title: string; status: string };
   milestones: Milestone[];
+  client?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  };
+  freelancer?: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    displayName?: string | null;
+    avatarUrl?: string | null;
+  };
 }
 
 export interface Dispute {
@@ -1247,6 +1288,34 @@ class ApiClient {
   // Wallet / Top-ups
   async getWallet(): Promise<WalletResponse> {
     return this.request("/api/v1/escrow/wallet");
+  }
+
+  async getTransactionMovements(): Promise<{ movements: TransactionMovement[]; total: number }> {
+    return this.request("/api/v1/escrow/wallet/transactions");
+  }
+
+  async getPayouts(params?: { page?: number; limit?: number }): Promise<{
+    items: Array<{
+      id: string;
+      amountMinor: number;
+      feeMinor: number;
+      netAmountMinor: number;
+      provider: string;
+      status: string;
+      payoutAccountIdentifier: string;
+      errorMessage: string | null;
+      createdAt: string;
+      settledAt: string | null;
+    }>;
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const query = qs.toString();
+    return this.request("/api/v1/escrow/payouts" + (query ? "?" + query : ""));
   }
 
   async getTopUpRequests(): Promise<TopUpRequest[]> {

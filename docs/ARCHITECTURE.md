@@ -1,6 +1,8 @@
 # Architecture
 
-Last updated: 2026-11-07
+Last updated: 2026-11-09
+
+> **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **625** keys (43 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
 
 ## System Overview
 
@@ -13,8 +15,9 @@ flowchart TB
   A --> P["PostgreSQL via Prisma"]
   A --> R["Redis + BullMQ"]
   A --> O["MinIO / S3-compatible object store"]
+  A --> S["OpenSearch (optional index, PostgreSQL fallback)"]
   A --> X["Fayda, PEP, Telebirr, CBE, M-Pesa, SMS and Telegram adapters"]
-  R --> W["Auto-release, gig-auto-release, KYC refresh, TMS scan, notifications, withholding-report workers"]
+  R --> W["9 workers: auto-release, gig-auto-release, review-reveal, featured-refresh, payment-reconcile, KYC refresh, TMS scan, notifications, withholding-remittance"]
   W --> P
   W --> X
 ```
@@ -26,7 +29,7 @@ The API is the authority for roles, KYC gates, contract signatures, state transi
 | Path | Responsibility |
 |---|---|
 | `apps/frontend/src` | Browser/Telegram UI, API client, role-aware workspaces |
-| `apps/frontend/src/pages/ops/` | Operations Console v2 — single staff console (19 pages, command palette, RBAC-driven nav) |
+| `apps/frontend/src/pages/ops/` | Operations Console v2 — single staff console (23 page components, command palette, RBAC-driven nav) |
 | `apps/backend/src/app.ts` | Middleware order and route registration |
 | `apps/backend/src/modules` | Domain routes, services, provider adapters |
 | `apps/backend/src/queue` | BullMQ queues and workers |
@@ -64,7 +67,7 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 | `jobs` | `/api/v1/jobs` | Job search/creation, proposals, atomic serializable proposal decisions |
 | `contracts` | `/api/v1/contracts` | Contract creation, PDF storage, party access, independent signatures, 7-day cooling-off cancellation |
 | `escrow` | `/api/v1/escrow` | Wallet-first milestone funding, delivery submission, client acceptance, auto-release, wallet balance |
-| `topups` | `/api/v1/wallet/topups` | Manual top-up submission & receipt attachment, automated checkout (Telebirr/CBE/M-Pesa), staff approval queue |
+| `topups` | `/api/v1/wallet/topups` | Manual top-up submission & receipt attachment, automated checkout (Telebirr live; CBE/M-Pesa stubbed), staff approval queue |
 | `webhooks` | `/api/v1/webhooks` | Signed Telebirr and CBE provider callback ingestion (RSA-PSS + HMAC-SHA256) |
 | `disputes` | `/api/v1/disputes` | 5-stage dispute lifecycle (negotiation → evidence → mediation → arbitration → resolved), evidence bundles, staff resolution |
 | `gigs` | `/api/v1/gigs` | Fiverr-style gig creation (packages/tiers), ordering, funding, delivery, revision loop, acceptance, reviews, gig disputes |
@@ -94,6 +97,8 @@ TIER_1 VERIFIED -> Tier 2 request -> UNDER_REVIEW -> TIER_2 VERIFIED | REJECTED
 ```
 
 The daily worker marks overdue records with `periodicReviewPending`. It does not change `VERIFIED` to `UNDER_REVIEW`, avoiding accidental loss of active access.
+
+**MVP scope (2026-11-09):** the three-tier model exists in the schema (`KycTier` = `TIER_1` / `TIER_2` / `TIER_3`) and in the KYC module, but the MVP launches **simplified single-tier**: Tier 1 (National ID / Fayda) unlocks every core action, and the withdrawal gate resolves to `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")` (`src/modules/escrow/escrow.routes.ts:322`). With `TIN_FEATURE_ENABLED=false` (the default), Tier 2/TIN is deferred to Phase 4. See `docs/DECISIONS.md` → *Holding TIN Requirement for MVP*.
 
 ### Job And Proposal
 
@@ -128,6 +133,8 @@ DISPUTED -> RELEASED | REFUNDED | PARTIAL_REFUND
 
 Submitting a milestone schedules a warning at 24 hours before the deadline and a release at `AUTO_RELEASE_WINDOW_DAYS` (7 calendar days, matching Service Agreement Clause 2.2(b)). Explicit client acceptance cancels those jobs. Conditional database updates make release/refund paths idempotent under retries or concurrent requests. A separate 7-day statutory cooling-off guard (`Contract.cancellableUntil`, ECA Proclamation 1205/2020) additionally blocks auto-release while still in force — cooling-off currently wins over deemed acceptance, pending legal validation (ESC-002).
 
+> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.worker.ts:54-64` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
+
 ### Dispute
 
 ```text
@@ -151,6 +158,24 @@ Telebirr B2C disbursement is live; deterministic sandbox simulation is used when
 ## Financial Integrity Controls
 
 - The server derives milestone value, fees, and withholding; clients cannot submit authoritative totals.
+- Fee and tax constants live in `apps/backend/src/config/env.ts` and are applied in `apps/backend/src/modules/escrow/fees.ts`:
+
+  | Constant | Value | Note |
+  |---|---|---|
+  | `PLATFORM_FEE_RATE_FREELANCER` | `0.07` | Deducted from the freelancer's gross on release (7% general platform fee) |
+  | `PLATFORM_FEE_RATE_CLIENT` | `0` | No client deposit surcharge (unified 7% rule, 2026-11-09) |
+  | `WITHHOLDING_THRESHOLD_MINOR` | `1_000_000` (10,000 ETB) | Withholding only applies at/above this gross |
+  | `WITHHOLDING_RATE_WITH_TIN` | `0.03` | Requires `TIN_FEATURE_ENABLED=true` |
+  | `WITHHOLDING_RATE_WITHOUT_TIN` | `0.30` | Requires `TIN_FEATURE_ENABLED=true` |
+  | `TIN_FEATURE_ENABLED` | `false` (default) | **Withholding is 0 at launch**; the freelancer keeps 93% of gross |
+  | `AUTO_RELEASE_WINDOW_DAYS` | `7` | Matches Master Design Clause 2.2(b) — the Roadmap's "5 days" is stale |
+  | `VAT_THRESHOLD_MINOR` | `45_000_000` (450,000 ETB) | Finance alert threshold; the Playbook's "ETB 1,000,000" is stale |
+  | `VAT_RATE` | `0.15` | `VAT_REGISTERED` defaults to `false` |
+  | `MINIMUM_CONTRACTING_AGE` | `18` | Enforced at registration (`auth.service.ts:76`) |
+  | `COOLING_OFF_HOURS` | `24` | **Defined but unused** — see the verified gap note in the Escrow section |
+  | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `1h` / `30d` | The Playbook's "24h access / 7d refresh" is stale |
+  | `PAYMENT_RECONCILE_CRON` | `*/10 * * * *` | Payment-side reconciliation sweep every 10 minutes |
+
 - `contractId` and `milestoneId` are checked together when funding.
 - A partial unique database index prevents multiple pending payment attempts for one milestone.
 - Provider transaction IDs are unique and webhook transitions are idempotent.
@@ -230,12 +255,15 @@ sequenceDiagram
 |---|---|---|
 | `auto-release` | Milestone submission | Schedules 24h warning before deadline and conditionally releases eligible escrow after 7 days |
 | `gig-auto-release` | Gig order delivery submission | Same 7-day auto-release logic for gig orders; gig dispute cancels the job |
+| `review-reveal` | Scheduled sweep | Reveals double-blind contract reviews older than 14 days by setting `revealedAt` |
+| `featured-refresh` | Scheduled sweep / manual trigger from the ops console | Recomputes the featured talent carousel (staff-pinned, top-rated, recently verified) |
+| `payment-reconcile` | Scheduled sweep (default `PAYMENT_RECONCILE_STALE_MINUTES` threshold) | Webhook safety net: re-queries the provider transaction-status API for escrow funding transactions still `PENDING` past the stale threshold and feeds the result through the idempotent `handlePaymentWebhook` path. Telebirr only — CBE is skipped until its client implements `queryPaymentStatus` |
 | `kyc-refresh` | Daily schedule | Marks periodic reviews due (`periodicReviewPending = true`) without revoking verified access |
 | `notifications` | Domain events | Persists in-app notices and attempts configured SMS/Telegram delivery |
-| `tms-scan` | Every 15 minutes | Re-runs structuring/velocity/round-amounts rules; sweeps flags with expired 24h STR SLA clock; raises `STR_SLA_BREACH` audit events |
-| `withholding-report` | Monthly schedule (BullMQ cron) | Generates monthly withholding tax remittance reports (`WithholdingRemittanceReport`) |
+| `tms-scan` | Every 15 minutes (`TMS_SCAN_CRON`, default `*/15 * * * *`) | Re-runs structuring/velocity/round-amounts rules; sweeps flags with expired 24h STR SLA clock; raises `STR_SLA_BREACH` audit events |
+| `withholding-remittance` | Monthly schedule (BullMQ cron) | Generates monthly withholding tax remittance reports (`WithholdingRemittanceReport`) |
 
-Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
+All nine queues are declared in `apps/backend/src/queue/queues.ts` (eight) and `apps/backend/src/queue/withholdingRemittance.worker.ts` (one). Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
 
 ## Multilingual System
 
@@ -248,7 +276,9 @@ The platform supports four languages natively:
 | `om` | Afaan Oromoo | Latin |
 | `ti` | Tigrigna | Fidel (Ge'ez) |
 
-**Frontend (314 keys):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. `Yekis_translations.csv` is the offline parity ledger.
+**Frontend (625 keys, 43 nested objects):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. All four languages (`en`, `am`, `om`, `ti`) carry an **identical 625-key leaf set** with 43 nested objects each (verified 2026-11-09 by evaluating the exported `translations` object). `Yekis_translations.csv` is the offline parity ledger.
+
+> **Orphaned strings (2026-11-09):** `marketing.stats` (8 keys per language) still exists in `i18n.ts`, but the `StatsSection` component was removed from `LandingPageV2.tsx` — the keys and their `.v2-stats*` CSS (`landing-v2.css:441-653`) are dead. They are retained so the marketing copy is not lost, but they render nothing today.
 
 **Telegram Bot (243 keys):** Locale files at `apps/backend/src/modules/bot/locales/{en,am,om,ti}.json`. All 4 languages have exact 100% key parity. `getBotTranslation()` drives outbound push notifications so users receive localized alerts.
 
@@ -269,27 +299,67 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 - `AuditLog` is append-only by application convention and supported by database grants/pgaudit initialization.
 - Secrets are environment validated and must not be committed. Server refuses to boot in production with a mocked PEP provider.
 
+### Verified compliance gaps (2026-11-09)
+
+These are **not** implemented today. They are recorded here so the architecture document does not imply a control the code does not have.
+
+| Control required by the documents | Actual code state |
+|---|---|
+| 10-year immutable retention of audit, transaction, dispute, and STR records | `AuditLog` (`schema.prisma:686-710`) has **no retention/expiry column and no purge job**. There is no WORM module and no append-only partition enforcement in application code — "append-only" is convention only, and pgaudit is enabled by the `infra/postgres` image but its grants are not verified after deployment |
+| PDPP data-subject rights (access, portability, erasure) | **No tooling exists.** Grepping `apps/backend/src` for `exportData`, `downloadMyData`, `deleteAccount`, `erasure`, or `portability` returns zero matches. There is no admin erasure tool and no "delete my data" route |
+| 72-hour ECA breach notification workflow | `apps/backend/src/lib/breachAlert.ts` writes a `logger.fatal(...)` record only. The SMS/Telegram/email dispatch to the incident-response team is **commented out** (`breachAlert.ts:34-36`), so the alert is log-only |
+| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:322`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). Note `src/middleware/requireKycVerified.ts` is dead code — it has zero importers; the live guard is `hardBlock.ts` |
+| Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts:35`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped |
+
 ## External Boundaries
 
 | Boundary | Local behavior | Production requirement |
 |---|---|---|
 | Fayda | Mock verification (eSignet OIDC/PAR stub) | Formal integration and approved credentials |
 | PEP/Sanctions | Stub screening | Approved sanctions/PEP source; server refuses production boot with mock |
-| Payment collection (C2B) | Telebirr C2B Web Checkout (RSA-PSS) + CBE HMAC adapter; M-Pesa stub | Sandbox/live mapping and reconciliation; CBE webhook scheme confirmation (PAY-004) |
+| Payment collection (C2B) | **Telebirr C2B Web Checkout (RSA-PSS) only.** `cbe.client.ts` and `mpesa.client.ts` always throw `PaymentProviderUnavailableError` | Sandbox/live mapping and reconciliation; CBE webhook scheme confirmation (PAY-004); M-Pesa integration path undecided |
 | Payout (B2C) | Telebirr B2C live with deterministic sandbox simulation; automatic wallet rollback on provider refusal | Production credentials, monitoring, reconciliation |
 | SMS | Worker client | Credentials, templates, delivery monitoring |
 | Telegram | Grammy bot + Mini App init-data verification | Production push verification, account linking |
 | STR | Records a human filing; does not submit to FIC | External human/regulatory process; confirm FIC operating procedure |
 
+### Payment Provider Enum vs. Live Rails
+
+The Prisma `PaymentProvider` enum (`apps/backend/prisma/schema.prisma:98-103`) still contains four values — `TELEBIRR`, `CHAPA`, `CBE_BIRR`, `M_PESA` — but only **one** is a live rail:
+
+| Enum value | App-layer status | Evidence |
+|---|---|---|
+| `TELEBIRR` | **Live** | `src/modules/escrow/providers/telebirr.client.ts` implements initiate/verify/query + B2C payout |
+| `CBE_BIRR` | Stub | `src/modules/escrow/providers/cbe.client.ts` always throws `PaymentProviderUnavailableError` |
+| `M_PESA` | Stub | `src/modules/escrow/providers/mpesa.client.ts` always throws `PaymentProviderUnavailableError`; gated by `MPESA_CHECKOUT_ENABLED` (`env.ts:98`) |
+| `CHAPA` | **Rejected** | No client adapter exists. The app-layer union `PaymentProvider` (`src/schemas.ts:59`) and the escrow route enum (`src/modules/escrow/escrow.routes.ts:152`) list only `TELEBIRR`, `CBE_BIRR`, `M_PESA`, so a `CHAPA` request is a validation error. The enum value is retained in PostgreSQL as an inert row until a PG17+ host can run `DROP VALUE` (see `docs/DATABASE.md`) |
+
+This is a deliberate split: the **database enum is historical residue** from the 2026-08-26 PAY-002 removal, while the **application surface is the authoritative list**. Master Design Decision Log `PAY-003` marks *M-Pesa = REMOVED*; the codebase still ships an M-Pesa client stub, the enum value, the `schemas.ts` union member, and top-up route support. That divergence is recorded in `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and needs a product decision (remove vs. finish).
+
 ## Local Topology
 
-| Service | Address |
-|---|---|
-| Frontend | `http://127.0.0.1:3000` |
-| API | `http://127.0.0.1:4000` |
-| PostgreSQL | `localhost:5433` -> container `5432` |
-| Redis | `localhost:6379` |
-| MinIO API | `http://localhost:9000` |
-| MinIO console | `http://localhost:9001` |
+| Service | Address | Source of truth |
+|---|---|---|
+| Frontend (Vite dev server) | `http://127.0.0.1:3000` | `apps/frontend/vite.config.ts` (`server.port = 3000`) and root `package.json` (`dev` script passes `--port=3000`). **Not 5173.** `vite preview` serves `4173` |
+| API | `http://127.0.0.1:4000` | `apps/backend/src/server.ts`; the Vite dev server proxies `/api` (HTTP + WebSocket) to it |
+| PostgreSQL | `localhost:5433` -> container `5432` | `docker-compose.yml` |
+| Redis | `localhost:6379` | `docker-compose.yml` |
+| MinIO API | `http://localhost:9000` | `docker-compose.yml` |
+| MinIO console | `http://localhost:9001` | `docker-compose.yml` |
+| OpenSearch | `http://localhost:9200` | `docker-compose.yml`; optional — `searchIndex.service.ts` falls back to PostgreSQL when unreachable |
+
+The dev server binds `0.0.0.0` by default (`VITE_DEV_HOST` overrides) and ships an explicit `server.fs.deny` list that blocks `.env`, private-key extensions, `backups/**`, `*.dump`, `*.sql`, `uploads/**`, and `docs/security/**` from being served through `/@fs/`.
 
 See `SETUP.md` for exact commands.
+
+## Continuous Integration
+
+Two GitHub Actions workflows exist at `.github/workflows/`:
+
+| Workflow | What it actually does |
+|---|---|
+| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, and a frontend job that runs the production build. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
+| `deploy.yml` | **Placeholder only.** The workflow file exists but its deployment steps are a comment ("Deploy steps would go here"). No image is built, pushed, or deployed |
+
+> The `deploy.yml` placeholder is the reason the roadmap's Phase 0 DoD "auto-run tests on every PR" is now satisfied for **tests** but the release pipeline is still unbuilt. Documented in `docs/ROADMAP_ALIGNMENT.md`.
+

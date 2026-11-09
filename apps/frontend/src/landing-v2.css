@@ -39,8 +39,8 @@
   /* hero — floating paths (paint only) */
   --v2-path-a: #14b8a6;
   --v2-path-b: #22c55e;
-  --v2-pop: #22c55e;
-  --v2-pop-glow: rgba(34, 197, 94, 0.55);
+  --v2-pop: #a78bfa;
+  --v2-pop-glow: rgba(167, 139, 250, 0.55);
   --v2-glow-1: rgba(34, 197, 94, 0.14);
   --v2-glow-2: rgba(20, 184, 166, 0.11);
 
@@ -111,8 +111,8 @@
   /* hero — floating paths (paint only) */
   --v2-path-a: #0d9488;
   --v2-path-b: #16a34a;
-  --v2-pop: #16a34a;
-  --v2-pop-glow: rgba(22, 163, 74, 0.35);
+  --v2-pop: #a78bfa;
+  --v2-pop-glow: rgba(167, 139, 250, 0.45);
   --v2-glow-1: rgba(22, 163, 74, 0.14);
   --v2-glow-2: rgba(13, 148, 136, 0.12);
 
@@ -381,6 +381,7 @@
   align-items: center;
 }
 .yk-v2 .v2-hero-title {
+  position: relative;
   margin: 0;
   perspective: 900px;
   font-family: "Big Shoulders Display", var(--v2-font-head);
@@ -408,12 +409,7 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 }
 /* after the entrance the animation is dropped so the hover transition
    owns the transform (a running/filled animation would win over it) */
-.yk-v2 .v2-hero-title.settled .v2-letter { animation: none; opacity: 1; transform: none; }
-.yk-v2 .v2-hero-title:hover .v2-letter {
-  transform: translateY(-0.18em) scale(1.22); /* the "pop" */
-  color: var(--v2-pop);
-  text-shadow: 0 0 28px var(--v2-pop-glow);
-}
+.yk-v2 .v2-hero-title.settled .v2-letter { animation: none; opacity: 1; transform: none; transition: none; }
 /* Grounded subheadline */
 .yk-v2 .v2-hero-sub {
   max-width: 680px;

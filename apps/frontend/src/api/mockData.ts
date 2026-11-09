@@ -2233,12 +2233,13 @@ class MockStore {
     }
     if ((cleanPath === "/escrow/fund" || cleanPath === "/escrow/fund-from-wallet") && method === "POST") {
       const milestoneId = String(parsedBody?.milestoneId || "ms-207");
+      const nowIso = new Date().toISOString();
       this.milestones = this.milestones.map((m) => {
         if (m.id === milestoneId) {
           if (this.walletMinor >= m.amountMinor) {
             this.walletMinor -= m.amountMinor;
           }
-          return { ...m, escrowState: "ESCROW_HELD" };
+          return { ...m, escrowState: "RELEASED", releasedAt: nowIso };
         }
         return m;
       });

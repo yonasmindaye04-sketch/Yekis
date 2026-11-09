@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
 import { HandWrittenTitle } from "./components/HandWrittenTitle";
+import { ProximityPopTitle } from "./components/ProximityPopTitle";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
@@ -290,47 +291,28 @@ function Reveal({
   );
 }
 
-/* Per-letter spring title with hover "pop" (Floating Paths hero) */
+/* Per-letter title with interactive proximity pop animation */
 function SpringTitle({
   text,
   settled,
   className,
+  stageRef,
 }: {
   text: string;
   settled: boolean;
   className?: string;
+  stageRef?: React.RefObject<HTMLElement | null>;
 }) {
-  const words = text.split(" ");
-  let idx = 0;
   return (
-    <h1
-      className={`v2-hero-title${settled ? " settled" : ""}${className ? ` ${className}` : ""}`}
-      aria-label={text}
-    >
-      {words.map((word, wi) => (
-        <span className="v2-word" key={`${word}-${wi}`} aria-hidden="true">
-          {word.split("").map((ch) => {
-            const myIdx = idx++;
-            return (
-              <span
-                className="v2-letter"
-                key={`${ch}-${myIdx}`}
-                style={
-                  {
-                    "--d": `${(myIdx * 0.007).toFixed(3)}s`,
-                    "--i": myIdx,
-                  } as React.CSSProperties
-                }
-              >
-                {ch}
-              </span>
-            );
-          })}
-        </span>
-      ))}
-    </h1>
+    <ProximityPopTitle
+      text={text}
+      settled={settled}
+      className={className}
+      stageRef={stageRef}
+    />
   );
 }
+
 
 /* Avatar */
 function V2Avatar({
@@ -436,6 +418,7 @@ function FloatingPaths({ position }: { position: 1 | -1 }) {
 
 function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => void }) {
   const { t } = useI18n();
+  const heroRef = useRef<HTMLElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
@@ -472,7 +455,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
   }, []);
 
   return (
-    <section className="v2-hero" id="top">
+    <section className="v2-hero" id="top" ref={heroRef}>
       {/* ambient glow orbs */}
       <div className="v2-fp-glow v2-fp-glow-one" />
       <div className="v2-fp-glow v2-fp-glow-two" />
@@ -486,7 +469,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
       {/* hero content */}
       <div className="v2-hero-inner" ref={innerRef}>
         {/* Dynamic Spring Title */}
-        <SpringTitle text={t.marketing.hero.title} settled={settled} />
+        <SpringTitle text={t.marketing.hero.title} settled={settled} stageRef={heroRef} />
 
         {/* Grounded Subheadline (Zero AI Slop) */}
         <p className="v2-hero-sub">
@@ -851,7 +834,7 @@ function FeesSection() {
       <HandWrittenTitle
         eyebrow="Yekis Jobs"
         title="Make ideas visible."
-        subtitle="Where verified Ethiopian talent and ambitious teams build together — protected by escrow from day one."
+        subtitle="Where verified Ethiopian talent and ambitious teams build together."
       />
     </section>
   );

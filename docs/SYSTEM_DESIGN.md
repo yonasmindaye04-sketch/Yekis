@@ -915,7 +915,7 @@ The client must first load their in-platform wallet with real ETB. They transfer
 Both the client and freelancer must digitally accept the contract (`POST /api/v1/contracts/:id/accept`) before any escrow can be funded. The service enforces this: `fundMilestone` and `fundMilestoneFromWallet` both throw `ContractNotFullyExecutedError` if either `clientAcceptedAt` or `freelancerAcceptedAt` is missing. The moment the **second signature** is recorded, the contracts service automatically attempts to fund all `PAYMENT_PENDING` milestones from the client's wallet in a single atomic transaction (wallet debit + all milestone state updates in one `prisma.$transaction`). If the client wallet has insufficient balance, a `"topup-required"` notification is sent instead and the client must fund manually.
 
 **Phase 3 — Escrow Holding (Funds Locked)**
-When a milestone is funded — either automatically on contract signing, or manually via `POST /api/v1/escrow/fund-from-wallet` — the client is charged `gross + platform fee from client` (currently **gross × 1.05**). This full charge is atomically deducted from their wallet, and the milestone transitions to `ESCROW_HELD`. The freelancer receives a `"escrow-funded"` push notification signalling they can begin work. A TMS structuring check (`runPostFundingChecks`) runs non-blockingly after the state transition to flag any suspicious funding patterns.
+When a milestone is funded — either automatically on contract signing, or manually via `POST /api/v1/escrow/fund-from-wallet` — the client deposits the gross milestone amount (zero deposit surcharge, `PLATFORM_FEE_RATE_CLIENT = 0`). This charge is atomically deducted from their wallet, and the milestone transitions to `ESCROW_HELD`. The freelancer receives a `"escrow-funded"` push notification signalling they can begin work. A TMS structuring check (`runPostFundingChecks`) runs non-blockingly after the state transition to flag any suspicious funding patterns.
 
 **Phase 4 — Work Delivery & Review Window**
 The freelancer submits work via `POST /api/v1/escrow/milestones/:id/submit`. The milestone moves to `SUBMITTED_FOR_REVIEW` and two BullMQ jobs are scheduled with deterministic job IDs:
@@ -930,7 +930,7 @@ Whether triggered by the client's explicit acceptance or the auto-release timer,
 2. Freelancer's `wallet.balanceMinor` incremented by `freelancerNetMinor`.
 3. Freelancer's lifetime `user.totalEarnedNetMinor` counter incremented (this drives the public profile "total earned" figure independently of the spendable wallet balance).
 
-The **freelancer's net amount** is: `gross − platform fee from freelancer (5%) − withholding tax`. Withholding tax only applies when the gross milestone amount meets or exceeds `WITHHOLDING_THRESHOLD_MINOR` (ETB 10,000), with a lower rate (3%) for freelancers who have a TIN on file and a higher rate (30%) for those without — per Ethiopian tax law. After release, `checkAndUpdateContractCompletion()` checks whether every milestone on the contract has reached a terminal state (`RELEASED`, `REFUNDED`, or `PARTIAL_REFUND`) and marks the contract `COMPLETED` if so.
+The **freelancer's net amount** is: `gross − platform fee (7%)`. Under the MVP launch policy, statutory withholding tax is held at 0% pending formal tax remittance procedures, so freelancers retain a 93% net payout with zero withholding tax deduction. After release, `checkAndUpdateContractCompletion()` checks whether every milestone on the contract has reached a terminal state (`RELEASED`, `REFUNDED`, or `PARTIAL_REFUND`) and marks the contract `COMPLETED` if so.
 
 **Phase 5b — Dispute Path**
 If either party calls `POST /api/v1/disputes` while the milestone is in `ESCROW_HELD`, `WORK_IN_PROGRESS`, or `SUBMITTED_FOR_REVIEW`, the milestone transitions to `DISPUTED` and both BullMQ jobs are cancelled immediately. Funds remain frozen in the escrow ledger (no wallet entries are written) while a three-stage mediation process runs (Negotiation → Admin Review → Mediation). A staff mediator resolves the dispute with one of three outcomes: `RELEASE_TO_FREELANCER` (calls `releaseMilestoneFunds`), `REFUND_TO_CLIENT` (calls `refundMilestoneToClient`, crediting the client's wallet), or `PARTIAL_SPLIT` (calls both with split amounts, milestone → `PARTIAL_REFUND`).
@@ -970,12 +970,10 @@ stateDiagram-v2
 
 #### Financial Split Logic (`calculateFees` in `fees.ts`)
 * **Gross Milestone Amount:** $M$
-* **Client Total Charge:** $M \times (1 + \text{Client Fee Rate})$, where Client Fee Rate = 5% (`PLATFORM_FEE_RATE_CLIENT = 0.05`).
-* **Platform Fee from Freelancer:** $M \times \text{Freelancer Fee Rate}$, where Freelancer Fee Rate = 5% (`PLATFORM_FEE_RATE_FREELANCER = 0.05`).
-* **Withholding Tax:** If $M \ge \text{ETB 10,000}$ (`WITHHOLDING_THRESHOLD_MINOR = 1000000`):
-  * Freelancer with TIN: $M \times 3\%$ (`WITHHOLDING_TAX_RATE_WITH_TIN = 0.03`).
-  * Freelancer without TIN: $M \times 30\%$ (`WITHHOLDING_TAX_RATE_WITHOUT_TIN = 0.30`).
-* **Net Credited to Freelancer Wallet:** $M - \text{Freelancer Platform Fee} - \text{Withholding Tax}$.
+* **Client Total Charge:** $M$ (zero client surcharge; `PLATFORM_FEE_RATE_CLIENT = 0`).
+* **Platform Fee from Freelancer:** $M \times 7\%$ (`PLATFORM_FEE_RATE_FREELANCER = 0.07`).
+* **Withholding Tax:** Held at 0% for MVP launch (`TIN_FEATURE_ENABLED = false`).
+* **Net Credited to Freelancer Wallet:** $M - \text{Platform Fee} = M \times 93\%$.
 
 #### Key Flows
 
@@ -992,7 +990,7 @@ sequenceDiagram
 
     Client->>API: POST /api/v1/escrow/fund-from-wallet { milestoneId }
     API->>Service: fundMilestoneFromWallet(clientId, milestoneId)
-    Note over Service: Calculates Client Total Charge (Gross + 5% Fee)<br/>Verifies client.wallet.balanceMinor >= totalCharge
+    Note over Service: Calculates Client Total Charge (Gross + 0% client surcharge)<br/>Verifies client.wallet.balanceMinor >= totalCharge
     Service->>DB: prisma.$transaction([Wallet.decrement(totalCharge), Milestone.update(ESCROW_HELD)])
     Service->>Queue: add("escrow-funded", { freelancerId })
     Service->>TMS: runPostFundingChecks(clientId)
@@ -1360,7 +1358,7 @@ sequenceDiagram
     Client->>API: POST /api/v1/contracts/:id/accept (Sign Agreement)
     Freelancer->>API: POST /api/v1/contracts/:id/accept (Sign Agreement)
     Note over ContractMod: Contract is FULLY EXECUTED
-    ContractMod->>EscrowMod: Auto-Debit Client Wallet for Total Milestone Charge (+5% Fee)
+    ContractMod->>EscrowMod: Auto-Debit Client Wallet for Total Milestone Charge (no client surcharge)
     EscrowMod-->>ContractMod: Milestone State -> ESCROW_HELD
     API->>Freelancer: Notification: Escrow Locked. Work can begin!
 
@@ -1373,7 +1371,7 @@ sequenceDiagram
     %% Acceptance or Dispute Branch
     alt Happy Path: Client Approves Work
         Client->>API: POST /api/v1/escrow/milestones/:id/accept
-        Note over EscrowMod: Calculates 5% Platform Fee + Withholding Tax (3% with TIN / 30% without TIN)<br/>Credits Net Earnings to Freelancer Wallet<br/>Milestone State -> RELEASED
+        Note over EscrowMod: Calculates 7% Platform Fee (Withholding Tax held at 0%)<br/>Credits 93% Net Earnings to Freelancer Wallet<br/>Milestone State -> RELEASED
     else Dispute Branch: Client Raises Dispute
         Client->>API: POST /api/v1/disputes (Dispute Category & Description)
         Note over EscrowMod: Milestone State -> DISPUTED (Escrow Frozen)
@@ -1889,7 +1887,7 @@ All in-thread messages pass through `circumvention.middleware.ts` which strips o
 3. Each party signs independently → `POST /api/v1/contracts/:id/accept`.
 4. Backend records timestamp on `clientAcceptedAt` or `freelancerAcceptedAt`.
 5. **When both have signed (fully executed):**
-   - Backend checks if client wallet has sufficient balance for all milestone charges + 5% fee.
+   - Backend checks if client wallet has sufficient balance for all milestone charges. The client pays **no deposit surcharge** (`PLATFORM_FEE_RATE_CLIENT = 0`); the flat 7% platform fee is deducted from the freelancer's release.
    - If sufficient: atomic transaction deducts wallet balance and sets all milestones to `ESCROW_HELD`.
    - If insufficient: notification queued asking client to top up.
 6. Contract is now `FULLY_EXECUTED` and work can begin.
@@ -1928,8 +1926,8 @@ PAYMENT_PENDING → ESCROW_HELD → SUBMITTED_FOR_REVIEW → RELEASED
 
 *Manual Client Approval:*
 1. Client reviews delivery, clicks Release → `POST /api/v1/escrow/milestones/:id/accept`.
-2. Fee calculation: 5% platform fee deducted + withholding tax (3% with TIN / 30% without TIN if amount ≥ ETB 10,000).
-3. Net amount credited to `Freelancer.wallet.balanceMinor`.
+2. Fee calculation: 7% platform fee deducted (withholding tax held at 0% for MVP).
+3. Net amount (93%) credited to `Freelancer.wallet.balanceMinor`.
 4. Scheduled BullMQ release jobs cancelled.
 
 *Auto-Release:*  
@@ -1939,9 +1937,9 @@ If client takes no action in 5 days, `autoRelease.worker.ts` calls `releaseMiles
 
 | Party | Charge |
 |---|---|
-| Client pays | `Milestone Amount × 1.05` (5% platform add-on) |
-| Freelancer receives | `Milestone Amount − 5% platform fee − withholding tax` |
-| Platform retains | 5% from client + 5% from freelancer + withholding tax |
+| Client pays | `Milestone Amount` (0% deposit surcharge) |
+| Freelancer receives | `Milestone Amount − 7% platform fee` (93% net payout) |
+| Platform retains | 7% general platform fee |
 
 **Files:** `WorkflowWorkspace.tsx` (ContractsWorkspace milestones tab), `apps/backend/src/modules/escrow/`
 

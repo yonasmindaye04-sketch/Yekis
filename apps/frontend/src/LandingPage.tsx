@@ -28,6 +28,7 @@ import { MarketingFooter } from "./MarketingFooter";
 import "./marketing.css";
 import { useScrollReveal } from "./components/motion";
 import Lightfall from "./components/Lightfall";
+import { ProximityPopTitle } from "./components/ProximityPopTitle";
 import { useTheme } from "./theme/ThemeContext";
 
 type LandingPageProps = {
@@ -191,7 +192,7 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
   };
 
   // Wave-stagger delay index per letter (spaces don't consume a slot)
-  let heroCharIndex = 0;
+  // heroCharIndex replaced by ProximityPopTitle
 
   return (
     <main className="landing-page marketing-page">
@@ -221,22 +222,10 @@ export function LandingPage({ onStart, onNavigate }: LandingPageProps) {
           mouseRadius={1.2}
           mouseDampening={0.2}
         />
-        <h1 className="hero-title pop-text" aria-label={HERO_TITLE}>
-          {HERO_TITLE.split("").map((ch, i) =>
-            ch === " " ? (
-              " "
-            ) : (
-              <span
-                key={i}
-                className="pop-char"
-                aria-hidden="true"
-                style={{ "--i": heroCharIndex++ } as React.CSSProperties}
-              >
-                {ch}
-              </span>
-            ),
-          )}
-        </h1>
+        <ProximityPopTitle
+          text={HERO_TITLE}
+          className="hero-title pop-text"
+        />
         <div className="hero-actions">
           <button
             className="btn-primary"

@@ -64,6 +64,26 @@ contractsRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
     include: {
       job: { select: { id: true, title: true, status: true } },
       milestones: { orderBy: { dueDate: "asc" } },
+      client: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
+      freelancer: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          displayName: true,
+          avatarUrl: true,
+        },
+      },
     },
     orderBy: { createdAt: "desc" },
   });

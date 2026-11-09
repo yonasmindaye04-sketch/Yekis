@@ -446,12 +446,30 @@ export async function fundGigOrderFromWallet(params: {
       );
     }
 
+    // Immediately credit freelancer wallet upon gig payment
+    await tx.wallet.upsert({
+      where: { userId: order.gig.freelancerId },
+      create: {
+        userId: order.gig.freelancerId,
+        balanceMinor: fees.freelancerNetMinor,
+      },
+      update: {
+        balanceMinor: { increment: fees.freelancerNetMinor },
+      },
+    });
+
+    await tx.user.update({
+      where: { id: order.gig.freelancerId },
+      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+    });
+
     await tx.gigOrder.update({
       where: { id: order.id },
       data: {
         totalChargeMinor: fees.clientTotalChargeMinor,
-        escrowState: "ESCROW_HELD",
-        status: "ESCROW_HELD",
+        escrowState: "RELEASED",
+        status: "COMPLETED",
+        releasedAt: new Date(),
       },
     });
   });

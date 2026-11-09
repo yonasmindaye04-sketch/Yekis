@@ -1,16 +1,46 @@
-﻿# Yekis_jobs Completeness Checklist
+# Yekis_jobs Completeness Checklist
 
 Last reviewed: 2026-11-09
 
 `[x]` means implemented and verified locally. `[ ]` means production work, broader test coverage, or external validation is still required. This is the authoritative project checklist; `EXTENDED_COMPLETENESS_CHECKLIST.md` points here to prevent status drift.
 
-## Documentation Alignment (2026-11-07)
+## Documentation Alignment (2026-11-09)
+
+Re-verified every documented count, constant, queue, port, and enum against the codebase and against the three governing source documents (*Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, *Master Design, Legal & Compliance Document (Draft 1)*). The documents are the **intent baseline**; the **codebase is the truth** for implementation status. Divergences are recorded, not silently reconciled.
+
+- [x] `docs/ARCHITECTURE.md` updated: ops console 19 → 23 page components, frontend i18n 314 → 625 keys (43 nested objects), background processing 6 → 9 queues, `PaymentProvider` enum-vs-live-rails table, financial-constants table, CI section, verified-compliance-gap table, OpenSearch + `server.fs.deny` in local topology, and the unarmed-cooling-off gap recorded
+- [x] `docs/COMPLIANCE_BLOCKERS.md` rewritten: withholding corrected 2% → **3% / 30%** (and recorded as **0% at launch** behind `TIN_FEATURE_ENABLED=false`), Chapa references replaced with "Telebirr is the only live rail", the stale "withdrawFromWallet is stubbed" claim removed (Telebirr B2C is live), and three missing blockers added (10-year retention/WORM, PDPP data-subject rights, real breach dispatch)
+- [x] `docs/DECISIONS.md` updated: eight new 2026-11-09 entries covering the baseline-vs-truth rule, payment-rail truth, the unarmed cooling-off right, the withholding gate, auto-release/VAT/JWT constants, and CI-vs-deploy; four historical entries annotated as superseded
+- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against the 2026-11-09 scan
+- [x] `docs/DOCUMENT_UNIFICATION_2026-08-26.md` given an explicit 2026-11-09 corrections section (its "CI/CD does not exist" claim was false)
+- [x] `docs/DOCUMENT_UNIFICATION_2026-11-09.md` created — decision-by-decision map of all three documents against the code
+- [x] `docs/ROADMAP_ALIGNMENT.md` created — phase-by-phase map of the Roadmap (Phase 0 → Phase 4) against the code, with a status label per task
+- [x] `docs/CHANGELOG.md`, `docs/PROJECT_CONTEXT.md`, `docs/WALKTHROUGH.md` updated per `.agents/AGENTS.md`
+
+### Verified Gaps Recorded (not silently fixed)
+
+- [ ] **Cooling-off right is not armed** — `Contract.cancellableUntil` is never written by `createContractFromProposal()`, so `cancelDuringCoolingOff()` always rejects with `CoolingOffExpiredError` and the 7-day statutory right is unavailable (`ESC-002`)
+- [ ] **No 10-year record retention / WORM** — `AuditLog` has no retention column and no purge job; there is no WORM module
+- [ ] **No PDPP data-subject rights tooling** — no export, portability, or erasure route or admin tool exists
+- [ ] **Breach alert is log-only** — the SMS/Telegram dispatch in `src/lib/breachAlert.ts` is commented out
+- [ ] **M-Pesa divergence** — Master Design `PAY-003` marks it removed; the code still ships the stub, enum value, schema union member, and top-up route support
+- [ ] **No frontend automated tests** — zero frontend test files and no test runner; the CI frontend job runs build only
+- [ ] **Deploy pipeline is a placeholder** — `.github/workflows/deploy.yml` exists but contains no deploy steps
 
 ## MVP Scope Adjustments (2026-11-09)
 
+- [x] **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul**: Redesigned both the official receipt/voucher sheet (`FiscalDocumentModal.tsx`) and transaction movement detail view (`BrowserWallet.tsx`) to match the Excel invoice design template. Implemented clean spreadsheet styling (`.excel-sheet-*`), prominent `INVOICE` header with `24Billions PVT. · Yekis Technologies PLC` lockup, 2-column metadata grids (To/Date/Invoice#/Customer ID and Shipping Address/Make all checks payable to), classic 7-column metadata band (`Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date`), line-items table with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total`, stacked totals box (`Total Discount | Subtotal | Sales tax | Total`), "Thank you for your business!" footer, bold status indicators with bold colors (no low-opacity pills), and strict theme parity.
+- [x] **Contracts & Escrow Responsive & Accessibility Overhaul**: Added tablet (960px) and mobile (640px/480px) responsive rules in `shadcn-dashboard.css` and `WorkflowWorkspace.tsx`. Enhanced touch targets (42px-44px), smooth momentum tab scrolling, 2x2 tablet KPI grids, fluid action button wrapping, and verified across iPhone (375px), iPad (768px/820px), and desktop (1280px).
+- [x] **Contracts & Escrow Filter Toolbar Layout Restoration**: Fixed the large blank gap bug in `WorkflowWorkspace.tsx` across both Contracts and Escrow Center tabs by introducing `.sh-card.sh-filter-card` and `.sh-filter-card-actions` CSS rules, resetting flex-direction to row, removing buggy `flex: "1 1 280px"` vertical height expansion in flex columns, and ensuring clean responsive mobile stacking.
+- [x] **"Make ideas visible." Editorial Section Design Overhaul & Minimized Replay Delay**: Implemented updated hero banner layout with kicker pill situated cleanly above the stage, `Plus Jakarta Sans` headline typography (`clamp(2.6rem, 7vw, 4.9rem)`), compact 380px stage height, scoped `.yk-v2` stage collision prevention, and minimized animation replay delay down to ~0.53s hold / 2.4s cycle with instant click-to-replay.
+- [x] **Milestone Acceptance & Error UX Parity**: Removed 5-minute fresh auth blocker from client milestone acceptance (`POST /api/v1/escrow/milestones/:milestoneId/accept`); introduced dedicated `errorMessage` state and red `.workflow-message-error` banner across all workflow workspaces to prevent errors displaying as green success messages.
+- [x] **Contract Direct Chat & Credential Lookup**: Added "Chat with Client" / "Chat with Freelancer" button directly on executed contract cards; enabled multi-credential recipient lookup (email, ID, phone, UCID) for direct messaging.
+- [x] **Hero Section Clean Layout Restoration**: Reverted the temporary edge-to-edge expansion back to the clean centered format (`max-width: 1120px`, `clamp(2.6rem, 7.6vw, 7.1rem)` headline, `680px` subheadline) while maintaining the interactive purple proximity pop animation.
 - [x] **Hero Slogan Interactive Proximity Pop Animation**: Real-time cursor-proximity pop effect with smoothstep falloff, lerping, untransformed coordinate caching, purple `#a78bfa` hover glow, theme rest colors, and reduced motion safety in `LandingPageV2.tsx` and `LandingPage.tsx`.
 - [x] **TIN Requirement Held for MVP**: TIN collection and 30% withholding penalty held for launch (`TIN_FEATURE_ENABLED=false`); Tier 1 verified freelancers can withdraw directly.
 - [x] **Simplified Single-Tier Launch**: Tier 1 (National ID / Fayda) unlocks all core actions; Tier 2/TIN deferred to Phase 4.
+- [x] **Clean MVP Verification Presentation**: Eliminated "MVP Launch Notice" banners and hidden deferred Tier 2/TIN cards from standard user view. Progression cleanly displays Account Created -> Verified Identity (bidding, contracts, wallet withdrawals).
+- [x] **Platform-Wide 7% Only General Fee**: Unified the platform fee model to a flat 7% general platform fee (0% client surcharge, 7% deducted upon milestone release), eliminating withholding tax rows and secondary deductions from proposal breakdowns, fee calculators, and ledger allocations. Freelancers keep 93% net payout.
 
 - [x] `docs/ARCHITECTURE.md` updated: 12 missing modules added, 3 missing workers added, system diagram updated, External Boundaries corrected (B2C live), multilingual section added
 - [x] `docs/DATABASE.md` updated: 14 missing models added, full StaffRole enum (7 values), GigStatus/GigOrderStatus enums, ContractStatus.CANCELLED and ProposalStatus.COUNTER_OFFERED added, erDiagram extended
@@ -47,7 +77,7 @@ Last reviewed: 2026-11-09
 - [x] Tier 2 request/review and withdrawal gate
 - [x] Wallet-mismatch compliance hold with no debit
 - [x] Manual top-up submission, staff review, and wallet credit
-- [x] Multi-rail payment choices (Telebirr, Commercial Bank of Ethiopia CBE, and Safaricom M-Pesa) across Instant Checkout, Manual Transfer, and Freelancer Withdrawals
+- [x] Multi-rail payment choices across Instant Checkout, Manual Transfer, and Freelancer Withdrawals — **Telebirr is the only live rail** (C2B checkout + B2C payout); CBE Birr and M-Pesa clients exist but always throw `PaymentProviderUnavailableError`; the manual-transfer + receipt-attachment fallback is live on every rail
 - [x] Manual verification fallback: actionable transfer fallback on API failure and receipt attachment to unconfirmed checkout requests (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`)
 - [x] In-app notifications and support chat surfaces
 - [x] Telegram bot full 4-language support (English, Amharic, Afaan Oromoo, Tigrigna) with native authentic phrasing, 100% dictionary key parity (243 keys), dynamic user language preference sync, and localized push notifications
@@ -57,7 +87,7 @@ Last reviewed: 2026-11-09
 - [x] Staff KYC, top-up, dispute, TMS, and Finance queues
 - [x] Finance reconciliation read models and fee credit ledger
 - [x] Monthly withholding tax remittance reporting job
-- [x] 7-day contract cooling-off right cancellation
+- [x] 7-day contract cooling-off **mechanism** (`cancelDuringCoolingOff`) — ⚠️ **not armed in production**: `createContractFromProposal()` never sets `Contract.cancellableUntil`, so the endpoint always rejects with `CoolingOffExpiredError`. See *Verified Gaps Recorded* above
 
 ## Backend And Data Integrity
 
@@ -112,7 +142,7 @@ Last reviewed: 2026-11-09
 - [x] Full support desk dispatch: real-time staff alerting on guest tickets, auto-assignment to all active staff roles, and shared queue visibility
 - [x] Loading, empty, action-busy, and user-visible error/confirmation states in primary workflows
 - [x] Complete Light/Dark mode design token system with WCAG AAA contrast, consistent brand colors, clean SVG icons without background box artifacts, and human-first copy
-- [x] **Operations Console v2** (`apps/frontend/src/pages/ops/`) - single staff console replacing `StaffDashboard.tsx` + eight `Admin*Page.tsx` files (19 components retired)
+- [x] **Operations Console v2** (`apps/frontend/src/pages/ops/`) - single staff console replacing `StaffDashboard.tsx` + eight `Admin*Page.tsx` files (19 components retired); the console now renders **23 page components** under 23 page IDs plus 6 shared primitives
 - [x] Command Center: Action Center ranking SLA breaches, risk, health, recon and queue work, with per-directive deep links
 - [x] Dependency-free SVG charts (area, grouped bar, donut, sparkline, h-bars) with empty-data guards
 - [x] Ctrl/Cmd+K command palette over pages and records, filtered by the signed-in role's permissions
@@ -153,7 +183,7 @@ Last reviewed: 2026-11-09
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (áŠ áˆ›áˆ­áŠ›), Oromiffa (Afaan Oromoo), and Tigrigna (á‰µáŒáˆ­áŠ›) alongside English with typed i18n system, persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem.
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**625 leaf keys, 43 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
 
 ## Marketing Site (Public)
 
@@ -167,7 +197,7 @@ Last reviewed: 2026-11-09
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration â€” 4 languages supported: English (`en`), Amharic (`am` / áŠ áˆ›áˆ­áŠ›), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / á‰µáŒáˆ­áŠ›) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv`.
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**625 leaf keys per language, 43 nested objects, verified 2026-11-09**).
 
 ## Automated And Manual Verification
 
@@ -181,11 +211,11 @@ Last reviewed: 2026-11-09
 - [x] Live local Tier 2 review and withdrawal scenario
 - [x] Live local dispute through partial split
 - [x] Live local wallet mismatch hold and TMS dismissal
-- [ ] Unit tests for fee, KYC, dispute, and escrow edge cases
+- [x] Backend unit/integration suite — **64 test files, ~781 `it()` cases** under `apps/backend/tests/` (62 module + 2 script suites), covering fees, KYC, dispute, escrow, cooling-off, TMS, auth, gigs, and the release/refund paths
 - [ ] Concurrency stress test for acceptance, webhooks, release, and dispute resolution
 - [ ] Auto-release worker test using controlled time
 - [ ] Provider contract tests using real sandbox payloads/signatures
-- [ ] CI required checks for build, test, lint, migration validation, and dependency scanning
+- [ ] CI required checks for build, test, lint, migration validation, and dependency scanning — **partially done**: `.github/workflows/ci.yml` runs the doc-parity check, secret scan, backend type-check, route-audit baseline gate, backend `pnpm test`, fresh-database check, and the frontend production build. **Still missing:** frontend lint as a required check, a migration-validation gate, and a dependency scan (e.g. `pnpm audit` / Dependabot) as a blocking check. `.github/workflows/deploy.yml` is a placeholder with no deploy steps
 
 ## External Integrations
 
@@ -193,8 +223,8 @@ Last reviewed: 2026-11-09
 - [ ] Production PEP/sanctions screening source
 - [x] Telebirr C2B Web Checkout integration (fabric token caching, RSA-PSS signing, preOrder creation, web checkout redirect, body-embedded webhook verification, mock fallback)
 - [ ] Live Telebirr production credentials verification and settlement reconciliation
-- [ ] Chapa collection sandbox verification and reconciliation
-- [ ] CBE Birr collection sandbox verification and reconciliation
+- [ ] CBE Birr collection sandbox verification and reconciliation — ⚠️ the CBE client is a **stub** that throws `PaymentProviderUnavailableError`; the integration path (Star Pay vs. classic CBE Birr merchant flow) is still pending CBE confirmation (PAY-004)
+- [ ] M-Pesa collection sandbox verification and reconciliation — ⚠️ the M-Pesa client is a **stub** that throws `PaymentProviderUnavailableError`; Master Design `PAY-003` marks M-Pesa **REMOVED**, so this needs a product decision before any work
 - [x] Real payout/disbursement API with pending, success, failure, reversal, and reconciliation states (Telebirr B2C disbursement with `PayoutTransaction` lifecycle)
 - [ ] Production SMS credentials/templates/delivery monitoring
 - [ ] Telegram account linking and production push verification
@@ -202,11 +232,13 @@ Last reviewed: 2026-11-09
 
 ## Security, Compliance, And Operations
 
-- [x] Local Docker services for PostgreSQL/pgaudit, Redis, and MinIO
+- [x] Local Docker services for PostgreSQL/pgaudit, Redis, MinIO, and OpenSearch
 - [x] PostgreSQL host port documented consistently as `5433`
 - [x] Environment example and secret separation
 - [x] Helmet, CORS, rate limiting, body limits, and upload limits
 - [x] KYC and contract documents stored outside PostgreSQL
+- [ ] 10-year record retention enforced in code (`AuditLog` has no retention column and no purge job) and WORM object storage configured
+- [ ] PDPP data-subject access / portability / erasure tooling (no route or admin tool exists today)
 - [ ] Ethiopian production hosting/data residency verified
 - [ ] Production object versioning, object lock, retention, and restore test
 - [ ] Production secret manager and rotation procedure

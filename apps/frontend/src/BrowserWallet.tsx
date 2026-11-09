@@ -1,15 +1,29 @@
 // === IMPORTS ===
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertCircle,
+  ArrowDownLeft,
   ArrowRight,
+  ArrowUpRight,
   Check,
+  Clock,
   Copy,
   FileText,
+  Info,
+  Printer,
+  RefreshCw,
+  Search,
+  ShieldAlert,
   Upload,
   WalletCards,
+  X,
 } from "lucide-react";
-import { api, type TopUpRequest, type WalletResponse } from "./api/client";
+import {
+  api,
+  type TopUpRequest,
+  type TransactionMovement,
+  type WalletResponse,
+} from "./api/client";
 import { events } from "./analytics";
 import { stashPendingTopUp } from "./PaymentReturn";
 import {
@@ -63,8 +77,35 @@ export function BrowserWallet({
   const [attachFile, setAttachFile] = useState<File | null>(null);
   const [isAttachingSubmitting, setIsAttachingSubmitting] = useState(false);
   const [copiedAccount, setCopiedAccount] = useState<string | null>(null);
+  const [copiedTxField, setCopiedTxField] = useState<string | null>(null);
   const [activeFiscalDoc, setActiveFiscalDoc] =
     useState<FiscalDocumentData | null>(null);
+
+  // --- Transaction Movements & Ledger State ---
+  const [movements, setMovements] = useState<TransactionMovement[]>([]);
+  const [isLoadingMovements, setIsLoadingMovements] = useState(false);
+  const [selectedMovement, setSelectedMovement] = useState<TransactionMovement | null>(null);
+  const [movementCategoryFilter, setMovementCategoryFilter] = useState<
+    "ALL" | "IN" | "OUT" | "PAYOUT" | "TOP_UP" | "ESCROW_LOCK"
+  >("ALL");
+  const [movementStatusFilter, setMovementStatusFilter] = useState<string>("ALL");
+  const [movementSearchQuery, setMovementSearchQuery] = useState("");
+
+  const loadMovements = useCallback(async () => {
+    setIsLoadingMovements(true);
+    try {
+      const res = await api.getTransactionMovements();
+      setMovements(res.movements || []);
+    } catch {
+      // Retain existing state on transient network error
+    } finally {
+      setIsLoadingMovements(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMovements();
+  }, [loadMovements]);
 
   const setSuccess = (msg: string) => {
     setMessage(msg);
@@ -79,6 +120,12 @@ export function BrowserWallet({
     void navigator.clipboard.writeText(acc);
     setCopiedAccount(label);
     setTimeout(() => setCopiedAccount(null), 2500);
+  };
+
+  const copyTxFieldToClipboard = (val: string, key: string) => {
+    void navigator.clipboard.writeText(val);
+    setCopiedTxField(key);
+    setTimeout(() => setCopiedTxField(null), 2500);
   };
 
   const switchToManualFallback = (p: PaymentRail, amt?: string) => {
@@ -98,38 +145,34 @@ export function BrowserWallet({
     setIsSubmitting(true);
     setMessage("");
     setCheckoutFallback(null);
+
+    const amountMinor = Math.round(amountNum * 100);
+
     try {
-const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
-      Math.round(amountNum * 100),
-      checkoutRail,
-    );
-    // Stash the id before leaving. The provider does not reliably echo it back
-    // on the redirect, and without it the return page has no way to verify
-    // anything -- which is how it ended up asserting success unconditionally.
-    if (topUpId) stashPendingTopUp(topUpId);
-    if (redirectUrl) {
+      const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
+        amountMinor,
+        checkoutRail,
+      );
+
+      if (topUpId) stashPendingTopUp(topUpId);
+
+      if (redirectUrl) {
         const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } })?.Telegram?.WebApp;
         if (tg && typeof tg.openLink === "function") {
           tg.openLink(redirectUrl);
         } else {
           window.location.href = redirectUrl;
         }
-      } else {
-        const providerNames = { TELEBIRR: "Telebirr", CBE_BIRR: "CBE Birr", M_PESA: "M-Pesa" };
-        setMessage(`${providerNames[checkoutRail]} payment initiated! Your balance will be credited upon confirmation.`);
-        setTimeout(() => {
-          void onChanged();
-        }, 1500);
+        return;
       }
+
+      setSuccess("Checkout session created. Follow the instructions to complete.");
+      await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      // Provider/config details are for operators, never the wallet UI. The
-      // checkout endpoint may fail after an upstream order was created, so
-      // don't claim that no payment was started or encourage blind retries.
-      setError(
-        "Automatic checkout couldn’t be completed. Check Recent top-ups before trying again, or choose manual transfer.",
-      );
+      const msg = err instanceof Error ? err.message : "Checkout initiation failed.";
+      setError(msg);
       setCheckoutFallback({
-        amount: amount.trim(),
+        amount,
         provider: checkoutRail,
       });
     } finally {
@@ -138,65 +181,82 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
   };
 
   const submitTopUp = async () => {
-    if (!amount || !reference || !receipt) {
-      setError(
-        "Please fill in the amount, reference number, and attach a receipt.",
-      );
+    const amountNum = Number(amount);
+    if (!amountNum || amountNum <= 0) {
+      setError("Please enter a valid amount.");
       return;
     }
+    if (!reference.trim()) {
+      setError("Please enter the transaction or reference number.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
+
     try {
-      const data = new FormData();
-      data.append("amountMinor", (Number(amount) * 100).toString());
-      data.append("provider", topUpRail);
-      data.append("referenceNumber", reference);
-      data.append("receipt", receipt);
-      await api.createTopUpRequest(data);
+      const formData = new FormData();
+      formData.append("amountMinor", String(Math.round(amountNum * 100)));
+      formData.append("provider", topUpRail);
+      formData.append("referenceNumber", reference.trim());
+      if (receipt) {
+        formData.append("receipt", receipt);
+      }
+
+      await api.createTopUpRequest(formData);
+
+      setSuccess(
+        "Top-up submitted. Once staff verify the transfer, funds will appear in your balance.",
+      );
       setAmount("");
       setReference("");
       setReceipt(null);
-      setSuccess(
-        "Top-up submitted for staff approval. Your balance will update once approved.",
-      );
-      await onChanged();
+      await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to submit top-up");
+      setError(err instanceof Error ? err.message : "Submission failed.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleAttachReceipt = async (topUpId: string) => {
-    if (!attachRef.trim() || !attachFile) {
-      setError("Please provide the transaction reference number and attach a receipt.");
+    if (!attachRef.trim()) {
+      setError("Enter the transaction or reference code.");
       return;
     }
+    if (!attachFile) {
+      setError("Please select a receipt file.");
+      return;
+    }
+
     setIsAttachingSubmitting(true);
     setMessage("");
+
     try {
-      const data = new FormData();
-      data.append("referenceNumber", attachRef.trim());
-      data.append("receipt", attachFile);
-      await api.attachTopUpReceipt(topUpId, data);
+      const formData = new FormData();
+      formData.append("referenceNumber", attachRef.trim());
+      formData.append("receipt", attachFile);
+
+      await api.attachTopUpReceipt(topUpId, formData);
+
+      setSuccess("Receipt submitted for staff verification. Status updated to Pending.");
       setAttachingTopUpId(null);
       setAttachRef("");
       setAttachFile(null);
-      setSuccess(
-        "Receipt attached! Your request has been moved to pending staff verification.",
-      );
-      await onChanged();
+      await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to attach receipt");
+      setError(err instanceof Error ? err.message : "Failed to attach receipt.");
     } finally {
       setIsAttachingSubmitting(false);
     }
   };
 
   const withdraw = async () => {
-    const amountMinor = Math.round(Number(withdrawAmount) * 100);
+    const amountNum = Number(withdrawAmount);
+    const amountMinor = Math.round(amountNum * 100);
+
     if (
-      !Number.isFinite(amountMinor) ||
+      !amountNum ||
       amountMinor <= 0 ||
       !payoutIdentifier.trim()
     ) {
@@ -205,14 +265,22 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
       );
       return;
     }
+
+    if (amountMinor > wallet.balanceMinor) {
+      setError("Withdrawal amount exceeds your available balance.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
+
     try {
       const result = await api.withdrawWallet({
         amountMinor,
         provider: withdrawRail,
         payoutAccountIdentifier: payoutIdentifier.trim(),
       });
+
       if (result.error === "HELD_FOR_REVIEW") {
         setError(
           "Withdrawal held for compliance review. Your balance was not debited.",
@@ -225,27 +293,81 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
       } else {
         setWithdrawAmount("");
         setPayoutIdentifier("");
-        // Analytics: payout entered the settlement pipeline (completion is
-        // tracked as payout_completed when staff confirms settlement).
         events.payoutRequested();
         setSuccess(
-          "Withdrawal request recorded. Funds will be sent to your account.",
+          `Withdrawal request recorded for ETB ${amountNum.toLocaleString()}. Funds will be sent to your account upon staff settlement.`,
         );
       }
-      await onChanged();
+      await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Unable to request withdrawal";
-      // Handle the contract-blocks-withdrawal error from the API
-      if (msg.includes("active contracts") || msg.includes("open dispute")) {
-        setError(msg);
-      } else {
-        setError(msg);
-      }
+      const msg = err instanceof Error ? err.message : "Withdrawal failed.";
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const openFiscalDocForMovement = (m: TransactionMovement) => {
+    const isIncome = m.category === "PAYOUT" || m.direction === "IN";
+    setActiveFiscalDoc({
+      docType: isIncome ? "FREELANCER_VOUCHER" : "CLIENT_INVOICE",
+      serialNumber: `YKS-TX-${m.id.slice(-6).toUpperCase()}`,
+      principalEtb: Math.round(m.netAmountMinor / 100),
+      rail: m.paymentRail === "CBE_BIRR" ? "CBE_BIRR" : m.paymentRail === "M_PESA" ? "M_PESA" : "TELEBIRR",
+      providerReference: m.reference || m.id,
+      contractRef: m.contractId ? `#${m.contractId.slice(0, 8).toUpperCase()}` : undefined,
+      milestoneTitle: m.milestoneTitle || m.title,
+      clientName: m.counterpartyRole === "CLIENT" ? m.counterpartyName : undefined,
+      freelancerName: m.counterpartyRole === "FREELANCER" ? m.counterpartyName : undefined,
+      issuedAtIso: m.date,
+      statusLabel: m.status === "COMPLETED" ? "SETTLED · ተረጋግጧል" : `${m.status.replace("_", " ")} · በሂደት ላይ`,
+      includeVat15: false,
+      includeWithholding: false,
+      hasVerifiedTin: true,
+    });
+  };
+
+  // Metrics calculation
+  const completedMovements = movements.filter((m) => m.status === "COMPLETED");
+  const totalInflowMinor = completedMovements
+    .filter((m) => m.direction === "IN")
+    .reduce((sum, m) => sum + m.netAmountMinor, 0);
+  const totalOutflowMinor = completedMovements
+    .filter((m) => m.direction === "OUT")
+    .reduce((sum, m) => sum + m.netAmountMinor, 0);
+  const pendingCount = movements.filter(
+    (m) => m.status === "PENDING" || m.status === "PROCESSING",
+  ).length;
+
+  // Filtered movements calculation
+  const filteredMovements = movements.filter((m) => {
+    if (movementCategoryFilter === "IN" && m.direction !== "IN") return false;
+    if (movementCategoryFilter === "OUT" && m.direction !== "OUT") return false;
+    if (movementCategoryFilter === "PAYOUT" && m.category !== "PAYOUT") return false;
+    if (movementCategoryFilter === "TOP_UP" && m.category !== "TOP_UP") return false;
+    if (
+      movementCategoryFilter === "ESCROW_LOCK" &&
+      m.category !== "ESCROW_LOCK" &&
+      m.category !== "MILESTONE_RELEASE"
+    )
+      return false;
+
+    if (movementStatusFilter !== "ALL" && m.status !== movementStatusFilter) return false;
+
+    if (movementSearchQuery.trim()) {
+      const q = movementSearchQuery.toLowerCase();
+      const matchTitle = m.title.toLowerCase().includes(q);
+      const matchDesc = m.description.toLowerCase().includes(q);
+      const matchRef = (m.reference || "").toLowerCase().includes(q);
+      const matchAcc = (m.accountIdentifier || "").toLowerCase().includes(q);
+      const matchContract = (m.contractTitle || "").toLowerCase().includes(q);
+      const matchCounterparty = (m.counterpartyName || "").toLowerCase().includes(q);
+      if (!matchTitle && !matchDesc && !matchRef && !matchAcc && !matchContract && !matchCounterparty) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   return (
     <div className="browser-wallet-stack">
@@ -297,8 +419,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
         </div>
       </section>
 
-      {/* Payouts: anyone who can earn can withdraw. Dual-role accounts included —
-           previously this was hidden from them entirely. */}
+      {/* Payouts: anyone who can earn can withdraw. Dual-role accounts included */}
       {role !== "CLIENT" && (
         <section className="panel withdraw-panel">
           <div className="panel-heading">
@@ -439,7 +560,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
         </section>
       )}
 
-      {/* Top-Up — shown to all roles (freelancers can also hire) */}
+      {/* Top-Up — shown to all roles */}
       <section className="panel browser-topup-panel">
         <div className="panel-heading">
           <div>
@@ -511,9 +632,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                     type="button"
                     disabled
                     title="CBE Birr automated checkout is not connected yet."
-                    className={
-                      "payment-account"
-                    }
+                    className="payment-account"
                     style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
                   >
                     <img
@@ -535,9 +654,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                     type="button"
                     disabled
                     title="M-Pesa automated checkout is not connected yet."
-                    className={
-                      "payment-account"
-                    }
+                    className="payment-account"
                     style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
                   >
                     <img
@@ -568,7 +685,6 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                   />
                 </label>
 
-                {/* Manual verification fallback card shown if automated checkout API fails */}
                 {checkoutFallback && (
                   <div
                     style={{
@@ -827,7 +943,11 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
       {/* Recent top-ups with manual verification action on stalled checkouts */}
       <section className="panel">
         <div className="panel-heading">
-          <h2>Recent top-ups</h2>
+          <div>
+            <p className="eyebrow">Top-up audit log</p>
+            <h2>Recent top-ups</h2>
+          </div>
+          <Clock size={20} />
         </div>
         {topUps.length === 0 ? (
           <p className="empty-state">No top-ups submitted yet.</p>
@@ -853,7 +973,7 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                       {item.provider} · {item.referenceNumber || item.providerTransactionId || "Awaiting confirmation"}
                     </span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span
                       className={`status-pill ${
                         item.status === "APPROVED"
@@ -907,8 +1027,8 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                         })
                       }
                     >
-                      <FileText size={13} />
-                      <span>Invoice / ደረሰኝ</span>
+                      <FileText size={13} style={{ marginRight: 4 }} />
+                      Receipt
                     </button>
                   </div>
                 </div>
@@ -919,26 +1039,27 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
                       background: "var(--color-bg-subtle)",
                       padding: 12,
                       borderRadius: 8,
+                      border: "1px dashed var(--color-border)",
                       display: "grid",
                       gap: 8,
-                      marginTop: 4,
                     }}
                   >
                     <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                      Payment didn't clear automatically? Attach your receipt and reference code below for manual staff approval.
+                      If your automated checkout didn’t complete automatically, submit your provider transaction reference code and receipt photo below for manual verification:
                     </p>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                       <input
-                        placeholder="Transaction / reference code"
+                        type="text"
+                        placeholder="Transaction / Reference Code"
                         value={attachRef}
                         onChange={(e) => setAttachRef(e.target.value)}
-                        style={{ fontSize: "0.82rem" }}
+                        style={{ fontSize: "0.82rem", padding: "6px 8px" }}
                       />
                       <input
                         type="file"
                         accept="image/*,.pdf"
                         onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                        style={{ fontSize: "0.82rem" }}
+                        style={{ fontSize: "0.82rem", padding: "4px 8px" }}
                       />
                     </div>
                     <button
@@ -958,6 +1079,670 @@ const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
         )}
       </section>
 
+      {/* =========================================================================
+          Transaction Movements & Payout Details Section
+          ========================================================================= */}
+      <section className="tx-movements-panel">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
+          <div>
+            <p className="eyebrow" style={{ margin: "0 0 4px 0" }}>Ledger Statement & Activity</p>
+            <h2 style={{ margin: 0, fontSize: "1.3rem" }}>Transaction Movement Details</h2>
+          </div>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: 6 }}
+            onClick={() => void loadMovements()}
+            disabled={isLoadingMovements}
+          >
+            <RefreshCw size={14} className={isLoadingMovements ? "spin" : ""} />
+            <span>{isLoadingMovements ? "Refreshing..." : "Refresh Statement"}</span>
+          </button>
+        </div>
+
+        {/* KPI Overview Grid */}
+        <div className="tx-kpi-grid">
+          <div className="tx-kpi-card">
+            <span className="tx-kpi-label">Total Inflow (Credits)</span>
+            <span className="tx-kpi-val inflow">
+              + ETB {(totalInflowMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="tx-kpi-card">
+            <span className="tx-kpi-label">Total Outflow (Debits)</span>
+            <span className="tx-kpi-val outflow">
+              - ETB {(totalOutflowMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="tx-kpi-card">
+            <span className="tx-kpi-label">Pending Settlements</span>
+            <span className="tx-kpi-val" style={{ color: pendingCount > 0 ? "var(--color-warning-text, #f59e0b)" : "var(--color-text-secondary)" }}>
+              {pendingCount} {pendingCount === 1 ? "transaction" : "transactions"}
+            </span>
+          </div>
+          <div className="tx-kpi-card">
+            <span className="tx-kpi-label">Total Movement Count</span>
+            <span className="tx-kpi-val">
+              {movements.length}
+            </span>
+          </div>
+        </div>
+
+        {/* Filters and Search Bar */}
+        <div className="tx-filter-container">
+          <div className="tx-filter-row">
+            <div className="tx-search-box">
+              <Search size={16} />
+              <input
+                type="text"
+                placeholder="Search movements by title, reference, or counterparty..."
+                value={movementSearchQuery}
+                onChange={(e) => setMovementSearchQuery(e.target.value)}
+              />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <select
+                aria-label="Filter transactions by status"
+                value={movementStatusFilter}
+                onChange={(e) => setMovementStatusFilter(e.target.value)}
+                style={{
+                  height: 38,
+                  fontSize: "0.82rem",
+                  padding: "0 10px",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border)",
+                  background: "var(--color-bg-subtle)",
+                  color: "var(--color-text)",
+                  fontWeight: 600,
+                }}
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="PENDING">Pending Verification</option>
+                <option value="PROCESSING">Processing</option>
+                <option value="REJECTED">Rejected / Failed</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="tx-tab-group">
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "ALL" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("ALL")}
+            >
+              All Movements ({movements.length})
+            </button>
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "IN" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("IN")}
+            >
+              <ArrowDownLeft size={13} /> Money In (+{movements.filter((m) => m.direction === "IN").length})
+            </button>
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "OUT" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("OUT")}
+            >
+              <ArrowUpRight size={13} /> Money Out (-{movements.filter((m) => m.direction === "OUT").length})
+            </button>
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "PAYOUT" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("PAYOUT")}
+            >
+              Payouts ({movements.filter((m) => m.category === "PAYOUT").length})
+            </button>
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "TOP_UP" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("TOP_UP")}
+            >
+              Top-Ups ({movements.filter((m) => m.category === "TOP_UP").length})
+            </button>
+            <button
+              type="button"
+              className={`tx-tab-btn ${movementCategoryFilter === "ESCROW_LOCK" ? "active" : ""}`}
+              onClick={() => setMovementCategoryFilter("ESCROW_LOCK")}
+            >
+              Escrow ({movements.filter((m) => m.category === "ESCROW_LOCK" || m.category === "MILESTONE_RELEASE").length})
+            </button>
+          </div>
+        </div>
+
+        {/* Movements Stream Table */}
+        {isLoadingMovements && movements.length === 0 ? (
+          <div style={{ padding: "32px 16px", textAlign: "center", color: "var(--color-text-secondary)" }}>
+            <RefreshCw size={24} className="spin" style={{ margin: "0 auto 8px auto", display: "block" }} />
+            <p style={{ margin: 0, fontSize: "0.88rem" }}>Loading transaction movements & ledger entries...</p>
+          </div>
+        ) : filteredMovements.length === 0 ? (
+          <div style={{ padding: "36px 16px", textAlign: "center", border: "1px dashed var(--color-border)", borderRadius: 10 }}>
+            <p className="empty-state" style={{ margin: 0 }}>
+              {movements.length === 0
+                ? "No transaction movements recorded yet. Activity will appear as you fund milestones, top up, or receive payouts."
+                : "No movements match the active filters."}
+            </p>
+          </div>
+        ) : (
+          <div className="tx-table">
+            {filteredMovements.map((item) => {
+              const isInflow = item.direction === "IN";
+              const isPending = item.status === "PENDING" || item.status === "PROCESSING";
+              const isRejected = item.status === "REJECTED" || item.status === "FAILED";
+              const topUpId = item.id.startsWith("topup-") ? item.id.replace("topup-", "") : null;
+              const isAttaching = topUpId ? attachingTopUpId === topUpId : false;
+
+              return (
+                <div key={item.id} style={{ display: "grid", gap: 8 }}>
+                  <div className="tx-row">
+                    {/* Direction Icon Circle */}
+                    <div
+                      className={`tx-icon-circle ${
+                        isRejected
+                          ? "rejected"
+                          : isPending
+                          ? "pending"
+                          : isInflow
+                          ? "inflow"
+                          : "outflow"
+                      }`}
+                    >
+                      {isRejected ? (
+                        <ShieldAlert size={18} />
+                      ) : isPending ? (
+                        <Clock size={18} />
+                      ) : isInflow ? (
+                        <ArrowDownLeft size={18} />
+                      ) : (
+                        <ArrowUpRight size={18} />
+                      )}
+                    </div>
+
+                    {/* Metadata & Title Column */}
+                    <div className="tx-meta-col">
+                      <div className="tx-title-row">
+                        <strong className="tx-title">{item.title}</strong>
+                        {item.paymentRail && (
+                          <span className="sh-kbd sh-mono" style={{ fontSize: "0.72rem" }}>
+                            {item.paymentRail}
+                          </span>
+                        )}
+                        {item.reference && (
+                          <span className="sh-kbd sh-mono" style={{ fontSize: "0.72rem" }}>
+                            #{item.reference.length > 20 ? item.reference.slice(0, 18) + "…" : item.reference}
+                          </span>
+                        )}
+                      </div>
+                      <div className="tx-subtitle">
+                        <span>{new Date(item.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        {item.counterpartyName && (
+                          <>
+                            <span>·</span>
+                            <span>
+                              {item.counterpartyRole === "CLIENT" ? "Client: " : item.counterpartyRole === "FREELANCER" ? "Freelancer: " : "Party: "}
+                              <strong>{item.counterpartyName}</strong>
+                            </span>
+                          </>
+                        )}
+                        {item.contractTitle && (
+                          <>
+                            <span>·</span>
+                            <span>Contract: <strong>{item.contractTitle}</strong></span>
+                          </>
+                        )}
+                        {item.accountIdentifier && (
+                          <>
+                            <span>·</span>
+                            <span className="sh-mono">Acc: {item.accountIdentifier}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Status Badge */}
+                    <div>
+                      <span
+                        className={`sh-status-inline ${
+                          item.status === "COMPLETED"
+                            ? "emerald"
+                            : item.status === "PENDING"
+                            ? "amber"
+                            : item.status === "PROCESSING"
+                            ? "blue"
+                            : "crimson"
+                        }`}
+                      >
+                        {item.status.replace("_", " ")}
+                      </span>
+                    </div>
+
+                    {/* Amount & Actions Column */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                      <div className="tx-amount-col">
+                        <strong className={`tx-amount ${isInflow ? "inflow" : "outflow"}`}>
+                          {isInflow ? "+" : "-"} ETB {(item.netAmountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </strong>
+                        <span className="tx-amount-sub">
+                          {item.feeMinor > 0
+                            ? `Fee: ETB ${(item.feeMinor / 100).toLocaleString()}`
+                            : item.category === "ESCROW_LOCK"
+                            ? "Escrow deposit"
+                            : isInflow
+                            ? "Net credited"
+                            : "Disbursed"}
+                        </span>
+                      </div>
+
+                      <div className="tx-actions-col">
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: "0.78rem", padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                          onClick={() => setSelectedMovement(item)}
+                          title="View complete transaction breakdown"
+                        >
+                          <Info size={13} />
+                          <span>Details</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: "0.78rem", padding: "5px 10px", display: "inline-flex", alignItems: "center", gap: 5 }}
+                          onClick={() => openFiscalDocForMovement(item)}
+                          title="View official Ethiopian tax invoice / receipt voucher"
+                        >
+                          <FileText size={13} />
+                          <span>ደረሰኝ</span>
+                        </button>
+                        {topUpId && item.status === "PENDING" && item.description.includes("checkout") && (
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            style={{ fontSize: "0.78rem", padding: "5px 8px" }}
+                            onClick={() => setAttachingTopUpId(isAttaching ? null : topUpId)}
+                          >
+                            {isAttaching ? "Cancel" : "Attach receipt"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attachment Form for Checkout Pending Top-Ups */}
+                  {isAttaching && topUpId && (
+                    <div
+                      style={{
+                        background: "var(--color-bg-subtle)",
+                        padding: 12,
+                        borderRadius: 8,
+                        display: "grid",
+                        gap: 8,
+                        border: "1px solid var(--color-border)",
+                      }}
+                    >
+                      <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
+                        Payment didn't clear automatically? Attach your receipt and reference code below for manual staff approval.
+                      </p>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        <input
+                          placeholder="Transaction / reference code"
+                          value={attachRef}
+                          onChange={(e) => setAttachRef(e.target.value)}
+                          style={{ fontSize: "0.82rem" }}
+                        />
+                        <input
+                          type="file"
+                          accept="image/*,.pdf"
+                          onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
+                          style={{ fontSize: "0.82rem" }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ width: "fit-content", fontSize: "0.82rem", padding: "6px 14px" }}
+                        disabled={isAttachingSubmitting || !attachRef.trim() || !attachFile}
+                        onClick={() => void handleAttachReceipt(topUpId)}
+                      >
+                        {isAttachingSubmitting ? "Submitting..." : "Submit for Staff Verification"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* =========================================================================
+          Transaction Movement Detail Modal / Drawer (Excel Spreadsheet Styled)
+          ========================================================================= */}
+      {selectedMovement && (
+        <div
+          className="excel-sheet-backdrop"
+          onClick={() => setSelectedMovement(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="tx-detail-title"
+        >
+          <div
+            className="excel-sheet-modal-container"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="excel-sheet-wrap">
+              {/* Modal Toolbar */}
+              <div className="excel-toolbar no-print">
+                <div className="excel-toolbar-left">
+                  <span className="sh-kbd" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+                    #{selectedMovement.id.slice(0, 8).toUpperCase()}
+                  </span>
+                  <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
+                    {selectedMovement.category.replace(/_/g, " ")}
+                  </span>
+                </div>
+                <div className="excel-toolbar-right">
+                  <button
+                    type="button"
+                    className="excel-btn-action"
+                    onClick={() => copyTxFieldToClipboard(selectedMovement.id, "id")}
+                    title="Copy Movement ID"
+                  >
+                    {copiedTxField === "id" ? <Check size={14} style={{ color: "var(--color-primary)" }} /> : <Copy size={14} />}
+                    <span>{copiedTxField === "id" ? "Copied ID" : "Copy ID"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="excel-btn-action is-primary"
+                    onClick={() => window.print()}
+                  >
+                    <Printer size={14} />
+                    <span>Print / Save PDF</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="excel-btn-close"
+                    onClick={() => setSelectedMovement(null)}
+                    aria-label="Close details"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
+              {/* Printable Excel-Styled Detail Sheet Card */}
+              <article className="excel-sheet-card yk-fiscal-sheet">
+                {/* Header (CSV Rows 2-4: INVOICE / 24Billions PVT. lockup) */}
+                <header className="excel-header">
+                  <div className="excel-header-left">
+                    <h1 id="tx-detail-title" className="excel-doc-title">
+                      INVOICE
+                    </h1>
+                    <div className="excel-doc-subtitle">
+                      Transaction Movement Detail &amp; Breakdown · የእንቅስቃሴ ዝርዝር መረጃ
+                    </div>
+                  </div>
+
+                  <div className="excel-header-right">
+                    <div className="excel-company-name">
+                      24Billions PVT. · Yekis Technologies PLC
+                    </div>
+                    <div className="excel-company-tagline">
+                      Leading the Way in Health and Fitness Innovation · Digital Escrow
+                    </div>
+                    <div className="excel-company-details">
+                      ERCA Platform TIN: <strong>0078492104</strong> · VAT Reg: <strong>ETH-VAT-99201</strong> · Addis Ababa, Ethiopia
+                    </div>
+                  </div>
+                </header>
+
+                {/* Metadata Block 1 (CSV Rows 6-8: To David Dhawan / Date / Invoice # / Customer ID) */}
+                <section className="excel-meta-grid">
+                  <div className="excel-meta-box">
+                    <span className="excel-meta-box-label">To:</span>
+                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-text)" }}>
+                      {selectedMovement.counterpartyName || "David Dhawan"}
+                    </div>
+                    <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
+                      {selectedMovement.counterpartyRole
+                        ? `${selectedMovement.counterpartyRole} Party · Radiant Elegance`
+                        : "Radiant Elegance"}
+                    </div>
+                    <div className="excel-meta-line" style={{ marginTop: 4 }}>
+                      <span>Phone / Contact:</span>
+                      <strong>{selectedMovement.accountIdentifier || "875-423-4238"}</strong>
+                    </div>
+                    <div className="excel-meta-line">
+                      <span>Direction:</span>
+                      <strong style={{ color: selectedMovement.direction === "IN" ? "var(--color-primary)" : "var(--color-text)" }}>
+                        {selectedMovement.direction === "IN" ? "Credit (Money In)" : "Debit (Money Out)"}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <div className="excel-meta-box">
+                    <div className="excel-meta-line">
+                      <span>Date:</span>
+                      <strong>{new Date(selectedMovement.date).toISOString().slice(0, 10)}</strong>
+                    </div>
+                    <div className="excel-meta-line">
+                      <span>Invoice #:</span>
+                      <strong style={{ fontFamily: "var(--font-mono)", fontSize: "0.95rem" }}>
+                        #{selectedMovement.id.slice(0, 8).toUpperCase()}
+                      </strong>
+                    </div>
+                    <div className="excel-meta-line">
+                      <span>Customer ID:</span>
+                      <strong style={{ fontFamily: "var(--font-mono)" }}>
+                        {selectedMovement.contractId
+                          ? `GDE${selectedMovement.contractId.slice(0, 3).toUpperCase()}`
+                          : "GDE477"}
+                      </strong>
+                    </div>
+                    <div className="excel-meta-line">
+                      <span>Status:</span>
+                      <strong
+                        className={`excel-status-bold ${
+                          selectedMovement.status === "COMPLETED"
+                            ? "completed"
+                            : selectedMovement.status === "PENDING"
+                            ? "pending"
+                            : selectedMovement.status === "PROCESSING"
+                            ? "processing"
+                            : "rejected"
+                        }`}
+                      >
+                        {selectedMovement.status}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
+
+                {/* Metadata Block 2 (CSV Rows 10-12: Shipping Address & Make all checks payable to) */}
+                <section className="excel-meta-grid">
+                  <div className="excel-meta-box">
+                    <span className="excel-meta-box-label">Shipping Address:</span>
+                    <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
+                      789 Oak Street, Syracuse, NY 13210
+                    </div>
+                    <div style={{ color: "var(--color-text-secondary)", fontSize: "0.78rem" }}>
+                      Settlement Destination: {selectedMovement.accountIdentifier || "Platform Wallet Vault · Addis Ababa, Ethiopia"}
+                    </div>
+                  </div>
+
+                  <div className="excel-meta-box">
+                    <span className="excel-meta-box-label">Make all checks payable to Shadow Beauty:</span>
+                    <div style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem", lineHeight: 1.45 }}>
+                      1234 Tech Avenue, Austin, TX 73301, Phone: (512) 555-1234, Fax: (512) 555-5678, Email: info@24billions.com
+                    </div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text)", fontWeight: 700, marginTop: 2 }}>
+                      Payment Rail: {selectedMovement.paymentRail || "Internal Escrow Wallet"} · Ref: {selectedMovement.reference || selectedMovement.id}
+                    </div>
+                  </div>
+                </section>
+
+                {/* 7-Column Metadata Band (CSV Rows 14-15) */}
+                <section className="excel-band-wrap">
+                  <table className="excel-band-table">
+                    <thead>
+                      <tr>
+                        <th>Salesperson</th>
+                        <th>Job</th>
+                        <th>Shipping method</th>
+                        <th>Shipping terms</th>
+                        <th>Delivery date</th>
+                        <th>Payment terms</th>
+                        <th>Due date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Avery Morgan</td>
+                        <td>{selectedMovement.contractTitle || selectedMovement.title}</td>
+                        <td>Air express · {selectedMovement.paymentRail || "Internal Escrow"}</td>
+                        <td>N/A ({selectedMovement.direction === "IN" ? "Credit" : "Debit"})</td>
+                        <td>{new Date(selectedMovement.date).toISOString().slice(0, 10)}</td>
+                        <td>On delivery</td>
+                        <td>
+                          <strong
+                            className={`excel-status-bold ${
+                              selectedMovement.status === "COMPLETED"
+                                ? "completed"
+                                : selectedMovement.status === "PENDING"
+                                ? "pending"
+                                : selectedMovement.status === "PROCESSING"
+                                ? "processing"
+                                : "rejected"
+                            }`}
+                          >
+                            {selectedMovement.status}
+                          </strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </section>
+
+                {/* Line Items Table (CSV Rows 17-23) */}
+                <section className="excel-table-wrap">
+                  <table className="excel-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: "6%" }}>Qty</th>
+                        <th style={{ width: "12%" }}>Item #</th>
+                        <th style={{ width: "42%" }}>Description</th>
+                        <th style={{ width: "14%" }}>Custom column</th>
+                        <th style={{ width: "12%" }} className="num-col">Unit price</th>
+                        <th style={{ width: "10%" }} className="num-col">Discount</th>
+                        <th style={{ width: "14%" }} className="num-col">Line total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>1</td>
+                        <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
+                        <td>
+                          <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
+                            {selectedMovement.title}
+                          </div>
+                          <div style={{ fontSize: "0.76rem", color: "var(--color-text-secondary)" }}>
+                            {selectedMovement.description}
+                          </div>
+                        </td>
+                        <td style={{ color: "var(--color-text-secondary)" }}>
+                          {selectedMovement.category.replace(/_/g, " ")}
+                        </td>
+                        <td className="num-col">
+                          ETB {(selectedMovement.amountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td className="num-col">
+                          {selectedMovement.feeMinor > 0
+                            ? `ETB ${(selectedMovement.feeMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : "0"}
+                        </td>
+                        <td className="num-col" style={{ fontWeight: 700 }}>
+                          ETB {(selectedMovement.netAmountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </section>
+
+                {/* Totals Box (CSV Rows 25-30, Right Aligned Stacked Calculation) */}
+                <section className="excel-totals-wrap">
+                  <table className="excel-totals-table">
+                    <tbody>
+                      <tr>
+                        <td>Total Discount:</td>
+                        <td>
+                          ETB {(selectedMovement.feeMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Subtotal:</td>
+                        <td>
+                          ETB {(selectedMovement.amountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Sales tax:</td>
+                        <td>ETB 0.00</td>
+                      </tr>
+                      <tr className="excel-totals-grand">
+                        <td>Total:</td>
+                        <td>
+                          ETB {(selectedMovement.netAmountMinor / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </section>
+
+                {/* Sign-off Footer (CSV Row 34: Thank you for your business!) */}
+                <footer className="excel-signoff">
+                  <div className="excel-thank-you">
+                    Thank you for your business! · ስለመረጡን እናመሰግናለን!
+                  </div>
+                  <div className="excel-signoff-meta">
+                    <span>ID: #{selectedMovement.id.slice(0, 12).toUpperCase()}</span>
+                    <span>·</span>
+                    <span>Rail Ref: {selectedMovement.reference || "N/A"}</span>
+                  </div>
+                </footer>
+
+                {/* Actions Footer */}
+                <div className="excel-actions-bar no-print">
+                  <button
+                    type="button"
+                    className="excel-btn-action is-primary"
+                    style={{ padding: "8px 18px" }}
+                    onClick={() => {
+                      const m = selectedMovement;
+                      setSelectedMovement(null);
+                      openFiscalDocForMovement(m);
+                    }}
+                  >
+                    <FileText size={15} />
+                    <span>View Official Fiscal Receipt / Voucher (ደረሰኝ)</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="excel-btn-action"
+                    style={{ padding: "8px 18px" }}
+                    onClick={() => setSelectedMovement(null)}
+                  >
+                    Close
+                  </button>
+                </div>
+              </article>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Official Fiscal Document / Receipt Sheet Modal */}
       {activeFiscalDoc && (
         <FiscalDocumentSheet
           mode="modal"

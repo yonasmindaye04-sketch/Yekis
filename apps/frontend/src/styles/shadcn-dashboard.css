@@ -1829,6 +1829,67 @@
   flex-wrap: wrap;
 }
 
+/* ── Filter Toolbar Card (Contracts & Escrow Center) ────────────────────── */
+.sh-card.sh-filter-card {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+  min-height: 0;
+  height: auto;
+}
+
+.sh-filter-card .sh-segmented {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+
+.sh-filter-card .sh-segmented::-webkit-scrollbar {
+  display: none;
+}
+
+.sh-filter-card .sh-seg-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.sh-filter-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+}
+
+.sh-filter-card-actions .sh-search-input-wrap {
+  min-width: 200px;
+  max-width: 360px;
+  height: 36px;
+  flex: 1 1 auto;
+}
+
+.sh-filter-card-actions .sh-clear-input {
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .sh-search-input-wrap {
   display: flex;
   align-items: center;
@@ -3010,6 +3071,63 @@
   }
 }
 
+@media (max-width: 960px) {
+  .sh-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sh-card.sh-filter-card {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    height: auto;
+    min-height: 0;
+  }
+
+  .sh-filter-card .sh-segmented {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .sh-filter-card .sh-seg-btn {
+    min-height: 38px;
+    padding: 0 12px;
+    font-size: 0.8rem;
+  }
+
+  .sh-filter-card-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    width: 100%;
+    max-width: 100%;
+    flex: none;
+    height: auto;
+    min-height: 0;
+  }
+
+  .sh-filter-card-actions .sh-search-input-wrap {
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    height: 42px;
+  }
+
+  .sh-filter-card-actions .sh-clear-input {
+    min-width: 36px;
+    min-height: 36px;
+  }
+}
+
 @media (max-width: 768px) {
   .platform-shell.sh-shell,
   .platform-shell.sh-shell.sh-collapsed,
@@ -3196,6 +3314,49 @@
     overflow-x: auto;
   }
 
+  .sh-card-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .workflow-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .workflow-actions .sh-btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 130px;
+    min-height: 44px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .signature-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .signature-grid > span {
+    flex: 1 1 140px;
+    justify-content: center;
+    min-height: 38px;
+  }
+
+  .milestone-row {
+    padding: 14px 0;
+    gap: 12px;
+  }
+
+  .milestone-row .workflow-actions .sh-btn {
+    flex: 1 1 100%;
+    min-height: 42px;
+  }
+
   /* Mobile Stage-Tab Kanban */
   .sh-kanban-mobile-tabs {
     display: flex;
@@ -3289,6 +3450,25 @@
 @media (max-width: 480px) {
   .sh-kpi-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sh-filter-card-actions {
+    flex-wrap: wrap;
+  }
+
+  .sh-filter-card-actions .sh-cell-meta {
+    width: 100%;
+    font-size: 0.74rem;
+  }
+
+  .workflow-actions .sh-btn {
+    flex: 1 1 100% !important;
+    width: 100%;
+  }
+
+  .signature-grid > span {
+    flex: 1 1 100%;
+    width: 100%;
   }
 
   .sh-card {

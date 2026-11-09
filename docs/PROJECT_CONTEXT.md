@@ -1,5 +1,70 @@
 # Project Context
 
+> **Update 2026-11-09 (Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul):**
+> 1. **Motivation & Scope:** Redesigned both the official receipt/voucher sheet (`FiscalDocumentModal.tsx`) and transaction movement detail view (`BrowserWallet.tsx`) to match the user's Excel invoice template.
+> 2. **Design System & Layout Architecture (`.excel-sheet-*` in `index.css`):**
+>    - **Clean Spreadsheet Canvas**: Crisp cell borders, high-contrast tabular typography (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-mode theme parity, and `@media print` white-paper styles.
+>    - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `24Billions PVT. · Yekis Technologies PLC` corporate lockup, tagline ("Leading the Way in Health and Fitness Innovation · Digital Escrow"), and ERCA Platform TIN/VAT metadata.
+>    - **Metadata Blocks (Rows 6–12)**:
+>      - Two-column structured grid pairing "To: <Counterparty Name>" (David Dhawan / Radiant Elegance / Freelancer), Address/Phone, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID (`GDE477` / UCID), and Fiscal Status.
+>      - Shipping/Service Address block paired with the "Make all checks payable to Shadow Beauty / Yekis Escrow Trust Vault" remittance block with provider rail settlement details.
+>    - **7-Column Metadata Band (Rows 14–15)**: Exact spreadsheet header band displaying `Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date / Status`.
+>    - **Line Items Table (Rows 17–23)**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
+>    - **Totals Box (Rows 25–30)**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.
+>    - **Sign-off Footer (Row 34)**: "Thank you for your business! · ስለመረጡን እናመሰግናለን!" with digital audit verification hash and verification link.
+>    - **Strict Rule Compliance**: Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs. Guaranteed 100% theme-invariant layout geometry with colors and borders driven by root theme variables.
+> 3. **Verification**: Frontend production build (`tsc -b && vite build`) passed cleanly with zero errors; `node scripts/check-doc-parity.mjs` passed with 100% alignment.
+
+> **Update 2026-11-09 (Mobile & Tablet Responsiveness & Accessibility Overhaul):**
+> 1. **Motivation & Scope:** Enhanced accessibility and fluid responsiveness across the Contracts and Escrow Center tabs in `WorkflowWorkspace.tsx` for smartphones (320px–480px) and tablets (768px–960px iPads).
+> 2. **Responsive Architecture & Touch Ergonomics:**
+>    - `shadcn-dashboard.css`: Added `@media (max-width: 960px)` tablet breakpoint. Stacks filter toolbar controls vertically with natural `10px` gap, expands search bar to full width with `42px` accessible tap height, and formats KPI stats into a balanced 2x2 grid.
+>    - Momentum horizontal tab swipe: `.sh-segmented` features `-webkit-overflow-scrolling: touch`, hidden scrollbars, `overscroll-behavior-x: contain`, and `flex-shrink: 0` pills to prevent awkward text squishing on touch devices.
+>    - Mobile action buttons: Under `640px` and `480px`, card headers stack vertically and action buttons expand into full-width or half-width touch targets with `44px` minimum tap height per WCAG 2.5.5 / 2.5.8 recommendations.
+> 3. **Verification:** Validated via automated multi-device headless Chrome testing (375px, 768px, 820px, 1280px). Confirmed zero horizontal overflow, clean touch targets, and zero vertical gap inflation.
+
+> **Update 2026-11-09 (Contracts & Escrow Filter Toolbar Layout Restoration):**
+> 1. **Visual Defect & Root Cause**: Filter bar cards on both the Contracts and Escrow Center pages in `WorkflowWorkspace.tsx` displayed an enormous ~280px empty vertical blank block between the segmented tab list and the search input. Because `.sh-card` defaults to `display: flex; flex-direction: column`, omitting `flex-direction: row` caused the search input wrapper's `flex: 1 1 280px` to act along the column (height) axis, pushing the two control groups to top and bottom with hundreds of pixels of blank space in between.
+> 2. **Design System & Component Fix**:
+>    - Introduced dedicated `.sh-card.sh-filter-card` and `.sh-filter-card-actions` styles in `apps/frontend/src/styles/shadcn-dashboard.css`.
+>    - Enforced horizontal row layout (`flex-direction: row`), natural height (`min-height: 0; height: auto`), compact padding (`10px 14px`), and responsive mobile wrapping under 768px.
+>    - Replaced conflicting inline flex styles in `ContractsWorkspace` and `EscrowWorkspace` with these standardized classes.
+> 3. **Verification**: Full headless Chrome layout measurement confirmed the filter toolbar rendered with natural compact height (~48px on desktop) and zero blank vertical space. Frontend production build passed cleanly.
+
+> **Update 2026-11-09 (Documentation ↔ Codebase Alignment Pass):**
+> 1. **Scope:** Reconciled every Markdown document in `docs/` against the actual codebase, using the three governing source documents — *Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, and *Master Design, Legal & Compliance Document (Draft 1)* — as the **intent baseline**, and the codebase as the **truth** for implementation status.
+> 2. **Verified facts established by the pass:**
+>    - Frontend i18n: **625 leaf keys** per language (43 nested objects), exact parity across `en` / `am` / `om` / `ti`. Telegram bot: **243 keys**.
+>    - Operations Console v2: **23 page components** under 23 page IDs, plus 6 shared primitives.
+>    - Background processing: **9 BullMQ queues** — `auto-release`, `gig-auto-release`, `review-reveal`, `featured-refresh`, `payment-reconcile`, `kyc-refresh`, `notifications`, `tms-scan`, `withholding-remittance`.
+>    - Vite dev server runs on **port 3000** (`vite.config.ts`), not 5173; `vite preview` on 4173.
+>    - Financials: flat **7%** platform fee from the freelancer, **0%** client surcharge, **0%** withholding at launch (`TIN_FEATURE_ENABLED=false`); 3% / 30% rates configured above 10,000 ETB but dormant. Auto-release **7 days**. VAT threshold **450,000 ETB** at 15%. JWT access **1h** / refresh **30d**.
+>    - **Telebirr is the only live payment rail.** CBE and M-Pesa clients are stubs that throw `PaymentProviderUnavailableError`; no Chapa adapter exists. The Prisma enum retains inert `CHAPA` / `M_PESA` values.
+>    - **CI exists** (`.github/workflows/ci.yml`: doc-parity, secret scan, type-check, route-audit gate, backend tests, fresh-db check, frontend build). `.github/workflows/deploy.yml` is a **placeholder**. There are **zero frontend test files and no frontend test runner**.
+>    - Backend: 45 Prisma models, 29 enums, 20 modules, 9 workers, 64 test files (~781 `it()` cases).
+> 3. **New verified gaps (recorded, not silently fixed):** the 7-day cooling-off right is **not armed** (`Contract.cancellableUntil` is never written); `AuditLog` has **no 10-year retention column and no purge job** and there is **no WORM module**; **no PDPP data-subject access/portability/erasure tooling exists**; `src/lib/breachAlert.ts` is **log-only** (the SMS/Telegram dispatch is commented out); only 7 routes are KYC-gated and profile editing is deliberately not one of them; `src/middleware/requireKycVerified.ts` is dead code (the live guard is `src/middleware/hardBlock.ts`).
+> 4. **New documents:** `docs/ROADMAP_ALIGNMENT.md` (phase-by-phase map) and `docs/DOCUMENT_UNIFICATION_2026-11-09.md` (decision-by-decision map). `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` was regenerated and `docs/COMPLIANCE_BLOCKERS.md` was rewritten (the "2% withholding" figure was wrong — it is 3% / 30%, currently 0%; and `withdrawFromWallet` is live, not stubbed).
+
+> **Update 2026-11-09 (Contract Direct Chat & Credential Lookup):**
+> 1. **Direct Message Recipient Lookup**: Direct chat initiation (`POST /api/v1/chat/direct`) now supports user discovery by email (case-insensitive), phone (normalized to Ethiopian format `+251...`), unique customer ID (`ucid`), or primary ID (`id`), resolving previously reported "Recipient user not found" errors when clients and freelancers enter emails.
+> 2. **Contract Page Direct Communication**: Contract cards now render a direct communication button (`Chat with Freelancer` / `Chat with Client`) that instantly seeds or resumes a 1:1 conversation between the bilateral parties and automatically switches the active viewport to the target chat thread in `ChatWorkspace`.
+
+> **Update 2026-11-09 (Platform-Wide 7% Only General Fee Rule):**
+> 1. **Motivation & Scope:** Replaced inconsistent take-rate and fee displays across the platform with a single universal rule: a flat **7% general platform fee** deducted from milestone release, with zero client deposit fees and zero withholding tax deductions.
+> 2. **Fee Architecture & Synchronization:**
+>    - `apps/backend/src/config/env.ts`: `PLATFORM_FEE_RATE_CLIENT = 0`, `PLATFORM_FEE_RATE_FREELANCER = 0.07`.
+>    - `apps/frontend/src/pages/ops/components/ui.tsx` (`EscrowFeeBreakdown`): Default `feeRate = 0.07`, withholding tax row removed. Proposal breakdowns clearly display Gross, Yekis Fee (7%), and Estimated Net Payout (93% take-home).
+>    - `apps/frontend/src/FeesPage.tsx`: Calculator and manifesto updated to 7% platform fee / 93% freelancer take-home.
+>    - `apps/frontend/src/i18n.ts`: 4-language locales updated to 7% fee labels with all withholding tax deductions zeroed out for launch.
+
+> **Update 2026-11-09 (Hero Section Clean Layout Restoration):**
+> 1. **Motivation & Scope:** Following user review of edge-to-edge typography expansion, the hero container and typography were restored to their clean, focused centered layout, maintaining the high-fidelity interactive purple proximity pop animation.
+> 2. **Restored Specifications:**
+>    - `.v2-hero-inner` restored to centered `max-width: 1120px` container with `3rem 6% 4.5rem` padding.
+>    - `.v2-hero-title` font size restored to `clamp(2.6rem, 7.6vw, 7.1rem)` with `1.1` line-height and `0.005em` letter-spacing.
+>    - `.v2-hero-sub` restored to `max-width: 680px` and `clamp(1.05rem, 1.45vw, 1.25rem)` font-size.
+>    - Proximity pop radius calibrated back to `110px` with purple (`#a78bfa`) interactive pop and glow.
+
 > **Update 2026-11-09 (Hero Section Interactive Slogan Proximity Pop Text Animation):**
 > 1. **Motivation & Scope:** Replaced coarse block-level CSS hover effects on hero headlines with a high-fidelity interactive typography animation. Moving the cursor across the hero stage triggers individual letter popping with smooth proximity falloff and authentic purple glow styling.
 > 2. **Proximity Pop Physics & Rendering:**
@@ -16,12 +81,19 @@
 > 2. **Single-Tier Verified Withdrawal Policy:**
 >    - Feature flag `TIN_FEATURE_ENABLED` configured in `apps/backend/src/config/env.ts` (default `false`).
 >    - `/api/v1/escrow/wallet/withdraw` requirement relaxed to `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")`. Tier 1 verified freelancers (National ID / Fayda biometric eSignet) can withdraw earnings directly.
->    - Statutory platform withholding tax in `calculateFees` held at 0 ETB while `TIN_FEATURE_ENABLED=false` pending tax authority remittance procedure formalization (`TAX-002`). Freelancers receive 95% net milestone payouts (5% commission).
+>    - Statutory platform withholding tax in `calculateFees` held at 0 ETB while `TIN_FEATURE_ENABLED=false` pending tax authority remittance procedure formalization (`TAX-002`). Under the unified 7% general-fee rule, freelancers receive 93% net milestone payouts (7% commission) and clients pay no deposit surcharge.
 >    - `UpgradeToTier2Input` schema updated to make `tin` and `businessRegNumber` optional fields.
 > 3. **UI & Legal Alignment:**
 >    - Service agreement contract template Clause 6 dynamically clarifies independent contractor tax responsibility when platform withholding is deferred.
->    - `BrowserVerification.tsx` and `BrowserWallet.tsx` display transparent MVP launch notices indicating Tier 1 unlocks full access and withdrawals.
+>    - Clean single-tier verification presentation in BrowserVerification.tsx and BrowserWallet.tsx: completely eliminated meta-announcement notices ("MVP Launch Notice") and hidden the deferred Tier 2/TIN card entirely from standard user view. Users experience a clean 2-step progression (Account Created -> Verified Identity) where Fayda National ID verification unlocks bidding, contracts, and wallet withdrawals without being distracted or confused by deferred tax compliance forms.
 > 4. **Roadmap & Phase 4:** The 3-tier KYC model with mandatory TIN/trade licenses and automated ERA tax remittance is deferred to Phase 4 (Growth & Scale).
+
+> **Update 2026-11-09 ("Make ideas visible." — Design Overhaul & Minimized Replay Delay):**
+> 1. **Motivation & Scope:** Implemented the user-provided design update for the "Make ideas visible." editorial hero section (`HandWrittenTitle.tsx` and `HandWrittenTitle.css`) and minimized the replay delay of the hand-drawn circle animation.
+> 2. **Structural Hierarchy (Pill Above Circle):** The "Yekis Jobs" pill (`.yk-hw-pill`) is extracted above the circle stage, leaving the hand-drawn SVG loop to frame solely the headline and subtitle. The pill adheres to `.agents/AGENTS.md` with bold solid fills (`#22c55e` dark, `#16a34a` light, no low-opacity backgrounds).
+> 3. **Compact Editorial Dimensions & Typography:** Compacted section padding to `56px 24px 48px` (desktop) and stage height to `380px` (`340px` tablet, `310px` mobile), with scoped specificity preventing any interference with `.yk-v2 .stage` (the 440vh scroll-driven escrow section). Added Google Fonts `Plus Jakarta Sans` for the bold headline (`clamp(2.6rem, 7vw, 4.9rem)`).
+> 4. **Minimized Replay Delay:** Replaced the previous 6.5s animation (which had a ~2.52s idle hold and 3.42s delay before redrawing) with an energetic 2.4s cycle. The circle draws in ~1.5s via `cubic-bezier(0.43, 0.13, 0.23, 0.96)`, holds briefly for ~0.53s, fades in ~0.24s, and immediately redraws. Clicking anywhere on the banner also triggers an instant replay.
+> 5. **Strict Theme Parity:** Declared all geometry, padding, and font-metrics in theme-invariant base rules, with `:root[data-theme="dark"]` and `:root[data-theme="light"]` altering only color, background, and shadow values.
 
 > **Update 2026-11-08 ("Make ideas visible." — Full-Viewport Editorial Alignment, Bold Eyebrow & Continuous Auto-Play):**
 > 1. **Motivation & Scope:** Refined the "Make ideas visible." editorial banner (`HandWrittenTitle`) so its space usage, vertical spacing, and typography integrate seamlessly with the full-screen escrow stage section above it.

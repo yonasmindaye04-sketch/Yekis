@@ -50,7 +50,7 @@ const RAIL_SERVICES: RailServiceItem[] = [
     rows: [
       { label: "CBE BIRR WALLET", badge: "< 90 SEC" },
       { label: "BANK RTGS LIMIT", badge: "5,000,000 ETB" },
-      { label: "ESCROW FEE", badge: "2.5% FLAT" },
+      { label: "ESCROW FEE", badge: "7% FLAT" },
     ],
   },
   {
@@ -80,11 +80,11 @@ const RAIL_SERVICES: RailServiceItem[] = [
 const PLATFORM_COMPARISONS = [
   {
     id: "comp-yekis",
-    name: "YeKis Studio Escrow (2.5%)",
-    role: "97.5% FREELANCER TAKE-HOME · NATIVE ETB",
+    name: "YeKis General Escrow (7%)",
+    role: "93% FREELANCER TAKE-HOME · NATIVE ETB",
     quote:
-      "On a 100,000 ETB software contract, the freelancer receives 97,500 ETB directly into Telebirr or CBE Birr in under two minutes.",
-    metric: "97.5% KEPT",
+      "On a 100,000 ETB software contract, the freelancer receives 93,000 ETB directly into Telebirr or CBE Birr in under two minutes.",
+    metric: "93% KEPT",
   },
   {
     id: "comp-global",
@@ -246,14 +246,14 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
   }, []);
 
   const calc = useMemo(() => {
-    const clientFee = Math.round(amount * 0.025);
-    const freelancerFee = Math.round(amount * 0.025);
+    const clientFee = 0;
+    const freelancerFee = Math.round(amount * 0.07);
     const vatAmount = includeVat ? Math.round(amount * 0.15) : 0;
-    const whtEligible = amount > 10000;
-    const whtAmount = includeWithholding && whtEligible ? Math.round(amount * 0.02) : 0;
+    const whtEligible = false;
+    const whtAmount = 0;
 
-    const totalClientEscrowFunding = amount + clientFee + vatAmount - whtAmount;
-    const netFreelancerTakeHome = amount - freelancerFee + vatAmount - whtAmount;
+    const totalClientEscrowFunding = amount;
+    const netFreelancerTakeHome = amount - freelancerFee;
 
     return {
       clientFee,
@@ -264,7 +264,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
       totalClientEscrowFunding,
       netFreelancerTakeHome,
     };
-  }, [amount, includeVat, includeWithholding]);
+  }, [amount, includeVat]);
 
   const stickyItems: StickyStackItem[] = useMemo(
     () =>
@@ -298,7 +298,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
             <h1 className="cs-hero-display">
               <span className="cs-hero-line">
                 {lang === "am" ? "የድካምዎን" : "we keep"}{" "}
-                <span className="cs-hero-brace">{"{97.5%}"}</span>
+                <span className="cs-hero-brace">{"{93%}"}</span>
               </span>
               <span className="cs-hero-line">
                 <span className="cs-hero-arrow" aria-hidden="true">
@@ -351,7 +351,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
       </section>
 
       {/* ================================================================
-          BAND 2 — CRISP WHITE { 2.5% } MANIFESTO (ZERO SUB-PARAGRAPHS)
+          BAND 2 — CRISP WHITE { 7% } MANIFESTO (ZERO SUB-PARAGRAPHS)
           ================================================================ */}
       <section className="cs-manifesto-band">
         <div className="cs-band-inner">
@@ -362,7 +362,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
             >
               <span className="cs-brace-emblem-char">{"{"}</span>
-              <span className="cs-brace-emblem-word">2.5%</span>
+              <span className="cs-brace-emblem-word">7%</span>
               <span className="cs-brace-emblem-char">{"}"}</span>
             </motion.div>
 
@@ -372,21 +372,21 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   lang === "am"
                     ? [
                         { text: "ዓለም አቀፍ ፕላትፎርሞች 20% ሲቆርጡ፣ YeKis ግን" },
-                        { text: "97.5% ክፍያዎ በቀጥታ", highlight: true },
+                        { text: "93% ክፍያዎ በቀጥታ", highlight: true },
                         { text: "ወደ ቴሌብር ወይም ንግድ ባንክ እንዲገባ ያደርጋል።" },
                       ]
                     : [
-                        { text: "While global portals take up to 20%, YeKis charges a symmetric" },
-                        { text: "2.5% escrow fee per side", highlight: true },
-                        { text: "—with native ETB payouts and free ERCA tax schedules." },
+                        { text: "While global portals take up to 20%, YeKis charges a flat" },
+                        { text: "7% general platform fee", highlight: true },
+                        { text: "—with native ETB payouts and zero hidden charges." },
                       ]
                 }
               />
 
               <AnimatedCountUpStrip
                 metrics={[
-                  { value: 97.5, decimals: 1, suffix: "%", label: "FREELANCER TAKE-HOME" },
-                  { value: 2.5, decimals: 1, suffix: "%", label: "FLAT ESCROW FEE" },
+                  { value: 93, decimals: 0, suffix: "%", label: "FREELANCER TAKE-HOME" },
+                  { value: 7, decimals: 0, suffix: "%", label: "GENERAL PLATFORM FEE" },
                   { value: 0, suffix: " ETB", label: "SUBSCRIPTION COST" },
                 ]}
               />
@@ -587,7 +587,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                       borderRadius: 6,
                     }}
                   >
-                    97.5% NET
+                    93% NET
                   </span>
                 </div>
 
@@ -609,14 +609,14 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     </tr>
                     <tr>
                       <td>Client Escrow Fee</td>
-                      <td>+2.5%</td>
+                      <td>0%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        +{calc.clientFee.toLocaleString()} ETB
+                        0 ETB
                       </td>
                     </tr>
                     <tr>
-                      <td>Freelancer Fee</td>
-                      <td>−2.5%</td>
+                      <td>Freelancer Platform Fee</td>
+                      <td>−7%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
                         −{calc.freelancerFee.toLocaleString()} ETB
                       </td>
@@ -630,9 +630,9 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     </tr>
                     <tr>
                       <td>ERCA Withholding</td>
-                      <td>{calc.whtAmount > 0 ? "−2%" : "0%"}</td>
+                      <td>0%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        {calc.whtAmount > 0 ? `−${calc.whtAmount.toLocaleString()} ETB` : "0 ETB"}
+                        0 ETB
                       </td>
                     </tr>
                   </tbody>
@@ -796,7 +796,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   style={{ background: "transparent", color: "#f4f7f4", border: "1px solid rgba(255,255,255,0.28)" }}
                   onClick={() => onStart?.("register")}
                 >
-                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 97.5% as Talent"}
+                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 93% as Talent"}
                 </button>
                 <button
                   type="button"

@@ -151,9 +151,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     fGross = Math.round((sel.amt * split) / 100);
     cRefund = sel.amt - fGross;
   }
-  const fee = Math.round(fGross * 0.05);
-  const wh = fGross >= 1000000 ? Math.round(fGross * 0.3) : 0;
-  const net = fGross - fee - wh;
+  const fee = Math.round(fGross * 0.07);
+  const wh = 0;
+  const net = fGross - fee;
 
   return (
     <div className="fade">
