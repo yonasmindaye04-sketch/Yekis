@@ -4,14 +4,14 @@
 > 1. **Motivation & Scope:** Redesigned both the official receipt/voucher sheet (`FiscalDocumentModal.tsx`) and transaction movement detail view (`BrowserWallet.tsx`) to match the user's Excel invoice template.
 > 2. **Design System & Layout Architecture (`.excel-sheet-*` in `index.css`):**
 >    - **Clean Spreadsheet Canvas**: Crisp cell borders, high-contrast tabular typography (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-mode theme parity, and `@media print` white-paper styles.
->    - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `24Billions PVT. · Yekis Technologies PLC` corporate lockup, tagline ("Leading the Way in Health and Fitness Innovation · Digital Escrow"), and ERCA Platform TIN/VAT metadata.
->    - **Metadata Blocks (Rows 6–12)**:
->      - Two-column structured grid pairing "To: <Counterparty Name>" (David Dhawan / Radiant Elegance / Freelancer), Address/Phone, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID (`GDE477` / UCID), and Fiscal Status.
->      - Shipping/Service Address block paired with the "Make all checks payable to Shadow Beauty / Yekis Escrow Trust Vault" remittance block with provider rail settlement details.
->    - **7-Column Metadata Band (Rows 14–15)**: Exact spreadsheet header band displaying `Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date / Status`.
->    - **Line Items Table (Rows 17–23)**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
->    - **Totals Box (Rows 25–30)**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.
->    - **Sign-off Footer (Row 34)**: "Thank you for your business! · ስለመረጡን እናመሰግናለን!" with digital audit verification hash and verification link.
+>    - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `Yekis Technologies PLC` corporate lockup, tagline ("Custodial Escrow & Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ"), and ERCA Platform TIN/VAT metadata.
+>    - **Metadata Blocks**:
+>      - Two-column structured grid pairing "To: <Counterparty Name>" (Client / Freelancer), Role, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID, and Fiscal Status.
+>      - Removed physical shipping address and check payable remittance blocks, keeping the layout focused on digital escrow settlement.
+>    - **7-Column Metadata Band**: Exact spreadsheet header band displaying `Party / Agent | Job / Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`.
+>    - **Line Items Table**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
+>    - **Totals Box**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.
+>    - **Sign-off Footer**: "Thank you for your business! · ስለመረጡን እናመሰግናለን!" with digital audit verification hash and verification link.
 >    - **Strict Rule Compliance**: Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs. Guaranteed 100% theme-invariant layout geometry with colors and borders driven by root theme variables.
 > 3. **Verification**: Frontend production build (`tsc -b && vite build`) passed cleanly with zero errors; `node scripts/check-doc-parity.mjs` passed with 100% alignment.
 

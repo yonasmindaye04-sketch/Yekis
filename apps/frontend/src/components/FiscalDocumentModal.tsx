@@ -352,7 +352,7 @@ export function FiscalDocumentSheet({
             : "Excel-Styled Bilingual Freelancer Payout Remittance and ERCA Withholding Tax Voucher"
         }
       >
-        {/* Header (Matching Excel CSV Row 2-4: INVOICE / 24Billions PVT. lockup) */}
+        {/* Header */}
         <header className="excel-header">
           <div className="excel-header-left">
             <h1 className="excel-doc-title">
@@ -367,10 +367,10 @@ export function FiscalDocumentSheet({
 
           <div className="excel-header-right">
             <div className="excel-company-name">
-              24Billions PVT. · Yekis Technologies PLC
+              Yekis Technologies PLC · ዬኪስ ቴክኖሎጂስ ኃ/የተ/የግ/ማ
             </div>
             <div className="excel-company-tagline">
-              Leading the Way in Health and Fitness Innovation · Digital Escrow
+              Custodial Escrow &amp; Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ
             </div>
             <div className="excel-company-details">
               ERCA Platform TIN: <strong>0078492104</strong> · VAT Reg: <strong>ETH-VAT-99201</strong> · Addis Ababa, Ethiopia
@@ -378,7 +378,7 @@ export function FiscalDocumentSheet({
           </div>
         </header>
 
-        {/* Metadata Block 1 (Matching Excel CSV Rows 6-8: To David Dhawan / Date / Invoice # / Customer ID) */}
+        {/* Metadata Block (To / Date / Invoice # / Customer ID / Fiscal Status) */}
         <section className="excel-meta-grid">
           <div className="excel-meta-box">
             <span className="excel-meta-box-label">To:</span>
@@ -387,12 +387,12 @@ export function FiscalDocumentSheet({
             </div>
             <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
               {activeDocType === "CLIENT_INVOICE"
-                ? (data.clientLocation ? `${data.clientLocation} · Radiant Elegance` : "Radiant Elegance")
+                ? (data.clientLocation || "Addis Ababa, Ethiopia")
                 : `Yekis Verified Talent · ${freelancerUcid}`}
             </div>
             <div className="excel-meta-line" style={{ marginTop: 4 }}>
-              <span>Phone / Contact:</span>
-              <strong>{activeDocType === "CLIENT_INVOICE" ? "875-423-4238" : "+251 911 012 345"}</strong>
+              <span>Role / Party:</span>
+              <strong>{activeDocType === "CLIENT_INVOICE" ? "Client (ከፋይ ደንበኛ)" : "Contractor / Freelancer (ባለሙያ)"}</strong>
             </div>
             <div className="excel-meta-line">
               <label htmlFor="client-tin-field">
@@ -425,7 +425,7 @@ export function FiscalDocumentSheet({
             <div className="excel-meta-line">
               <span>Customer ID:</span>
               <strong style={{ fontFamily: "var(--font-mono)" }}>
-                {activeDocType === "CLIENT_INVOICE" ? (clientTinInput ? `GDE${clientTinInput.slice(-3).toUpperCase()}` : "GDE477") : freelancerUcid}
+                {activeDocType === "CLIENT_INVOICE" ? (clientTinInput ? `#CL-${clientTinInput.slice(-4)}` : "ETH-CL-2089") : freelancerUcid}
               </strong>
             </div>
             <div className="excel-meta-line">
@@ -440,54 +440,31 @@ export function FiscalDocumentSheet({
           </div>
         </section>
 
-        {/* Metadata Block 2 (Matching Excel CSV Rows 10-12: Shipping Address & Make all checks payable to) */}
-        <section className="excel-meta-grid">
-          <div className="excel-meta-box">
-            <span className="excel-meta-box-label">Shipping Address:</span>
-            <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
-              789 Oak Street, Syracuse, NY 13210
-            </div>
-            <div style={{ color: "var(--color-text-secondary)", fontSize: "0.78rem" }}>
-              Digital Delivery &amp; Escrow Release Destination: {data.clientLocation || "Addis Ababa, Ethiopia"}
-            </div>
-          </div>
-
-          <div className="excel-meta-box">
-            <span className="excel-meta-box-label">Make all checks payable to Shadow Beauty:</span>
-            <div style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem", lineHeight: 1.45 }}>
-              1234 Tech Avenue, Austin, TX 73301, Phone: (512) 555-1234, Fax: (512) 555-5678, Email: info@24billions.com
-            </div>
-            <div style={{ fontSize: "0.78rem", color: "var(--color-text)", fontWeight: 700, marginTop: 2 }}>
-              Settlement Rail: {railInfo.nameEn} · Account: {railInfo.settlementAccount} · Ref: {providerRef}
-            </div>
-          </div>
-        </section>
-
-        {/* 7-Column Metadata Band (Matching Excel CSV Rows 14-15) */}
+        {/* 7-Column Metadata Band */}
         <section className="excel-band-wrap">
           <table className="excel-band-table">
             <thead>
               <tr>
-                <th>Salesperson</th>
-                <th>Job</th>
-                <th>Shipping method</th>
-                <th>Shipping terms</th>
-                <th>Delivery date</th>
-                <th>Payment terms</th>
-                <th>Due date</th>
+                <th>Agent / Party</th>
+                <th>Contract &amp; Milestone</th>
+                <th>Payment Rail</th>
+                <th>Terms</th>
+                <th>Delivery Date</th>
+                <th>Payment Terms</th>
+                <th>Status</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>Avery Morgan</td>
-                <td>{contractCode} · {milestoneTitle}</td>
-                <td>Air express · {railInfo.nameEn}</td>
-                <td>N/A (Escrow Protected)</td>
+                <td>{activeDocType === "CLIENT_INVOICE" ? "Yekis Escrow Officer" : freelancerName}</td>
+                <td>{contractCode ? `${contractCode} · ${milestoneTitle}` : milestoneTitle}</td>
+                <td>{railInfo.nameEn}</td>
+                <td>Escrow Protected (AACCSA Standards)</td>
                 <td>{dates.greg}</td>
                 <td>On delivery</td>
                 <td>
                   <strong className="excel-status-bold completed">
-                    {activeDocType === "CLIENT_INVOICE" ? "2026-11-16 (COMPLETED)" : "SETTLED"}
+                    {data.statusLabel ?? (activeDocType === "CLIENT_INVOICE" ? "ESCROW FUNDED" : "SETTLED")}
                   </strong>
                 </td>
               </tr>
@@ -495,7 +472,7 @@ export function FiscalDocumentSheet({
           </table>
         </section>
 
-        {/* Line Items Table (Matching Excel CSV Rows 17-23) */}
+        {/* Line Items Table */}
         <section className="excel-table-wrap">
           <table className="excel-table">
             <thead>
@@ -514,7 +491,7 @@ export function FiscalDocumentSheet({
                 <>
                   <tr>
                     <td>1</td>
-                    <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>MS-01</td>
                     <td>
                       <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Escrow Principal Deposit — {milestoneTitle}
@@ -530,7 +507,7 @@ export function FiscalDocumentSheet({
                   </tr>
                   <tr>
                     <td>1</td>
-                    <td style={{ fontFamily: "var(--font-mono)" }}>2309</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>FEE-CL</td>
                     <td>
                       <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Yekis Client Escrow Protection &amp; Gateway Fee ({(clientFeeRate * 100).toFixed(1)}%)
@@ -547,7 +524,7 @@ export function FiscalDocumentSheet({
                   {isVatEnabled && (
                     <tr>
                       <td>1</td>
-                      <td style={{ fontFamily: "var(--font-mono)" }}>2390</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>TAX-VAT</td>
                       <td>
                         <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                           Ethiopian Value Added Tax (ERCA Standard VAT 15%)
@@ -567,7 +544,7 @@ export function FiscalDocumentSheet({
                 <>
                   <tr>
                     <td>1</td>
-                    <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>MS-REL</td>
                     <td>
                       <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Gross Milestone Amount Released from Escrow — {milestoneTitle}
@@ -584,7 +561,7 @@ export function FiscalDocumentSheet({
                   {isVatEnabled && (
                     <tr>
                       <td>1</td>
-                      <td style={{ fontFamily: "var(--font-mono)" }}>2309</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>TAX-VAT</td>
                       <td>
                         <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                           Output VAT Collected (15% Registered Commercial Invoice)
@@ -601,7 +578,7 @@ export function FiscalDocumentSheet({
                   )}
                   <tr>
                     <td>1</td>
-                    <td style={{ fontFamily: "var(--font-mono)" }}>943</td>
+                    <td style={{ fontFamily: "var(--font-mono)" }}>FEE-FL</td>
                     <td>
                       <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                         Less: Yekis Freelancer Platform &amp; Settlement Service Fee ({(freelancerFeeRate * 100).toFixed(1)}%)
@@ -618,7 +595,7 @@ export function FiscalDocumentSheet({
                   {isWhtEnabled && (
                     <tr>
                       <td>1</td>
-                      <td style={{ fontFamily: "var(--font-mono)" }}>92</td>
+                      <td style={{ fontFamily: "var(--font-mono)" }}>TAX-WHT</td>
                       <td>
                         <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                           Less: ERCA Statutory Withholding Tax ({(whtRate * 100).toFixed(0)}% {isTinVerified ? "3% Verified TIN" : "30% Unverified TIN Rate"})

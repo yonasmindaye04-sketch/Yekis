@@ -2868,10 +2868,10 @@ img, video, iframe, canvas {
 
 /* ============================================================================
    Excel Spreadsheet Invoice & Detail Sheet Design System (.excel-*)
-   Directly modeled on the Excel invoice reference template:
-   - Header: INVOICE / 24Billions PVT. lockup
-   - Metadata blocks: To / Date / Invoice # / Customer ID / Shipping / Payable to
-   - 7-Column Metadata Band: Salesperson, Job, Shipping method/terms, Delivery date, Payment terms, Status
+   Directly modeled on the Excel invoice reference template layout:
+   - Header: INVOICE / Yekis Technologies PLC lockup
+   - Metadata blocks: To / Date / Invoice # / Customer ID
+   - 7-Column Metadata Band: Party, Job/Contract, Payment Rail, Terms, Date, Payment Terms, Status
    - Line Items Table: Qty, Item #, Description, Custom column, Unit price, Discount, Line total
    - Totals Box: Total Discount, Subtotal, Sales tax, Total
    - Sign-off: Thank you for your business!

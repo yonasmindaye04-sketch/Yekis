@@ -1474,7 +1474,7 @@ export function BrowserWallet({
 
               {/* Printable Excel-Styled Detail Sheet Card */}
               <article className="excel-sheet-card yk-fiscal-sheet">
-                {/* Header (CSV Rows 2-4: INVOICE / 24Billions PVT. lockup) */}
+                {/* Header */}
                 <header className="excel-header">
                   <div className="excel-header-left">
                     <h1 id="tx-detail-title" className="excel-doc-title">
@@ -1487,10 +1487,10 @@ export function BrowserWallet({
 
                   <div className="excel-header-right">
                     <div className="excel-company-name">
-                      24Billions PVT. · Yekis Technologies PLC
+                      Yekis Technologies PLC · ዬኪስ ቴክኖሎጂስ ኃ/የተ/የግ/ማ
                     </div>
                     <div className="excel-company-tagline">
-                      Leading the Way in Health and Fitness Innovation · Digital Escrow
+                      Custodial Escrow &amp; Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ
                     </div>
                     <div className="excel-company-details">
                       ERCA Platform TIN: <strong>0078492104</strong> · VAT Reg: <strong>ETH-VAT-99201</strong> · Addis Ababa, Ethiopia
@@ -1498,21 +1498,21 @@ export function BrowserWallet({
                   </div>
                 </header>
 
-                {/* Metadata Block 1 (CSV Rows 6-8: To David Dhawan / Date / Invoice # / Customer ID) */}
+                {/* Metadata Block (To / Date / Invoice # / Customer ID) */}
                 <section className="excel-meta-grid">
                   <div className="excel-meta-box">
                     <span className="excel-meta-box-label">To:</span>
                     <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-text)" }}>
-                      {selectedMovement.counterpartyName || "David Dhawan"}
+                      {selectedMovement.counterpartyName || "Platform User"}
                     </div>
                     <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
                       {selectedMovement.counterpartyRole
-                        ? `${selectedMovement.counterpartyRole} Party · Radiant Elegance`
-                        : "Radiant Elegance"}
+                        ? `${selectedMovement.counterpartyRole} Party`
+                        : (selectedMovement.direction === "IN" ? "Client Party" : "Freelancer Party")}
                     </div>
                     <div className="excel-meta-line" style={{ marginTop: 4 }}>
-                      <span>Phone / Contact:</span>
-                      <strong>{selectedMovement.accountIdentifier || "875-423-4238"}</strong>
+                      <span>Destination / Account:</span>
+                      <strong>{selectedMovement.accountIdentifier || "Platform Wallet Vault"}</strong>
                     </div>
                     <div className="excel-meta-line">
                       <span>Direction:</span>
@@ -1537,8 +1537,8 @@ export function BrowserWallet({
                       <span>Customer ID:</span>
                       <strong style={{ fontFamily: "var(--font-mono)" }}>
                         {selectedMovement.contractId
-                          ? `GDE${selectedMovement.contractId.slice(0, 3).toUpperCase()}`
-                          : "GDE477"}
+                          ? `#${selectedMovement.contractId.slice(0, 8).toUpperCase()}`
+                          : `#${selectedMovement.id.slice(-6).toUpperCase()}`}
                       </strong>
                     </div>
                     <div className="excel-meta-line">
@@ -1560,51 +1560,28 @@ export function BrowserWallet({
                   </div>
                 </section>
 
-                {/* Metadata Block 2 (CSV Rows 10-12: Shipping Address & Make all checks payable to) */}
-                <section className="excel-meta-grid">
-                  <div className="excel-meta-box">
-                    <span className="excel-meta-box-label">Shipping Address:</span>
-                    <div style={{ fontWeight: 600, color: "var(--color-text)" }}>
-                      789 Oak Street, Syracuse, NY 13210
-                    </div>
-                    <div style={{ color: "var(--color-text-secondary)", fontSize: "0.78rem" }}>
-                      Settlement Destination: {selectedMovement.accountIdentifier || "Platform Wallet Vault · Addis Ababa, Ethiopia"}
-                    </div>
-                  </div>
-
-                  <div className="excel-meta-box">
-                    <span className="excel-meta-box-label">Make all checks payable to Shadow Beauty:</span>
-                    <div style={{ color: "var(--color-text-secondary)", fontSize: "0.8rem", lineHeight: 1.45 }}>
-                      1234 Tech Avenue, Austin, TX 73301, Phone: (512) 555-1234, Fax: (512) 555-5678, Email: info@24billions.com
-                    </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--color-text)", fontWeight: 700, marginTop: 2 }}>
-                      Payment Rail: {selectedMovement.paymentRail || "Internal Escrow Wallet"} · Ref: {selectedMovement.reference || selectedMovement.id}
-                    </div>
-                  </div>
-                </section>
-
-                {/* 7-Column Metadata Band (CSV Rows 14-15) */}
+                {/* 7-Column Metadata Band */}
                 <section className="excel-band-wrap">
                   <table className="excel-band-table">
                     <thead>
                       <tr>
-                        <th>Salesperson</th>
-                        <th>Job</th>
-                        <th>Shipping method</th>
-                        <th>Shipping terms</th>
-                        <th>Delivery date</th>
-                        <th>Payment terms</th>
-                        <th>Due date</th>
+                        <th>Party / Initiator</th>
+                        <th>Job / Contract</th>
+                        <th>Payment Rail</th>
+                        <th>Terms</th>
+                        <th>Value Date</th>
+                        <th>Settlement Type</th>
+                        <th>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
-                        <td>Avery Morgan</td>
+                        <td>{selectedMovement.counterpartyName || "Yekis Settlement Engine"}</td>
                         <td>{selectedMovement.contractTitle || selectedMovement.title}</td>
-                        <td>Air express · {selectedMovement.paymentRail || "Internal Escrow"}</td>
-                        <td>N/A ({selectedMovement.direction === "IN" ? "Credit" : "Debit"})</td>
+                        <td>{selectedMovement.paymentRail || "Internal Platform Escrow"}</td>
+                        <td>{selectedMovement.direction === "IN" ? "Escrow Deposit (Credit)" : "Disbursal (Debit)"}</td>
                         <td>{new Date(selectedMovement.date).toISOString().slice(0, 10)}</td>
-                        <td>On delivery</td>
+                        <td>Instant Settlement</td>
                         <td>
                           <strong
                             className={`excel-status-bold ${
@@ -1625,7 +1602,7 @@ export function BrowserWallet({
                   </table>
                 </section>
 
-                {/* Line Items Table (CSV Rows 17-23) */}
+                {/* Line Items Table */}
                 <section className="excel-table-wrap">
                   <table className="excel-table">
                     <thead>
@@ -1642,7 +1619,7 @@ export function BrowserWallet({
                     <tbody>
                       <tr>
                         <td>1</td>
-                        <td style={{ fontFamily: "var(--font-mono)" }}>238</td>
+                        <td style={{ fontFamily: "var(--font-mono)" }}>#{selectedMovement.id.slice(0, 8).toUpperCase()}</td>
                         <td>
                           <div style={{ fontWeight: 700, color: "var(--color-text)" }}>
                             {selectedMovement.title}

@@ -8,8 +8,9 @@ All notable implementation and documentation changes are recorded here.
 - **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul (2026-11-09)**:
   - Re-architected both the printable Receipt/Voucher view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.
   - Added the `.excel-sheet-*` design system in `apps/frontend/src/index.css` with clean tabular spreadsheet borders, tabular numeric formatting (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-theme light/dark parity, and `@media print` paper styles.
-  - Implemented the prominent `INVOICE` / `PAYOUT RECEIPT` header with `24Billions PVT. · Yekis Technologies PLC` lockup and tagline (*"Leading the Way in Health and Fitness Innovation · Digital Escrow"*).
-  - Implemented 2-column key-value metadata blocks (To, Address, Phone, TIN, Date, Invoice #, Customer ID, and Payment Remittance) plus the classic 7-column metadata band (`Salesperson | Job | Shipping method | Shipping terms | Delivery date | Payment terms | Due date`).
+  - Implemented the prominent `INVOICE` / `PAYOUT RECEIPT` header with `Yekis Technologies PLC` lockup and tagline (*"Custodial Escrow & Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ"*).
+  - Implemented 2-column key-value metadata blocks (To, Role, TIN/Account, Date, Invoice #, Customer ID, and Fiscal Status) plus the classic 7-column metadata band (`Party | Job/Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`).
+  - Removed physical shipping address and check payable remittance blocks, keeping the layout focused on digital escrow settlement.
   - Added line-items spreadsheet table with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` and right-aligned stacked totals calculations with classic Excel double-underline grand total borders.
   - Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs per project rules.
 
