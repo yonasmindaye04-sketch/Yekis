@@ -18,6 +18,8 @@ export const updateProfileSchema = z.object({
     .optional(),
   isAvailableForWork: z.boolean().optional(),
   profileVisibility: z.enum(["PUBLIC", "PROPOSERS", "PRIVATE"]).optional(),
+  languagePreference: z.enum(["en", "am", "om", "ti"]).optional(),
+  timezone: z.string().max(60).optional(),
   avatarUrl: z
     .string()
     .max(1_500_000, "Avatar image data is too large")

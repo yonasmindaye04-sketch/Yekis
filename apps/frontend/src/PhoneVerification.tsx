@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ShieldCheck, Loader2 } from "lucide-react";
+import { ShieldCheck, Loader2, Info } from "lucide-react";
+import { TbFileAlert } from "react-icons/tb";
+import { Alert, AlertTitle } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { api } from "./api/client";
 import { useI18n } from "./i18n";
 import "./PhoneVerification.css";
@@ -171,11 +174,25 @@ export function PhoneVerification({
           </form>
         )}
 
-        {info && <p className="pv-info">{info}</p>}
+        {info && (
+          <Alert variant="info" className="flex items-center gap-2.5 mt-2.5 text-left">
+            <Avatar className="size-6 rounded-[5px] shrink-0">
+              <AvatarFallback className="bg-sky-600 dark:bg-sky-600/80 rounded-[5px] text-white">
+                <Info className="size-4" />
+              </AvatarFallback>
+            </Avatar>
+            <AlertTitle className="text-xs">{info}</AlertTitle>
+          </Alert>
+        )}
         {error && (
-          <p className="pv-error" role="alert">
-            {error}
-          </p>
+          <Alert variant="destructive" className="flex items-center gap-2.5 mt-2.5 text-left">
+            <Avatar className="size-6 rounded-[5px] shrink-0">
+              <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                <TbFileAlert className="size-4" />
+              </AvatarFallback>
+            </Avatar>
+            <AlertTitle className="text-xs">{error}</AlertTitle>
+          </Alert>
         )}
 
         <div className="pv-actions">

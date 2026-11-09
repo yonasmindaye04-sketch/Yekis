@@ -29,6 +29,9 @@ import {
   formatEtbMajor,
   formatStatusLabel,
 } from "./pages/ops/components/ui";
+import { TbAlertTriangle } from "react-icons/tb";
+import { Alert, AlertTitle } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
@@ -490,16 +493,24 @@ export function JobsWorkspace({
   return (
     <div className="workflow-stack">
       {message && (
-        <p className="workflow-message">
-          <Check size={16} />
-          {message}
-        </p>
+        <Alert variant="success" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-emerald-600 dark:bg-emerald-600/80 rounded-[5px] text-white">
+              <Check className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{message}</AlertTitle>
+        </Alert>
       )}
       {errorMessage && (
-        <p className="workflow-message-error">
-          <AlertTriangle size={16} />
-          {errorMessage}
-        </p>
+        <Alert variant="destructive" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+              <TbAlertTriangle className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{errorMessage}</AlertTitle>
+        </Alert>
       )}
       {hiringPanel}
 
@@ -1416,16 +1427,24 @@ export function ContractsWorkspace({
       </div>
 
       {message && (
-        <p className="workflow-message">
-          <Check size={16} />
-          {message}
-        </p>
+        <Alert variant="success" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-emerald-600 dark:bg-emerald-600/80 rounded-[5px] text-white">
+              <Check className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{message}</AlertTitle>
+        </Alert>
       )}
       {errorMessage && (
-        <p className="workflow-message-error">
-          <AlertTriangle size={16} />
-          {errorMessage}
-        </p>
+        <Alert variant="destructive" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+              <TbAlertTriangle className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{errorMessage}</AlertTitle>
+        </Alert>
       )}
       {filteredContractEntries.length === 0 ? (
         <div className="sh-card" style={{ textAlign: "center", padding: "28px 16px" }}>
@@ -2191,16 +2210,24 @@ export function EscrowWorkspace({
       </div>
 
       {message && (
-        <p className="workflow-message">
-          <Check size={16} />
-          {message}
-        </p>
+        <Alert variant="success" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-emerald-600 dark:bg-emerald-600/80 rounded-[5px] text-white">
+              <Check className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{message}</AlertTitle>
+        </Alert>
       )}
       {errorMessage && (
-        <p className="workflow-message-error">
-          <AlertTriangle size={16} />
-          {errorMessage}
-        </p>
+        <Alert variant="destructive" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+              <TbAlertTriangle className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{errorMessage}</AlertTitle>
+        </Alert>
       )}
 
       {filteredMilestones.length === 0 ? (
@@ -2482,16 +2509,24 @@ export function DisputesWorkspace() {
   return (
     <div className="workflow-stack">
       {message && (
-        <p className="workflow-message">
-          <Check size={16} />
-          {message}
-        </p>
+        <Alert variant="success" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-emerald-600 dark:bg-emerald-600/80 rounded-[5px] text-white">
+              <Check className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{message}</AlertTitle>
+        </Alert>
       )}
       {errorMessage && (
-        <p className="workflow-message-error">
-          <AlertTriangle size={16} />
-          {errorMessage}
-        </p>
+        <Alert variant="destructive" className="flex items-center gap-2.5 mb-2.5">
+          <Avatar className="size-6 rounded-[5px] shrink-0">
+            <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+              <TbAlertTriangle className="size-3.5" />
+            </AvatarFallback>
+          </Avatar>
+          <AlertTitle>{errorMessage}</AlertTitle>
+        </Alert>
       )}
       {disputes.length === 0 ? (
         <div className="sh-card">

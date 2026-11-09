@@ -100,6 +100,86 @@ profileRouter.get(
   },
 );
 
+// GET /me/export
+profileRouter.get(
+  "/me/export",
+  requireAuth,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          kyc: { select: { tier: true, status: true } },
+          wallet: { select: { balanceMinor: true } },
+          _count: {
+            select: {
+              jobsPosted: true,
+              proposals: true,
+              contractsAsClient: true,
+              contractsAsFreelancer: true,
+              notifications: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        return res.status(404).json({ error: "USER_NOT_FOUND" });
+      }
+
+      const exportData = {
+        platform: "Yekis Jobs",
+        exportedAt: new Date().toISOString(),
+        account: {
+          ucid: user.ucid,
+          email: user.email,
+          phone: user.phone,
+          phoneVerified: !!user.phoneVerifiedAt,
+          role: user.role,
+          languagePreference: user.languagePreference,
+          timezone: user.timezone,
+          createdAt: user.createdAt,
+        },
+        profile: {
+          firstName: user.firstName,
+          lastName: user.lastName,
+          displayName: user.displayName,
+          bio: user.bio,
+          isAvailableForWork: user.isAvailableForWork,
+          profileVisibility: user.profileVisibility,
+          profileCompleteness: user.profileCompleteness,
+        },
+        verification: {
+          kycTier: user.cachedKycTier || user.kyc?.tier || "TIER_1",
+          kycStatus: user.cachedKycStatus || user.kyc?.status || "PENDING",
+        },
+        financials: {
+          currency: "ETB",
+          balanceMinor: user.wallet?.balanceMinor || 0,
+          totalEarnedNetMinor: user.totalEarnedNetMinor,
+          totalSpentGrossMinor: user.totalSpentGrossMinor,
+        },
+        activityCounts: {
+          jobsPosted: user._count.jobsPosted,
+          proposalsSubmitted: user._count.proposals,
+          contractsAsClient: user._count.contractsAsClient,
+          contractsAsFreelancer: user._count.contractsAsFreelancer,
+          notificationsReceived: user._count.notifications,
+        },
+      };
+
+      res.setHeader("Content-Disposition", `attachment; filename=yekis-export-${user.ucid}.json`);
+      res.setHeader("Content-Type", "application/json");
+      res.json(exportData);
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error exporting user data");
+      res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 // POST /:userId/report
 profileRouter.post(
   "/:userId/report",

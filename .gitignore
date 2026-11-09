@@ -49,3 +49,4 @@ docs/security/zap/*.md
 # TELEBIRR_PRIVATE_KEY into .env, so it must never be tracked.
 apps/backend/fix_env.js
 apps/backend/test-webhook.js
+scratch/

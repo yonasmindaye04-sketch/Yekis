@@ -1,7 +1,6 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useState } from "react";
 import {
-  AlertCircle,
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
@@ -30,6 +29,10 @@ import {
   FiscalDocumentSheet,
   type FiscalDocumentData,
 } from "./components/FiscalDocumentModal";
+import { TbFileAlert, TbAlertCircle } from "react-icons/tb";
+import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
+import { cn } from "@/lib/utils";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -320,7 +323,7 @@ export function BrowserWallet({
       clientName: m.counterpartyRole === "CLIENT" ? m.counterpartyName : undefined,
       freelancerName: m.counterpartyRole === "FREELANCER" ? m.counterpartyName : undefined,
       issuedAtIso: m.date,
-      statusLabel: m.status === "COMPLETED" ? "SETTLED · ተረጋግጧል" : `${m.status.replace("_", " ")} · በሂደት ላይ`,
+      statusLabel: m.status === "COMPLETED" ? "SETTLED" : m.status.replace("_", " "),
       includeVat15: false,
       includeWithholding: false,
       hasVerifiedTin: true,
@@ -411,8 +414,8 @@ export function BrowserWallet({
             <FileText size={15} />
             <span>
               {role === "FREELANCER"
-                ? "Payout & Tax Voucher (ደረሰኝ)"
-                : "Invoice & Escrow Receipt (ደረሰኝ)"}
+                ? "Payout & Tax Voucher"
+                : "Invoice & Escrow Receipt"}
             </span>
           </button>
           <WalletCards size={36} />
@@ -432,12 +435,13 @@ export function BrowserWallet({
 
           {/* Provider selector */}
           <p className="wallet-help">Choose where to receive your payout:</p>
-          <div className="payment-grid">
+          <div className="payment-grid payment-grid-3 withdraw-payment-grid">
             <button
+              type="button"
               className={
                 withdrawRail === "TELEBIRR"
-                  ? "payment-account selected"
-                  : "payment-account"
+                  ? "payment-account withdraw-account selected"
+                  : "payment-account withdraw-account"
               }
               onClick={() => setWithdrawRail("TELEBIRR")}
             >
@@ -445,10 +449,10 @@ export function BrowserWallet({
                 src="/payment/Telebirr.png"
                 alt="Telebirr"
                 style={{
-                  width: "70px",
-                  height: "70px",
+                  width: "40px",
+                  height: "40px",
                   objectFit: "contain",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   flexShrink: 0,
                 }}
               />
@@ -458,10 +462,11 @@ export function BrowserWallet({
               </div>
             </button>
             <button
+              type="button"
               className={
                 withdrawRail === "CBE_BIRR"
-                  ? "payment-account selected"
-                  : "payment-account"
+                  ? "payment-account withdraw-account selected"
+                  : "payment-account withdraw-account"
               }
               onClick={() => setWithdrawRail("CBE_BIRR")}
             >
@@ -469,10 +474,10 @@ export function BrowserWallet({
                 src="/payment/cbe payment.jpg"
                 alt="CBE Bank"
                 style={{
-                  width: "70px",
-                  height: "70px",
+                  width: "40px",
+                  height: "40px",
                   objectFit: "cover",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   flexShrink: 0,
                 }}
               />
@@ -482,10 +487,11 @@ export function BrowserWallet({
               </div>
             </button>
             <button
+              type="button"
               className={
                 withdrawRail === "M_PESA"
-                  ? "payment-account selected"
-                  : "payment-account"
+                  ? "payment-account withdraw-account selected"
+                  : "payment-account withdraw-account"
               }
               onClick={() => setWithdrawRail("M_PESA")}
             >
@@ -493,10 +499,10 @@ export function BrowserWallet({
                 src="/payment/mpesa.svg"
                 alt="Safaricom M-Pesa"
                 style={{
-                  width: "70px",
-                  height: "70px",
+                  width: "40px",
+                  height: "40px",
                   objectFit: "contain",
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   flexShrink: 0,
                 }}
               />
@@ -507,7 +513,7 @@ export function BrowserWallet({
             </button>
           </div>
 
-          <div className="browser-topup-fields">
+          <div className="browser-topup-fields withdraw-fields">
             <label>
               Amount (ETB)
               <input
@@ -540,14 +546,26 @@ export function BrowserWallet({
           </div>
 
           {message && (
-            <p
-              className={
-                messageIsError ? "wallet-message error" : "wallet-message"
-              }
+            <Alert variant={messageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
             >
-              {!messageIsError && <Check size={16} />}
-              {message}
-            </p>
+              <Avatar className="size-6 rounded-[5px] shrink-0">
+                <AvatarFallback
+                  className={cn(
+                    "rounded-[5px] text-white",
+                    messageIsError
+                      ? "bg-destructive dark:bg-destructive/60"
+                      : "bg-emerald-600 dark:bg-emerald-600/80"
+                  )}
+                >
+                  {messageIsError ? (
+                    <TbAlertCircle className="size-3.5" />
+                  ) : (
+                    <Check className="size-3.5" />
+                  )}
+                </AvatarFallback>
+              </Avatar>
+              <AlertTitle>{message}</AlertTitle>
+            </Alert>
           )}
 
           <button
@@ -686,28 +704,21 @@ export function BrowserWallet({
                 </label>
 
                 {checkoutFallback && (
-                  <div
-                    style={{
-                      background: "rgba(239, 68, 68, 0.08)",
-                      border: "1px solid rgba(239, 68, 68, 0.28)",
-                      borderRadius: 10,
-                      padding: "14px 16px",
-                      display: "grid",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                      <AlertCircle size={20} style={{ color: "#ef4444", flexShrink: 0, marginTop: 2 }} />
-                      <div>
-                        <strong style={{ color: "#ef4444", fontSize: "0.9rem", display: "block" }}>
-                          Automated Gateway Issue — Manual Verification Available
-                        </strong>
-                        <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                          Automatic {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} checkout could not be completed. Check Recent top-ups before retrying so you don’t accidentally pay twice. You can also use manual verification and submit your receipt.
-                        </p>
-                      </div>
+                  <Alert variant="destructive" className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 my-2">
+                    <Avatar className="size-6 rounded-[5px] shrink-0 self-start sm:self-center">
+                      <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                        <TbFileAlert className="size-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <AlertTitle className="font-semibold text-destructive">
+                        Automated Gateway Issue — Manual Verification Available
+                      </AlertTitle>
+                      <AlertDescription className="mt-1">
+                        Automatic {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} checkout could not be completed. Check Recent top-ups before retrying so you don’t accidentally pay twice. You can also use manual verification and submit your receipt.
+                      </AlertDescription>
                     </div>
-                    <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+                    <div className="flex gap-2 shrink-0 pt-2 sm:pt-0">
                       <button
                         type="button"
                         className="btn-primary"
@@ -725,7 +736,7 @@ export function BrowserWallet({
                         Dismiss
                       </button>
                     </div>
-                  </div>
+                  </Alert>
                 )}
 
                 <button
@@ -927,14 +938,26 @@ export function BrowserWallet({
             )}
 
             {message && (
-              <p
-                className={
-                  messageIsError ? "wallet-message error" : "wallet-message"
-                }
+              <Alert variant={messageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
               >
-                {!messageIsError && <Check size={16} />}
-                {message}
-              </p>
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback
+                    className={cn(
+                      "rounded-[5px] text-white",
+                      messageIsError
+                        ? "bg-destructive dark:bg-destructive/60"
+                        : "bg-emerald-600 dark:bg-emerald-600/80"
+                    )}
+                  >
+                    {messageIsError ? (
+                      <TbAlertCircle className="size-3.5" />
+                    ) : (
+                      <Check className="size-3.5" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                <AlertTitle>{message}</AlertTitle>
+              </Alert>
             )}
           </>
         )}
@@ -1019,8 +1042,8 @@ export function BrowserWallet({
                           issuedAtIso: item.createdAt,
                           statusLabel:
                             item.status === "APPROVED"
-                              ? "ESCROW CREDITED · ተረጋግጧል"
-                              : `${item.status.replace("_", " ")} · በሂደት ላይ`,
+                              ? "ESCROW FUNDED"
+                              : item.status.replace("_", " "),
                           includeVat15: true,
                           includeWithholding: true,
                           hasVerifiedTin: true,
@@ -1354,7 +1377,7 @@ export function BrowserWallet({
                           title="View official Ethiopian tax invoice / receipt voucher"
                         >
                           <FileText size={13} />
-                          <span>ደረሰኝ</span>
+                          <span>Receipt</span>
                         </button>
                         {topUpId && item.status === "PENDING" && item.description.includes("checkout") && (
                           <button
@@ -1707,7 +1730,7 @@ export function BrowserWallet({
                     }}
                   >
                     <FileText size={15} />
-                    <span>View Official Fiscal Receipt / Voucher (ደረሰኝ)</span>
+                    <span>View Official Fiscal Receipt / Voucher</span>
                   </button>
                   <button
                     type="button"

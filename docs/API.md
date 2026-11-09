@@ -303,6 +303,7 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | `PATCH` | `/api/v1/users/me/profile` | Authenticated | Update bio, title, location, etc. |
 | `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
 | `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
+| `GET` | `/api/v1/users/me/export` | Authenticated | Export complete GDPR/PDPP user personal data archive as JSON |
 | `GET` | `/api/v1/skills` | Public | List available skills |
 | `POST` | `/api/v1/contracts/:id/review` | Contract party | Submit double-blind review for contract |
 | `GET` | `/api/v1/users/:userId/reviews` | Public/Authenticated | List user's published reviews |
@@ -597,6 +598,8 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `POST` | `/api/v1/auth/oauth/facebook` | Public | Facebook OAuth sign-in / register |
 | `POST` | `/api/v1/auth/reset-password-request` | Public | Send password reset email |
 | `POST` | `/api/v1/auth/reset-password` | Public (valid reset token) | Set new password |
+| `POST` | `/api/v1/auth/change-password` | Authenticated | Change account password with current verification and optional session revocation |
+| `POST` | `/api/v1/auth/revoke-sessions` | Authenticated | Invalidate all remote sessions across all devices and refresh local session tokens |
 
 ## KYC (Full Route List)
 

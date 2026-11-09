@@ -4,6 +4,14 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Added
+- **Multi-Language Fiscal Receipt & Payout Voucher System (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09)**:
+  - **Clean Language Separation & Elimination of Mixed Strings**: Replaced previously mixed Amharic + English receipt strings (e.g. titles, subtitles, line items, metadata bands, table headers, payment rail descriptions, and legal compliance covenants) with 100% pure, dedicated translations across 4 Ethiopian working languages: **English (`en`)**, **Amharic (`am`)**, **Afaan Oromoo / Oromifa (`om`)**, and **Tigrigna (`ti`)**.
+  - **Default to English (`en`)**: Configured the receipt and voucher system to always default to clean English (`en`) as the baseline standard (`isDefault: true`).
+  - **In-Sheet Multi-Language Selector (`.excel-receipt-lang-bar`)**: Added a responsive, accessible segmented language switcher directly inside `.excel-sheet-top-bar` on the receipt preview (`FiscalDocumentModal.tsx`), allowing clients and freelancers to switch between English (Default), አማርኛ, Afaan Oromoo, and ትግርኛ with a single click. The selector automatically hides during print (`.no-print`).
+  - **Localized Ethiopian & Gregorian Date Support**: Implemented `formatReceiptDate` supporting standard Gregorian dates for English (`Nov 09, 2026`), Afaan Oromoo native calendar month formatting (`Sadaasa 09, 2026`), and Ethiopian Ge'ez calendar month dates for Amharic (`ጥቅምት 30, 2019 ዓ.ም`) and Tigrigna (`ጥቅምቲ 30, 2019 ዓ.ም`).
+  - **Status Resolution & Wallet Cleanup**: Added `resolveStatusLabel` to map transaction lifecycle statuses (`SETTLED`, `ESCROW FUNDED`, `DISBURSED`, `PROCESSING`) into clean localized terms without mixed bullet separators. Updated `BrowserWallet.tsx` receipt launcher buttons to clean unmixed English labels.
+
 ### Changed
 - **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul & Unified Layout (2026-11-09)**:
   - Re-architected both the printable Receipt/Voucher view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.

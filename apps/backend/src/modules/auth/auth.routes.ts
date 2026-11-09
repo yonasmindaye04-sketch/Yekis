@@ -13,6 +13,9 @@ import {
   resetPassword,
   refreshSession,
   logoutSession,
+  changePassword,
+  revokeOtherSessionsAndRefresh,
+  PasswordMismatchError,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
@@ -645,6 +648,83 @@ authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
   return res.json(user);
 });
+
+const changePasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_PASSWORD_CHANGE_ATTEMPTS" },
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, "Current password is required"),
+  newPassword: z.string().min(8, "Password must be at least 8 characters long"),
+  revokeOtherSessions: z.boolean().optional().default(true),
+});
+
+authRouter.post(
+  "/change-password",
+  requireAuth,
+  changePasswordLimiter,
+  async (req: AuthedRequest, res) => {
+    try {
+      const parsed = changePasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "VALIDATION_FAILED", details: parsed.error.issues });
+      }
+
+      const { currentPassword, newPassword, revokeOtherSessions } = parsed.data;
+      const result = await changePassword(
+        req.user!.id,
+        currentPassword,
+        newPassword,
+        revokeOtherSessions,
+      );
+
+      return res.json({
+        ok: true,
+        message: "Password changed successfully",
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (err) {
+      if (err instanceof PasswordMismatchError) {
+        return res
+          .status(400)
+          .json({ error: "PASSWORD_MISMATCH", message: err.message });
+      }
+      if (err instanceof Error) {
+        return res
+          .status(400)
+          .json({ error: "PASSWORD_CHANGE_FAILED", message: err.message });
+      }
+      logger.error({ err }, "Unexpected error in /change-password");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+authRouter.post(
+  "/revoke-sessions",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const result = await revokeOtherSessionsAndRefresh(req.user!.id);
+      return res.json({
+        ok: true,
+        message: "All other sessions revoked successfully",
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      });
+    } catch (err) {
+      logger.error({ err }, "Unexpected error in /revoke-sessions");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // Mounts POST /auth/phone/code and /auth/phone/verify onto authRouter.
 //

@@ -1,5 +1,6 @@
 # Agent Rules for Yekis Project
 
+- **MANDATORY PREREQUISITE**: Whenever asked to build, modify, or refactor any feature or page in this codebase, you MUST read and strictly adhere to `docs/rule.md` / `RULE.md` first. These rules apply to all agents and contributors working on this codebase.
 - Always update the Markdown (`.md`) documentation files to reflect the newest content and logic of the codebase whenever modifications are made.
 - Record every change, feature addition, or update we make to the codebase in the relevant documentation files (e.g. `docs/WALKTHROUGH.md`, `docs/COMPLETENESS_CHECKLIST.md`, `docs/API.md`, `docs/DATABASE.md`, `docs/PROJECT_CONTEXT.md`).
 - Never use low opacity background pill designs for status indicators (e.g., `.status-pill`). Always use bold text with a bold color design instead.

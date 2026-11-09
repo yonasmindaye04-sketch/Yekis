@@ -24,6 +24,8 @@ import { api } from "../../../api/client";
 import type { SelfProfile, UpdateProfilePayload } from "../../../api/client";
 import { useOpsUi } from "../opsUiContext";
 import { Banner, ErrorBox, Kv, LoadingBox, PageHead, SecTitle } from "../components/ui";
+import { Alert, AlertTitle } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 
 type Visibility = "PUBLIC" | "PROPOSERS" | "PRIVATE";
 
@@ -240,12 +242,14 @@ export default function ProfilePage() {
           <SecTitle icon={BadgeCheck}>Public details</SecTitle>
 
           {fieldError ? (
-            <div className="banner b-red" style={{ marginBottom: 14 }}>
-              <span className="banner-ic">
-                <TriangleAlert size={18} />
-              </span>
-              <div>{fieldError}</div>
-            </div>
+            <Alert variant="destructive" className="flex items-center gap-2.5 mb-2.5">
+              <Avatar className="size-6 rounded-[5px] shrink-0">
+                <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                  <TriangleAlert className="size-4" />
+                </AvatarFallback>
+              </Avatar>
+              <AlertTitle>{fieldError}</AlertTitle>
+            </Alert>
           ) : null}
 
           <div className="grid g2" style={{ gap: 12 }}>

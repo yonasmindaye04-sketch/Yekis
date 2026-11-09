@@ -481,3 +481,140 @@ export async function resetPassword(token: string, newPassword: string) {
     entityId: resetRecord.userId,
   });
 }
+
+export class PasswordMismatchError extends Error {
+  constructor(message = "Current password is incorrect") {
+    super(message);
+    this.name = "PasswordMismatchError";
+  }
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  revokeOtherSessions = true,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      ucid: true,
+      role: true,
+      staffRole: true,
+      passwordHash: true,
+      sessionVersion: true,
+    },
+  });
+
+  if (!user) {
+    throw new InvalidCredentialsError("User not found");
+  }
+
+  let validCurrent = false;
+  try {
+    validCurrent = await verifyPassword(user.passwordHash, currentPassword);
+  } catch {
+    validCurrent = false;
+  }
+
+  if (!validCurrent) {
+    throw new PasswordMismatchError("Current password is incorrect");
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+
+  let updatedUser = user;
+  if (revokeOtherSessions) {
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordSetAt: new Date(),
+        sessionVersion: { increment: 1 },
+      },
+      select: {
+        id: true,
+        ucid: true,
+        role: true,
+        staffRole: true,
+        passwordHash: true,
+        sessionVersion: true,
+      },
+    });
+  } else {
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordSetAt: new Date(),
+      },
+      select: {
+        id: true,
+        ucid: true,
+        role: true,
+        staffRole: true,
+        passwordHash: true,
+        sessionVersion: true,
+      },
+    });
+  }
+
+  await recordAuditEvent({
+    userId,
+    eventType: "PASSWORD_CHANGED",
+    entityType: "User",
+    entityId: userId,
+  });
+
+  const tokens = await createAuthTokens(
+    {
+      id: updatedUser.id,
+      ucid: updatedUser.ucid,
+      role: updatedUser.role,
+      staffRole: updatedUser.staffRole,
+      sessionVersion: updatedUser.sessionVersion,
+    },
+    ["pwd"],
+  );
+
+  return tokens;
+}
+
+export async function revokeOtherSessionsAndRefresh(userId: string) {
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+    select: {
+      id: true,
+      ucid: true,
+      role: true,
+      staffRole: true,
+      sessionVersion: true,
+    },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "SESSIONS_REVOKED",
+    entityType: "User",
+    entityId: userId,
+  });
+
+  const tokens = await createAuthTokens(
+    {
+      id: updatedUser.id,
+      ucid: updatedUser.ucid,
+      role: updatedUser.role,
+      staffRole: updatedUser.staffRole,
+      sessionVersion: updatedUser.sessionVersion,
+    },
+    ["pwd"],
+  );
+
+  return tokens;
+}
