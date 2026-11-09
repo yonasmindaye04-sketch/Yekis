@@ -2915,6 +2915,58 @@ img, video, iframe, canvas {
   font-family: var(--font-sans);
 }
 
+/* Document Top Bar with Actions (Directly inside sheet card) */
+.excel-sheet-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.excel-sheet-top-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.excel-sheet-top-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary);
+  background: var(--color-bg);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+}
+
+.excel-sheet-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.excel-interactive-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
 /* Sheet Top Toolbar (Action Controls) */
 .excel-toolbar {
   display: flex;
@@ -3085,6 +3137,41 @@ img, video, iframe, canvas {
   color: var(--color-text-secondary);
   font-variant-numeric: tabular-nums;
   margin-top: 2px;
+}
+
+/* Unified Single Wide Metadata Box (Unifying To & Invoice Info) */
+.excel-meta-wide-box {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.excel-meta-wide-col {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 0.83rem;
+}
+
+.excel-meta-wide-right {
+  border-left: 1px solid var(--color-border);
+}
+
+.excel-meta-recipient-name {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.excel-meta-recipient-sub {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 0.82rem;
 }
 
 /* 2-Column Excel Metadata Blocks (Rows 6-12 in CSV) */
@@ -3349,6 +3436,13 @@ img, video, iframe, canvas {
   }
   .excel-meta-grid {
     grid-template-columns: 1fr;
+  }
+  .excel-meta-wide-box {
+    grid-template-columns: 1fr;
+  }
+  .excel-meta-wide-right {
+    border-left: none;
+    border-top: 1px solid var(--color-border);
   }
   .excel-header {
     flex-direction: column;

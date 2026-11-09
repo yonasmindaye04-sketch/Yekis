@@ -2,14 +2,20 @@
 
 Last validated: 2026-11-09
 
-> **Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul (2026-11-09):**
+> **Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul & Unified Layout (2026-11-09):**
+> - **Unified Single Wide Metadata Box (`.excel-meta-wide-box`)**:
+>   - Unified the previously split two-box metadata section into a single, seamless, wide bordered box spanning the full width of the Excel sheet.
+>   - Left side (`.excel-meta-wide-left`): Recipient Party ("To:"), verified talent UCID/location, Role ("Client" / "Contractor"), and TIN.
+>   - Right side (`.excel-meta-wide-right`): Date (Gregorian and Ethiopian calendar), Invoice/Serial #, Customer ID, and Fiscal Status (`.excel-status-bold`).
+>   - Divided internally by a clean border line with responsive single-column stacking on mobile devices (`@media (max-width: 768px)`).
+> - **Removed Detached Floating Toolbar & Integrated In-Card Actions**:
+>   - Eliminated the awkward external floating toolbar card (`.excel-toolbar`) above the receipt that had caused visual detachment and large whitespace voids.
+>   - Replaced it with an integrated in-sheet top bar (`.excel-sheet-top-bar`) inside `.excel-sheet-card` featuring document status/serial badges and neatly aligned action buttons (`Copy Ref / ID`, `Print / Save PDF`, and `Close [X]`) marked `.no-print`.
+>   - Suppressed perspective switching tabs and tax simulation toggles (`interactiveControls={false}`) for settled wallet records in `BrowserWallet.tsx`, while preserving compact controls for fee simulation on `FeesPage.tsx`.
 > - **Excel Spreadsheet Design System (`index.css`, `FiscalDocumentModal.tsx`, `BrowserWallet.tsx`)**:
 >   - Re-architected both the printable Receipt view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.
 >   - **Spreadsheet Canvas & Layout (`.excel-sheet-*`)**: Crisp cell borders, high-contrast tabular typography (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-mode theme parity, and `@media print` white-paper styles.
 >   - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `Yekis Technologies PLC` corporate lockup, tagline ("Custodial Escrow & Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ"), and ERCA Platform TIN/VAT metadata.
->   - **Metadata Blocks**:
->     - Two-column structured grid pairing "To: <Counterparty Name>" (Client / Freelancer), Role, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID, and Fiscal Status.
->     - Removed physical shipping address and check payable remittance blocks, keeping the layout focused on digital escrow settlement.
 >   - **7-Column Metadata Band**: Exact spreadsheet header band displaying `Party / Agent | Job / Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`.
 >   - **Line Items Table**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
 >   - **Totals Box**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.

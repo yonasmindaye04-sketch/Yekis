@@ -1,13 +1,13 @@
 # Project Context
 
-> **Update 2026-11-09 (Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul):**
+> **Update 2026-11-09 (Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul & Unified Layout):**
 > 1. **Motivation & Scope:** Redesigned both the official receipt/voucher sheet (`FiscalDocumentModal.tsx`) and transaction movement detail view (`BrowserWallet.tsx`) to match the user's Excel invoice template.
 > 2. **Design System & Layout Architecture (`.excel-sheet-*` in `index.css`):**
 >    - **Clean Spreadsheet Canvas**: Crisp cell borders, high-contrast tabular typography (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-mode theme parity, and `@media print` white-paper styles.
+>    - **Unified Single Wide Metadata Box (`.excel-meta-wide-box`)**: Replaced split 2-box cards with a single continuous wide box with unified outer border, internal vertical column division, and responsive single-column mobile stacking.
+>    - **Removed Detached Floating Toolbar**: Removed the floating external toolbar card above the receipt that caused visual detachment and large whitespace voids. Integrated the utility actions (`Copy Ref / ID`, `Print / Save PDF`, `Close [X]`) directly inside `.excel-sheet-card` header (`.excel-sheet-top-bar`) marked `.no-print`.
+>    - **Suppressed Simulation Controls on Settled Records**: Configured `interactiveControls={false}` for wallet receipt views so settled transaction records do not display interactive perspective switching or tax toggles.
 >    - **Top Header**: High-visibility uppercase `INVOICE` / `PAYOUT RECEIPT` title with bilingual Amharic subtitle, paired with the `Yekis Technologies PLC` corporate lockup, tagline ("Custodial Escrow & Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ"), and ERCA Platform TIN/VAT metadata.
->    - **Metadata Blocks**:
->      - Two-column structured grid pairing "To: <Counterparty Name>" (Client / Freelancer), Role, and live editable/verified TIN input against Date, Invoice/Serial #, Customer ID, and Fiscal Status.
->      - Removed physical shipping address and check payable remittance blocks, keeping the layout focused on digital escrow settlement.
 >    - **7-Column Metadata Band**: Exact spreadsheet header band displaying `Party / Agent | Job / Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`.
 >    - **Line Items Table**: Full spreadsheet grid with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` supporting principal milestone release/deposit, platform fees, statutory 15% VAT, and ERCA withholding.
 >    - **Totals Box**: Right-aligned stacked calculations (`Total Discount`, `Subtotal`, `Sales tax`, `Total`) with classic Excel double-underline grand total border.

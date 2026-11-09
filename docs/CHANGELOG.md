@@ -5,11 +5,14 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Changed
-- **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul (2026-11-09)**:
+- **Receipt & Transaction Details Sections Excel Spreadsheet Overhaul & Unified Layout (2026-11-09)**:
   - Re-architected both the printable Receipt/Voucher view (`FiscalDocumentModal.tsx` / `FiscalDocumentSheet`) and the Transaction Movement Details modal (`BrowserWallet.tsx`) to match the user's Excel invoice template.
   - Added the `.excel-sheet-*` design system in `apps/frontend/src/index.css` with clean tabular spreadsheet borders, tabular numeric formatting (`font-variant-numeric: tabular-nums; font-family: var(--font-mono)`), dual-theme light/dark parity, and `@media print` paper styles.
+  - **Unified Single Wide Metadata Box (`.excel-meta-wide-box`)**: Replaced the two separate split boxes (`TO:` and `Date/Invoice#/Customer ID/Status`) with a single continuous wide box with unified outer border, internal vertical column division, and responsive single-column mobile stacking.
+  - **Removed Detached Floating Toolbar**: Removed the floating external toolbar card above the receipt that caused visual detachment and large whitespace voids. Integrated the utility actions (`Copy Ref / ID`, `Print / Save PDF`, `Close [X]`) directly inside `.excel-sheet-card` header (`.excel-sheet-top-bar`) marked `.no-print`.
+  - **Suppressed Simulation Controls on Settled Records**: Configured `interactiveControls={false}` for wallet receipt views so settled transaction records do not display interactive perspective switching or tax toggles.
   - Implemented the prominent `INVOICE` / `PAYOUT RECEIPT` header with `Yekis Technologies PLC` lockup and tagline (*"Custodial Escrow & Digital Work Marketplace · አዲስ አበባ፣ ኢትዮጵያ"*).
-  - Implemented 2-column key-value metadata blocks (To, Role, TIN/Account, Date, Invoice #, Customer ID, and Fiscal Status) plus the classic 7-column metadata band (`Party | Job/Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`).
+  - Implemented the classic 7-column metadata band (`Party | Job/Contract | Payment Rail | Terms | Delivery Date | Payment Terms | Status`).
   - Removed physical shipping address and check payable remittance blocks, keeping the layout focused on digital escrow settlement.
   - Added line-items spreadsheet table with `Qty | Item # | Description | Custom column | Unit price | Discount | Line total` and right-aligned stacked totals calculations with classic Excel double-underline grand total borders.
   - Enforced bold text with bold color for all status indicators (`.excel-status-bold`), eliminating all low-opacity pill designs per project rules.

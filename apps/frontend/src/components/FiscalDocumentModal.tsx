@@ -247,76 +247,35 @@ export function FiscalDocumentSheet({
 
   const sheetContent = (
     <div className="excel-sheet-wrap yk-fiscal-wrap">
-      {/* Interactive Toolbar (Hidden in @media print) */}
-      {interactiveControls && (
-        <div className="excel-toolbar no-print">
-          <div className="excel-toolbar-left" role="tablist" aria-label="Document recipient perspective">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeDocType === "CLIENT_INVOICE"}
-              className={`excel-tab-btn ${
-                activeDocType === "CLIENT_INVOICE" ? "is-active" : ""
-              }`}
-              onClick={() => setDocType("CLIENT_INVOICE")}
-            >
-              <FileText size={15} />
-              <span>Client Invoice &amp; Escrow Receipt</span>
-              <small>የደንበኛ ደረሰኝ</small>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeDocType === "FREELANCER_VOUCHER"}
-              className={`excel-tab-btn ${
-                activeDocType === "FREELANCER_VOUCHER" ? "is-active" : ""
-              }`}
-              onClick={() => setDocType("FREELANCER_VOUCHER")}
-            >
-              <FileCheck2 size={15} />
-              <span>Freelancer Payout &amp; WHT Voucher</span>
-              <small>የባለሙያ ክፍያ ማረጋገጫ</small>
-            </button>
+      {/* Printable Bilingual Excel-Styled Fiscal Sheet */}
+      <article
+        className="excel-sheet-card yk-fiscal-sheet"
+        aria-label={
+          activeDocType === "CLIENT_INVOICE"
+            ? "Excel-Styled Bilingual Client Commercial Invoice and Escrow Deposit Receipt"
+            : "Excel-Styled Bilingual Freelancer Payout Remittance and ERCA Withholding Tax Voucher"
+        }
+      >
+        {/* Document Top Bar with Actions (Integrated inside the card) */}
+        <div className="excel-sheet-top-bar no-print">
+          <div className="excel-sheet-top-left">
+            <span className="excel-sheet-top-badge">
+              <FileText size={13} />
+              {activeDocType === "CLIENT_INVOICE" ? "Escrow Receipt · ደረሰኝ" : "Payout Voucher · ክፍያ ማረጋገጫ"}
+            </span>
+            <span style={{ fontSize: "0.82rem", fontFamily: "var(--font-mono)", fontWeight: 700, color: "var(--color-text-secondary)" }}>
+              #{serial}
+            </span>
           </div>
 
-          <div className="excel-toolbar-right">
-            <button
-              type="button"
-              className={`excel-chip-toggle ${isVatEnabled ? "is-on" : ""}`}
-              onClick={toggleVat}
-              title="Toggle 15% Ethiopian Value Added Tax (ተ.እ.ታ)"
-            >
-              <span>15% VAT (ተ.እ.ታ): {isVatEnabled ? "ON" : "OFF"}</span>
-            </button>
-
-            <button
-              type="button"
-              className={`excel-chip-toggle ${isWhtEnabled ? "is-on" : ""}`}
-              onClick={toggleWht}
-              title="Toggle ERCA Withholding Tax (ዊዝሆልዲንግ ታክስ)"
-            >
-              <span>ERCA WHT: {isWhtEnabled ? "ON" : "EXEMPT"}</span>
-            </button>
-
-            {isWhtEnabled && (
-              <button
-                type="button"
-                className={`excel-chip-toggle ${isTinVerified ? "is-on" : ""}`}
-                onClick={toggleTinStatus}
-                title="Switch between 3% Verified TIN and 30% Unverified TIN rate"
-              >
-                <span>
-                  TIN Rate: {isTinVerified ? "3% Verified" : "30% Unverified"}
-                </span>
-              </button>
-            )}
-
+          <div className="excel-sheet-top-actions">
             <button
               type="button"
               className="excel-btn-action"
               onClick={copyReference}
+              title="Copy Reference"
             >
-              {copiedSerial ? <Check size={14} /> : <Copy size={14} />}
+              {copiedSerial ? <Check size={14} style={{ color: "var(--color-primary)" }} /> : <Copy size={14} />}
               <span>{copiedSerial ? "Copied ID" : "Copy Ref"}</span>
             </button>
 
@@ -324,6 +283,7 @@ export function FiscalDocumentSheet({
               type="button"
               className="excel-btn-action is-primary"
               onClick={handlePrint}
+              title="Print / Save PDF"
             >
               <Printer size={14} />
               <span>Print / Save PDF</span>
@@ -341,17 +301,74 @@ export function FiscalDocumentSheet({
             )}
           </div>
         </div>
-      )}
 
-      {/* Printable Bilingual Excel-Styled Fiscal Sheet */}
-      <article
-        className="excel-sheet-card yk-fiscal-sheet"
-        aria-label={
-          activeDocType === "CLIENT_INVOICE"
-            ? "Excel-Styled Bilingual Client Commercial Invoice and Escrow Deposit Receipt"
-            : "Excel-Styled Bilingual Freelancer Payout Remittance and ERCA Withholding Tax Voucher"
-        }
-      >
+        {/* Optional Interactive Controls (Used for simulation previews e.g. on FeesPage) */}
+        {interactiveControls && (
+          <div className="excel-interactive-controls no-print">
+            <div className="excel-toolbar-left" role="tablist" aria-label="Document recipient perspective">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeDocType === "CLIENT_INVOICE"}
+                className={`excel-tab-btn ${
+                  activeDocType === "CLIENT_INVOICE" ? "is-active" : ""
+                }`}
+                onClick={() => setDocType("CLIENT_INVOICE")}
+              >
+                <FileText size={14} />
+                <span>Client Invoice &amp; Escrow Receipt</span>
+                <small>የደንበኛ ደረሰኝ</small>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeDocType === "FREELANCER_VOUCHER"}
+                className={`excel-tab-btn ${
+                  activeDocType === "FREELANCER_VOUCHER" ? "is-active" : ""
+                }`}
+                onClick={() => setDocType("FREELANCER_VOUCHER")}
+              >
+                <FileCheck2 size={14} />
+                <span>Freelancer Payout &amp; WHT Voucher</span>
+                <small>የባለሙያ ክፍያ ማረጋገጫ</small>
+              </button>
+            </div>
+
+            <div className="excel-toolbar-right">
+              <button
+                type="button"
+                className={`excel-chip-toggle ${isVatEnabled ? "is-on" : ""}`}
+                onClick={toggleVat}
+                title="Toggle 15% Ethiopian Value Added Tax (ተ.እ.ታ)"
+              >
+                <span>15% VAT (ተ.እ.ታ): {isVatEnabled ? "ON" : "OFF"}</span>
+              </button>
+
+              <button
+                type="button"
+                className={`excel-chip-toggle ${isWhtEnabled ? "is-on" : ""}`}
+                onClick={toggleWht}
+                title="Toggle ERCA Withholding Tax (ዊዝሆልዲንግ ታክስ)"
+              >
+                <span>ERCA WHT: {isWhtEnabled ? "ON" : "EXEMPT"}</span>
+              </button>
+
+              {isWhtEnabled && (
+                <button
+                  type="button"
+                  className={`excel-chip-toggle ${isTinVerified ? "is-on" : ""}`}
+                  onClick={toggleTinStatus}
+                  title="Switch between 3% Verified TIN and 30% Unverified TIN rate"
+                >
+                  <span>
+                    TIN: {isTinVerified ? "3% Verified" : "30% Unverified"}
+                  </span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <header className="excel-header">
           <div className="excel-header-left">
@@ -378,14 +395,14 @@ export function FiscalDocumentSheet({
           </div>
         </header>
 
-        {/* Metadata Block (To / Date / Invoice # / Customer ID / Fiscal Status) */}
-        <section className="excel-meta-grid">
-          <div className="excel-meta-box">
+        {/* Unified Metadata Block (Single Wide Box) */}
+        <section className="excel-meta-wide-box">
+          <div className="excel-meta-wide-col excel-meta-wide-left">
             <span className="excel-meta-box-label">To:</span>
-            <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-text)" }}>
+            <div className="excel-meta-recipient-name">
               {activeDocType === "CLIENT_INVOICE" ? clientName : freelancerName}
             </div>
-            <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
+            <div className="excel-meta-recipient-sub">
               {activeDocType === "CLIENT_INVOICE"
                 ? (data.clientLocation || "Addis Ababa, Ethiopia")
                 : `Yekis Verified Talent · ${freelancerUcid}`}
@@ -413,7 +430,7 @@ export function FiscalDocumentSheet({
             </div>
           </div>
 
-          <div className="excel-meta-box">
+          <div className="excel-meta-wide-col excel-meta-wide-right">
             <div className="excel-meta-line">
               <span>Date:</span>
               <strong>{dates.greg} ({dates.eth})</strong>

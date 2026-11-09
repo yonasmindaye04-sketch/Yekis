@@ -1433,47 +1433,52 @@ export function BrowserWallet({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="excel-sheet-wrap">
-              {/* Modal Toolbar */}
-              <div className="excel-toolbar no-print">
-                <div className="excel-toolbar-left">
-                  <span className="sh-kbd" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
-                    #{selectedMovement.id.slice(0, 8).toUpperCase()}
-                  </span>
-                  <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                    {selectedMovement.category.replace(/_/g, " ")}
-                  </span>
-                </div>
-                <div className="excel-toolbar-right">
-                  <button
-                    type="button"
-                    className="excel-btn-action"
-                    onClick={() => copyTxFieldToClipboard(selectedMovement.id, "id")}
-                    title="Copy Movement ID"
-                  >
-                    {copiedTxField === "id" ? <Check size={14} style={{ color: "var(--color-primary)" }} /> : <Copy size={14} />}
-                    <span>{copiedTxField === "id" ? "Copied ID" : "Copy ID"}</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="excel-btn-action is-primary"
-                    onClick={() => window.print()}
-                  >
-                    <Printer size={14} />
-                    <span>Print / Save PDF</span>
-                  </button>
-                  <button
-                    type="button"
-                    className="excel-btn-close"
-                    onClick={() => setSelectedMovement(null)}
-                    aria-label="Close details"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-              </div>
-
               {/* Printable Excel-Styled Detail Sheet Card */}
               <article className="excel-sheet-card yk-fiscal-sheet">
+                {/* Document Top Bar with Actions (Integrated inside card) */}
+                <div className="excel-sheet-top-bar no-print">
+                  <div className="excel-sheet-top-left">
+                    <span className="excel-sheet-top-badge">
+                      <FileText size={13} />
+                      Movement Breakdown · ዝርዝር
+                    </span>
+                    <span className="sh-kbd" style={{ fontSize: "0.82rem", fontWeight: 700 }}>
+                      #{selectedMovement.id.slice(0, 8).toUpperCase()}
+                    </span>
+                    <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
+                      {selectedMovement.category.replace(/_/g, " ")}
+                    </span>
+                  </div>
+                  <div className="excel-sheet-top-actions">
+                    <button
+                      type="button"
+                      className="excel-btn-action"
+                      onClick={() => copyTxFieldToClipboard(selectedMovement.id, "id")}
+                      title="Copy Movement ID"
+                    >
+                      {copiedTxField === "id" ? <Check size={14} style={{ color: "var(--color-primary)" }} /> : <Copy size={14} />}
+                      <span>{copiedTxField === "id" ? "Copied ID" : "Copy ID"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="excel-btn-action is-primary"
+                      onClick={() => window.print()}
+                      title="Print or Save PDF"
+                    >
+                      <Printer size={14} />
+                      <span>Print / Save PDF</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="excel-btn-close"
+                      onClick={() => setSelectedMovement(null)}
+                      aria-label="Close details"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
                 {/* Header */}
                 <header className="excel-header">
                   <div className="excel-header-left">
@@ -1498,14 +1503,14 @@ export function BrowserWallet({
                   </div>
                 </header>
 
-                {/* Metadata Block (To / Date / Invoice # / Customer ID) */}
-                <section className="excel-meta-grid">
-                  <div className="excel-meta-box">
+                {/* Unified Metadata Block (Single Wide Box) */}
+                <section className="excel-meta-wide-box">
+                  <div className="excel-meta-wide-col excel-meta-wide-left">
                     <span className="excel-meta-box-label">To:</span>
-                    <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--color-text)" }}>
+                    <div className="excel-meta-recipient-name">
                       {selectedMovement.counterpartyName || "Platform User"}
                     </div>
-                    <div style={{ color: "var(--color-text-secondary)", fontWeight: 600 }}>
+                    <div className="excel-meta-recipient-sub">
                       {selectedMovement.counterpartyRole
                         ? `${selectedMovement.counterpartyRole} Party`
                         : (selectedMovement.direction === "IN" ? "Client Party" : "Freelancer Party")}
@@ -1522,7 +1527,7 @@ export function BrowserWallet({
                     </div>
                   </div>
 
-                  <div className="excel-meta-box">
+                  <div className="excel-meta-wide-col excel-meta-wide-right">
                     <div className="excel-meta-line">
                       <span>Date:</span>
                       <strong>{new Date(selectedMovement.date).toISOString().slice(0, 10)}</strong>
@@ -1723,7 +1728,7 @@ export function BrowserWallet({
       {activeFiscalDoc && (
         <FiscalDocumentSheet
           mode="modal"
-          interactiveControls={true}
+          interactiveControls={false}
           data={activeFiscalDoc}
           onClose={() => setActiveFiscalDoc(null)}
         />
