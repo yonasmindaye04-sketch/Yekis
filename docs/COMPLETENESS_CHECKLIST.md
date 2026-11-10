@@ -20,10 +20,11 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 ### Verified Gaps Recorded (not silently fixed)
 
 - [x] **ESC-003 — escrow semantics restored on the wallet-funding path**: `fundMilestoneFromWallet` now places the milestone in `ESCROW_HELD` instead of paying the freelancer at funding time. The freelancer is credited only on client acceptance, the 7-day auto-release, or a staff dispute resolution. The gig path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. `releaseMilestoneFunds()` is restricted to `SUBMITTED_FOR_REVIEW | DISPUTED`. Both funding paths now share one `placeEscrowHold()` helper. **Legal text unchanged.** Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts` (20 tests)
-- [ ] **Cooling-off right is not armed** — `Contract.cancellableUntil` is never written by `createContractFromProposal()`, so `cancelDuringCoolingOff()` always rejects with `CoolingOffExpiredError` and the 7-day statutory right is unavailable (`ESC-002`)
-- [ ] **No 10-year record retention / WORM** — `AuditLog` has no retention column and no purge job; there is no WORM module
-- [ ] **No PDPP data-subject rights tooling** — no export, portability, or erasure route or admin tool exists
-- [ ] **Breach alert is log-only** — the SMS/Telegram dispatch in `src/lib/breachAlert.ts` is commented out
+- [x] **Cooling-off right is armed** — `createContractFromProposal()` writes `Contract.cancellableUntil` as `createdAt + COOLING_OFF_DAYS` (env, default 7), so `cancelDuringCoolingOff()` works and the 7-day statutory right is actually available (`ESC-002`, resolved 2026-11-10). Covered by `apps/backend/tests/cooling-off.test.ts`
+- [x] **10-year record retention enforced in code** — `AuditLog.retentionUntil` is NOT NULL and stamped at write time; a daily `audit-purge` worker calls the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which deletes a row only when both its stamp has expired and it is at least ten years old. The application role keeps no `DELETE` privilege on the table. **WORM object storage is still a production configuration task** — see `docs/COMPLIANCE_BLOCKERS.md` #7
+- [x] **PDPP data-subject rights tooling** — `GET /api/v1/users/me/export` returns the complete archive; `POST /api/v1/users/me/erasure` destroys the personal content (including chat-attachment bytes), revokes marketing and analytics consent without deleting the consent history, closes the account, and retains the identity, financial and AML records the law requires. Covered by `apps/backend/tests/privacy-data-rights.test.ts`
+- [x] **Breach response chain implemented** — opening an incident contains it (revoking every affected user's sessions), notifies staff in-app/SMS/Telegram, notifies each affected user, records the incident in the audit log, starts the 72-hour clock and prepares an ECA filing template. **The ECA filing itself remains a human step** and detection is staff-confirmed — see `docs/COMPLIANCE_BLOCKERS.md` #6
+- [x] **Two-factor approval on withdrawals** — a withdrawal requires an SMS code that approves that one payout; the approval is consumed on completion, and a phone-verification code cannot substitute for it. Covered by `apps/backend/tests/withdrawal-2fa.test.ts`
 - [ ] **M-Pesa divergence** — Master Design `PAY-003` marks it removed; the code still ships the stub, enum value, schema union member, and top-up route support
 - [ ] **No frontend automated tests** — zero frontend test files and no test runner; the CI frontend job runs build only
 - [ ] **Deploy pipeline is a placeholder** — `.github/workflows/deploy.yml` exists but contains no deploy steps
@@ -241,8 +242,8 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Environment example and secret separation
 - [x] Helmet, CORS, rate limiting, body limits, and upload limits
 - [x] KYC and contract documents stored outside PostgreSQL
-- [ ] 10-year record retention enforced in code (`AuditLog` has no retention column and no purge job) and WORM object storage configured
-- [ ] PDPP data-subject access / portability / erasure tooling (no route or admin tool exists today)
+- [x] 10-year record retention enforced in code (`AuditLog.retentionUntil` + a purge job with a hard ten-year floor in SQL). **WORM object storage configuration is still open**
+- [x] PDPP data-subject access / portability / erasure tooling (complete export, and an erasure that retains the AML and financial records)
 - [ ] Ethiopian production hosting/data residency verified
 - [ ] Production object versioning, object lock, retention, and restore test
 - [ ] Production secret manager and rotation procedure

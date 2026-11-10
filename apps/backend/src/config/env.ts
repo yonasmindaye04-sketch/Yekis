@@ -229,8 +229,6 @@ const EnvSchema = z.object({
     .string()
     .optional()
     .transform((v) => v === "true"),
-  // Hours a cooling-off lock is applied for after a sensitive account change.
-  COOLING_OFF_HOURS: z.coerce.number().int().positive().default(24),
   // Current consent versions. A user who consented to an older version is
   // re-prompted before sensitive actions.
   TERMS_VERSION: z.string().default("1.0"),
@@ -269,6 +267,19 @@ const EnvSchema = z.object({
   WITHHOLDING_RATE_WITHOUT_TIN: z.coerce.number().default(0.3),
 
   AUTO_RELEASE_WINDOW_DAYS: z.coerce.number().default(AUTO_RELEASE_WINDOW_DAYS_DEFAULT), // matches Service Agreement Clause 2.2(b): automatic release after SEVEN calendar days
+
+  // Statutory cooling-off window — Electronic Transactions Proclamation
+  // No. 1205/2020. Distinct from AUTO_RELEASE_WINDOW_DAYS even though both
+  // default to 7: the first is a consumer right the client may exercise, the
+  // second is a contractual fallback the platform applies. Coupling them
+  // would mean a change to one silently moved the other.
+  COOLING_OFF_DAYS: z.coerce.number().default(7),
+
+  // Audit-log retention — 10 years. PDPP No. 1321/2024 / AML record-keeping
+  // both require financial and identity evidence to be held for a decade.
+  // Rows are marked with a retentionUntil stamp at write time and swept by
+  // the audit-purge worker once the period expires.
+  AUDIT_RETENTION_YEARS: z.coerce.number().default(10),
 
   // Payment reconciliation sweep (paymentReconcile.worker.ts) — the webhook
   // safety net. Polls Telebirr's queryOrder API for escrow transactions still

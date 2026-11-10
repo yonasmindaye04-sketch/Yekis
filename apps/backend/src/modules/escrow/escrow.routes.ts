@@ -24,6 +24,12 @@ import {
   PhoneNotVerifiedError,
 } from "./escrow.service.js";
 import { WithdrawalHeldForReviewError } from "../tms/tms.service.js";
+import {
+  requestWithdrawalOtp,
+  WithdrawalOtpInvalidError,
+  WithdrawalOtpRequiredError,
+  WithdrawalPhoneMissingError,
+} from "./withdrawalOtp.service.js";
 
 export const escrowRouter = Router();
 
@@ -357,16 +363,73 @@ escrowRouter.post(
         .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
 
     try {
+      // The SMS approval is verified inside the service, immediately before
+      // the wallet is debited. Doing it there rather than here means a user
+      // whose contract or balance blocks the withdrawal is told that without
+      // first being sent an SMS for a payout that was never going to happen,
+      // and it means no other path to the money can skip the check.
       const result = await withdrawFromWallet({
         userId: req.user!.id,
         amountMinor: parsed.data.amountMinor,
         provider: parsed.data.provider,
         payoutAccountIdentifier: parsed.data.payoutAccountIdentifier,
+        otpCode: parsed.data.otpCode,
       });
       return res.json(result);
     } catch (err) {
+      if (err instanceof WithdrawalOtpInvalidError) {
+        return res.status(400).json({
+          error: "WITHDRAWAL_CODE_INVALID",
+          message: err.message,
+        });
+      }
+      if (err instanceof WithdrawalOtpRequiredError) {
+        return res.status(403).json({
+          error: "WITHDRAWAL_CODE_REQUIRED",
+          message: err.message,
+        });
+      }
       if (handleKnownErrors(err, res)) return;
       logger.error({ err }, "Withdrawal failed");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+/**
+ * Requests the SMS code that approves a payout.
+ *
+ * Separate from the withdrawal itself so the client can send the code and
+ * let the user read it before they confirm the amount and destination — the
+ * point of a second factor is that it is checked against something the user
+ * is looking at, not pre-emptively collected.
+ */
+escrowRouter.post(
+  "/wallet/withdraw/otp",
+  requireAuth,
+  requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1"),
+  async (req: AuthedRequest, res) => {
+    try {
+      const challenge = await requestWithdrawalOtp(req.user!.id);
+      return res.json({
+        expiresAt: challenge.expiresAt,
+        retryAfterSec: challenge.retryAfterSec,
+        // Never in production. The local dev client cannot read an SMS, and
+        // a development build that refuses to work is a development build
+        // nobody tests.
+        ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
+      });
+    } catch (err) {
+      if (err instanceof WithdrawalPhoneMissingError) {
+        return res.status(409).json({
+          error: "PHONE_NOT_VERIFIED",
+          message: err.message,
+        });
+      }
+      if (err instanceof WithdrawalOtpRequiredError) {
+        return res.status(400).json({ error: "INVALID_REQUEST", message: err.message });
+      }
+      logger.error({ err }, "Failed to issue withdrawal approval code");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

@@ -246,7 +246,14 @@ describe("PARTIAL_SPLIT pays both parties and relieves the pool for both", () =>
 
     // Both parties were paid — this already worked.
     const balances = await walletBalances();
-    const feeMinor = Math.round(FREELANCER_SHARE * env.PLATFORM_FEE_RATE_FREELANCER);
+    // The release path deducts the platform fee AND the payment/disbursement
+    // provider fee. The provider fee used to be taken at cash-out as a
+    // hardcoded 0.5%; it is now collected once, on the transaction gross, at
+    // release time, so a share released through a dispute resolution carries it
+    // too.
+    const feeMinor =
+      Math.round(FREELANCER_SHARE * env.PLATFORM_FEE_RATE_FREELANCER) +
+      Math.round(FREELANCER_SHARE * env.PAYMENT_PROVIDER_FEE_RATE);
     expect(balances.client).toBe(CLIENT_SHARE);
     expect(balances.freelancer).toBe(FREELANCER_SHARE - feeMinor);
 

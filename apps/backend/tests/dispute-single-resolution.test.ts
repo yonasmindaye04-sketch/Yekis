@@ -47,6 +47,25 @@ function PLATFORM_FEE_MINOR(grossMinor: number): number {
   return Math.round(grossMinor * env.PLATFORM_FEE_RATE_FREELANCER);
 }
 
+/**
+ * The payment/disbursement provider fee — the second component of the fee
+ * engine.
+ *
+ * It used to be taken at cash-out as a hardcoded 0.5% of the payout. It is now
+ * collected once, on the transaction gross, at RELEASE time, so a release
+ * (including one that happens through a dispute resolution) deducts it too.
+ * These assertions have to account for it or they would pin the old, cheaper
+ * behaviour.
+ */
+function PROVIDER_FEE_MINOR(grossMinor: number): number {
+  return Math.round(grossMinor * env.PAYMENT_PROVIDER_FEE_RATE);
+}
+
+/** Everything the platform keeps off a release of `grossMinor`. */
+function TOTAL_FEES_MINOR(grossMinor: number): number {
+  return PLATFORM_FEE_MINOR(grossMinor) + PROVIDER_FEE_MINOR(grossMinor);
+}
+
 async function ensureStaff(): Promise<void> {
   const existing = await prisma.user.findFirst({
     where: { email: "f04-staff@test.et" },
@@ -239,7 +258,7 @@ describe("F-04 a dispute can only be resolved once", () => {
       expect(movedToClient).toBe(100000);
       expect(movedToFreelancer).toBe(0);
     } else {
-      expect(movedToFreelancer + PLATFORM_FEE_MINOR(100000)).toBe(100000);
+      expect(movedToFreelancer + TOTAL_FEES_MINOR(100000)).toBe(100000);
       expect(movedToClient).toBe(0);
     }
   });
@@ -271,7 +290,7 @@ describe("F-04 a dispute can only be resolved once", () => {
     const after = await walletBalances();
     expect(after).toEqual(mid);
     // The release happened exactly once: freelancer net + platform fee.
-    expect(after.freelancer - before.freelancer + PLATFORM_FEE_MINOR(100000)).toBe(100000);
+    expect(after.freelancer - before.freelancer + TOTAL_FEES_MINOR(100000)).toBe(100000);
     expect(after.client - before.client).toBe(0);
   });
 
@@ -540,7 +559,7 @@ describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
     // fee is read from the live config rather than hard-coded, so the
     // conservation assertion does not rot when the rate changes.
     expect(after.freelancer - before.freelancer).toBe(
-      50000 - PLATFORM_FEE_MINOR(50000),
+      50000 - TOTAL_FEES_MINOR(50000),
     );
     expect(after.client - before.client).toBe(50000);
 
@@ -576,14 +595,14 @@ describe("F-04 the normal arbitration path still works", () => {
     // no TIN. Conservation is what matters: the whole escrow left the platform
     // and landed in exactly one wallet.
     expect(after.freelancer - before.freelancer).toBe(
-      100000 - PLATFORM_FEE_MINOR(100000),
+      100000 - TOTAL_FEES_MINOR(100000),
     );
     expect(after.client - before.client).toBe(0);
     const paidOut =
       after.freelancer -
       before.freelancer +
       (after.client - before.client) +
-      PLATFORM_FEE_MINOR(100000);
+      TOTAL_FEES_MINOR(100000);
     expect(paidOut).toBe(100000);
 
     const final = await prisma.dispute.findUniqueOrThrow({ where: { id: disputeId } });

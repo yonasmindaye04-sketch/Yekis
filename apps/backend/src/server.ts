@@ -30,12 +30,14 @@ import "./queue/reviewReveal.worker.js";
 import "./queue/featuredRefresh.worker.js";
 import "./queue/tmsScan.worker.js";
 import "./queue/gigAutoRelease.worker.js";
+import "./queue/auditPurge.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
 import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
 import { schedulePaymentReconcileJob } from "./queue/paymentReconcile.worker.js";
 import { scheduleReviewRevealJob } from "./queue/reviewReveal.worker.js";
 import { scheduleFeaturedRefreshJob } from "./queue/featuredRefresh.worker.js";
 import { scheduleTmsScanJob } from "./queue/tmsScan.worker.js";
+import { scheduleAuditPurgeJob } from "./queue/auditPurge.worker.js";
 
 // T2-K: PEP stub safety guard — structurally impossible to run production with the mock.
 // A silent mock PEP check in production is a real AML/CTF regulatory violation, not
@@ -186,6 +188,9 @@ scheduleFeaturedRefreshJob().catch((err) =>
 );
 scheduleTmsScanJob().catch((err) =>
   logger.error({ err }, "Failed to schedule TMS scan job"),
+);
+scheduleAuditPurgeJob().catch((err) =>
+  logger.error({ err }, "Failed to schedule audit retention purge job"),
 );
 
 // === MAIN FUNCTIONS ===

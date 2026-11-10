@@ -184,9 +184,30 @@ The 7-day cooling-off cancellation right may only be exercised by the client whi
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/submit` | Contract freelancer | Mark funded work delivered and schedule auto-release |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
-| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 1 verified (Tier 2 if TIN enabled) | Request payout to provider account |
+| `POST` | `/api/v1/escrow/wallet/withdraw/otp` | Tier 1 verified (Tier 2 if TIN enabled) | Send the SMS code that approves one payout |
+| `POST` | `/api/v1/escrow/wallet/withdraw` | Tier 1 verified (Tier 2 if TIN enabled) | Request payout to provider account. Requires `otpCode` |
 | `GET` | `/api/v1/escrow/wallet/transactions` | Authenticated | Return user transaction movements & double-entry ledger history |
 | `GET` | `/api/v1/escrow/transactions` | Authenticated | Alias for wallet transactions |
+
+Withdrawal body:
+
+```json
+{
+  "provider": "TELEBIRR",
+  "amountMinor": 250000,
+  "payoutAccountIdentifier": "+251911000000",
+  "otpCode": "123456"
+}
+```
+
+**Two-factor approval is mandatory for withdrawals.** `otpCode` is the code
+sent by `POST /api/v1/escrow/wallet/withdraw/otp`; it approves **one** payout
+and is consumed when that payout completes. A withdrawal without a valid code
+is refused with `403 WITHDRAWAL_CODE_REQUIRED` or `400
+WITHDRAWAL_CODE_INVALID`, and no money moves. Business-rule refusals (an
+active contract, an open dispute, a non-zero wallet balance) are reported
+before the code is needed, so a blocked withdrawal never sends an SMS for a
+payout that was never going to happen.
 
 Funding body (wallet-first):
 
@@ -336,7 +357,8 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | `PATCH` | `/api/v1/users/me/profile` | Authenticated | Update bio, title, location, etc. |
 | `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
 | `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
-| `GET` | `/api/v1/users/me/export` | Authenticated | Export complete GDPR/PDPP user personal data archive as JSON |
+| `GET` | `/api/v1/users/me/export` | Authenticated | Export the complete PDPP data-subject archive as JSON — account, profile, verification, financials, marketplace activity, communications (consents, notifications, chat, DMs) and the compliance records the platform holds |
+| `POST` | `/api/v1/users/me/erasure` | Authenticated + fresh auth (5 min) | Erase personal data under PDPP Art. 15. Destroys profile, chat, DMs, portfolio, marketing and analytics data and the credentials; retains the identity, financial and AML records the law requires; closes the account. Returns `409 ERASURE_BLOCKED` with the outstanding items when money is still in flight |
 | `GET` | `/api/v1/skills` | Public | List available skills |
 | `POST` | `/api/v1/contracts/:id/review` | Contract party | Submit double-blind review for contract |
 | `GET` | `/api/v1/users/:userId/reviews` | Public/Authenticated | List user's published reviews |
@@ -472,6 +494,8 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates (real sums/counts) |
 | `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics + recent activity feed |
 | `GET` | `/api/v1/admin/monitoring/health` | `monitoring.view` | DB / Redis / object-store / Telebirr-config checks + ledger balance |
+| `POST` | `/api/v1/admin/incidents/breach` | `incidents.manage` | Open a data-breach incident: revokes the sessions of the affected users, alerts staff by SMS/Telegram, notifies the affected users, and returns the ECA notification template plus the 72-hour deadline |
+| `GET` | `/api/v1/admin/incidents/breaches` | `incidents.manage` | List open breach incidents with the ECA filing deadline and whether it is still inside the 72-hour window |
 
 Existing protected queue routes (KYC, top-ups, disputes, TMS, etc.) remain on `requireStaffRole(...)` and are unchanged by Phase 1.
 

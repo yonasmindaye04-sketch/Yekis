@@ -13,6 +13,13 @@ export class PhoneCodeRateLimitedError extends Error {}
 export class PhoneCodeDeliveryFailedError extends Error {}
 export class PhoneCodeInvalidError extends Error {}
 
+/**
+ * What a code proves. Each purpose has its own outstanding code, so the
+ * "one live code per number" rule cannot be used to cancel a pending
+ * withdrawal approval by asking for a phone-verification code.
+ */
+export type PhoneCodePurpose = "PHONE_VERIFICATION" | "WITHDRAWAL";
+
 export interface PhoneChallenge {
   /** Only returned in non-production so tests and local dev can read the code. */
   devCode?: string;
@@ -33,7 +40,7 @@ function now(): number {
 }
 
 /** sha256(salt + code), hex. Salted so one leaked row cannot be tabulated. */
-function hashCode(salt: string, code: string): string {
+export function hashCode(salt: string, code: string): string {
   return createHash("sha256").update(`${salt}:${code}`).digest("hex");
 }
 
@@ -69,16 +76,28 @@ export function normalizePhone(raw: string): string {
 export async function requestPhoneCode(params: {
   phone: string;
   userId?: string | null;
+  purpose?: PhoneCodePurpose;
+  /**
+   * Overrides the SMS wording. `{code}` is replaced with the code.
+   *
+   * A code that approves a payout must say so — "your verification code" gives
+   * the holder of the phone no way to tell an approving message from a login
+   * message, which is exactly the confusion that gets someone phished into
+   * approving a payout.
+   */
+  message?: string;
 }): Promise<PhoneChallenge> {
   const phone = normalizePhone(params.phone);
+  const purpose = params.purpose ?? "PHONE_VERIFICATION";
 
   if (!/^\+251[1-9]\d{8}$/.test(phone)) {
     throw new PhoneCodeInvalidError("Enter a valid Ethiopian mobile number.");
   }
 
-  // Throttle by number. Without this, anyone can burn a target's SMS quota.
+  // Throttle by number AND purpose. Without this, anyone can burn a target's
+  // SMS quota.
   const issuesSince = await prisma.phoneVerificationCode.count({
-    where: { phone, createdAt: { gte: new Date(now() - ISSUE_WINDOW_MS) } },
+    where: { phone, purpose, createdAt: { gte: new Date(now() - ISSUE_WINDOW_MS) } },
   });
   if (issuesSince >= MAX_ISSUES_PER_WINDOW) {
     throw new PhoneCodeRateLimitedError(
@@ -87,7 +106,7 @@ export async function requestPhoneCode(params: {
   }
 
   const existing = await prisma.phoneVerificationCode.findFirst({
-    where: { phone, verifiedAt: null },
+    where: { phone, purpose, verifiedAt: null },
     orderBy: { createdAt: "desc" },
   });
 
@@ -117,13 +136,14 @@ export async function requestPhoneCode(params: {
     // the two and would fail). The check below is inside the transaction so a
     // concurrent second send cannot slip a row in between the delete and insert.
     await tx.phoneVerificationCode.deleteMany({
-      where: { phone, verifiedAt: null },
+      where: { phone, purpose, verifiedAt: null },
     });
 
     const created = await tx.phoneVerificationCode.create({
       data: {
         phone,
         userId: params.userId ?? null,
+        purpose,
         codeHash: hashCode(salt, code),
         salt,
         expiresAt,
@@ -134,7 +154,7 @@ export async function requestPhoneCode(params: {
     // while we were working, the oldest is discarded so only the newest code is
     // ever live. An older live code is the thing an attacker would replay.
     const stillOpen = await tx.phoneVerificationCode.findMany({
-      where: { phone, verifiedAt: null },
+      where: { phone, purpose, verifiedAt: null },
       orderBy: { createdAt: "desc" },
       select: { id: true },
     });
@@ -149,7 +169,9 @@ export async function requestPhoneCode(params: {
 
   const { sent } = await sendSms({
     phone,
-    message: `Your Yekis verification code is ${code}. It expires in 10 minutes. Never share it.`,
+    message: params.message
+      ? params.message.replace("{code}", code)
+      : `Your Yekis verification code is ${code}. It expires in 10 minutes. Never share it.`,
   });
 
   if (!sent) {
@@ -182,12 +204,14 @@ export async function verifyPhoneCode(params: {
   phone: string;
   code: string;
   userId?: string | null;
+  purpose?: PhoneCodePurpose;
 }): Promise<{ verified: true }> {
   const phone = normalizePhone(params.phone);
   const submitted = params.code.trim();
+  const purpose = params.purpose ?? "PHONE_VERIFICATION";
 
   const row = await prisma.phoneVerificationCode.findFirst({
-    where: { phone, verifiedAt: null },
+    where: { phone, purpose, verifiedAt: null },
     orderBy: { createdAt: "desc" },
   });
 
@@ -243,7 +267,12 @@ export async function verifyPhoneCode(params: {
     // Conditional on `phone` so a verification for one number can never mark a
     // *different* number on the same account as verified. `normalizePhone`
     // already ran on both sides, so this is an exact comparison.
-    if (params.userId) {
+    //
+    // Only a PHONE_VERIFICATION code marks the number as verified. A
+    // WITHDRAWAL code proves a different thing — that the account holder
+    // approved one payout — and must not be able to set the account-wide
+    // "this number is mine" flag by itself.
+    if (params.userId && purpose === "PHONE_VERIFICATION") {
       await tx.user.updateMany({
         where: { id: params.userId, phone },
         data: { phoneVerifiedAt: verifiedAt },
@@ -265,10 +294,12 @@ export async function verifyPhoneCode(params: {
 export async function hasRecentVerifiedCode(
   phone: string,
   maxAgeMs = CODE_TTL_MS,
+  purpose: PhoneCodePurpose = "PHONE_VERIFICATION",
 ): Promise<boolean> {
   const row = await prisma.phoneVerificationCode.findFirst({
     where: {
       phone: normalizePhone(phone),
+      purpose,
       verifiedAt: { not: null, gte: new Date(now() - maxAgeMs) },
     },
     orderBy: { verifiedAt: "desc" },
@@ -277,10 +308,22 @@ export async function hasRecentVerifiedCode(
   return row !== null;
 }
 
-/** Test/maintenance helper: clear outstanding challenges for a number. */
-export async function clearPhoneChallenges(phone: string): Promise<number> {
+/**
+ * Test/maintenance helper: clear outstanding challenges for a number.
+ *
+ * Scoped by purpose by default. Pass "ALL" to clear every purpose for the
+ * number, which is what a full reset wants.
+ */
+export async function clearPhoneChallenges(
+  phone: string,
+  purpose: PhoneCodePurpose | "ALL" = "PHONE_VERIFICATION",
+): Promise<number> {
   const { count } = await prisma.phoneVerificationCode.deleteMany({
-    where: { phone: normalizePhone(phone), verifiedAt: null },
+    where: {
+      phone: normalizePhone(phone),
+      verifiedAt: null,
+      ...(purpose === "ALL" ? {} : { purpose }),
+    },
   });
   return count;
 }

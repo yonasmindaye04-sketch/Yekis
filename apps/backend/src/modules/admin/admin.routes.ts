@@ -7,6 +7,7 @@ import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
+import { triggerBreachAlert } from "../../lib/breachAlert.js";
 import type { StaffRole } from "@prisma/client";
 import {
   PERMISSIONS,
@@ -943,6 +944,111 @@ adminRouter.get(
       return res.json(await getSystemHealth());
     } catch (err) {
       logger.error({ err }, "Failed to fetch system health");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- Security incidents (PDPP breach workflow) ----------
+/**
+ * Opens a data-breach incident.
+ *
+ * Detection is human-confirmed: a staff member opens the incident once they
+ * have confirmed a breach actually occurred. From that moment the module
+ * takes over — sessions are revoked, staff and affected users are notified,
+ * and the PDPP 72-hour ECA notification clock starts.
+ *
+ * Step-up auth is required: this revokes live sessions and sends SMS to
+ * every affected user, so it must not be reachable with a session that was
+ * opened days ago.
+ */
+adminRouter.post(
+  "/incidents/breach",
+  requireFreshAuth(300),
+  requirePermission("incidents.manage"),
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({
+        severity: z.enum(["HIGH", "CRITICAL"]),
+        description: z.string().min(10).max(4000),
+        affectedSystems: z.array(z.string().min(1).max(120)).min(1).max(20),
+        estimatedUsersImpacted: z.number().int().min(0).optional(),
+        affectedUserIds: z.array(z.string().min(1)).max(5000).optional(),
+        dataCategories: z.array(z.string().min(1).max(120)).max(20).optional(),
+      })
+      .safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "VALIDATION_ERROR",
+        details: parsed.error.flatten(),
+      });
+    }
+
+    try {
+      const outcome = await triggerBreachAlert({
+        ...parsed.data,
+        openedByStaffId: req.user!.id,
+      });
+      return res.status(201).json(outcome);
+    } catch (err) {
+      logger.error({ err }, "Failed to open security breach incident");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+/**
+ * Lists open breach incidents with the ECA notification deadline, so the
+ * compliance desk can see which filings are still inside the 72-hour window.
+ */
+adminRouter.get(
+  "/incidents/breaches",
+  requirePermission("incidents.manage"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      const incidents = await prisma.auditLog.findMany({
+        where: { eventType: "SECURITY_BREACH_OPENED" },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          createdAt: true,
+          metadata: true,
+          actorRole: true,
+        },
+      });
+
+      const now = Date.now();
+      return res.json({
+        items: incidents.map((i) => {
+          const meta = (i.metadata ?? {}) as Record<string, unknown>;
+          const deadline =
+            typeof meta.ecaNotificationDeadline === "string"
+              ? meta.ecaNotificationDeadline
+              : null;
+          const msRemaining = deadline
+            ? new Date(deadline).getTime() - now
+            : null;
+          return {
+            id: i.id,
+            openedAt: i.createdAt,
+            severity: meta.severity ?? null,
+            description: meta.description ?? null,
+            affectedSystems: meta.affectedSystems ?? [],
+            dataCategories: meta.dataCategories ?? [],
+            estimatedUsersImpacted: meta.estimatedUsersImpacted ?? null,
+            affectedUserCount: Array.isArray(meta.affectedUserIds)
+              ? meta.affectedUserIds.length
+              : null,
+            ecaNotificationDeadline: deadline,
+            msUntilEcaDeadline: msRemaining,
+            withinFilingWindow: msRemaining === null ? null : msRemaining > 0,
+          };
+        }),
+      });
+    } catch (err) {
+      logger.error({ err }, "Failed to list security breach incidents");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

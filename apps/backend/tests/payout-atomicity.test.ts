@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
 import { env } from "../src/config/env.js";
+import { grantWithdrawalApproval } from "./helpers/withdrawalOtp.js";
 
 /**
  * Payout atomicity and the settle race.
@@ -105,6 +106,7 @@ async function cleanup() {
     await prisma.notification.deleteMany({ where: { userId: { in: ids } } });
     await prisma.transactionFlag.deleteMany({ where: { userId: { in: ids } } });
     await prisma.payoutTransaction.deleteMany({ where: { userId: { in: ids } } });
+    await prisma.phoneVerificationCode.deleteMany({ where: { userId: { in: ids } } });
     await prisma.wallet.deleteMany({ where: { userId: { in: ids } } });
     await prisma.kycRecord.deleteMany({ where: { userId: { in: ids } } });
     await prisma.ledgerAccount.deleteMany({ where: { code: { in: ids.map(getUserAccountCode) } } });
@@ -253,6 +255,7 @@ describe("the withdrawal is atomic", () => {
       amountMinor: AMOUNT,
       provider: "TELEBIRR" as never,
       payoutAccountIdentifier: user.phone,
+      otpCode: await grantWithdrawalApproval(user.id),
     });
 
     expect(await balanceOf(user.id)).toBe(before - AMOUNT);
@@ -288,6 +291,7 @@ describe("the withdrawal is atomic", () => {
         amountMinor: AMOUNT,
         provider: "TELEBIRR" as never,
         payoutAccountIdentifier: user.phone,
+        otpCode: await grantWithdrawalApproval(user.id),
       }),
     ).rejects.toThrow(/injected/i);
     clearTransactionFault();
@@ -316,6 +320,7 @@ describe("the withdrawal is atomic", () => {
       amountMinor: AMOUNT,
       provider: "TELEBIRR" as never,
       payoutAccountIdentifier: user.phone,
+      otpCode: await grantWithdrawalApproval(user.id),
     });
 
     // Both, together. Before the fix the payout was CONFIRMED first and the
@@ -330,16 +335,26 @@ describe("the withdrawal is atomic", () => {
     expect(journal, "a CONFIRMED payout must have a journal").toBeTruthy();
     expect(journal!.referenceType).toBe("WITHDRAWAL_PAYOUT");
 
-    // Exact amounts: user liability debited gross, asset credited net, fee to
-    // revenue.
+    // Exact amounts: the user liability is debited gross and the settlement
+    // asset credited gross.
+    //
+    // There is NO disbursement-fee line here any more. The provider fee used
+    // to be taken at cash-out, as a hardcoded 0.5% of the payout, and the
+    // journal split the payout between the asset and a revenue account. It is
+    // now collected once, on the transaction gross, at RELEASE time, and
+    // routed to REVENUE-DISBURSEMENT-FEES there — so the platform's take is a
+    // single 7.5% instead of 7% here and a surprise 0.5% at cash-out.
+    //
+    // Taking it in both places would have made the take 8%.
     const byCode = new Map(journal!.entries.map((e) => [e.account.code, e]));
     expect(byCode.get(getUserAccountCode(user.id))?.debitMinor).toBe(AMOUNT);
     expect(byCode.get(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code)?.creditMinor).toBe(
-      AMOUNT - FEE_MINOR,
+      AMOUNT,
     );
-    expect(byCode.get(CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.code)?.creditMinor).toBe(
-      FEE_MINOR,
-    );
+    expect(
+      byCode.get(CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.code),
+      "the provider fee is collected at release, not at cash-out",
+    ).toBeUndefined();
   });
 
   it("does not confirm the payout when the journal cannot be posted", async () => {
@@ -359,6 +374,7 @@ describe("the withdrawal is atomic", () => {
         amountMinor: AMOUNT,
         provider: "TELEBIRR" as never,
         payoutAccountIdentifier: user.phone,
+        otpCode: await grantWithdrawalApproval(user.id),
       }),
     ).rejects.toThrow(/injected/i);
     clearTransactionFault();
@@ -382,6 +398,7 @@ describe("the withdrawal is atomic", () => {
         amountMinor: AMOUNT,
         provider: "TELEBIRR" as never,
         payoutAccountIdentifier: user.phone,
+        otpCode: await grantWithdrawalApproval(user.id),
       }),
     ).rejects.toThrow();
 

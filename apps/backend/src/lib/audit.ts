@@ -1,6 +1,7 @@
 // === IMPORTS ===
 import { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
+import { env } from "../config/env.js";
 
 /**
  * Writes an append-only audit entry. Called for every event that matters for
@@ -18,6 +19,10 @@ import { prisma } from "./prisma.js";
  * Writes one append-only audit row. All new fields are optional so existing
  * call sites keep compiling unchanged; new admin/financial flows should
  * populate `previousState` / `newState` / `amountMinor` where relevant.
+ *
+ * Every row carries its own retention expiry (`retentionUntil`), stamped from
+ * the configured retention period. Without it the table had no defined
+ * deletion point at all: append-only with no purge, forever.
  */
 export async function recordAuditEvent(params: {
   userId?: string;
@@ -47,7 +52,12 @@ export async function recordAuditEvent(params: {
   tx?: Prisma.TransactionClient;
 }) {
   const client = params.tx ?? prisma;
-  await client.auditLog.create({
+  const createdAt = new Date();
+  const retentionUntil = new Date(
+    createdAt.getTime() + env.AUDIT_RETENTION_YEARS * 365.25 * 24 * 60 * 60 * 1000,
+  );
+
+  return client.auditLog.create({
     data: {
       userId: params.userId,
       eventType: params.eventType,
@@ -61,6 +71,8 @@ export async function recordAuditEvent(params: {
       amountMinor: params.amountMinor ?? null,
       requestId: params.requestId ?? null,
       ipAddress: params.ipAddress ?? null,
+      createdAt,
+      retentionUntil,
     },
   });
 }

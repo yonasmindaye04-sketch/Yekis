@@ -74,7 +74,8 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 | `tms` | `/api/v1/tms` | AML flags (structuring, velocity, round-amounts), review queue, STR recording, hold lift |
 | `notifications` | `/api/v1/notifications` | In-app notification ledger, read state |
 | `chat` | `/api/v1/chat` | Guest/authenticated support conversations, direct 2-party negotiation threads, auto staff assignment, file attachments, Mini-Me AI co-pilot |
-| `profiles` | `/api/v1/users` | Public profiles, bio/skills/portfolio, visibility gates, completeness score, profile reporting |
+| `profiles` | `/api/v1/users` | Public profiles, bio/skills/portfolio, visibility gates, completeness score, profile reporting, PDPP data-subject export and erasure |
+| `privacy` | N/A (Internal service) | PDPP data-subject rights: full personal-data export, and erasure that destroys personal content while retaining the AML and financial records the law requires (`modules/privacy/privacy.service.ts`) |
 | `skills` | `/api/v1/skills` | Standardized skill taxonomy |
 | `reviews` | `/api/v1/reviews` | Double-blind contract review system, Bayesian rating averages, public responses |
 | `featured` | `/api/v1/featured` | Talent carousel (staff-pinned, top-rated, recently verified algorithm) |
@@ -148,7 +149,7 @@ Submitting a milestone schedules a warning at 24 hours before the deadline and a
 
 > **ESC-003 — resolved 2026-11-09.** Commit `a03259a` had made the wallet-funding path debit the client and credit the freelancer inside the funding transaction, claiming the milestone straight to `RELEASED`. That bypassed the delivery step, the client acceptance step, the 24-hour warning, the 7-day auto-release timer, and dispute (which accepts only `ESCROW_HELD | WORK_IN_PROGRESS | SUBMITTED_FOR_REVIEW`). The fix restored escrow semantics on the wallet path and narrowed `releaseMilestoneFunds()` back to `SUBMITTED_FOR_REVIEW | DISPUTED`; the gig funding path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. **Legal text unchanged** — the code was brought back into line with Master Design §3A.13.6 and Service Agreement Clause 2.2. Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts`.
 
-> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.handler.ts` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
+> **ESC-002 — resolved 2026-11-10.** The cooling-off guard had **never been armed by the production contract-creation path**. `Contract.cancellableUntil` was documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` never wrote the field and no other code path assigned it. `cancelDuringCoolingOff()` therefore always rejected with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field was `null`, and `autoRelease.handler.ts` never skipped a release for cooling-off because the timestamp was always `null`. The 7-day statutory cancellation right was effectively **not available** to clients. It is now written as `createdAt + COOLING_OFF_DAYS` (env, default 7), and the unused `COOLING_OFF_HOURS` (default `24`) has been **deleted** — two variables for one concept, one of them unused, is exactly how the gap survived. Covered by `apps/backend/tests/cooling-off.test.ts`.
 
 ### Dispute
 
@@ -187,7 +188,8 @@ Telebirr B2C disbursement is live; deterministic sandbox simulation is used when
   | `VAT_THRESHOLD_MINOR` | `45_000_000` (450,000 ETB) | Finance alert threshold; the Playbook's "ETB 1,000,000" is stale |
   | `VAT_RATE` | `0.15` | `VAT_REGISTERED` defaults to `false` |
   | `MINIMUM_CONTRACTING_AGE` | `18` | Enforced at registration (`auth.service.ts:76`) |
-  | `COOLING_OFF_HOURS` | `24` | **Defined but unused** — see the verified gap note in the Escrow section |
+  | `COOLING_OFF_DAYS` | `7` | Statutory cooling-off window written to `Contract.cancellableUntil` (Electronic Transactions Proclamation No. 1205/2020) |
+  | `AUDIT_RETENTION_YEARS` | `10` | Years an audit row is retained before the purge worker may remove it (also floored at 10 years in SQL) |
   | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `1h` / `30d` | The Playbook's "24h access / 7d refresh" is stale |
   | `PAYMENT_RECONCILE_CRON` | `*/10 * * * *` | Payment-side reconciliation sweep every 10 minutes |
 
@@ -314,17 +316,17 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 - `AuditLog` is append-only by application convention and supported by database grants/pgaudit initialization.
 - Secrets are environment validated and must not be committed. Server refuses to boot in production with a mocked PEP provider.
 
-### Verified compliance gaps (2026-11-09)
+### Verified compliance gaps (2026-11-10)
 
 These are **not** implemented today. They are recorded here so the architecture document does not imply a control the code does not have.
 
 | Control required by the documents | Actual code state |
 |---|---|
-| 10-year immutable retention of audit, transaction, dispute, and STR records | `AuditLog` (`schema.prisma:686-710`) has **no retention/expiry column and no purge job**. There is no WORM module and no append-only partition enforcement in application code — "append-only" is convention only, and pgaudit is enabled by the `infra/postgres` image but its grants are not verified after deployment |
-| PDPP data-subject rights (access, portability, erasure) | **No tooling exists.** Grepping `apps/backend/src` for `exportData`, `downloadMyData`, `deleteAccount`, `erasure`, or `portability` returns zero matches. There is no admin erasure tool and no "delete my data" route |
-| 72-hour ECA breach notification workflow | `apps/backend/src/lib/breachAlert.ts` writes a `logger.fatal(...)` record only. The SMS/Telegram/email dispatch to the incident-response team is **commented out** (`breachAlert.ts:36`), so the alert is log-only |
-| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). Note `src/middleware/requireKycVerified.ts` is dead code — it has zero importers; the live guard is `hardBlock.ts` |
-| Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts:35`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped |
+| 10-year immutable retention of audit, transaction, dispute, and STR records | **The audit retention is now implemented.** `AuditLog.retentionUntil` is NOT NULL and stamped at write time as `createdAt + AUDIT_RETENTION_YEARS` (default 10); a daily `audit-purge` worker calls the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which deletes a row only when both its stamp has expired and it is at least ten years old. The application role holds no `DELETE` privilege on the table — it is granted `EXECUTE` on the function only. **Still open:** there is no WORM module and no append-only partition enforcement in application code, and pgaudit's grants are not verified after deployment |
+| PDPP data-subject rights (access, portability, erasure) | **Implemented.** `GET /api/v1/users/me/export` returns the complete archive; `POST /api/v1/users/me/erasure` destroys the personal content (including the chat attachment bytes in the object store and its local-disk fallback), revokes marketing and analytics consent without deleting the consent history, closes the account, and retains the identity, financial and AML records the law requires — stating in the response exactly what was kept. **Still open:** the exact retained-field list has not been reviewed by counsel |
+| 72-hour ECA breach notification workflow | **The response chain is implemented.** Opening an incident contains it (revoking every affected user's sessions), notifies staff in-app/SMS/Telegram with the deadline, notifies each affected user, records the incident in the audit log, starts the 72-hour clock, and prepares an ECA filing template with the PDPP-required fields filled in. **Still open:** the ECA has no API, so the filing itself is a human step; detection is staff-confirmed rather than automated; and no DPO is appointed to be the named contact |
+| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). The dead duplicate at `src/middleware/requireKycVerified.ts` has been deleted; the live guard is `hardBlock.ts` |
+| Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped. The block is commented out rather than gated, so the reactivation is a one-line change |
 
 ## External Boundaries
 

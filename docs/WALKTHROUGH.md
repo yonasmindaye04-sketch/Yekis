@@ -710,17 +710,20 @@ flowchart LR
   E --> N["Freelancer wallet"]
   N --> O["Request Tier 2"]
   O --> P["Staff verifies Tier 2"]
-  P --> Q["Request withdrawal"]
-  Q --> R{"Wallet mismatch?"}
+  P --> Q["Request an SMS approval code"]
+  Q --> Q2{"Code entered"}
+  Q2 -- Wrong or missing --> S0["Refused: WITHDRAWAL_CODE_INVALID / REQUIRED"]
+  Q2 -- Valid --> R{"Wallet mismatch?"}
   R -- Yes --> S["Hold with no debit and create TMS flag"]
   R -- No --> T["Debit wallet and record payout request"]
+  T --> T2["Approval consumed — one code, one payout"]
 ```
 
 Important controls:
 
 - Submitting work schedules a 24-hour warning and final release job (unless the contract is still within its 7-day cooling-off window, which takes precedence).
 - Explicit acceptance cancels delayed release jobs.
-- Client can cancel the contract during the 7-day cooling-off window if no escrow is funded or work started yet.
+- Client can cancel the contract during the 7-day cooling-off window if no escrow is funded or work started yet. The window is **armed**: `createContractFromProposal()` writes `Contract.cancellableUntil` as `createdAt + COOLING_OFF_DAYS`, so the right the Terms of Service promise is actually available.
 - Release and refund paths use guarded database updates to prevent duplicate wallet credits.
 - Fees and withholding are calculated on the server. Platform fees are credited to the `PlatformOperatingAccount` and monitored against the VAT alert threshold.
 - Disputes are attached to individual milestones, so a multi-milestone contract can have separate cases.
@@ -728,8 +731,9 @@ Important controls:
 - Submitting dispute evidence automatically compiles a JSON bundle containing contract terms and the direct message log.
 - Partial-split amounts cannot exceed the milestone value, and guarantee contract completion once applied.
 - Tier 2 is required for withdrawal.
+- **A withdrawal needs two-factor approval.** `POST /api/v1/escrow/wallet/withdraw/otp` sends a code to the phone number on the account; the withdrawal then requires it as `otpCode`. The approval is verified inside the service immediately before the wallet is debited, is consumed when the payout completes, and authorises exactly one payout. Business-rule refusals are reported before the code is needed, so a blocked withdrawal never sends an SMS for a payout that was never going to happen. A phone-verification code cannot approve a payout — `PhoneVerificationCode.purpose` keeps the two separate.
 - A payout identifier that does not match the verified phone is held for review with HTTP `202`; no wallet debit occurs.
-- Telebirr B2C automated disbursement initiates payout to the freelancer's mobile wallet (deducting a standard 0.5% cash-out fee). Successful transfers atomically post balanced double-entry general ledger entries (`LedgerJournal` / `LedgerEntry`), while immediate provider refusals automatically roll back the wallet debit.
+- Telebirr B2C automated disbursement initiates payout to the freelancer's mobile wallet. The provider's cash-out fee is collected once, on the transaction gross, at release time (so the platform's overall take is a single 7.5% rather than 7% at release plus a surprise 0.5% at cash-out). Successful transfers atomically post balanced double-entry general ledger entries (`LedgerJournal` / `LedgerEntry`), while immediate provider refusals automatically roll back the wallet debit.
 
 ## Frontend Surfaces
 

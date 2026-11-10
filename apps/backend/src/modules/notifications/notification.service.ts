@@ -25,6 +25,14 @@ const CRITICAL_NOTIFICATION_TYPES = new Set([
   "proposal-received",
   "proposal-accepted",
   "contract-executed",
+  // Security incidents must reach the person whether or not they have the app
+  // open — the ECA clock is running and a breach that only shows up in an
+  // in-app inbox is a breach nobody acts on.
+  "security-breach",
+  // An erasure notice has to reach the data subject by SMS: their email
+  // address has just been replaced, so email is no longer a channel that
+  // reaches them.
+  "account-erased",
 ]);
 
 import { sendPlatformMovementEmail } from "../../lib/email/email.service.js";
@@ -55,6 +63,10 @@ function formatNotificationTitle(type: string): string {
       return "Contract Fully Executed";
     case "new-message":
       return "New Chat Message";
+    case "security-breach":
+      return "Security Notice";
+    case "account-erased":
+      return "Your Data Has Been Erased";
     default:
       return "Account Movement Update";
   }

@@ -71,7 +71,7 @@ const RAIL_SERVICES: RailServiceItem[] = [
     badge: "FREE PDF & CSV",
     rows: [
       { label: "15% VAT SCHEDULE", badge: "AUTO" },
-      { label: "2% WITHHOLDING", badge: "> 10,000 ETB" },
+      { label: "WITHHOLDING TAX", badge: "3% / 30% > 10K" },
       { label: "AUDIT EXPORT", badge: "0 ETB" },
     ],
   },
@@ -528,7 +528,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
                 <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {lang === "am" ? "2% ዊዝሆልዲንግ (WHT > 10K ETB)" : "2% Withholding Tax (> 10K ETB)"}
+                    {lang === "am" ? "የዊዝሆልዲንግ ታክስ (3% / 30% > 10K ETB)" : "Withholding Tax (3% / 30% > 10K ETB)"}
                   </span>
                   <input
                     type="checkbox"

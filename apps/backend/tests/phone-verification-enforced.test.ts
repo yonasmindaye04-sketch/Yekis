@@ -55,6 +55,7 @@ async function cleanup() {
     prisma.auditLog.deleteMany({ where: { userId: { in: ids } } }),
     prisma.notification.deleteMany({ where: { userId: { in: ids } } }),
     prisma.transactionFlag.deleteMany({ where: { userId: { in: ids } } }),
+    prisma.phoneVerificationCode.deleteMany({ where: { userId: { in: ids } } }),
     prisma.wallet.deleteMany({ where: { userId: { in: ids } } }),
     prisma.user.deleteMany({ where: { id: { in: ids } } }),
   ]);
@@ -299,6 +300,10 @@ describe("the gate answers with an actionable status", () => {
         amountMinor: 100_000,
         provider: "TELEBIRR",
         payoutAccountIdentifier: user.phone,
+        // The withdrawal approval code is required by the schema. It is never
+        // reached: the phone gate fires first, which is exactly what this test
+        // asserts.
+        otpCode: "123456",
       });
 
     expect(res.status).toBe(403);

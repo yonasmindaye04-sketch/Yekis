@@ -516,7 +516,7 @@ export const FALLBACK_OPS_LEDGER: LedgerBundle = {
     },
     {
       code: "2040-ETB",
-      name: "MOR Withholding Tax Payable (2%)",
+      name: "MOR Withholding Tax Payable (3% / 30%)",
       type: "LIABILITY",
       bal: 7_100_000,
       c: "#d97706",

@@ -40,6 +40,19 @@ const OAUTH_SRC = readFileSync(
 const STAMP = Date.now();
 const M = 100000;
 const ids: string[] = [];
+/**
+ * The milestones this file created.
+ *
+ * The ledger cleanup is scoped to these. It used to delete every journal whose
+ * idempotency key contained "escrow-fund-" — which is the PRODUCTION key
+ * prefix (`escrow-fund-${milestoneId}`), used by every suite that funds an
+ * escrow. Running in parallel against one shared test database, this file's
+ * `afterEach` therefore deleted other suites' funding journals, and those
+ * suites' escrow-pool assertions then read a pool that had never been funded.
+ * The symptom was an intermittent failure in a different file, which is the
+ * hardest kind of failure to attribute.
+ */
+const milestoneIds: string[] = [];
 let seq = 0;
 
 function nextPhone() {
@@ -96,17 +109,20 @@ async function makeMilestone(clientId: string, freelancerId: string) {
     include: { milestones: true },
   });
   ids.push(contract.id);
+  milestoneIds.push(contract.milestones[0].id);
   return contract.milestones[0];
 }
 
 afterEach(async () => {
   const all = ids.length ? ids : ["__none__"];
+  const milestones = milestoneIds.length ? milestoneIds : ["__none__"];
   await prisma.auditLog.deleteMany({ where: { userId: { in: all } } });
+  // Scoped to THIS file's milestones — see the note on `milestoneIds`.
   await prisma.ledgerEntry.deleteMany({
-    where: { journal: { idempotencyKey: { contains: "escrow-fund-" } } },
+    where: { journal: { referenceId: { in: milestones } } },
   });
   await prisma.ledgerJournal.deleteMany({
-    where: { idempotencyKey: { contains: "escrow-fund-" } },
+    where: { referenceId: { in: milestones } },
   });
   await prisma.milestone.deleteMany({ where: { contractId: { in: all } } });
   await prisma.contract.deleteMany({ where: { id: { in: all } } });
@@ -115,6 +131,7 @@ afterEach(async () => {
   await prisma.kycRecord.deleteMany({ where: { userId: { in: all } } });
   await prisma.user.deleteMany({ where: { id: { in: all } } });
   ids.length = 0;
+  milestoneIds.length = 0;
 });
 
 describe("concurrent escrow funding cannot double-charge or overdraw", () => {

@@ -90,7 +90,7 @@ const FAQ_TOPICS: FAQTopicService[] = [
     slaBadge: "AUDIT-READY PDF",
     rows: [
       { label: "ETHIOPIAN VAT", badge: "15% AUTO" },
-      { label: "WITHHOLDING", badge: "2% > 10K ETB" },
+      { label: "WITHHOLDING", badge: "3% / 30% > 10K" },
       { label: "FINANCE EXPORT", badge: "PDF + CSV" },
     ],
   },
@@ -160,14 +160,14 @@ const FAQ_ITEMS: FAQItem[] = [
       am: "የYeKis የአገልግሎት ክፍያ ከውጭ ፕላትፎርሞች አንጻር ምን ያህል ነው?",
     },
     answer: {
-      en: "YeKis charges a flat 2.5% client deposit fee and a 2.5% freelancer release fee. Freelancers keep 97.5% of every contract with zero monthly subscriptions.",
-      am: "YeKis ከደንበኛው 2.5% እና ከባለሙያው 2.5% ብቻ ይቆርጣል። ባለሙያዎች የውሉን 97.5% በሙሉ ያገኛሉ።",
+      en: "YeKis charges a flat 7% platform fee on released milestones and no client deposit fee. Freelancers keep 93% of every contract with zero monthly subscriptions.",
+      am: "YeKis ከተለቀበ የሥራ ምዕራፍ 7% ጠቅላላ ክፍያ ከደንበኛው ግን የምንም ክፍያ አያስገኝም። ባለሙያዎች የውሉን 93% በሙሉ ያገኛሉ።",
     },
     goldHighlight: {
-      en: "Freelancers take home 97.5% of every ETB milestone.",
-      am: "ባለሙያዎች የድካማቸውን 97.5% ያለምንም ወርሃዊ ክፍያ ያገኛሉ።",
+      en: "Freelancers take home 93% of every ETB milestone.",
+      am: "ባለሙያዎች የድካማቸውን 93% ያለምንም ወርሃዊ ክፍያ ያገኛሉ።",
     },
-    slaMetric: "97.5% TAKE-HOME",
+    slaMetric: "93% TAKE-HOME",
   },
   {
     id: "faq-dispute-sla",
@@ -210,12 +210,12 @@ const FAQ_ITEMS: FAQItem[] = [
     num: "07",
     category: "tax",
     question: {
-      en: "Does YeKis generate ERCA-compliant VAT and 2% Withholding Tax certificates?",
-      am: "YeKis ለገቢዎች ሚኒስቴር የሚሆን የ15% ቫት እና የ2% ዊዝሆልዲንግ ሰነድ ያዘጋጃል?",
+      en: "Does YeKis generate ERCA-compliant VAT and Withholding Tax certificates?",
+      am: "YeKis ለገቢዎች ሚኒስቴር የሚሆን የ15% ቫት እና የዊዝሆልዲንግ ታክስ ሰነድ ያዘጋጃል?",
     },
     answer: {
-      en: "Yes. Our fiscal engine automatically calculates optional 15% VAT and statutory 2% Withholding Tax on contracts above 10,000 ETB, issuing downloadable PDFs.",
-      am: "አዎ! ሲስተሙ የ15% ቫት እና ከ10,000 ብር በላይ ለሆኑ ውሎች የ2% ዊዝሆልዲንግ አስልቶ ሕጋዊ የPDF ሰነድ ያዘጋጃል።",
+      en: "Yes. Our fiscal engine automatically calculates optional 15% VAT and statutory withholding tax on contracts above 10,000 ETB — 3% where the freelancer holds a TIN, 30% where they do not — issuing downloadable PDFs.",
+      am: "አዎ! ሲስተሙ የ15% ቫት እና ከ10,000 ብር በላይ ለሆኑ ውሎች የዊዝሆልዲንግ ታክስ ያስልቶ (በTIN ያለ ባለሙያ 3%， ሳይኖር 30%) ሕጋዊ የPDF ሰነድ ያዘጋጃል።",
     },
     goldHighlight: {
       en: "Instant ERCA tax invoices & withholding vouchers.",

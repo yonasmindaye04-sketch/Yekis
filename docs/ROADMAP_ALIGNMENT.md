@@ -1,11 +1,17 @@
 # Roadmap ↔ Codebase Alignment
 
 **Generated:** 2026-11-09
-**Codebase HEAD:** `a15177e`
+**Codebase HEAD:** `a15177e` (rows re-verified against `7babd4b` + the 2026-11-10 code pass)
 **Baseline document:** *Master Engineering & Product Roadmap (Revised)* — Revision 2, July 2026
 **Companion:** `docs/DOCUMENT_UNIFICATION_2026-11-09.md` (decision-by-decision map across all three documents)
 
 **Rule:** the Roadmap is the **intent baseline**; the **codebase is the truth** for implementation status. Every row below was verified against `apps/backend/src`, `apps/backend/prisma/schema.prisma`, `apps/frontend/src`, and `.github/workflows`. Where the code diverges from a Roadmap decision, the divergence is **stated** rather than silently reconciled.
+
+> **2026-11-10 code pass.** The rows marked ✅ below moved there in this pass and are the
+> code-only items from the not-started / partial list: 2FA on withdrawals, the 10-year audit
+> retention, the PDPP data-subject tooling, the armed cooling-off right, and the
+> breach-notification response chain. The stale fee copy across the marketing and fiscal
+> surfaces was corrected at the same time.
 
 **Status labels**
 
@@ -80,7 +86,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | User registration & login — email + phone OTP, language preference on the record | ✅ **Implemented** | `User.languagePreference`; email/password + phone OTP + Google/Apple/Facebook/Telegram OAuth + Telegram Mini App |
 | Role system — CLIENT / FREELANCER / BOTH | ✅ **Implemented** | `User.role` |
 | Session management — JWT + refresh tokens, secure cookie storage | ✅ **Implemented** | `JWT_ACCESS_TTL = "1h"`, `JWT_REFRESH_TTL = "30d"` (`env.ts:43-44`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 h (`auth.service.ts:342`) |
-| 2FA (SMS OTP) optional at MVP, **mandatory for withdrawals** | ⚪ **Not Started** | Withdrawal uses `requireFreshAuth(300)` (5-minute re-auth) instead of 2FA |
+| 2FA (SMS OTP) optional at MVP, **mandatory for withdrawals** | ✅ **Implemented** | A withdrawal requires an SMS approval code for **that** payout (`POST /api/v1/escrow/wallet/withdraw/otp` → `otpCode` on `POST /wallet/withdraw`). The code is consumed when the payout completes, so one code cannot authorise two payouts. `PhoneVerificationCode.purpose` scopes it, so a phone-verification code cannot approve a payment. `requireFreshAuth(300)` remains as well |
 | **Hard Block System — unverified users blocked from withdrawing, changing profile, bidding, receiving payments** | ⚠️ **Partial / Divergence** | 7 routes gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately NOT gated** (`profile.routes.ts:59`) — it was removed because gating it blocked onboarding. `src/middleware/requireKycVerified.ts` is **dead code**; the live guard is `hardBlock.ts` |
 | Age / contractual-capacity gate | ✅ **Implemented** | `MINIMUM_CONTRACTING_AGE = 18` |
 | KYC document upload (National ID / Passport / Driver's Licence) to encrypted object storage | ✅ **Implemented** | 15 MB chat cap; KYC documents stored outside PostgreSQL. Object versioning / object lock / retention are production config tasks (`docs/COMPLIANCE_BLOCKERS.md` #7) |
@@ -106,7 +112,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Payment Integration (Telebirr) — initiate, callback, verify HMAC signature, sandbox test | ✅ **Implemented** | C2B Web Checkout with native Node RSA-PSS signing, Redis fabric-token cache, body-embedded signature verification, mock fallback |
 | Payment Integration (M-Pesa) — secondary/fallback gateway | ⚠️ **Divergence** | `mpesa.client.ts` is a **stub** that throws `PaymentProviderUnavailableError`. Master Design `PAY-003` marks M-Pesa **REMOVED** — the Roadmap and the Master Design disagree with each other, and the code half-implements it. Needs a product decision |
 | Payment Integration (CBE Birr) — tertiary option | 🔵 **Stub / Mock** | `cbe.client.ts` always throws. PAY-004 path unconfirmed |
-| Fee engine — freelancer net, platform fee, provider fee | ⚠️ **Divergence** | Flat 7% from the freelancer, 0% client surcharge. **Provider fee (0.5–2%) is not implemented** — a hardcoded 0.5% disbursement fee is applied to every provider (`docs/hardening/AUDIT_FINANCE_WORKERS.md` L-3) |
+| Fee engine — freelancer net, platform fee, provider fee | ⚠️ **Divergence (7% / 0% vs the Roadmap's 5% / 5%)** | Flat 7% from the freelancer, 0% client surcharge (`PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0`), documented in `docs/DECISIONS.md` → *Platform-Wide 7% Only General Fee Rule*; the Roadmap wording is stale. The **provider fee (0.5%) is now part of the engine** (`PAYMENT_PROVIDER_FEE_RATE`), collected once on the transaction gross at release and routed to `REVENUE-DISBURSEMENT-FEES` — the platform's overall take is a single 7.5% rather than 7% at release plus a surprise 0.5% at cash-out |
 | Three-pool financial ledger (LED-001) | ✅ **Implemented** | `PlatformOperatingAccount`, `PlatformFeeCredit`, `LedgerAccount` / `LedgerJournal` / `LedgerEntry` with a zero-sum invariant |
 | Atomic milestone release + revenue recognition (LED-002) | ✅ **Implemented** | `releaseMilestoneFunds` (`escrow.service.ts:797-890`) runs one `prisma.$transaction` crediting the wallet, the operating account, `PlatformFeeCredit`, and the double-entry journal |
 | **Withholding tax logic — 3% with TIN / 30% without, on payouts ≥ ETB 10,000** | 🟡 **Partial — dormant** | Rates and threshold are correct (`env.ts:259-261`), but `calculateFees` gates the whole calculation on `TIN_FEATURE_ENABLED`, which defaults to `false` (`fees.ts:35`). **Withholding is 0% at launch** |
@@ -119,11 +125,11 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Dispute Stage 2 — auto-compiled evidence package, categorised dispute types | ✅ **Implemented** | Evidence bundle with SHA-256 hashed JSON |
 | Dispute Stage 3 — mediator queue with a 3–5 day recommendation | ✅ **Implemented** | `DISPUTE_MEDIATOR` role, atomic queue claiming, arbitration award application. The **people** (2 trained mediators) are a Phase 0/1 hiring item |
 | Dispute Stage 4 — AACCSA escalation mechanics | ⚪ **Not Started** | The arbitration *stage* exists in the state machine; the operational AACCSA procedure is not written down |
-| Immutable audit log, 10-year retention | ⚪ **Not Started** | `AuditLog` is append-only **by convention**; it has **no retention column and no purge job**, and there is **no WORM module**. `docs/COMPLIANCE_BLOCKERS.md` #7 |
+| Immutable audit log, 10-year retention | ✅ **Implemented** | `AuditLog.retentionUntil` is NOT NULL and stamped at write time as `createdAt + AUDIT_RETENTION_YEARS` (default 10 years). A daily `audit-purge` worker calls the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which deletes a row only when **both** its stamp has expired **and** it is at least ten years old — so a misconfigured retention period cannot shorten a statutory obligation. The application role keeps no `DELETE` privilege on the table; it is granted `EXECUTE` on the function only. `docs/COMPLIANCE_BLOCKERS.md` #7 (WORM storage and the least-privilege grant verification remain open) |
 | WORM storage — pgaudit + append-only partitioned tables | 🟡 Partial | pgaudit image exists in `infra/postgres`; grants/`AuditLog` revokes unverified after deployment; no partition enforcement |
 | Consent management — granular unbundled checkboxes, stored timestamps | ✅ **Implemented** | 5 fields (`src/schemas.ts:134-141`): `kycDataProcessing` + `financialDataProcessing` required, `platformNotifications` / `marketingCommunications` / `analytics` optional. `ConsentRecord` rows are written |
-| **Data Erasure Tooling** — wipe marketing data, photos, chat; preserve AML data | ⚪ **Not Started** | **No tooling exists.** No `exportData` / `downloadMyData` / `deleteAccount` / `erasure` / `portability` match anywhere in `apps/backend/src`. `docs/COMPLIANCE_BLOCKERS.md` #8 |
-| Breach notification workflow — 72 h, detect → contain → notify ECA → notify users → file | 🟡 Partial | `src/lib/breachAlert.ts` writes `logger.fatal(...)` only; the SMS/Telegram dispatch is **commented out** (`breachAlert.ts:36`). No contain step, no user notification, no report template |
+| **Data Erasure Tooling** — wipe marketing data, photos, chat; preserve AML data | ✅ **Implemented** | `POST /api/v1/users/me/erasure` (fresh auth). Destroys the profile, bio, avatar, email, password, OAuth/Telegram identifiers, chat and DM bodies, the portfolio, the skills, the copy on jobs/proposals/gigs/reviews, the notifications, and the analytics; deletes the chat attachments from the object store **and** its local-disk fallback. Closes the account (suspended, sessions revoked). Retains the UCID, DOB, Fayda biometric id, phone, KYC record and documents, the wallet and its transactions, the ledger, the audit log, the flags, the consent history and the contracts/disputes — and says so in the response. Consent is revoked by a new `granted: false` row, never deleted. Refused with `409 ERASURE_BLOCKED` while money is in flight. `GET /api/v1/users/me/export` returns the complete archive. The retained-field list still needs counsel sign-off (`docs/COMPLIANCE_BLOCKERS.md` #8) |
+| Breach notification workflow — 72 h, detect → contain → notify ECA → notify users → file | 🟡 **Partial — response chain implemented** | `src/lib/breachAlert.ts` now runs the whole chain: it **contains** (revokes every affected user's sessions by bumping `sessionVersion`), **notifies staff** in-app/SMS/Telegram, **notifies affected users** one message each, **records** the incident in the audit log, starts the **72-hour clock**, and **prepares the ECA filing** as a template with the PDPP-required fields filled in. `POST /api/v1/admin/incidents/breach` opens one and `GET /api/v1/admin/incidents/breaches` lists them with the deadline. Still human: the ECA has no API, so the filing is submitted by a person; and detection is staff-confirmed rather than automated |
 | Backup & DR test against a restored environment; confirm RTO/RPO | ⚪ **Not Started** | — |
 
 ### Engineering — Frontend
@@ -235,12 +241,12 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Subprocessor DPAs | IN PROGRESS | ⛔ External |
 | Contract translation standard | DECIDED APPROACH | ⛔ External (certified translations required; English governs) |
 | Production hosting selection | PENDING | ⛔ External — Ethiopian hosting is a launch blocker |
-| Audit-log enforcement | PENDING EXECUTION CONFIRMATION | ⚠️ Still accurate, and worse than it sounds: there is **no retention column and no purge job** in `AuditLog`, and no WORM module |
+| Audit-log enforcement | PENDING EXECUTION CONFIRMATION | ✅ **Retention column + purge job implemented** — `AuditLog.retentionUntil` (NOT NULL, 10 years) and a daily purge through a `SECURITY DEFINER` function with a hard ten-year floor. ⛔ WORM storage and the least-privilege grant verification are still open |
 | Helpdesk infrastructure | PENDING | ⚠️ **Code is ahead** — a native in-app support desk ships |
 | Escrow bank custodian framework | PENDING / DEFERRED | ⛔ External (FIN-001) |
 | VAT registration threshold | TBD | 🟡 Code uses 450,000 ETB at 15%; accountant confirmation outstanding |
 | ERA remittance process | OPEN ACTION | ⛔ External — the platform records deductions and produces a monthly report; a human files |
-| Cooling-off period architecture | PENDING LEGAL VALIDATION | ⚠️ **Worse than "pending validation"** — the mechanism exists but the field is never written, so the right is **not available** (`ESC-002`) |
+| Cooling-off period architecture | PENDING LEGAL VALIDATION | ✅ **The mechanism is armed.** `Contract.cancellableUntil` is written by `createContractFromProposal()` as `createdAt + COOLING_OFF_DAYS`, so the client can now actually exercise the right the ToS promises. ⛔ The certified-translation requirement and counsel's sign-off on the Service Agreement wording are still open |
 | CBE integration architecture (PAY-004) | PENDING | ⛔ External |
 
 ---
@@ -255,14 +261,15 @@ Every Roadmap KPI (registered/KYC-verified users, completed escrow transactions,
 
 | # | Divergence | Where | Action |
 |---|---|---|---|
-| 1 | `FeesPage.tsx` still shows **"2% WITHHOLDING"** / "2% Withholding Tax (> 10K ETB)" while the backend uses **3% / 30%** above 10,000 ETB — and 0% at launch | `apps/frontend/src/FeesPage.tsx:74,531` | Code fix (copy only). Not changed here — this pass is documentation-only |
-| 2 | `schema.prisma:442` says `cancellableUntil` is "set to createdAt + 7 days by `createContractFromProposal()`", but it is never set | `apps/backend/prisma/schema.prisma:442` | Code fix + regression test. Recorded as `ESC-002` |
-| 3 | `autoRelease.worker.ts:51` comment says "AUTO_RELEASE_WINDOW_DAYS default (5)" while the default is **7** | `apps/backend/src/queue/autoRelease.worker.ts:51` | Comment fix |
-| 4 | `apps/backend/src/middleware/requireKycVerified.ts` is dead code (0 importers) next to the live `hardBlock.ts` guard | backend | Delete or consolidate |
+| 1 | ~~`FeesPage.tsx` still shows **"2% WITHHOLDING"** / "2% Withholding Tax (> 10K ETB)" while the backend uses **3% / 30%** above 10,000 ETB — and 0% at launch~~ | `apps/frontend/src/FeesPage.tsx`, `FAQPage.tsx`, `AboutPage.tsx` | ✅ **RESOLVED 2026-11-10.** The copy now reads "3% / 30% > 10K" everywhere, and the FAQ states the rates and the threshold. The same pass found two more fee-copy defects and fixed them: the FAQ still advertised a **2.5% client / 2.5% freelancer** split (the platform charges 0% / 7%), and `FiscalDocumentModal` defaulted to **2.5% / 2.5%**, so every fiscal receipt the platform generated showed fees it does not collect — it now defaults to 0% / 7%, matching `fees.ts` |
+| 2 | ~~`schema.prisma:442` says `cancellableUntil` is "set to createdAt + 7 days by `createContractFromProposal()`", but it is never set~~ | `apps/backend/src/modules/contracts/contracts.service.ts` | ✅ **RESOLVED 2026-11-10 (ESC-002).** `createContractFromProposal()` now writes `cancellableUntil = createdAt + COOLING_OFF_DAYS` (env, default 7). The 7-day cooling-off right the ToS promises the client is now actually available, and the auto-release guard in `autoRelease.handler.ts` can finally fire |
+| 3 | ~~`autoRelease.worker.ts:51` comment says "AUTO_RELEASE_WINDOW_DAYS default (5)" while the default is **7**~~ | `apps/backend/src/queue/autoRelease.worker.ts` | ✅ **RESOLVED** — the worker was rewritten to delegate to `autoRelease.handler.ts` and the stale comment is gone |
+| 4 | ~~`apps/backend/src/middleware/requireKycVerified.ts` is dead code (0 importers) next to the live `hardBlock.ts` guard~~ | backend | ✅ **RESOLVED 2026-11-10** — deleted. The live guard is `hardBlock.ts`, which additionally returns a machine-readable `nextAction` so the frontend can offer the step instead of rendering a dead end |
 | 5 | `docs/FLOW.md`, `docs/SYSTEM_DESIGN.md`, `docs/WALKTHROUGH.md` described a 5% client fee / 5% freelancer fee | docs | **Fixed in this pass** to 7% / 0% |
 | 6 | **~~Wallet funding releases immediately instead of holding in escrow~~** (`ESC-003`) | `apps/backend/src/modules/escrow/escrow.service.ts` (commit `a03259a`) | ✅ **RESOLVED 2026-11-09.** Escrow semantics restored on the wallet path; the gig path too; `releaseMilestoneFunds()` narrowed back to `SUBMITTED_FOR_REVIEW \| DISPUTED`. **Legal text unchanged.** See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` |
 | 7 | ~~**8 backend tests fail at HEAD**~~ | backend | ✅ **RESOLVED.** `escrow-lifecycle-http`, `simulated-negotiations-and-disputes`, `dispute-single-resolution`, `topup-provider-rails` and `critical-fixes` all pass. Full suite: **595 passed / 61 files, 0 failed** (baseline at `a15177e`: 567 passed, 8 failed) |
-| 8 | **`fundGigOrderFromWallet` claims the gig order with an unconditional update** — `tx.gigOrder.update({ where: { id } })` rather than a conditional `updateMany` on `escrowState: "PAYMENT_PENDING"` | `apps/backend/src/modules/gigs/gig.service.ts:466` | 🟡 Pre-existing (predates `a03259a`), not an escrow bypass. Two concurrent fundings of one gig order can both debit the client's wallet. The milestone path is protected by the conditional claim; the gig path should get the same treatment |
+| 8 | ~~**`fundGigOrderFromWallet` claims the gig order with an unconditional update** — `tx.gigOrder.update({ where: { id } })` rather than a conditional `updateMany` on `escrowState: "PAYMENT_PENDING"`~~ | `apps/backend/src/modules/gigs/gig.service.ts` | ✅ **RESOLVED 2026-11-10.** The claim is now a conditional `updateMany` and the wallet debit carries its own `gte` guard, so the database arbitrates and exactly one concurrent funding can win — the same treatment the milestone path already had |
+| 9 | **The fee-engine change shipped without its tests.** `7babd4b` moved the provider fee into the fee engine and started collecting it at release, but the dispute and payout tests still asserted the old amounts | `apps/backend/tests/dispute-single-resolution.test.ts`, `dispute-partial-split-ledger.test.ts`, `payout-atomicity.test.ts` | ✅ **RESOLVED 2026-11-10.** The behaviour is intentional — the platform's take is a single 7.5% instead of 7% at release plus a surprise 0.5% at cash-out — so the **tests** were updated to the new arithmetic rather than the code reverted. The suite is now **617 passed / 65 files, 0 failed** |
 
 ---
 
@@ -270,15 +277,26 @@ Every Roadmap KPI (registered/KYC-verified users, completed escrow transactions,
 
 | Phase | Implemented | Partial | Stub / Mock | Blocked — External | Not Started | Divergence |
 |---|---|---|---|---|---|---|
-| Phase 0 | 3 | 3 | 2 | 14 | 1 | 2 |
-| Phase 1 (backend) | 24 | 10 | 5 | 3 | 5 | 3 |
+| Phase 0 | 3 | 3 | 2 | 14 | 0 | 2 |
+| Phase 1 (backend) | 27 | 8 | 5 | 3 | 3 | 3 |
 | Phase 1 (frontend) | 7 | 4 | 0 | 2 | 2 | 0 |
 | Phase 1 (legal / ops / finance) | 3 | 2 | 0 | 8 | 1 | 1 |
 | Phase 2 | 0 | 3 | 0 | 5 | 8 | 0 |
-| Phase 3 | 1 | 3 | 0 | 8 | 4 | 0 |
+| Phase 3 | 1 | 4 | 0 | 8 | 4 | 0 |
 | Phase 4 | 1 | 1 | 0 | 6 | 5 | 0 |
 
-**Reading the numbers:** the *code* for the trust loop is largely built (Phase 1 backend is the strongest column). The *external* column dominates Phases 0, 2, 3, and 4 — which is the expected shape: what is missing is credentials, counsel, vendors, accountants, and humans, not engineering. The genuinely under-built engineering items are the **retention/WORM layer**, the **PDPP data-rights tooling**, the **armed cooling-off right**, the **breach-notification dispatch**, **frontend automated tests**, and the **deploy pipeline**.
+**Reading the numbers:** the *code* for the trust loop is largely built (Phase 1 backend is the strongest column). The *external* column dominates Phases 0, 2, 3, and 4 — which is the expected shape: what is missing is credentials, counsel, vendors, accountants, and humans, not engineering.
+
+**2026-11-10 code pass.** Three code-only items moved out of "Not Started" and one moved out of "Partial":
+the **10-year audit retention** (retention column + purge job with a hard ten-year floor),
+the **PDPP data-subject tooling** (complete export, and an erasure that destroys the personal
+content while retaining the AML and financial records), the **armed cooling-off right**
+(`ESC-002` — `cancellableUntil` was never written, so the right the ToS promises was unreachable),
+and the **breach-notification response chain** (contain → notify staff → notify users → audit
+record → 72-hour clock → prepared ECA filing template). What is still missing from the
+engineering column is the *frontend automated tests*, the *deploy pipeline*, the *Lighthouse gate*,
+the *load-test harness* and the *KPI instrumentation* — all of which are Phase 2 tooling rather
+than product gaps.
 
 ---
 

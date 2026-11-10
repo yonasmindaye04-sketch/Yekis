@@ -3,6 +3,7 @@ import { Router } from "express";
 import type { Response } from "express";
 import {
   requireAuth,
+  requireFreshAuth,
   optionalAuth,
   type AuthedRequest,
 } from "../../middleware/auth.js";
@@ -11,6 +12,13 @@ import {
   updateProfileSchema,
   reportProfileSchema,
 } from "./profile.validation.js";
+import {
+  buildUserDataExport,
+  eraseUserData,
+  findErasureBlockers,
+  ErasureBlockedError,
+  UserNotFoundError,
+} from "../privacy/privacy.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 
@@ -101,6 +109,12 @@ profileRouter.get(
 );
 
 // GET /me/export
+//
+// PDPP Art. 13 — the data subject's right of access. Returns every category
+// of personal data the platform holds, not a summary. The payload is built by
+// the privacy module so that the export and the erasure agree on what
+// "personal data" means — the two must not drift apart, or the export would
+// quietly under-report what the platform keeps.
 profileRouter.get(
   "/me/export",
   requireAuth,
@@ -109,65 +123,14 @@ profileRouter.get(
       const userId = req.user!.id;
       const user = await prisma.user.findUnique({
         where: { id: userId },
-        include: {
-          kyc: { select: { tier: true, status: true } },
-          wallet: { select: { balanceMinor: true } },
-          _count: {
-            select: {
-              jobsPosted: true,
-              proposals: true,
-              contractsAsClient: true,
-              contractsAsFreelancer: true,
-              notifications: true,
-            },
-          },
-        },
+        select: { ucid: true },
       });
 
       if (!user) {
         return res.status(404).json({ error: "USER_NOT_FOUND" });
       }
 
-      const exportData = {
-        platform: "Yekis Jobs",
-        exportedAt: new Date().toISOString(),
-        account: {
-          ucid: user.ucid,
-          email: user.email,
-          phone: user.phone,
-          phoneVerified: !!user.phoneVerifiedAt,
-          role: user.role,
-          languagePreference: user.languagePreference,
-          timezone: user.timezone,
-          createdAt: user.createdAt,
-        },
-        profile: {
-          firstName: user.firstName,
-          lastName: user.lastName,
-          displayName: user.displayName,
-          bio: user.bio,
-          isAvailableForWork: user.isAvailableForWork,
-          profileVisibility: user.profileVisibility,
-          profileCompleteness: user.profileCompleteness,
-        },
-        verification: {
-          kycTier: user.cachedKycTier || user.kyc?.tier || "TIER_1",
-          kycStatus: user.cachedKycStatus || user.kyc?.status || "PENDING",
-        },
-        financials: {
-          currency: "ETB",
-          balanceMinor: user.wallet?.balanceMinor || 0,
-          totalEarnedNetMinor: user.totalEarnedNetMinor,
-          totalSpentGrossMinor: user.totalSpentGrossMinor,
-        },
-        activityCounts: {
-          jobsPosted: user._count.jobsPosted,
-          proposalsSubmitted: user._count.proposals,
-          contractsAsClient: user._count.contractsAsClient,
-          contractsAsFreelancer: user._count.contractsAsFreelancer,
-          notificationsReceived: user._count.notifications,
-        },
-      };
+      const exportData = await buildUserDataExport(userId);
 
       res.setHeader("Content-Disposition", `attachment; filename=yekis-export-${user.ucid}.json`);
       res.setHeader("Content-Type", "application/json");
@@ -176,6 +139,57 @@ profileRouter.get(
       if (handleKnownErrors(error, res)) return;
       logger.error({ err: error }, "Error exporting user data");
       res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// POST /me/erasure
+//
+// PDPP Art. 15 — the data subject's right to erasure.
+//
+// Step-up authentication is required. This destroys the account's personal
+// content and closes it; it must not be triggerable from a session that was
+// left open on a shared machine.
+//
+// The response states exactly what was erased and exactly what was retained
+// (and why), because "your data has been erased" while the AML records are
+// still on file would be a misleading answer.
+profileRouter.post(
+  "/me/erasure",
+  requireAuth,
+  requireFreshAuth(300),
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+
+      // A dry run first: tell the caller what is blocking the request without
+      // destroying anything, so an unresolvable state does not look like a
+      // silent failure.
+      const blockers = await findErasureBlockers(userId);
+      if (blockers.length > 0) {
+        return res.status(409).json({
+          error: "ERASURE_BLOCKED",
+          message:
+            "Erasure cannot proceed until the outstanding items below are resolved.",
+          blockers,
+        });
+      }
+
+      const result = await eraseUserData(userId);
+      return res.json(result);
+    } catch (error: any) {
+      if (error instanceof ErasureBlockedError) {
+        return res.status(409).json({
+          error: "ERASURE_BLOCKED",
+          message: error.message,
+          blockers: error.blockers,
+        });
+      }
+      if (error instanceof UserNotFoundError) {
+        return res.status(404).json({ error: "USER_NOT_FOUND" });
+      }
+      logger.error({ err: error }, "Error erasing user data");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },
 );
