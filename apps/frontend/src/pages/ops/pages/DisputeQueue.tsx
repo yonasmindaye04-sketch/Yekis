@@ -9,7 +9,6 @@
 
 import { useCallback, useState } from "react";
 import {
-  AlertTriangle,
   Clock,
   Eye,
   FileText,
@@ -39,6 +38,9 @@ import {
   Button,
   Card,
 } from "../components/ui";
+import { TbFileAlert } from "react-icons/tb";
+import { Alert, AlertTitle } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { useOpsUi } from "../opsUiContext";
 
 const OUTCOMES: { id: DisputeOutcome; label: string }[] = [
@@ -339,9 +341,14 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                       </button>
                     </div>
                   ) : (
-                    <div className="scope-box" style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--ops-red)", fontWeight: 600 }}>
-                      <AlertTriangle size={17} /> No deliverable file or link was formally attached to this milestone.
-                    </div>
+                    <Alert variant="destructive" className="flex items-center gap-2.5">
+                      <Avatar className="size-6 rounded-[5px] shrink-0">
+                        <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                          <TbFileAlert className="size-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <AlertTitle>No deliverable file or link was formally attached to this milestone.</AlertTitle>
+                    </Alert>
                   )}
                 </div>
                 <div>

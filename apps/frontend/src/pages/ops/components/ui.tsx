@@ -24,7 +24,8 @@ import type { LucideIcon } from "lucide-react";
 import { fmt } from "../opsApi";
 import type { Rail as RailT } from "../opsTypes";
 import { Sparkline } from "./charts";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Card as ShadcnCard } from "@/components/ui/card";
@@ -267,14 +268,35 @@ export function Banner({
   strong: string;
   rest: string;
 }) {
+  const variant =
+    tone === "b-red"
+      ? "destructive"
+      : tone === "b-amber"
+      ? "warning"
+      : tone === "b-green"
+      ? "success"
+      : "info";
+
+  const fallbackBg =
+    tone === "b-red"
+      ? "bg-destructive dark:bg-destructive/60"
+      : tone === "b-amber"
+      ? "bg-amber-600 dark:bg-amber-600/80"
+      : tone === "b-green"
+      ? "bg-emerald-600 dark:bg-emerald-600/80"
+      : "bg-sky-600 dark:bg-sky-600/80";
+
   return (
-    <Alert className={cn("banner", tone)}>
-      <span className="banner-ic">
-        <Icon size={18} />
-      </span>
-      <AlertDescription>
-        <AlertTitle>{strong}</AlertTitle> {rest}
-      </AlertDescription>
+    <Alert variant={variant} className={cn("flex items-center gap-2.5 mb-3", tone)}>
+      <Avatar className="size-6 rounded-[5px] shrink-0">
+        <AvatarFallback className={cn("rounded-[5px] text-white", fallbackBg)}>
+          <Icon className="size-3.5" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <AlertTitle className="inline font-semibold">{strong}</AlertTitle>{" "}
+        <span className="text-xs text-muted-foreground">{rest}</span>
+      </div>
     </Alert>
   );
 }
@@ -565,14 +587,21 @@ export function Empty({
 
 export function ErrorBox({ error, reload }: { error: string; reload: () => void }) {
   return (
-    <Alert className="banner b-red">
-      <span className="banner-ic">
-        <XCircle size={18} />
-      </span>
-      <AlertDescription>
-        <AlertTitle>Could not load data.</AlertTitle> {error}{" "}
-        <Button variant="ghost" size="sm" onClick={reload}>Retry</Button>
-      </AlertDescription>
+    <Alert variant="destructive" className="flex items-center gap-2.5 mb-3 b-red">
+      <Avatar className="size-6 rounded-[5px] shrink-0">
+        <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+          <XCircle className="size-4" />
+        </AvatarFallback>
+      </Avatar>
+      <div className="flex-1 min-w-0">
+        <AlertTitle className="inline font-semibold">Could not load data.</AlertTitle>{" "}
+        <span className="text-xs text-muted-foreground">{error}</span>
+      </div>
+      {reload && (
+        <Button variant="ghost" size="sm" onClick={reload} className="shrink-0">
+          Retry
+        </Button>
+      )}
     </Alert>
   );
 }

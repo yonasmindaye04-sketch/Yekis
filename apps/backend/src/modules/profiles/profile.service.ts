@@ -191,6 +191,10 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
       userUpdateData.isAvailableForWork = data.isAvailableForWork;
     if (data.profileVisibility !== undefined)
       userUpdateData.profileVisibility = data.profileVisibility;
+    if (data.languagePreference !== undefined)
+      userUpdateData.languagePreference = data.languagePreference;
+    if (data.timezone !== undefined)
+      userUpdateData.timezone = data.timezone;
     if (data.avatarUrl !== undefined)
       userUpdateData.avatarUrl = data.avatarUrl || null;
 

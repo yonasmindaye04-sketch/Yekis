@@ -1992,6 +1992,12 @@ class MockStore {
         this.customAvatarUrl = null;
         this.customProfileCompleteness = 35;
         this.customBio = "";
+        // The API answers 202 { ok, message } for both new and duplicate
+        // registrations so the endpoint cannot be used to enumerate accounts.
+        return {
+          ok: true,
+          message: "If these details are valid, you can sign in to continue.",
+        };
       }
       const user = this.getCurrentUser();
       return {

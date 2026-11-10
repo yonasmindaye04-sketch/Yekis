@@ -27,6 +27,9 @@ import {
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
 import "./ChatWorkspace.css";
+import { TbFileAlert } from "react-icons/tb";
+import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
+import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 
 // === ANTI-CIRCUMVENTION PATTERNS ===
 const CIRCUMVENTION_REGEXES = [
@@ -829,10 +832,21 @@ export function ChatWorkspace({
 
             {/* ── ANTI-CIRCUMVENTION CAUTION ── */}
             {circumventionAlert && (
-              <div className="chat-anti-circumvention-banner">
-                <ShieldAlert size={18} className="shield-icon" />
-                <p>{circumventionAlert}</p>
-              </div>
+              <Alert variant="warning" className="flex items-center gap-2.5 mb-2 mx-4">
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback className="bg-amber-600 dark:bg-amber-600/80 rounded-[5px] text-white">
+                    <ShieldAlert className="size-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <AlertTitle className="text-amber-800 dark:text-amber-300 font-semibold text-xs">
+                    Platform Safety Notice
+                  </AlertTitle>
+                  <AlertDescription className="text-amber-700/90 dark:text-amber-400/90 text-xs">
+                    {circumventionAlert}
+                  </AlertDescription>
+                </div>
+              </Alert>
             )}
 
             {/* ── COMPOSER ── */}
@@ -905,7 +919,16 @@ export function ChatWorkspace({
                   </button>
                 </div>
               )}
-              {error && <p className="chat-error-banner">{error}</p>}
+              {error && (
+                <Alert variant="destructive" className="flex items-center gap-2.5 mt-2">
+                  <Avatar className="size-6 rounded-[5px] shrink-0">
+                    <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                      <TbFileAlert className="size-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <AlertTitle className="text-xs">{error}</AlertTitle>
+                </Alert>
+              )}
             </div>
           </>
         ) : (

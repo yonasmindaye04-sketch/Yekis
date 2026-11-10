@@ -44,7 +44,6 @@ import {
   EyeOff,
   Package,
   X,
-  LifeBuoy,
   PanelLeftClose,
   PanelLeftOpen,
   Menu,
@@ -52,6 +51,7 @@ import {
 } from "lucide-react";
 import { ProfilePage } from "./ProfilePage";
 import { ProfileEditPage } from "./ProfileEditPage";
+import { SettingsWorkspace } from "./SettingsWorkspace";
 import {
   YekisAvatar,
   AVATAR_UPDATED_EVENT,
@@ -625,6 +625,11 @@ const loadWorkspace = async () => {
     setError("");
     setSuccessMessage("");
     setIsLoading(true);
+    // Registration answers 202 for both new and existing accounts, so the
+    // follow-up sign-in is the only thing that can tell the user apart. A
+    // failed sign-in after registering must not disclose whether the account
+    // already existed.
+    const wasRegistering = authMode === "register";
     try {
       if (authMode === "forgot-password") {
         await api.requestPasswordReset(email);
@@ -690,7 +695,9 @@ if (authMode === "register") {
       setError(
         message === "DUPLICATE_USER"
           ? "This email or phone already has an account. Switch to Sign in."
-          : message,
+          : wasRegistering && message === "INVALID_CREDENTIALS"
+            ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+            : message,
       );
     } finally {
       setIsLoading(false);
@@ -2350,49 +2357,13 @@ if (authMode === "register") {
               </div>
               <span className="sh-kbd">{user.ucid ?? "YEK-USER"}</span>
             </div>
-            <div className="sh-card settings-list">
-              <div className="sh-kv-row">
-                <span>{t.workspace.settings.emailLabel}</span>
-                <strong className="sh-mono">{user.email}</strong>
-              </div>
-              <div className="sh-kv-row">
-                <span>{t.workspace.settings.roleLabel}</span>
-                <strong>{roleLabel(platformRole)}</strong>
-              </div>
-              <div className="sh-kv-row">
-                <span>{t.workspace.settings.kycLabel}</span>
-                <span className="sh-status-inline emerald">
-                  {user.kyc?.tier ?? "TIER_2"} ({user.kyc?.status ?? "VERIFIED"})
-                </span>
-              </div>
-              <div className="sh-kv-row">
-                <span>{t.workspace.settings.supportLabel}</span>
-                <span>{t.workspace.settings.supportDesc}</span>
-              </div>
-              <div style={{ display: "flex", gap: 10, paddingTop: 12, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="sh-btn sh-btn-secondary"
-                  onClick={() => setView("profile-edit")}
-                >
-                  <Edit size={14} /> {t.workspace.settings.editProfileBtn}
-                </button>
-                <button
-                  type="button"
-                  className="sh-btn sh-btn-secondary"
-                  onClick={() => setView("chat")}
-                >
-                  <LifeBuoy size={14} /> {t.workspace.settings.chatSupportBtn}
-                </button>
-                <button
-                  type="button"
-                  className="sh-btn sh-btn-secondary"
-                  onClick={logout}
-                >
-                  <LogOut size={14} /> {t.nav.signOut}
-                </button>
-              </div>
-            </div>
+            <SettingsWorkspace
+              user={user}
+              onUserUpdated={() => void loadWorkspace()}
+              onNavigateToProfileEdit={() => setView("profile-edit")}
+              onNavigateToChat={() => setView("chat")}
+              onLogout={logout}
+            />
           </section>
         )}
       </main>

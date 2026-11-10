@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "vite apps/frontend --port=3000 --host=0.0.0.0",
+    "dev": "vite apps/frontend --port=3000 --host=127.0.0.1",
     "dev:all": "docker compose up -d && pnpm -r --parallel dev",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",

@@ -79,13 +79,16 @@ export async function registerUser(input: RegisterInput) {
     );
   }
 
+  // Hash before the uniqueness lookup so a duplicate registration costs the
+  // same Argon2 work as a new one. The route now returns an identical response
+  // either way; keeping the timing close removes the remaining oracle.
+  const passwordHash = await hashPassword(input.password);
+
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { phone: input.phone }] },
   });
   if (existing)
     throw new DuplicateUserError("Email or phone already registered.");
-
-  const passwordHash = await hashPassword(input.password);
 
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven
@@ -480,4 +483,141 @@ export async function resetPassword(token: string, newPassword: string) {
     entityType: "User",
     entityId: resetRecord.userId,
   });
+}
+
+export class PasswordMismatchError extends Error {
+  constructor(message = "Current password is incorrect") {
+    super(message);
+    this.name = "PasswordMismatchError";
+  }
+}
+
+export async function changePassword(
+  userId: string,
+  currentPassword: string,
+  newPassword: string,
+  revokeOtherSessions = true,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      ucid: true,
+      role: true,
+      staffRole: true,
+      passwordHash: true,
+      sessionVersion: true,
+    },
+  });
+
+  if (!user) {
+    throw new InvalidCredentialsError("User not found");
+  }
+
+  let validCurrent = false;
+  try {
+    validCurrent = await verifyPassword(user.passwordHash, currentPassword);
+  } catch {
+    validCurrent = false;
+  }
+
+  if (!validCurrent) {
+    throw new PasswordMismatchError("Current password is incorrect");
+  }
+
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error("Password must be at least 8 characters long");
+  }
+
+  const passwordHash = await hashPassword(newPassword);
+
+  let updatedUser = user;
+  if (revokeOtherSessions) {
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordSetAt: new Date(),
+        sessionVersion: { increment: 1 },
+      },
+      select: {
+        id: true,
+        ucid: true,
+        role: true,
+        staffRole: true,
+        passwordHash: true,
+        sessionVersion: true,
+      },
+    });
+  } else {
+    updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        passwordHash,
+        passwordSetAt: new Date(),
+      },
+      select: {
+        id: true,
+        ucid: true,
+        role: true,
+        staffRole: true,
+        passwordHash: true,
+        sessionVersion: true,
+      },
+    });
+  }
+
+  await recordAuditEvent({
+    userId,
+    eventType: "PASSWORD_CHANGED",
+    entityType: "User",
+    entityId: userId,
+  });
+
+  const tokens = await createAuthTokens(
+    {
+      id: updatedUser.id,
+      ucid: updatedUser.ucid,
+      role: updatedUser.role,
+      staffRole: updatedUser.staffRole,
+      sessionVersion: updatedUser.sessionVersion,
+    },
+    ["pwd"],
+  );
+
+  return tokens;
+}
+
+export async function revokeOtherSessionsAndRefresh(userId: string) {
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+    select: {
+      id: true,
+      ucid: true,
+      role: true,
+      staffRole: true,
+      sessionVersion: true,
+    },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "SESSIONS_REVOKED",
+    entityType: "User",
+    entityId: userId,
+  });
+
+  const tokens = await createAuthTokens(
+    {
+      id: updatedUser.id,
+      ucid: updatedUser.ucid,
+      role: updatedUser.role,
+      staffRole: updatedUser.staffRole,
+      sessionVersion: updatedUser.sessionVersion,
+    },
+    ["pwd"],
+  );
+
+  return tokens;
 }

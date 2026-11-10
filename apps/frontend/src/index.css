@@ -1020,7 +1020,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 
 @media (max-width: 900px) { .platform-auth { grid-template-columns: 1fr; overflow-y: auto; height: auto; min-height: 100vh; padding-top: 68px; }.platform-auth-art { display: none; }.auth-panel { padding: 24px 20px 36px; }.platform-shell { grid-template-columns: 76px minmax(0, 1fr); }.platform-sidebar { align-items: center; padding-inline: 10px; }.sidebar-brand strong, .sidebar-role > span:last-child, .sidebar-nav button:not(.active)::after, .sidebar-settings, .sidebar-nav button .nav-label { display: none; }.sidebar-nav { width: 100%; }.sidebar-nav button { justify-content: center; padding: 13px 8px; }.sidebar-nav button.active { justify-content: center; }.platform-topbar, .platform-content { padding-inline: 24px; }.topbar-actions .user-menu span:not(.avatar), .topbar-actions .user-menu b { display: none; }
   .topbar-actions .user-menu { padding: 5px; background: transparent; border-color: transparent; box-shadow: none; }.platform-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .platform-shell { display: block; padding-bottom: 82px; }.platform-sidebar { display: none; }.platform-topbar { padding: 20px 16px; }.platform-topbar h1 { font-size: 1.55rem; }.platform-content { padding: 20px 16px 35px; }.overview-hero, .wallet-hero, .job-platform-card { align-items: stretch; flex-direction: column; padding: 24px 18px; }.platform-metrics { grid-template-columns: 1fr 1fr; }.platform-metrics article:last-child { grid-column: 1 / -1; }.form-grid { grid-template-columns: 1fr; }.form-wide { grid-column: auto; }.payment-grid, .payment-grid-3, .browser-topup-fields { grid-template-columns: 1fr !important; }.table-head { display: none; }.table-row { grid-template-columns: 1.5fr 1fr; gap: 8px; }.table-row span:last-child { color: var(--color-text); }.platform-mobile-nav { position: fixed; z-index: 10; right: 8px; bottom: 8px; left: 8px; display: flex; justify-content: space-around; padding: 6px; border: 1px solid var(--color-border); border-radius: 18px; background: var(--color-bg-elevated); box-shadow: var(--shadow-lg); }.platform-mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; min-height: 46px; flex: 1; border: 0; border-radius: 12px; background: transparent; color: var(--color-text-secondary); transition: all 0.2s ease; }.platform-mobile-nav button.active { background: var(--color-primary); color: var(--color-primary-text); }.platform-mobile-nav small { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }.platform-mobile-nav span { font-size: 1.05rem; } }
+@media (max-width: 640px) { .platform-shell { display: block; padding-bottom: 82px; }.platform-sidebar { display: none; }.platform-topbar { padding: 20px 16px; }.platform-topbar h1 { font-size: 1.55rem; }.platform-content { padding: 20px 16px 35px; }.overview-hero, .wallet-hero, .job-platform-card { align-items: stretch; flex-direction: column; padding: 24px 18px; }.platform-metrics { grid-template-columns: 1fr 1fr; }.platform-metrics article:last-child { grid-column: 1 / -1; }.form-grid { grid-template-columns: 1fr; }.form-wide { grid-column: auto; }.payment-grid, .payment-grid-3, .withdraw-payment-grid, .browser-topup-fields, .withdraw-fields { grid-template-columns: 1fr !important; }.table-head { display: none; }.table-row { grid-template-columns: 1.5fr 1fr; gap: 8px; }.table-row span:last-child { color: var(--color-text); }.platform-mobile-nav { position: fixed; z-index: 10; right: 8px; bottom: 8px; left: 8px; display: flex; justify-content: space-around; padding: 6px; border: 1px solid var(--color-border); border-radius: 18px; background: var(--color-bg-elevated); box-shadow: var(--shadow-lg); }.platform-mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; min-height: 46px; flex: 1; border: 0; border-radius: 12px; background: transparent; color: var(--color-text-secondary); transition: all 0.2s ease; }.platform-mobile-nav button.active { background: var(--color-primary); color: var(--color-primary-text); }.platform-mobile-nav small { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }.platform-mobile-nav span { font-size: 1.05rem; } }
 
 /* Public landing page */
 .landing-page { background: var(--color-bg); color: var(--color-text); }
@@ -1633,7 +1633,18 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .evidence-list { display: grid; gap: 8px; }
 .evidence-list blockquote { padding: 12px; border-left: 3px solid var(--color-primary); background: var(--color-bg-subtle); color: var(--color-text); font-size: .88rem; }
 .evidence-input { flex: 1 1 320px; }
-.tier2-panel, .withdraw-panel { display: grid; gap: 18px; }
+.tier2-panel { display: grid; gap: 18px; }
+.withdraw-panel { display: grid; gap: 14px; }
+.withdraw-panel .wallet-help { margin: 0; font-size: 0.86rem; }
+.withdraw-payment-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.withdraw-account { gap: 10px; padding: 10px 12px; border-radius: 10px; }
+.withdraw-account img { width: 40px; height: 40px; border-radius: 6px; flex-shrink: 0; }
+.withdraw-account .payment-account-text strong { font-size: 0.88rem; font-weight: 600; line-height: 1.25; }
+.withdraw-account .payment-account-text span { font-size: 0.74rem; line-height: 1.2; }
+.withdraw-fields { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.withdraw-fields label { margin-top: 0; gap: 5px; font-size: 0.84rem; font-weight: 500; }
+.withdraw-fields input { height: 38px; padding: 8px 12px; font-size: 0.88rem; }
+.withdraw-panel .btn-primary { justify-self: start; min-height: 38px; padding: 0 20px; font-size: 0.86rem; border-radius: 8px; }
 
 .staff-compliance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
 .staff-action-case { border-bottom: 1px solid var(--color-border); }
@@ -4351,4 +4362,107 @@ img, video, iframe, canvas {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+
+
+/* ==========================================================================
+   Receipt & Invoice Multi-Language Switcher (.excel-receipt-lang-*)
+   ========================================================================== */
+
+.excel-receipt-lang-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 3px 6px;
+}
+
+.excel-receipt-lang-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0 4px;
+}
+
+.excel-receipt-lang-options {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.excel-lang-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 140ms ease;
+}
+
+.excel-lang-pill-btn:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.excel-lang-pill-btn.is-active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.excel-lang-default-tag {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.excel-lang-pill-btn.is-active .excel-lang-default-tag {
+  background: #ffffff;
+  color: var(--color-primary);
+}
+
+.excel-lang-pill-btn:not(.is-active) .excel-lang-default-tag {
+  background: var(--color-bg-subtle);
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+
+@media (max-width: 768px) {
+  .excel-sheet-top-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .excel-receipt-lang-bar {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .excel-receipt-lang-options {
+    width: 100%;
+  }
 }

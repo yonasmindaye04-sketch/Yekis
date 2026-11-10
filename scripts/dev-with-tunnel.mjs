@@ -7,6 +7,17 @@ import { spawn } from "node:child_process";
 const PORT = Number(process.env.TUNNEL_PORT || 3000);
 const URL_RE = /https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/;
 
+// A quick tunnel publishes the dev server to the internet with no access
+// control. Make that an explicit, short-lived decision instead of the default.
+if (process.env.ALLOW_DEV_TUNNEL !== "1") {
+  console.error(
+    "[tunnel] Refusing to expose the Vite dev server by default.\n" +
+      "[tunnel] Set ALLOW_DEV_TUNNEL=1 only for a short-lived, trusted demo.\n" +
+      "[tunnel] Prefer a production build served without a tunnel.",
+  );
+  process.exit(1);
+}
+
 let tunnelProc = null;
 let backendProc = null;
 let frontendProc = null;
@@ -31,7 +42,7 @@ function spawnLogged(cmd, args, opts = {}) {
 }
 
 // 1. Start cloudflared and wait for the public URL.
-tunnelProc = spawn("cloudflared", ["tunnel", "--url", `http://localhost:${PORT}`], {
+tunnelProc = spawn("cloudflared", ["tunnel", "--url", `http://127.0.0.1:${PORT}`], {
   stdio: ["ignore", "pipe", "pipe"],
 });
 

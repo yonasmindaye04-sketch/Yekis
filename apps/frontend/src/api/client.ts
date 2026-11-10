@@ -64,6 +64,8 @@ export interface UpdateProfilePayload {
   skillIds?: string[];
   isAvailableForWork?: boolean;
   profileVisibility?: "PUBLIC" | "PROPOSERS" | "PRIVATE";
+  languagePreference?: "en" | "am" | "om" | "ti";
+  timezone?: string;
   avatarUrl?: string | null;
 }
 
@@ -946,6 +948,41 @@ class ApiClient {
     });
   }
 
+  async changePassword(input: {
+    currentPassword: string;
+    newPassword: string;
+    revokeOtherSessions?: boolean;
+  }): Promise<{ ok: boolean; message: string; accessToken?: string; refreshToken?: string }> {
+    const res = await this.request<{ ok: boolean; message: string; accessToken?: string; refreshToken?: string }>(
+      "/api/v1/auth/change-password",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+    );
+    if (res.accessToken) {
+      this.setSession({ accessToken: res.accessToken, refreshToken: res.refreshToken });
+    }
+    return res;
+  }
+
+  async revokeAllSessions(): Promise<{ ok: boolean; message: string; accessToken?: string; refreshToken?: string }> {
+    const res = await this.request<{ ok: boolean; message: string; accessToken?: string; refreshToken?: string }>(
+      "/api/v1/auth/revoke-sessions",
+      {
+        method: "POST",
+      },
+    );
+    if (res.accessToken) {
+      this.setSession({ accessToken: res.accessToken, refreshToken: res.refreshToken });
+    }
+    return res;
+  }
+
+  async exportUserData(): Promise<Record<string, unknown>> {
+    return this.request("/api/v1/users/me/export");
+  }
+
   async loginWithMobile(input: { phone?: string; email?: string; identifier?: string; password: string }): Promise<{ accessToken: string; refreshToken?: string; user?: AuthUser }> {
     return this.request("/api/v1/auth/login", {
       method: "POST",
@@ -1197,7 +1234,7 @@ class ApiClient {
     role: "CLIENT" | "FREELANCER" | "BOTH";
     dateOfBirth: string;
     consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
-  }): Promise<{ id: string; ucid: string }> {
+  }): Promise<{ ok: boolean; message: string }> {
     return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
   }
 

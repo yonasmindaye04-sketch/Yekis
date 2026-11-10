@@ -2,6 +2,59 @@
 
 Last validated: 2026-11-09
 
+> **Multi-Language Fiscal Receipt & Payout Voucher Architecture (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09):**
+> - **Clean Language Separation & Elimination of Mixed Strings**:
+>   - Replaced previously mixed Amharic + English receipt strings (e.g. `INVOICE / ደረሰኝ`, `Commercial Invoice & Escrow Deposit Receipt · የንግድ ደረሰኝ እና የኢስክሮ ክፍያ ማረጋገጫ`, `Role / Party: Client (ከፋይ ደንበኛ)`, `ESCROW FUNDED · በኢስክሮ የተያዘ`, dual-language line items, and joint English/Amharic compliance text blocks) with pure, dedicated translations across 4 Ethiopian working languages: **English (`en`)**, **Amharic (`am`)**, **Afaan Oromoo (`om`)**, and **Tigrigna (`ti`)**.
+> - **English as Default**:
+>   - All receipts, invoices, and vouchers default to clean English (`en`) upon opening, satisfying enterprise and institutional accounting standards while allowing 1-click localization.
+> - **In-Sheet Multi-Language Selector (`.excel-receipt-lang-bar`)**:
+>   - Directly situated in the in-card top toolbar (`.excel-sheet-top-bar`) with interactive pills: `English [Default]`, `አማርኛ`, `Afaan Oromoo`, and `ትግርኛ`.
+>   - State changes instantly re-render every heading, column, label, currency explanation, payment rail description, and legal covenant.
+>   - Hides on print via `.no-print` so exported PDFs and paper receipts remain clean and unencumbered.
+> - **Native Calendar & Date Formatting (`formatReceiptDate`)**:
+>   - English: `Nov 09, 2026`
+>   - Afaan Oromoo: `Sadaasa 09, 2026`
+>   - Amharic: `ጥቅምት 30, 2019 ዓ.ም`
+>   - Tigrigna: `ጥቅምቲ 30, 2019 ዓ.ም`
+> - **Wallet & Status Resolution Cleanup**:
+>   - Enhanced `BrowserWallet.tsx` to launch receipts with clean semantic status tags (`SETTLED`, `ESCROW FUNDED`) and unmixed button labels (`Payout & Tax Voucher`, `Invoice & Escrow Receipt`, `Receipt`).
+
+> **Browser Wallet Withdraw Earnings Panel Redesign & Space Optimization (2026-11-09):**
+> - **Unified 3-Column Responsive Payout Selector (`.withdraw-payment-grid`, `.withdraw-account`)**:
+>   - Replaced the previous 2-column layout (`.payment-grid`) which left Safaricom M-Pesa awkwardly alone on row 2 with 50% wasted void space.
+>   - Restructured all 3 payment methods (Telebirr, CBE Bank, and Safaricom M-Pesa) into an evenly balanced, single-row 3-column grid (`repeat(3, minmax(0, 1fr))`) on desktop and tablet viewports.
+>   - Reduced provider logo size from `70px × 70px` to a compact, clean `40px × 40px` with `6px` border-radius.
+>   - Scaled down card padding to `10px 12px` and refined typography (`strong` at `0.88rem`, subtitle `span` at `0.74rem`), cutting overall card height from ~100px to ~60px and overall provider section height by over 70%.
+> - **Tighter Vertical Rhythm & Eliminated Gap Inflation (`.withdraw-panel`, `.withdraw-fields`)**:
+>   - Streamlined panel grid gap from `18px` to `14px`, removed default paragraph margins on `.wallet-help` (`margin: 0`), and reset `.withdraw-payment-grid` margins to zero.
+>   - Grouped amount and destination identifier inputs into `.withdraw-fields` with zeroed top label margins and compact `38px` input height.
+>   - Positioned the "Request withdrawal" action button with `justify-self: start`, `38px` height, and `0 20px` padding for clean alignment.
+> - **Mobile Compaction & Theme Parity**:
+>   - Added `.withdraw-payment-grid` and `.withdraw-fields` to the `@media (max-width: 640px)` mobile ruleset (`grid-template-columns: 1fr !important`), guaranteeing seamless 1-column mobile stacking without horizontal overflow.
+>   - 100% theme parity preserved: all dimensions, paddings, and layout rules remain theme-invariant in base CSS, while colors and borders dynamically adapt through theme variables in both light and dark modes.
+
+> **Platform-Wide Alert & Warning Design System Overhaul (2026-11-09):**
+> - **Unified Alert Architecture (`@/components/base-ui/alert`, `@/components/base-ui/avatar`, `@/components/ui/alert`, `@/components/ui/avatar`)**:
+>   - Standardized all alert, notification, warning, and error callout components across the Yekis platform to adopt the high-contrast squared avatar icon badge pattern (`<Alert className="flex items-center gap-3"><Avatar className="rounded-md shrink-0"><AvatarFallback className="... rounded-md text-white"><Icon className="size-4" /></AvatarFallback></Avatar><AlertTitle>...</AlertTitle></Alert>`).
+>   - Updated `apps/frontend/src/components/ui/avatar.tsx` to support `after:rounded-[inherit]` and `rounded-[inherit]` fallback, ensuring squared `rounded-md` avatars maintain crisp, theme-accurate border rings and background fills without clipping.
+>   - Enhanced `apps/frontend/src/components/ui/alert.tsx` with clean flex alignment, subtle cards, border styling, semantic variants (`default`, `destructive`, `warning`, `success`, `info`), `<AlertContent>`, and `<UnifiedAlert>` helper component.
+>   - Established `@/components/base-ui/alert` and `@/components/base-ui/avatar` aliases with full re-export parity, along with a reference implementation in `apps/frontend/src/components/base-ui/alert-example.tsx`.
+> - **Platform-Wide Implementation Across Workspaces & Dashboards**:
+>   - **Operations Console (`apps/frontend/src/pages/ops/components/ui.tsx`, `Profile.tsx`, `DisputeQueue.tsx`)**: Upgraded `Banner` and `ErrorBox` primitives to use the bold avatar icon badge with tone-based color coding (`b-red`, `b-amber`, `b-green`, `b-blue`). Upgraded missing deliverable warnings in `DisputeQueue.tsx` with `TbFileAlert` and operator audit log banners in `Profile.tsx`.
+>   - **Browser Wallet (`apps/frontend/src/BrowserWallet.tsx`)**: Replaced raw inline error boxes with `Alert` using `TbFileAlert` on the automated checkout fallback banner, and updated withdrawal and top-up status messages with avatar badges.
+>   - **Workflow & Contracts Workspace (`apps/frontend/src/WorkflowWorkspace.tsx`)**: Transformed all success messages and error alerts across Jobs, Proposals, Contracts, Escrow Milestones, and Disputes into the unified `Alert` component with `TbAlertTriangle` and `Check` avatar badges.
+>   - **Chat Workspace (`apps/frontend/src/ChatWorkspace.tsx`)**: Upgraded the anti-circumvention platform safety notices with `ShieldAlert` avatar badge and error callouts with `TbFileAlert`.
+>   - **Phone Verification (`apps/frontend/src/PhoneVerification.tsx`)**: Replaced plain status paragraphs with the unified `Alert` component for SMS status updates (`Info`) and verification failures (`TbFileAlert`).
+> - **Theme Parity & Design Rules Compliance**:
+>   - 100% compliant with `.agents/AGENTS.md` and `docs/rule.md`: strictly avoids low-opacity background pills, guarantees theme-invariant layout geometry, and uses bold, solid, high-contrast avatar badge backgrounds (`bg-destructive`, `bg-amber-600`, `bg-emerald-600`, `bg-sky-600`) with white icons.
+> - **Verification**:
+>   - `pnpm --filter frontend build` (`tsc -b && vite build`) passed with zero errors.
+>   - `node scripts/check-doc-parity.mjs` passed with 100% alignment.
+
+> **Comprehensive Engineering, UI/UX, Theming, Responsiveness & Operational Ruleset (2026-11-09):**
+> - Formalized strict system-wide development, design, and operational rules in `docs/rule.md`, `RULE.md`, and `.agents/AGENTS.md`.
+> - Enforces mandatory prerequisite reading before modifying any code or view, zero-emoji policy, bold-text-only status styling without low-opacity pills or borders, theme-conditional CSS parity, header-only theme toggle, 44x44px touch targets, mobile compaction (2-per-row stats & tiles at <=640px), universal reachability, formal document layout specifications, async route error handling, MAX-based sequence numbering, and HMAC-SHA256 Telegram verification.
+
 > **Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul & Unified Layout (2026-11-09):**
 > - **Unified Single Wide Metadata Box (`.excel-meta-wide-box`)**:
 >   - Unified the previously split two-box metadata section into a single, seamless, wide bordered box spanning the full width of the Excel sheet.
@@ -1005,3 +1058,43 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
   - The auto-release worker releases a `SUBMITTED_FOR_REVIEW` milestone when the 7-day window expires, unless a dispute was raised first.
   - A staff dispute resolution releases from `DISPUTED`.
   - `ESCROW_HELD` and `WORK_IN_PROGRESS` are **not** release entry states: paying out from them would skip the delivery and the client's acceptance.
+
+
+---
+
+### Settings & Account Governance Workspace
+- **Overview**:
+  - Replaced the placeholder settings view with a full-fledged, 5-tab user settings workspace (`apps/frontend/src/SettingsWorkspace.tsx`) mounted in `FullPlatformApp.tsx`.
+- **Security & Password Tab**:
+  - Password change with Argon2id hash verification on backend (`POST /api/v1/auth/change-password`).
+  - Strict strength validation: 8+ characters, uppercase, lowercase, numbers, and symbols.
+  - Multi-session rotation option: "Sign out of all other devices" invalidates prior JWT refresh tokens by incrementing `sessionVersion` while minting fresh session credentials for the current client tab.
+  - Active session monitoring and one-click remote session revocation (`POST /api/v1/auth/revoke-sessions`).
+- **Preferences & Localization Tab**:
+  - 4 languages supported: English (`en`), Amharic (`am`), Oromo (`om`), and Tigrinya (`ti`).
+  - Live frontend i18n context switching with persistent backend profile sync (`PATCH /api/v1/users/me/profile` with `languagePreference`).
+  - Timezone selector with East Africa Time (`Africa/Addis_Ababa`, UTC+3) as default.
+  - Theme toggle (Dark / Light mode) with strict theme geometry parity.
+- **Notifications Tab**:
+  - Granular notification channels: Escrow and milestone releases, proposal submissions, direct chat messages, and security audit events.
+  - Configurable in-app and SMS alert toggles.
+- **Privacy & Marketplace Visibility Tab**:
+  - Available for Work toggle (controls marketplace presence).
+  - Directory visibility mode selector (Public, Proposers Only, Private).
+- **Data Management & Danger Zone Tab**:
+  - Personal Data Archive export (`GET /api/v1/users/me/export`) providing machine-readable JSON archive of user account, KYC records, transactions, wallet summary, notifications, and audit log events in compliance with data privacy regulations.
+  - Session sign-out and regulatory retention disclosure (statutory 10-year financial retention under Ethiopian law).
+
+
+---
+
+### Alert Card Size & Roundness Refinement
+- **Compact Layout & Sizing**:
+  - Reduced vertical and horizontal padding from bulky `p-3.5` (14px) to compact `px-3 py-1.5` (6px top/bottom, 12px left/right).
+  - Scaled status icon avatar down from `size-8` (32px) to `size-6` (24px) with `size-3.5` (14px) inner vector icons.
+  - Overall alert card height reduced from ~60px to ~36px, producing a sleek, unobtrusive notification bar across all workspace workflows.
+- **Architectural Corner Roundness**:
+  - Decreased border-radius from bulbous `rounded-xl` (18px) to crisp, subtle `rounded-[6px]` (matching standard card and container geometry).
+  - Avatar badge corners aligned to matching `rounded-[5px]`.
+- **System-Wide Application**:
+  - Applied across `apps/frontend/src/components/ui/alert.tsx`, `WorkflowWorkspace.tsx`, `SettingsWorkspace.tsx`, `BrowserWallet.tsx`, `ChatWorkspace.tsx`, `PhoneVerification.tsx`, and ops monitoring pages.

@@ -494,6 +494,11 @@ export function App() {
     const normalizedPhone = normalizeEthiopianPhone(mobilePhone);
     setTelegramAuthStatus("loading");
     setTelegramAuthError("");
+    // Registration answers 202 for both new and existing accounts, so the
+    // follow-up sign-in is the only thing that can tell the user apart. A
+    // failed sign-in after signing up must not disclose whether the account
+    // already existed.
+    const wasSigningUp = mobileAuthMode === "signup";
 
     try {
       if (mobileAuthMode === "signup") {
@@ -543,7 +548,9 @@ export function App() {
       const raw = err instanceof Error ? err.message : "Login failed";
       if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
         setTelegramAuthError(
-          "Invalid phone number or password. Please check your credentials.",
+          wasSigningUp
+            ? "We could not sign you in with those details. If you already have an account, sign in instead."
+            : "Invalid phone number or password. Please check your credentials.",
         );
       } else if (raw.includes("DUPLICATE_USER") || raw.includes("409")) {
         setTelegramAuthError(

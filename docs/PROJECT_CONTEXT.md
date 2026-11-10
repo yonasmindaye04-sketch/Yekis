@@ -1,5 +1,49 @@
 # Project Context
 
+> **Update 2026-11-09 (Multi-Language Fiscal Receipt & Payout Voucher Architecture):**
+> 1. **Motivation & Scope:** Addressed user feedback regarding receipts having mixed Amharic and English text simultaneously. Implemented 4 distinct, unmixed language versions (English, Amharic, Afaan Oromoo, and Tigrigna) with English as the default.
+> 2. **Multi-Language Architecture (`FiscalDocumentModal.tsx`, `RECEIPT_I18N`):**
+>    - **Pure Localization**: Provided comprehensive dictionaries for `en`, `am`, `om`, and `ti` for all document sections: header titles, subtitles, corporate metadata, recipient party, role, TIN labels, 7-column metadata band, line-items table, categories, stacked totals, payment rail proof, compliance covenants, and digital sign-off.
+>    - **Default to English**: System initializes with `language = "en"` by default, ensuring corporate clarity and consistency for international and local audits.
+>    - **In-Sheet Multi-Language Switcher (`.excel-receipt-lang-bar`)**: Positioned cleanly inside `.excel-sheet-top-bar` with `.no-print` exclusion. Users can toggle between English (Default), አማርኛ, Afaan Oromoo, and ትግርኛ at any time.
+>    - **Native Calendar & Date Formatting (`formatReceiptDate`)**: Formats dates in standard Gregorian for English, native Oromo month names for Afaan Oromoo, and authentic Ethiopian Ge'ez calendar month dates for Amharic and Tigrigna.
+>    - **Status & Wallet Consistency**: Added `resolveStatusLabel` to cleanly translate lifecycle statuses without mixed bullet strings. Updated `BrowserWallet.tsx` launcher buttons.
+> 3. **Verification:** Verified clean TypeScript transpilation of `FiscalDocumentModal.tsx` and `BrowserWallet.tsx` with 0 errors.
+
+> **Update 2026-11-09 (Browser Wallet Withdraw Earnings Panel Redesign & Space Optimization):**
+> 1. **Motivation & Scope:** Optimized the Withdraw Earnings panel (`.withdraw-panel`) in `BrowserWallet.tsx` to eliminate large visual voids, oversized logos, and excessive vertical spacing.
+> 2. **Layout & Component Upgrades:**
+>    - **3-Column Provider Selector (`.withdraw-payment-grid`)**: Switched from 2-column grid to a single-row 3-column layout on desktop/tablets (`repeat(3, minmax(0, 1fr))`), placing Telebirr, CBE Bank, and Safaricom M-Pesa side-by-side with no trailing blanks.
+>    - **Compact Card Ergonomics (`.withdraw-account`)**: Reduced logos from `70px × 70px` to `40px × 40px`, reduced padding to `10px 12px`, and adjusted typography for tight vertical efficiency (~60px card height vs ~100px previously).
+>    - **Optimized Vertical Rhythm (`.withdraw-panel`, `.withdraw-fields`)**: Reduced panel gap to `14px`, removed `.payment-grid` margin inflation, reset label margins, and standardized input heights to `38px`.
+>    - **Mobile Compaction & Theme Parity**: Added to the `@media (max-width: 640px)` 1-column mobile compaction rules; layout is strictly theme-invariant with dual-mode theme variable support.
+> 3. **Verification:** Built frontend (`tsc -b && vite build`) with zero errors; doc parity verified with `node scripts/check-doc-parity.mjs`.
+
+> **Update 2026-11-09 (Platform-Wide Alert & Warning Design System Overhaul):**
+> 1. **Motivation & Scope:** Standardized all alerts, banners, warnings, and error callouts across the Yekis platform to adopt the unified squared avatar badge alert pattern (`<Alert className="flex items-center gap-3"><Avatar className="rounded-md shrink-0"><AvatarFallback className="... rounded-md text-white"><Icon className="size-4" /></AvatarFallback></Avatar><AlertTitle>...</AlertTitle></Alert>`).
+> 2. **Component & Token Architecture (`@/components/base-ui/alert`, `@/components/base-ui/avatar`, `@/components/ui/alert`, `@/components/ui/avatar`):**
+>    - Enhanced `Avatar` and `AvatarFallback` in `components/ui/avatar.tsx` to use `after:rounded-[inherit]` and `rounded-[inherit]`, enabling smooth square/rounded-md badge silhouettes with theme-consistent borders and solid fills.
+>    - Upgraded `Alert` in `components/ui/alert.tsx` with flex layout, high-contrast semantic variants (`default`, `destructive`, `warning`, `success`, `info`), `<AlertContent>`, `<AlertAction>`, and `<UnifiedAlert>` helper.
+>    - Added `@/components/base-ui/alert` and `@/components/base-ui/avatar` forwarding modules and a reference example in `components/base-ui/alert-example.tsx`.
+> 3. **Platform Call Sites Refactored:**
+>    - Operations Console (`Banner`, `ErrorBox`, `DisputeQueue.tsx`, `Profile.tsx`).
+>    - Browser Wallet (`BrowserWallet.tsx`: checkout fallback banner with `TbFileAlert`, transaction message banners).
+>    - Workflow Workspace (`WorkflowWorkspace.tsx`: status feedback and error alerts across jobs, proposals, contracts, escrow milestones, and disputes).
+>    - Chat Workspace (`ChatWorkspace.tsx`: anti-circumvention safety caution with `ShieldAlert`, send error banner with `TbFileAlert`).
+>    - Phone Verification (`PhoneVerification.tsx`: SMS status and failure banners).
+> 4. **Theme Parity & Rules Enforcement:** 100% compliant with `.agents/AGENTS.md` and `docs/rule.md`: strictly avoids low-opacity background pills, guarantees theme-invariant layout geometry, and uses bold, solid, high-contrast avatar badge backgrounds (`bg-destructive`, `bg-amber-600`, `bg-emerald-600`, `bg-sky-600`) with white icons.
+> 5. **Verification:** `pnpm --filter frontend build` passed with zero errors; `node scripts/check-doc-parity.mjs` passed with 100% alignment.
+
+> **Update 2026-11-09 (Comprehensive Engineering, UI/UX, Theming, Responsiveness & Operational Ruleset):**
+> 1. **Motivation & Scope:** Enforced non-negotiable standards across all contributors and agents working on Yekis by unifying `docs/rule.md`, `RULE.md`, and `.agents/AGENTS.md`.
+> 2. **Key Requirements Formalized:**
+>    - **Mandatory Prerequisite**: Mandatory reading of `rule.md` before building, refactoring, or modifying any code or page.
+>    - **Zero-Emoji Policy**: Complete ban on emoji characters across JSX/TSX, CSS, HTML, logs, bot messages, alerts, and documentation; icons via Lucide, FontAwesome, SVG, or Google Material Symbols.
+>    - **Status Indicators**: Bold colored text only — absolute prohibition on low-opacity translucent pill backgrounds, border frames, and pseudo-element dots.
+>    - **Theme Parity & UI Aesthetics**: Strict theme-invariant layout rules (colors/backgrounds/shadows only in theme-conditional rules), single header-only theme toggle, compact explicit-width date-range filter wrappers, and native micro-animations.
+>    - **Responsiveness**: Dense mobile compaction (2-per-row stats & tiles at <=640px, shared button rows, zero horizontal overflow, 44x44px hit targets, mobile data grid scroll containers, 14-16px inputs to prevent iOS zoom, and accessible mobile drawer toggle buttons).
+>    - **Backend & Database**: Mandatory `asyncHandler` wrapping on Express route handlers, MAX-based human sequential identifiers (`ORD-00001`, `REC-00001`, `JOB-00001`), column qualification in JOINs, idempotent migrations/seeds, and cryptographic Telegram `initData` HMAC-SHA256 verification.
+
 > **Update 2026-11-09 (Receipt & Transaction Detail Sections Excel Spreadsheet Overhaul & Unified Layout):**
 > 1. **Motivation & Scope:** Redesigned both the official receipt/voucher sheet (`FiscalDocumentModal.tsx`) and transaction movement detail view (`BrowserWallet.tsx`) to match the user's Excel invoice template.
 > 2. **Design System & Layout Architecture (`.excel-sheet-*` in `index.css`):**
@@ -538,3 +582,12 @@ The pilot is functionally complete when a real user can complete the journey in 
 ## Documentation Practice
 
 Documentation is part of the definition of done. Every implementation change updates the relevant Markdown file and `CHANGELOG.md`; the persistent repository rule is in `.agents/AGENTS.md`.
+
+
+### Settings Workspace & Security Controls
+- **Interactive Settings Workspace**: Built `SettingsWorkspace.tsx` with 5 functional sections: Security & Password, Preferences & Localization, Notification Channels, Privacy & Marketplace Visibility, and Data & Account Governance.
+- **Backend API Endpoints**:
+  - `POST /api/v1/auth/change-password`: Argon2id verification, session version increment, audit logging.
+  - `POST /api/v1/auth/revoke-sessions`: Remote token invalidation across devices.
+  - `GET /api/v1/users/me/export`: Portable JSON archive of user record, KYC status, wallet balance, and audit events.
+- **Design System Compliance**: 100% theme parity, bold status indicators, and avatar-badge alert components conforming to `rule.md`.
