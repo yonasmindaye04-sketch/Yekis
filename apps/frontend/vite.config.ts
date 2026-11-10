@@ -44,6 +44,18 @@ const DENIED_FS_PATHS = [
   "**/.pnpm-store/**",
   "**/fix_env.js",
   "**/test-webhook.js",
+  // Repository metadata and source trees that must never be served over
+  // /@fs/. The allow list below is the primary control; these patterns remain
+  // as defence in depth if the allow list is widened later.
+  "**/README.md",
+  "**/package.json",
+  "**/pnpm-lock.yaml",
+  "**/security/**",
+  "**/.github/**",
+  "**/prisma/**",
+  "**/scripts/**",
+  "**/docs/**",
+  "**/apps/backend/**",
 ];
 
 /**
@@ -55,7 +67,7 @@ const DENIED_FS_PATHS = [
  * Set VITE_DEV_HOST=0.0.0.0 when a setup genuinely needs a LAN-reachable
  * dev server.
  */
-const DEV_HOST = process.env.VITE_DEV_HOST ?? "0.0.0.0";
+const DEV_HOST = process.env.VITE_DEV_HOST ?? "127.0.0.1";
 
 /**
  * Hostnames the dev server answers to.
@@ -79,11 +91,33 @@ const ALLOWED_HOSTS = [
 ];
 
 /**
+ * Origins allowed to embed the application in a frame.
+ *
+ * The application is embedded as a frame by Telegram (Mini App webview), by
+ * Google AI Studio and by Cloudflare-hosted previews, so `frame-ancestors`
+ * has to name those origins. Every other origin is refused by the browser —
+ * that is the clickjacking control.
+ *
+ * Framing is expressed here rather than with `X-Frame-Options` because
+ * `X-Frame-Options: DENY` would refuse to render the app in exactly those
+ * trusted contexts, and because the header has no allowlist form that modern
+ * browsers honour (`ALLOW-FROM` was removed from Chrome).
+ */
+const FRAME_ANCESTORS = [
+  "'self'",
+  "https://web.telegram.org",
+  "https://*.telegram.org",
+  "https://aistudio.google.com",
+  "https://*.google.com",
+  "https://*.googleusercontent.com",
+  "https://*.run.app",
+].join(" ");
+
+/**
  * Response headers the dev server sets on every response.
  */
 const SECURITY_HEADERS = {
-  "Content-Security-Policy":
-    "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org https://aistudio.google.com https://*.google.com https://*.googleusercontent.com https://*.run.app *",
+  "Content-Security-Policy": `frame-ancestors ${FRAME_ANCESTORS}`,
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Cross-Origin-Resource-Policy": "cross-origin",
@@ -99,6 +133,11 @@ const PRODUCTION_CSP = [
   "base-uri 'self'",
   "object-src 'none'",
   "form-action 'self'",
+  // `frame-ancestors` is ignored in a <meta> CSP, so the production host must
+  // also send this policy as an HTTP header. The value below is the one the
+  // host must use; it names the trusted embedders so the Mini App keeps
+  // working while every other origin stays blocked.
+  `frame-ancestors ${FRAME_ANCESTORS}`,
   "script-src 'self' 'unsafe-inline' https://telegram.org https://www.googletagmanager.com https://*.gstatic.com https://*.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
@@ -260,9 +299,17 @@ export default defineConfig({
   server: {
     host: DEV_HOST,
     port: 3000,
-    allowedHosts: ALLOWED_HOSTS.length > 0 ? true : true,
+    allowedHosts: ALLOWED_HOSTS,
     fs: {
       strict: true,
+      // Allow only the files the browser actually needs. A denylist over the
+      // whole repo let /@fs/ serve README.md, package.json, pnpm-lock.yaml,
+      // .github workflows and the backend seed script.
+      allow: [
+        resolve(__dirname, "index.html"),
+        resolve(__dirname, "src"),
+        resolve(__dirname, "public"),
+      ],
       deny: DENIED_FS_PATHS,
     },
     headers: SECURITY_HEADERS,
@@ -301,7 +348,7 @@ export default defineConfig({
     // headers as the dev server plus the real CSP.
     host: DEV_HOST,
     port: 4173,
-    allowedHosts: true,
+    allowedHosts: ALLOWED_HOSTS,
     headers: SECURITY_HEADERS,
   },
 });

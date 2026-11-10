@@ -56,6 +56,14 @@ pnpm --filter frontend dev
 
 The local PostgreSQL host port is `5433`. Follow [SETUP.md](SETUP.md) for environment details and verification commands.
 
+Two security defaults are worth knowing before you run anything:
+
+- **The dev servers bind to loopback only** (`127.0.0.1`). Publishing them to a network
+  or a tunnel requires an explicit opt-in (`ALLOW_DEV_TUNNEL=1`) — see
+  [CLOUDFLARE_TUNNEL_PLAYBOOK.md](docs/CLOUDFLARE_TUNNEL_PLAYBOOK.md).
+- **Seeding demo accounts requires `SEED_DEMO_PASSWORD`** (12+ characters) in
+  `apps/backend/.env`. No demo password is committed to the repository.
+
 ## Documentation Map
 
 | Document | Use it for |

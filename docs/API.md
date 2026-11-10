@@ -23,7 +23,7 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered accounts |
 | `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
 | `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange a valid refresh token for a new access+refresh pair. Suspended accounts are refused here too â€” a suspension takes effect at the next silent refresh. |
 | `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
@@ -47,6 +47,37 @@ Registration body:
 ```
 
 Marketplace roles are `CLIENT`, `FREELANCER`, and `BOTH`.
+
+### Registration response
+
+Registration deliberately does not disclose whether the email or phone was already
+registered. A new account and a duplicate account both return:
+
+```http
+HTTP/1.1 202 Accepted
+```
+
+```json
+{
+  "ok": true,
+  "message": "If these details are valid, you can sign in to continue."
+}
+```
+
+The client completes registration by signing in. The remaining statuses are
+unambiguous and safe to distinguish:
+
+| Status | Body | Meaning |
+|---|---|---|
+| `202` | `{ "ok": true, "message": "..." }` | Accepted — sign in to continue (new **or** existing account) |
+| `400` | `{ "error": "VALIDATION_ERROR", "details": { ... } }` | The body failed input validation |
+| `403` | `{ "error": "AGE_RESTRICTED", "message": "..." }` | Below the minimum contracting age |
+| `500` | `{ "error": "INTERNAL_ERROR" }` | Unexpected server error (no stack trace is returned) |
+
+> **Breaking change (2026-11-09):** the endpoint previously returned `201` with
+> `{ "id", "ucid" }` for a new account and `409 DUPLICATE_USER` for an existing one.
+> Clients that read `id`/`ucid` from the response must be updated to sign in
+> instead.
 
 ## KYC
 
@@ -577,7 +608,7 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered accounts |
 | `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
 | `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange refresh token for new access+refresh pair. Suspended accounts refused. |
 | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidates the current session |

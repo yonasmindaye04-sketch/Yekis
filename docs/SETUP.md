@@ -1,6 +1,6 @@
 ﻿# Local Setup
 
-Last updated: 2026-08-10
+Last updated: 2026-11-10
 
 ## 1. Overview
 
@@ -89,6 +89,34 @@ Configurable groups in `apps/frontend/.env`:
 
 > Blank provider credentials use development stub behavior only.
 
+### Demo accounts (`SEED_DEMO_PASSWORD`)
+
+Seeding creates the local demo staff and seller accounts (`admin@yekis.et`,
+`compliance@yekis.et`, `support@yekis.et`, `seller@yekis.et`). Their password is **not**
+committed to the repository — it is read from `SEED_DEMO_PASSWORD` at seed time:
+
+```powershell
+# In apps/backend/.env (gitignored). Minimum 12 characters.
+SEED_DEMO_PASSWORD=<a random local-only value>
+```
+
+Generate one with:
+
+```powershell
+node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+```
+
+Rules enforced by `prisma/seed.ts`:
+
+- The variable is required (12+ characters) — the seed fails fast without it.
+- The seed refuses to run when `NODE_ENV=production`.
+- The value is never printed to the console or written to a log.
+- The seed bumps `sessionVersion` on the demo accounts it updates, which revokes
+  access and refresh tokens issued before the rotation.
+
+Set it in `apps/backend/.env` (gitignored) rather than the repo-root `.env`; the
+backend reads `apps/backend/.env` first.
+
 ## 6. Start Local Infrastructure
 
 From the repo root:
@@ -125,7 +153,32 @@ pnpm --filter frontend dev
 - Frontend: `http://127.0.0.1:3000`
 - API health: `http://127.0.0.1:4000/health`
 
+Both dev servers bind to **loopback only** (`127.0.0.1`). The Vite dev server also
+enforces a `Host` header allowlist, so opening it through a LAN IP or a tunnel
+hostname requires adding that host to `ALLOWED_HOSTS` in
+`apps/frontend/vite.config.ts`.
+
 > Note: the root package currently has no generic `dev` script, and `dev:web` does not target the `frontend` package.
+
+### Exposing the app publicly (tunnels)
+
+The dev server must never be published to the internet: it serves the application
+source over `/@fs/` and proxies `/api` to the backend. The tunnel helpers therefore
+refuse to start unless you opt in explicitly:
+
+```powershell
+$env:ALLOW_DEV_TUNNEL = "1"
+pnpm dev:tunnel
+```
+
+`ALLOW_DEV_TUNNEL=1` is required by both `pnpm dev:tunnel`
+(`scripts/dev-with-tunnel.mjs`) and `pnpm tunnel:cloudflare`
+(`scripts/start-cloudflare-tunnel.ps1`). The tunnel target is always
+`http://127.0.0.1:<port>`. Stop the tunnel as soon as the demo ends — a quick
+tunnel URL is public and unauthenticated for its whole lifetime.
+
+For anything longer-lived, serve a production build (`pnpm --filter frontend build`)
+from a static host instead of the dev server.
 
 ## 8. Verify Setup
 
@@ -136,6 +189,13 @@ docker compose ps
 pnpm --filter backend test
 pnpm --filter backend build
 pnpm --filter frontend build
+```
+
+To populate a fresh database with the local demo accounts (requires
+`SEED_DEMO_PASSWORD`, see [Demo accounts](#demo-accounts-seed_demo_password)):
+
+```powershell
+pnpm --filter backend db:seed
 ```
 
 Check health:

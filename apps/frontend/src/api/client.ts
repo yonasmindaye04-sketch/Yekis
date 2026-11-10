@@ -1234,7 +1234,7 @@ class ApiClient {
     role: "CLIENT" | "FREELANCER" | "BOTH";
     dateOfBirth: string;
     consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
-  }): Promise<{ id: string; ucid: string }> {
+  }): Promise<{ ok: boolean; message: string }> {
     return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
   }
 

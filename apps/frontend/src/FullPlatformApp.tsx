@@ -625,6 +625,11 @@ const loadWorkspace = async () => {
     setError("");
     setSuccessMessage("");
     setIsLoading(true);
+    // Registration answers 202 for both new and existing accounts, so the
+    // follow-up sign-in is the only thing that can tell the user apart. A
+    // failed sign-in after registering must not disclose whether the account
+    // already existed.
+    const wasRegistering = authMode === "register";
     try {
       if (authMode === "forgot-password") {
         await api.requestPasswordReset(email);
@@ -690,7 +695,9 @@ if (authMode === "register") {
       setError(
         message === "DUPLICATE_USER"
           ? "This email or phone already has an account. Switch to Sign in."
-          : message,
+          : wasRegistering && message === "INVALID_CREDENTIALS"
+            ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+            : message,
       );
     } finally {
       setIsLoading(false);

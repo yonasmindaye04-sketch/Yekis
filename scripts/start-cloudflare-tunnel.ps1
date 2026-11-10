@@ -12,6 +12,13 @@ param(
     [int]$Port = 3000
 )
 
+# A quick tunnel publishes the target with no access control. Require an
+# explicit opt-in so a dev server cannot be exposed by habit.
+if ($env:ALLOW_DEV_TUNNEL -ne "1") {
+    Write-Error "Refusing to expose a local server by default. Set ALLOW_DEV_TUNNEL=1 only for a short-lived, trusted demo."
+    exit 1
+}
+
 $cf = Get-Command cloudflared -ErrorAction SilentlyContinue
 if (-not $cf) {
     $candidates = @(
@@ -29,6 +36,7 @@ if (-not $cf) {
     exit 1
 }
 
-Write-Host "[cloudflare] Starting quick tunnel -> http://localhost:$Port"
+Write-Host "[cloudflare] Starting quick tunnel -> http://127.0.0.1:$Port"
 Write-Host "[cloudflare] Press Ctrl+C to stop."
-& $cf tunnel --url "http://localhost:$Port"
+Write-Host "[cloudflare] WARNING: the URL is public. Stop the tunnel as soon as the demo ends."
+& $cf tunnel --url "http://127.0.0.1:$Port"

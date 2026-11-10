@@ -348,7 +348,11 @@ This is a deliberate split: the **database enum is historical residue** from the
 | MinIO console | `http://localhost:9001` | `docker-compose.yml` |
 | OpenSearch | `http://localhost:9200` | `docker-compose.yml`; optional — `searchIndex.service.ts` falls back to PostgreSQL when unreachable |
 
-The dev server binds `0.0.0.0` by default (`VITE_DEV_HOST` overrides) and ships an explicit `server.fs.deny` list that blocks `.env`, private-key extensions, `backups/**`, `*.dump`, `*.sql`, `uploads/**`, and `docs/security/**` from being served through `/@fs/`.
+The dev server binds `127.0.0.1` by default (`VITE_DEV_HOST` overrides) and enforces an explicit `Host` header allowlist (`ALLOWED_HOSTS` in `apps/frontend/vite.config.ts`) for both `server` and `preview`. File serving uses an **allowlist**: `server.fs.allow` is limited to `index.html`, `src/`, and `public/`, so `/@fs/` cannot reach repository files outside the frontend root. A `server.fs.deny` list (`.env`, private-key extensions, `backups/**`, `*.dump`, `*.sql`, `uploads/**`, `docs/security/**`, plus repository metadata such as `README.md`, `package.json`, `pnpm-lock.yaml`, `.github/**`, `security/**`, `docs/**`, and `apps/backend/**`) remains as defence in depth.
+
+The dev server must not be exposed to a public network. The tunnel helpers require `ALLOW_DEV_TUNNEL=1` before they will start and always target `http://127.0.0.1:<port>`. For a long-lived public deployment, serve the production build (`pnpm --filter frontend build`) from a static host.
+
+The production CSP is injected into `index.html` as a `<meta>` tag by `productionCspPlugin`. Browsers ignore `frame-ancestors` in a `<meta>` policy, so the production host must **also** send the CSP as an HTTP response header for framing protection to apply. That header must use the `frame-ancestors` value defined in `apps/frontend/vite.config.ts` (`'self'`, Telegram, AI Studio, Google, `*.run.app`) rather than `frame-ancestors 'self'`: the app is framed by the Telegram Mini App webview and by AI Studio previews, and `frame-ancestors` is the only directive that can name trusted embedders (`X-Frame-Options: DENY` would refuse to render the app in those contexts, and `X-Frame-Options` has no allowlist form that modern browsers honour).
 
 See `SETUP.md` for exact commands.
 

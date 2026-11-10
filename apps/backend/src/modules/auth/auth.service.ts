@@ -79,13 +79,16 @@ export async function registerUser(input: RegisterInput) {
     );
   }
 
+  // Hash before the uniqueness lookup so a duplicate registration costs the
+  // same Argon2 work as a new one. The route now returns an identical response
+  // either way; keeping the timing close removes the remaining oracle.
+  const passwordHash = await hashPassword(input.password);
+
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email: input.email }, { phone: input.phone }] },
   });
   if (existing)
     throw new DuplicateUserError("Email or phone already registered.");
-
-  const passwordHash = await hashPassword(input.password);
 
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven

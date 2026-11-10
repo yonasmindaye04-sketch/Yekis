@@ -1,4 +1,5 @@
 // === IMPORTS ===
+import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { seedDemoActivity } from "./demoActivity";
@@ -7,7 +8,24 @@ const prisma = new PrismaClient();
 
 // === SEED DATA ===
 
-const DEMO_PASSWORD = "test1234";
+/**
+ * Demo accounts exist only for local/staging walkthroughs. The password is
+ * supplied out-of-band so a usable credential is never committed to the repo.
+ * Production must create staff accounts through the admin runbook instead.
+ */
+function resolveDemoPassword(): string {
+  const value = process.env.SEED_DEMO_PASSWORD?.trim();
+  if (!value || value.length < 12) {
+    throw new Error(
+      "SEED_DEMO_PASSWORD is required (12+ characters) to seed demo accounts. " +
+        "Set it in apps/backend/.env or the process environment.",
+    );
+  }
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refusing to seed demo accounts in production.");
+  }
+  return value;
+}
 
 const SKILLS = [
   { id: "web-development", nameEn: "Web Development", nameAm: "ድር መስሪያ", category: "DEVELOPMENT" as const, displayOrder: 1 },
@@ -27,6 +45,10 @@ const SKILLS = [
 
 // === MAIN ===
 async function main() {
+  // Hash once and reuse for every demo account instead of paying Argon2 eight
+  // times, and never log the plaintext value.
+  const demoPasswordHash = await hashPassword(resolveDemoPassword());
+
   console.log("🌱 Seeding skills taxonomy...");
 
   for (const skill of SKILLS) {
@@ -54,7 +76,8 @@ async function main() {
     update: {
       role: "CLIENT",
       staffRole: "ADMIN",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
+      sessionVersion: { increment: 1 },
       cachedKycTier: "TIER_1",
       cachedKycStatus: "VERIFIED",
       kyc: { upsert: { create: { tier: "TIER_1", status: "VERIFIED" }, update: { tier: "TIER_1", status: "VERIFIED" } } },
@@ -63,7 +86,7 @@ async function main() {
     create: {
       email: "admin@yekis.et",
       phone: "+251910011818",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "ADMIN",
@@ -83,7 +106,8 @@ async function main() {
     update: {
       role: "CLIENT",
       staffRole: "COMPLIANCE_OFFICER",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
+      sessionVersion: { increment: 1 },
       cachedKycTier: "TIER_1",
       cachedKycStatus: "VERIFIED",
       kyc: { upsert: { create: { tier: "TIER_1", status: "VERIFIED" }, update: { tier: "TIER_1", status: "VERIFIED" } } },
@@ -92,7 +116,7 @@ async function main() {
     create: {
       email: "compliance@yekis.et",
       phone: "+251910011819",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "COMPLIANCE_OFFICER",
@@ -114,7 +138,8 @@ async function main() {
     update: {
       role: "CLIENT",
       staffRole: "SUPPORT",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
+      sessionVersion: { increment: 1 },
       cachedKycTier: "TIER_1",
       cachedKycStatus: "PENDING",
       kyc: { upsert: { create: { tier: "TIER_1", status: "PENDING" }, update: { tier: "TIER_1" } } },
@@ -123,7 +148,7 @@ async function main() {
     create: {
       email: "support@yekis.et",
       phone: "+251910011820",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
       role: "CLIENT",
       dateOfBirth: new Date("1990-01-01"),
       staffRole: "SUPPORT",
@@ -148,7 +173,8 @@ async function main() {
     where: { email: "seller@yekis.et" },
     update: {
       role: "FREELANCER",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
+      sessionVersion: { increment: 1 },
       cachedKycTier: "TIER_1",
       cachedKycStatus: "VERIFIED",
       bio: "Brand and web designer helping Ethiopian businesses look established.",
@@ -160,7 +186,7 @@ async function main() {
     create: {
       email: "seller@yekis.et",
       phone: "+251910011821",
-      passwordHash: await hashPassword(DEMO_PASSWORD),
+      passwordHash: demoPasswordHash,
       role: "FREELANCER",
       dateOfBirth: new Date("1993-04-12"),
       cachedKycTier: "TIER_1",
@@ -175,7 +201,7 @@ async function main() {
     },
   });
 
-  console.log("  ✅ Demo freelancer seeded (seller@yekis.et / test1234)");
+  console.log("  ✅ Demo freelancer seeded (seller@yekis.et)");
 
   const GIGS = [
     {
@@ -282,7 +308,7 @@ async function main() {
 
   console.log("🌱 Seeding demo activity (contracts, escrow, payments, payouts, receipts, disputes)...");
 
-  const activity = await seedDemoActivity(prisma);
+  const activity = await seedDemoActivity(prisma, demoPasswordHash);
 
   console.log(
     `  ✅ ${activity.contracts} contracts / ${activity.milestones} milestones / ` +

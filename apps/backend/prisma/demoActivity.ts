@@ -19,9 +19,14 @@ import type { PrismaClient } from "@prisma/client";
 
 const DAY_MS = 86_400_000;
 
-/** Argon2id hash of `test1234` (m=16384, t=3, p=4) — same demo password. */
-export const DEMO_ACTIVITY_PASSWORD_HASH =
-  "$argon2id$v=19$m=16384,t=3,p=4$moKzIFyFuBOQSBofUzBkMA$8+FqJ8ALDHtSjPUbRFR+N7NihXxl2LDPwuqSbsrXcjk";
+/**
+ * Argon2id hash of a random 32-byte value generated when the demo credential
+ * was rotated. Data-migration-created demo rows use this so they have no known
+ * password. `prisma/seed.ts` passes the real SEED_DEMO_PASSWORD hash when it
+ * wants usable local demo accounts.
+ */
+export const DISABLED_DEMO_PASSWORD_HASH =
+  "$argon2id$v=19$m=16384,t=3,p=4$WO/Z0Lx9BHEYn8EqtEPhGg$0/A554eG7mGhzzBIhIPS2X2/1Fds/5ZtQ8Z2w6RmKFg";
 
 export interface DemoUser {
   id: string;
@@ -1029,6 +1034,7 @@ export interface DemoActivitySummary {
 
 export async function seedDemoActivity(
   prisma: PrismaClient,
+  passwordHash: string = DISABLED_DEMO_PASSWORD_HASH,
 ): Promise<DemoActivitySummary> {
   const now = Date.now();
   const at = (daysAgo: number | undefined): Date | null =>
@@ -1046,7 +1052,8 @@ export async function seedDemoActivity(
         role: u.role,
         firstName: u.firstName,
         lastName: u.lastName,
-        passwordHash: DEMO_ACTIVITY_PASSWORD_HASH,
+        passwordHash,
+        sessionVersion: { increment: 1 },
         bio: u.bio ?? "",
         isAvailableForWork: u.isAvailableForWork ?? false,
         totalEarnedNetMinor: u.totalEarnedNetMinor ?? 0,
@@ -1060,7 +1067,7 @@ export async function seedDemoActivity(
         ucid: u.ucid,
         email: u.email,
         phone: u.phone,
-        passwordHash: DEMO_ACTIVITY_PASSWORD_HASH,
+        passwordHash,
         role: u.role,
         firstName: u.firstName,
         lastName: u.lastName,

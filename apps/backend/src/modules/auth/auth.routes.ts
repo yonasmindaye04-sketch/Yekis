@@ -143,9 +143,18 @@ authRouter.post("/register", registrationLimiter, async (req, res) => {
       .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
   }
 
+  // Registration must not answer the question "does this email/phone already
+  // exist?" New and duplicate requests therefore return the same 202 body.
+  // The client signs in afterwards; a wrong password fails exactly like any
+  // other login and does not reveal whether the account was just created.
+  const accepted = {
+    ok: true,
+    message: "If these details are valid, you can sign in to continue.",
+  } as const;
+
   try {
-    const user = await registerUser(parsed.data);
-    return res.status(201).json({ id: user.id, ucid: user.ucid });
+    await registerUser(parsed.data);
+    return res.status(202).json(accepted);
   } catch (err) {
     if (err instanceof AgeRestrictionError) {
       return res
@@ -153,9 +162,7 @@ authRouter.post("/register", registrationLimiter, async (req, res) => {
         .json({ error: "AGE_RESTRICTED", message: err.message });
     }
     if (err instanceof DuplicateUserError) {
-      return res
-        .status(409)
-        .json({ error: "DUPLICATE_USER", message: err.message });
+      return res.status(202).json(accepted);
     }
     logger.error({ err }, "Unexpected error during registration");
     return res.status(500).json({ error: "INTERNAL_ERROR" });

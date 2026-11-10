@@ -11,6 +11,8 @@ const CHROME = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe";
 const BASE_URL = "http://localhost:5174";
 const EVIDENCE_ROOT = "C:\\Users\\Za\\Desktop\\project\\Yekis\\docs\\theme-parity";
 const USERS_FILE = "C:\\Users\\Za\\AppData\\Local\\Temp\\opencode\\audit-users.json";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@yekis.et";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || process.env.SEED_DEMO_PASSWORD;
 
 const args = process.argv.slice(2);
 const MODE = (args.find((a) => a.startsWith("--mode")) || "--mode=before").split("=")[1];
@@ -147,11 +149,13 @@ async function main() {
   if (fs.existsSync(USERS_FILE)) users = JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
   if (!users.client) users.client = await createUser("CLIENT").catch((e) => { console.error(e.message); return null; });
   if (!users.freelancer) users.freelancer = await createUser("FREELANCER").catch((e) => { console.error(e.message); return null; });
-  if (!users.admin) users.admin = await loginUser("admin@yekis.et", "test1234").catch((e) => { console.error(e.message); return null; });
+  if (!users.admin && ADMIN_PASSWORD) {
+    users.admin = await loginUser(ADMIN_EMAIL, ADMIN_PASSWORD).catch((e) => { console.error(e.message); return null; });
+  }
   users.creds = {
     client: { email: "audit-client@yekis.et", password: "Test1234!a" },
     freelancer: { email: "audit-freelancer@yekis.et", password: "Test1234!a" },
-    admin: { email: "admin@yekis.et", password: "test1234" },
+    admin: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   };
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
   console.log("users ready:", Object.entries(users).map(([k, v]) => `${k}:${v ? "ok" : "MISSING"}`).join(" "));

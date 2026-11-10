@@ -22,7 +22,7 @@ import {
   DEMO_TOP_UPS,
   DEMO_USERS,
   DEMO_WALLET_BALANCES,
-  DEMO_ACTIVITY_PASSWORD_HASH,
+  DISABLED_DEMO_PASSWORD_HASH,
 } from "../prisma/demoActivity.js";
 
 const stamp = process.argv[2] ?? "20261022150000";
@@ -111,7 +111,7 @@ for (const u of DEMO_USERS) {
         q(u.ucid),
         q(u.email),
         q(u.phone),
-        q(DEMO_ACTIVITY_PASSWORD_HASH),
+        q(DISABLED_DEMO_PASSWORD_HASH),
         q(u.role),
         "'1994-06-15'::timestamp",
         t(u.registeredDaysAgo),

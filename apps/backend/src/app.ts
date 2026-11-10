@@ -33,6 +33,7 @@ import botRouter from "./modules/bot/bot.routes.js";
 import { env } from "./config/env.js";
 export function buildApp() {
   const app = express();
+  app.disable("x-powered-by");
 
   // Behind a reverse proxy (cloudflared in dev, nginx/ALB in prod) Express must be
   // told how many hops to trust, otherwise req.ip is the proxy's IP — which
@@ -168,8 +169,9 @@ export function buildApp() {
     res.status(404).json({ error: "NOT_FOUND", path: req.path });
   });
 
-  // Central error handler â€” catches anything that slips past route-level
-  // try/catch. Never leak err.stack in production responses.
+  // Central error handler — catches anything that slips past route-level
+  // try/catch. Client responses never contain the stack, internal paths, or
+  // dependency versions; those are logged server-side only.
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   app.use(
     (
@@ -178,14 +180,22 @@ export function buildApp() {
       res: express.Response,
       _next: express.NextFunction,
     ) => {
+      // body-parser reports malformed JSON as a SyntaxError with a 400 status
+      // and `type: "entity.parse.failed"`. Without this branch it reached the
+      // generic handler and became an avoidable 500.
+      const parseError = err as Error & { type?: string; status?: number };
+      if (parseError.type === "entity.parse.failed") {
+        logger.warn({ err, path: req.path }, "Invalid JSON request body");
+        return res.status(400).json({
+          error: "INVALID_JSON",
+          message: "Request body is not valid JSON.",
+        });
+      }
+
       logger.error({ err, path: req.path }, "Unhandled error");
-      res.status(500).json({ 
+      res.status(500).json({
         error: "INTERNAL_ERROR",
-        message:
-          env.NODE_ENV === "development"
-            ? err.message
-            : "An unexpected error occurred.",
-        stack: env.NODE_ENV === "development" ? err.stack : undefined,
+        message: "An unexpected error occurred.",
       });
     },
   );
