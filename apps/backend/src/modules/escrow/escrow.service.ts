@@ -881,6 +881,7 @@ export async function releaseMilestoneFunds(
       milestoneGrossMinor: amountMinor,
       freelancerNetMinor: fees.freelancerNetMinor,
       platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      paymentProviderFeeMinor: fees.paymentProviderFeeMinor,
       withholdingTaxMinor: fees.withholdingTaxMinor,
     });
   };
@@ -1040,9 +1041,21 @@ export async function withdrawFromWallet(params: {
     );
   }
 
-  // Telebirr B2C fee (0.5% standard cashout)
-  const feeMinor = Math.round(params.amountMinor * 0.005);
-  const netAmountMinor = params.amountMinor - feeMinor;
+  // The payment/disbursement provider fee is no longer taken here.
+  //
+  // It used to be a hardcoded 0.5% literal on this line, deducted from the
+  // payout amount and charged identically for every provider — neither
+  // configurable nor routed by the fee engine
+  // (docs/hardening/AUDIT_FINANCE_WORKERS.md finding L-3). It is now the
+  // second component of the fee engine: computed on the transaction gross at
+  // release and routed to REVENUE-DISBURSEMENT-FEES there, so the platform's
+  // overall take on a transaction is a single 7.5% (7% commission + 0.5%
+  // provider fee) rather than 7% now and a surprise deduction at cash-out.
+  //
+  // Charging it in both places would make the take 8%, so the payout
+  // disburses the full wallet amount.
+  const feeMinor = 0;
+  const netAmountMinor = params.amountMinor;
 
   // The debit, the audit event and the payout row are ONE transaction.
   //

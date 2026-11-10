@@ -348,6 +348,7 @@ export async function recordEscrowFundingLedger(
  * Debit:  LIABILITY (Escrow Pool)
  * Credit: LIABILITY (Freelancer wallet account — net)
  * Credit: REVENUE (Platform commission)
+ * Credit: REVENUE (Payment/disbursement provider fee)
  * Credit: LIABILITY (Withholding tax due ERA)
  */
 export async function recordMilestoneReleaseLedger(
@@ -358,6 +359,7 @@ export async function recordMilestoneReleaseLedger(
     milestoneGrossMinor: number;
     freelancerNetMinor: number;
     platformFeeFromFreelancerMinor: number;
+    paymentProviderFeeMinor: number;
     withholdingTaxMinor: number;
   },
 ) {
@@ -382,6 +384,19 @@ export async function recordMilestoneReleaseLedger(
       accountName: CHART_OF_ACCOUNTS.REVENUE_PLATFORM_FEES.name,
       accountType: CHART_OF_ACCOUNTS.REVENUE_PLATFORM_FEES.type,
       creditMinor: params.platformFeeFromFreelancerMinor,
+    });
+  }
+
+  // The provider fee is the second component of the fee engine. It is routed
+  // here, at release, so the transaction's take is a single visible number
+  // (7% platform commission + 0.5% provider fee) rather than a deduction
+  // that appears later at cash-out.
+  if (params.paymentProviderFeeMinor > 0) {
+    entries.push({
+      accountCode: CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.code,
+      accountName: CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.name,
+      accountType: CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.type,
+      creditMinor: params.paymentProviderFeeMinor,
     });
   }
 

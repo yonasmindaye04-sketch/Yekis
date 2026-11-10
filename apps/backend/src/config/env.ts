@@ -284,6 +284,18 @@ const EnvSchema = z.object({
   PLATFORM_FEE_RATE_CLIENT: z.coerce.number().default(0),
   PLATFORM_FEE_RATE_FREELANCER: z.coerce.number().default(0.07),
 
+  // Payment / disbursement provider fee — the second component of the fee
+  // engine, charged on the milestone gross alongside the platform fee.
+  // 0.5% (the standard Telebirr cash-out rate), so the platform's overall
+  // take on a transaction is 7.5%: 7% platform commission + 0.5% provider fee.
+  //
+  // This used to be a hardcoded `0.005` literal inside withdrawFromWallet,
+  // applied to every provider at payout time, which meant it was neither
+  // configurable nor routed by the fee engine (see docs/hardening/
+  // AUDIT_FINANCE_WORKERS.md finding L-3). It is now computed once, on the
+  // transaction, and routed to REVENUE-DISBURSEMENT-FEES at release.
+  PAYMENT_PROVIDER_FEE_RATE: z.coerce.number().default(0.005),
+
   // TMS / AML rule thresholds — aligned with the Master Design document
   // (§11.4 Transaction monitoring red flags) as of the 2026-08-26 unification.
   // Structuring = multiple deposits totaling > 500k ETB within 7 days;
