@@ -245,8 +245,14 @@ describe("LOCK (source text) — the wallet debit is guarded", () => {
     );
     expect(src).toMatch(/updateMany\(\{\s*where: \{[^}]*balanceMinor: \{ gte:/);
     // The milestone is claimed conditionally too, so a loser cannot mark an
-    // already-funded milestone as held.
-    expect(src).toMatch(/where: \{ id: milestone\.id, escrowState: "PAYMENT_PENDING" \}/);
+    // already-funded milestone as held. The claim lives in the shared
+    // placeEscrowHold helper (both the wallet path and the provider webhook
+    // path go through it), so the lock pins the helper's predicate and that
+    // it is actually called -- a guard nobody calls protects nothing.
+    expect(src).toMatch(
+      /where: \{\s*id: params\.milestoneId,\s*escrowState: "PAYMENT_PENDING"/,
+    );
+    expect(src).toMatch(/placeEscrowHold\(tx, \{/);
   });
 
   it("the gig debit carries a gte guard", async () => {

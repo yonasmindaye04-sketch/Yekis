@@ -536,8 +536,12 @@ describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
     });
 
     const after = await walletBalances();
-    // 50000 to the freelancer less the 5% platform fee; 50000 to the client.
-    expect(after.freelancer - before.freelancer).toBe(47500);
+    // 50000 to the freelancer less the platform fee; 50000 to the client. The
+    // fee is read from the live config rather than hard-coded, so the
+    // conservation assertion does not rot when the rate changes.
+    expect(after.freelancer - before.freelancer).toBe(
+      50000 - PLATFORM_FEE_MINOR(50000),
+    );
     expect(after.client - before.client).toBe(50000);
 
     const milestone = await prisma.milestone.findUniqueOrThrow({
@@ -567,11 +571,13 @@ describe("F-04 the normal arbitration path still works", () => {
     });
 
     const after = await walletBalances();
-    // Net of the freelancer's 5% platform fee; withholding is 0 because this
+    // Net of the freelancer's platform fee; withholding is 0 because this
     // amount is under the ETB 10,000 threshold and the fixture freelancer has
     // no TIN. Conservation is what matters: the whole escrow left the platform
     // and landed in exactly one wallet.
-    expect(after.freelancer - before.freelancer).toBe(95000);
+    expect(after.freelancer - before.freelancer).toBe(
+      100000 - PLATFORM_FEE_MINOR(100000),
+    );
     expect(after.client - before.client).toBe(0);
     const paidOut =
       after.freelancer -

@@ -4,6 +4,17 @@
 **Scope:** Reconciliation of `Yekis_Master_Design_Legal_Compliance_Modified (2).docx` and `Master_Engineering_Roadmap_Aligned.docx` against the implemented codebase, and the first implementation pass of the agreed decisions.
 **Rule:** Where the documents are marked DECIDED and the code diverges, the code was brought to the document. Where the code is ahead of the documents (reverse gaps), this record supplies corrected wording to merge into the next docx revision.
 
+> **2026-11-09 corrections.** This record is retained as history. Four of its statements are now out of date and are corrected below. The full, current decision-by-decision map lives in **`docs/DOCUMENT_UNIFICATION_2026-11-09.md`**, and the phase-by-phase map lives in **`docs/ROADMAP_ALIGNMENT.md`**.
+>
+> | # | 2026-08-26 statement | 2026-11-09 reality |
+> |---|---|---|
+> | 1 | Part 2 item 7: *"CI/CD pipeline does not exist yet (`.github/workflows` empty) — Roadmap Phase 0 DoD 'auto-run tests on every PR' is NOT met"* | **No longer true.** `.github/workflows/ci.yml` now runs the doc-parity check, secret scan, backend type-check, route-audit baseline gate, backend `pnpm test`, fresh-database check, and the frontend production build on every PR. `.github/workflows/deploy.yml` exists but is a **placeholder** — its deploy steps are a comment. The frontend CI job runs **build only**: there are zero frontend test files and no frontend test runner. So the *test* DoD is met for the backend; the *deploy* pipeline, frontend lint, migration validation, and dependency scanning are still missing |
+> | 2 | Part 1 item 6: *"Unverified users cannot change profile — `requireKycVerified("TIER_1")` added to `PATCH /api/v1/profile/me/profile`"* | **No longer true.** The profile gate was deliberately removed because it blocked onboarding (`src/modules/profiles/profile.routes.ts:59`). Profile editing is ungated today. Only 7 routes are KYC-gated, and `src/middleware/requireKycVerified.ts` is now dead code — the live guard is `src/middleware/hardBlock.ts` |
+> | 3 | Part 1 item 4 (fee split implied by the documents: 5% freelancer + 5% client) | The platform fee is now a **single flat 7% deducted from the freelancer**, with a **0% client surcharge** (`PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0`), and withholding is held at **0%** at launch behind `TIN_FEATURE_ENABLED=false`. See `docs/DECISIONS.md` → *Platform-Wide 7% Only General Fee Rule* |
+> | 4 | Part 4 verification: *"`pnpm --filter backend test` ✅ (15/15)"* | The suite is now **60 test files / 535 `it()`/`test()` cases**. The result stands; the count is stale |
+>
+> Also new since this record was written: the **7-day cooling-off right is not armed** (`Contract.cancellableUntil` is never written), there is **no 10-year retention column, purge job, or WORM module**, there is **no PDPP data-subject access/portability/erasure tooling**, `src/lib/breachAlert.ts` is **log-only** (its SMS/Telegram dispatch is commented out), and the background processing fleet is now **9 BullMQ queues** rather than the 4 listed in Part 1 item 2's neighbourhood.
+
 ---
 
 ## Part 1 — Decisions implemented in code today

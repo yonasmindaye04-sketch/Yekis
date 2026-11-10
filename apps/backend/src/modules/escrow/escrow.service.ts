@@ -76,6 +76,55 @@ export async function assertEscrowNotHeld(milestoneId: string): Promise<void> {
 }
 
 /**
+ * The single place where a funded milestone becomes ESCROW_HELD.
+ *
+ * Funding source must never change the lifecycle. A milestone funded from the
+ * client's in-platform wallet and a milestone funded through a payment
+ * provider end in exactly the same state, with the same client-side spend
+ * accounting, and differ only in where the money was debited from. This
+ * helper is that shared step, so the two paths cannot drift apart again.
+ *
+ * Runs inside the caller's transaction. The claim is a conditional
+ * `updateMany` on `PAYMENT_PENDING`, so exactly one concurrent funding can
+ * win and the losers roll their whole transaction back.
+ *
+ * Returns false when the milestone is not in a fundable state (already
+ * funded, or on a contract that is no longer ACTIVE). The caller decides what
+ * that means: a provider webhook flags the payment for staff to return, a
+ * direct wallet debit fails the request because the money has already left
+ * the wallet.
+ */
+async function placeEscrowHold(
+  tx: Prisma.TransactionClient,
+  params: {
+    clientId: string;
+    milestoneId: string;
+    totalChargedMinor: number;
+  },
+): Promise<boolean> {
+  const claimed = await tx.milestone.updateMany({
+    where: {
+      id: params.milestoneId,
+      escrowState: "PAYMENT_PENDING",
+      // Only a live contract can hold funds. A cooling-off cancellation marks
+      // the contract CANCELLED and leaves the milestone in PAYMENT_PENDING,
+      // so the contract predicate is what stops that case.
+      contract: { status: "ACTIVE" },
+    },
+    data: { escrowState: "ESCROW_HELD" },
+  });
+
+  if (claimed.count !== 1) return false;
+
+  await tx.user.update({
+    where: { id: params.clientId },
+    data: { totalSpentGrossMinor: { increment: params.totalChargedMinor } },
+  });
+
+  return true;
+}
+
+/**
  * Client funds a milestone. Requires the contract to be fully executed
  * (both parties digitally accepted â€” see contracts.service.ts) before any
  * money moves, per the trust-loop sequencing.
@@ -153,6 +202,13 @@ export async function fundMilestone(params: {
 
 /**
  * T1-E: Direct wallet funding â€” debits client wallet balance immediately.
+ *
+ * The wallet is only the funding SOURCE. It changes where the money comes
+ * from, not what happens to it: the milestone still goes into escrow, the
+ * freelancer still has to deliver, and the client still has to accept (or
+ * wait out the 7-day deemed-acceptance window) before the freelancer is
+ * credited. Master Design section 3A.13.6 and Service Agreement Clause 2.2 apply
+ * to every funding method.
  */
 export async function fundMilestoneFromWallet(params: {
   clientId: string;
@@ -224,42 +280,25 @@ export async function fundMilestoneFromWallet(params: {
       );
     }
 
-    // Immediate transfer: credit freelancer wallet immediately upon payment
-    await tx.wallet.upsert({
-      where: { userId: milestone.contract.freelancerId },
-      create: {
-        userId: milestone.contract.freelancerId,
-        balanceMinor: fees.freelancerNetMinor,
-      },
-      update: {
-        balanceMinor: { increment: fees.freelancerNetMinor },
-      },
+    // Shared escrow-hold step. Identical to the provider-webhook path: claim
+    // PAYMENT_PENDING -> ESCROW_HELD and account the client's spend. The
+    // freelancer is NOT credited here -- that happens in releaseMilestoneFunds,
+    // after delivery and client acceptance (or the 7-day deemed-acceptance
+    // window). The wallet is only where the money came from.
+    const held = await placeEscrowHold(tx, {
+      clientId: params.clientId,
+      milestoneId: milestone.id,
+      totalChargedMinor: fees.clientTotalChargeMinor,
     });
-
-    await tx.user.update({
-      where: { id: milestone.contract.freelancerId },
-      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    });
-
-    await tx.user.update({
-      where: { id: params.clientId },
-      data: { totalSpentGrossMinor: { increment: fees.clientTotalChargeMinor } },
-    });
-
-    const claimed = await tx.milestone.updateMany({
-      where: { id: milestone.id, escrowState: "PAYMENT_PENDING" },
-      data: {
-        escrowState: "RELEASED",
-        releasedAt: new Date(),
-      },
-    });
-    if (claimed.count !== 1) {
+    if (!held) {
       throw new InvalidEscrowStateError(
         "This milestone is no longer awaiting payment.",
       );
     }
 
-    // Double-entry general ledger postings: funding + immediate release
+    // Double-entry general ledger posting: client wallet -> escrow pool.
+    // The matching release journal (escrow pool -> freelancer wallet) is
+    // posted by releaseMilestoneFunds, not here.
     await recordEscrowFundingLedger(tx, {
       clientId: params.clientId,
       milestoneId: milestone.id,
@@ -267,44 +306,25 @@ export async function fundMilestoneFromWallet(params: {
       milestoneGrossMinor: fees.grossAmountMinor,
       platformFeeFromClientMinor: fees.platformFeeFromClientMinor,
     });
-
-    await recordPlatformEarnings(tx, fees, milestone.id);
-
-    await recordMilestoneReleaseLedger(tx, {
-      freelancerId: milestone.contract.freelancerId,
-      milestoneId: milestone.id,
-      milestoneGrossMinor: milestone.amountMinor,
-      freelancerNetMinor: fees.freelancerNetMinor,
-      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-      withholdingTaxMinor: fees.withholdingTaxMinor,
-    });
   });
-
-  await checkVatThresholdAfterRelease(milestone.id);
-  await checkAndUpdateContractCompletion(milestone.id);
 
   await recordAuditEvent({
     userId: params.clientId,
-    eventType: "ESCROW_FUNDED_AND_RELEASED",
+    eventType: "ESCROW_FUNDED_FROM_WALLET",
     entityType: "Milestone",
     entityId: milestone.id,
     metadata: {
       chargedMinor: fees.clientTotalChargeMinor,
       grossMinor: fees.grossAmountMinor,
-      freelancerNetMinor: fees.freelancerNetMinor,
       platformFeeMinor: fees.platformFeeFromClientMinor,
     },
   });
 
-  await notificationQueue.add("escrow-released", {
+  await notificationQueue.add("escrow-funded", {
     userId: milestone.contract.freelancerId,
     milestoneId: milestone.id,
     message:
-      "Payment of ETB " +
-      (fees.freelancerNetMinor / 100).toLocaleString() +
-      " for project '" +
-      milestone.title +
-      "' has been added to your wallet immediately!",
+      "Escrow has been funded from the client's wallet - you can begin work.",
   });
 
   await notificationQueue.add("payment-debited", {
@@ -315,7 +335,7 @@ export async function fundMilestoneFromWallet(params: {
       (fees.clientTotalChargeMinor / 100).toLocaleString() +
       " for '" +
       milestone.title +
-      "' was deducted from your wallet and credited to the freelancer.",
+      "' was deducted from your wallet and held in escrow.",
   });
 
   // Dispatch formal order invoice receipt email to the client
@@ -430,7 +450,7 @@ export async function handlePaymentWebhook(params: {
       return "FAILED" as const;
     }
 
-    // The money DID arrive â€” the provider says so and the transaction row now
+    // The money DID arrive - the provider says so and the transaction row now
     // records that. But it must not be parked in escrow on a milestone that is
     // no longer fundable.
     //
@@ -438,28 +458,21 @@ export async function handlePaymentWebhook(params: {
     // move a milestone to ESCROW_HELD whatever state it was in. The concrete
     // case: a client cancels during the cooling-off window, which marks the
     // contract CANCELLED and deliberately leaves the milestone in
-    // PAYMENT_PENDING â€” the payment they had already started then succeeds. The
+    // PAYMENT_PENDING - the payment they had already started then succeeds. The
     // old code locked it in escrow on a cancelled contract, where no accept,
     // dispute or refund path can ever reach it. The client's money, held, with
     // no route out.
     //
-    // Both predicates are needed and neither is sufficient alone:
-    //   - escrowState alone does not help, because cooling-off cancellation
-    //     LEAVES the milestone in PAYMENT_PENDING. The contract predicate is the
-    //     one that actually stops this case.
-    //   - contract status alone does not help, because a milestone can reach a
-    //     settled state on an ACTIVE contract.
-    const funded = await tx.milestone.updateMany({
-      where: {
-        id: transaction.milestoneId,
-        escrowState: "PAYMENT_PENDING",
-        // Only a live contract can hold funds.
-        contract: { status: "ACTIVE" },
-      },
-      data: { escrowState: "ESCROW_HELD" },
+    // placeEscrowHold owns that decision now (claim + spend accounting), so
+    // this path and the direct-wallet path cannot disagree about what
+    // "funded" means.
+    const funded = await placeEscrowHold(tx, {
+      clientId: transaction.milestone.contract.clientId,
+      milestoneId: transaction.milestoneId,
+      totalChargedMinor: transaction.amountMinor,
     });
 
-    if (funded.count === 0) {
+    if (!funded) {
       // The money is real and recorded on the transaction; the milestone is not
       // in a state to hold it. Refusing silently would leave a known payment
       // that nobody has been told about, so it is raised for a human to return.
@@ -498,11 +511,6 @@ export async function handlePaymentWebhook(params: {
 
       return "ORPHANED" as const;
     }
-
-    await tx.user.update({
-      where: { id: transaction.milestone.contract.clientId },
-      data: { totalSpentGrossMinor: { increment: transaction.amountMinor } },
-    });
 
     return "FUNDED" as const;
   });
@@ -833,10 +841,16 @@ export async function releaseMilestoneFunds(
     //   DISPUTED             - staff resolution or arbitration award
     // The loser gets count=0 and throws BEFORE any wallet credit,
     // eliminating the historical double-payout race.
+    //
+    // ESCROW_HELD and WORK_IN_PROGRESS are deliberately NOT legal entry
+    // states. Releasing from them would let a milestone pay out without the
+    // freelancer ever delivering and without the client ever accepting --
+    // the escrow guarantee (Master Design 3A.13.6, Service Agreement Clause
+    // 2.2) would be bypassed on the delivery step itself.
     const claim = await tx.milestone.updateMany({
       where: {
         id: milestoneId,
-        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS", "DISPUTED"] },
+        escrowState: { in: ["SUBMITTED_FOR_REVIEW", "DISPUTED"] },
         escrowHolds: { none: { active: true } },
       },
       data: { escrowState: "RELEASED", releasedAt: new Date() },

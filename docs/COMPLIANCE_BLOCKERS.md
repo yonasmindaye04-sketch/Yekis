@@ -16,7 +16,8 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 **Current Code Implementation**:
 - The ledger logic correctly separates the funds logically (see `PlatformOperatingAccount`, `PlatformFeeCredit` models).
 - Escrow flow treats external payments as held in escrow, but they actually land in whatever default merchant account `telebirrClient` is configured with (`TELEBIRR_MERCHANT_APP_ID` / `TELEBIRR_MERCHANT_CODE`). There is **no** `chapaClient` — that adapter was deleted on 2026-08-26.
-- **Correction:** `withdrawFromWallet` (`apps/backend/src/modules/escrow/escrow.service.ts:863`) is **not** stubbed. Telebirr B2C disbursement is implemented in `payout.service.ts`, with automatic wallet rollback and compensating double-entry ledger postings on provider refusal, and ledger posting on `CONFIRMED`. The real gap is **not** the payout API — it is the ring-fenced account itself.
+- **Correction:** `withdrawFromWallet` (`apps/backend/src/modules/escrow/escrow.service.ts:915`) is **not** stubbed. Telebirr B2C disbursement is implemented in `payout.service.ts`, with automatic wallet rollback and compensating double-entry ledger postings on provider refusal, and ledger posting on `CONFIRMED`. The real gap is **not** the payout API — it is the ring-fenced account itself.
+- **⚠️ Related finding (`ESC-003`, not a blocker but a divergence):** the wallet-funding path no longer holds funds in escrow at all. `fundMilestoneFromWallet` (`escrow.service.ts:157-300`) credits the freelancer immediately and claims the milestone as `RELEASED`, so the escrow hold, the client-acceptance step, and the dispute window do not exist on that path. The ring-fenced-account work above assumes a real escrow balance exists; on the current wallet path there is none to segregate. Recorded in `docs/DOCUMENT_UNIFICATION_2026-11-09.md` §Part 1 row 1.9.
 
 ## 2. ERA Withholding Tax Remittance API
 **Domain**: Finance / Taxes
@@ -74,7 +75,7 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 **The Block**: The law requires reporting significant data breaches to the Ethiopian Communications Authority (ECA) within 72 hours. The ECA does not have an automated webhook or API for this.
 
 **Current Code Implementation**:
-- **Correction:** `src/lib/breachAlert.ts` does **not** send a Telegram/email/SMS alert. It calls `logger.fatal({ breachAlert: true, severity, affectedSystems, estimatedUsersImpacted }, ...)`. The dispatch to the internal Security Incident Response Team is **commented out** (`breachAlert.ts:34-36`):
+- **Correction:** `src/lib/breachAlert.ts` does **not** send a Telegram/email/SMS alert. It calls `logger.fatal({ breachAlert: true, severity, affectedSystems, estimatedUsersImpacted }, ...)`. The dispatch to the internal Security Incident Response Team is **commented out** (`breachAlert.ts:36`):
   ```ts
   // TODO: Send critical SMS/Telegram/Email to the Security Incident Response Team (SIRT)
   // await notificationQueue.add("security-alert", { ...params });
@@ -115,7 +116,7 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 **Current Code Implementation**:
 - **Telebirr is the only live collection rail.** `src/modules/escrow/providers/telebirr.client.ts` implements the full C2B Web Checkout flow with RSA-PSS signing and a Redis-cached fabric token, plus B2C payout.
 - `src/modules/escrow/providers/cbe.client.ts` and `src/modules/escrow/providers/mpesa.client.ts` **always throw `PaymentProviderUnavailableError`** — they are stubs with a typed interface, not working adapters.
-- There is **no** `chapa.client.ts`. The app-layer provider union (`src/schemas.ts:59`) and the escrow route enum (`src/modules/escrow/escrow.routes.ts:152`) list only `TELEBIRR`, `CBE_BIRR`, `M_PESA`, so a `CHAPA` request is a validation error. The Prisma `PaymentProvider` enum still carries an inert `CHAPA` value because PostgreSQL cannot drop an enum value before PG17+.
+- There is **no** `chapa.client.ts`. The app-layer provider union (`src/schemas.ts:59`) and the escrow route enum (`src/modules/escrow/escrow.routes.ts:153`) list only `TELEBIRR`, `CBE_BIRR`, `M_PESA`, so a `CHAPA` request is a validation error. The Prisma `PaymentProvider` enum still carries an inert `CHAPA` value because PostgreSQL cannot drop an enum value before PG17+.
 - M-Pesa checkout is additionally gated by `env.MPESA_CHECKOUT_ENABLED` (`env.ts:98`).
 
 ## 10. Legal/Commercial Items Outside The Engineering Boundary

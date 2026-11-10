@@ -57,6 +57,7 @@ Last validated: 2026-11-09
 >   - **Telebirr is the only live payment rail.** CBE and M-Pesa clients are throwing stubs; Chapa is fully removed from the application layer (only an inert PostgreSQL enum value remains).
 >   - **CI exists** and runs on every pull request (doc-parity, secret scan, type-check, route-audit gate, backend tests, fresh-db check, frontend build). `deploy.yml` is a **placeholder**. There are **zero frontend test files and no frontend test runner**.
 > - **Walkthrough-level corrections:** dispute-resolution preview now shows the 7% general fee (was documented as 5%); the 7-day cooling-off step is marked as **not available in practice** because `createContractFromProposal()` never sets `Contract.cancellableUntil`; the fee sections now describe the unified 7%/0% rule.
+> - **✅ Walkthrough correction — the escrow step is the same on both funding paths.** Funding a milestone from the platform wallet (`POST /api/v1/escrow/fund-from-wallet`) and funding it through Telebirr (`POST /api/v1/escrow/fund`) both end in `ESCROW_HELD`. The wallet is only the **source** of the money. The submit → review → accept/dispute sequence below applies identically to both: the freelancer submits the delivery, the client gets a 24-hour warning, the 7-day auto-release timer runs, and either party can raise a dispute. The freelancer is credited only on client acceptance, on auto-release, or on a staff dispute resolution — never at funding time. Tracked as `ESC-003`; see `docs/ARCHITECTURE.md` → *Escrow*.
 > - **New references:** `docs/ROADMAP_ALIGNMENT.md`, `docs/DOCUMENT_UNIFICATION_2026-11-09.md`, regenerated `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md`, rewritten `docs/COMPLIANCE_BLOCKERS.md`.
 
 > **Direct Chat Credential Lookup & Contract Page Direct Chat Action (2026-11-09):**
@@ -991,12 +992,16 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
 
 ---
 
-### Immediate Project Payment Transfer (Client to Freelancer)
-- **Direct Settlement Architecture**:
-  - When a project milestone or gig order is paid by the client (`fundMilestoneFromWallet` / `fundGigOrderFromWallet`), funds are debited from the client's wallet and **credited to the freelancer's wallet immediately** (net of standard platform fee and withholding).
-  - The milestone or gig order transitions immediately to `RELEASED` / `COMPLETED`, stamping `releasedAt` in real time.
-  - Sibling milestones are evaluated via `checkAndUpdateContractCompletion` so contracts advance to `COMPLETED` seamlessly.
+### Escrow Funding And Release (Client to Freelancer)
+- **Escrow-First Architecture**:
+  - When a project milestone or gig order is paid by the client (`fundMilestoneFromWallet` / `fundGigOrderFromWallet`), funds are debited from the client's wallet and placed in **escrow**: the milestone or gig order transitions to `ESCROW_HELD`, and `releasedAt` stays null.
+  - The freelancer is **not** credited at funding time. The money is released — and the freelancer credited — only when the client accepts the delivery, when the 7-day auto-release window expires, or when a staff member resolves a dispute.
+  - The delivery/submission step, the 24-hour warning before auto-release, and the dispute window all apply exactly as they do on the external-payment path. The funding **source** never changes the lifecycle.
+  - Sibling milestones are evaluated via `checkAndUpdateContractCompletion` so contracts advance to `COMPLETED` seamlessly once every milestone reaches a terminal state.
 - **Double-Entry General Ledger Integrity**:
-  - Automatically posts both `ESCROW_FUND` and `MILESTONE_RELEASE` general ledger journals in the atomic database transaction, ensuring the chart of accounts and the user's `2100-USER-${userId}` ledger accounts remain in balanced equilibrium.
-- **Flexible Direct Release**:
-  - Clients can also release funds at any time directly from `ESCROW_HELD` or `WORK_IN_PROGRESS` states via `acceptMilestone`, removing blocking review friction.
+  - Funding posts the `ESCROW_FUND` journal (client wallet -> escrow pool) in the atomic database transaction. The matching `MILESTONE_RELEASE` journal (escrow pool -> freelancer wallet, less platform fee and withholding) is posted by the release path, not by funding, so the chart of accounts and the user's `2100-USER-${userId}` ledger accounts remain in balanced equilibrium.
+- **Release Paths**:
+  - `acceptMilestone` releases a `SUBMITTED_FOR_REVIEW` milestone on the client's explicit acceptance.
+  - The auto-release worker releases a `SUBMITTED_FOR_REVIEW` milestone when the 7-day window expires, unless a dispute was raised first.
+  - A staff dispute resolution releases from `DISPUTED`.
+  - `ESCROW_HELD` and `WORK_IN_PROGRESS` are **not** release entry states: paying out from them would skip the delivery and the client's acceptance.

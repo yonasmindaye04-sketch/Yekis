@@ -19,6 +19,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 
 ### Verified Gaps Recorded (not silently fixed)
 
+- [x] **ESC-003 — escrow semantics restored on the wallet-funding path**: `fundMilestoneFromWallet` now places the milestone in `ESCROW_HELD` instead of paying the freelancer at funding time. The freelancer is credited only on client acceptance, the 7-day auto-release, or a staff dispute resolution. The gig path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. `releaseMilestoneFunds()` is restricted to `SUBMITTED_FOR_REVIEW | DISPUTED`. Both funding paths now share one `placeEscrowHold()` helper. **Legal text unchanged.** Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts` (20 tests)
 - [ ] **Cooling-off right is not armed** — `Contract.cancellableUntil` is never written by `createContractFromProposal()`, so `cancelDuringCoolingOff()` always rejects with `CoolingOffExpiredError` and the 7-day statutory right is unavailable (`ESC-002`)
 - [ ] **No 10-year record retention / WORM** — `AuditLog` has no retention column and no purge job; there is no WORM module
 - [ ] **No PDPP data-subject rights tooling** — no export, portability, or erasure route or admin tool exists
@@ -63,12 +64,12 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Freelancer job discovery, proposal submission, own-proposal view, and withdrawal
 - [x] Client proposal review, shortlist/reject, and atomic acceptance
 - [x] Generated contract PDF, party-only access, and both-party signatures
-- [x] Milestone funding request with contract/milestone validation (wallet-first flow)
+- [x] Milestone funding request with contract/milestone validation (wallet-first flow) — the wallet path places the milestone in `ESCROW_HELD`; it does not pay the freelancer at funding time
 - [x] Contract execution auto-funds escrow from wallet if balance is sufficient
 - [x] Telebirr C2B Web Checkout flow (preOrder initiation, web checkout redirect, return page handling) - deprecated path
 - [x] Signed webhook processing and escrow-held transition - deprecated path
 - [x] Client block: cannot withdraw with active contracts or open disputes
-- [x] Delivery submission and BullMQ auto-release scheduling
+- [x] Delivery submission and BullMQ auto-release scheduling — reachable on both funding paths: a wallet-funded milestone reaches `ESCROW_HELD` like any other, so the freelancer can submit and the client gets the 24 h warning plus the 7-day auto-release timer
 - [x] Client acceptance and atomic wallet release
 - [x] Per-milestone dispute negotiation, evidence, mediation, arbitration, and resolution
 - [x] Mutual dispute withdrawal via matched outcomes
@@ -211,9 +212,10 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Live local Tier 2 review and withdrawal scenario
 - [x] Live local dispute through partial split
 - [x] Live local wallet mismatch hold and TMS dismissal
-- [x] Backend unit/integration suite — **64 test files, ~781 `it()` cases** under `apps/backend/tests/` (62 module + 2 script suites), covering fees, KYC, dispute, escrow, cooling-off, TMS, auth, gigs, and the release/refund paths
+- [x] Backend unit/integration suite — **61 test files, 595 tests, all passing** (`apps/backend/tests/`). Baseline at `a15177e` was 567 passing / 8 failing across 4 files; all 8 failures are fixed
+- [x] **ESC-003 escrow-semantics suite** (`tests/escrow-wallet-funding-semantics.test.ts`, 20 tests): wallet funding ends in `ESCROW_HELD` with the freelancer unpaid; submit → accept → `RELEASED` credits the freelancer only then; the 24 h warning and the auto-release timer are scheduled and the auto-release job pays out; a wallet-funded milestone is disputable by either party; release is refused from `ESCROW_HELD` / `WORK_IN_PROGRESS` / `PAYMENT_PENDING`; insufficient balance, concurrent double-funding and idempotent retries all behave
 - [ ] Concurrency stress test for acceptance, webhooks, release, and dispute resolution
-- [ ] Auto-release worker test using controlled time
+- [x] Auto-release worker test using controlled time — the auto-release job body moved to `src/queue/autoRelease.handler.ts` so it can be called without a live BullMQ consumer, and `tests/escrow-wallet-funding-semantics.test.ts` drives it end to end
 - [ ] Provider contract tests using real sandbox payloads/signatures
 - [ ] CI required checks for build, test, lint, migration validation, and dependency scanning — **partially done**: `.github/workflows/ci.yml` runs the doc-parity check, secret scan, backend type-check, route-audit baseline gate, backend `pnpm test`, fresh-database check, and the frontend production build. **Still missing:** frontend lint as a required check, a migration-validation gate, and a dependency scan (e.g. `pnpm audit` / Dependabot) as a blocking check. `.github/workflows/deploy.yml` is a placeholder with no deploy steps
 

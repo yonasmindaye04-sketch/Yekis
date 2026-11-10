@@ -20,6 +20,13 @@ apps/backend/uploads/
 backups/
 *.dump
 
+# DeepCode local state: project memory notes, session pointers and cached
+# artifacts. The shared configuration (deepcode_config.json) is tracked; the
+# runtime state is not.
+.deepcode/
+logs/
+deepcode_lab/
+
 # test run output
 apps/backend/*report*.json
 

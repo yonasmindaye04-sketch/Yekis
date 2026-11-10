@@ -181,14 +181,15 @@ describe("the escrow lifecycle exists over HTTP", () => {
     expect(funded.body.escrowState).toBe("ESCROW_HELD");
 
     // The money left the client's wallet, which is the whole point. The charge
-    // is the milestone amount plus the client-side platform fee, so the
-    // expectation is taken from calculateFees rather than hardcoded -- a test
-    // that asserts a magic number would silently rot when the fee changes.
+    // is taken from calculateFees rather than hardcoded -- a test that asserts
+    // a magic number would silently rot when the fee changes. The client-side
+    // surcharge is currently 0% (the unified 7% general fee is taken from the
+    // freelancer at release), so the charge equals the milestone amount.
     const expectedCharge = calculateFees({
       milestoneAmountMinor: M,
       freelancerHasTin: false,
     }).clientTotalChargeMinor;
-    expect(expectedCharge).toBeGreaterThan(M);
+    expect(expectedCharge).toBeGreaterThanOrEqual(M);
 
     const walletAfter = await prisma.wallet.findUniqueOrThrow({ where: { userId: clientId } });
     expect(walletAfter.balanceMinor).toBe(500000 - expectedCharge);

@@ -953,11 +953,11 @@ stateDiagram-v2
     PAYMENT_PENDING --> ESCROW_HELD: handlePaymentWebhook(SUCCESS)\n[Legacy C2B Redirect]
 
     ESCROW_HELD --> WORK_IN_PROGRESS: Freelancer Commences Work
-    ESCROW_HELD --> SUBMITTED_FOR_REVIEW: submitMilestone()\n[Schedules BullMQ 5-Day Auto-Release]
+    ESCROW_HELD --> SUBMITTED_FOR_REVIEW: submitMilestone()\n[Schedules BullMQ 7-Day Auto-Release]
     WORK_IN_PROGRESS --> SUBMITTED_FOR_REVIEW: submitMilestone()
 
     SUBMITTED_FOR_REVIEW --> RELEASED: acceptMilestone()\n[Client Manual Approval]
-    SUBMITTED_FOR_REVIEW --> RELEASED: autoReleaseWorker\n[5-Day Timer Expires]
+    SUBMITTED_FOR_REVIEW --> RELEASED: autoReleaseWorker\n[7-Day Timer Expires]
     
     SUBMITTED_FOR_REVIEW --> DISPUTED: raiseDispute()\n[Dispute Module Trigger]
     ESCROW_HELD --> DISPUTED: raiseDispute()
@@ -1011,9 +1011,9 @@ sequenceDiagram
 
     Freelancer->>API: POST /api/v1/escrow/milestones/:id/submit { deliverableUrl }
     API->>Service: submitMilestone(freelancerId, milestoneId, url)
-    Service->>DB: Milestone.update(SUBMITTED_FOR_REVIEW, autoReleaseAt: now + 5 days)
+    Service->>DB: Milestone.update(SUBMITTED_FOR_REVIEW, autoReleaseAt: now + 7 days)
     Service->>AutoQ: add("warn", delay: 4 days)
-    Service->>AutoQ: add("release", delay: 5 days)
+    Service->>AutoQ: add("release", delay: 7 days)
     API-->>Freelancer: HTTP 200 OK
 
     alt Client Manually Accepts
@@ -1061,7 +1061,7 @@ sequenceDiagram
 | `POST` | `/api/v1/escrow/fund` | Authenticated (Client, Tier 1) | (Deprecated C2B) Initiate external provider redirect payment |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return authenticated user's current wallet `balanceMinor` |
 | `GET` | `/api/v1/escrow/milestones` | Authenticated | List all milestones across user's contracts |
-| `POST` | `/api/v1/escrow/milestones/:id/submit` | Authenticated (Contract Freelancer) | Submit milestone deliverable, schedule 5-day BullMQ auto-release |
+| `POST` | `/api/v1/escrow/milestones/:id/submit` | Authenticated (Contract Freelancer) | Submit milestone deliverable, schedule 7-day BullMQ auto-release |
 | `POST` | `/api/v1/escrow/milestones/:id/accept` | Authenticated (Contract Client) | Manually approve deliverable and release funds net of fees/tax |
 | `POST` | `/api/v1/escrow/wallet/withdraw` | Authenticated (Tier 2 Verified) | Request payout to Telebirr/CBE; runs TMS checks and active-contract blocks |
 | `POST` | `/api/v1/webhooks/telebirr` | Public (Raw Body, RSA-PSS Sign) | Ingest Telebirr payment webhooks, verify RSA-PSS body signature, update escrow |
@@ -1309,7 +1309,7 @@ BullMQ manages five dedicated Redis queues:
 
 | Queue Name | Worker File | Schedule / Trigger | Action | Cancellation Rule |
 |---|---|---|---|---|
-| `auto-release` | `autoRelease.worker.ts` | Scheduled with 4-day (warn) and 5-day (release) delay upon milestone delivery submission | Warns client at day 4; auto-releases escrow to freelancer at day 5 | Job is marked stale & skipped if milestone leaves `SUBMITTED_FOR_REVIEW` (e.g. accepted or disputed) |
+| `auto-release` | `autoRelease.worker.ts` | Scheduled with 6-day (warn) and 7-day (release) delay upon milestone delivery submission | Warns client at day 4; auto-releases escrow to freelancer at day 5 | Job is marked stale & skipped if milestone leaves `SUBMITTED_FOR_REVIEW` (e.g. accepted or disputed) |
 | `kyc-refresh` | `kycRefresh.worker.ts` | Cron `0 3 * * *` (Daily at 03:00 UTC) | Sweeps verified KYC records where `nextReviewDueAt <= now()` and sets `periodicReviewPending = true` | N/A (Recurring idempotent sweep) |
 | `notifications` | `notification.worker.ts` | Event-triggered by domain modules (`escrow-funded`, `dispute-raised`, etc.) | Dispatches in-app record, Telegram push, and SMS for critical types | N/A (Immediate execution) |
 | `review-reveal` | `reviewReveal.worker.ts` | Recurring sweep / 14-day delay | Reveals blind reviews older than 14 days and recalculates Bayesian rating scores | Skipped if already revealed by mutual review submission |
@@ -1366,7 +1366,7 @@ sequenceDiagram
     Note over Freelancer,Client: Phase 5: Work, Delivery & Auto-Release Window
     Freelancer->>API: POST /api/v1/escrow/milestones/:id/submit { deliverableUrl }
     Note over EscrowMod: Milestone -> SUBMITTED_FOR_REVIEW
-    EscrowMod->>Queue: Schedule 5-Day Auto-Release Job
+    EscrowMod->>Queue: Schedule 7-Day Auto-Release Job
 
     %% Acceptance or Dispute Branch
     alt Happy Path: Client Approves Work
@@ -1494,7 +1494,7 @@ graph TD
 ## 10. Glossary
 
 * **AACCSA:** Addis Ababa Chamber of Commerce and Sectoral Associations. The designated arbitration authority for Stage 4 legal dispute escalation.
-* **Auto-Release Window:** A configurable 5-day period (`AUTO_RELEASE_WINDOW_DAYS = 5`) starting upon freelancer deliverable submission, after which escrowed funds automatically release to the freelancer if the client takes no action.
+* **Auto-Release Window:** A configurable 7-day period (`AUTO_RELEASE_WINDOW_DAYS = 7`) starting upon freelancer deliverable submission, after which escrowed funds automatically release to the freelancer if the client takes no action.
 * **Bayesian Rating Score:** A weighted rating average that incorporates platform-wide prior means ($m = 4.5, C = 5$) to prevent new accounts with a single 5-star review from outranking seasoned freelancers.
 * **Double-Blind Review:** A reputation mechanism where client and freelancer feedback remains hidden until both parties have submitted reviews or until 14 days elapse.
 * **FIC:** Financial Intelligence Center (Ethiopia). The national regulatory agency receiving Suspicious Transaction Reports (STRs).
@@ -1901,7 +1901,7 @@ All in-thread messages pass through `circumvention.middleware.ts` which strips o
 
 ### 9.6 Escrow & Milestone Management
 
-**What it does:** The core financial safety mechanism. Client funds are held in escrow until freelancer delivers work and client approves. Provides automatic release if client doesn't respond within 5 days.
+**What it does:** The core financial safety mechanism. Client funds are held in escrow until freelancer delivers work and client approves. Provides automatic release if client doesn't respond within 7 days.
 
 **How it works:**
 
@@ -1921,7 +1921,7 @@ PAYMENT_PENDING → ESCROW_HELD → SUBMITTED_FOR_REVIEW → RELEASED
 
 *Delivery Submission (Freelancer):*
 1. Freelancer completes work, clicks Submit → `POST /api/v1/escrow/milestones/:id/submit`.
-2. Milestone → `SUBMITTED_FOR_REVIEW`, `autoReleaseAt = now + 5 days`.
+2. Milestone → `SUBMITTED_FOR_REVIEW`, `autoReleaseAt = now + 7 days`.
 3. BullMQ schedules two jobs: `warn` (fires at day 4) and `release` (fires at day 5).
 
 *Manual Client Approval:*
@@ -1931,7 +1931,7 @@ PAYMENT_PENDING → ESCROW_HELD → SUBMITTED_FOR_REVIEW → RELEASED
 4. Scheduled BullMQ release jobs cancelled.
 
 *Auto-Release:*  
-If client takes no action in 5 days, `autoRelease.worker.ts` calls `releaseMilestoneFunds()` automatically, crediting the freelancer's wallet.
+If client takes no action in 7 days, `autoRelease.worker.ts` calls `releaseMilestoneFunds()` automatically, crediting the freelancer's wallet.
 
 **Financial Formula:**
 

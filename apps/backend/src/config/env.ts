@@ -18,6 +18,14 @@ for (const envPath of envPaths) {
 
 // Fail fast on startup if required config is missing — better than a
 // confusing runtime error three requests into production.
+/**
+ * Service Agreement Clause 2.2(b): the Freelancer is paid automatically when
+ * seven (7) calendar days elapse from submission without the Client raising
+ * a Dispute. Exported so the value can be asserted in tests instead of being
+ * duplicated as a literal.
+ */
+export const AUTO_RELEASE_WINDOW_DAYS_DEFAULT = 7;
+
 const EnvSchema = z.object({
   NODE_ENV: z
     // "staging" was missing, and that gap was load-bearing. The safety checks
@@ -260,7 +268,7 @@ const EnvSchema = z.object({
   WITHHOLDING_RATE_WITH_TIN: z.coerce.number().default(0.03),
   WITHHOLDING_RATE_WITHOUT_TIN: z.coerce.number().default(0.3),
 
-  AUTO_RELEASE_WINDOW_DAYS: z.coerce.number().default(7), // matches Service Agreement Clause 2.2(b): automatic release after SEVEN calendar days
+  AUTO_RELEASE_WINDOW_DAYS: z.coerce.number().default(AUTO_RELEASE_WINDOW_DAYS_DEFAULT), // matches Service Agreement Clause 2.2(b): automatic release after SEVEN calendar days
 
   // Payment reconciliation sweep (paymentReconcile.worker.ts) — the webhook
   // safety net. Polls Telebirr's queryOrder API for escrow transactions still

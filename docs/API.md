@@ -167,6 +167,8 @@ Funding body (wallet-first):
 
 Funding response (`200 OK`): returns the updated milestone object with `escrowState: "ESCROW_HELD"`.
 
+The wallet is the **source** of the money, not a shortcut around escrow. Funding from the wallet places the milestone in exactly the same state as an externally-paid milestone: the freelancer still has to deliver, the client still has to accept (or let the 7-day deemed-acceptance window expire), the 24-hour warning and the auto-release timer are still scheduled on submission, and either party can still raise a dispute. The freelancer's wallet is credited only at release. *(Restored 2026-11-09 under ESC-003; see `docs/DECISIONS.md`.)*
+
 *(Note: The old `/fund` route expecting `provider` is deprecated. Escrow funding is now automatically triggered when both parties accept the contract, provided the client has topped up their wallet. The `/fund-from-wallet` route is available for manual retry.)*
 
 When `provider` is `TELEBIRR`, `initiatePayment` creates a preOrder via the Telebirr Merchant API, utilizes a Redis-cached Fabric token, and returns a real `redirectUrl` for web checkout. In mock mode (when Telebirr credentials are not configured), it falls back to returning a mock transaction ID and `redirectUrl: null`.

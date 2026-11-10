@@ -98,7 +98,7 @@ TIER_1 VERIFIED -> Tier 2 request -> UNDER_REVIEW -> TIER_2 VERIFIED | REJECTED
 
 The daily worker marks overdue records with `periodicReviewPending`. It does not change `VERIFIED` to `UNDER_REVIEW`, avoiding accidental loss of active access.
 
-**MVP scope (2026-11-09):** the three-tier model exists in the schema (`KycTier` = `TIER_1` / `TIER_2` / `TIER_3`) and in the KYC module, but the MVP launches **simplified single-tier**: Tier 1 (National ID / Fayda) unlocks every core action, and the withdrawal gate resolves to `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")` (`src/modules/escrow/escrow.routes.ts:322`). With `TIN_FEATURE_ENABLED=false` (the default), Tier 2/TIN is deferred to Phase 4. See `docs/DECISIONS.md` → *Holding TIN Requirement for MVP*.
+**MVP scope (2026-11-09):** the three-tier model exists in the schema (`KycTier` = `TIER_1` / `TIER_2` / `TIER_3`) and in the KYC module, but the MVP launches **simplified single-tier**: Tier 1 (National ID / Fayda) unlocks every core action, and the withdrawal gate resolves to `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")` (`src/modules/escrow/escrow.routes.ts:351`). With `TIN_FEATURE_ENABLED=false` (the default), Tier 2/TIN is deferred to Phase 4. See `docs/DECISIONS.md` → *Holding TIN Requirement for MVP*.
 
 ### Job And Proposal
 
@@ -124,6 +124,8 @@ ACTIVE -> CANCELLED  (client exercises 7-day cooling-off right per ECA Proclamat
 
 ### Escrow
 
+Funding **source** changes where the money comes from. It never changes the lifecycle.
+
 ```text
 PAYMENT_PENDING -> ESCROW_HELD -> WORK_IN_PROGRESS -> SUBMITTED_FOR_REVIEW
 SUBMITTED_FOR_REVIEW -> RELEASED        (client acceptance or auto-release after 7 days)
@@ -131,9 +133,22 @@ SUBMITTED_FOR_REVIEW -> DISPUTED
 DISPUTED -> RELEASED | REFUNDED | PARTIAL_REFUND
 ```
 
+Both funding paths land in the same state:
+
+| Path | Endpoint | Money comes from | Milestone ends in |
+|---|---|---|---|
+| External payment | `POST /api/v1/escrow/fund` (Telebirr C2B) | the provider, on the signed webhook | `ESCROW_HELD` |
+| Wallet funding | `POST /api/v1/escrow/fund-from-wallet` | the client's in-platform wallet | `ESCROW_HELD` |
+
+Both go through one shared helper, `placeEscrowHold()` (`apps/backend/src/modules/escrow/escrow.service.ts`), which performs the three writes that must be identical regardless of source: the conditional claim `PAYMENT_PENDING -> ESCROW_HELD` (guarded on `contract.status = ACTIVE`), the client's lifetime gross-spend increment, and — for the wallet path — the double-entry funding journal (`client wallet -> escrow pool`).
+
+The freelancer is credited **only** by `releaseMilestoneFunds()`, which claims from `SUBMITTED_FOR_REVIEW` (client acceptance or 7-day auto-release) or `DISPUTED` (staff resolution / arbitration award). `ESCROW_HELD` and `WORK_IN_PROGRESS` are deliberately **not** legal entry states: releasing from them would pay out without a delivery and without a client acceptance, bypassing the escrow guarantee on the delivery step itself.
+
 Submitting a milestone schedules a warning at 24 hours before the deadline and a release at `AUTO_RELEASE_WINDOW_DAYS` (7 calendar days, matching Service Agreement Clause 2.2(b)). Explicit client acceptance cancels those jobs. Conditional database updates make release/refund paths idempotent under retries or concurrent requests. A separate 7-day statutory cooling-off guard (`Contract.cancellableUntil`, ECA Proclamation 1205/2020) additionally blocks auto-release while still in force — cooling-off currently wins over deemed acceptance, pending legal validation (ESC-002).
 
-> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.worker.ts:54-64` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
+> **ESC-003 — resolved 2026-11-09.** Commit `a03259a` had made the wallet-funding path debit the client and credit the freelancer inside the funding transaction, claiming the milestone straight to `RELEASED`. That bypassed the delivery step, the client acceptance step, the 24-hour warning, the 7-day auto-release timer, and dispute (which accepts only `ESCROW_HELD | WORK_IN_PROGRESS | SUBMITTED_FOR_REVIEW`). The fix restored escrow semantics on the wallet path and narrowed `releaseMilestoneFunds()` back to `SUBMITTED_FOR_REVIEW | DISPUTED`; the gig funding path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. **Legal text unchanged** — the code was brought back into line with Master Design §3A.13.6 and Service Agreement Clause 2.2. Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts`.
+
+> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.handler.ts` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
 
 ### Dispute
 
@@ -307,8 +322,8 @@ These are **not** implemented today. They are recorded here so the architecture 
 |---|---|
 | 10-year immutable retention of audit, transaction, dispute, and STR records | `AuditLog` (`schema.prisma:686-710`) has **no retention/expiry column and no purge job**. There is no WORM module and no append-only partition enforcement in application code — "append-only" is convention only, and pgaudit is enabled by the `infra/postgres` image but its grants are not verified after deployment |
 | PDPP data-subject rights (access, portability, erasure) | **No tooling exists.** Grepping `apps/backend/src` for `exportData`, `downloadMyData`, `deleteAccount`, `erasure`, or `portability` returns zero matches. There is no admin erasure tool and no "delete my data" route |
-| 72-hour ECA breach notification workflow | `apps/backend/src/lib/breachAlert.ts` writes a `logger.fatal(...)` record only. The SMS/Telegram/email dispatch to the incident-response team is **commented out** (`breachAlert.ts:34-36`), so the alert is log-only |
-| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:322`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). Note `src/middleware/requireKycVerified.ts` is dead code — it has zero importers; the live guard is `hardBlock.ts` |
+| 72-hour ECA breach notification workflow | `apps/backend/src/lib/breachAlert.ts` writes a `logger.fatal(...)` record only. The SMS/Telegram/email dispatch to the incident-response team is **commented out** (`breachAlert.ts:36`), so the alert is log-only |
+| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). Note `src/middleware/requireKycVerified.ts` is dead code — it has zero importers; the live guard is `hardBlock.ts` |
 | Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts:35`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped |
 
 ## External Boundaries
@@ -325,14 +340,14 @@ These are **not** implemented today. They are recorded here so the architecture 
 
 ### Payment Provider Enum vs. Live Rails
 
-The Prisma `PaymentProvider` enum (`apps/backend/prisma/schema.prisma:98-103`) still contains four values — `TELEBIRR`, `CHAPA`, `CBE_BIRR`, `M_PESA` — but only **one** is a live rail:
+The Prisma `PaymentProvider` enum (`apps/backend/prisma/schema.prisma:96-101`) still contains four values — `TELEBIRR`, `CHAPA`, `CBE_BIRR`, `M_PESA` — but only **one** is a live rail:
 
 | Enum value | App-layer status | Evidence |
 |---|---|---|
 | `TELEBIRR` | **Live** | `src/modules/escrow/providers/telebirr.client.ts` implements initiate/verify/query + B2C payout |
 | `CBE_BIRR` | Stub | `src/modules/escrow/providers/cbe.client.ts` always throws `PaymentProviderUnavailableError` |
 | `M_PESA` | Stub | `src/modules/escrow/providers/mpesa.client.ts` always throws `PaymentProviderUnavailableError`; gated by `MPESA_CHECKOUT_ENABLED` (`env.ts:98`) |
-| `CHAPA` | **Rejected** | No client adapter exists. The app-layer union `PaymentProvider` (`src/schemas.ts:59`) and the escrow route enum (`src/modules/escrow/escrow.routes.ts:152`) list only `TELEBIRR`, `CBE_BIRR`, `M_PESA`, so a `CHAPA` request is a validation error. The enum value is retained in PostgreSQL as an inert row until a PG17+ host can run `DROP VALUE` (see `docs/DATABASE.md`) |
+| `CHAPA` | **Rejected** | No client adapter exists. The app-layer union `PaymentProvider` (`src/schemas.ts:59`) and the escrow route enum (`src/modules/escrow/escrow.routes.ts:153`) list only `TELEBIRR`, `CBE_BIRR`, `M_PESA`, so a `CHAPA` request is a validation error. The enum value is retained in PostgreSQL as an inert row until a PG17+ host can run `DROP VALUE` (see `docs/DATABASE.md`) |
 
 This is a deliberate split: the **database enum is historical residue** from the 2026-08-26 PAY-002 removal, while the **application surface is the authoritative list**. Master Design Decision Log `PAY-003` marks *M-Pesa = REMOVED*; the codebase still ships an M-Pesa client stub, the enum value, the `schemas.ts` union member, and top-up route support. That divergence is recorded in `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and needs a product decision (remove vs. finish).
 

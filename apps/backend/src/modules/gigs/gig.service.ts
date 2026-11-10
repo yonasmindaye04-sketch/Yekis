@@ -446,30 +446,16 @@ export async function fundGigOrderFromWallet(params: {
       );
     }
 
-    // Immediately credit freelancer wallet upon gig payment
-    await tx.wallet.upsert({
-      where: { userId: order.gig.freelancerId },
-      create: {
-        userId: order.gig.freelancerId,
-        balanceMinor: fees.freelancerNetMinor,
-      },
-      update: {
-        balanceMinor: { increment: fees.freelancerNetMinor },
-      },
-    });
-
-    await tx.user.update({
-      where: { id: order.gig.freelancerId },
-      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    });
-
+    // The order goes into escrow, it is not paid out. The freelancer is
+    // credited by acceptGigOrder (client acceptance) or by the gig
+    // auto-release worker, after the delivery has been submitted for review.
+    // The wallet is only where the money came from.
     await tx.gigOrder.update({
       where: { id: order.id },
       data: {
         totalChargeMinor: fees.clientTotalChargeMinor,
-        escrowState: "RELEASED",
-        status: "COMPLETED",
-        releasedAt: new Date(),
+        escrowState: "ESCROW_HELD",
+        status: "ESCROW_HELD",
       },
     });
   });

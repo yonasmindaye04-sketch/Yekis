@@ -157,7 +157,7 @@ describe("the checkout failure body carries only an error code", () => {
     expect(walletSrc).not.toMatch(
       /Automated checkout failed:\s*\$\{/,
     );
-    expect(walletSrc).toMatch(/Check Recent top-ups before trying again/);
+    expect(walletSrc).toMatch(/Check Recent top-ups before retrying/);
   });
 
   it("classifies the error class correctly", async () => {
