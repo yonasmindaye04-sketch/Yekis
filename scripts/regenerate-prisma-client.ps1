@@ -3,16 +3,20 @@
 #
 # WHY THIS EXISTS
 # `prisma generate` writes the Windows query engine to a temp file and then
-# renames it over the existing one. On this machine that rename fails with
-# EPERM because the destination file has a deny-delete disposition — the file
-# can be renamed but not deleted, and Windows will not let a rename replace a
-# file it cannot delete. Every `prisma generate` therefore fails after
-# writing a stray `.tmpNNNNN` file.
+# renames it over the existing one. That rename fails with EPERM while the
+# backend server is running, because the running Node process has the query
+# engine DLL mapped and Windows will not let a file that is open be replaced.
+# The symptom is confusing: the file can be RENAMED but not DELETED, which
+# makes it look like an ACL or file-disposition problem rather than a lock.
+#
+# Stopping the server makes `prisma generate` work again. This script exists
+# for the case where you cannot stop it (a dev server you want to keep
+# running, or a schema edit that only needs the generated TYPES).
 #
 # The engine binary is unchanged by a schema edit, so the fix is to generate
 # into a clean directory and copy everything EXCEPT the engine across. The
-# generated TypeScript types — the only thing a schema change actually alters
-# — are replaced.
+# generated TypeScript types -- the only thing a schema change actually alters
+# -- are replaced.
 #
 # Usage: pwsh scripts/regenerate-prisma-client.ps1
 
