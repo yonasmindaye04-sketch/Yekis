@@ -51,13 +51,26 @@ pnpm --filter frontend build                         # tsc -b && vite build
 ## Documentation is part of the change
 
 - Always update the relevant Markdown files to reflect the newest content and
-  logic of the codebase whenever modifications are made.
-- Record every change, feature addition or update in the relevant documents:
-  `docs/WALKTHROUGH.md`, `docs/COMPLETENESS_CHECKLIST.md`, `docs/API.md`,
-  `docs/DATABASE.md`, `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`,
-  `docs/CHANGELOG.md`.
+  logic of the codebase whenever modifications are made — **in the same commit
+  as the code**. A change that lands with the docs describing the previous
+  behaviour is an incomplete change.
+- `docs/SYSTEM_DESIGN.md` is the **canonical** description of how the platform
+  works. It must have one deep-dive section per backend module, a matching
+  table of contents, and a view map covering every frontend view. The
+  doc-parity gate checks all of this.
+- Never describe a stub as live, a plan as implemented, or a removed
+  integration as available. Distinguish verified behaviour from mocks, stubs
+  and planned work.
+- Record every change in the relevant documents: `docs/WALKTHROUGH.md`,
+  `docs/COMPLETENESS_CHECKLIST.md`, `docs/API.md`, `docs/DATABASE.md`,
+  `docs/PROJECT_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/SYSTEM_DESIGN.md`,
+  `docs/ROADMAP_ALIGNMENT.md`, `docs/COMPLIANCE_BLOCKERS.md`, and
+  `docs/CHANGELOG.md`. **The changelog is the audit log of what changed** —
+  what it was, why it was needed, and what it means for anyone integrating
+  against the platform.
 - `node scripts/check-doc-parity.mjs` fails CI when the docs drift from the
-  code. Run it after touching anything user-visible.
+  code. Run it after touching anything user-visible. If a check fails, fix the
+  **document** — never weaken the check.
 
 ## Frontend rules
 

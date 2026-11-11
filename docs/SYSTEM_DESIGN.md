@@ -11,21 +11,45 @@
 1. [System Overview](#1-system-overview)
 2. [Data Model](#2-data-model)
 3. [Per-Module Deep Dive (Backend)](#3-per-module-deep-dive)
-   - 3.13 [Module: Gig Marketplace](#313-module-gig-marketplace-appsbackendsrcmodulesgigs)
-   - 3.14 [Module: Finance, General Ledger & Tax Accounting](#314-module-finance-general-ledger--tax-accounting-appsbackendsrcmodulesfinance)
-   - 3.15 [Module: Search & OpenSearch Integration](#315-module-search--opensearch-integration-appsbackendsrcmodulessearch)
-   - 3.16 [Module: Admin & Role-Based Access Control](#316-module-admin--role-based-access-control-appsbackendsrcmodulesadmin)
+   - 3.1 [Module: Identity & Authentication](#31-module-identity--authentication-appsbackendsrcmodulesauth)
+   - 3.2 [Module: Tiered KYC](#32-module-tiered-kyc-appsbackendsrcmoduleskyc)
+   - 3.3 [Module: Jobs, Proposals & Direct Messaging](#33-module-jobs-proposals--direct-messaging-appsbackendsrcmodulesjobs)
+   - 3.4 [Module: Contracts & Service Agreements](#34-module-contracts--service-agreements-appsbackendsrcmodulescontracts)
+   - 3.5 [Module: Escrow & Wallet](#35-module-escrow--wallet-appsbackendsrcmodulesescrow)
+   - 3.6 [Module: Manual Wallet Top-Ups](#36-module-manual-wallet-top-ups-appsbackendsrcmodulestopups)
+   - 3.7 [Module: Dispute Resolution](#37-module-dispute-resolution-appsbackendsrcmodulesdisputes)
+   - 3.8 [Module: Transaction Monitoring / TMS](#38-module-transaction-monitoring--tms-appsbackendsrcmodulestms)
+   - 3.9 [Module: Notifications](#39-module-notifications-appsbackendsrcmodulesnotifications)
+   - 3.10 [Module: Support Chat & Direct Messaging](#310-module-support-chat--direct-messaging-appsbackendsrcmoduleschat)
+   - 3.11 [Module: Profiles, Skills, Reviews, Portfolio & Featured Talent](#311-module-profiles-skills-reviews-portfolio--featured-talent)
+   - 3.12 [Module: Telegram Bot](#312-module-telegram-bot-appsbackendsrcmodulesbot)
+   - 3.13 [Module: Gigs & Service Packages](#313-module-gigs--service-packages-appsbackendsrcmodulesgigs)
+   - 3.14 [Module: Finance — Ledger, Chart of Accounts & Reconciliation](#314-module-finance--ledger-chart-of-accounts--reconciliation-appsbackendsrcmodulesfinance)
+   - 3.15 [Module: Payment Providers & Webhook Ingestion](#315-module-payment-providers--webhook-ingestion)
+   - 3.16 [Module: Admin, RBAC & the Ops Console](#316-module-admin-rbac--the-ops-console-appsbackendsrcmodulesadmin)
+   - 3.17 [Module: Privacy & Data-Subject Rights](#317-module-privacy--data-subject-rights-appsbackendsrcmodulesprivacy)
+   - 3.18 [Module: Search & OpenSearch Integration](#318-module-search--opensearch-integration-appsbackendsrcmodulessearch)
 4. [Cross-Cutting Concerns](#4-cross-cutting-concerns)
+   - 4.1 [Authentication & Permission Enforcement Model](#41-authentication--permission-enforcement-model)
+   - 4.2 [Audit Logging & Append-Only AML Guarantee](#42-audit-logging--append-only-aml-guarantee)
+   - 4.3 [Background Processing & Worker Registry](#43-background-processing--worker-registry)
 5. [The End-to-End Trust Loop](#5-the-end-to-end-trust-loop)
 6. [Master Relationship & Dependency Diagram](#6-master-relationship--dependency-diagram)
 7. [Known Inconsistencies, Stubs & Gaps](#7-known-inconsistencies-stubs--gaps)
 8. [Frontend Architecture](#8-frontend-architecture)
-   - 8.8 [Operations Console v2 Architecture](#88-operations-console-v2-architecture-appsfrontendsrcpagesops)
-   - 8.9 [Multilingual Translation Framework](#89-multilingual-translation-framework-appsfrontendsrci18nts)
-   - 8.10 [Real-Time WebSocket Infrastructure](#810-real-time-websocket-infrastructure-apiv1ws)
+   - 8.1 [Entry Point & Runtime Branching](#81-entry-point--runtime-branching-maintsx--apptsx)
+   - 8.2 [Telegram Mini App Shell](#82-telegram-mini-app-shell-apptsx)
+   - 8.3 [Full Browser Platform](#83-full-browser-platform-fullplatformapptsx)
+   - 8.4 [API Client Layer](#84-api-client-layer-appsfrontendsrcapiclientts)
+   - 8.5 [Telegram WebApp Hook](#85-telegram-webapp-hook-usetelegramminiappts)
+   - 8.6 [Payment Return Handler](#86-payment-return-handler-paymentreturntsx)
+   - 8.7 [Frontend Build & Dev Configuration](#87-frontend-build--dev-configuration)
+   - 8.8 [The Operations Console](#88-the-operations-console-appsfrontendsrcpagesops)
+   - 8.9 [Multilingual Translation Framework](#89-multilingual-translation-framework)
+   - 8.10 [Real-Time WebSocket Infrastructure](#810-real-time-websocket-infrastructure)
 9. [Platform Section-by-Section Functional Reference](#9-platform-section-by-section-functional-reference)
-   - 9.15 [Gig Marketplace Functional Reference](#915-gig-marketplace)
-   - 9.16 [Operations Console Functional Reference](#916-operations-console-v2)
+   - 9.15 [Gig Marketplace](#915-gig-marketplace)
+   - 9.16 [Operations Console](#916-operations-console)
    - 9.17 [Multilingual & Localization Workflow](#917-multilingual--localization-workflow)
    - 9.18 [Telebirr B2C Automated Disbursement & Ledger Rollback](#918-telebirr-b2c-automated-disbursement--ledger-rollback)
 10. [Glossary](#10-glossary)
@@ -1292,6 +1316,387 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 
 ---
 
+### 3.13 Module: Gigs & Service Packages (`apps/backend/src/modules/gigs/`)
+
+* **Purpose:** A second, Fiverr-shaped route to market: a freelancer publishes a **gig** with one to three **packages** (Basic / Standard / Premium), a client orders one, funds it from their wallet into escrow, receives a deliverable, may request revisions, and accepts.
+* **Owns Models:** `Gig`, `GigPackage`, `GigOrder`, `GigReview` (plus `gigDispute.service.ts` for the dispute path).
+* **Files:** `gig.service.ts`, `gig.routes.ts`, `gigDispute.service.ts`; auto-release lives in `apps/backend/src/queue/gigAutoRelease.worker.ts`.
+
+#### Gig Lifecycle
+
+| From | To | Actor | Code |
+|---|---|---|---|
+| (new) | `DRAFT` | Freelancer or BOTH | `createGig()` — `gig.service.ts:82` |
+| any | `ACTIVE` | Staff holding `gigs.moderate` | `moderateGigStatus()` — `gig.service.ts:208` |
+| any | `REJECTED` | Staff holding `gigs.moderate` (reason ≥ 10 chars) | same |
+| any | `PAUSED` / `ARCHIVED` | The gig's owner | `setGigStatus()` — `gig.service.ts:327` |
+| any | `PAUSED` / `REJECTED` / `ARCHIVED` | Staff via the admin route | `admin.routes.ts:131` |
+
+There is **no transition graph** — these are *permission* rules, not state-machine rules. `setGigStatus()` re-checks the owner allow-list (`OWNER_SETTABLE_STATUS = ["PAUSED", "ARCHIVED"]`, `gig.service.ts:242`) in the service as well as the route, so the route's 400 cannot be bypassed by calling the service directly.
+
+**Publication is a staff decision.** A gig is created `DRAFT` and only a staff member with `gigs.moderate` can make it `ACTIVE`. Search hard-codes `status: "ACTIVE"` on both the OpenSearch and the Postgres branch (`gig.service.ts:137-139`, `:158-160`), and `GigSearchQuery` has no `status` field — a draft gig is not reachable by id either: `getGigById()` returns 404 (not 403) for a non-ACTIVE gig to anyone who is not the owner or staff, because "confirming that a draft id exists is itself a disclosure" (`gig.service.ts:244-249`).
+
+#### Packages
+
+`GigPackageTier` is `BASIC | STANDARD | PREMIUM`. The tier is a **label** — no backend code branches on it. A gig carries **1 to 3** packages (`packages: z.array(GigPackageInput).min(1).max(3)`), at most one per tier (`@@unique([gigId, tier])`). Prices are `priceMinor` — integer ETB cents, never floats.
+
+Packages are **immutable after creation** (`UpdateGigInput` omits `packages`), and `package.revisionsIncluded` / `deliveryDays` / `addOns` are written but never read. The revision cap actually enforced is the **gig-level** `Gig.maxRevisions`, read from the live row (`gig.service.ts:551`) — so lowering a gig's cap immediately affects orders already placed against it.
+
+#### Order Lifecycle
+
+`PENDING_PAYMENT` → `ESCROW_HELD` → (`WORK_IN_PROGRESS`) → `SUBMITTED_FOR_REVIEW` → `COMPLETED`, with `DISPUTED` as an alternative branch and `CANCELLED` on refund.
+
+| Transition | Trigger | Notes |
+|---|---|---|
+| `PENDING_PAYMENT` | `createGigOrder()` — `gig.service.ts:358` | The gig must be `ACTIVE` and the client must not be the gig's owner |
+| `ESCROW_HELD` | `fundGigOrderFromWallet()` — `gig.service.ts:394` | Wallet debit uses a conditional `updateMany` with a `gte` guard, so the database arbitrates a concurrent double-funding |
+| `SUBMITTED_FOR_REVIEW` | `submitGigDelivery()` — `gig.service.ts:480` | Schedules the `gig-auto-release` BullMQ job at `now + AUTO_RELEASE_WINDOW_DAYS` (7) |
+| `WORK_IN_PROGRESS` | `requestGigRevision()` — `gig.service.ts:537` | Cancels the auto-release job and increments `revisionsUsed` |
+| `COMPLETED` | `acceptGigOrder()` — `gig.service.ts:587` | Conditional claim on `escrowState: "SUBMITTED_FOR_REVIEW"`; a loser of the race credits nobody |
+| `COMPLETED` | `gigAutoRelease.worker.ts` — the timeout path | Same conditional-claim pattern |
+| `DISPUTED` | `raiseGigDispute()` — `gigDispute.service.ts` | Cancels the auto-release job so a disputed order cannot auto-release |
+| `COMPLETED` → review | `createGigReview()` — `gig.service.ts:646` | One review per order (`GigReview.orderId @unique`), created blind |
+
+#### How Gigs Differ From Milestone Contracts — the important part
+
+A gig order **reuses the escrow module's fee engine** (`calculateFees` from
+`apps/backend/src/modules/escrow/fees.ts`) but **reimplements escrow handling
+inline**. It does **not** call `placeEscrowHold()` — that helper is private to
+the escrow module — and it does **not** call `releaseMilestoneFunds()`.
+
+| Concern | Milestone contract | Gig order |
+|---|---|---|
+| Escrow hold | `placeEscrowHold()` — a conditional `updateMany` claim plus `totalSpentGrossMinor` accounting | An inline `tx.gigOrder.update` — **no conditional claim, no spend accounting** (`gig.service.ts:453-460`) |
+| Release | `releaseMilestoneFunds()` — claims from `SUBMITTED_FOR_REVIEW \| DISPUTED`, refuses when an admin `EscrowHold` is active | Three separate implementations (`acceptGigOrder`, the auto-release worker, `resolveGigDispute`), each with its own conditional claim |
+| Admin escrow hold | `EscrowHold` model + `escrow.freeze` permission | **None** — gigs have no `EscrowHold` |
+| **Double-entry ledger** | `recordEscrowFundingLedger` / `recordMilestoneReleaseLedger` | **Never posted** — a gig order moves money without a journal |
+| Platform earnings | `recordPlatformEarnings()` inside the release transaction | `recordGigPlatformEarnings()` **outside** it (`gig.service.ts:625`) |
+
+The missing gig journal is the same class of defect as the known
+partial-split finding (`docs/hardening/AUDIT_ADMIN_RBAC_GIGS_DISPUTES.md`,
+finding **H3**). `PlatformFeeCredit` already carries a `gigOrderId` column, so
+the schema anticipated it.
+
+#### Gig Disputes
+
+`Dispute` is polymorphic: exactly one of `contractId` or `gigOrderId` is set,
+enforced by the DB constraint `Dispute_subject_check`. A gig dispute uses the
+order's `clientId` and the **gig's** `freelancerId` as its parties, flips the
+order to `DISPUTED`, and cancels the auto-release job.
+
+Only stages 1 and 2 are reachable from the gig path — negotiation and
+evidence. Mediation and arbitration are **not implemented for gigs**;
+`resolveGigDispute()` jumps straight to `RESOLVED`. Settlement outcomes are
+the shared `RELEASE_TO_FREELANCER | REFUND_TO_CLIENT | PARTIAL_SPLIT`, and the
+client is refunded the **full** charge including the client fee.
+
+#### Known Gaps (stated, not hidden)
+
+- **No duplicate-order protection.** `createGigOrder()` has no idempotency key, no check for an existing open order on the same package, and no DB uniqueness on `GigOrder`. The same client can open unlimited orders for one package and fund each independently.
+- **The gig dispute settlement is not transactional.** `resolveGigDispute()` commits the escrow claim before the wallet credit, unlike `acceptGigOrder()` which wraps both (finding **H2**).
+- **Gig reviews are never revealed.** `reviewReveal.worker.ts` queries `prisma.review` only, never `prisma.gigReview`, so `GigReview.revealedAt` is never written and `Gig.ratingAverage` / `ratingCount` stay at 0 — while `ratingAverage` is the primary sort key of `searchGigs`.
+- `Gig.viewCount`, `Gig.autoAcceptOrders`, `GigOrder.deliverableHash` are stored and never read.
+- Two tiers of gig dispute (`STAGE_3`, `STAGE_4`) and the `GET /gigs/orders/mine` route exist in the plan but not in the code.
+- **No client-side gig dispute UI** — the endpoints exist, nothing calls them.
+
+---
+
+### 3.14 Module: Finance — Ledger, Chart of Accounts & Reconciliation (`apps/backend/src/modules/finance/`)
+
+* **Purpose:** The double-entry accounting spine. Every movement of real money posts a balanced journal; a staff read-model reconciles provider state against internal state; monthly withholding reports are computed for ERA remittance.
+* **Owns Models:** `LedgerAccount`, `LedgerJournal`, `LedgerEntry`.
+* **Files:** `ledger.service.ts` (the engine), `finance.service.ts` (read models), `finance.routes.ts` (4 staff routes).
+
+#### The Chart of Accounts
+
+`CHART_OF_ACCOUNTS` (`ledger.service.ts:7-46`) — seven accounts, plus one generated account per user:
+
+| Code | Name | Type |
+|---|---|---|
+| `1000-ASSET-TELEBIRR` | Telebirr Gateway Settlement Account | ASSET |
+| `1010-ASSET-CBE` | Commercial Bank of Ethiopia Settlement Account | ASSET |
+| `2000-LIABILITY-ESCROW` | Customer Milestone Escrow Pool | LIABILITY |
+| `2050-LIABILITY-WITHHOLDING-ERA` | Withholding Tax Payable to ERA | LIABILITY |
+| `2060-LIABILITY-VAT-PAYABLE` | Value Added Tax Payable | LIABILITY |
+| `4000-REVENUE-PLATFORM-FEES` | Platform Marketplace Commission Revenue | REVENUE |
+| `4010-REVENUE-DISBURSEMENT-FEES` | Withdrawal & Disbursement Fee Revenue | REVENUE |
+| `2100-USER-{userId}` | User Wallet (generated per user) | LIABILITY |
+
+`2060-LIABILITY-VAT-PAYABLE` is **declared and never used** — VAT is not accrued anywhere, and `PlatformOperatingAccount.accumulatedVatMinor`, `env.VAT_RATE` and `env.VAT_REGISTERED` are likewise never written or read.
+
+`resolveSettlementAssetAccount(provider)` (`ledger.service.ts:62-66`) returns the CBE account **only** when `provider === "CBE_BIRR"`; the comment explains that an earlier version compared against the literal `"CBE"`, which the `PaymentProvider` enum never contains, so every CBE movement was collapsing into the Telebirr line.
+
+#### The three pools
+
+The Master Design's "three pool" model is a **read model** over three things, not three ledger accounts:
+
+| Pool | Where it lives |
+|---|---|
+| **Escrow pool** | Ledger account `2000-LIABILITY-ESCROW`, and a derived figure computed from `Milestone.escrowState` (`finance.service.ts:33-41`) |
+| **User wallet pool** | One `2100-USER-{userId}` ledger account per user, alongside `Wallet.balanceMinor` — two balances that can and do drift |
+| **Platform operating pool** | The `PlatformOperatingAccount` singleton (`id = "singleton"`) plus the append-only `PlatformFeeCredit` log |
+
+`PlatformOperatingAccount` and `PlatformFeeCredit` are **not** ledger accounts. They are a separate accumulator that runs in parallel to the double-entry ledger, so platform revenue exists in **two** ledgers at once: the `4000`/`4010` REVENUE accounts and the singleton accumulator. The fee-credit log is deliberately not FK-linked — `milestoneId` **or** `gigOrderId`, exactly one set — so it covers both release paths.
+
+#### The zero-sum invariant
+
+**In application code** (`postJournalEntry`, `ledger.service.ts:131-255`):
+
+1. Idempotency short-circuit — an existing journal with the same `idempotencyKey` is returned, not re-posted.
+2. Per-line validation — no negative amounts, no line with both a debit and a credit.
+3. Journal balance — `totalDebits !== totalCredits` throws `UnbalancedJournalError`.
+4. Zero-amount journals are rejected.
+5. Sign convention from the **stored account type**: ASSET/EXPENSE use `debit − credit`; LIABILITY/EQUITY/REVENUE use `credit − debit`.
+6. **One statement.** The lines are buffered and written with a single `tx.ledgerEntry.createMany()`.
+
+**In the database** (two migrations):
+
+- `20261009120000_ledger_and_payout_invariants` — row-local checks: `LedgerEntry_amounts_check` (no negatives, not both, not neither) and `LedgerAccount_balance_check`. The balance check is **deliberately not** a blanket `balanceMinor >= 0`: every real escrow liability is negative by design (81 of 272 accounts were negative in the dev database), so the constraint is scoped to the debit-normal types (`ASSET`, `EXPENSE`) where an overdraft is a bug.
+- `20261013120000_ledger_journal_balance_guard` — the journal-level guard.
+
+**Why a statement-level trigger, and not a row trigger** — two measured reasons, both in the migration header:
+
+1. A non-deferred `FOR EACH ROW` trigger validates the running total after every line, so a correct posting (`debit 50`, `credit 50`) looks unbalanced after the first line and is rejected.
+2. A `DEFERRABLE INITIALLY DEFERRED` constraint trigger fires correctly under `psql` and under `prisma.$transaction([...])`, but **never fires inside `prisma.$transaction(async tx => ...)`** — the interactive-transaction form the ledger actually uses — because the deferred check is never reached before COMMIT. A trigger that can be bypassed by choosing a different Prisma call style is not a guarantee.
+
+Hence three `FOR EACH STATEMENT` triggers with transition relations (`NEW TABLE AS new_rows` / `OLD TABLE AS old_rows`), sharing one validator. **Caller-visible consequence:** the lines for one journal must be written in **one** statement. A correcting line appended in a second statement is rejected; corrections are new compensating journals.
+
+#### The five journal-posting functions
+
+| Function | `referenceType` | Idempotency key | Debit | Credit |
+|---|---|---|---|---|
+| `recordWalletTopUpLedger` | `WALLET_TOPUP` | `topup-{topUpId}` | `1000`/`1010` asset | `2100-USER-{userId}` |
+| `recordEscrowFundingLedger` | `ESCROW_FUND` | `escrow-fund-{milestoneId}` | `2100-USER-{clientId}` | `2000` escrow pool (+ `4000` for a client add-on) |
+| `recordMilestoneReleaseLedger` | `MILESTONE_RELEASE` | `escrow-release-{milestoneId}` | `2000` escrow pool | `2100-USER-{freelancerId}` (+ `4000`, `4010`, and `2050` when withholding is non-zero) |
+| `recordDisputeRefundLedger` | `DISPUTE_REFUND` | `dispute-refund-{milestoneId}` | `2000` escrow pool | `2100-USER-{clientId}` |
+| `recordWithdrawalDisbursementLedger` | `WITHDRAWAL_PAYOUT` | `payout-{payoutId}` | `2100-USER-{userId}` | `1000`/`1010` asset (+ `4010` for a fee) |
+
+`2050-LIABILITY-WITHHOLDING-ERA` is the only account the release function can post to, and in practice it never does: statutory withholding is **hard-zero** at the fee engine (the 3%/30% block is commented out pending accountant sign-off), so the ERA report aggregates 0.
+
+**Not every money movement has a journal.** The provider-webhook escrow-funding path posts none (only the wallet-funding path does), `settlePayout` FAILED re-credits the wallet with **no reversal journal**, and gig orders post none at all.
+
+#### Reconciliation — three different things
+
+| What | Where | What it does |
+|---|---|---|
+| `listReconciliation` | `admin/operational.service.ts:14-88` | Derives `MATCHED` / `MISMATCH` / `PENDING` / `FAILED` per provider transaction by comparing the provider's status against the milestone's escrow state. `GET /api/v1/admin/reconciliation` |
+| `getFinanceReconciliation` | `finance.service.ts:23-70` | A read model over `escrowHeldMinor`, `totalReleasedMinor`, `platformFeeAccumulatedMinor`, `withholdingAccumulatedMinor`. `GET /api/v1/finance/reconciliation` |
+| `paymentReconcile.worker.ts` | `queue/` | A BullMQ sweep that polls the provider's status API for stuck `PENDING` transactions and replays them through the **same idempotent webhook handler** |
+
+There is **no** worker that reconciles the double-entry ledger against provider balances.
+
+#### Withholding remittance
+
+`generateWithholdingRemittanceReport()` (`queue/withholdingRemittance.worker.ts:84`) aggregates `PlatformFeeCredit` for the prior EAT month — using an explicit 3-hour offset rather than the host timezone, because a UTC host silently produced UTC months while the comments all claimed EAT. It runs at 23:00 UTC on the 1st (02:00 EAT on the 2nd).
+
+**The worker never files anything.** It computes what is owed to ERA; a human submits it and records the reference via `POST /api/v1/finance/withholding/:reportId/file`, which sets `filedAt`, `filedByStaffId` and `eraReferenceNumber`. ERA has no machine-readable API.
+
+#### VAT threshold monitoring
+
+`checkVatThresholdAfterRelease()` (`escrow/escrow.service.ts:699`) raises a `TransactionFlag` of type `VAT_THRESHOLD_REACHED` when cumulative platform fee revenue crosses `VAT_THRESHOLD_MINOR` (450,000 ETB), and notifies staff.
+
+Two caveats worth stating: the alert fires **at most once, ever** (the dedupe is a global `findFirst` with no unique constraint), and it runs only on the non-composed release path — **the dispute-resolution release path never evaluates it**.
+
+#### `auditLedgerIntegrity()`
+
+`ledger.service.ts:528` compares total debits to total credits across the whole ledger and returns `{ isBalanced, totalEntries, totalDebitsMinor, totalCreditsMinor, discrepancyMinor }`. It is surfaced under `integrity` in `GET /api/v1/admin/ledger`.
+
+**What it does not check**, despite its name: it does not group by journal, does not compare each account's cached `balanceMinor` against its own entries, does not compare `Wallet.balanceMinor` totals against the `2100-USER-*` balances, and — the important one — **a completely missing flow is invisible to it**, because a missing journal is perfectly balanced. Both `topups/topup.service.ts:642` and `admin/payoutAdmin.service.ts:58` say this in terms: a payout could be CONFIRMED with no ledger entry and `auditLedgerIntegrity` would not notice.
+
+#### Finance Routes
+
+| Method | Path | Guard |
+|---|---|---|
+| `GET` | `/api/v1/finance/reconciliation` | `requireAuth` + `requireStaffRole("ADMIN", "COMPLIANCE_OFFICER")` |
+| `GET` | `/api/v1/finance/ledger/fees` | same |
+| `GET` | `/api/v1/finance/withholding` | same |
+| `POST` | `/api/v1/finance/withholding/:reportId/file` | same + Zod body |
+
+Ledger-reading also happens outside this module: `GET /api/v1/admin/ledger`, `/admin/ledger/journals`, `/admin/reconciliation`, `/admin/reports/summary`, `/admin/monitoring/health` (permission-gated), and `GET /api/v1/escrow/wallet/transactions` (the user's own movements).
+
+---
+
+### 3.15 Module: Payment Providers & Webhook Ingestion
+
+* **Purpose:** The adapter layer between Yekis and the payment rails, plus the inbound webhook ingestion that turns a provider callback into a state change.
+* **Files:** `providers/paymentProvider.interface.ts` (the contract every client implements), `providers/telebirr.client.ts`, `providers/cbe.client.ts`, `providers/mpesa.client.ts`, `providers/chapa.client.ts` (**deleted** — PAY-002), and `webhooks.routes.ts`.
+
+#### Provider Status
+
+| Provider | Status | Collection | Disbursement |
+|---|---|---|---|
+| **Telebirr** | **Live** | C2B Web Checkout with native Node RSA-PSS signing | B2C `initiateDisbursement()` — implemented and called by the withdrawal path (`telebirr.client.ts:449`) |
+| **CBE Birr** | Stub | `cbe.client.ts` throws `PaymentProviderUnavailableError` | — |
+| **M-Pesa** | Stub | `mpesa.client.ts` throws `PaymentProviderUnavailableError` | — |
+| ~~Chapa~~ | **Removed** | No adapter, no webhook route. The `PaymentProvider` enum keeps `CHAPA` as an inert member — dropping a Postgres enum member means recreating the type and every column that uses it | — |
+
+#### The Telebirr client
+
+Four operations, all following the same pattern — obtain a **fabric token** (cached in Redis by `telebirr.token.ts`), POST with `Authorization: Bearer <token>`, and sign the request body with `SHA256WithRSA`:
+
+| Operation | Purpose |
+|---|---|
+| `initiatePayment()` | C2B checkout — returns the redirect URL the client is sent to |
+| `verifyWebhookSignature()` | Verifies the **body-embedded** RSA-PSS signature against Telebirr's public key |
+| `queryPaymentStatus()` | Status API used by the reconciliation sweep for transactions stuck in `PENDING` |
+| `initiateDisbursement()` | B2C payout to the freelancer's phone |
+| `queryDisbursementStatus()` | Disbursement status; its doc comment states the status "must remain unknown; never fabricate payout confirmation" |
+
+The webhook signature is **inside the JSON body** (`sign` field), not an HTTP header — which is why Telebirr needs a dedicated handler while CBE uses the generic one.
+
+#### Webhook Ingestion
+
+`webhooks.routes.ts` implements two handlers:
+
+- **Generic** (`buildWebhookHandler(provider, signatureHeaderName)`) — reads a signature from an **HTTP header**, verifies it, then delegates. CBE uses this with header `x-cbe-signature`.
+- **Telebirr-specific** — extracts the signature from the **body** and verifies it with RSA-PSS.
+
+Both reject an invalid signature with a logged warning before any state change.
+
+Two further guards apply to the Telebirr handler: the webhook is **idempotent** (a replayed callback does not double-apply the state transition), and the callback is **bound to the transaction** it created, so a forged payload cannot credit a milestone that was never paid for.
+
+> **Mounting order matters.** The webhook routers are mounted **before** `express.json()` in `app.ts` (lines 101 and 106), because they must parse the raw body themselves to verify a signature over the exact bytes the provider sent. Re-serialising the JSON to verify a signature can differ byte-for-byte from what was signed, and silently break verification.
+
+---
+
+### 3.16 Module: Admin, RBAC & the Ops Console (`apps/backend/src/modules/admin/`)
+
+* **Purpose:** The staff surface. Read models over people, contracts and money, plus the privileged write actions (escrow release/hold, payout settlement, staff role assignment, gig moderation, breach incident opening).
+* **Files:** `admin.routes.ts` (30 routes), `permissions.ts` (the RBAC model), `usersContracts.service.ts`, `financeAdmin.service.ts`, `operational.service.ts`, `payoutAdmin.service.ts`.
+* **Mounted:** `/api/v1/admin`, with `requireAuth` applied to the whole router.
+
+#### The Permission Model
+
+`PERMISSIONS` (`permissions.ts:14-48`) is a list of 30 `domain.action` keys, with a documented action ladder: **VIEW < CREATE < EDIT < APPROVE < EXECUTE < MANAGE**.
+
+`requirePermission(key)` **re-reads `staffRole` from the database on every request** and never trusts the JWT claim, which can be stale after a role change. Failure is `403 {"error":"PERMISSION_DENIED","required":"<key>"}`.
+
+`requireStaffRole(...roles)` is the coarser guard, used by the modules that predate the matrix (finance, top-ups, TMS, staff reports). It also re-reads from the database, and treats `ADMIN` and `SUPER_ADMIN` as full-access exceptions even when they are not listed — so a full-access account never sees a sidebar item it will get a 403 for.
+
+The eight roles and what they hold:
+
+| Role | Permissions |
+|---|---|
+| `SUPER_ADMIN` | all 30 |
+| `ADMIN` | all 30 (legacy full-access) |
+| `OPERATIONS_ADMIN` | `dashboard.view`, `users.view`, `users.suspend`, `contracts.view`, `escrow.view`, `payments.view`, `payouts.view`, `payouts.settle`, `disputes.view`, `support.handle`, `monitoring.view`, `receipts.view` |
+| `FINANCE_ADMIN` | `dashboard.view`, `users.view`, `payments.view`, `escrow.view`, `payouts.view`, `payouts.settle`, `ledger.view`, `reconciliation.view`, `reports.view`, `receipts.view`, `audit.view` |
+| `DISPUTE_MEDIATOR` | `dashboard.view`, `users.view`, `contracts.view`, `disputes.view`, `disputes.mediate`, `disputes.resolve` |
+| `COMPLIANCE_ADMIN` | `dashboard.view`, `users.view`, `kyc.review`, `tms.review`, `support.handle`, `disputes.view`, `disputes.mediate`, `monitoring.view`, `audit.view`, `topups.review`, `incidents.manage` |
+| `COMPLIANCE_OFFICER` | identical to `COMPLIANCE_ADMIN` (legacy) |
+| `SUPPORT` | `dashboard.view`, `users.view`, `support.handle` |
+
+Seven keys are held by **nobody except `SUPER_ADMIN`/`ADMIN`**: `profiles.moderate`, `gigs.moderate`, `featured.manage`, `bot.manage`, `escrow.freeze`, `escrow.release`, `settings.manage`. In particular **only `SUPER_ADMIN`/`ADMIN` can release or hold escrow** — `OPERATIONS_ADMIN` has `escrow.view` but not `escrow.release`.
+
+> The code comment at `permissions.ts:123-124` says financial release approval "stays with OPERATIONS_ADMIN/SUPER_ADMIN in later phases" — that is **aspirational**. Today `OPERATIONS_ADMIN` holds `payouts.settle` but cannot release escrow and has no `kyc.review`.
+
+#### Step-Up Authentication
+
+Eleven admin routes additionally require `requireFreshAuth(300)`: gig moderation, escrow release/hold/unhold, user suspend/unsuspend, force KYC re-review, staff role assignment, staff status change, payout settlement, and opening a breach incident.
+
+`requireFreshAuth` returns `401 REAUTH_REQUIRED` when the credential's `auth_time` is missing or older than 300 seconds, and `403 STEP_UP_REQUIRED` when the credential is recent but not "strong" — a Telegram or OAuth session is not sufficient for a step-up, only a password session is.
+
+#### The privileged actions
+
+| Action | Permission | Writes |
+|---|---|---|
+| Force-release escrow | `escrow.release` | `releaseMilestoneFunds()` → milestone `RELEASED`, wallet credited net, platform earnings + ledger journals; then audit `ADMIN_ESCROW_RELEASED` with `previousState`/`newState` |
+| Freeze / unfreeze escrow | `escrow.freeze` | An `EscrowHold` row (one active hold per milestone, 409 on a second); audit `ADMIN_ESCROW_HELD` / `ADMIN_ESCROW_UNHELD` |
+| Settle a payout | `payouts.settle` | A conditional claim `PENDING/PROCESSING → CONFIRMED` **plus** the disbursement journal in the same transaction; `FAILED` re-credits the wallet in the same transaction. Audit `PAYOUT_SETTLED` / `PAYOUT_FAILED` |
+| Change a staff role | `admins.manage` | Updates `staffRole`, **bumps `sessionVersion`** so live sessions are revoked, audit `STAFF_ROLE_CHANGED`. 409 on a self-change or demoting the last full-access admin |
+| Suspend a staff account | `admins.manage` | A `Serializable` transaction with `SELECT … FOR UPDATE` guarding the last-admin case; audit `STAFF_SUSPENDED` |
+| Suspend a user | `users.suspend` | 403 `CANNOT_SUSPEND_STAFF` if the target has any staff role; audit `USER_SUSPENDED` |
+| Force KYC re-review | `kyc.review` | Sets `periodicReviewPending` and `nextReviewDueAt`; audit `KYC_FORCED_REREVIEW` + a staff fan-out |
+| Moderate a gig | `gigs.moderate` | Status change, audit `GIG_STATUS_CHANGED`, and a search re-index |
+| Open a breach incident | `incidents.manage` | `triggerBreachAlert()` — see §4.2 |
+
+#### Audit Log Surface
+
+`GET /api/v1/admin/audit-logs` (`admin.routes.ts:221`), permission `audit.view`, paginated (default 25, max 100) with four server-side filters: `eventType`, `entityType`, `entityId`, `userId`. There is **no date-range filter and no server-side free-text search** — the console's search box filters the current page in the browser, and says so in the UI.
+
+The second audit surface is `GET /api/v1/admin/incidents/breaches`, which reads `SECURITY_BREACH_OPENED` rows out of the same table.
+
+---
+
+### 3.17 Module: Privacy & Data-Subject Rights (`apps/backend/src/modules/privacy/`)
+
+* **Purpose:** PDPP No. 1321/2024 access, portability and erasure. One module so the export and the erasure agree on what "personal data" means — if they drifted apart, the export would quietly under-report what the platform keeps.
+* **Files:** `privacy.service.ts` (the implementation). The routes live in `profiles.routes.ts` so the existing documented export route keeps working.
+* **Routes:** `GET /api/v1/users/me/export`, `POST /api/v1/users/me/erasure`.
+
+#### Access and Portability
+
+`GET /api/v1/users/me/export` returns every category the platform holds, grouped: `account`, `profile`, `verification`, `financials`, `marketplaceActivity`, `communications` (consents, notifications, support conversations, DMs), and `compliance`.
+
+The verification block reads the authoritative **`KycRecord`**, not `User.cachedKycStatus`. The cache defaults to `PENDING` and previously shadowed the real status, so a verified user read as unverified.
+
+#### Erasure
+
+Erasure is **not** "delete the user row". A `User` row is the foreign key that almost everything hangs off, and the financial and AML records must survive for ten years. So erasure:
+
+- **Destroys**: the name, display name, bio, avatar and avatar CDN URLs, the email (replaced by a non-routable placeholder), the password (randomised), the OAuth and Telegram identifiers, the chat and DM bodies, the portfolio, the skills, the marketplace copy on jobs / proposals / gigs / reviews / counter-offers, the notification preferences, the notifications, the analytics (profile views and featured-placement logs), and the chat attachments **from the object store including its local-disk fallback** — nulling the database row does not destroy the bytes.
+- **Retains**: the UCID, date of birth, Fayda biometric id, phone, the KYC record and documents, the wallet and its transactions, the ledger, the audit log, the transaction flags, the consent history, the contracts / milestones / disputes / evidence, and the reviews written *about* the user by other people.
+- **Closes the account**: suspended, sessions revoked, credentials invalidated, profile private.
+
+**Consent is revoked, never deleted.** Marketing and analytics get a new `granted: false` `ConsentRecord` row — the history of what was agreed to is itself the evidence.
+
+**Erasure is refused while money is in flight.** A non-zero wallet balance, a pending payout or top-up, an active contract, or an open dispute each produce a specific `409 ERASURE_BLOCKED` blocker, because erasing the identity out from under money that is still owed would leave it unclaimable.
+
+The exact retained-field list is still **pending counsel sign-off** (`docs/COMPLIANCE_BLOCKERS.md` #8). The split implemented here follows the Roadmap's wording and deliberately retains rather more than less: an over-retention is a complaint, an under-retention is a regulatory breach.
+
+---
+
+### 3.18 Module: Search & OpenSearch Integration (`apps/backend/src/modules/search/`)
+
+* **Purpose:** Full-text search over gigs and jobs, with a Postgres fallback so that search never hard-fails because the cluster is down.
+* **Files:** `searchIndex.service.ts` — one file, no routes, no controller.
+
+#### The integration
+
+Deliberately dependency-free: the client is a plain `fetch`, not the `@opensearch-project/opensearch` package.
+
+| Setting | Value |
+|---|---|
+| Endpoint | `OPENSEARCH_URL` — the only OpenSearch env var in the repository |
+| Indices | `yekis-gigs`, `yekis-jobs` |
+| Auth | **None.** The local compose service runs `DISABLE_SECURITY_PLUGIN: "true"`, so a secured production cluster would reject every request |
+| Timeout / retry | **None** |
+
+Indexed document shapes:
+
+| Index | Fields |
+|---|---|
+| `yekis-gigs` | `title`, `description`, `category`, `tags`, `status`, `freelancerId`, `ratingAverage`, `ratingCount` |
+| `yekis-jobs` | `title`, `description`, `category`, `status`, `clientId` |
+
+Not indexed: gig packages and pricing, `requirements`, `faqJson`, thumbnails and media; job budget, deadline, milestones and screening questions.
+
+Queries are `multi_match` with `fuzziness: "AUTO"` — gig fields `["title^3", "description", "tags"]`, job fields `["title^3", "description"]`.
+
+#### The resilient fallback
+
+Three layers, all silent:
+
+1. **Not configured** — `isSearchConfigured()` is `Boolean(env.OPENSEARCH_URL)`. Indexing returns immediately; querying returns `null`.
+2. **Down** — the query catches everything and returns `null` with a `logger.warn`; indexing warns and continues.
+3. **The caller decides** — `if (hits)` in `gig.service.ts:130` and `jobs.service.ts:58`: a `null` means "use Postgres".
+
+> **One sharp edge.** `searchText` returns `null` only on *error*. A successful search with **zero hits** returns `[]`, which is truthy — so an empty result short-circuits the Postgres fallback and returns zero items. A cluster that is up but has not been populated therefore behaves as "nothing matches".
+
+The Postgres fallback filters on `status: "ACTIVE"` (hard-coded — `GigSearchQuery` has no `status` field) and searches `title` **or** `description` with `contains` + `mode: "insensitive"`. `tags` is indexed but **not** searched in the fallback. Pagination is `skip`/`take` with a parallel `count` inside one transaction; the sort is `ratingAverage desc, createdAt desc` and is **not** caller-controllable.
+
+#### Known gaps
+
+- **Job search never uses OpenSearch.** `JobSearchQuery` has no `q` field and Zod strips unknown keys, so the `yekis-jobs` index is written but never read.
+- **Gig edits are never re-indexed.** `updateGig()` changes title, description, category and tags without calling `indexGig`, so the indexed document goes stale on every edit. Only creation and status changes re-index.
+- **Job status changes are never re-indexed** — `cancelJob()` does not call `indexJob`, so a closed job keeps `status: "OPEN"` in the index forever.
+- **No reindex, no backfill, no document deletion.** There is no `DELETE` call in the module; indices are created implicitly by OpenSearch's dynamic mapping on first write, with no explicit mapping, analyzer configuration, alias or version pinning. The index therefore drifts permanently from Postgres with no way to rebuild it short of turning `OPENSEARCH_URL` off.
+- `minPriceMinor` / `maxPriceMinor` are declared on `GigSearchQuery` and read nowhere — price filtering is a no-op on both paths.
+- On the OpenSearch path the returned `total` is the number of rows after filtering, **capped at 100** — not the true match count.
+- There is **no test coverage** for the module.
+
+---
+
 ## 4. Cross-Cutting Concerns
 
 ### 4.1 Authentication & Permission Enforcement Model
@@ -1326,17 +1731,58 @@ flowchart TD
   ```
   This guarantees that even a compromised backend process cannot alter or purge the 10-year AML audit trail.
 
+#### Retention: every row carries its own expiry
+
+`AuditLog.retentionUntil` is **NOT NULL** and is stamped at write time as
+`createdAt + AUDIT_RETENTION_YEARS` (default **10 years**, `env.ts`). An audit
+row without a defined expiry is exactly the ambiguity the retention
+requirement exists to remove, so the column is required rather than optional.
+
+The purge runs through the `SECURITY DEFINER` function
+`purge_expired_audit_logs(batch_size)` (migration
+`20261110120000_audit_log_retention`). The application role is granted
+`EXECUTE` on the function and holds **no `DELETE` privilege on the table** —
+so "the app cannot delete audit rows" survives the purge. The app can ask for
+an expired row to be removed; it cannot remove a live one, and it cannot
+alter the rule.
+
+The function deletes a row only when **both** its stamp has expired **and** it
+is at least ten years old. That second condition lives in SQL on purpose: a
+misconfigured `AUDIT_RETENTION_YEARS` must not be able to shorten a statutory
+retention obligation.
+
+The `audit-purge` BullMQ worker runs the function daily at 05:00, in bounded
+batches, and **audits itself** — every run that removes anything writes an
+`AUDIT_LOG_PURGE` row saying how many rows went and when. The record of the
+record's destruction survives the destruction.
+
+#### What every row carries
+
+`actorRole`, `action` (defaults to `eventType`), `previousState`, `newState`,
+`amountMinor`, `requestId` (the pino-http request id), `ipAddress`, and
+`retentionUntil`. Every financial, compliance and administrative transition
+writes one.
+
 ### 4.3 Background Processing & Worker Registry
 
-BullMQ manages five dedicated Redis queues:
+BullMQ manages **ten** dedicated Redis queues:
 
 | Queue Name | Worker File | Schedule / Trigger | Action | Cancellation Rule |
 |---|---|---|---|---|
-| `auto-release` | `autoRelease.worker.ts` | Scheduled with 6-day (warn) and 7-day (release) delay upon milestone delivery submission | Warns client at day 4; auto-releases escrow to freelancer at day 5 | Job is marked stale & skipped if milestone leaves `SUBMITTED_FOR_REVIEW` (e.g. accepted or disputed) |
-| `kyc-refresh` | `kycRefresh.worker.ts` | Cron `0 3 * * *` (Daily at 03:00 UTC) | Sweeps verified KYC records where `nextReviewDueAt <= now()` and sets `periodicReviewPending = true` | N/A (Recurring idempotent sweep) |
-| `notifications` | `notification.worker.ts` | Event-triggered by domain modules (`escrow-funded`, `dispute-raised`, etc.) | Dispatches in-app record, Telegram push, and SMS for critical types | N/A (Immediate execution) |
-| `review-reveal` | `reviewReveal.worker.ts` | Recurring sweep / 14-day delay | Reveals blind reviews older than 14 days and recalculates Bayesian rating scores | Skipped if already revealed by mutual review submission |
+| `auto-release` | `autoRelease.handler.ts` + `autoRelease.worker.ts` | Scheduled with a 24-hour (warn) and 7-day (release) delay upon milestone delivery submission | Warns client 24 h before the deadline; auto-releases escrow to the freelancer at day 7 | Job is marked stale & skipped if the milestone leaves `SUBMITTED_FOR_REVIEW` (e.g. accepted or disputed) or if the contract is still inside its cooling-off window |
+| `gig-auto-release` | `gigAutoRelease.worker.ts` | Same pattern for gig orders | Auto-releases a gig escrow when the review window elapses | Cancelled when a revision is requested or a gig dispute is raised |
+| `kyc-refresh` | `kycRefresh.worker.ts` | Cron `0 3 * * *` (Daily at 03:00 UTC) | Sweeps verified KYC records where `nextReviewDueAt <= now()` and sets `periodicReviewPending = true`, notifying the user | N/A (Recurring idempotent sweep) |
+| `notifications` | `notification.worker.ts` | Event-triggered by domain modules (`escrow-funded`, `dispute-raised`, `security-breach`, etc.) | Persists the in-app record first, then pushes over the socket, and fans out to SMS (critical types), email and Telegram | N/A (Immediate execution) |
+| `review-reveal` | `reviewReveal.worker.ts` | Recurring sweep / 14-day delay | Reveals blind **contract** reviews older than 14 days and recalculates Bayesian rating scores | Skipped if already revealed by mutual review submission. **Gig reviews are not covered** — `GigReview.revealedAt` is never written |
 | `featured-refresh` | `featuredRefresh.worker.ts` | Recurring schedule | Recalculates candidate pools and updates featured carousel rankings | N/A (Recurring sweep) |
+| `payment-reconcile` | `paymentReconcile.worker.ts` | Cron every 10 minutes | Polls the provider's status API for transactions stuck in `PENDING` past the stale window and replays them through the same idempotent webhook handler | Gives up after the configured window, leaving the transaction `PENDING` for manual review |
+| `tms-scan` | `tmsScan.worker.ts` | Cron every 15 minutes | Runs the AML rule engine (structuring, round amounts, velocity) and sweeps STR filing SLAs | N/A (Recurring sweep) |
+| `withholding-remittance` | `withholdingRemittance.worker.ts` | Cron `0 23 1 * *` (23:00 UTC on the 1st = 02:00 EAT on the 2nd) | Computes the prior month's ERA withholding from `PlatformFeeCredit` | N/A — the report is idempotent per `periodMonth`; **filing is a human step** |
+| `audit-purge` | `auditPurge.worker.ts` | Cron `0 5 * * *` (Daily at 05:00 UTC) | Deletes audit rows past their retention stamp **and** past the hard ten-year floor, in bounded batches, and audits the purge itself | N/A (Recurring sweep) |
+
+The worker body for `auto-release` lives in `autoRelease.handler.ts` so the
+test suite can drive the release path without standing up a live BullMQ
+consumer.
 
 ---
 
@@ -1511,6 +1957,25 @@ graph TD
 | ~~**Chapa Payment Aggregator**~~ | — | **REMOVED.** Chapa was deleted from the approved payment architecture (PAY-002; migration `20260826090000_tms_rules_and_chapa_removal`). No adapter, no enum member, no webhook route. | Nothing — it is not coming back without a new product decision. |
 | **Provider Payouts (B2C / Withdrawal)** | `apps/backend/src/modules/escrow/providers/telebirr.client.ts` | **Live.** `initiateDisbursement()` (line 449) is implemented and is what `withdrawFromWallet()` calls. A confirmed disbursement posts the balanced ledger journal in the same transaction as the payout confirmation; an immediate provider refusal rolls the wallet debit back. | Production Telebirr merchant credentials and a funded disbursement balance. CBE B2C remains unwired. |
 | **SMSEthiopia Delivery** | `apps/backend/src/modules/notifications/sms.client.ts` | Live REST client; falls back to logger warning if `SMS_ETHIOPIA_API_KEY` is omitted. | Valid SMSEthiopia gateway balance and API key. |
+| **OpenSearch** | `apps/backend/src/modules/search/searchIndex.service.ts` | Live but **unauthenticated**, with a Postgres fallback. The `yekis-jobs` index is written and never read; gig edits and job status changes are never re-indexed; there is no reindex path and no document deletion. | An authenticated cluster, an explicit index mapping, and a reindex/backfill job. |
+| **ERCA / ERA automated remittance** | `apps/backend/src/modules/finance/finance.service.ts` | The report is **computed** monthly and a human files it; the ERA reference is recorded afterwards. | ERA offers no machine-readable API. The filing stays a human obligation. |
+
+### 7.3 Where the Known Gaps Live
+
+Each gap is documented **next to the code it belongs to**, so a reader who opens a module section finds its own limitations rather than a distant list:
+
+| Gap | Documented in |
+|---|---|
+| Gig orders post no double-entry journal; no duplicate-order protection; the gig dispute settlement is not transactional; gig reviews are never revealed | §3.13 |
+| `auditLedgerIntegrity()` cannot see a missing flow; the three definitions of "escrow held" disagree; gig money bypasses the ledger; the VAT alert fires at most once ever | §3.14 |
+| CBE and M-Pesa throw; the `PaymentProvider` enum keeps inert `CHAPA`/`M_PESA` members | §3.15, and the note under §2.2 |
+| Only `SUPER_ADMIN`/`ADMIN` can release or hold escrow; five console actions call endpoints that do not exist; the frontend/backend permission mismatches | §3.16, §8.8 |
+| The retained-field list for erasure is not counsel-reviewed; object lock would block erasure deletes | §3.17, `docs/COMPLIANCE_BLOCKERS.md` #8 |
+| Job search never uses OpenSearch; gig edits go stale in the index; no reindex path | §3.18 |
+| The audit retention stamp and the purge that enforces it | §4.2 |
+| Five ops console actions 404; the fallback matrix drifts from the server's; orphaned mock data | §8.8 |
+| ~866 hardcoded JSX literals; registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
+| No offline queue for socket events; the client ping is a no-op; guest sockets cannot connect | §8.10 |
 
 ---
 
@@ -1814,15 +2279,172 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 
 | Property | Value |
 |---|---|
-| Framework | React 18 + Vite |
+| Framework | React 19 + Vite 8 (Rolldown) |
 | Language | TypeScript (strict) |
-| Linting | ESLint with `react-hooks/rules-of-hooks` |
-| CSS | Vanilla CSS (`index.css` — 110 KB design system) |
+| Linting | ESLint with `react-hooks/rules-of-hooks` and `react-refresh` |
+| CSS | Vanilla CSS (`index.css` design system) + per-feature CSS files (`landing-v2.css`, `shadcn-dashboard.css`, `ops-console.css`, …) |
 | Icons | `lucide-react` |
 | Environment Variable | `VITE_API_BASE_URL` |
-| Dev Server | `pnpm dev` → `http://localhost:3000` |
+| Dev Server | `pnpm dev` → `http://127.0.0.1:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
-| Internationalization | `i18n.ts` (Amharic + English string catalog) |
+| Internationalization | `i18n.ts` — four locales, 625 keys each |
+
+> **The React version in this table was 18 in earlier revisions; the project
+> now runs React 19** (`apps/frontend/package.json` pins `^19.3.0`).
+
+---
+
+### 8.8 The Operations Console (`apps/frontend/src/pages/ops/`)
+
+* **Purpose:** The staff workspace — 23 pages covering support, mediation, identity review, moderation, finance, reconciliation and administration.
+* **Entry point:** `FullPlatformApp.tsx:871-878` — if `user.staffRole` is set, the console **takes over the entire SPA shell**. There is no marketplace fallback for staff.
+
+#### The shell
+
+| Piece | Where | What it does |
+|---|---|---|
+| Nav | `opsNav.ts:42-132` | 23 items in **6 groups** — Overview; Cases (support, disputes, risk); Review Queues (KYC, profile reports, gigs, receipts); Financial (contracts, payments, payouts, escrow, reconciliation, tax, ledger, reports); Administration (users, staff, featured, bot, audit, monitoring); Account (profile) |
+| Sidebar | `OpsConsole.tsx` | Collapsible column ≥ 861 px (state persisted in `localStorage["yekis-ops-nav"]`); overlay drawer below that; a mobile bottom nav carries the first four permitted items |
+| Command Palette | `components/CommandPalette.tsx` | Ctrl/⌘+K. Indexes the permitted pages **plus** lazily-fetched records from contracts, users, disputes, KYC and payouts — each fetch only runs if the role can see that page, and each failure degrades to an empty section |
+| Action Center | `components/actionCenter.tsx` | Turns live data into a prioritised directive list, severity **3 = critical / 2 = high / 1 = queue**: breached dispute SLAs, open critical risk flags, failed health checks, reconciliation mismatches, pending payouts, KYC awaiting review, open profile reports |
+| Notification Bell | `components/NotificationBell.tsx` | Reads `GET /notifications` on mount and on every socket event; a row is **disabled** when the signed-in role cannot open its target page |
+| Theme | `theme/ThemeContext.tsx` | `localStorage["yekis-theme"]`, else `prefers-color-scheme`; writes `data-theme` on `<html>` and syncs the Telegram WebApp header colours |
+
+There is **no React Router** — `page` is a `useState<OpsPageId>` and `focusId` carries a deep-linked record id.
+
+#### The frontend permission model
+
+`opsPerms.ts` maps each of the 23 page ids to exactly **one** backend permission key. `useOpsPerms()` fetches the live matrix from `GET /api/v1/admin/permissions/matrix` and replaces the local map; if that fetch fails it falls back to a hard-coded matrix "so it degrades to something close to correct rather than to 'hide everything'". `SUPER_ADMIN` and `ADMIN` are handled by a wildcard.
+
+`can()` is used in exactly **four** places: sidebar filtering, the deep-link fallback, the command palette, and the notification bell.
+
+> **No ops page gates its action buttons by permission.** Every `disabled=` attribute is driven by an in-flight flag, by row state, or by empty-form state — never by the operator's role. The **backend** is the enforcement point: a `SUPPORT` operator who reaches a page they should not see still gets `403 PERMISSION_DENIED`. Hiding a nav item is a courtesy, not a control.
+
+#### The API layer
+
+`opsApi.ts` is an **adapter, not a second client**: every call goes through the shared `api` singleton, so the base URL, the Bearer token, the automatic refresh and the request-id handling are identical to the rest of the SPA. It owns the translation from wire shapes (`opsBackend.ts`) to the compact console model (`opsTypes.ts`).
+
+There are two distinct fallback mechanisms:
+
+- **`soft(promise, fallback)`** — swallows every error, including 403 and 404, and substitutes an empty or zeroed value. Used by the overview fan-out, the badge counters, the reports bundle and the ledger. A missing permission therefore renders as "no data", not as an error.
+- **`opsListApi.*`** — deliberately does **not** fall back. The rejection propagates so the page renders an `ErrorBox`, because "a missing or shadowed route shows up as a failure instead of looking exactly like 'there is no data'".
+
+`opsFallbackData.ts` (18.7 KB of mock constants) is **orphaned** — imported by nothing. The real empty state is zeroed data, never mocked rows.
+
+#### Known gaps
+
+- **Five console actions call endpoints that do not exist** and will 404 at runtime: `POST /admin/contracts/:id/intervene`, `POST /admin/payments/:id/action`, `POST /admin/escrows/:id/action`, `POST /admin/reconciliation/:id/resolve`, `POST /admin/ledger/journals/:id/action`. The Escrow page's Release/Hold/Unhold buttons work because they use dedicated methods instead of the generic action endpoint.
+- `Reconciliation.tsx` calls the ledger-action endpoint with a **hard-coded fake journal id**.
+- `Payouts.tsx` offers five settlement outcomes; the backend accepts only `CONFIRMED` and `FAILED`.
+- **Frontend/backend permission mismatches**: `profiles.moderate` gates the Profile Reports nav item but is granted to nobody except `SUPER_ADMIN`/`ADMIN`, so compliance staff lose it once the live matrix loads; and several pages are gated by `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN")`, which excludes the newer `COMPLIANCE_ADMIN` role even though the permission matrix grants it the relevant keys.
+
+---
+
+### 8.9 Multilingual Translation Framework
+
+#### The frontend catalogue
+
+`apps/frontend/src/i18n.ts` holds the four locales inline as TypeScript objects — there is no separate JSON or PO file.
+
+| Property | Value |
+|---|---|
+| Languages | `en`, `am` (አማርኛ), `om` (Afaan Oromoo), `ti` (ትግርኛ) |
+| Leaf keys per language | **625**, identical across all four (no missing, no extra) |
+| Nested objects per language | 43 |
+| Maximum depth | 3 (e.g. `workspace.jobs.status.SHORTLISTED`) |
+| Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `onboarding`, `workspace` |
+
+**There is no `t()` function.** `t` *is* the locale object, so usage is `t.nav.home`, `t.workspace.notifications.title` — 408 property-style usages and zero call-style usages across the frontend.
+
+The exported API is `Language`, `LanguageInfo`, `SUPPORTED_LANGUAGES`, `translations`, `TranslationsType`, `isLanguage()`, `LanguageProvider` and `useI18n()`.
+
+#### Choosing and persisting the language
+
+1. Initial state reads `localStorage["yekis-language"]`; if that is not a supported language it falls back to `navigator.language` prefix matching, then to English.
+2. `setLanguage()` writes the key, sets `document.documentElement.lang`, and fires `events.languageChanged()`.
+3. **The server wins on login**: `FullPlatformApp.tsx` calls `setLanguage(me.languagePreference)` when the profile says it is a supported language.
+4. The preference is stored server-side on `User.languagePreference` and changed in `SettingsWorkspace.tsx`.
+
+#### The bot catalogue
+
+`apps/backend/src/modules/bot/locales/{en,am,om,ti}.json` — **243 flat keys** each, an identical key set across the four. `getBotTranslation(locale, key, params)` falls back to English and then to the raw key, and substitutes `{param}` placeholders.
+
+`en.ftl` (Fluent format, 326 lines) is **dead** — only the JSON files are loaded.
+
+`Yekis_translations.csv` at the repository root is a manual parity ledger (219 rows, with real translations in all three non-English columns). No code reads it.
+
+Bot users choose a language from a keyboard; the handler stores it on `ctx.session.language` **and** on `User.languagePreference`.
+
+#### Known gaps
+
+- **Hardcoded copy is still widespread.** 26 of 130 `.tsx` files import the i18n module; the other 104 contain hardcoded user-facing strings — roughly **866 literal JSX text nodes**, concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity.
+- **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
+- **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
+- **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
+- `LandingPage.tsx` (977 lines) is **dead code** — the app imports `LandingPageV2`.
+
+---
+
+### 8.10 Real-Time WebSocket Infrastructure
+
+#### The server
+
+`apps/backend/src/lib/socket.ts` attaches a `ws` server to the same `node:http` server on the path **`/api/v1/ws`**.
+
+**Authentication happens at the handshake and is re-checked continuously.** The token travels in the **query string** (`?token=…`) — there is no `Authorization` header and no `Origin` check, so the token is exposed in access logs, proxy logs and browser history. The handshake verifies the JWT and then calls the **same** `checkSessionIsUsable()` helper that backs `requireAuth`, so the two front doors cannot drift. A 30-second heartbeat re-runs it and closes the socket with `4003` if the account was suspended, deleted, or had its `sessionVersion` bumped (a role change, a staff suspension).
+
+| Close code | Meaning |
+|---|---|
+| `4001` | Missing token, or a token with no subject |
+| `4003` | `UNKNOWN_USER`, `GUEST_CONTACT`, `SUSPENDED`, `SESSION_REVOKED`, or a bad/expired signature |
+
+**Message envelope** (server → client): `{ "event": "<name>", "data": <any>, "timestamp": "<ISO 8601>" }`.
+
+**Channels** — exactly three namespaces: `user:{userId}` (granted on connect), `staff:alerts` (granted to staff) and `conversation:{id}` (client-requested, and **authorised** — a participant or staff, with the authorisation cached per socket and failing **closed** on a database error).
+
+**Client → server actions:** `subscribe`, `unsubscribe`, `typing`, `read`. The client's 25-second `{action:"ping"}` has **no server branch** and is silently discarded; the server's own protocol-level ping is what actually detects a dead socket.
+
+**Broadcast API:** `sendToUser`, `broadcastToChannel`, `broadcastToStaff`, `broadcastToConversation`.
+
+#### The client
+
+`apps/frontend/src/api/socket.ts` — a singleton `RealtimeSocketManager`.
+
+| Behaviour | Detail |
+|---|---|
+| Connect | `connect()` no-ops when already open/connecting. The URL is built from `VITE_API_BASE_URL` or `window.location`, with `wss:` for an `https:` API base |
+| No-connect cases | No token, a token starting with `demo-`, or ≥ 10 reconnect attempts |
+| Reconnect | `min(1000 × 1.5ⁿ, 15000)` — 1.5 s, 2.25 s, 3.375 s … capped at 15 s, **hard-stopping after 10 attempts** and then giving up silently |
+| On open | Resends every stored subscription, then starts the 25 s ping interval |
+| On close | Clears the ping interval; reconnects unless the close was deliberate |
+
+**Events consumed by the frontend:** `chat:new_message`, `chat:message`, `chat:typing` (ChatWorkspace and the guest widget); `chat:new_conversation` (Support Desk); nine named `notify:*` events (FullPlatformApp); and two **wildcard** `notify:*` listeners that simply reload lists (NotificationCenter, the ops NotificationBell).
+
+The server's `connected` welcome frame and its `chat:read` broadcast have **no consumer**.
+
+#### How the socket push relates to the notification queue
+
+**The socket push comes from the BullMQ notification worker, not from the service layer.** The chain is:
+
+```
+service layer → notificationQueue.add(name, …) → notification.worker.ts
+              → persist the in-app Notification row FIRST
+              → then sendToUser(userId, `notify:${name}`, …)
+```
+
+Persisting first is deliberate: a client that refreshes immediately after the socket event can always find the row. The push is wrapped in a try/catch, so a socket failure never fails the job.
+
+The consequence is that the push is **asynchronous and delayed by queue latency**, and that **there is no offline queue** — `sendToUser` returns `false` when the user has no sockets and the return value is ignored, so a `notify:*` event emitted while the user is offline is **dropped**. Recovery is entirely by client polling (15 s for notifications, 60 s for the workspace snapshot, 2 s for chat, 1.5 s for the guest widget).
+
+**Chat is the exception.** `chat.service.ts` emits `chat:message` / `chat:new_message` **synchronously in the request path** *and* enqueues a `new-message` notification job, so a chat message can arrive twice.
+
+#### Known gaps
+
+- **Guest-support sockets do not work.** Guest tokens are signed with a different secret, and the guest's `User` row is flagged `isGuestContact`, which the shared session check rejects. The guest widget therefore falls back to its 1.5-second poll. The guest-specific branches in the socket handler are unreachable dead code, and no test covers that path.
+- **Only 9 of ~44 `notify:*` names are handled explicitly**; the rest only trigger the wildcard list reloads.
+- **No `Origin` validation, no per-IP connection limit, no `maxPayload`.** The socket transport is also outside the HTTP rate limiter.
+- **Authorisation caching is never invalidated.** A staff member demoted mid-session keeps read access to the conversations they were authorised for earlier in that socket's life.
+- There is no presence model, no read-receipts channel, and no topic channels beyond the three listed.
 
 ---
 
@@ -2208,10 +2830,89 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 | Worker | File | What It Does |
 |---|---|---|
-| `autoRelease.worker.ts` | `queue/` | Listens on `auto-release` queue. Fires a client warning notification at day 4 after milestone submission; auto-releases escrowed funds to freelancer at day 5 if client hasn't acted. Stale-checks milestone state before executing — skips if milestone already left `SUBMITTED_FOR_REVIEW`. |
-| `kycRefresh.worker.ts` | `queue/` | Runs daily at 03:00 UTC (cron). Sweeps all `VERIFIED` KYC records where `nextReviewDueAt <= now()` and marks them `periodicReviewPending = true`, which triggers re-verification. |
-| `notification.worker.ts` | `queue/` | Processes notification events from all domain modules. Writes in-app `Notification` record, optionally fires Telegram push and SMSEthiopia API for critical event types. |
-| `reviewReveal.worker.ts` | `queue/` | Recurring sweep. Sets `isBlind = false` on reviews older than 14 days. Recalculates Bayesian ratings for affected users. |
+| `autoRelease.handler.ts` / `autoRelease.worker.ts` | `queue/` | Listens on the `auto-release` queue. Fires a client warning notification 24 h before the deadline; auto-releases escrowed funds at day 7 if the client has not acted. Stale-checks the milestone state first, and skips the release while the contract is still inside its 7-day cooling-off window. |
+| `gigAutoRelease.worker.ts` | `queue/` | The same pattern for gig orders, keyed on `gigOrderId`. |
+| `kycRefresh.worker.ts` | `queue/` | Runs daily at 03:00 UTC (cron). Sweeps all `VERIFIED` KYC records where `nextReviewDueAt <= now()`, marks them `periodicReviewPending = true` and notifies the user that re-verification is due. |
+| `notification.worker.ts` | `queue/` | Processes notification events from all domain modules. Persists the in-app `Notification` record **first**, then pushes over the socket, then fans out to Telegram and the SMSEthiopia API for critical event types. |
+| `reviewReveal.worker.ts` | `queue/` | Recurring sweep. Sets `isBlind = false` on **contract** reviews older than 14 days. Recalculates Bayesian ratings for affected users. Gig reviews are not covered. |
 | `featuredRefresh.worker.ts` | `queue/` | Recurring sweep. Recalculates featured freelancer carousel rankings using Bayesian score, verification recency, staff pins, and category balance algorithm. |
+| `paymentReconcile.worker.ts` | `queue/` | Runs every 10 minutes. Polls the provider's status API for transactions stuck in `PENDING` and replays them through the same idempotent webhook handler. |
+| `tmsScan.worker.ts` | `queue/` | Runs every 15 minutes. Executes the AML rule engine and sweeps STR filing SLAs, alerting staff when one is breached. |
+| `withholdingRemittance.worker.ts` | `queue/` | Runs at 23:00 UTC on the 1st of each month. Computes the prior month's ERA withholding from `PlatformFeeCredit`. **It does not file anything** — a human submits it and records the ERA reference. |
+| `auditPurge.worker.ts` | `queue/` | Runs daily at 05:00 UTC. Deletes audit rows past their retention stamp **and** past the hard ten-year floor, in bounded batches, and audits the purge itself. |
+
+---
+
+### 9.15 Gig Marketplace
+
+**What it does:** A second route to market, shaped like a services catalogue rather than a job board. A freelancer publishes a gig with up to three priced packages; a client orders one, funds it into escrow, receives a deliverable, may request revisions within the gig's cap, and accepts.
+
+**The flow, end to end:**
+
+1. **Publish** — the freelancer creates a gig (`DRAFT`) with 1–3 packages. Only `FREELANCER` and `BOTH` roles may. The gig is indexed into OpenSearch.
+2. **Moderate** — a staff member with `gigs.moderate` publishes or rejects it. **Publication is a staff decision**: search hard-codes `status: "ACTIVE"`, and a non-`ACTIVE` gig is a 404 for anyone but its owner and staff.
+3. **Order** — a client picks a package. The gig must be `ACTIVE`, and the client cannot order their own gig.
+4. **Fund** — the client's wallet is debited into escrow. The debit uses a conditional update with a `gte` guard, so the database arbitrates a concurrent double-funding.
+5. **Deliver** — the freelancer submits; a 7-day auto-release timer starts.
+6. **Revise** — the client may request a revision, which cancels the auto-release timer and increments `revisionsUsed` against the gig's `maxRevisions`.
+7. **Accept** — the client's acceptance releases the escrow to the freelancer net, or the timer fires and it happens anyway.
+
+**Files:** `GigMarketplace.tsx` (buyer), `GigSellerDashboard.tsx` (seller), `pages/ops/pages/GigModeration.tsx` (staff).
+
+**What is different from the milestone flow**, and why it matters: a gig order reuses the escrow module's **fee engine** but **reimplements the escrow handling inline**. It does not call `placeEscrowHold()`, it does not call `releaseMilestoneFunds()`, it has no admin escrow hold, and — the significant one — **it posts no double-entry journal at all**. A gig order moves money and the ledger does not see it.
+
+---
+
+### 9.16 Operations Console
+
+**What it does:** The staff workspace. Twenty-three pages, all reached from one shell that replaces the marketplace for anyone with a staff role.
+
+**The shape of an operator's day** is the **Action Center** on the Overview page: a prioritised list built from live data — breached dispute SLAs first, then open critical risk flags, failed health checks, reconciliation mismatches, pending payouts, KYC awaiting review, and open profile reports.
+
+**The six nav groups** map to the six things staff do: watch the whole platform (Overview); work cases (Support Desk, Dispute Mediation, Risk & Fraud); clear review queues (KYC, Profile Reports, Gig Moderation, Receipts); handle money (Contracts, Payments, Payouts, Escrow, Reconciliation, Tax Reports, Ledger, Reports); administer it (Users, Staff & Roles, Featured Talent, Telegram Bot, Audit Logs, System Health); and manage themselves (My Profile).
+
+**Three things a staff member can do that carry money or law:**
+- **Release escrow** (`escrow.release`, step-up auth) — forces a milestone out of review or dispute into `RELEASED`, with the platform earnings and the ledger journals posted in the same transaction.
+- **Settle a payout** (`payouts.settle`, step-up auth) — records the provider's outcome. `CONFIRMED` posts the disbursement journal in the same transaction; `FAILED` re-credits the wallet in the same transaction.
+- **Open a breach incident** (`incidents.manage`, step-up auth) — starts the PDPP response chain: session revocation, staff and user notification, the 72-hour ECA clock, and the prepared filing.
+
+**What the console does not do:** it does not gate its own action buttons by permission. Every action is enforced by the backend's `requirePermission`, and the console hides only the navigation to it.
+
+---
+
+### 9.17 Multilingual & Localization Workflow
+
+**What it does:** Serves the platform in four Ethiopian working languages — English (default), አማርኛ, Afaan Oromoo and ትግርኛ — in both the browser platform and the Telegram bot.
+
+**How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
+
+**Two catalogues, not one.** The frontend holds 625 nested keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+
+**Where it falls short today:**
+- Roughly **866 hardcoded JSX text literals** remain across 104 frontend files that never import the i18n module — concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more.
+- **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
+- **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
+- **No RTL support** — the platform is left-to-right only, and `dir` is never set.
+
+---
+
+### 9.18 Telebirr B2C Automated Disbursement & Ledger Rollback
+
+**What it does:** Moves a freelancer's earned balance out to their phone number, and guarantees that the books and the money agree.
+
+**The call.** `POST /api/v1/escrow/wallet/withdraw` requires, in order: a verified account (Tier 1 under the MVP policy), a fresh session (`requireFreshAuth(300)`), a verified phone, no active contract or open dispute for the paying party, a matching payout destination, and **an SMS approval code for this specific payout**. The code is verified inside the service immediately before the wallet is debited, and consumed when the payout completes — one code, one payout.
+
+**The debit and the provider call.** The wallet debit, the audit event and the `PayoutTransaction` row are **one transaction**. The provider call is deliberately **outside** it: Telebirr is an external system that cannot join a database transaction, and calling it inside would hold a pooled connection open across a network round trip. What goes wrong if the process dies in between is bounded and recoverable: a `PROCESSING` payout with a provider reference exists, which is exactly the state the reconciliation sweep and staff settlement exist for.
+
+**The three outcomes:**
+- **Confirmed** — the payout is marked `CONFIRMED` and the disbursement journal is posted **in the same transaction**. Either both happen or the payout stays `PROCESSING`. The journal debits the user's liability account for the gross and credits the Telebirr settlement asset for the net.
+- **Refused** — the wallet is re-credited and the payout marked `FAILED`, with the reason recorded. Nothing is left behind.
+- **Pending** — the payout stays `PROCESSING` with the provider reference, awaiting the webhook or the reconciliation sweep.
+
+**The rollback that matters.** An earlier version marked the payout `CONFIRMED` first and posted the journal afterwards, in a separate transaction with no error handling. A journal failure then propagated with the payout already `CONFIRMED` and the money already gone: the route 500'd, the user retried, and a **second** disbursement went out while the first had landed. Now either both happen or neither does — and no `CONFIRMED` payout exists without its journal.
+
+**The fee.** The provider's cash-out fee is collected once, on the transaction gross, at **release** time — not at cash-out. The platform's overall take is therefore a single 7.5% (7% commission + 0.5% provider fee) rather than 7% here and a surprise deduction at cash-out.
+
+**Still open:** CBE Birr B2C is not implemented (the CBE client throws), so the CBE settlement asset account exists but is never credited by a disbursement.
 
 ---

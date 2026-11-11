@@ -98,11 +98,11 @@ if (fs.existsSync(sysDesignPath)) {
   const sysContent = fs.readFileSync(sysDesignPath, "utf-8");
   const requiredKeywords = [
     "Gig Marketplace",
-    "General Ledger",
+    "Chart of Accounts",
     "Operations Console",
     "Multilingual",
     "Telebirr B2C",
-    "OpenSearch"
+    "OpenSearch",
   ];
 
   console.log(`\n📘 Checking Canonical SYSTEM_DESIGN.md topic coverage...`);
@@ -224,6 +224,168 @@ if (fs.existsSync(roadmapPath)) {
     hasErrors = true;
   } else {
     console.log(`? All ${summaryRows.length} summary rows match their tables.`);
+  }
+}
+
+// 6. Verify the canonical design document actually covers the codebase.
+//
+// WHY THIS EXISTS
+// `docs/SYSTEM_DESIGN.md` is the canonical document, and it had drifted so far
+// that its table of contents promised six sections whose bodies did not exist
+// (Gigs, Finance, Search, Admin/RBAC, the Ops Console, Multilingual), while
+// six backend modules had no section at all. A document that promises sections
+// it does not contain cannot be maintained.
+//
+// This check fails when:
+//   - a backend module has no "### 3.x Module: ..." section,
+//   - a table-of-contents entry points at a section that does not exist,
+//   - the frontend view map omits a view the app can actually show,
+//   - a removed payment provider is still described as a live integration.
+//
+// It is deliberately a *coverage* check, not a correctness check. It cannot
+// tell that a section is wrong — only that one is missing.
+
+const designPath = path.join(rootDir, "docs/SYSTEM_DESIGN.md");
+if (fs.existsSync(designPath)) {
+  console.log(`\n?? Checking SYSTEM_DESIGN.md covers the codebase...`);
+  const design = fs.readFileSync(designPath, "utf-8");
+
+  // --- 6a. Every backend module has a deep-dive section. ---
+  const modulesDir = path.join(rootDir, "apps/backend/src/modules");
+  const backendModules = fs
+    .readdirSync(modulesDir)
+    .filter((f) => fs.statSync(path.join(modulesDir, f)).isDirectory());
+
+  const uncoveredModules = [];
+  for (const mod of backendModules) {
+    // A section names its module directory, e.g. "### 3.13 Module: Gigs ... (`apps/backend/src/modules/gigs/`)".
+    const mentioned = design.includes(`src/modules/${mod}/`);
+    if (!mentioned) uncoveredModules.push(mod);
+  }
+
+  if (uncoveredModules.length > 0) {
+    console.error(
+      `? Backend modules with no section in docs/SYSTEM_DESIGN.md: ${uncoveredModules.join(", ")}`,
+    );
+    console.error(
+      `  Add a "### 3.x Module: ..." section for each, or say why the module needs none.`,
+    );
+    hasErrors = true;
+  } else {
+    console.log(
+      `? All ${backendModules.length} backend modules have a section in SYSTEM_DESIGN.md.`,
+    );
+  }
+
+  // --- 6b. Every table-of-contents entry resolves to a real heading. ---
+  //
+  // The slug is GitHub's: lowercase, drop everything that is not a word
+  // character, a space or a hyphen, then turn EACH space into a hyphen.
+  // Collapsing runs of whitespace (`\s+`) would produce a different anchor
+  // for a heading like "Identity & Authentication", where the removed `&`
+  // leaves two spaces and GitHub emits a double hyphen.
+  const headings = new Set(
+    [...design.matchAll(/^#{2,4}\s+(.+)$/gm)].map((m) =>
+      m[1]
+        .trim()
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, "")
+        .replace(/\s/g, "-"),
+    ),
+  );
+  const tocBlock = design.split("## Table of Contents")[1]?.split("\n---")[0] ?? "";
+  const danglingToc = [];
+  for (const m of tocBlock.matchAll(/\]\(#([\w-]+)\)/g)) {
+    if (!headings.has(m[1])) danglingToc.push(m[1]);
+  }
+  if (danglingToc.length > 0) {
+    console.error(
+      `? Table-of-contents entries with no matching heading: ${danglingToc.join(", ")}`,
+    );
+    hasErrors = true;
+  } else {
+    console.log(`? Every table-of-contents entry resolves to a heading.`);
+  }
+
+  // ...and the other way round. A heading that exists but is not in the table
+  // of contents is a section nobody will find, which is how the six promised
+  // sections went missing in the first place.
+  const tocAnchors = new Set(
+    [...tocBlock.matchAll(/\]\(#([\w-]+)\)/g)].map((m) => m[1]),
+  );
+  const orphanedHeadings = [];
+  for (const m of design.matchAll(/^###\s+(3\.\d+\s+Module:.*)$/gm)) {
+    const slug = m[1]
+      .trim()
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, "")
+      .replace(/\s/g, "-");
+    if (!tocAnchors.has(slug)) orphanedHeadings.push(m[1].trim());
+  }
+  if (orphanedHeadings.length > 0) {
+    console.error(
+      `? Module sections missing from the table of contents: ${orphanedHeadings.join(", ")}`,
+    );
+    hasErrors = true;
+  } else {
+    console.log(`? Every module section is listed in the table of contents.`);
+  }
+
+  // --- 6c. The frontend view map lists every view the app can show. ---
+  const platformApp = path.join(rootDir, "apps/frontend/src/FullPlatformApp.tsx");
+  if (fs.existsSync(platformApp)) {
+    const app = fs.readFileSync(platformApp, "utf-8");
+    const viewUnion = app.match(/type View\s*=\s*([\s\S]*?);/);
+    const views = viewUnion
+      ? [...viewUnion[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1])
+      : [];
+    // The fence may be CRLF, so match any line ending after the backticks.
+    const viewMap = design.match(
+      /#### View & Route System[\s\S]*?```\r?\n([\s\S]*?)```/,
+    );
+    const mappedViews = viewMap
+      ? [...viewMap[1].matchAll(/"([a-z-]+)"/g)].map((m) => m[1])
+      : [];
+    const missingViews = views.filter((v) => !mappedViews.includes(v));
+    if (missingViews.length > 0) {
+      console.error(
+        `? Frontend views missing from the SYSTEM_DESIGN.md view map: ${missingViews.join(", ")}`,
+      );
+      hasErrors = true;
+    } else {
+      console.log(`? All ${views.length} frontend views appear in the view map.`);
+    }
+  }
+
+  // --- 6d. A removed payment provider is not described as live. ---
+  //
+  // Chapa was removed from the approved payment architecture (PAY-002). A
+  // document that still lists it as a collection rail misleads anyone
+  // integrating against it.
+  //
+  // The check looks for the specific ways the document used to describe Chapa
+  // as live — as a peer rail, as an adapter, as a webhook. A bare mention of
+  // the name is NOT a failure: the enum member is inert and still says
+  // "CHAPA", and the note explaining that has to be able to name it.
+  const chapaAsLive = [...design.matchAll(/^.*chapa.*$/gim)]
+    .map((m) => m[0])
+    .filter((line) => {
+      // A struck-through row, or one that says it was removed, is the
+      // document recording the removal — that is exactly right, not drift.
+      if (/~~/.test(line)) return false;
+      if (/REMOVED|removed|deleted|no adapter/i.test(line)) return false;
+      return /Telebirr,\s*Chapa|Chapa\s+or\s+CBE|ChapaGW|webhooks\/chapa|chapa\.client|Chapa Payment Aggregator/i.test(
+        line,
+      );
+    });
+  if (chapaAsLive.length > 0) {
+    console.error(
+      `? Chapa is removed but SYSTEM_DESIGN.md still describes it as live:`,
+    );
+    for (const line of chapaAsLive) console.error(`  ${line.trim().slice(0, 140)}`);
+    hasErrors = true;
+  } else {
+    console.log(`? No removed payment provider is described as live.`);
   }
 }
 

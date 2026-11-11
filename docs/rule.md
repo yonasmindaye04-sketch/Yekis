@@ -175,14 +175,56 @@ These rules define the non-negotiable engineering, design, accessibility, and op
 
 ## 13. Documentation, Testing & Lifecycle
 
+### 13.1 Documentation Is Part of the Change
+
 - **Keep Documentation Updated**:
-  - Update the relevant Markdown files in the same change whenever code, configuration, schema, routes, UI, architecture, or workflows change.
-  - Add every completed change to `CHANGELOG.md` under `Unreleased`.
-  - Keep `API.md`, `DATABASE.md`, `ARCHITECTURE.md`, `WALKTHROUGH.md`, `SETUP.md`, `PROJECT_CONTEXT.md`, and `COMPLETENESS_CHECKLIST.md` aligned with their areas of ownership.
-  - Documentation must distinguish locally verified behavior from mocks, stubs, planned work, and production-ready integrations.
-- **Write and Maintain Tests**:
-  - Add or update tests when changing behavior.
-  - Cover critical paths such as auth, escrow release, and dispute flow.
-  - Prefer real behavior tests over brittle mock-only verification.
-- **Persistent Agent Instruction**:
-  - The persistent agent instruction is stored in `.agents/AGENTS.md`.
+  - Update the relevant Markdown files **in the same change** whenever code, configuration, schema, routes, UI, architecture, or workflows change. A change that lands with the docs describing the previous behaviour is an incomplete change, not a documented change.
+  - Add every completed change to `CHANGELOG.md` under `Unreleased`. The changelog is the **audit log of what actually changed** — what the change was, why it was needed, and what it means for anyone integrating against the platform. Write it for a reader six months out who has no memory of the change.
+  - Keep `API.md`, `DATABASE.md`, `ARCHITECTURE.md`, `SYSTEM_DESIGN.md`, `WALKTHROUGH.md`, `SETUP.md`, `PROJECT_CONTEXT.md`, `COMPLETENESS_CHECKLIST.md`, `ROADMAP_ALIGNMENT.md` and `COMPLIANCE_BLOCKERS.md` aligned with their areas of ownership.
+  - Documentation must distinguish locally verified behavior from mocks, stubs, planned work, and production-ready integrations. **Never describe a stub as live, a plan as implemented, or a removed integration as available.** A reader who trusts the document and integrates against a removed payment rail has been actively misled.
+  - When a documented behaviour changes, **fix the document in the same commit as the code**. Fixing it later is how the canonical design document ended up telling readers that a payout API was not wired when it was, and that a removed payment rail was live.
+
+### 13.2 The Canonical Design Document Is `docs/SYSTEM_DESIGN.md`
+
+`docs/SYSTEM_DESIGN.md` is the **single canonical description of how the platform works**. It must cover, at minimum:
+
+| Section | Must cover |
+|---|---|
+| §3 Per-Module Deep Dive | **One section per backend module** in `apps/backend/src/modules/` — its purpose, the models it owns, its lifecycle, its guards, and its known gaps. |
+| §4 Cross-Cutting | The permission model, the audit-log guarantee, and the worker registry. |
+| §8 Frontend Architecture | The runtime branching, the Mini App shell, the browser platform, the view map, the API client, and the staff console. |
+| §9 Functional Reference | What every user-facing section does, in plain English, with the file that powers it. |
+
+- **The table of contents must match the body.** A section promised in the contents and missing from the body is worse than no promise, because a reader trusts the contents.
+- **A module with no section is a module nobody has documented.** If a module genuinely needs no section, say so in the contents.
+- **Document the gaps next to the code they belong to.** A limitation discovered while reading module X belongs in section X, not in a distant list — and §7 carries an index pointing at them.
+
+### 13.3 The Documentation Gate Is Enforced, Not Remembered
+
+`node scripts/check-doc-parity.mjs` fails CI on documentation drift. It currently checks:
+
+1. Every Prisma model is documented in `docs/DATABASE.md`.
+2. Every backend module is documented in `docs/ARCHITECTURE.md`.
+3. Every mounted API path is represented in `docs/API.md`.
+4. The canonical topics are present in `docs/SYSTEM_DESIGN.md`.
+5. The `docs/ROADMAP_ALIGNMENT.md` summary counts match the tables they summarise.
+6. `docs/SYSTEM_DESIGN.md` covers the codebase:
+   - every backend module has a deep-dive section,
+   - every table-of-contents entry resolves to a heading,
+   - every module section is listed in the table of contents,
+   - every frontend view appears in the view map,
+   - no removed payment provider is described as a live integration.
+
+**Run it before claiming a change is done.** If a check fails, the fix is to update the document — not to weaken the check. A gate that can be satisfied by editing the gate is not a gate.
+
+### 13.4 Write and Maintain Tests
+
+- Add or update tests when changing behaviour.
+- Cover critical paths such as auth, escrow release, and dispute flow.
+- Prefer real behavior tests over brittle mock-only verification.
+- **A test that exercises a cleanup across a shared database must be scoped to its own rows.** An unscoped delete in one suite silently destroys another suite's fixtures, and the failure surfaces in the *wrong* file — which is the hardest kind of failure to attribute.
+- When a behaviour is verified by a script rather than a unit test (a layout regression, a CSS invariant), keep the script and run it the same way.
+
+### 13.5 Persistent Agent Instruction
+
+- The persistent agent instruction is stored in `.agents/AGENTS.md`.
