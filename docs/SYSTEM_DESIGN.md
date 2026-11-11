@@ -148,7 +148,6 @@ flowchart TD
     %% Module / Worker Outbound Adapters
     EscrowMod -->|HTTPS + RSA-PSS| TelebirrGW
     EscrowMod -->|HTTPS HMAC| CbeGW
-    EscrowMod -->|HTTPS HMAC| ChapaGW
     Q_Notif -->|SMS Dispatch| SmsEth
     Q_Notif -->|Bot Push Messages| TgApi
     KycMod -->|Biometric Verification| FaydaAPI
@@ -369,7 +368,7 @@ erDiagram
     PaymentTransaction {
         string id PK
         string milestoneId FK
-        enum provider "TELEBIRR | CHAPA | CBE_BIRR"
+        enum provider "TELEBIRR | CHAPA | CBE_BIRR | M_PESA"
         string providerTransactionId UK
         int amountMinor
         string status "PENDING | SUCCESS | FAILED"
@@ -389,7 +388,7 @@ erDiagram
         string id PK
         string userId FK
         string walletId FK
-        enum provider "TELEBIRR | CHAPA | CBE_BIRR"
+        enum provider "TELEBIRR | CHAPA | CBE_BIRR | M_PESA"
         int amountMinor
         string referenceNumber
         string receiptImagePath
@@ -591,6 +590,16 @@ erDiagram
     }
 ```
 
+> **Note on the `PaymentProvider` enum.** The ERD above shows the enum exactly as it
+> exists in `schema.prisma`, which is `TELEBIRR | CHAPA | CBE_BIRR | M_PESA`.
+> **`CHAPA` and `M_PESA` are inert members.** Chapa was removed from the approved
+> payment architecture (PAY-002) and has no adapter, no webhook route and no
+> client; M-Pesa is likewise unimplemented. The enum members were left in place
+> deliberately — dropping a Postgres enum member requires recreating the type
+> and every column that uses it, and the rows that referenced them were
+> migrated away already. **Only Telebirr is live.** CBE Birr and M-Pesa clients
+> exist but throw `PaymentProviderUnavailableError`.
+
 ### 2.2 Model Group Descriptions
 
 1. **Identity & Consents (`User`, `ConsentRecord`):** Manages user accounts, unique customer IDs (`ucid`), login credentials, cached KYC states, cumulative spend/earnings, profile presentation, and mandatory KYC data processing consents.
@@ -674,7 +683,7 @@ sequenceDiagram
 
 ### 3.2 Module: Tiered KYC (`apps/backend/src/modules/kyc/`)
 
-* **Purpose:** Implements tiered compliance verification. Tier 1 gates browsing and proposal bidding; Tier 2 (TIN / Business Reg) gates withdrawal capabilities; Tier 3 handles PEP / high-volume enhanced due diligence.
+* **Purpose:** Implements tiered compliance verification. Tier 1 gates browsing, proposal bidding AND withdrawals; Tier 2 (TIN / Business Reg) is the Phase 4 upgrade that also cuts withholding from 30% to 3%; Tier 3 handles PEP / high-volume enhanced due diligence.
 * **Owns Models:** `KycRecord`, `KycDocument`, `KycReviewEvent`.
 
 #### State Machine (`KycStatus` & `KycTier`)
@@ -734,7 +743,7 @@ sequenceDiagram
 | `GET` | `/api/v1/kyc/status` | Authenticated | Get current user's KYC tier, status, and missing requirements |
 | `POST` | `/api/v1/kyc/documents` | Authenticated | Multipart upload of KYC document image/PDF to encrypted WORM storage |
 | `POST` | `/api/v1/kyc/submit-tier1` | Authenticated | Submit personal details for Tier 1 automated and manual review |
-| `POST` | `/api/v1/kyc/upgrade-tier2` | Authenticated (Tier 1 Verified) | Submit TIN / Business Registration number for Tier 2 withdrawal rights |
+| `POST` | `/api/v1/kyc/upgrade-tier2` | Authenticated (Tier 1 Verified) | Submit TIN / Business Registration number for Tier 2 (Phase 4 — reduces withholding, not a withdrawal prerequisite) |
 | `GET` | `/api/v1/kyc/admin/queue` | Staff (`COMPLIANCE_OFFICER` / `ADMIN`) | List pending KYC submissions requiring human verification |
 | `POST` | `/api/v1/kyc/admin/review/:id` | Staff (`COMPLIANCE_OFFICER` / `ADMIN`) | Submit formal KYC decision (`VERIFIED` / `REJECTED`) with audit logging |
 | `GET` | `/api/v1/kyc/admin/document-url/:docId`| Staff (`COMPLIANCE_OFFICER` / `ADMIN`) | Generate temporary signed URL to inspect encrypted KYC document |
@@ -901,7 +910,7 @@ sequenceDiagram
 
 ### 3.5 Module: Escrow & Wallet (`apps/backend/src/modules/escrow/`)
 
-* **Purpose:** The core financial ledger engine. Manages milestone escrow states, wallet-first escrow funding, delivery submissions, client approvals, auto-release timers, fee and withholding tax splits, provider checkout initiation (Telebirr, Chapa, CBE Birr), and Tier 2-gated freelancer withdrawals.
+* **Purpose:** The core financial ledger engine. Manages milestone escrow states, wallet-first escrow funding, delivery submissions, client approvals, auto-release timers, fee and withholding tax splits, provider checkout initiation (Telebirr; CBE Birr and M-Pesa are throwing stubs), and freelancer withdrawals gated on Tier 1 KYC.
 * **Owns Models:** `Milestone`, `PaymentTransaction`, `Wallet`.
 
 #### Escrow Funds Flow (Plain-English Narrative)
@@ -909,7 +918,7 @@ sequenceDiagram
 Funds move through six sequential phases. All amounts are stored and computed as **integer minor units (ETB cents)** — never floating-point — to prevent rounding errors.
 
 **Phase 1 — Client Wallet Top-Up (Before Any Work)**
-The client must first load their in-platform wallet with real ETB. They transfer funds via Telebirr, Chapa, or CBE Birr, then submit a top-up request (`POST /api/v1/topups`) with a receipt image and the sender reference. A staff member reviews the receipt in the admin panel and either approves or rejects it. On approval, the client's `wallet.balanceMinor` is credited atomically in a Prisma transaction. No funds move automatically — this step is always human-gated.
+The client must first load their in-platform wallet with real ETB. They transfer funds via Telebirr, then submit a top-up request (`POST /api/v1/topups`) with a receipt image and the sender reference. A staff member reviews the receipt in the admin panel and either approves or rejects it. On approval, the client's `wallet.balanceMinor` is credited atomically in a Prisma transaction. No funds move automatically — this step is always human-gated.
 
 **Phase 2 — Contract Signing (Trust Lock)**
 Both the client and freelancer must digitally accept the contract (`POST /api/v1/contracts/:id/accept`) before any escrow can be funded. The service enforces this: `fundMilestone` and `fundMilestoneFromWallet` both throw `ContractNotFullyExecutedError` if either `clientAcceptedAt` or `freelancerAcceptedAt` is missing. The moment the **second signature** is recorded, the contracts service automatically attempts to fund all `PAYMENT_PENDING` milestones from the client's wallet in a single atomic transaction (wallet debit + all milestone state updates in one `prisma.$transaction`). If the client wallet has insufficient balance, a `"topup-required"` notification is sent instead and the client must fund manually.
@@ -930,18 +939,19 @@ Whether triggered by the client's explicit acceptance or the auto-release timer,
 2. Freelancer's `wallet.balanceMinor` incremented by `freelancerNetMinor`.
 3. Freelancer's lifetime `user.totalEarnedNetMinor` counter incremented (this drives the public profile "total earned" figure independently of the spendable wallet balance).
 
-The **freelancer's net amount** is: `gross − platform fee (7%)`. Under the MVP launch policy, statutory withholding tax is held at 0% pending formal tax remittance procedures, so freelancers retain a 93% net payout with zero withholding tax deduction. After release, `checkAndUpdateContractCompletion()` checks whether every milestone on the contract has reached a terminal state (`RELEASED`, `REFUNDED`, or `PARTIAL_REFUND`) and marks the contract `COMPLETED` if so.
+The **freelancer's net amount** is: `gross − platform fee (7%) − provider fee (0.5%)` = **92.5% of gross**. The provider fee is the cost of moving the money through Telebirr and is collected once, on the transaction gross, at release time — so the platform's overall take is a single 7.5% rather than 7% here plus a surprise deduction at cash-out. Under the MVP launch policy, statutory withholding tax is held at 0% pending formal tax remittance procedures, so there is no withholding deduction. After release, `checkAndUpdateContractCompletion()` checks whether every milestone on the contract has reached a terminal state (`RELEASED`, `REFUNDED`, or `PARTIAL_REFUND`) and marks the contract `COMPLETED` if so.
 
 **Phase 5b — Dispute Path**
 If either party calls `POST /api/v1/disputes` while the milestone is in `ESCROW_HELD`, `WORK_IN_PROGRESS`, or `SUBMITTED_FOR_REVIEW`, the milestone transitions to `DISPUTED` and both BullMQ jobs are cancelled immediately. Funds remain frozen in the escrow ledger (no wallet entries are written) while a three-stage mediation process runs (Negotiation → Admin Review → Mediation). A staff mediator resolves the dispute with one of three outcomes: `RELEASE_TO_FREELANCER` (calls `releaseMilestoneFunds`), `REFUND_TO_CLIENT` (calls `refundMilestoneToClient`, crediting the client's wallet), or `PARTIAL_SPLIT` (calls both with split amounts, milestone → `PARTIAL_REFUND`).
 
 **Phase 6 — Freelancer Withdrawal**
-Once funds are in the freelancer's wallet, they can request a payout via `POST /api/v1/escrow/wallet/withdraw`. This endpoint requires **Tier 2 KYC** (full identity verification). Three additional guards apply:
-- If the user is a `CLIENT`, any active contract milestone or open dispute blocks the withdrawal entirely (`ActiveContractWithdrawalBlockedError`).
+Once funds are in the freelancer's wallet, they can request a payout via `POST /api/v1/escrow/wallet/withdraw`. This endpoint requires **verified KYC** — Tier 1 under the MVP launch policy (`TIN_FEATURE_ENABLED = false`, so the gate resolves to `requireKycVerified("TIER_1")`; Tier 2 is the Phase 4 upgrade). Four additional guards apply:
+- **Two-factor approval of the payout.** `POST /api/v1/escrow/wallet/withdraw/otp` sends an SMS code to the number on the account, and the withdrawal requires it as `otpCode`. The code approves one payout, is verified inside the service immediately before the wallet is debited, and is consumed when the payout completes. A phone-*verification* code cannot approve a payout — `PhoneVerificationCode.purpose` keeps the two separate.
+- If the user is the paying party on an active contract milestone or an open dispute, the withdrawal is blocked entirely (`ActiveContractWithdrawalBlockedError`).
 - **Wallet-mismatch check (hard block):** If the payout destination account does not match the identity on the KYC record, the withdrawal is held for compliance review and returns HTTP 202 (`HELD_FOR_REVIEW`). Funds are not moved.
 - **Pass-through check (soft flag):** If the withdrawal looks like an immediate pass-through (funds in → funds out with no real activity), a `TransactionFlag` is created for staff review but the withdrawal is not blocked.
 
-On a clean pass, the wallet balance is optimistically debited. Note: the actual **provider payout API** (sending real ETB to the freelancer's Telebirr/CBE account) is not yet wired to live SDKs — the balance is debited internally but no external transfer is executed in the current build.
+On a clean pass the wallet is debited, a `PayoutTransaction` is created, and the platform calls the provider's disbursement API: **Telebirr B2C `initiateDisbursement()`** (`apps/backend/src/modules/escrow/providers/telebirr.client.ts:449`) is implemented and is what the withdrawal path actually calls. A confirmed disbursement posts the balanced double-entry journal in the same transaction as the payout confirmation; an immediate provider refusal rolls the wallet debit back and marks the payout `FAILED`.
 
 #### State Machine (`EscrowState`)
 
@@ -972,8 +982,10 @@ stateDiagram-v2
 * **Gross Milestone Amount:** $M$
 * **Client Total Charge:** $M$ (zero client surcharge; `PLATFORM_FEE_RATE_CLIENT = 0`).
 * **Platform Fee from Freelancer:** $M \times 7\%$ (`PLATFORM_FEE_RATE_FREELANCER = 0.07`).
+* **Provider (disbursement) Fee:** $M \times 0.5\%$ (`PAYMENT_PROVIDER_FEE_RATE = 0.005`) — the cost of moving the money through Telebirr, collected once on the transaction gross at release and credited to `REVENUE-DISBURSEMENT-FEES`.
 * **Withholding Tax:** Held at 0% for MVP launch (`TIN_FEATURE_ENABLED = false`).
-* **Net Credited to Freelancer Wallet:** $M - \text{Platform Fee} = M \times 93\%$.
+* **Net Credited to Freelancer Wallet:** $M - \text{Platform Fee} - \text{Provider Fee} = M \times 92.5\%$.
+* **Platform's overall take:** $7.5\%$ of the gross ($7\%$ commission + $0.5\%$ provider fee) — a single number, not a surprise at cash-out.
 
 #### Key Flows
 
@@ -1027,7 +1039,7 @@ sequenceDiagram
     end
 ```
 
-##### Flow 3: Tier 2 Freelancer Withdrawal with TMS Wallet Mismatch Guard
+##### Flow 3: Freelancer Withdrawal with TMS Wallet Mismatch Guard
 ```mermaid
 sequenceDiagram
     autonumber
@@ -1037,10 +1049,13 @@ sequenceDiagram
     participant TMS as TMS Service (tms/tms.service.ts)
     participant DB as PostgreSQL (Prisma)
 
-    Freelancer->>API: POST /api/v1/escrow/wallet/withdraw { amountMinor, provider, payoutAccountIdentifier }
-    Note over API: Verified Tier 2 KYC Required (requireKycVerified("TIER_2"))
+    Freelancer->>API: POST /api/v1/escrow/wallet/withdraw/otp
+    API->>Freelancer: SMS approval code (one payout)
+    Freelancer->>API: POST /api/v1/escrow/wallet/withdraw { amountMinor, provider, payoutAccountIdentifier, otpCode }
+    Note over API: Verified Tier 1 KYC Required (requireKycVerified("TIER_1"))
+    Note over API: requireFreshAuth(300) — the session must be recent
     API->>Service: withdrawFromWallet(...)
-    Note over Service: If User is CLIENT, verifies NO active contracts/disputes exist
+    Note over Service: If User is the paying party, verifies NO active contracts/disputes exist
     Service->>TMS: checkWalletMismatch(userId, payoutAccountIdentifier)
     alt Phone/Account Mismatch Detected
         TMS->>DB: TransactionFlag.create(WALLET_MISMATCH, PENDING_REVIEW)
@@ -1048,9 +1063,17 @@ sequenceDiagram
         Service-->>API: Error Caught
         API-->>Freelancer: HTTP 202 Accepted { error: "HELD_FOR_REVIEW" }
     else Valid Match
+        Service->>Service: verifyWithdrawalOtp(otpCode) — consumed on success
         Service->>TMS: runPassThroughCheck()
-        Service->>DB: Wallet.decrement(amountMinor)
-        API-->>Freelancer: HTTP 200 OK { success: true }
+        Service->>DB: Wallet.decrement(amountMinor) + PayoutTransaction.create (one transaction)
+        Service->>Telebirr: initiateDisbursement(amountMinor, recipientPhone, referenceId)
+        alt Provider Confirms
+            Service->>DB: Payout.status = CONFIRMED + ledger journal (one transaction)
+            API-->>Freelancer: HTTP 200 OK { payoutId, status: "CONFIRMED" }
+        else Provider Rejects
+            Service->>DB: Wallet.re-credit + Payout.status = FAILED
+            API-->>Freelancer: HTTP 5xx { error: "INTERNAL_ERROR" }
+        end
     end
 ```
 
@@ -1063,9 +1086,9 @@ sequenceDiagram
 | `GET` | `/api/v1/escrow/milestones` | Authenticated | List all milestones across user's contracts |
 | `POST` | `/api/v1/escrow/milestones/:id/submit` | Authenticated (Contract Freelancer) | Submit milestone deliverable, schedule 7-day BullMQ auto-release |
 | `POST` | `/api/v1/escrow/milestones/:id/accept` | Authenticated (Contract Client) | Manually approve deliverable and release funds net of fees/tax |
-| `POST` | `/api/v1/escrow/wallet/withdraw` | Authenticated (Tier 2 Verified) | Request payout to Telebirr/CBE; runs TMS checks and active-contract blocks |
+| `POST` | `/api/v1/escrow/wallet/withdraw/otp` | Authenticated (Tier 1 Verified) | Send the SMS code that approves one payout |
+| `POST` | `/api/v1/escrow/wallet/withdraw` | Authenticated (Tier 1 Verified, fresh auth) | Request payout to Telebirr; requires `otpCode`; runs TMS checks and active-contract blocks |
 | `POST` | `/api/v1/webhooks/telebirr` | Public (Raw Body, RSA-PSS Sign) | Ingest Telebirr payment webhooks, verify RSA-PSS body signature, update escrow |
-| `POST` | `/api/v1/webhooks/chapa` | Public (Raw Body, HMAC Header) | Ingest Chapa payment webhooks, verify HMAC signature [STUBBED] |
 | `POST` | `/api/v1/webhooks/cbe` | Public (Raw Body, HMAC Header) | Ingest CBE payment webhooks [STUBBED] |
 
 * **Depends on:** `apps/backend/src/lib/prisma.ts`, `apps/backend/src/lib/audit.ts`, `apps/backend/src/queue/queues.ts`, `apps/backend/src/modules/tms/tms.service.ts`, `apps/backend/src/modules/escrow/fees.ts`, `apps/backend/src/modules/escrow/providers/telebirr.client.ts`.
@@ -1283,7 +1306,7 @@ flowchart TD
     UserCheck -- No --> GateRouter{"Route Gate Type"}
     
     GateRouter -- Staff Route --> StaffMid["requireStaffRole(role)\n(Checks User.staffRole in COMPLIANCE_OFFICER, ADMIN)"]
-    GateRouter -- KYC-Gated Route --> KycMid["requireKycVerified(tier)\n(Tier 1 for Jobs/Proposals, Tier 2 for Withdrawal)"]
+    GateRouter -- KYC-Gated Route --> KycMid["requireKycVerified(tier)\n(Tier 1 for Jobs/Proposals/Withdrawal under the MVP policy)"]
     GateRouter -- Standard Authed Route --> Handler["Execute Route Handler"]
 
     StaffMid -- Not Staff --> StaffErr["HTTP 403 FORBIDDEN (STAFF_ONLY)"]
@@ -1319,7 +1342,7 @@ BullMQ manages five dedicated Redis queues:
 
 ## 5. The End-to-End Trust Loop
 
-The following sequence diagram traces the complete lifecycle of a job—from user registration and tiered KYC verification through proposal acceptance, dual contract signing, wallet-first escrow locking, delivery submission, client approval, fee/withholding deduction, and Tier 2 freelancer withdrawal (including the dispute branch).
+The following sequence diagram traces the complete lifecycle of a job—from user registration and tiered KYC verification through proposal acceptance, dual contract signing, wallet-first escrow locking, delivery submission, client approval, fee/withholding deduction, and Tier 1 freelancer withdrawal (including the dispute branch).
 
 ```mermaid
 sequenceDiagram
@@ -1371,7 +1394,7 @@ sequenceDiagram
     %% Acceptance or Dispute Branch
     alt Happy Path: Client Approves Work
         Client->>API: POST /api/v1/escrow/milestones/:id/accept
-        Note over EscrowMod: Calculates 7% Platform Fee (Withholding Tax held at 0%)<br/>Credits 93% Net Earnings to Freelancer Wallet<br/>Milestone State -> RELEASED
+        Note over EscrowMod: Calculates 7% Platform Fee + 0.5% Provider Fee (Withholding Tax held at 0%)<br/>Credits 92.5% Net Earnings to Freelancer Wallet<br/>Milestone State -> RELEASED
     else Dispute Branch: Client Raises Dispute
         Client->>API: POST /api/v1/disputes (Dispute Category & Description)
         Note over EscrowMod: Milestone State -> DISPUTED (Escrow Frozen)
@@ -1380,7 +1403,7 @@ sequenceDiagram
     end
 
     %% Withdrawal
-    Note over Freelancer: Phase 6: Tier 2 Verification & Withdrawal
+    Note over Freelancer: Phase 6: Tier 1 Verification & Withdrawal
     Freelancer->>API: POST /api/v1/kyc/upgrade-tier2 (Submit TIN / Business Reg)
     Staff->>API: POST /api/v1/kyc/admin/review/:id (VERIFIED -> Tier 2)
     Freelancer->>API: POST /api/v1/escrow/wallet/withdraw (Amount, Provider, Phone)
@@ -1485,8 +1508,8 @@ graph TD
 | **Fayda National ID Verification** | `apps/backend/src/modules/kyc/fayda.client.ts` | `[STUBBED — pending NID API Approval]` Deterministic mock returning fake biometric IDs (`mock-biometric-<docNumber>`). | Formal application and production API contract approval with the Ethiopian National ID Program (NIDP). |
 | **PEP / Sanctions Screening** | `apps/backend/src/modules/kyc/pep.client.ts` | `[STUBBED — pending Vendor Selection]` Local in-memory set matching `"test flagged person"`. | Procurement and integration of a commercial AML/PEP watchlist provider (e.g., ComplyAdvantage, World-Check). |
 | **CBE Birr C2B Gateway** | `apps/backend/src/modules/escrow/providers/cbe.client.ts` | `[STUBBED — pending CBE API Publication]` Mock transaction ID generator returning `redirectUrl: null`. | Commercial agreement with Commercial Bank of Ethiopia (CBE) for API credentials or manual reconciliation protocol. |
-| **Chapa Payment Aggregator** | `apps/backend/src/modules/escrow/providers/chapa.client.ts` | `[STUBBED — pending Live API Wiring]` Throws runtime error if credentials present; falls back to mock transaction IDs. | Wiring real `POST /v1/transaction/initialize` request payload to Chapa endpoints once live merchant keys are issued. |
-| **Provider Payouts (B2C / Withdrawal)** | `apps/backend/src/modules/escrow/escrow.service.ts` | `[STUBBED — balance debited, no external payout API wired]` Debits internal ledger without calling Telebirr/CBE B2C disbursement APIs. | Telebirr/CBE B2C bulk payout API integration to transmit fiat funds to user phone/account. |
+| ~~**Chapa Payment Aggregator**~~ | — | **REMOVED.** Chapa was deleted from the approved payment architecture (PAY-002; migration `20260826090000_tms_rules_and_chapa_removal`). No adapter, no enum member, no webhook route. | Nothing — it is not coming back without a new product decision. |
+| **Provider Payouts (B2C / Withdrawal)** | `apps/backend/src/modules/escrow/providers/telebirr.client.ts` | **Live.** `initiateDisbursement()` (line 449) is implemented and is what `withdrawFromWallet()` calls. A confirmed disbursement posts the balanced ledger journal in the same transaction as the payout confirmation; an immediate provider refusal rolls the wallet debit back. | Production Telebirr merchant credentials and a funded disbursement balance. CBE B2C remains unwired. |
 | **SMSEthiopia Delivery** | `apps/backend/src/modules/notifications/sms.client.ts` | Live REST client; falls back to logger warning if `SMS_ETHIOPIA_API_KEY` is omitted. | Valid SMSEthiopia gateway balance and API key. |
 
 ---
@@ -1501,7 +1524,7 @@ graph TD
 * **Hard-Block Middleware:** Express middleware (`apps/backend/src/middleware/hardBlock.ts`) that strictly halts request execution if a user has not attained the required KYC tier or if their account is suspended.
 * **KycTier:** The three-level progressive compliance ladder:
   * `TIER_1`: Basic identity document and address. Enables job browsing, bidding, and contract signing.
-  * `TIER_2`: Verified TIN certificate or Business Registration. Enables wallet balance withdrawal.
+  * `TIER_2`: Verified TIN certificate or Business Registration. Under the MVP policy Tier 1 already enables withdrawal; Tier 2 is the Phase 4 upgrade that reduces withholding from 30% to 3%.
   * `TIER_3`: Enhanced due diligence for Politically Exposed Persons (PEPs) or high-velocity/high-volume users.
 * **Minor Units:** Persisting financial values as integers representing the smallest currency denomination (ETB cents, where $1.00\text{ ETB} = 100\text{ minor units}$).
 * **RSA-PSS:** `SHA256withRSAandMGF1` cryptographic signing algorithm mandated by Telebirr's C2B merchant gateway for payment pre-orders and webhook payloads.
@@ -1642,21 +1665,60 @@ FullPlatformApp.tsx
 │   └── Reset password form       — POST /api/v1/auth/reset-password
 │
 └── Authenticated Platform Shell (user != null)
-    ├── Sidebar navigation (role-aware nav items)
+    ├── Sidebar navigation (role-aware nav items) — FROZEN, see below
     ├── Header (user avatar, notifications bell, logout)
     ├── NotificationCenter.tsx    — Dropdown notification feed
     ├── FeaturedCarousel.tsx      — Featured freelancer cards
     └── View Content (by view state):
         ├── "overview"        → Dashboard metrics, featured talent
         ├── "jobs"            → JobsWorkspace (post + browse)
+        ├── "gigs"            → GigMarketplace (browse gigs)
+        ├── "my-gigs"         → MyGigsWorkspace (a freelancer's own listings)
         ├── "contracts"       → ContractsWorkspace (sign, fund, milestones)
+        ├── "escrow"          → EscrowWorkspace (milestone tracking)
         ├── "wallet"          → BrowserWallet (top-up, history, withdraw)
         ├── "verification"    → BrowserVerification (KYC doc upload)
         ├── "chat"            → SupportChat (customer support tickets)
         ├── "cases"           → DisputesWorkspace (raise/track disputes)
+        ├── "settings"        → SettingsWorkspace (account, security, notifications)
         ├── "profile"         → ProfilePage (public view)
         └── "profile-edit"    → ProfileEditPage (edit bio, skills, portfolio)
 ```
+
+#### The Sidebar Is Frozen (does not scroll with the body)
+
+`.platform-shell.sh-shell` is a **grid** (`256px minmax(0, 1fr)`), so the
+sidebar is a grid item and the grid would normally **stretch it to the height
+of the row** — and the row is as tall as the main content. On a long page the
+sidebar therefore became taller than the viewport and scrolled away with the
+body, taking the navigation with it: by the time the user reached the bottom
+of the page there was no way to change section.
+
+The base rule (`apps/frontend/src/styles/shadcn-dashboard.css`) fixes it:
+
+```css
+.platform-shell.sh-shell .platform-sidebar {
+  position: sticky;   /* pins it to the viewport while the grid area scrolls under */
+  top: 0;
+  align-self: start; /* stops the grid stretching it to the row height */
+  height: 100vh;     /* exactly one viewport tall */
+  overflow-y: auto;  /* scrolls its own contents if the nav is taller than the screen */
+}
+```
+
+The `sh-variant-inset` and `sh-variant-floating` variants override `top` and
+`height` (both more specific than the base rule), and at `≤ 768px` the sidebar
+becomes a drawer with `position: fixed !important`. The layout properties live
+in the un-themed base rule so the dark theme cannot diverge from them.
+
+The **topbar** was already frozen the same way (`position: sticky; top: 0`),
+and the **ops console** sidebar was already `position: fixed`
+(`apps/frontend/src/styles/ops-console.css`). The browser-platform sidebar was
+the only one that scrolled.
+
+> Note: the Telegram Mini App (`App.tsx`) does **not** use this sidebar — it
+> uses the horizontal browser-tab navigation (`platform-tab-bar`, also
+> `position: sticky`). See §8.2.
 
 #### Role-Based Navigation (FullPlatformApp)
 
@@ -1818,7 +1880,7 @@ This section provides a plain-English description of every user-facing section o
 | Tier | Requirement | Unlocks |
 |---|---|---|
 | Tier 1 | Fayda National ID photo + selfie + personal details | Posting jobs, bidding on proposals, signing contracts |
-| Tier 2 | TIN certificate or Business Registration | Wallet balance withdrawal |
+| Tier 2 | TIN certificate or Business Registration | Reduces withholding from 30% to 3% (Phase 4). Withdrawals are already open at Tier 1 |
 | Tier 3 | Enhanced due diligence (PEP / high volume) | Continued operations for flagged accounts |
 
 *Document Upload Flow:*
@@ -1927,7 +1989,7 @@ PAYMENT_PENDING → ESCROW_HELD → SUBMITTED_FOR_REVIEW → RELEASED
 *Manual Client Approval:*
 1. Client reviews delivery, clicks Release → `POST /api/v1/escrow/milestones/:id/accept`.
 2. Fee calculation: 7% platform fee deducted (withholding tax held at 0% for MVP).
-3. Net amount (93%) credited to `Freelancer.wallet.balanceMinor`.
+3. Net amount (92.5% — 7% platform fee + 0.5% provider fee) credited to `Freelancer.wallet.balanceMinor`.
 4. Scheduled BullMQ release jobs cancelled.
 
 *Auto-Release:*  
@@ -1938,7 +2000,7 @@ If client takes no action in 7 days, `autoRelease.worker.ts` calls `releaseMiles
 | Party | Charge |
 |---|---|
 | Client pays | `Milestone Amount` (0% deposit surcharge) |
-| Freelancer receives | `Milestone Amount − 7% platform fee` (93% net payout) |
+| Freelancer receives | `Milestone Amount − 7% platform fee − 0.5% provider fee` (92.5% net payout) |
 | Platform retains | 7% general platform fee |
 
 **Files:** `WorkflowWorkspace.tsx` (ContractsWorkspace milestones tab), `apps/backend/src/modules/escrow/`
