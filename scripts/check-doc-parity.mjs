@@ -121,6 +121,112 @@ if (fs.existsSync(sysDesignPath)) {
   }
 }
 
+// 5. Verify the ROADMAP_ALIGNMENT.md summary counts against its own tables.
+//
+// WHY THIS EXISTS
+// The "Summary Counts" table in docs/ROADMAP_ALIGNMENT.md had never been
+// reconciled with the tables it summarises. It claimed 8 not-started items in
+// Phase 2 where the table has 5, 3 blocked items in Phase 1 (backend) where
+// the table has none, and 2 stub items in Phase 0 where the table has none.
+//
+// A summary that does not match its source cannot be updated reliably: every
+// status change has to be applied twice, by hand, and the hand-applied copy
+// is the one that goes stale. This check counts the rows and compares them.
+//
+// Run `node scripts/roadmap-alignment-counts.mjs` to print the counts.
+const roadmapPath = path.join(rootDir, "docs/ROADMAP_ALIGNMENT.md");
+if (fs.existsSync(roadmapPath)) {
+  console.log(`\n?? Checking ROADMAP_ALIGNMENT.md summary counts against its tables...`);
+  const roadmapContent = fs.readFileSync(roadmapPath, "utf-8");
+
+  const lines = roadmapContent.split(/\r?\n/);
+  const counts = new Map();
+  let phase = "";
+  let sub = "";
+
+  const key = () => {
+    if (!phase) return null;
+    if (phase === "Phase 1" && sub) return `Phase 1 (${sub})`;
+    return phase;
+  };
+
+  for (const line of lines) {
+    const phaseMatch = line.match(/^## Phase (\d)/);
+    if (phaseMatch) {
+      phase = `Phase ${phaseMatch[1]}`;
+      sub = "";
+      continue;
+    }
+    const subMatch = line.match(/^### (.+)$/);
+    if (subMatch) {
+      const s = subMatch[1];
+      if (/Core Backend/.test(s)) sub = "backend";
+      else if (/Frontend/.test(s)) sub = "frontend";
+      else if (/Legal & Compliance \(Phase 1\)/.test(s)) sub = "legal / ops / finance";
+      else sub = "";
+      continue;
+    }
+    if (!line.startsWith("|")) continue;
+    if (/^\|\s*-/.test(line)) continue;
+    if (/^\|\s*(Roadmap item|#\s*\||Phase\s*\||Status label)/.test(line)) continue;
+
+    const k = key();
+    if (!k) continue;
+    if (!counts.has(k)) {
+      counts.set(k, { impl: 0, part: 0, stub: 0, blk: 0, not: 0, div: 0 });
+    }
+    const c = counts.get(k);
+    const status = (line.split("|")[2] ?? "").trim();
+    if (status.startsWith("✅")) c.impl++;
+    else if (status.startsWith("🟡") || status.startsWith("⟡")) c.part++;
+    else if (status.startsWith("🔵")) c.stub++;
+    else if (status.startsWith("⛔")) c.blk++;
+    else if (status.startsWith("⚪")) c.not++;
+    else if (status.startsWith("⚠️")) c.div++;
+  }
+
+  // The summary table's own rows, in order.
+  const summaryRows = [...roadmapContent.matchAll(
+    /^\|\s*(Phase [0-9][^|]*?)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|\s*(\d+)\s*\|/gm,
+  )];
+
+  const drift = [];
+  for (const row of summaryRows) {
+    const name = row[1].trim();
+    const claimed = {
+      impl: Number(row[2]),
+      part: Number(row[3]),
+      stub: Number(row[4]),
+      blk: Number(row[5]),
+      not: Number(row[6]),
+      div: Number(row[7]),
+    };
+    const actual = counts.get(name);
+    if (!actual) {
+      drift.push(`${name}: no rows found for this phase`);
+      continue;
+    }
+    for (const field of ["impl", "part", "stub", "blk", "not", "div"]) {
+      if (claimed[field] !== actual[field]) {
+        drift.push(
+          `${name}: ${field} says ${claimed[field]}, the tables have ${actual[field]}`,
+        );
+      }
+    }
+  }
+
+  if (drift.length > 0) {
+    console.error(`? Summary counts do not match the tables:`);
+    for (const d of drift) console.error(`  - ${d}`);
+    console.error(
+      `  Run: node scripts/roadmap-alignment-counts.mjs  (and scripts/roadmap-alignment-rows.mjs to list the rows)`,
+    );
+    hasErrors = true;
+  } else {
+    console.log(`? All ${summaryRows.length} summary rows match their tables.`);
+  }
+}
+
 if (hasErrors) {
   console.error("\n❌ Documentation drift detected! Please update the corresponding documentation files.");
   process.exit(1);

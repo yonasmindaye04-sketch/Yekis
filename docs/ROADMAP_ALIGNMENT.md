@@ -87,7 +87,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Role system — CLIENT / FREELANCER / BOTH | ✅ **Implemented** | `User.role` |
 | Session management — JWT + refresh tokens, secure cookie storage | ✅ **Implemented** | `JWT_ACCESS_TTL = "1h"`, `JWT_REFRESH_TTL = "30d"` (`env.ts:43-44`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 h (`auth.service.ts:342`) |
 | 2FA (SMS OTP) optional at MVP, **mandatory for withdrawals** | ✅ **Implemented** | A withdrawal requires an SMS approval code for **that** payout (`POST /api/v1/escrow/wallet/withdraw/otp` → `otpCode` on `POST /wallet/withdraw`). The code is consumed when the payout completes, so one code cannot authorise two payouts. `PhoneVerificationCode.purpose` scopes it, so a phone-verification code cannot approve a payment. `requireFreshAuth(300)` remains as well |
-| **Hard Block System — unverified users blocked from withdrawing, changing profile, bidding, receiving payments** | ⚠️ **Partial / Divergence** | 7 routes gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately NOT gated** (`profile.routes.ts:59`) — it was removed because gating it blocked onboarding. `src/middleware/requireKycVerified.ts` is **dead code**; the live guard is `hardBlock.ts` |
+| **Hard Block System — unverified users blocked from withdrawing, changing profile, bidding, receiving payments** | ⚠️ **Partial / Divergence** | 7 routes gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately NOT gated** (`profile.routes.ts:59`) — it was removed because gating it blocked onboarding. The duplicate `src/middleware/requireKycVerified.ts` (0 importers) has been **deleted**; the live guard is `hardBlock.ts` |
 | Age / contractual-capacity gate | ✅ **Implemented** | `MINIMUM_CONTRACTING_AGE = 18` |
 | KYC document upload (National ID / Passport / Driver's Licence) to encrypted object storage | ✅ **Implemented** | 15 MB chat cap; KYC documents stored outside PostgreSQL. Object versioning / object lock / retention are production config tasks (`docs/COMPLIANCE_BLOCKERS.md` #7) |
 | Fayda ID integration + manual review fallback | 🔵 **Stub / Mock** | `fayda.client.ts` mock; dedup policy explicit (`kyc.service.ts:46-54`); staff review queue ships |
@@ -267,7 +267,7 @@ Every Roadmap KPI (registered/KYC-verified users, completed escrow transactions,
 | 4 | ~~`apps/backend/src/middleware/requireKycVerified.ts` is dead code (0 importers) next to the live `hardBlock.ts` guard~~ | backend | ✅ **RESOLVED 2026-11-10** — deleted. The live guard is `hardBlock.ts`, which additionally returns a machine-readable `nextAction` so the frontend can offer the step instead of rendering a dead end |
 | 5 | `docs/FLOW.md`, `docs/SYSTEM_DESIGN.md`, `docs/WALKTHROUGH.md` described a 5% client fee / 5% freelancer fee | docs | **Fixed in this pass** to 7% / 0% |
 | 6 | **~~Wallet funding releases immediately instead of holding in escrow~~** (`ESC-003`) | `apps/backend/src/modules/escrow/escrow.service.ts` (commit `a03259a`) | ✅ **RESOLVED 2026-11-09.** Escrow semantics restored on the wallet path; the gig path too; `releaseMilestoneFunds()` narrowed back to `SUBMITTED_FOR_REVIEW \| DISPUTED`. **Legal text unchanged.** See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` |
-| 7 | ~~**8 backend tests fail at HEAD**~~ | backend | ✅ **RESOLVED.** `escrow-lifecycle-http`, `simulated-negotiations-and-disputes`, `dispute-single-resolution`, `topup-provider-rails` and `critical-fixes` all pass. Full suite: **595 passed / 61 files, 0 failed** (baseline at `a15177e`: 567 passed, 8 failed) |
+| 7 | ~~**8 backend tests fail at HEAD**~~ | backend | ✅ **RESOLVED.** `escrow-lifecycle-http`, `simulated-negotiations-and-disputes`, `dispute-single-resolution`, `topup-provider-rails` and `critical-fixes` all pass. Full suite: **595 passed / 61 files, 0 failed** at `a15177e` (baseline: 567 passed, 8 failed) — now **617 passed / 65 files, 0 failed** after the 2026-11-10 code pass |
 | 8 | ~~**`fundGigOrderFromWallet` claims the gig order with an unconditional update** — `tx.gigOrder.update({ where: { id } })` rather than a conditional `updateMany` on `escrowState: "PAYMENT_PENDING"`~~ | `apps/backend/src/modules/gigs/gig.service.ts` | ✅ **RESOLVED 2026-11-10.** The claim is now a conditional `updateMany` and the wallet debit carries its own `gte` guard, so the database arbitrates and exactly one concurrent funding can win — the same treatment the milestone path already had |
 | 9 | **The fee-engine change shipped without its tests.** `7babd4b` moved the provider fee into the fee engine and started collecting it at release, but the dispute and payout tests still asserted the old amounts | `apps/backend/tests/dispute-single-resolution.test.ts`, `dispute-partial-split-ledger.test.ts`, `payout-atomicity.test.ts` | ✅ **RESOLVED 2026-11-10.** The behaviour is intentional — the platform's take is a single 7.5% instead of 7% at release plus a surprise 0.5% at cash-out — so the **tests** were updated to the new arithmetic rather than the code reverted. The suite is now **617 passed / 65 files, 0 failed** |
 
@@ -277,26 +277,37 @@ Every Roadmap KPI (registered/KYC-verified users, completed escrow transactions,
 
 | Phase | Implemented | Partial | Stub / Mock | Blocked — External | Not Started | Divergence |
 |---|---|---|---|---|---|---|
-| Phase 0 | 3 | 3 | 2 | 14 | 0 | 2 |
-| Phase 1 (backend) | 27 | 8 | 5 | 3 | 3 | 3 |
-| Phase 1 (frontend) | 7 | 4 | 0 | 2 | 2 | 0 |
-| Phase 1 (legal / ops / finance) | 3 | 2 | 0 | 8 | 1 | 1 |
-| Phase 2 | 0 | 3 | 0 | 5 | 8 | 0 |
-| Phase 3 | 1 | 4 | 0 | 8 | 4 | 0 |
-| Phase 4 | 1 | 1 | 0 | 6 | 5 | 0 |
+| Phase 0 | 4 | 3 | 0 | 16 | 1 | 4 |
+| Phase 1 (backend) | 28 | 9 | 4 | 0 | 3 | 4 |
+| Phase 1 (frontend) | 10 | 4 | 0 | 1 | 1 | 0 |
+| Phase 1 (legal / ops / finance) | 2 | 1 | 0 | 7 | 1 | 1 |
+| Phase 2 | 0 | 2 | 0 | 6 | 5 | 0 |
+| Phase 3 | 1 | 2 | 0 | 4 | 4 | 0 |
+| Phase 4 | 1 | 1 | 0 | 3 | 6 | 0 |
+
+> **These numbers are counted from the tables above, not estimated.** Run
+> `node scripts/roadmap-alignment-counts.mjs` to regenerate them.
+>
+> **The previous summary table did not reconcile with its own tables** — it
+> claimed, for example, 8 not-started items in Phase 2 where the table has 5,
+> 3 blocked items in Phase 1 (backend) where the table has **none**, and 2
+> stub items in Phase 0 where the table has none. It is corrected here rather
+> than patched, because a summary that does not match its source cannot be
+> updated reliably.
 
 **Reading the numbers:** the *code* for the trust loop is largely built (Phase 1 backend is the strongest column). The *external* column dominates Phases 0, 2, 3, and 4 — which is the expected shape: what is missing is credentials, counsel, vendors, accountants, and humans, not engineering.
 
-**2026-11-10 code pass.** Three code-only items moved out of "Not Started" and one moved out of "Partial":
+**2026-11-10 code pass.** Three Phase 1 backend rows moved out of "Not Started" and into "Implemented":
 the **10-year audit retention** (retention column + purge job with a hard ten-year floor),
 the **PDPP data-subject tooling** (complete export, and an erasure that destroys the personal
-content while retaining the AML and financial records), the **armed cooling-off right**
-(`ESC-002` — `cancellableUntil` was never written, so the right the ToS promises was unreachable),
-and the **breach-notification response chain** (contain → notify staff → notify users → audit
-record → 72-hour clock → prepared ECA filing template). What is still missing from the
-engineering column is the *frontend automated tests*, the *deploy pipeline*, the *Lighthouse gate*,
-the *load-test harness* and the *KPI instrumentation* — all of which are Phase 2 tooling rather
-than product gaps.
+content while retaining the AML and financial records), and the **armed cooling-off right**
+(`ESC-002` — `cancellableUntil` was never written, so the right the ToS promises was unreachable).
+The **2FA on withdrawals** row also moved to "Implemented" (it was one of the Phase 1 backend
+not-started rows), and the **breach-notification response chain** moved from "log-only" to a
+working contain → notify staff → notify users → audit record → 72-hour clock → prepared ECA
+filing template. What is still missing from the engineering column is the *frontend automated
+tests*, the *deploy pipeline*, the *Lighthouse gate*, the *load-test harness* and the *KPI
+instrumentation* — all of which are Phase 2 tooling rather than product gaps.
 
 ---
 
