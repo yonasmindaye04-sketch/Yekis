@@ -50,7 +50,7 @@ const RAIL_SERVICES: RailServiceItem[] = [
     rows: [
       { label: "CBE BIRR WALLET", badge: "< 90 SEC" },
       { label: "BANK RTGS LIMIT", badge: "5,000,000 ETB" },
-      { label: "ESCROW FEE", badge: "7% FLAT" },
+      { label: "ESCROW FEE", badge: "7.5% FLAT" },
     ],
   },
   {
@@ -71,7 +71,7 @@ const RAIL_SERVICES: RailServiceItem[] = [
     badge: "FREE PDF & CSV",
     rows: [
       { label: "15% VAT SCHEDULE", badge: "AUTO" },
-      { label: "2% WITHHOLDING", badge: "> 10,000 ETB" },
+      { label: "WITHHOLDING TAX", badge: "DEFERRED" },
       { label: "AUDIT EXPORT", badge: "0 ETB" },
     ],
   },
@@ -80,11 +80,11 @@ const RAIL_SERVICES: RailServiceItem[] = [
 const PLATFORM_COMPARISONS = [
   {
     id: "comp-yekis",
-    name: "YeKis General Escrow (7%)",
-    role: "93% FREELANCER TAKE-HOME · NATIVE ETB",
+    name: "YeKis General Escrow (7.5%)",
+    role: "92.5% FREELANCER TAKE-HOME · NATIVE ETB",
     quote:
-      "On a 100,000 ETB software contract, the freelancer receives 93,000 ETB directly into Telebirr or CBE Birr in under two minutes.",
-    metric: "93% KEPT",
+      "On a 100,000 ETB software contract, the freelancer receives 92,500 ETB directly into Telebirr or CBE Birr in under two minutes.",
+    metric: "92.5% KEPT",
   },
   {
     id: "comp-global",
@@ -247,7 +247,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
   const calc = useMemo(() => {
     const clientFee = 0;
-    const freelancerFee = Math.round(amount * 0.07);
+    // 7% platform commission + 0.5% payment/disbursement provider fee.
+    // The provider fee used to be charged at cash-out instead; it is now
+    // collected on the transaction, so the take is one number up front.
+    const freelancerFee = Math.round(amount * 0.075);
     const vatAmount = includeVat ? Math.round(amount * 0.15) : 0;
     const whtEligible = false;
     const whtAmount = 0;
@@ -298,7 +301,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
             <h1 className="cs-hero-display">
               <span className="cs-hero-line">
                 {lang === "am" ? "የድካምዎን" : "we keep"}{" "}
-                <span className="cs-hero-brace">{"{93%}"}</span>
+                <span className="cs-hero-brace">{"{92.5%}"}</span>
               </span>
               <span className="cs-hero-line">
                 <span className="cs-hero-arrow" aria-hidden="true">
@@ -351,7 +354,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
       </section>
 
       {/* ================================================================
-          BAND 2 — CRISP WHITE { 7% } MANIFESTO (ZERO SUB-PARAGRAPHS)
+          BAND 2 — CRISP WHITE { 7.5% } MANIFESTO (ZERO SUB-PARAGRAPHS)
           ================================================================ */}
       <section className="cs-manifesto-band">
         <div className="cs-band-inner">
@@ -372,12 +375,12 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   lang === "am"
                     ? [
                         { text: "ዓለም አቀፍ ፕላትፎርሞች 20% ሲቆርጡ፣ YeKis ግን" },
-                        { text: "93% ክፍያዎ በቀጥታ", highlight: true },
+                        { text: "92.5% ክፍያዎ በቀጥታ", highlight: true },
                         { text: "ወደ ቴሌብር ወይም ንግድ ባንክ እንዲገባ ያደርጋል።" },
                       ]
                     : [
                         { text: "While global portals take up to 20%, YeKis charges a flat" },
-                        { text: "7% general platform fee", highlight: true },
+                        { text: "7.5% total fee (7% platform + 0.5% payment)", highlight: true },
                         { text: "—with native ETB payouts and zero hidden charges." },
                       ]
                 }
@@ -528,7 +531,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
                 <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {lang === "am" ? "2% ዊዝሆልዲንግ (WHT > 10K ETB)" : "2% Withholding Tax (> 10K ETB)"}
+                    {lang === "am" ? "ግምርኛ ካቲስ ግብር (ዘግየተ)" : "Statutory withholding tax (deferred)"}
                   </span>
                   <input
                     type="checkbox"
@@ -587,7 +590,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                       borderRadius: 6,
                     }}
                   >
-                    93% NET
+                    92.5% NET
                   </span>
                 </div>
 
@@ -796,7 +799,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   style={{ background: "transparent", color: "#f4f7f4", border: "1px solid rgba(255,255,255,0.28)" }}
                   onClick={() => onStart?.("register")}
                 >
-                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 93% as Talent"}
+                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 92.5% as Talent"}
                 </button>
                 <button
                   type="button"

@@ -68,6 +68,10 @@ export const LaunchCategory = z.enum([
   "CONTENT_WRITING",
   "TRANSLATION",
   "DATA_ENTRY",
+  "VIDEO_PRODUCTION",
+  "ACCOUNTING_BOOKKEEPING",
+  "LEGAL_RESEARCH",
+  "DATA_ANALYTICS",
 ]);
 export type LaunchCategory = z.infer<typeof LaunchCategory>;
 

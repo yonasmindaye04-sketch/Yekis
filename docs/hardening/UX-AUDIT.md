@@ -5,7 +5,7 @@
 > - **Frontend dev port** -- was `5173`. The Vite dev server runs on **3000** (`apps/frontend/vite.config.ts`); `vite preview` on 4173.
 > - **Withdrawal tier** -- the audit records a hard `TIER_2` withdrawal gate. The live gate is `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")`, so **Tier 1 can withdraw** today.
 >
-> See `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` and `docs/ROADMAP_ALIGNMENT.md` for the current verified state. The audit's *findings* (F-01 ... F-2x) remain valid as observations of the code at that date.
+> See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md` for the current verified state. The audit's *findings* (F-01 ... F-2x) remain valid as observations of the code at that date.
 
 **Type:** read-only product / UX / robustness audit. **No code, schema or config was changed.**
 **Date:** 2026-10-07 · **Repo state:** `3175676` ("fix(roles): make BOTH a working dual-role account end to end")

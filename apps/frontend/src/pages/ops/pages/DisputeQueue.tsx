@@ -153,7 +153,10 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     fGross = Math.round((sel.amt * split) / 100);
     cRefund = sel.amt - fGross;
   }
-  const fee = Math.round(fGross * 0.07);
+  // 7% platform commission + 0.5% payment/disbursement provider fee.
+  // The provider fee used to be taken at cash-out instead; it is now
+  // collected on the transaction, so the take is one number up front.
+  const fee = Math.round(fGross * 0.075);
   const wh = 0;
   const net = fGross - fee;
 

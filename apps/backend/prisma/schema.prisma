@@ -123,6 +123,15 @@ enum LaunchCategory {
   CONTENT_WRITING
   TRANSLATION
   DATA_ENTRY
+  // Phase 0 launch category lock (2026-11-12): the launch list was widened
+  // from six to ten subcategories. VIDEO_PRODUCTION,
+  // ACCOUNTING_BOOKKEEPING and LEGAL_RESEARCH are the Roadmap's own
+  // second-sector candidates; DATA_ANALYTICS extends the existing data
+  // taxonomy.
+  VIDEO_PRODUCTION
+  ACCOUNTING_BOOKKEEPING
+  LEGAL_RESEARCH
+  DATA_ANALYTICS
 }
 
 enum Visibility {

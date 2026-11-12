@@ -148,7 +148,7 @@ Submitting a milestone schedules a warning at 24 hours before the deadline and a
 
 > **ESC-003 — resolved 2026-11-09.** Commit `a03259a` had made the wallet-funding path debit the client and credit the freelancer inside the funding transaction, claiming the milestone straight to `RELEASED`. That bypassed the delivery step, the client acceptance step, the 24-hour warning, the 7-day auto-release timer, and dispute (which accepts only `ESCROW_HELD | WORK_IN_PROGRESS | SUBMITTED_FOR_REVIEW`). The fix restored escrow semantics on the wallet path and narrowed `releaseMilestoneFunds()` back to `SUBMITTED_FOR_REVIEW | DISPUTED`; the gig funding path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. **Legal text unchanged** — the code was brought back into line with Master Design §3A.13.6 and Service Agreement Clause 2.2. Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts`.
 
-> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.handler.ts` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
+> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.handler.ts` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:233`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
 
 ### Dispute
 
@@ -177,12 +177,13 @@ Telebirr B2C disbursement is live; deterministic sandbox simulation is used when
 
   | Constant | Value | Note |
   |---|---|---|
-  | `PLATFORM_FEE_RATE_FREELANCER` | `0.07` | Deducted from the freelancer's gross on release (7% general platform fee) |
+  | `PLATFORM_FEE_RATE_FREELANCER` | `0.07` | Deducted from the freelancer's gross on release (7% platform commission) |
+  | `PAYMENT_PROVIDER_FEE_RATE` | `0.005` | Payment/disbursement provider fee, on the same gross. Overall platform take **7.5%**, freelancer nets **92.5%** |
   | `PLATFORM_FEE_RATE_CLIENT` | `0` | No client deposit surcharge (unified 7% rule, 2026-11-09) |
   | `WITHHOLDING_THRESHOLD_MINOR` | `1_000_000` (10,000 ETB) | Withholding only applies at/above this gross |
-  | `WITHHOLDING_RATE_WITH_TIN` | `0.03` | Requires `TIN_FEATURE_ENABLED=true` |
+  | `WITHHOLDING_RATE_WITH_TIN` | `0.03` | Configured but **not applied** — the withholding block in `calculateFees()` is commented out (deferred, TAX-002) |
   | `WITHHOLDING_RATE_WITHOUT_TIN` | `0.30` | Requires `TIN_FEATURE_ENABLED=true` |
-  | `TIN_FEATURE_ENABLED` | `false` (default) | **Withholding is 0 at launch**; the freelancer keeps 93% of gross |
+  | `TIN_FEATURE_ENABLED` | `false` (default) | **Withholding is 0** — the deduction is commented out pending the accountant's confirmation. The freelancer keeps **92.5%** of gross |
   | `AUTO_RELEASE_WINDOW_DAYS` | `7` | Matches Master Design Clause 2.2(b) — the Roadmap's "5 days" is stale |
   | `VAT_THRESHOLD_MINOR` | `45_000_000` (450,000 ETB) | Finance alert threshold; the Playbook's "ETB 1,000,000" is stale |
   | `VAT_RATE` | `0.15` | `VAT_REGISTERED` defaults to `false` |

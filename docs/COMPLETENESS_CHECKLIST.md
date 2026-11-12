@@ -11,9 +11,9 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] `docs/ARCHITECTURE.md` updated: ops console 19 → 23 page components, frontend i18n 314 → 625 keys (43 nested objects), background processing 6 → 9 queues, `PaymentProvider` enum-vs-live-rails table, financial-constants table, CI section, verified-compliance-gap table, OpenSearch + `server.fs.deny` in local topology, and the unarmed-cooling-off gap recorded
 - [x] `docs/COMPLIANCE_BLOCKERS.md` rewritten: withholding corrected 2% → **3% / 30%** (and recorded as **0% at launch** behind `TIN_FEATURE_ENABLED=false`), Chapa references replaced with "Telebirr is the only live rail", the stale "withdrawFromWallet is stubbed" claim removed (Telebirr B2C is live), and three missing blockers added (10-year retention/WORM, PDPP data-subject rights, real breach dispatch)
 - [x] `docs/DECISIONS.md` updated: eight new 2026-11-09 entries covering the baseline-vs-truth rule, payment-rail truth, the unarmed cooling-off right, the withholding gate, auto-release/VAT/JWT constants, and CI-vs-deploy; four historical entries annotated as superseded
-- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against the 2026-11-09 scan
-- [x] `docs/DOCUMENT_UNIFICATION_2026-08-26.md` given an explicit 2026-11-09 corrections section (its "CI/CD does not exist" claim was false)
+- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against the 2026-11-09 scan — **removed 2026-11-12**; its durable content (the effort-graded engineering backlog and the *Partial Implementations* table) moved here, and its code-ahead findings into `docs/DOCUMENT_UNIFICATION_2026-11-09.md` → Part 8
 - [x] `docs/DOCUMENT_UNIFICATION_2026-11-09.md` created — decision-by-decision map of all three documents against the code
+- [x] `docs/DOCUMENT_UNIFICATION_2026-08-26.md` **removed and consolidated** into `docs/DOCUMENT_UNIFICATION_2026-11-09.md` (2026-11-12). Its decision rows moved to Parts 1–4, its *code-ahead-of-the-documents* findings to **Part 8**, its corrections table to **Part 5**, and a statement-by-statement disposition map to **Part 9** — so no content was lost and the merge stays auditable
 - [x] `docs/ROADMAP_ALIGNMENT.md` created — phase-by-phase map of the Roadmap (Phase 0 → Phase 4) against the code, with a status label per task
 - [x] `docs/CHANGELOG.md`, `docs/PROJECT_CONTEXT.md`, `docs/WALKTHROUGH.md` updated per `.agents/AGENTS.md`
 
@@ -27,6 +27,11 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [ ] **M-Pesa divergence** — Master Design `PAY-003` marks it removed; the code still ships the stub, enum value, schema union member, and top-up route support
 - [ ] **No frontend automated tests** — zero frontend test files and no test runner; the CI frontend job runs build only
 - [ ] **Deploy pipeline is a placeholder** — `.github/workflows/deploy.yml` exists but contains no deploy steps
+- [ ] **UCID is not the transactional join key** — `User.ucid` is assigned at KYC completion and is resolvable (the direct-chat lookup finds a user by it), but the transaction tables link to `User.id`, not to the UCID that the Roadmap requires
+- [ ] **No KYC state-change notifications** — the in-app ledger records the transition, but no user notification fires on `VERIFIED` / `REJECTED` (`docs/hardening/UX-AUDIT.md` F-11)
+- [ ] **No performance gate and no measured score** — there is no Lighthouse gate in CI and no measured score against the Roadmap's ≥80 target on simulated 3G
+- [ ] **No KPI instrumentation** — every Roadmap KPI (registered users, dispute rate, median time to payout, STR filing timeliness, …) is a business metric with no measurement code behind it: no time-series store, no uptime monitor, no KPI measurement code
+- [x] **Escrow auto-release timing assertion is flaky under parallel load** — **fixed.** `tests/escrow-wallet-funding-semantics.test.ts` asserted `releaseDelay - warnDelay === DAY` exactly, but `submitMilestone` computed the two queue delays from **two separate `Date.now()` calls**, so the milliseconds spent on the first `queue.add()` Redis round-trip leaked into the gap (observed `86399999` vs `86400000`). `submitMilestone` now reads the clock **once** and derives both delays from that instant, which makes the gap exactly `DAY` by construction; `warnDate` now subtracts 24 h in absolute time rather than via local wall-clock `setHours`, so the warning stays exactly 24 h ahead on DST-observing hosts. The gig path (`submitGigDelivery`) got the same single-clock-read treatment. The test's release-window bound was widened by one hour so a DST transition cannot break it.
 
 ## MVP Scope Adjustments (2026-11-09)
 
@@ -43,12 +48,13 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] **TIN Requirement Held for MVP**: TIN collection and 30% withholding penalty held for launch (`TIN_FEATURE_ENABLED=false`); Tier 1 verified freelancers can withdraw directly.
 - [x] **Simplified Single-Tier Launch**: Tier 1 (National ID / Fayda) unlocks all core actions; Tier 2/TIN deferred to Phase 4.
 - [x] **Clean MVP Verification Presentation**: Eliminated "MVP Launch Notice" banners and hidden deferred Tier 2/TIN cards from standard user view. Progression cleanly displays Account Created -> Verified Identity (bidding, contracts, wallet withdrawals).
-- [x] **Platform-Wide 7% Only General Fee**: Unified the platform fee model to a flat 7% general platform fee (0% client surcharge, 7% deducted upon milestone release), eliminating withholding tax rows and secondary deductions from proposal breakdowns, fee calculators, and ledger allocations. Freelancers keep 93% net payout.
+- [x] **Platform-Wide 7% Only General Fee**: Unified the platform fee model to a flat 7% general platform fee (0% client surcharge, 7% deducted upon milestone release), eliminating withholding tax rows and secondary deductions from proposal breakdowns, fee calculators, and ledger allocations. **Updated 2026-11-12:** a 0.5% payment/disbursement provider fee was added, so the overall take is **7.5%** and freelancers keep **92.5%**.
 
 - [x] `docs/ARCHITECTURE.md` updated: 12 missing modules added, 3 missing workers added, system diagram updated, External Boundaries corrected (B2C live), multilingual section added
 - [x] `docs/DATABASE.md` updated: 14 missing models added, full StaffRole enum (7 values), GigStatus/GigOrderStatus enums, ContractStatus.CANCELLED and ProposalStatus.COUNTER_OFFERED added, erDiagram extended
 - [x] `docs/API.md` updated: full auth route list (21 routes), finance module section, bot management section, gig moderation path corrected, TMS full routes, PATCH chat/status added, OpenSearch integration documented
-- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against November 2026 codebase scan
+- [x] `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` regenerated against November 2026 codebase scan — **removed 2026-11-12**; its durable content moved into this file and into `docs/DOCUMENT_UNIFICATION_2026-11-09.md` → Part 8
+
 ## Product Journey
 
 - [x] Registration, login, age gate, consent capture, and JWT sessions
@@ -252,6 +258,35 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [ ] Backup, restore, disaster recovery, incident response, and rollback drills
 - [ ] Legal approval for contracts, privacy, consent, age, KYC, AML, tax, and retention policies
 - [ ] Penetration test and dependency/security scan before launch
+
+## Remaining Engineering Work (Not External)
+
+*Items whose blockers are credentials, counsel, vendors, accountants or people are **not** listed here — they are tracked under External Integrations, Launch Readiness and `docs/COMPLIANCE_BLOCKERS.md`. This table is the engineering-only backlog, graded for effort: **XS** ≈ under an hour, **S** ≈ a day, **M** ≈ a week, **L** ≈ multi-week. It was carried over from `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` (removed 2026-11-12) so the effort grading survives the consolidation.*
+
+| # | Item | Effort |
+|---|---|---|
+| 1 | **Arm the 7-day cooling-off right** — set `Contract.cancellableUntil` in `createContractFromProposal()` and add a regression test | S |
+| 2 | **10-year retention + purge job + WORM** — add retention columns to `AuditLog` / `TransactionFlag` / `Dispute`, an archival worker, object lock, and a restore test | M |
+| 3 | **PDPP data-subject rights** — export route, erasure admin tool, hold-preserving deletes, 30-day confirmation | M |
+| 4 | **Wire the breach-notification dispatch** — uncomment the `notificationQueue` call and add a user-notification path | S |
+| 5 | **Frontend automated tests** — introduce a runner (Vitest) and cover the critical flows | L |
+| 6 | **Deploy pipeline** — replace the `deploy.yml` placeholder with a real image build/push/deploy | M |
+| 7 | **CI hardening** — add frontend lint, migration validation, and a dependency scan as required checks | S |
+| 8 | **Extend `check-doc-parity.mjs`** to cover frontend counts (i18n keys, ops pages), queue names, and financial constants — the CI gate that would have caught most of the drift this checklist had to record by hand | M |
+| 9 | **Delete or consolidate `src/middleware/requireKycVerified.ts`** — dead code; every live import is `src/middleware/hardBlock.ts` | XS |
+| 10 | **Decide PAY-003** — delete the M-Pesa stub or finish the integration and amend the Master Design | S |
+| 11 | **Model the payment-provider fee per provider** — the 0.5% provider fee is now configurable and routed through the fee engine, but it is still one flat rate applied to every provider | S |
+| 12 | **UCID as the transactional join key** — `User.ucid` exists and resolves, but transactions link to `User.id` | M |
+| 13 | **KYC state-change notifications** — fire a user notification on `VERIFIED` / `REJECTED` (UX-AUDIT F-11) | S |
+| 14 | **Lighthouse gate + measured score** — no gate in CI, no measured score against the ≥80 target | M |
+| 15 | **KPI instrumentation** — no time-series store, no uptime monitor, no KPI measurement code | M |
+
+**Completed since the alignment report was generated (2026-11-09):**
+
+- ✅ **Fee copy cleanup** — `FeesPage.tsx` no longer says "2% WITHHOLDING"; the row reads "WITHHOLDING TAX / DEFERRED" (`docs/COMPLETENESS_CHECKLIST.md` → *MVP Scope Adjustments* → *Platform-Wide 7% Only General Fee*).
+- ✅ **Stale "default (5)" comment** — `autoRelease.worker.ts` was split; the job body moved to `autoRelease.handler.ts` and the comment went with it.
+- ✅ **Payment-provider fee moved out of `withdrawFromWallet`** — the hardcoded `0.005` literal at cash-out is now a configurable, fee-engine-routed component collected at release. The platform's overall take is **7.5%** (7% commission + 0.5% provider fee) and the freelancer nets **92.5%** (`docs/DECISIONS.md` → *Unified 7.5% Fee Engine*).
+- ✅ **Escrow auto-release timing flake** — see *Verified Gaps Recorded*.
 
 ## Launch Readiness
 

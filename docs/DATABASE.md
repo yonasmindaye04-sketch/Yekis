@@ -134,6 +134,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `JobStatus` | `OPEN`, `IN_PROGRESS`, `COMPLETED`, `CANCELLED` |
 | `ProposalStatus` | `SUBMITTED`, `SHORTLISTED`, `ACCEPTED`, `REJECTED`, `WITHDRAWN`, `COUNTER_OFFERED` |
 | `EscrowState` | `PAYMENT_PENDING`, `ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `ACCEPTED`, `RELEASED`, `DISPUTED`, `REFUNDED`, `PARTIAL_REFUND` |
+| `LaunchCategory` | `WEB_APP_DEVELOPMENT`, `GRAPHIC_DESIGN`, `DIGITAL_MARKETING`, `CONTENT_WRITING`, `TRANSLATION`, `DATA_ENTRY`, `VIDEO_PRODUCTION`, `ACCOUNTING_BOOKKEEPING`, `LEGAL_RESEARCH`, `DATA_ANALYTICS` — **ten** launch subcategories, widened from six on 2026-11-12 by the Phase 0 launch-category lock. The migration is additive (`ALTER TYPE ... ADD VALUE`), so existing `Job.category` and `Gig.category` rows keep their values |
 | `DisputeStage` | `NONE`, `STAGE_1_NEGOTIATION`, `STAGE_2_EVIDENCE`, `STAGE_3_MEDIATION`, `STAGE_4_ARBITRATION`, `RESOLVED` |
 | `PaymentProvider` | `TELEBIRR`, `CBE_BIRR`, `M_PESA` — Safaricom M-Pesa added alongside Telebirr and CBE; `CHAPA` removed 2026-08-26 (app layer); inert enum value remains in PG16 until a PG17+ migration can drop it |
 | `TransactionFlagType` | `STRUCTURING`, `VELOCITY`, `ROUND_AMOUNTS`, `PASS_THROUGH`, `WALLET_MISMATCH`, `STAFF_FLAGGED`, `VAT_THRESHOLD_REACHED` |
@@ -163,6 +164,21 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260829233000_gig_disputes_polymorphic` | Polymorphic dispute subject: `Dispute.contractId`/`milestoneId` nullable (unique dropped), `Dispute.gigOrderId` (`@unique` + FK), DB CHECK enforcing exactly one subject per dispute, `GigOrderStatus.DISPUTED`. Re-runnable (see note below). |
 | `20261003120000_chatwoot_support_bridge` | Added `Conversation.channel`/`chatwoot*` columns plus `ChatMessage.origin`/`externalId` for a third-party agent inbox that was evaluated and then dropped |
 | `20261003140000_drop_chatwoot_bridge_columns` | Removes the four unused `Conversation` Chatwoot columns. `ChatMessage.origin` and `ChatMessage.externalId` are KEPT as generic provenance and idempotency markers |
+| `20261003150000_auth_federated_identity_guard` | Federated (OAuth) sign-in can no longer claim an existing password account |
+| `20261003160000_chat_message_attachment_url_index` | Index on the chat attachment URL column for the evidence/attachment lookups |
+| `20261003180000_telegram_login_codes` | Telegram web-login code table for the browser login handoff |
+| `20261006120000_escrow_admin_holds` | `EscrowHold` — staff-placed administrative holds on a milestone's escrow |
+| `20261006123000_session_version_revocation` | `User.sessionVersion` + `TokenSession`, so every session can be revoked at once |
+| `20261007120000_guest_support_identity_isolation` | Guest support tokens pinned to one conversation; identity isolation for guest chat |
+| `20261008120000_reconcile_ledger_and_payout_drift` | Reconciles the ledger and payout tables that had drifted; adds `M_PESA` and `CHECKOUT_PENDING` to their enums (re-runnable `DO $$` guards) |
+| `20261009120000_ledger_and_payout_invariants` | Ledger and payout invariants (zero-sum journals, unique payout references) |
+| `20261013120000_ledger_journal_balance_guard` | Statement-level trigger that rejects an unbalanced `LedgerJournal` |
+| `20261013130000_phone_verification_otp` | Phone verification OTP table |
+| `20261016120000_phone_verified_at` | `User.phoneVerifiedAt` — a payout destination is only accepted once the number is proven |
+| `20261022120000_seed_demo_data` | Local demo seed data (development only) |
+| `20261022150000_seed_demo_activity` | Local demo activity seed (development only) |
+| `20261109120000_rotate_seeded_demo_passwords` | Pentest remediation (C-01): replaces the four committed Argon2id demo hashes with a hash of a value stored nowhere, and bumps `sessionVersion` so tokens issued before the rotation no longer validate |
+| `20261112120000_launch_categories_ten` | Phase 0 launch-category lock: `LaunchCategory` widened from six to **ten** subcategories. **Additive only** — `ALTER TYPE ... ADD VALUE IF NOT EXISTS` per value (with `duplicate_object` guards), so existing `Job.category` and `Gig.category` rows keep their values |
 
 ### Re-runnable migrations
 

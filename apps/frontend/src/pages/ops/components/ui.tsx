@@ -748,12 +748,16 @@ export function ConfirmActionModal({
 
 export interface EscrowFeeBreakdownProps {
   grossEtb: number;
+  /** Platform commission. Defaults to the backend's PLATFORM_FEE_RATE_FREELANCER. */
   feeRate?: number;
+  /** Payment/disbursement provider fee. Defaults to PAYMENT_PROVIDER_FEE_RATE. */
+  providerFeeRate?: number;
   compact?: boolean;
   labels?: {
     title?: string;
     grossLabel?: string;
     platformFeeLabel?: string;
+    providerFeeLabel?: string;
     tinTaxLabel?: string;
     unverifiedTaxLabel?: string;
     netPayoutLabel?: string;
@@ -761,15 +765,29 @@ export interface EscrowFeeBreakdownProps {
   };
 }
 
+/**
+ * The two components the fee engine takes on a transaction: the platform
+ * commission and the payment/disbursement provider fee. Together they are
+ * the platform's overall take (7.5% by default), and what is left is the
+ * freelancer's net payout.
+ *
+ * The provider fee used to be charged at cash-out instead, so a user saw
+ * 93% in their wallet and then a further deduction when they withdrew.
+ * It is shown here alongside the commission so the take is one number the
+ * user can see before they accept.
+ */
 export function EscrowFeeBreakdown({
   grossEtb,
   feeRate = 0.07,
+  providerFeeRate = 0.005,
   compact = false,
   labels,
 }: EscrowFeeBreakdownProps) {
   const safeGross = Number.isFinite(grossEtb) && grossEtb > 0 ? grossEtb : 0;
   const platformFee = Math.round(safeGross * feeRate * 100) / 100;
-  const netPayout = Math.max(0, Math.round((safeGross - platformFee) * 100) / 100);
+  const providerFee = Math.round(safeGross * providerFeeRate * 100) / 100;
+  const totalFee = platformFee + providerFee;
+  const netPayout = Math.max(0, Math.round((safeGross - totalFee) * 100) / 100);
 
   return (
     <div className={`yk-fee-breakdown ${compact ? "compact" : ""}`}>
@@ -788,6 +806,13 @@ export function EscrowFeeBreakdown({
               `Yekis Fee (${Math.round(feeRate * 100)}%)`}
           </span>
           <span className="sh-mono">− {formatEtbMajor(platformFee)}</span>
+        </div>
+        <div className="yk-fee-row">
+          <span>
+            {labels?.providerFeeLabel ??
+              `Payment Fee (${(providerFeeRate * 100).toFixed(1).replace(/\.0$/, "")}%)`}
+          </span>
+          <span className="sh-mono">− {formatEtbMajor(providerFee)}</span>
         </div>
         <div className="yk-fee-row total">
           <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout"}</strong>

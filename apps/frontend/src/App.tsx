@@ -1998,6 +1998,12 @@ export function App() {
                     <option value="CONTENT_WRITING">Content Writing</option>
                     <option value="TRANSLATION">Translation</option>
                     <option value="DATA_ENTRY">Data Entry</option>
+                    <option value="VIDEO_PRODUCTION">Video Production</option>
+                    <option value="ACCOUNTING_BOOKKEEPING">
+                      Accounting &amp; Bookkeeping
+                    </option>
+                    <option value="LEGAL_RESEARCH">Legal Research</option>
+                    <option value="DATA_ANALYTICS">Data Analytics</option>
                   </select>
                 </label>
                 <label className="form-wide">

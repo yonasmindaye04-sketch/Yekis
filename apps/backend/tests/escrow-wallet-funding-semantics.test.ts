@@ -304,13 +304,22 @@ describe("ESC-003: a wallet-funded milestone runs the full escrow lifecycle", ()
     expect(release).toBeDefined();
 
     const DAY = 86_400_000;
+    const HOUR = 3_600_000;
     // The release timer sits AUTO_RELEASE_WINDOW_DAYS out; the warning sits
     // exactly 24 hours before it. The window itself is configurable, so the
     // assertion is relative to the configured value rather than a literal.
+    //
+    // The gap is exactly DAY BY CONSTRUCTION: submitMilestone reads the clock
+    // once and derives both delays from that single instant. It used to read
+    // Date.now() separately for each queue.add(), so the milliseconds spent on
+    // the first Redis round-trip leaked into the gap and this equality
+    // assertion became flaky under parallel load (it observed DAY - 1).
     const releaseDelay = release?.[2]?.delay as number;
     const warnDelay = warn?.[2]?.delay as number;
     expect(releaseDelay).toBeGreaterThan(DAY * (env.AUTO_RELEASE_WINDOW_DAYS - 1));
-    expect(releaseDelay).toBeLessThanOrEqual(DAY * env.AUTO_RELEASE_WINDOW_DAYS);
+    // The deadline is seven CALENDAR days, which is 168 hours everywhere
+    // except across a daylight-saving transition, where it is 167 or 169.
+    expect(releaseDelay).toBeLessThanOrEqual(DAY * env.AUTO_RELEASE_WINDOW_DAYS + HOUR);
     expect(releaseDelay - warnDelay).toBe(DAY);
   });
 

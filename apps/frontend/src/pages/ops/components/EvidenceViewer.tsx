@@ -472,7 +472,7 @@ function renderDocumentSheet(d: ViewerDoc) {
                       GROSS ETB
                     </th>
                     <th style={{ padding: "7px 10px", borderBottom: "1px solid #cbd5e1", fontSize: 10 }}>
-                      NET (93%)
+                      NET (92.5%)
                     </th>
                   </tr>
                 </thead>

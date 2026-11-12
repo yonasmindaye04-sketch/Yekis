@@ -54,16 +54,30 @@ const PROVIDER_CLIENTS: Record<PaymentProvider, PaymentProviderClient> = {
   M_PESA: mpesaClient,
 };
 
-function autoReleaseDate(): Date {
-  const d = new Date();
+/**
+ * The auto-release deadline: AUTO_RELEASE_WINDOW_DAYS calendar days from
+ * `from` (Service Agreement Clause 2.2(b) - "seven calendar days").
+ *
+ * Takes the base instant as an argument so the whole submission can be
+ * anchored to ONE clock read. See submitMilestone for why that matters.
+ */
+function autoReleaseDate(from: Date = new Date()): Date {
+  const d = new Date(from);
   d.setDate(d.getDate() + env.AUTO_RELEASE_WINDOW_DAYS);
   return d;
 }
 
+/**
+ * The 24-hour warning point: exactly 24 hours before the release deadline.
+ *
+ * Absolute-time subtraction rather than `setHours(getHours() - 24)` on local
+ * wall-clock fields, so the warning stays exactly 24 hours ahead of the
+ * release even on a host that observes daylight saving. (The release
+ * deadline itself is deliberately calendar-day arithmetic, because the
+ * Service Agreement says "seven calendar days".)
+ */
 function warnDate(releaseAt: Date): Date {
-  const d = new Date(releaseAt);
-  d.setHours(d.getHours() - 24);
-  return d;
+  return new Date(releaseAt.getTime() - 24 * 60 * 60 * 1000);
 }
 
 export async function assertEscrowNotHeld(milestoneId: string): Promise<void> {
@@ -599,13 +613,25 @@ export async function submitMilestone(params: {
     );
   }
 
-  const releaseAt = autoReleaseDate();
+  // ONE clock read for the whole submission.
+  //
+  // The warn job and the release job must be scheduled from the SAME
+  // instant. Reading Date.now() separately for each of them let the
+  // milliseconds elapsed between the two queue.add() calls (a Redis
+  // round-trip) bleed into the gap between the two delays, so
+  // "releaseDelay - warnDelay" came out as DAY minus that elapsed time
+  // instead of exactly DAY. Under parallel test load that gap was
+  // occasionally a millisecond or two, which made the exact-equality
+  // assertion in escrow-wallet-funding-semantics.test.ts flaky.
+  const now = new Date();
+  const releaseAt = autoReleaseDate(now);
+  const nowMs = now.getTime();
 
   const updated = await prisma.milestone.update({
     where: { id: milestone.id },
     data: {
       escrowState: "SUBMITTED_FOR_REVIEW",
-      submittedAt: new Date(),
+      submittedAt: now,
       autoReleaseAt: releaseAt,
       deliverableUrl: params.deliverableUrl,
       deliverableHash: params.fileBuffer
@@ -619,7 +645,7 @@ export async function submitMilestone(params: {
     { milestoneId: milestone.id, kind: "warn" },
     {
       jobId: `warn-${milestone.id}`,
-      delay: warnDate(releaseAt).getTime() - Date.now(),
+      delay: warnDate(releaseAt).getTime() - nowMs,
     },
   );
   await autoReleaseQueue.add(
@@ -627,7 +653,7 @@ export async function submitMilestone(params: {
     { milestoneId: milestone.id, kind: "release" },
     {
       jobId: `release-${milestone.id}`,
-      delay: releaseAt.getTime() - Date.now(),
+      delay: releaseAt.getTime() - nowMs,
     },
   );
 
@@ -1628,8 +1654,14 @@ export async function getUserTransactionMovements(
           m.contract.client?.displayName ||
           m.contract.client?.firstName ||
           m.contract.client?.email;
-        const feeEst = Math.round(m.amountMinor * 0.07);
-        const netEst = m.amountMinor - feeEst;
+        // Derived from the fee engine rather than a hard-coded rate: the
+        // platform's take is the commission plus the provider fee, and a
+        // literal here silently rots whenever a rate changes.
+        const releaseFees = calculateFees({
+          milestoneAmountMinor: m.amountMinor,
+        });
+        const feeEst = m.amountMinor - releaseFees.freelancerNetMinor;
+        const netEst = releaseFees.freelancerNetMinor;
         movements.push({
           id: "escrow-release-" + m.id,
           date: (m.releasedAt || m.submittedAt || m.createdAt).toISOString(),

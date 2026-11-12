@@ -1,5 +1,44 @@
 # Architecture And Product Decisions
 
+## 2026-11-12
+
+### Phase 0 Decision Lock — Twelve Open Questions Answered
+The founder closed twelve Phase 0 / Phase 1 decisions. Each is recorded here with its **code status**, which is not always the same thing as the decision itself.
+
+| # | Decision | Code status |
+|---|---|---|
+| 1 | Content is authored by the founder (bilingual Amharic + English) with Gemini as the second-language assistant; no external hire | No code. Output still needs founder review before it reaches users |
+| 2 | Approved collection rails are **Telebirr, CBE Birr and M-Pesa**; Chapa removed; bank-custodian deferred as FIN-001 | App layer exposes exactly those three. **Only Telebirr has a working adapter** — CBE and M-Pesa are throwing stubs |
+| 3 | The founder is the appointed DPO (PDPP Art. 37) | No code. Independence expectation flagged for counsel |
+| 4 | Subprocessor DPA scope: Fayda ID, cloud provider, Telebirr, CBE Birr, M-Pesa (Chapa removed) | No code. DPAs not executed |
+| 5 | **Ten** launch subcategories | ✅ `LaunchCategory` = 10 values (migration `20261112120000_launch_categories_ten`), validation + 4-language i18n |
+| 6 | **7% platform commission, 0% client surcharge** | ✅ `PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0` |
+| 7 | Tech stack = what the codebase already uses: React + Vite, Node + Express + TypeScript, PostgreSQL + pgaudit, Redis + BullMQ, MinIO/S3 | Already true. Ethiopian hosting still outstanding |
+| 8 | **M-Pesa is an approved rail** — supersedes Master Design `PAY-003` | Approved, but `mpesa.client.ts` still throws until Safaricom supplies the merchant API |
+| 9 | Fee engine has three components; the platform's overall take is **7.5%** and the freelancer nets **92.5%** | ✅ Implemented — see *Unified 7.5% Fee Engine* below |
+| 10 | Statutory withholding is **deferred** | ✅ The deduction is commented out in `calculateFees()` — see *Deferred Statutory Withholding* below |
+| 11 | Auto-release after **7 days**, with the 24-hour warning | ✅ Code default was already 7; the local `.env` had 5 and is now 7 |
+| 12 | The **native in-app support desk** is the helpdesk; no third-party vendor | ✅ True. SLAs are not enforced in code |
+
+### Unified 7.5% Fee Engine
+The platform's take on a transaction is **7.5%**, collected as two components at release: a **7% platform commission** (`PLATFORM_FEE_RATE_FREELANCER`) and a **0.5% payment/disbursement provider fee** (`PAYMENT_PROVIDER_FEE_RATE`). The client pays no deposit surcharge, and the freelancer nets **92.5%**.
+- **Rationale:** the provider fee was previously a hardcoded `0.005` literal inside `withdrawFromWallet`, applied identically to every provider at payout time — neither configurable nor routed by the fee engine (`docs/hardening/AUDIT_FINANCE_WORKERS.md` finding L-3). A user saw 93% in their wallet and then a further deduction when they withdrew. Computing it once, on the transaction gross, and routing it to `REVENUE-DISBURSEMENT-FEES` makes the take a single visible number the user can see before accepting.
+- **Consequences:** the payout no longer deducts a cash-out fee, so the platform carries Telebirr's own B2C charge out of its 7.5% rather than passing it on. The release journal gains a third credit line so the double-entry stays balanced. The frontend fee breakdown now shows the commission and the provider fee as two rows.
+
+### Deferred Statutory Withholding
+The Income Tax Proclamation's 3% (with TIN) / 30% (without) withholding on payouts at or above ETB 10,000 is **not applied**. The calculation is commented out in `calculateFees()`.
+- **Rationale:** the ERA remittance channel, form numbers, filing frequency, supporting-document requirements and responsible party are all unconfirmed (`TAX-002`, OPEN ACTION), and the accountant has not signed off on the figures. Deducting an unverified statutory amount from freelancer payouts before that confirmation would take money from workers on the strength of a guess.
+- **Mechanics:** the rates (`WITHHOLDING_RATE_WITH_TIN`, `WITHHOLDING_RATE_WITHOUT_TIN`) and the threshold (`WITHHOLDING_THRESHOLD_MINOR`) stay in `env.ts`, and `TIN_FEATURE_ENABLED` stays as the switch, so reactivation is a one-line change rather than a reconstruction. The commented block is kept in place, not deleted.
+
+### Ten Launch Categories
+The launch subcategory list is **ten**, not the Roadmap's original four-to-six: the original six (Web & Mobile App Development, Graphic Design & Branding, Digital Marketing, Content & Copywriting, Translation & Localization, Data Processing) plus **Video Production**, **Accounting & Bookkeeping**, **Legal Research** and **Data Analytics**.
+- **Rationale:** the first three additions are the Roadmap's own Phase-4 second-sector candidates, promoted to launch; Data Analytics extends the existing data taxonomy.
+- **Mechanics:** `LaunchCategory` in `schema.prisma` (migration `20261112120000_launch_categories_ten`, additive `ALTER TYPE ... ADD VALUE` only), the Zod enums in `src/schemas.ts` and `packages/schemas/src/index.ts`, the frontend category maps, and the `categories` dictionary in all four languages. Existing rows keep their values — the migration adds values, it does not rewrite data.
+
+### M-Pesa Is An Approved Rail
+Master Design `PAY-003` ("M-Pesa is not part of the approved payment architecture") is **superseded**. M-Pesa is an approved collection rail alongside Telebirr and CBE Birr.
+- **Consequence:** the M-Pesa client stub is **kept**, not deleted — it is the integration point the decision keeps alive until Safaricom supplies the merchant API, the callback contract and credentials. Until then `mpesa.client.ts` still throws `PaymentProviderUnavailableError` and `verifyWebhookSignature` returns `false`, so no payment can be taken on that rail.
+
 ## 2026-11-09
 
 ### Funding Source Never Changes The Lifecycle (ESC-003)
@@ -41,7 +80,7 @@ Only **Telebirr** is a working payment rail. CBE Birr and M-Pesa clients exist b
 ### Cooling-Off Right Is Not Armed (Documented Divergence, Not Fixed)
 `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but that function never writes the field and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError`, and `autoRelease.worker.ts:50-64` never skips a release for cooling-off because the timestamp is always `null`.
 - **Decision:** record the divergence as a **verified gap** (`ESC-002`) rather than silently changing behaviour in a documentation-only pass. The 7-day statutory cancellation right under ECA Proclamation No. 1205/2020 is **not available to clients today**.
-- **Also noted:** `COOLING_OFF_HOURS` (`env.ts:225`, default `24`) is defined but referenced nowhere else in the backend.
+- **Also noted:** `COOLING_OFF_HOURS` (`env.ts:233`, default `24`) is defined but referenced nowhere else in the backend.
 - **Next:** confirm the intended window with counsel (7 days vs. the unused 24-hour constant), then implement the assignment in `createContractFromProposal()` with a regression test.
 
 ### Withholding Is 0% At Launch, Not 2%
@@ -55,7 +94,7 @@ The configured withholding rates are **3% with a TIN** and **30% without one**, 
 `VAT_THRESHOLD_MINOR = 45_000_000` minor units (450,000 ETB) with `VAT_RATE = 0.15`. The Playbook's "ETB 1,000,000" figure is stale. The exact threshold still needs accountant confirmation (`docs/COMPLIANCE_BLOCKERS.md` #10).
 
 ### Session Token Lifetimes Are 1h / 30d
-`JWT_ACCESS_TTL` defaults to `1h` and `JWT_REFRESH_TTL` to `30d` (`env.ts:43-44`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 hours in `auth.service.ts:342`.
+`JWT_ACCESS_TTL` defaults to `1h` and `JWT_REFRESH_TTL` to `30d` (`env.ts:51-52`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 hours in `auth.service.ts:342`.
 
 ### CI Exists; Deployment Does Not
 `.github/workflows/ci.yml` runs the doc-parity check, secret scan, backend type-check, route-audit gate, backend test suite, fresh-database check, and the frontend production build on every pull request. `.github/workflows/deploy.yml` exists but is a **placeholder** — its deploy steps are a comment. The frontend CI job runs **build only**; there is no frontend test runner and no frontend test files.

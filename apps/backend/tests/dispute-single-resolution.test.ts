@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { prisma } from "../src/lib/prisma.js";
-import { env } from "../src/config/env.js";
+import { calculateFees } from "../src/modules/escrow/fees.js";
 import {
   resolveDispute,
   escalateToArbitration,
@@ -39,12 +39,17 @@ const ids: { clientId?: string; freelancerId?: string; contractId?: string; mile
 const STAFF = { id: "" as string, role: "ADMIN" as const };
 
 /**
- * What the platform takes from the freelancer side of a release. Read from the
- * real config rather than hard-coded so the conservation assertions below do not
- * drift if the rate changes.
+ * Everything the platform takes from the freelancer side of a release: the
+ * platform commission plus the payment/disbursement provider fee.
+ *
+ * Derived from calculateFees rather than hard-coded, so the conservation
+ * assertions below cannot drift when a rate changes. It used to be
+ * `gross * PLATFORM_FEE_RATE_FREELANCER` alone, which silently stopped
+ * matching the moment the provider fee became part of the fee engine.
  */
-function PLATFORM_FEE_MINOR(grossMinor: number): number {
-  return Math.round(grossMinor * env.PLATFORM_FEE_RATE_FREELANCER);
+function TOTAL_FEE_MINOR(grossMinor: number): number {
+  const fees = calculateFees({ milestoneAmountMinor: grossMinor });
+  return grossMinor - fees.freelancerNetMinor;
 }
 
 async function ensureStaff(): Promise<void> {
@@ -239,7 +244,7 @@ describe("F-04 a dispute can only be resolved once", () => {
       expect(movedToClient).toBe(100000);
       expect(movedToFreelancer).toBe(0);
     } else {
-      expect(movedToFreelancer + PLATFORM_FEE_MINOR(100000)).toBe(100000);
+      expect(movedToFreelancer + TOTAL_FEE_MINOR(100000)).toBe(100000);
       expect(movedToClient).toBe(0);
     }
   });
@@ -271,7 +276,7 @@ describe("F-04 a dispute can only be resolved once", () => {
     const after = await walletBalances();
     expect(after).toEqual(mid);
     // The release happened exactly once: freelancer net + platform fee.
-    expect(after.freelancer - before.freelancer + PLATFORM_FEE_MINOR(100000)).toBe(100000);
+    expect(after.freelancer - before.freelancer + TOTAL_FEE_MINOR(100000)).toBe(100000);
     expect(after.client - before.client).toBe(0);
   });
 
@@ -540,7 +545,7 @@ describe("F-05 a PARTIAL_SPLIT award must carry a usable share", () => {
     // fee is read from the live config rather than hard-coded, so the
     // conservation assertion does not rot when the rate changes.
     expect(after.freelancer - before.freelancer).toBe(
-      50000 - PLATFORM_FEE_MINOR(50000),
+      50000 - TOTAL_FEE_MINOR(50000),
     );
     expect(after.client - before.client).toBe(50000);
 
@@ -576,14 +581,14 @@ describe("F-04 the normal arbitration path still works", () => {
     // no TIN. Conservation is what matters: the whole escrow left the platform
     // and landed in exactly one wallet.
     expect(after.freelancer - before.freelancer).toBe(
-      100000 - PLATFORM_FEE_MINOR(100000),
+      100000 - TOTAL_FEE_MINOR(100000),
     );
     expect(after.client - before.client).toBe(0);
     const paidOut =
       after.freelancer -
       before.freelancer +
       (after.client - before.client) +
-      PLATFORM_FEE_MINOR(100000);
+      TOTAL_FEE_MINOR(100000);
     expect(paidOut).toBe(100000);
 
     const final = await prisma.dispute.findUniqueOrThrow({ where: { id: disputeId } });

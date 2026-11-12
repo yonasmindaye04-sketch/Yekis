@@ -170,6 +170,10 @@ export const categoryLabels: Record<string, string> = {
   CONTENT_WRITING: "Content writing",
   TRANSLATION: "Translation",
   DATA_ENTRY: "Data entry",
+  VIDEO_PRODUCTION: "Video production",
+  ACCOUNTING_BOOKKEEPING: "Accounting & bookkeeping",
+  LEGAL_RESEARCH: "Legal research",
+  DATA_ANALYTICS: "Data analytics",
 };
 
 export const categories = Object.keys(categoryLabels);

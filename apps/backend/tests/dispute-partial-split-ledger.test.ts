@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
 import { env } from "../src/config/env.js";
+import { calculateFees } from "../src/modules/escrow/fees.js";
 import { resolveDispute } from "../src/modules/disputes/dispute.service.js";
 import {
   recordEscrowFundingLedger,
@@ -246,9 +247,15 @@ describe("PARTIAL_SPLIT pays both parties and relieves the pool for both", () =>
 
     // Both parties were paid — this already worked.
     const balances = await walletBalances();
-    const feeMinor = Math.round(FREELANCER_SHARE * env.PLATFORM_FEE_RATE_FREELANCER);
+    // The freelancer's share net of everything the platform takes on the
+    // transaction: the platform commission plus the payment/disbursement
+    // provider fee. Derived from calculateFees rather than hard-coded, so the
+    // assertion cannot drift when a rate changes.
+    const freelancerFees = calculateFees({
+      milestoneAmountMinor: FREELANCER_SHARE,
+    });
     expect(balances.client).toBe(CLIENT_SHARE);
-    expect(balances.freelancer).toBe(FREELANCER_SHARE - feeMinor);
+    expect(balances.freelancer).toBe(freelancerFees.freelancerNetMinor);
 
     // And the pool is relieved for the WHOLE milestone, not just the
     // freelancer's share. Before the fix this read FREELANCER_SHARE: the

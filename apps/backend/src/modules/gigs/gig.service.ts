@@ -29,8 +29,12 @@ export class GigNotPartyError extends Error {}
 export class GigInsufficientBalanceError extends Error {}
 
 // === HELPERS ===
-function autoReleaseDate(): Date {
-  const d = new Date();
+/** The auto-release deadline: AUTO_RELEASE_WINDOW_DAYS calendar days from
+ * `from` (Service Agreement Clause 2.2(b) - "seven calendar days"). Takes the
+ * base instant as an argument so the delivery submission can be anchored to
+ * ONE clock read - see submitGigDelivery. */
+function autoReleaseDate(from: Date = new Date()): Date {
+  const d = new Date(from);
   d.setDate(d.getDate() + env.AUTO_RELEASE_WINDOW_DAYS);
   return d;
 }
@@ -494,14 +498,18 @@ export async function submitGigDelivery(params: {
     throw new GigInvalidStateError(`Cannot deliver in state ${order.escrowState}.`);
   }
 
-  const releaseAt = autoReleaseDate();
+  // ONE clock read for the whole submission, so the recorded deadline and
+  // the queued job are anchored to the same instant. The milestone path does
+  // the same - see escrow.service.ts submitMilestone.
+  const now = new Date();
+  const releaseAt = autoReleaseDate(now);
 
   const updated = await prisma.gigOrder.update({
     where: { id: order.id },
     data: {
       escrowState: "SUBMITTED_FOR_REVIEW",
       status: "SUBMITTED_FOR_REVIEW",
-      submittedAt: new Date(),
+      submittedAt: now,
       autoReleaseAt: releaseAt,
       deliverableUrl: params.deliverableUrl ?? order.deliverableUrl,
       revisionStatus: "SUBMITTED",
@@ -513,7 +521,7 @@ export async function submitGigDelivery(params: {
     { gigOrderId: order.id },
     {
       jobId: `release-${order.id}`,
-      delay: releaseAt.getTime() - Date.now(),
+      delay: releaseAt.getTime() - now.getTime(),
     },
   );
 

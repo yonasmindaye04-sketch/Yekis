@@ -40,6 +40,18 @@ const OAUTH_SRC = readFileSync(
 const STAMP = Date.now();
 const M = 100000;
 const ids: string[] = [];
+/**
+ * Milestone ids this file created, so the ledger cleanup can be scoped to
+ * THIS file's journals.
+ *
+ * A pattern like `idempotencyKey: { contains: "escrow-fund-" }` matched every
+ * funding journal in the database, including the ones belonging to suites
+ * running in parallel. When this file's afterEach landed between another
+ * suite's seed and its assertion, that suite read an escrow pool that had
+ * never been funded. The ledger rows are shared across test files, so the
+ * cleanup has to be scoped the same way the user fixtures are.
+ */
+const milestoneIds: string[] = [];
 let seq = 0;
 
 function nextPhone() {
@@ -96,17 +108,23 @@ async function makeMilestone(clientId: string, freelancerId: string) {
     include: { milestones: true },
   });
   ids.push(contract.id);
+  milestoneIds.push(contract.milestones[0].id);
   return contract.milestones[0];
 }
 
 afterEach(async () => {
   const all = ids.length ? ids : ["__none__"];
+  const mine = milestoneIds.length ? milestoneIds : ["__none__"];
   await prisma.auditLog.deleteMany({ where: { userId: { in: all } } });
+  // Scoped to THIS file's milestones (see milestoneIds). Deleting every
+  // "escrow-fund-" journal in the database also deleted other suites'
+  // journals, and those suites then read an escrow pool that had never been
+  // funded.
   await prisma.ledgerEntry.deleteMany({
-    where: { journal: { idempotencyKey: { contains: "escrow-fund-" } } },
+    where: { journal: { referenceId: { in: mine } } },
   });
   await prisma.ledgerJournal.deleteMany({
-    where: { idempotencyKey: { contains: "escrow-fund-" } },
+    where: { referenceId: { in: mine } },
   });
   await prisma.milestone.deleteMany({ where: { contractId: { in: all } } });
   await prisma.contract.deleteMany({ where: { id: { in: all } } });

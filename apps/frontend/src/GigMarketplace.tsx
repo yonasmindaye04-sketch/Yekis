@@ -11,6 +11,10 @@ const categoryLabels: Record<string, string> = {
   CONTENT_WRITING: "Content Writing",
   TRANSLATION: "Translation",
   DATA_ENTRY: "Data Entry",
+  VIDEO_PRODUCTION: "Video Production",
+  ACCOUNTING_BOOKKEEPING: "Accounting & Bookkeeping",
+  LEGAL_RESEARCH: "Legal Research",
+  DATA_ANALYTICS: "Data Analytics",
 };
 
 const categories = Object.keys(categoryLabels);

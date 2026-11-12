@@ -31,13 +31,13 @@
 | Determine platform classification under NBE Directives | ⛔ Blocked — External | Same |
 | Fayda ID API access — begin formal application | ⛔ Blocked — External | Code side complete: `src/modules/kyc/fayda.client.ts` implements the interface with a deterministic mock; the staff review queue ships in the ops console (`pages/KycQueue.tsx`) |
 | ECA registration as Data Controller (PDPP No. 1321/2024) | ⛔ Blocked — External | — |
-| Appoint a DPO (PDPP Art. 37) | ⛔ Blocked — External | — |
+| Appoint a DPO (PDPP Art. 37) | ✅ **Decided — founder appointed** | The founder takes the DPO role. PDPP Art. 37 triggers on large-scale monitoring / large-scale special-category processing; the appointment itself is now made. **Caveat:** a founder acting as DPO may not satisfy the independence expectation PDPP Art. 37 contemplates. Flagged, not resolved — see the note below |
 | **Decide the KYC tier model** (3-tier vs. deliberately simplified single-tier) | ✅ **Implemented** | The explicit decision now exists: `TIN_FEATURE_ENABLED=false` + `requireKycVerified(env.TIN_FEATURE_ENABLED ? "TIER_2" : "TIER_1")` (`escrow.routes.ts:351`). Tier 2/TIN deferred to Phase 4. Recorded in `docs/DECISIONS.md` → *Holding TIN Requirement for MVP* |
 | Confirm certified-translation requirement for the Service Agreement | ⛔ Blocked — External | — |
 | Register the ROPA (PDPP Art. 33) | ⛔ Blocked — External | Roadmap marks it COMPLETE (drafted); execution timestamp still outstanding |
 | Scope the DPIA requirement | ⛔ Blocked — External | — |
-| Draft subprocessor DPAs (Fayda, cloud, Telebirr, CBE) | ⛔ Blocked — External | Note the list still names Chapa, which was removed (PAY-002) |
-| Confirm minimum contractual age | ✅ **Implemented (pending counsel)** | `MINIMUM_CONTRACTING_AGE = 18` (`env.ts:248`), enforced at registration (`auth.service.ts:76`) |
+| Draft subprocessor DPAs (Fayda, cloud, Telebirr, CBE) | ⛔ Blocked — External | **Scope corrected 2026-11-12:** the list is **Fayda ID, the cloud provider, Telebirr, CBE Birr and M-Pesa** — Chapa is removed (PAY-002) and M-Pesa joins the gateway list because it is an approved rail (PAY-003 reversed). The DPAs themselves are still not executed |
+| Confirm minimum contractual age | ✅ **Implemented (pending counsel)** | `MINIMUM_CONTRACTING_AGE = 18` (`env.ts:256`), enforced at registration (`auth.service.ts:76`) |
 | Scope insurance (cyber liability + fidelity bond) | ⛔ Blocked — External | — |
 | Escrow bank custodian structure [DEFERRED] | ⛔ Blocked — External | `docs/COMPLIANCE_BLOCKERS.md` #1. The internal ledger already governs escrow state, so this does not block MVP |
 
@@ -45,10 +45,10 @@
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| Lock escrow architecture — Telebirr + CBE approved, **no Chapa**, bank-custodian deferred | ⚠️ **Divergence** | Chapa is fully removed ✅, but CBE has **no working adapter** (stub). See Phase 1 below |
-| Lock launch categories (4–6 subcategories) | ⚠️ Partial | The code ships a skill taxonomy and category model, but the launch list is not code |
-| Lock take-rate & fee split — "10% platform fee (recommended: 5% from freelancer / 5% from client)" | ⚠️ **Divergence** | Code uses a flat **7% from the freelancer, 0% from the client** (`PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0`). Documented in `docs/DECISIONS.md` → *Platform-Wide 7% Only General Fee Rule*; the Roadmap wording is stale |
-| Hire a bilingual (Amharic + English) content writer | ⛔ Blocked — External | — |
+| Lock escrow architecture — Telebirr + CBE approved, **no Chapa**, bank-custodian deferred | ✅ **Decided 2026-11-12** | **Approved collection rails: Telebirr, CBE Birr and M-Pesa.** Chapa is removed from the architecture, the application layer and the database enum (the `CHAPA` enum value is inert residue only). The bank-custodian structure stays deferred as FIN-001. **Code status:** the app layer exposes exactly these three (`schemas.ts`, `escrow.routes.ts`, `topup.routes.ts`), but **only Telebirr has a working adapter** — CBE and M-Pesa are throwing stubs |
+| **Lock launch categories (4–6 subcategories)** | ✅ **Decided 2026-11-12 — widened to 10** | `LaunchCategory` now carries **ten** subcategories: the original six (Web & Mobile App Development, Graphic Design & Branding, Digital Marketing, Content & Copywriting, Translation & Localization, Data Processing) plus **Video Production, Accounting & Bookkeeping, Legal Research and Data Analytics**. The three additions are the Roadmap's own Phase-4 second-sector candidates; Data Analytics extends the existing data taxonomy. Implemented in `schema.prisma` (migration `20261112120000_launch_categories_ten`), `src/schemas.ts`, `packages/schemas/src/index.ts`, the frontend category maps, and the `categories` dictionary in all four languages |
+| **Lock take-rate & fee split — "10% platform fee (recommended: 5% from freelancer / 5% from client)"** | ✅ **Decided 2026-11-12 — 7%** | **7% general platform fee, no client surcharge**, plus a **0.5% payment/disbursement provider fee**: the platform's overall take on a transaction is **7.5%**, the freelancer keeps **92.5%**. `PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0`, `PAYMENT_PROVIDER_FEE_RATE = 0.005`. The Roadmap's "10%, split 5%/5%" wording is superseded |
+| **Hire a bilingual (Amharic + English) content writer** | ✅ **Decided 2026-11-12 — founder + Gemini** | Content is authored by the founder (bilingual Amharic/English) with Gemini as the second-language assistant. No external hire. **Caveat:** Gemini output still needs the founder's review before it reaches users, and the Amharic strings already in `i18n.ts` carry signs of machine translation — see `docs/hardening/UX-AUDIT.md` |
 | Decide native app vs. web-first launch | ✅ **Implemented** | Web-first. Browser SPA + Telegram Mini App + Telegram Bot. No native app |
 
 ### Engineering Setup [PARALLEL]
@@ -60,12 +60,44 @@
 | Select & provision infrastructure (Ethio Telecom Cloud / Safaricom Ethiopia; dev/staging/prod) | 🟡 Partial | Local Docker Compose stack exists (postgres, redis, minio, opensearch). No staging or production environment; Ethiopian residency is a launch blocker |
 | Confirm CBE integration path (Star Pay vs. classic CBE Birr merchant flow) | ⛔ Blocked — External | PAY-004, unchanged since 2026-08-26 |
 | Execute the cloud vendor DPA | ⛔ Blocked — External | — |
-| Define tech stack — React + Next.js, Node/Go, PostgreSQL + pgaudit, Redis, Ethiopian S3-compatible storage | ⚠️ Partial | React + **Vite** (not Next.js); Node/Express + TypeScript; PostgreSQL + pgaudit image (`infra/postgres`); Redis (BullMQ); MinIO/S3-compatible. Storage is **not** Ethiopian-hosted |
+| **Define tech stack — React + Next.js, Node/Go, PostgreSQL + pgaudit, Redis, Ethiopian S3-compatible storage** | ✅ **Decided 2026-11-12 — the stack in the codebase** | **React 19 + Vite** (not Next.js — no SSR/router framework), **Node + Express + TypeScript** (not Go), **PostgreSQL + pgaudit** (`infra/postgres`), **Redis + BullMQ**, **MinIO / S3-compatible object storage** (`src/lib/objectStore.ts`). **Still outstanding:** the storage is not Ethiopian-hosted (PDPP Art. 22 residency is a launch blocker) |
 | **Set up CI/CD — auto-run tests on every PR, block merge on failure** | 🟡 **Partial** | `.github/workflows/ci.yml` runs the doc-parity check, secret scan, backend type-check, route-audit baseline gate, backend `pnpm test`, fresh-database check, and the frontend production build on every PR. **Gaps:** the frontend job runs *build only* (no frontend tests exist — zero test files, no runner), there is no frontend lint check, no migration-validation gate, no dependency scan, and `.github/workflows/deploy.yml` is a **placeholder** with no deploy steps |
 | Configure monitoring & alerting (Sentry, uptime) | 🟡 Partial | `SENTRY_DSN` exists in `env.ts`; no uptime monitor, no alerting on the financial reconciliation paths |
 | Design backup & DR from day one; test in Phase 1 | ⚪ **Not Started** | No backup schedule, no restore procedure, no RTO/RPO. `docker-compose.yml` has local volumes only |
 
 **Phase 0 DoD** ("law firm engaged and all open legal questions answered in a written memo") — ⛔ Not met. The **engineering** sub-DoD ("all engineers can clone the repo, run the app locally, push a feature branch") is ✅ met.
+
+### Phase 0 decision log — resolved 2026-11-12
+
+Twelve open Phase 0 / Phase 1 questions were answered by the founder on 2026-11-12 and are now recorded here. Each row states the decision and then the **code status**, which is not always the same thing.
+
+| # | Decision | Decided | Code status after the change |
+|---|---|---|---|
+| 1 | Bilingual content writer | Founder (Amharic + English) + Gemini as the second-language assistant | No code. Quality control is manual — flagged below |
+| 2 | Escrow architecture | **Telebirr, CBE Birr and M-Pesa** are the approved collection rails; Chapa removed; bank-custodian deferred as FIN-001 | App layer exposes exactly those three. Only Telebirr has a working adapter |
+| 3 | DPO (PDPP Art. 37) | The founder appoints themselves | No code. Independence question flagged below |
+| 4 | Subprocessor DPAs | Scope: Fayda ID, cloud provider, Telebirr, CBE Birr, M-Pesa (Chapa removed) | No code. DPAs still not executed |
+| 5 | Launch categories | **Ten** subcategories | ✅ Implemented — schema + migration + validation + 4-language i18n |
+| 6 | Take-rate and fee split | **7% platform commission, 0% client surcharge**, + 0.5% provider fee = **7.5% total take** | ✅ Implemented |
+| 7 | Tech stack | The stack already in the codebase: React + Vite, Node + Express + TypeScript, PostgreSQL + pgaudit, Redis + BullMQ, MinIO/S3 | Already true. Ethiopian hosting still outstanding |
+| 8 | M-Pesa | **Added** as an approved rail — supersedes Master Design `PAY-003` | Approved, but the adapter is still a throwing stub |
+| 9 | Fee engine | Three components; overall take **7.5%**, freelancer nets **92.5%** | ✅ Implemented |
+| 10 | Withholding tax | **Deferred.** The statutory deduction is commented out; withholding is 0 | ✅ Implemented — the block is commented out, rates and flag preserved |
+| 11 | Auto-release cron | **7 days**, with the 24-hour warning | ✅ Implemented; the local `.env` was corrected from 5 to 7 |
+| 12 | Helpdesk | The **native in-app support desk** is the helpdesk — no third-party vendor | ✅ True. SLAs are not enforced in code |
+
+#### Caveats on the decisions above
+
+These are the points where a decision was made but something about it still deserves a second look. None of them blocks the launch; all of them are recorded rather than quietly closed.
+
+| # | Caveat |
+|---|---|
+| 1 | **Content quality.** Gemini output needs the founder's review before it reaches users, and the existing Amharic strings in `i18n.ts` show machine-translation artefacts. A content-review pass on the four languages is worth doing before launch |
+| 2 / 8 | **Two of the three approved rails have no working adapter.** CBE and M-Pesa both throw `PaymentProviderUnavailableError`. The decision makes them *approved*; it does not make them *working*. Safaricom merchant credentials and the CBE integration path (PAY-004) are still the blockers |
+| 3 | **DPO independence.** PDPP Art. 37 contemplates a DPO appointed for a public authority, for large-scale monitoring, or for large-scale special-category processing. A founder acting as DPO is the cheapest way to satisfy the appointment requirement, but it is the opposite of independence. Worth a line in the counsel memo |
+| 4 | M-Pesa joining the gateway list means a fifth subprocessor DPA that did not exist before |
+| 9 | The provider fee is now collected at release rather than at cash-out, so the freelancer's wallet already reflects it. The platform therefore carries Telebirr's own B2C cash-out charge out of its 7.5% take rather than passing it on. That is the intended reading of "the overall payment will be 7.5%", but it moves a real cost from the freelancer to the platform |
+| 12 | **No SLA enforcement.** The Roadmap asks for "disputes within 3 business days, general support within 24 hours". There is no SLA timer, no escalation and no auto-close in the code. The desk exists; the SLA does not |
 
 ---
 
@@ -79,7 +111,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 |---|---|---|
 | User registration & login — email + phone OTP, language preference on the record | ✅ **Implemented** | `User.languagePreference`; email/password + phone OTP + Google/Apple/Facebook/Telegram OAuth + Telegram Mini App |
 | Role system — CLIENT / FREELANCER / BOTH | ✅ **Implemented** | `User.role` |
-| Session management — JWT + refresh tokens, secure cookie storage | ✅ **Implemented** | `JWT_ACCESS_TTL = "1h"`, `JWT_REFRESH_TTL = "30d"` (`env.ts:43-44`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 h (`auth.service.ts:342`) |
+| Session management — JWT + refresh tokens, secure cookie storage | ✅ **Implemented** | `JWT_ACCESS_TTL = "1h"`, `JWT_REFRESH_TTL = "30d"` (`env.ts:51-52`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 h (`auth.service.ts:342`) |
 | 2FA (SMS OTP) optional at MVP, **mandatory for withdrawals** | ⚪ **Not Started** | Withdrawal uses `requireFreshAuth(300)` (5-minute re-auth) instead of 2FA |
 | **Hard Block System — unverified users blocked from withdrawing, changing profile, bidding, receiving payments** | ⚠️ **Partial / Divergence** | 7 routes gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately NOT gated** (`profile.routes.ts:59`) — it was removed because gating it blocked onboarding. `src/middleware/requireKycVerified.ts` is **dead code**; the live guard is `hardBlock.ts` |
 | Age / contractual-capacity gate | ✅ **Implemented** | `MINIMUM_CONTRACTING_AGE = 18` |
@@ -104,13 +136,13 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Contract storage — immutable, associated with both parties and the job | 🟡 Partial | `documentStoragePath` + `templateVersion`; immutable WORM storage is a production config task |
 | Escrow state machine | ✅ **Implemented — ESC-003 resolved 2026-11-09** | Both funding paths land in `ESCROW_HELD`: external payment (`POST /escrow/fund`, Telebirr) via the signed webhook, and wallet funding (`POST /escrow/fund-from-wallet`) via the shared `placeEscrowHold()` helper. The freelancer is credited only by `releaseMilestoneFunds()` — on client acceptance, the 7-day auto-release, or a staff dispute resolution. Delivery, the 24 h warning, the auto-release timer, and dispute all work identically on both paths. The same bypass on the gig path was fixed the same way |
 | Payment Integration (Telebirr) — initiate, callback, verify HMAC signature, sandbox test | ✅ **Implemented** | C2B Web Checkout with native Node RSA-PSS signing, Redis fabric-token cache, body-embedded signature verification, mock fallback |
-| Payment Integration (M-Pesa) — secondary/fallback gateway | ⚠️ **Divergence** | `mpesa.client.ts` is a **stub** that throws `PaymentProviderUnavailableError`. Master Design `PAY-003` marks M-Pesa **REMOVED** — the Roadmap and the Master Design disagree with each other, and the code half-implements it. Needs a product decision |
-| Payment Integration (CBE Birr) — tertiary option | 🔵 **Stub / Mock** | `cbe.client.ts` always throws. PAY-004 path unconfirmed |
-| Fee engine — freelancer net, platform fee, provider fee | ⚠️ **Divergence** | Flat 7% from the freelancer, 0% client surcharge. **Provider fee (0.5–2%) is not implemented** — a hardcoded 0.5% disbursement fee is applied to every provider (`docs/hardening/AUDIT_FINANCE_WORKERS.md` L-3) |
+| Payment Integration (M-Pesa) — secondary/fallback gateway | ✅ **Approved rail (2026-11-12) — implementation still a stub** | **M-Pesa is an approved payment rail**; Master Design `PAY-003` ("M-Pesa is not part of the approved payment architecture") is **superseded**. The app layer already exposes it (`schemas.ts`, `escrow.routes.ts`, `topup.routes.ts`, `env.MPESA_CHECKOUT_ENABLED`), but `mpesa.client.ts` **always throws `PaymentProviderUnavailableError`** and `verifyWebhookSignature` returns `false` until Safaricom supplies the merchant API, callback contract and credentials. The stub must not be deleted — it is the integration point the decision keeps alive |
+| Payment Integration (CBE Birr) — tertiary option | 🔵 **Stub / Mock** | `cbe.client.ts` always throws. PAY-004 path unconfirmed. CBE is an **approved** rail, so this is the larger of the two remaining build gaps |
+| **Fee engine — freelancer net, platform fee, provider fee** | ✅ **Implemented 2026-11-12** | Three components, all routed by `calculateFees()` on the transaction gross: **platform commission 7%** (`PLATFORM_FEE_RATE_FREELANCER`), **provider/disbursement fee 0.5%** (`PAYMENT_PROVIDER_FEE_RATE`), **withholding 0** (deferred — see below). The freelancer nets **92.5%** and the platform's overall take is **7.5%**. The provider fee used to be a hardcoded `0.005` literal charged at cash-out (`AUDIT_FINANCE_WORKERS.md` L-3); it is now computed once at release and routed to `REVENUE-DISBURSEMENT-FEES`, so the take is one visible number instead of a surprise at withdrawal |
 | Three-pool financial ledger (LED-001) | ✅ **Implemented** | `PlatformOperatingAccount`, `PlatformFeeCredit`, `LedgerAccount` / `LedgerJournal` / `LedgerEntry` with a zero-sum invariant |
 | Atomic milestone release + revenue recognition (LED-002) | ✅ **Implemented** | `releaseMilestoneFunds` (`escrow.service.ts:797-890`) runs one `prisma.$transaction` crediting the wallet, the operating account, `PlatformFeeCredit`, and the double-entry journal |
-| **Withholding tax logic — 3% with TIN / 30% without, on payouts ≥ ETB 10,000** | 🟡 **Partial — dormant** | Rates and threshold are correct (`env.ts:259-261`), but `calculateFees` gates the whole calculation on `TIN_FEATURE_ENABLED`, which defaults to `false` (`fees.ts:35`). **Withholding is 0% at launch** |
-| **Auto-release cron — 5 days after submission, notify 24 h before** | ⚠️ **Divergence (7 days)** | `AUTO_RELEASE_WINDOW_DAYS = 7` (`env.ts:263`), matching Master Design Clause 2.2(b) and the 24 h warning. The Roadmap's "5 days" is stale |
+| **Withholding tax logic — 3% with TIN / 30% without, on payouts ≥ ETB 10,000** | ✅ **Decided 2026-11-12 — deferred, code commented out** | The statutory deduction is **commented out** in `calculateFees()` and withholding is held at **0**. The rates (`WITHHOLDING_RATE_WITH_TIN = 0.03`, `WITHHOLDING_RATE_WITHOUT_TIN = 0.3`) and the threshold (`WITHHOLDING_THRESHOLD_MINOR = 1_000_000` = ETB 10,000) stay in `env.ts`, and the `TIN_FEATURE_ENABLED` flag stays as the switch. Reason: the ERA remittance channel, form numbers, filing frequency and responsible party are unconfirmed (TAX-002), and deducting an unverified statutory amount from freelancer payouts before the accountant confirms would take money from workers on the strength of a guess |
+| **Auto-release cron — 5 days after submission, notify 24 h before** | ✅ **Decided 2026-11-12 — 7 days** | `AUTO_RELEASE_WINDOW_DAYS` defaults to **7** (`env.ts`), matching Master Design Service Agreement Clause 2.2(b). The 24-hour warning is scheduled 24 h before it, and the two delays are exactly one day apart (asserted in `tests/escrow-wallet-funding-semantics.test.ts`). The Roadmap's "5 days" is superseded. **Also fixed:** the local `apps/backend/.env` had `AUTO_RELEASE_WINDOW_DAYS=5`, which contradicted the code default and the clause — it is now `7` |
 | Wallet system — internal balance, withdraw to Telebirr/CBE, minimum floor TBD | ✅ **Implemented** | Telebirr B2C disbursement is live with automatic wallet rollback. No minimum/maximum/cap/cooldown exists (`docs/hardening/UX-AUDIT.md` row 11) |
 | TMS AML rule engine — structuring, velocity, pass-through, wallet mismatch | ✅ **Implemented** | `TMS_STRUCTURING_TOTAL_THRESHOLD_MINOR = 50_000_000` (500k ETB) / 168 h / min 2; velocity >3× the 90-day baseline with an absolute floor of 6 releases; round amounts ≥3 × 10k ETB; pass-through window 24 h |
 | Compliance review queue + file an STR with the FIC within 24 h | 🟡 Partial | The queue and the 24 h SLA clock (`strDeadlineAt`, `STR_SLA_BREACH`) are implemented. **The platform records a human filing; it does not submit to the FIC** |
@@ -139,7 +171,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Milestone submission — files, links, text | ✅ **Implemented** | 15 MB attachment cap (`chat.routes.ts:69`); the Playbook's 50 MB is stale |
 | Dispute flow — structured form, evidence thread, mediator recommendation | ✅ **Implemented** | — |
 | User profile — verified badge, rating, portfolio, on-time rate, double-blind reviews | ✅ **Implemented** | Bayesian rating averages; blind reviews reveal after 14 days via the `review-reveal` queue |
-| Wallet & withdrawal — balance, destination, transparent withholding before confirm | ✅ **Implemented** | The ops console fee breakdown shows 7% and the 93% net; `FeesPage.tsx` still carries **stale "2% WITHHOLDING" copy** (see *Known Code/Doc Divergences* below) |
+| Wallet & withdrawal — balance, destination, transparent withholding before confirm | ✅ **Implemented** | The ops console fee breakdown shows the 7% commission and the 0.5% provider fee separately, totalling the **92.5%** net; `FeesPage.tsx` shows the same, and the stale "2% WITHHOLDING" copy is gone (withholding is deferred, 0%) |
 | Notifications centre — in-app list, SMS for critical events | 🟡 Partial | In-app notifications ship; the SMS worker client exists but no production credentials |
 | Mobile-first, bandwidth-first — Lighthouse ≥80 on simulated 3G; no image >200 KB | ⚪ **Not Started** | No Lighthouse gate in CI and no measured score |
 | **Amharic/English i18n — all strings in i18n files, no hardcoded copy** | 🟡 Partial | 625 keys in `i18n.ts` and 243 in the bot's locale JSONs, but hardcoded copy still exists in components |
@@ -157,7 +189,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | KYC/AML procedures manual | ⛔ Blocked — External | — |
 | Finalize subprocessor DPAs | ⛔ Blocked — External | — |
 | Hire/train 2 mediators | ⛔ Blocked — External | The `DISPUTE_MEDIATOR` role and mediation queue exist; the people do not |
-| Set up a helpdesk (Freshdesk / Zendesk) with SLAs | ⚠️ **Divergence — code is ahead** | A native in-app support desk ships: guest-scoped JWT chat, load-balanced staff assignment, OPEN/CLOSED workflow, attachments, unread counts, WebSocket delivery |
+| Set up a helpdesk (Freshdesk / Zendesk) with SLAs | ✅ **Decided 2026-11-12 — the native in-app support desk is the helpdesk** | No third-party helpdesk. The platform's own support desk is the helpdesk: guest-scoped JWT chat, load-balanced staff assignment, OPEN/CLOSED workflow, attachments, unread counts, WebSocket delivery, and a two-pane staff queue in the ops console (`pages/ops/pages/SupportDesk.tsx`). **SLA note:** the Roadmap's "disputes within 3 business days, general support within 24 hours" is **not** enforced by the code — there is no SLA timer, no escalation and no auto-close. Documented as-is rather than claimed |
 | Write internal playbooks (suspension, KYC review, STR filing, breach notification, AACCSA) | ⛔ Blocked — External | — |
 | Set up a moderation queue for prohibited listings, user reports, circumvention flags | ✅ **Implemented** | Profile reports, gig moderation, TMS flags, and circumvention counters all feed staff queues in the ops console |
 | Accounting integration — escrow + operating account to accounting software, real-time reconciliation | ⚪ **Not Started** | The internal ledger and reconciliation read models exist, but there is no connection to an external accounting package |
@@ -236,7 +268,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Contract translation standard | DECIDED APPROACH | ⛔ External (certified translations required; English governs) |
 | Production hosting selection | PENDING | ⛔ External — Ethiopian hosting is a launch blocker |
 | Audit-log enforcement | PENDING EXECUTION CONFIRMATION | ⚠️ Still accurate, and worse than it sounds: there is **no retention column and no purge job** in `AuditLog`, and no WORM module |
-| Helpdesk infrastructure | PENDING | ⚠️ **Code is ahead** — a native in-app support desk ships |
+| Helpdesk infrastructure | DECIDED (2026-11-12) | ✅ The native in-app support desk is the helpdesk. No external vendor. SLAs are not enforced in code |
 | Escrow bank custodian framework | PENDING / DEFERRED | ⛔ External (FIN-001) |
 | VAT registration threshold | TBD | 🟡 Code uses 450,000 ETB at 15%; accountant confirmation outstanding |
 | ERA remittance process | OPEN ACTION | ⛔ External — the platform records deductions and produces a monthly report; a human files |
@@ -282,4 +314,4 @@ Every Roadmap KPI (registered/KYC-verified users, completed escrow transactions,
 
 ---
 
-**Related documents:** `docs/ARCHITECTURE.md` · `docs/COMPLIANCE_BLOCKERS.md` · `docs/COMPLETENESS_CHECKLIST.md` · `docs/DECISIONS.md` · `docs/DOCUMENT_UNIFICATION_2026-11-09.md` · `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md`
+**Related documents:** `docs/ARCHITECTURE.md` · `docs/COMPLIANCE_BLOCKERS.md` · `docs/COMPLETENESS_CHECKLIST.md` · `docs/DECISIONS.md` · `docs/DOCUMENT_UNIFICATION_2026-11-09.md`

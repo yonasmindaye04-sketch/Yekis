@@ -131,7 +131,7 @@ CLIENT                          PLATFORM                        FREELANCER
   - Milestone transitions to `RELEASED`.
   - Net earnings credited to freelancer's wallet.
   - **Atomic Platform Fee Recognition (LED-002):** Platform commission (7% general platform fee, 0% client surcharge) is credited to `PlatformOperatingAccount` with a `PlatformFeeCredit` record.
-  - **Withholding Tax Status:** Held at 0% for MVP launch pending tax authority remittance formalization (`TAX-002`). Freelancers receive 93% net payout.
+  - **Withholding Tax Status:** Held at 0% for MVP launch pending tax authority remittance formalization (`TAX-002`) — the deduction is commented out in `calculateFees()`. Freelancers receive **92.5%** net payout (7% platform commission + 0.5% payment/disbursement provider fee).
   - When all milestones on a contract reach terminal states (`RELEASED`, `REFUNDED`, `PARTIAL_REFUND`), the contract is marked `COMPLETED`.
 
 ### Stage 9 — Payout & Automated B2C Disbursement

@@ -1,6 +1,13 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-09
+Last validated: 2026-11-12
+
+> **Phase 0 Decision Lock — what the user actually sees (2026-11-12):**
+> - **Fee breakdown**: the platform's overall take is **7.5%** — a 7% commission plus a 0.5% payment/disbursement provider fee. The freelancer nets **92.5%**. The fee breakdown component (`EscrowFeeBreakdown`) now shows the two components as separate rows, so the take is visible before the client accepts, rather than a further deduction appearing at cash-out.
+> - **No withholding yet**: the statutory withholding toggle on the fees page is labelled *deferred* and the backend deduction is commented out. Withholding is 0 until the accountant confirms the ERA remittance procedure.
+> - **Ten launch categories**: job posting, gig browsing and the search filters now offer Video Production, Accounting & Bookkeeping, Legal Research and Data Analytics alongside the original six, in all four languages.
+> - **M-Pesa is an approved rail** but cannot take money yet — selecting it surfaces the "unavailable" path until Safaricom supplies the merchant API.
+> - **Support**: the in-app support desk is the helpdesk. No external vendor, and the 24-hour / 3-business-day SLAs are **not** enforced by the platform yet.
 
 > **Multi-Language Fiscal Receipt & Payout Voucher Architecture (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09):**
 > - **Clean Language Separation & Elimination of Mixed Strings**:
@@ -111,7 +118,7 @@ Last validated: 2026-11-09
 >   - **CI exists** and runs on every pull request (doc-parity, secret scan, type-check, route-audit gate, backend tests, fresh-db check, frontend build). `deploy.yml` is a **placeholder**. There are **zero frontend test files and no frontend test runner**.
 > - **Walkthrough-level corrections:** dispute-resolution preview now shows the 7% general fee (was documented as 5%); the 7-day cooling-off step is marked as **not available in practice** because `createContractFromProposal()` never sets `Contract.cancellableUntil`; the fee sections now describe the unified 7%/0% rule.
 > - **✅ Walkthrough correction — the escrow step is the same on both funding paths.** Funding a milestone from the platform wallet (`POST /api/v1/escrow/fund-from-wallet`) and funding it through Telebirr (`POST /api/v1/escrow/fund`) both end in `ESCROW_HELD`. The wallet is only the **source** of the money. The submit → review → accept/dispute sequence below applies identically to both: the freelancer submits the delivery, the client gets a 24-hour warning, the 7-day auto-release timer runs, and either party can raise a dispute. The freelancer is credited only on client acceptance, on auto-release, or on a staff dispute resolution — never at funding time. Tracked as `ESC-003`; see `docs/ARCHITECTURE.md` → *Escrow*.
-> - **New references:** `docs/ROADMAP_ALIGNMENT.md`, `docs/DOCUMENT_UNIFICATION_2026-11-09.md`, regenerated `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md`, rewritten `docs/COMPLIANCE_BLOCKERS.md`.
+> - **New references:** `docs/ROADMAP_ALIGNMENT.md`, `docs/DOCUMENT_UNIFICATION_2026-11-09.md`, rewritten `docs/COMPLIANCE_BLOCKERS.md`. `docs/DOCUMENT_PROJECT_ALIGNMENT_REPORT.md` was regenerated against the 2026-11-09 scan and then removed on 2026-11-12, its content consolidated into the two documents above.
 
 > **Direct Chat Credential Lookup & Contract Page Direct Chat Action (2026-11-09):**
 > - **Multi-Credential Recipient Lookup in Direct Chat (`chat.service.ts`)**:

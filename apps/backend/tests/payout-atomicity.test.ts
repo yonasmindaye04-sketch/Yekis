@@ -62,7 +62,18 @@ const { CHART_OF_ACCOUNTS, getUserAccountCode, recordWalletTopUpLedger } = await
 
 const STAMP = Date.now();
 const AMOUNT = 400_000;
-const FEE_MINOR = Math.round(AMOUNT * 0.005);
+
+/**
+ * The payment/disbursement provider fee is NOT charged at cash-out.
+ *
+ * It used to be `AMOUNT * 0.005` here, deducted from the payout and credited
+ * to REVENUE-DISBURSEMENT-FEES. It is now the second component of the fee
+ * engine: computed on the milestone gross at release and routed there
+ * (see escrow.service.ts releaseMilestoneFunds). Charging it in both places
+ * would make the platform's overall take 8% instead of 7.5%, so a payout
+ * now disburses the whole wallet amount and its journal carries no fee line.
+ */
+const FEE_MINOR = 0;
 
 const userIds: string[] = [];
 let staffId = "";
@@ -330,16 +341,18 @@ describe("the withdrawal is atomic", () => {
     expect(journal, "a CONFIRMED payout must have a journal").toBeTruthy();
     expect(journal!.referenceType).toBe("WITHDRAWAL_PAYOUT");
 
-    // Exact amounts: user liability debited gross, asset credited net, fee to
-    // revenue.
+    // Exact amounts: user liability debited gross, asset credited gross.
+    // The provider fee is collected on the milestone at release, so the
+    // payout journal has no fee line.
     const byCode = new Map(journal!.entries.map((e) => [e.account.code, e]));
     expect(byCode.get(getUserAccountCode(user.id))?.debitMinor).toBe(AMOUNT);
     expect(byCode.get(CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT.code)?.creditMinor).toBe(
-      AMOUNT - FEE_MINOR,
+      AMOUNT,
     );
-    expect(byCode.get(CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.code)?.creditMinor).toBe(
-      FEE_MINOR,
-    );
+    expect(
+      byCode.get(CHART_OF_ACCOUNTS.REVENUE_DISBURSEMENT_FEES.code),
+      "the provider fee is collected at release, not at cash-out",
+    ).toBeUndefined();
   });
 
   it("does not confirm the payout when the journal cannot be posted", async () => {
@@ -404,8 +417,7 @@ describe("settlePayout cannot settle the same payout twice", () => {
         walletId: user.wallet!.id,
         amountMinor: AMOUNT,
         feeMinor: FEE_MINOR,
-        netAmountMinor: AMOUNT - FEE_MINOR,
-        provider: "TELEBIRR",
+        netAmountMinor: AMOUNT - FEE_MINOR,        provider: "TELEBIRR",
         payoutAccountIdentifier: user.phone,
         status: "PROCESSING",
       },
