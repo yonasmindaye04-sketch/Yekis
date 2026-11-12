@@ -187,7 +187,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**625 leaf keys, 43 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**569 leaf keys, 40 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
 
 ## Marketing Site (Public)
 
@@ -201,7 +201,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**625 leaf keys per language, 43 nested objects, verified 2026-11-09**).
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**569 leaf keys per language, 40 nested objects, verified 2026-11-12**).
 
 ## Automated And Manual Verification
 

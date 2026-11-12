@@ -461,7 +461,7 @@ The browser path gets this right — `FullPlatformApp.tsx:1603` gates the submit
 - **No secret committed.** `git check-ignore` confirms all three `.env` files are ignored by `.gitignore:3`; `git ls-files --error-unmatch` returns "did not match any file(s) known to git" for each.
 - **Console output is PII-clean.** Only 9 `console.*` calls exist, all error/analytics-debug paths.
 - **Analytics is consent-gated and PII-free.** Three independent gates at `analytics.ts:89-104`; `warnOnPossiblePii` (`:74-84`) is a dev-only guardrail.
-- **`localStorage`/`sessionStorage` inventory is otherwise benign.** Remaining keys: theme, language, consent, GA debug, splash, nav-collapse, onboarding-done, pending-top-up id, guest support thread (scoped token only, in `sessionStorage`).
+- **`localStorage`/`sessionStorage` inventory is otherwise benign.** Remaining keys: theme, language, consent, GA debug, splash, nav-collapse, pending-top-up id, guest support thread (scoped token only, in `sessionStorage`).
 - **Dev-only endpoints are correctly disabled in production server-side**, regardless of UI exposure: `POST /topups/checkout/:id/simulate-success` 404s when `NODE_ENV === "production"` (`topup.routes.ts:174`); `/telegram/start-polling` 400s (`:202`).
 - **`PaymentReturn.tsx` is hardened.** It polls `GET /wallet/topups/:id` and gates success on `status.credited` only.
 - **Production safety guards in `server.ts`** correctly hard-fail on `PEP_PROVIDER=mock` (`:43`) and `FAYDA_SIMULATE_UNAVAILABLE` (`:59`) in production.

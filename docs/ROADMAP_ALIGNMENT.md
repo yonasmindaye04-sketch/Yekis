@@ -136,7 +136,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| Bilingual (Amharic/English) toggle on first screen | ✅ **Implemented** | 4 languages (`en`/`am`/`om`/`ti`), **625 leaf keys** each, 43 nested objects, exact parity |
+| Bilingual (Amharic/English) toggle on first screen | ✅ **Implemented** | 4 languages (`en`/`am`/`om`/`ti`), **569 leaf keys** each, 40 nested objects, exact parity |
 | KYC upload & status screen with tier guidance | ✅ **Implemented** | `BrowserVerification.tsx` |
 | Client job posting wizard — category selector, milestone builder | 🟡 Partial | Job posting + milestone builder exist; the **step-by-step wizard** does not |
 | Freelancer browse & bid — job board with filters, proposal form | ✅ **Implemented** | — |
@@ -148,7 +148,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Wallet & withdrawal — balance, destination, transparent withholding before confirm | ✅ **Implemented** | The ops console fee breakdown shows 7% and the 93% net; `FeesPage.tsx` still carries **stale "2% WITHHOLDING" copy** (see *Known Code/Doc Divergences* below) |
 | Notifications centre — in-app list, SMS for critical events | 🟡 Partial | In-app notifications ship; the SMS worker client exists but no production credentials |
 | Mobile-first, bandwidth-first — Lighthouse ≥80 on simulated 3G; no image >200 KB | ⚪ **Not Started** | No Lighthouse gate in CI and no measured score |
-| **Amharic/English i18n — all strings in i18n files, no hardcoded copy** | 🟡 Partial | 625 keys in `i18n.ts` and 243 in the bot's locale JSONs, but hardcoded copy still exists in components |
+| **Amharic/English i18n — all strings in i18n files, no hardcoded copy** | 🟡 Partial | 569 keys in `i18n.ts` and 243 in the bot's locale JSONs, but hardcoded copy still exists in components |
 | Ethiopic font support — Noto Sans Ethiopic | ✅ **Implemented** | `index.css:1` imports Noto Sans Ethiopic; `--font-sans` / `--font-heading` fall back to it |
 | Accessible — unique IDs, labels on all inputs, keyboard navigable | 🟡 Partial | Many `id`/`aria` attributes ship; **no formal accessibility audit** has been performed |
 | Design system, UX research, wireframes, mockups, usability testing, design QA | ⛔ Blocked — External | Design artifacts, not code. No automated accessibility audit exists |

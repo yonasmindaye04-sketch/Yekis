@@ -2287,7 +2287,7 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | Environment Variable | `VITE_API_BASE_URL` |
 | Dev Server | `pnpm dev` → `http://127.0.0.1:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
-| Internationalization | `i18n.ts` — four locales, 625 keys each |
+| Internationalization | `i18n.ts` — four locales, 569 keys each |
 
 > **The React version in this table was 18 in earlier revisions; the project
 > now runs React 19** (`apps/frontend/package.json` pins `^19.3.0`).
@@ -2349,10 +2349,10 @@ There are two distinct fallback mechanisms:
 | Property | Value |
 |---|---|
 | Languages | `en`, `am` (አማርኛ), `om` (Afaan Oromoo), `ti` (ትግርኛ) |
-| Leaf keys per language | **625**, identical across all four (no missing, no extra) |
-| Nested objects per language | 43 |
+| Leaf keys per language | **569**, identical across all four (no missing, no extra) |
+| Nested objects per language | 40 |
 | Maximum depth | 3 (e.g. `workspace.jobs.status.SHORTLISTED`) |
-| Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `onboarding`, `workspace` |
+| Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `workspace` |
 
 **There is no `t()` function.** `t` *is* the locale object, so usage is `t.nav.home`, `t.workspace.notifications.title` — 408 property-style usages and zero call-style usages across the frontend.
 
@@ -2377,7 +2377,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 
 #### Known gaps
 
-- **Hardcoded copy is still widespread.** 26 of 130 `.tsx` files import the i18n module; the other 104 contain hardcoded user-facing strings — roughly **866 literal JSX text nodes**, concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity.
+- **Hardcoded copy is still widespread.** 25 of 129 `.tsx` files import the i18n module; the other 104 contain hardcoded user-facing strings — roughly **866 literal JSX text nodes**, concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity.
 - **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
@@ -2886,7 +2886,7 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
 
-**Two catalogues, not one.** The frontend holds 625 nested keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+**Two catalogues, not one.** The frontend holds 569 nested keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
 
 **Where it falls short today:**
 - Roughly **866 hardcoded JSX text literals** remain across 104 frontend files that never import the i18n module — concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more.
