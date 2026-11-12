@@ -67,11 +67,11 @@ erDiagram
 | `Wallet` | One balance per user in integer minor units |
 | `WalletTopUp` | Receipt-backed manual credit request and staff decision (also covers automated checkout flows) |
 | `PayoutTransaction` | Freelancer withdrawal record tracking Telebirr B2C disbursement lifecycle (PENDING → PROCESSING → CONFIRMED/FAILED/REVERSED); wallet balance is rolled back automatically on FAILED |
-| `Dispute` | Polymorphic dispute: linked to either one `milestoneId` (contract milestone) or one `gigOrderId` (gig order) — a DB CHECK enforces exactly one subject per row. Unique per subject. Staged deadlines, resolution outcome, and optional split |
+| `Dispute` | Polymorphic dispute: linked to either one `milestoneId` (contract milestone) or one `gigOrderId` (gig order) — a DB CHECK enforces exactly one subject per row. Unique per subject. Staged deadlines, resolution outcome, and optional split. Carries the SLA fact `firstRespondedAt` (the mediator claimed the case or recorded a recommendation) |
 | `DisputeEvidence` | Party statement tied to a dispute |
 | `TransactionFlag` | AML/TMS rule result and staff review/STR metadata (includes `strDeadlineAt` — 24h STR SLA clock set at detection) |
 | `Notification` | User notification ledger and delivery metadata |
-| `Conversation` | Support thread with participant relations, `creatorId`, and `assignedStaffId` for scoped staff access; creator and auto-assigned staff are registered as participants upon ticket creation |
+| `Conversation` | Support thread with participant relations, `creatorId`, and `assignedStaffId` for scoped staff access; creator and auto-assigned staff are registered as participants upon ticket creation. Carries the SLA facts `firstRespondedAt` (staff's first reply) and `resolvedAt` (the ticket was closed) |
 | `ConversationParticipant` | Junction table for `Conversation` ↔ `User` |
 | `ChatMessage` | Messages in a support `Conversation`; `origin` and `externalId` are generic provenance/idempotency markers |
 | `DirectThread` | 1-on-1 negotiation thread between a client and freelancer (optionally scoped to a job) |
@@ -165,6 +165,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20260829233000_gig_disputes_polymorphic` | Polymorphic dispute subject: `Dispute.contractId`/`milestoneId` nullable (unique dropped), `Dispute.gigOrderId` (`@unique` + FK), DB CHECK enforcing exactly one subject per dispute, `GigOrderStatus.DISPUTED`. Re-runnable (see note below). |
 | `20261003120000_chatwoot_support_bridge` | Added `Conversation.channel`/`chatwoot*` columns plus `ChatMessage.origin`/`externalId` for a third-party agent inbox that was evaluated and then dropped |
 | `20261003140000_drop_chatwoot_bridge_columns` | Removes the four unused `Conversation` Chatwoot columns. `ChatMessage.origin` and `ChatMessage.externalId` are KEPT as generic provenance and idempotency markers |
+| `20261112140000_sla_tracking` | SLA facts: `Conversation.firstRespondedAt`, `Conversation.resolvedAt` and `Dispute.firstRespondedAt`. The **deadlines are derived** from `createdAt` plus the configured targets, so changing a target applies immediately to every open item and there is no stored deadline to go stale. Indexed on `(status, firstRespondedAt)` and `(stage, firstRespondedAt)` for the breach queries |
 | `20261003150000_auth_federated_identity_guard` | Federated (OAuth) sign-in can no longer claim an existing password account |
 | `20261003160000_chat_message_attachment_url_index` | Index on the chat attachment URL column for the evidence/attachment lookups |
 | `20261003180000_telegram_login_codes` | Telegram web-login code table for the browser login handoff |
@@ -179,7 +180,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261022120000_seed_demo_data` | Local demo seed data (development only) |
 | `20261022150000_seed_demo_activity` | Local demo activity seed (development only) |
 | `20261109120000_rotate_seeded_demo_passwords` | Pentest remediation (C-01): replaces the four committed Argon2id demo hashes with a hash of a value stored nowhere, and bumps `sessionVersion` so tokens issued before the rotation no longer validate |
-| `20261112120000_launch_categories_ten` | Phase 0 launch-category lock: `LaunchCategory` widened from six to **ten** subcategories. **Additive only** — `ALTER TYPE ... ADD VALUE IF NOT EXISTS` per value (with `duplicate_object` guards), so existing `Job.category` and `Gig.category` rows keep their values |
+| `20261112120000_launch_categories_ten` | Phase 0 launch-category lock: `LaunchCategory` widened from six to **ten** subcategories at launch. **Ten is not a ceiling** — the enum grows by `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with `duplicate_object` guards), so existing `Job.category` and `Gig.category` rows keep their values and more categories can be added at any time |
 | `20261110120000_audit_log_retention` | Adds `AuditLog.retentionUntil` (NOT NULL, backfilled from `createdAt` + 10 years) with an index, and the `SECURITY DEFINER` function `purge_expired_audit_logs(batch_size)` that the retention worker calls. The application role gets EXECUTE only — it still holds no `DELETE` privilege on `AuditLog` |
 | `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
 

@@ -1,5 +1,13 @@
 # Project Context
 
+> **Update 2026-11-12 (Phase 0 decisions, part two — SLAs enforced, manual rails, DPO deferred):**
+> 1. **Service levels are enforced server-side.** The Roadmap's helpdesk SLAs ("general support within 24 hours", "disputes within 3 business days") were a number drawn in the browser; they are now facts. Two clocks per queue — first response and resolution — with the facts stored (`Conversation.firstRespondedAt` / `resolvedAt`, `Dispute.firstRespondedAt`) and the deadlines derived from creation time. Business days are Monday to Saturday. The state rides on both staff queues and is counted by `GET /api/v1/admin/sla/summary`. A breach is visible and reportable; **nothing is auto-escalated or auto-closed**.
+> 2. **CBE Birr and M-Pesa are handled manually.** Choosing either rail in the wallet goes straight to the manual transfer flow with that rail's instructions, instead of attempting a checkout the backend refuses. Both remain approved rails; both client stubs remain as the integration points.
+> 3. **The 7.5% take is all-in** — it covers the platform commission, the payment/disbursement provider fee, and the cash-out charge the platform absorbs at payout rather than passing on.
+> 4. **Ten launch categories, and ten is not a ceiling.** The enum grows by additive migration, so no existing row is ever rewritten.
+> 5. **A DPO is deferred** to a later phase; the MVP launches without one.
+> 6. **AI-assisted content is drafted, not published** — the assistant drafts, the founder reviews and signs off before anything reaches a user (`docs/rule.md` §13.5).
+
 > **Update 2026-11-12 (Phase 0 Decision Lock — fee engine, deferred withholding, ten launch categories, M-Pesa approved):**
 > 1. **Fee engine — the platform's overall take is 7.5%.** A 7% platform commission plus a 0.5% payment/disbursement provider fee, both computed on the transaction gross at release and routed by the ledger. The freelancer nets **92.5%**; the client pays no deposit surcharge. The provider fee used to be a hardcoded `0.005` literal charged at cash-out — it is now part of the fee engine, so the take is one visible number instead of a surprise at withdrawal.
 > 2. **Statutory withholding is deferred and commented out.** The 3% / 30% block in `calculateFees()` is disabled, with the rates, the ETB 10,000 threshold and the `TIN_FEATURE_ENABLED` switch preserved so reactivation is a one-line change. Reason: the ERA remittance channel and the accountant's sign-off are outstanding (TAX-002).

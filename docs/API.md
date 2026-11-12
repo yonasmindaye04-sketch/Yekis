@@ -323,7 +323,7 @@ The secured mounted API uses these paths; legacy `/raise`, `/contract/:id`, and 
 | `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party | Move negotiation to evidence |
 | `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party | Add evidence statement and progress when ready |
 | `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party | Escalate mediation to arbitration |
-| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue |
+| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries an `sla` object (first-response and resolution clocks, computed server-side) |
 | `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split |
 
 Raise body:
@@ -432,7 +432,7 @@ The API records a filing performed by a human; it does not submit to the FIC. A 
 | `POST` | `/api/v1/chat/conversations/:conversationId/assistant/suggest-replies` | Participant | Mini-Me AI suggested smart replies |
 | `POST` | `/api/v1/chat/conversations/:conversationId/assistant/summarize` | Participant | Mini-Me AI thread digest (deliverables, budget, timeline) |
 | `POST` | `/api/v1/chat/conversations/:conversationId/assistant/extract-deal` | Participant | Mini-Me AI deal terms extractor into escrow milestone |
-| `GET` | `/api/v1/chat/admin/conversations` | Staff | List support queue (scoped by assignedStaffId for non-admins) |
+| `GET` | `/api/v1/chat/admin/conversations` | Staff | List support queue (scoped by assignedStaffId for non-admins). Each row carries an `sla` object (first-response and resolution clocks, computed server-side) |
 | `POST` | `/api/v1/chat/admin/conversations/:id/claim` | Staff | Claim an unassigned conversation |
 | `POST` | `/api/v1/chat/support` | Authenticated | Open a support ticket and notify the support desk immediately |
 
@@ -492,6 +492,7 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `GET` | `/api/v1/admin/ledger/journals` | `ledger.view` | Paginated journal entries (referenceType, q search) |
 | `GET` | `/api/v1/admin/reconciliation` | `reconciliation.view` | Provider vs internal escrow state (MATCHED / MISMATCH / PENDING / FAILED + amounts) |
 | `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates (real sums/counts) |
+| `GET` | `/api/v1/admin/sla/summary` | `reports.view` | SLA breach counts for the open support and dispute queues (server-computed; see `docs/SYSTEM_DESIGN.md` §3.19) |
 | `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics + recent activity feed |
 | `GET` | `/api/v1/admin/monitoring/health` | `monitoring.view` | DB / Redis / object-store / Telebirr-config checks + ledger balance |
 | `POST` | `/api/v1/admin/incidents/breach` | `incidents.manage` | Open a data-breach incident: revokes the sessions of the affected users, alerts staff by SMS/Telegram, notifies the affected users, and returns the ECA notification template plus the 72-hour deadline |

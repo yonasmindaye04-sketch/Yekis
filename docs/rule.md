@@ -225,6 +225,12 @@ These rules define the non-negotiable engineering, design, accessibility, and op
 - **A test that exercises a cleanup across a shared database must be scoped to its own rows.** An unscoped delete in one suite silently destroys another suite's fixtures, and the failure surfaces in the *wrong* file — which is the hardest kind of failure to attribute.
 - When a behaviour is verified by a script rather than a unit test (a layout regression, a CSS invariant), keep the script and run it the same way.
 
-### 13.5 Persistent Agent Instruction
+### 13.5 AI-Assisted Content Is Drafted, Not Published
+
+- Content written with AI assistance (the assistant drafts, the founder signs off) must be **reviewed before it reaches a user**. This covers the marketing pages, the four locale dictionaries, the fiscal receipts and the onboarding copy.
+- Machine-translation artefacts in a shipped locale are a defect, not a cosmetic issue: a mis-rendered Amharic or Tigrinya string is the platform showing a user that their language was not taken seriously.
+- When a translation is generated rather than written, say so in the change record, and keep the unreviewed strings identifiable so they can be found and fixed.
+
+### 13.6 Persistent Agent Instruction
 
 - The persistent agent instruction is stored in `.agents/AGENTS.md`.

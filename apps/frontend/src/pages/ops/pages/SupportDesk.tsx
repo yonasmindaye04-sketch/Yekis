@@ -38,8 +38,12 @@ import {
   useToast,
 } from "../components/ui";
 
-/** Hours a ticket has been open; drives the SLA chip. */
-const waitHours = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_600_000;
+/**
+ * SLA is computed server-side (see modules/sla/sla.service.ts) and attached to
+ * each row. The console renders that state; it does not recompute it. An
+ * ad-hoc browser-side clock disagreed with the server, could not be filtered
+ * or reported on, and disappeared the moment the page was refreshed.
+ */
 
 export default function SupportDesk() {
   const toast = useToast();
@@ -195,7 +199,9 @@ export default function SupportDesk() {
   if (loading && rows.length === 0) return <LoadingBox />;
   if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
-  const breached = rows.filter((c) => c.status === "OPEN" && waitHours(c.updatedAt) > 24).length;
+  // The SLA state comes from the server, so this count is the same number the
+  // reporting endpoint reports rather than a second, browser-side opinion.
+  const breached = rows.filter((c) => c.status === "OPEN" && c.sla?.breached).length;
 
   return (
     <div className="fade">
@@ -297,7 +303,6 @@ export default function SupportDesk() {
           ) : (
             rows.map((c) => {
               const last = c.messages[0];
-              const wait = waitHours(c.updatedAt);
               return (
                 <button
                   key={c.id}
@@ -317,16 +322,20 @@ export default function SupportDesk() {
                       <span className="subject">{last.body.slice(0, 80)}</span>
                     </div>
                   ) : null}
-                  {c.status === "OPEN" && wait > 24 ? (
+                  {c.status === "OPEN" && c.sla?.breached ? (
                     <div style={{ marginTop: 7 }}>
                       <span className="sla breach">
                         <span className="pdot urgent" aria-hidden="true" />
-                        waiting {Math.floor(wait)}h
+                        {c.sla.firstResponse.breached
+                          ? `no first reply for ${Math.floor(Math.abs(c.sla.firstResponse.remainingMinutes) / 60)}h`
+                          : `unresolved for ${Math.floor(Math.abs(c.sla.resolution.remainingMinutes) / 60)}h`}
                       </span>
                     </div>
-                  ) : c.status === "OPEN" && wait > 2 ? (
+                  ) : c.status === "OPEN" && c.sla && c.sla.firstResponse.remainingMinutes <= 120 ? (
                     <div style={{ marginTop: 7 }}>
-                      <span className="sla warn">waiting {Math.floor(wait)}h</span>
+                      <span className="sla warn">
+                        reply due in {Math.max(0, Math.floor(c.sla.firstResponse.remainingMinutes / 60))}h
+                      </span>
                     </div>
                   ) : null}
                 </button>

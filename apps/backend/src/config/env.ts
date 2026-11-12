@@ -290,6 +290,25 @@ const EnvSchema = z.object({
   PAYMENT_RECONCILE_GIVE_UP_HOURS: z.coerce.number().default(3),
   PAYMENT_RECONCILE_BATCH_SIZE: z.coerce.number().default(50),
 
+  // SLA targets. Enforced server-side: the deadline is computed from the
+  // item's creation time and the clock stops when the obligation is met, so
+  // a breach is a queryable fact rather than a number drawn in the browser.
+  //
+  // Support: the Roadmap's helpdesk SLA is "general support within 24
+  // hours" -- that is the FIRST RESPONSE clock. The resolution clock is a
+  // separate target because the Roadmap states none.
+  //
+  // Disputes: "disputes within 3 business days" is the FIRST RESPONSE clock
+  // (the mediator's recommendation). Counting it from the raise would be
+  // breached by the 7-day Stage 1 negotiation window by construction.
+  SUPPORT_FIRST_RESPONSE_SLA_HOURS: z.coerce.number().int().positive().default(24),
+  SUPPORT_RESOLUTION_SLA_HOURS: z.coerce.number().int().positive().default(72),
+  DISPUTE_FIRST_RESPONSE_SLA_BUSINESS_DAYS: z.coerce.number().int().positive().default(3),
+  DISPUTE_RESOLUTION_SLA_BUSINESS_DAYS: z.coerce.number().int().positive().default(7),
+
+  // Business days run Monday to Saturday; Sunday is the only excluded day.
+  SLA_BUSINESS_DAY_EXCLUDED_WEEKDAY: z.coerce.number().int().min(0).max(6).default(0),
+
   // Take-rate — unified 7% general platform fee across the platform.
   // 0% client deposit surcharge; 7% deducted from milestone release.
   PLATFORM_FEE_RATE_CLIENT: z.coerce.number().default(0),
@@ -299,6 +318,11 @@ const EnvSchema = z.object({
   // engine, charged on the milestone gross alongside the platform fee.
   // 0.5% (the standard Telebirr cash-out rate), so the platform's overall
   // take on a transaction is 7.5%: 7% platform commission + 0.5% provider fee.
+  //
+  // The 7.5% is ALL-IN: it covers the platform commission AND every cost the
+  // platform carries to move the money, including the cash-out charge the
+  // platform absorbs at payout rather than passing on. That is why the payout
+  // disburses the full wallet amount with no further deduction.
   //
   // This used to be a hardcoded `0.005` literal inside withdrawFromWallet,
   // applied to every provider at payout time, which meant it was neither

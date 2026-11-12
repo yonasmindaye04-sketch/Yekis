@@ -34,6 +34,7 @@ import {
   getDashboardSummary,
   getSystemHealth,
 } from "./operational.service.js";
+import { slaSummary } from "../sla/sla.service.js";
 import {
   settlePayout,
   PayoutNotFoundError,
@@ -916,6 +917,24 @@ adminRouter.get(
       return res.json(await getReportsSummary());
     } catch (err) {
       logger.error({ err }, "Failed to fetch reports summary");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// ---------- SLA summary ----------
+// The Roadmap's helpdesk SLAs ("general support within 24 hours", "disputes
+// within 3 business days") are enforced server-side, so a breach is a
+// queryable fact. This endpoint reports the counts rather than making a
+// staff member notice them by eye.
+adminRouter.get(
+  "/sla/summary",
+  requirePermission("reports.view"),
+  async (_req: AuthedRequest, res) => {
+    try {
+      return res.json(await slaSummary());
+    } catch (err) {
+      logger.error({ err }, "Failed to fetch SLA summary");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

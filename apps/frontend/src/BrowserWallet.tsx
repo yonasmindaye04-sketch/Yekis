@@ -146,6 +146,29 @@ export function BrowserWallet({
     setMessage("");
   };
 
+  /**
+   * Choosing a rail on the Instant Checkout tab.
+   *
+   * Telebirr has an approved merchant API and can be checked out against.
+   * CBE Birr and M-Pesa do NOT: the backend refuses their checkout with
+   * PROVIDER_NOT_AVAILABLE, because they have no approved merchant API yet.
+   *
+   * Offering a button that can only fail was the old behaviour. Those two
+   * rails are approved collection rails and are handled MANUALLY, so choosing
+   * one goes straight to the manual transfer flow with that rail's
+   * instructions -- which is how the money actually moves today.
+   */
+  const chooseCheckoutRail = (rail: PaymentRail) => {
+    if (rail === "TELEBIRR") {
+      setCheckoutRail(rail);
+      setCheckoutFallback(null);
+      return;
+    }
+    setTopUpMethod("MANUAL");
+    setTopUpRail(rail);
+    setCheckoutFallback(null);
+  };
+
   const submitCheckoutTopUp = async () => {
     const amountNum = Number(amount);
     if (!amountNum || amountNum <= 0) {
@@ -699,7 +722,8 @@ export function BrowserWallet({
             {topUpMethod === "INSTANT" ? (
               <div style={{ maxWidth: 540, display: "grid", gap: 14 }}>
                 <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: "0.86rem" }}>
-                  Select an automated payment gateway. Your wallet will be credited automatically.
+                  Select a payment gateway. Telebirr checks out automatically; CBE Birr and
+                  M-Pesa are handled manually and open the transfer instructions.
                 </p>
 
                 <div className="payment-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
@@ -733,10 +757,10 @@ export function BrowserWallet({
                   </button>
                   <button
                     type="button"
-                    disabled
-                    title="CBE Birr automated checkout is not connected yet."
+                    onClick={() => chooseCheckoutRail("CBE_BIRR")}
+                    title="CBE Birr has no automated checkout yet, so it is handled manually: transfer to the account below and upload your receipt."
                     className="payment-account"
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
+                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
                   >
                     <img
                       src="/payment/cbe payment.jpg"
@@ -750,15 +774,15 @@ export function BrowserWallet({
                     />
                     <div className="payment-account-text" style={{ textAlign: "center" }}>
                       <strong>CBE Birr</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Coming later</span>
+                      <span style={{ fontSize: "0.72rem" }}>Manual transfer</span>
                     </div>
                   </button>
                   <button
                     type="button"
-                    disabled
-                    title="M-Pesa automated checkout is not connected yet."
+                    onClick={() => chooseCheckoutRail("M_PESA")}
+                    title="M-Pesa has no automated checkout yet, so it is handled manually: transfer to the account below and upload your receipt."
                     className="payment-account"
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6, opacity: 0.55, cursor: "not-allowed" }}
+                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
                   >
                     <img
                       src="/payment/mpesa.svg"
@@ -772,7 +796,7 @@ export function BrowserWallet({
                     />
                     <div className="payment-account-text" style={{ textAlign: "center" }}>
                       <strong>M-Pesa</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Coming later</span>
+                      <span style={{ fontSize: "0.72rem" }}>Manual transfer</span>
                     </div>
                   </button>
                 </div>

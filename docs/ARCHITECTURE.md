@@ -86,6 +86,7 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 | `admin` | `/api/v1/admin` | Phase 1 RBAC permission matrix, users/contracts/payments/escrow/payouts/ledger/reconciliation/reports/risk/monitoring staff surfaces |
 | `staffProfile` | `/api/v1/staff` | Profile report management (list, resolve) |
 | `search` | N/A (Internal service) | OpenSearch cluster integration (`searchIndex.service.ts`), indexing gigs & jobs, resilient fallback to PostgreSQL |
+| `sla` | N/A (Internal service) | SLA enforcement (`sla.service.ts`): server-computed first-response and resolution clocks for the support and dispute queues, business-day arithmetic, and the breach summary the ops console and `GET /api/v1/admin/sla/summary` read |
 | `bot` | `/api/v1/telegram` | Grammy Telegram bot webhook handler (4-language support: en/am/om/ti, 243 i18n keys, push notifications) |
 
 The secured `disputes/dispute.routes.ts` router is the mounted dispute implementation. The older `disputes.routes.ts` file is not mounted and should be treated as legacy until removed.
@@ -181,7 +182,7 @@ Telebirr B2C disbursement is live; deterministic sandbox simulation is used when
   | Constant | Value | Note |
   |---|---|---|
   | `PLATFORM_FEE_RATE_FREELANCER` | `0.07` | Deducted from the freelancer's gross on release (7% platform commission) |
-  | `PAYMENT_PROVIDER_FEE_RATE` | `0.005` | Payment/disbursement provider fee, on the same gross. Overall platform take **7.5%**, freelancer nets **92.5%** |
+  | `PAYMENT_PROVIDER_FEE_RATE` | `0.005` | Payment/disbursement provider fee, on the same gross. **The 7.5% total is all-in**: it covers the platform commission AND every cost the platform carries to move the money, including the cash-out charge the platform absorbs at payout rather than passing on |
   | `PLATFORM_FEE_RATE_CLIENT` | `0` | No client deposit surcharge (unified 7% rule, 2026-11-09) |
   | `WITHHOLDING_THRESHOLD_MINOR` | `1_000_000` (10,000 ETB) | Withholding only applies at/above this gross |
   | `WITHHOLDING_RATE_WITH_TIN` | `0.03` | Configured but **not applied** — the withholding block in `calculateFees()` is commented out (deferred, TAX-002) |
@@ -338,7 +339,7 @@ These are **not** implemented today. They are recorded here so the architecture 
 |---|---|---|
 | Fayda | Mock verification (eSignet OIDC/PAR stub) | Formal integration and approved credentials |
 | PEP/Sanctions | Stub screening | Approved sanctions/PEP source; server refuses production boot with mock |
-| Payment collection (C2B) | **Telebirr C2B Web Checkout (RSA-PSS) only.** `cbe.client.ts` and `mpesa.client.ts` always throw `PaymentProviderUnavailableError` | Sandbox/live mapping and reconciliation; CBE webhook scheme confirmation (PAY-004); M-Pesa integration path undecided |
+| Payment collection (C2B) | **Telebirr C2B Web Checkout (RSA-PSS).** CBE Birr and M-Pesa are **approved rails handled manually**: choosing either in the wallet switches straight to the manual transfer flow with that rail's account details and a receipt upload for staff verification, because neither has an approved merchant API (`cbe.client.ts` and `mpesa.client.ts` both throw `PaymentProviderUnavailableError`) | Safaricom merchant credentials and the CBE integration path (PAY-004) |
 | Payout (B2C) | Telebirr B2C live with deterministic sandbox simulation; automatic wallet rollback on provider refusal | Production credentials, monitoring, reconciliation |
 | SMS | Worker client | Credentials, templates, delivery monitoring |
 | Telegram | Grammy bot + Mini App init-data verification | Production push verification, account linking |
@@ -377,8 +378,22 @@ The production CSP is injected into `index.html` as a `<meta>` tag by `productio
 
 See `SETUP.md` for exact commands.
 
-## Continuous Integration
+## Service Levels
 
+The Roadmap's helpdesk SLAs — "general support within 24 hours" and "disputes within 3 business days" — are enforced **server-side**, not drawn in the browser.
+
+| Queue | First response | Resolution |
+|---|---|---|
+| Support | Staff's first reply on the ticket — `SUPPORT_FIRST_RESPONSE_SLA_HOURS` (default 24) | The ticket being closed — `SUPPORT_RESOLUTION_SLA_HOURS` (default 72) |
+| Disputes | The mediator claiming the case or recording a recommendation — `DISPUTE_FIRST_RESPONSE_SLA_BUSINESS_DAYS` (default 3) | The dispute reaching `RESOLVED` — `DISPUTE_RESOLUTION_SLA_BUSINESS_DAYS` (default 7) |
+
+Only the **facts** are stored — `Conversation.firstRespondedAt`, `Conversation.resolvedAt`, `Dispute.firstRespondedAt` (migration `20261112140000_sla_tracking`). The deadlines are **derived** from `createdAt` plus the configured targets, so changing a target applies immediately to every open item. Both facts are written once: a later reply cannot rewrite the first response, and a late reply does not un-breach a clock that was already missed.
+
+A business day is **Monday to Saturday**; Sunday is the only excluded day. Public holidays are not excluded, because the system has no holiday calendar.
+
+The state rides on the existing staff queues (`GET /api/v1/chat/admin/conversations`, `GET /api/v1/disputes/staff/queue`) and is counted by `GET /api/v1/admin/sla/summary`. It is **visible and reportable but not escalated**: nothing is automatically reassigned or auto-closed. See `docs/SYSTEM_DESIGN.md` §3.19.
+
+## Continuous Integration
 Two GitHub Actions workflows exist at `.github/workflows/`:
 
 | Workflow | What it actually does |

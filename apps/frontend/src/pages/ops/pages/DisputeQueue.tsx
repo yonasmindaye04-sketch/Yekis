@@ -67,8 +67,13 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
+  // The breach flag comes from the server (either clock missed). The
+  // browser-side `slaH` is only the fallback for rows that predate the
+  // server-side SLA.
   const visibleRows =
-    kpiFilter === "BREACHED" ? rows.filter((d) => d.slaH < 0) : rows;
+    kpiFilter === "BREACHED"
+      ? rows.filter((d) => d.sla?.breached ?? d.slaH < 0)
+      : rows;
   const sel = visibleRows.find((d) => d.id === selId) ?? rows.find((d) => d.id === selId) ?? null;
 
   useHotkeys(
@@ -264,7 +269,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                   <Pill s={d.stage} />
                 </div>
                 <div style={{ marginTop: 7 }}>
-                  <SlaBadge h={d.slaH} />
+                  <SlaBadge h={d.slaH} sla={d.sla} />
                 </div>
               </button>
             ))
@@ -277,7 +282,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>{sel.job}</h3>
-                <SlaBadge h={sel.slaH} />
+                <SlaBadge h={sel.slaH} sla={sel.sla} />
               </div>
               <div className="qd-meta">
                 Dispute category: <b style={{ color: "var(--ops-text)" }}>{sel.cat.replace(/_/g, " ")}</b> ·{" "}

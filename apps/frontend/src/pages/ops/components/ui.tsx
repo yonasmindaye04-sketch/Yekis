@@ -208,7 +208,38 @@ export function Rail({ p }: { p: RailT | string }) {
   );
 }
 
-export function SlaBadge({ h }: { h: number }) {
+export function SlaBadge({
+  h,
+  sla,
+}: {
+  h: number;
+  sla?: {
+    firstResponse: { breached: boolean; remainingMinutes: number; metAt: string | null };
+    resolution: { breached: boolean; remainingMinutes: number; metAt: string | null };
+    breached: boolean;
+  } | null;
+}) {
+  // When the API returned server-computed SLA state, render that. It is the
+  // same number the reporting endpoint counts, so the badge and the report
+  // cannot disagree.
+  if (sla) {
+    if (sla.breached) {
+      const clock = sla.firstResponse.breached ? sla.firstResponse : sla.resolution;
+      const which = sla.firstResponse.breached ? "no first response" : "unresolved";
+      return (
+        <span className="sla breach">
+          ● {which} for {Math.floor(Math.abs(clock.remainingMinutes) / 60)}h
+        </span>
+      );
+    }
+    const clock = sla.firstResponse.metAt ? sla.resolution : sla.firstResponse;
+    if (clock.metAt) return <span className="sla ok">● SLA met</span>;
+    const hours = Math.max(0, Math.floor(clock.remainingMinutes / 60));
+    if (hours < 24)
+      return <span className="sla warn">● SLA due in {hours}h</span>;
+    return <span className="sla ok">● SLA due in {Math.floor(hours / 24)}d</span>;
+  }
+
   // h === Infinity means the case carries no mediation deadline at all.
   if (!Number.isFinite(h))
     return <span className="sla ok">● No SLA deadline</span>;

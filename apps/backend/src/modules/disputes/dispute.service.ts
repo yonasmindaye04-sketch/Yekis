@@ -17,6 +17,7 @@ import { recordDisputeRefundLedger } from "../finance/ledger.service.js";
 import { uploadEvidenceBundle } from "../../lib/objectStore.js";
 import { logger } from "../../lib/logger.js";
 import { createHash } from "node:crypto";
+import { disputeSla } from "../sla/sla.service.js";
 
 // === MAIN FUNCTIONS ===
 export class DisputeNotFoundError extends Error {}
@@ -402,7 +403,17 @@ export async function getMediationQueue(params?: {
     }),
   ]);
 
-  return { items, total, page, pageSize: limit };
+  return {
+    items: items.map((d) => ({
+      ...d,
+      // SLA is computed and attached server-side, so the console does not
+      // have to redraw the clock and a breach is the same fact everywhere.
+      sla: disputeSla(d),
+    })),
+    total,
+    page,
+    pageSize: limit,
+  };
 }
 
 /**
@@ -505,6 +516,10 @@ try {
             mediatorRecommendation: params.recommendation,
             freelancerShareMinor: params.freelancerShareMinor ?? null,
             resolvedAt: new Date(),
+            // The recommendation IS the mediator's answer. If the dispute was
+            // never claimed, recording the recommendation is still the first
+            // response -- write it, once.
+            firstRespondedAt: dispute.firstRespondedAt ?? new Date(),
           },
         });
         if (claim.count === 0) {
@@ -802,6 +817,10 @@ export async function claimDisputeAsMediator(params: {
     data: {
       assignedMediatorStaffId: params.staffUserId,
       assignedAt: new Date(),
+      // Claiming the case is the first staff response: someone is on it.
+      // It stops the first-response SLA clock, and it is written once so a
+      // later claim cannot un-breach a dispute that was already missed.
+      firstRespondedAt: new Date(),
     },
   });
 

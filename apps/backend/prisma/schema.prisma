@@ -592,8 +592,12 @@ model Dispute {
   stage                                  DisputeStage              @default(STAGE_1_NEGOTIATION)
   raisedByUserId                         String
   description                            String
-  negotiationDeadlineAt                  DateTime? // Stage 1 — 7 days from raise
-  mediationDeadlineAt                    DateTime? // Stage 3 — 3-5 business days from escalation
+  negotiationDeadlineAt                  DateTime? // Stage 1 - 7 days from raise
+  mediationDeadlineAt                    DateTime? // Stage 3 - 3-5 business days from escalation
+  // SLA facts. The deadlines are DERIVED from createdAt plus the configured
+  // targets (see modules/sla/sla.service.ts); this records when the mediator
+  // first answered, so a breach is a queryable fact.
+  firstRespondedAt                       DateTime? // mediator recommendation recorded
   evidenceBundlePath                     String? // compiled Stage 2 package (object store pointer)
   evidenceBundleHash                     String?
   mediatorRecommendation                 String?
@@ -620,6 +624,7 @@ model Dispute {
   @@index([gigOrderId])
   @@index([milestoneId])
   @@index([stage])
+  @@index([stage, firstRespondedAt])
 }
 
 model DisputeEvidence {
@@ -742,6 +747,12 @@ model Conversation {
   contactEmail    String?
   subject         String
   status          String   @default("OPEN") // OPEN | CLOSED
+  // SLA facts. The deadlines are DERIVED from createdAt plus the configured
+  // targets (see modules/sla/sla.service.ts); these record when each
+  // obligation was actually met, so a breach is a queryable fact rather
+  // than a number redrawn in the browser.
+  firstRespondedAt DateTime? // staff's first reply on the ticket
+  resolvedAt       DateTime? // the ticket was closed
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -751,6 +762,7 @@ model Conversation {
   @@index([status])
   @@index([creatorId])
   @@index([assignedStaffId])
+  @@index([status, firstRespondedAt])
 }
 
 model ConversationParticipant {

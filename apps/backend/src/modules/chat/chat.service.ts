@@ -5,6 +5,7 @@ import { notifyStaffOfEvent } from "../../lib/staffAlerts.js";
 import { randomBytes, randomInt } from "node:crypto";
 import { broadcastToConversation, broadcastToStaff, sendToUser } from "../../lib/socket.js";
 import { notificationQueue } from "../../queue/queues.js";
+import { supportSla } from "../sla/sla.service.js";
 
 // === MAIN FUNCTIONS ===
 export class ConversationNotFoundError extends Error {}
@@ -565,7 +566,15 @@ export async function sendMessage(params: {
     });
     await tx.conversation.update({
       where: { id: conversation.id },
-      data: { updatedAt: new Date() },
+      data: {
+        updatedAt: new Date(),
+        // The first staff reply stops the first-response SLA clock. It is
+        // written once and never rewritten, so a later message cannot
+        // "un-breach" a ticket that was already missed.
+        ...(isStaff && !conversation.firstRespondedAt
+          ? { firstRespondedAt: new Date() }
+          : {}),
+      },
     });
     return created.id;
   });
@@ -1024,6 +1033,9 @@ export async function listStaffConversations(params?: {
             name: staffDisplayName(c.assignedStaff.email),
           }
         : null,
+      // SLA is computed and attached server-side, so the console does not
+      // have to redraw the clock and a breach is the same fact everywhere.
+      sla: supportSla(c),
     })),
     total,
     page,
@@ -1041,7 +1053,15 @@ export async function setConversationStatus(params: {
   if (!conversation) throw new ConversationNotFoundError();
   return prisma.conversation.update({
     where: { id: params.conversationId },
-    data: { status: params.status },
+    data: {
+      status: params.status,
+      // Closing the ticket stops the resolution SLA clock. It is written once:
+      // reopening a ticket does not un-breach a resolution that was already
+      // missed, and the fact that it was closed at all is kept.
+      ...(params.status === "CLOSED" && !conversation.resolvedAt
+        ? { resolvedAt: new Date() }
+        : {}),
+    },
     include: {
       creator: { select: { id: true, email: true, role: true } },
       assignedStaff: { select: STAFF_SELECT },

@@ -375,6 +375,16 @@ export interface RawDisputeItem {
   negotiationDeadlineAt: string | null;
   mediationDeadlineAt: string | null;
   createdAt: string;
+  /**
+   * SLA state, computed server-side (see modules/sla/sla.service.ts). The
+   * Roadmap's "disputes within 3 business days" is the FIRST RESPONSE clock
+   * here; the mediation deadline is a separate, later stage deadline.
+   */
+  sla?: {
+    firstResponse: SlaClock;
+    resolution: SlaClock;
+    breached: boolean;
+  };
   evidence: Array<{
     id: string;
     submittedByUserId: string;
@@ -500,6 +510,17 @@ export type RawTopUpPage = {
 };
 
 /* ── support chat queue ── */
+/**
+ * One SLA clock: a deadline, when the obligation was met (if it has been),
+ * and whether it was missed. Computed server-side.
+ */
+export interface SlaClock {
+  dueAt: string;
+  metAt: string | null;
+  breached: boolean;
+  remainingMinutes: number;
+}
+
 export interface RawConversation {
   id: string;
   subject: string;
@@ -508,6 +529,15 @@ export interface RawConversation {
   creator: { id: string; email: string; role: PrismaUserRole };
   assignedStaff: { id: string; name: string } | null;
   messages: Array<{ body: string; createdAt: string }>;
+  /**
+   * SLA state, computed server-side so the console does not redraw the clock
+   * and a breach is the same fact everywhere. Absent on older cached rows.
+   */
+  sla?: {
+    firstResponse: SlaClock;
+    resolution: SlaClock;
+    breached: boolean;
+  };
 }
 export type RawConversationPage = {
   items: RawConversation[];

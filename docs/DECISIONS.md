@@ -7,11 +7,11 @@ The founder closed twelve Phase 0 / Phase 1 decisions. Each is recorded here wit
 
 | # | Decision | Code status |
 |---|---|---|
-| 1 | Content is authored by the founder (bilingual Amharic + English) with Gemini as the second-language assistant; no external hire | No code. Output still needs founder review before it reaches users |
+| 1 | Content is authored by the founder (bilingual Amharic + English) with Gemini as the second-language assistant; no external hire | No code. **Review rule:** the assistant drafts, the founder reviews and signs off before anything reaches users |
 | 2 | Approved collection rails are **Telebirr, CBE Birr and M-Pesa**; Chapa removed; bank-custodian deferred as FIN-001 | App layer exposes exactly those three. **Only Telebirr has a working adapter** — CBE and M-Pesa are throwing stubs |
-| 3 | The founder is the appointed DPO (PDPP Art. 37) | No code. Independence expectation flagged for counsel |
+| 3 | A DPO (PDPP Art. 37) is **deferred to a later phase**; the MVP launches without one | No code. The founder holds the responsibility informally until the appointment is made |
 | 4 | Subprocessor DPA scope: Fayda ID, cloud provider, Telebirr, CBE Birr, M-Pesa (Chapa removed) | No code. DPAs not executed |
-| 5 | **Ten** launch subcategories | ✅ `LaunchCategory` = 10 values (migration `20261112120000_launch_categories_ten`), validation + 4-language i18n |
+| 5 | **Ten** launch subcategories at launch — **not a ceiling**; the list may grow | ✅ `LaunchCategory` = 10 values (migration `20261112120000_launch_categories_ten`), validation + 4-language i18n. Growth is an additive `ALTER TYPE ... ADD VALUE`, so no existing row is ever rewritten |
 | 6 | **7% platform commission, 0% client surcharge** | ✅ `PLATFORM_FEE_RATE_FREELANCER = 0.07`, `PLATFORM_FEE_RATE_CLIENT = 0` |
 | 7 | Tech stack = what the codebase already uses: React + Vite, Node + Express + TypeScript, PostgreSQL + pgaudit, Redis + BullMQ, MinIO/S3 | Already true. Ethiopian hosting still outstanding |
 | 8 | **M-Pesa is an approved rail** — supersedes Master Design `PAY-003` | Approved, but `mpesa.client.ts` still throws until Safaricom supplies the merchant API |
@@ -29,6 +29,18 @@ The platform's take on a transaction is **7.5%**, collected as two components at
 The Income Tax Proclamation's 3% (with TIN) / 30% (without) withholding on payouts at or above ETB 10,000 is **not applied**. The calculation is commented out in `calculateFees()`.
 - **Rationale:** the ERA remittance channel, form numbers, filing frequency, supporting-document requirements and responsible party are all unconfirmed (`TAX-002`, OPEN ACTION), and the accountant has not signed off on the figures. Deducting an unverified statutory amount from freelancer payouts before that confirmation would take money from workers on the strength of a guess.
 - **Mechanics:** the rates (`WITHHOLDING_RATE_WITH_TIN`, `WITHHOLDING_RATE_WITHOUT_TIN`) and the threshold (`WITHHOLDING_THRESHOLD_MINOR`) stay in `env.ts`, and `TIN_FEATURE_ENABLED` stays as the switch, so reactivation is a one-line change rather than a reconstruction. The commented block is kept in place, not deleted.
+
+### Unified 7.5% Take Is All-In
+The platform's take on a transaction is **7.5%**, and it covers **every cost**: the 7% platform commission, the payment/disbursement provider fee, and the cash-out charge the platform absorbs at payout rather than passing on to the freelancer.
+
+- **Rationale:** a freelancer who sees "92.5%" on one screen and then loses a further 0.5% at withdrawal is being charged twice for the same thing. Making the 7.5% the single, visible, all-in number is the whole point of moving the provider fee into the fee engine.
+- **Consequences:** the payout disburses the full wallet amount with no further deduction, and the 0.5% is credited to `REVENUE-DISBURSEMENT-FEES` at release. The platform's actual cash-out cost is not separately booked at payout, because the provider does not surface the charge on the disbursement response — the 0.5% is the platform's provision for it.
+
+### Manual Rails For CBE Birr And M-Pesa
+CBE Birr and M-Pesa are approved collection rails with no merchant API. Until Safaricom and CBE supply one, **both are handled manually**: choosing either in the wallet switches straight to the manual transfer flow with that rail's account details and a receipt upload for staff verification.
+
+- **Rationale:** the previous behaviour offered a button that could only fail — the checkout was attempted, the backend refused it with `PROVIDER_NOT_AVAILABLE`, and the user had to interpret the failure before being offered the manual path. The manual flow is how these rails actually move money today, so that is where the user should start.
+- The rails remain approved and the client stubs remain in place: they are the integration points the decision keeps alive.
 
 ### Ten Launch Categories
 The launch subcategory list is **ten**, not the Roadmap's original four-to-six: the original six (Web & Mobile App Development, Graphic Design & Branding, Digital Marketing, Content & Copywriting, Translation & Localization, Data Processing) plus **Video Production**, **Accounting & Bookkeeping**, **Legal Research** and **Data Analytics**.

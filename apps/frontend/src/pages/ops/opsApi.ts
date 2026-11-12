@@ -463,7 +463,14 @@ const toDispute = (r: RawDisputeItem): DisputeItem => {
     amt: ms.reduce((s, m) => s + m.amountMinor, 0),
     hasDel: ms.some((m) => Boolean(m.deliverableUrl)),
     deliverableUrl: deliverable?.deliverableUrl ?? null,
-    slaH: hoursUntil(r.mediationDeadlineAt),
+    // The server computes the SLA (the Roadmap's "disputes within 3 business
+    // days" first-response clock). The mediation deadline is a different,
+    // later stage deadline, so it is kept as a fallback for rows that predate
+    // the server-side SLA rather than being presented as the SLA.
+    slaH: r.sla
+      ? r.sla.firstResponse.remainingMinutes / 60
+      : hoursUntil(r.mediationDeadlineAt),
+    sla: r.sla ?? null,
     created: r.createdAt,
     ev: r.evidence.map((e) => ({
       side: e.submittedByUserId === r.contract?.freelancer.id ? ("freelancer" as const) : ("client" as const),

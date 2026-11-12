@@ -3,10 +3,11 @@
 Last validated: 2026-11-12
 
 > **Phase 0 Decision Lock — what the user actually sees (2026-11-12):**
+> - **Support and dispute SLAs are real now.** A support ticket has two clocks: the first staff reply (24 h) and the ticket being closed (72 h). A dispute has two clocks: the mediator answering (3 business days, Monday to Saturday) and the dispute reaching a resolution (7 business days). The ops console shows the server's own answer, the Support Desk and Dispute Queue can filter to breached cases only, and `GET /api/v1/admin/sla/summary` counts them for reporting. A late reply does not erase a breach, and nothing is auto-escalated or auto-closed — a breach is visible and countable, and a human still decides.
 > - **Fee breakdown**: the platform's overall take is **7.5%** — a 7% commission plus a 0.5% payment/disbursement provider fee. The freelancer nets **92.5%**. The fee breakdown component (`EscrowFeeBreakdown`) now shows the two components as separate rows, so the take is visible before the client accepts, rather than a further deduction appearing at cash-out.
 > - **No withholding yet**: the statutory withholding toggle on the fees page is labelled *deferred* and the backend deduction is commented out. Withholding is 0 until the accountant confirms the ERA remittance procedure.
-> - **Ten launch categories**: job posting, gig browsing and the search filters now offer Video Production, Accounting & Bookkeeping, Legal Research and Data Analytics alongside the original six, in all four languages.
-> - **M-Pesa is an approved rail** but cannot take money yet — selecting it surfaces the "unavailable" path until Safaricom supplies the merchant API.
+> - **Ten launch categories, and that is not a ceiling**: job posting, gig browsing and the search filters now offer Video Production, Accounting & Bookkeeping, Legal Research and Data Analytics alongside the original six, in all four languages. More can be added at any time — the list grows by an additive migration, so nothing already posted is rewritten.
+> - **CBE Birr and M-Pesa are approved rails handled manually.** Selecting either one in the wallet goes straight to the manual transfer flow with that rail's account details, a reference to quote, and a receipt upload for staff verification — no failed checkout to interpret. Telebirr is the only rail with an automated checkout.
 > - **Support**: the in-app support desk is the helpdesk. No external vendor, and the 24-hour / 3-business-day SLAs are **not** enforced by the platform yet.
 
 > **Multi-Language Fiscal Receipt & Payout Voucher Architecture (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09):**

@@ -366,6 +366,12 @@ export interface DisputeItem {
   /** Direct link to the submitted deliverable, when one exists. */
   deliverableUrl: string | null;
   slaH: number; // negative = breached
+  /** Server-computed SLA state, when the API returned it. */
+  sla?: {
+    firstResponse: { dueAt: string; metAt: string | null; breached: boolean; remainingMinutes: number };
+    resolution: { dueAt: string; metAt: string | null; breached: boolean; remainingMinutes: number };
+    breached: boolean;
+  } | null;
   created: string;
   ev: EvidenceMsg[];
 }

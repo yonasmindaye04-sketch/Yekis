@@ -5,6 +5,23 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Added
+- **Service levels are enforced server-side (2026-11-12)** (`apps/backend/src/modules/sla/sla.service.ts`, new module; `chat.service.ts`, `dispute.service.ts`, `admin.routes.ts`). The Roadmap's helpdesk SLAs — "general support within 24 hours" and "disputes within 3 business days" — were previously a number drawn in the browser: the ops console computed "hours since the ticket was created" and coloured it. Nothing was enforced, nothing was stored, and nothing could be reported on.
+  - **Two clocks per queue.** Support: first staff reply (24 h) and the ticket being closed (72 h). Disputes: the mediator answering (3 business days) and the dispute reaching `RESOLVED` (7 business days). The dispute first-response clock deliberately does not start at the raise: Stage 1 negotiation is designed to run seven days, so that reading would be breached by construction.
+  - **Only the facts are stored** — `Conversation.firstRespondedAt`, `Conversation.resolvedAt`, `Dispute.firstRespondedAt` (migration `20261112140000_sla_tracking`). The deadlines are **derived** from `createdAt` plus the configured targets, so changing a target applies immediately to every open item and there is no stored deadline to go stale.
+  - **Written once.** A later reply cannot rewrite the first response, and a late reply does not un-breach a clock that was already missed: a breach is a fact about what happened, not a snapshot of the present.
+  - **Business days are Monday to Saturday**; Sunday is the only excluded day. Public holidays are not excluded — there is no holiday calendar in the system, and inventing one would silently drift from reality.
+  - The state rides on `GET /api/v1/chat/admin/conversations` and `GET /api/v1/disputes/staff/queue`; `GET /api/v1/admin/sla/summary` counts the open queues by breach state. The ops console renders the server's state instead of recomputing it, and both queues can filter to breached cases.
+  - **Not escalated.** A breach is visible, countable and filterable; nothing is automatically reassigned, escalated to a supervisor, or auto-closed. Enforcement that moves work between people without a human deciding is a larger decision than an MVP should make quietly.
+  - Covered by `apps/backend/tests/sla-enforcement.test.ts`.
+
+### Changed
+- **CBE Birr and M-Pesa are handled manually (2026-11-12)** (`apps/frontend/src/BrowserWallet.tsx`): choosing either rail in the wallet now switches straight to the manual transfer flow with that rail's account details, a reference to quote and a receipt upload for staff verification. The previous behaviour offered a button that could only fail — the checkout was attempted, the backend refused it with `PROVIDER_NOT_AVAILABLE`, and the user had to interpret the failure before being offered the manual path. Both rails remain approved and both client stubs remain in place as the integration points.
+- **The 7.5% take is all-in (2026-11-12)**: it covers the 7% platform commission, the payment/disbursement provider fee, and the cash-out charge the platform absorbs at payout rather than passing on to the freelancer. A freelancer who sees "92.5%" on one screen and then loses a further 0.5% at withdrawal was being charged twice for the same thing.
+- **The launch-category list is ten, and ten is not a ceiling (2026-11-12)**: the enum grows by additive migration, so more subcategories can be added at any time without rewriting a single existing row.
+- **A DPO is deferred (2026-11-12)**: the appointment happens in a later phase. The MVP launches without one and the founder holds the data-protection responsibility informally until then.
+- **AI-assisted content is drafted, not published (2026-11-12)** (`docs/rule.md` §13.5): the assistant drafts, the founder reviews and signs off before anything reaches a user. Machine-translation artefacts in a shipped locale are a defect, not a cosmetic issue.
+
+### Added
 - **Ten launch categories (2026-11-12)** — the Phase 0 launch-category lock widened `LaunchCategory` from six subcategories to **ten**: the original six plus **Video Production, Accounting & Bookkeeping, Legal Research** (the Roadmap's own second-sector candidates) and **Data Analytics**.
   - `apps/backend/prisma/schema.prisma` — four new enum values.
   - `apps/backend/prisma/migrations/20261112120000_launch_categories_ten/migration.sql` — **additive only** (`ALTER TYPE ... ADD VALUE IF NOT EXISTS` per value, with `duplicate_object` guards). No existing `Job.category` or `Gig.category` row is rewritten.

@@ -29,6 +29,7 @@
    - 3.16 [Module: Admin, RBAC & the Ops Console](#316-module-admin-rbac--the-ops-console-appsbackendsrcmodulesadmin)
    - 3.17 [Module: Privacy & Data-Subject Rights](#317-module-privacy--data-subject-rights-appsbackendsrcmodulesprivacy)
    - 3.18 [Module: Search & OpenSearch Integration](#318-module-search--opensearch-integration-appsbackendsrcmodulessearch)
+- 3.19 [Module: SLA Enforcement](#319-module-sla-enforcement-appsbackendsrcmodulessla)
 4. [Cross-Cutting Concerns](#4-cross-cutting-concerns)
    - 4.1 [Authentication & Permission Enforcement Model](#41-authentication--permission-enforcement-model)
    - 4.2 [Audit Logging & Append-Only AML Guarantee](#42-audit-logging--append-only-aml-guarantee)
@@ -1694,6 +1695,39 @@ The Postgres fallback filters on `status: "ACTIVE"` (hard-coded — `GigSearchQu
 - `minPriceMinor` / `maxPriceMinor` are declared on `GigSearchQuery` and read nowhere — price filtering is a no-op on both paths.
 - On the OpenSearch path the returned `total` is the number of rows after filtering, **capped at 100** — not the true match count.
 - There is **no test coverage** for the module.
+
+---
+
+### 3.19 Module: SLA Enforcement (`apps/backend/src/modules/sla/`)
+
+* **Purpose:** the Roadmap's helpdesk SLAs — "general support within 24 hours" and "disputes within 3 business days" — as facts the platform can enforce and report, rather than a number drawn in the browser.
+* **Files:** `sla.service.ts` (the implementation). No routes of its own: the state rides on the existing staff queues and the summary route lives in the admin module.
+* **Routes:** `GET /api/v1/admin/sla/summary` (reporting), plus the `sla` field attached to every row of `GET /api/v1/chat/admin/conversations` and `GET /api/v1/disputes/staff/queue`.
+
+#### Two clocks per queue
+
+| Queue | First response | Resolution |
+|---|---|---|
+| Support | Staff's first reply on the ticket — `SUPPORT_FIRST_RESPONSE_SLA_HOURS` (default 24) | The ticket being closed — `SUPPORT_RESOLUTION_SLA_HOURS` (default 72) |
+| Disputes | The mediator claiming the case, or recording a recommendation — `DISPUTE_FIRST_RESPONSE_SLA_BUSINESS_DAYS` (default 3) | The dispute reaching `RESOLVED` — `DISPUTE_RESOLUTION_SLA_BUSINESS_DAYS` (default 7) |
+
+The dispute first-response clock deliberately does **not** start at the raise-and-expect-resolution reading of "3 business days": Stage 1 negotiation is designed to run seven days, so that clock would be breached by construction. It measures the time to a substantive staff answer.
+
+#### What is stored, and what is derived
+
+Only the **facts** are stored: `Conversation.firstRespondedAt`, `Conversation.resolvedAt` and `Dispute.firstRespondedAt` (migration `20261112140000_sla_tracking`). The **deadlines are derived** from `createdAt` plus the configured targets, so changing a target takes effect immediately for every open item and there is no stored deadline to go stale.
+
+Both facts are written **once**. A later reply cannot rewrite the first response, and a late reply does not un-breach a clock that was already missed: a breach is a fact about what happened, not a snapshot of the present.
+
+#### Business days
+
+A business day is **Monday to Saturday**; Sunday is the only excluded day. Public holidays are not excluded — there is no holiday calendar in the system, and inventing one would silently drift from reality. Only the day *count* is filtered: a deadline that lands on a Sunday is still a Sunday.
+
+#### Enforcement, and its limit
+
+The SLA is **visible and reportable**. The ops console renders the server's state rather than recomputing it, `GET /api/v1/admin/sla/summary` counts the open queues by breach state, and the breach flag is filterable in both queues.
+
+There is **no escalation**. A breach is visible, countable and filterable, but nothing is automatically reassigned, escalated to a supervisor, or auto-closed. That was the deliberate boundary: enforcement that moves work between people without a human deciding is a larger decision than an MVP should make quietly.
 
 ---
 
