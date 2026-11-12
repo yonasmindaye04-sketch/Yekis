@@ -111,6 +111,8 @@ class MockStore {
   })();
 
   walletMinor = 31920000;
+  /** The outstanding withdrawal approval code, mirroring the backend's one-shot challenge. */
+  withdrawalOtp: string | null = null;
 
   skills: (SkillSummary & { nameEn: string; nameAm: string })[] = [
     { id: "sk-1", name: "React & TypeScript", nameEn: "React & TypeScript", nameAm: "ሪአክት እና ታይፕስክሪፕት", category: "WEB_APP_DEVELOPMENT" },
@@ -2017,7 +2019,27 @@ class MockStore {
         pendingMinor: 4500000,
       } satisfies WalletResponse;
     }
+    if (cleanPath === "/escrow/wallet/withdraw/otp" && method === "POST") {
+      // The mock returns the code so the offline demo can complete a
+      // withdrawal. The real endpoint only ever returns it outside production.
+      const devCode = "123456";
+      this.withdrawalOtp = devCode;
+      return {
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        retryAfterSec: 60,
+        devCode,
+      };
+    }
     if (cleanPath === "/escrow/wallet/withdraw" && method === "POST") {
+      // Two-factor approval is mandatory: without a valid code the withdrawal
+      // is refused, exactly as the backend refuses it.
+      if (!this.withdrawalOtp || parsedBody?.otpCode !== this.withdrawalOtp) {
+        return {
+          error: "WITHDRAWAL_CODE_INVALID",
+          message: "That code is not valid.",
+        };
+      }
+      this.withdrawalOtp = null;
       const amountMinor = Number(parsedBody?.amountMinor || 0);
       if (amountMinor > 0 && amountMinor <= this.walletMinor) {
         this.walletMinor -= amountMinor;

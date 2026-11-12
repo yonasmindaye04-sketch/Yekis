@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   CreateBucketCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "node:crypto";
@@ -266,6 +267,72 @@ export async function getChatAttachmentStream(storageKey: string) {
     } catch {}
     throw err;
   }
+}
+
+/**
+ * Deletes an object from the store, and removes the local-disk backup too.
+ *
+ * Added for PDPP data erasure: wiping the database row is not enough when
+ * the bytes themselves are personal data — a chat attachment left in the
+ * bucket (or in the `uploads/` fallback directory) is still the data subject's
+ * data, and still readable by anyone holding the key.
+ *
+ * The local backup matters as much as the bucket. `uploadChatAttachment`
+ * writes every attachment to disk as well, and `getChatAttachmentStream`
+ * falls back to that copy when the bucket is unreachable — so deleting only
+ * the bucket object would leave the file fully readable through the API.
+ *
+ * Deletion is best-effort by design: a missing object is already gone, and a
+ * store that is down must not abort the erasure of the database rows. The
+ * return value says what actually happened so the caller can record it.
+ *
+ * NOTE ON WORM STORAGE: if object lock is later enabled in compliance mode,
+ * the store will reject the delete rather than removing the bytes, and a
+ * delete marker may be written instead. That is the correct behaviour for a
+ * locked bucket — the retention period wins — but it means an erasure in a
+ * WORM-configured environment needs a separate retention-exception process.
+ */
+export async function deleteObject(
+  storageKey: string,
+): Promise<{ bucketDeleted: boolean; localBackupDeleted: boolean; reason?: string }> {
+  let bucketDeleted = false;
+  let localBackupDeleted = false;
+  let reason: string | undefined;
+
+  try {
+    await objectStoreClient.send(
+      new DeleteObjectCommand({
+        Bucket: env.OBJECT_STORE_BUCKET,
+        Key: storageKey,
+      }),
+    );
+    bucketDeleted = true;
+  } catch (err) {
+    // NoSuchKey means it is already gone, which is the desired end state.
+    const name = (err as { name?: string })?.name;
+    if (name === "NoSuchKey" || name === "NotFound") {
+      bucketDeleted = true;
+    } else {
+      reason = name ?? "delete_failed";
+      logger.warn({ err, storageKey }, "Failed to delete object from object store");
+    }
+  }
+
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const localFile = path.resolve(
+      process.cwd(),
+      "uploads",
+      ...storageKey.split("/"),
+    );
+    await fs.rm(localFile, { force: true });
+    localBackupDeleted = true;
+  } catch (err) {
+    logger.warn({ err, storageKey }, "Failed to delete local object-store backup");
+  }
+
+  return { bucketDeleted, localBackupDeleted, reason };
 }
 
 // TIER 3 — PDPP Art. 22 DATA LOCALIZATION BLOCKER:

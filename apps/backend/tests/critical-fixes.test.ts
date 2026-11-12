@@ -41,15 +41,16 @@ const STAMP = Date.now();
 const M = 100000;
 const ids: string[] = [];
 /**
- * Milestone ids this file created, so the ledger cleanup can be scoped to
- * THIS file's journals.
+ * The milestones this file created.
  *
- * A pattern like `idempotencyKey: { contains: "escrow-fund-" }` matched every
- * funding journal in the database, including the ones belonging to suites
- * running in parallel. When this file's afterEach landed between another
- * suite's seed and its assertion, that suite read an escrow pool that had
- * never been funded. The ledger rows are shared across test files, so the
- * cleanup has to be scoped the same way the user fixtures are.
+ * The ledger cleanup is scoped to these. It used to delete every journal whose
+ * idempotency key contained "escrow-fund-" — which is the PRODUCTION key
+ * prefix (`escrow-fund-${milestoneId}`), used by every suite that funds an
+ * escrow. Running in parallel against one shared test database, this file's
+ * `afterEach` therefore deleted other suites' funding journals, and those
+ * suites' escrow-pool assertions then read a pool that had never been funded.
+ * The symptom was an intermittent failure in a different file, which is the
+ * hardest kind of failure to attribute.
  */
 const milestoneIds: string[] = [];
 let seq = 0;
@@ -114,17 +115,14 @@ async function makeMilestone(clientId: string, freelancerId: string) {
 
 afterEach(async () => {
   const all = ids.length ? ids : ["__none__"];
-  const mine = milestoneIds.length ? milestoneIds : ["__none__"];
+  const milestones = milestoneIds.length ? milestoneIds : ["__none__"];
   await prisma.auditLog.deleteMany({ where: { userId: { in: all } } });
-  // Scoped to THIS file's milestones (see milestoneIds). Deleting every
-  // "escrow-fund-" journal in the database also deleted other suites'
-  // journals, and those suites then read an escrow pool that had never been
-  // funded.
+  // Scoped to THIS file's milestones — see the note on `milestoneIds`.
   await prisma.ledgerEntry.deleteMany({
-    where: { journal: { referenceId: { in: mine } } },
+    where: { journal: { referenceId: { in: milestones } } },
   });
   await prisma.ledgerJournal.deleteMany({
-    where: { referenceId: { in: mine } },
+    where: { referenceId: { in: milestones } },
   });
   await prisma.milestone.deleteMany({ where: { contractId: { in: all } } });
   await prisma.contract.deleteMany({ where: { id: { in: all } } });
@@ -133,6 +131,7 @@ afterEach(async () => {
   await prisma.kycRecord.deleteMany({ where: { userId: { in: all } } });
   await prisma.user.deleteMany({ where: { id: { in: all } } });
   ids.length = 0;
+  milestoneIds.length = 0;
 });
 
 describe("concurrent escrow funding cannot double-charge or overdraw", () => {

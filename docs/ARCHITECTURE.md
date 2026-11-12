@@ -1,8 +1,10 @@
 # Architecture
 
-Last updated: 2026-11-09
+Last updated: 2026-11-12
 
-> **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **625** keys (43 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
+> **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **569** keys (40 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
+
+> **2026-11-12 pass.** Counts re-verified against the running codebase after the code-only compliance pass and the onboarding-guide removal: frontend i18n **569** keys (40 nested objects — the `onboarding` namespace was removed with the tour); background processing **9 → 10** queues (the `audit-purge` retention worker was added); the freelancer's net payout is **92.5%**, not 93% (the 0.5% provider fee is collected at release); withdrawals require an **SMS approval code**; the `Contract.cancellableUntil` cooling-off gap is **closed**; and `AuditLog` now carries a **10-year retention stamp** with a daily purge. The deep-dive detail lives in `docs/SYSTEM_DESIGN.md`.
 
 ## System Overview
 
@@ -74,7 +76,8 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 | `tms` | `/api/v1/tms` | AML flags (structuring, velocity, round-amounts), review queue, STR recording, hold lift |
 | `notifications` | `/api/v1/notifications` | In-app notification ledger, read state |
 | `chat` | `/api/v1/chat` | Guest/authenticated support conversations, direct 2-party negotiation threads, auto staff assignment, file attachments, Mini-Me AI co-pilot |
-| `profiles` | `/api/v1/users` | Public profiles, bio/skills/portfolio, visibility gates, completeness score, profile reporting |
+| `profiles` | `/api/v1/users` | Public profiles, bio/skills/portfolio, visibility gates, completeness score, profile reporting, PDPP data-subject export and erasure |
+| `privacy` | N/A (Internal service) | PDPP data-subject rights: full personal-data export, and erasure that destroys personal content while retaining the AML and financial records the law requires (`modules/privacy/privacy.service.ts`) |
 | `skills` | `/api/v1/skills` | Standardized skill taxonomy |
 | `reviews` | `/api/v1/reviews` | Double-blind contract review system, Bayesian rating averages, public responses |
 | `featured` | `/api/v1/featured` | Talent carousel (staff-pinned, top-rated, recently verified algorithm) |
@@ -148,7 +151,7 @@ Submitting a milestone schedules a warning at 24 hours before the deadline and a
 
 > **ESC-003 — resolved 2026-11-09.** Commit `a03259a` had made the wallet-funding path debit the client and credit the freelancer inside the funding transaction, claiming the milestone straight to `RELEASED`. That bypassed the delivery step, the client acceptance step, the 24-hour warning, the 7-day auto-release timer, and dispute (which accepts only `ESCROW_HELD | WORK_IN_PROGRESS | SUBMITTED_FOR_REVIEW`). The fix restored escrow semantics on the wallet path and narrowed `releaseMilestoneFunds()` back to `SUBMITTED_FOR_REVIEW | DISPUTED`; the gig funding path (`fundGigOrderFromWallet`) had the same bypass and was fixed the same way. **Legal text unchanged** — the code was brought back into line with Master Design §3A.13.6 and Service Agreement Clause 2.2. Covered by `apps/backend/tests/escrow-wallet-funding-semantics.test.ts`.
 
-> **Verified gap (2026-11-09):** the cooling-off guard is **not armed by the production contract-creation path**. `Contract.cancellableUntil` is documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` (`apps/backend/src/modules/contracts/contracts.service.ts:31-106`) never writes the field, and no other code path assigns it. `cancelDuringCoolingOff()` therefore always rejects with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field is `null`. `apps/backend/tests/cooling-off.test.ts:256-334` ("D-2 measurement") documents this explicitly. The 7-day statutory cancellation right is effectively **not available** to clients today, and `autoRelease.handler.ts` never skips a release for cooling-off because the timestamp is always `null`. `COOLING_OFF_HOURS` (`env.ts:233`, default `24`) is defined but referenced nowhere else in the backend. Tracked as `ESC-002` in `docs/ROADMAP_ALIGNMENT.md`.
+> **ESC-002 — resolved 2026-11-10.** The cooling-off guard had **never been armed by the production contract-creation path**. `Contract.cancellableUntil` was documented in `schema.prisma` as "set to createdAt + 7 days by `createContractFromProposal()`", but `createContractFromProposal()` never wrote the field and no other code path assigned it. `cancelDuringCoolingOff()` therefore always rejected with `CoolingOffExpiredError` ("The 7-day cooling-off window for this contract has expired.") because the field was `null`, and `autoRelease.handler.ts` never skipped a release for cooling-off because the timestamp was always `null`. The 7-day statutory cancellation right was effectively **not available** to clients. It is now written as `createdAt + COOLING_OFF_DAYS` (env, default 7), and the unused `COOLING_OFF_HOURS` (default `24`) has been **deleted** — two variables for one concept, one of them unused, is exactly how the gap survived. Covered by `apps/backend/tests/cooling-off.test.ts`.
 
 ### Dispute
 
@@ -188,7 +191,8 @@ Telebirr B2C disbursement is live; deterministic sandbox simulation is used when
   | `VAT_THRESHOLD_MINOR` | `45_000_000` (450,000 ETB) | Finance alert threshold; the Playbook's "ETB 1,000,000" is stale |
   | `VAT_RATE` | `0.15` | `VAT_REGISTERED` defaults to `false` |
   | `MINIMUM_CONTRACTING_AGE` | `18` | Enforced at registration (`auth.service.ts:76`) |
-  | `COOLING_OFF_HOURS` | `24` | **Defined but unused** — see the verified gap note in the Escrow section |
+  | `COOLING_OFF_DAYS` | `7` | Statutory cooling-off window written to `Contract.cancellableUntil` (Electronic Transactions Proclamation No. 1205/2020) |
+  | `AUDIT_RETENTION_YEARS` | `10` | Years an audit row is retained before the purge worker may remove it (also floored at 10 years in SQL) |
   | `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `1h` / `30d` | The Playbook's "24h access / 7d refresh" is stale |
   | `PAYMENT_RECONCILE_CRON` | `*/10 * * * *` | Payment-side reconciliation sweep every 10 minutes |
 
@@ -278,8 +282,9 @@ sequenceDiagram
 | `notifications` | Domain events | Persists in-app notices and attempts configured SMS/Telegram delivery |
 | `tms-scan` | Every 15 minutes (`TMS_SCAN_CRON`, default `*/15 * * * *`) | Re-runs structuring/velocity/round-amounts rules; sweeps flags with expired 24h STR SLA clock; raises `STR_SLA_BREACH` audit events |
 | `withholding-remittance` | Monthly schedule (BullMQ cron) | Generates monthly withholding tax remittance reports (`WithholdingRemittanceReport`) |
+| `audit-purge` | Daily at 05:00 UTC (BullMQ cron) | Deletes audit rows past their retention stamp **and** past the hard ten-year floor, through a `SECURITY DEFINER` function the application role may execute but cannot delete past; audits the purge itself |
 
-All nine queues are declared in `apps/backend/src/queue/queues.ts` (eight) and `apps/backend/src/queue/withholdingRemittance.worker.ts` (one). Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
+All ten queues are declared in `apps/backend/src/queue/queues.ts` (nine) and `apps/backend/src/queue/withholdingRemittance.worker.ts` (one). Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
 
 ## Multilingual System
 
@@ -292,7 +297,7 @@ The platform supports four languages natively:
 | `om` | Afaan Oromoo | Latin |
 | `ti` | Tigrigna | Fidel (Ge'ez) |
 
-**Frontend (625 keys, 43 nested objects):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. All four languages (`en`, `am`, `om`, `ti`) carry an **identical 625-key leaf set** with 43 nested objects each (verified 2026-11-09 by evaluating the exported `translations` object). `Yekis_translations.csv` is the offline parity ledger.
+**Frontend (569 keys, 40 nested objects):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. All four languages (`en`, `am`, `om`, `ti`) carry an **identical 569-key leaf set** with 40 nested objects each (verified 2026-11-12 by evaluating the exported `translations` object). `Yekis_translations.csv` is the offline parity ledger.
 
 > **Orphaned strings (2026-11-09):** `marketing.stats` (8 keys per language) still exists in `i18n.ts`, but the `StatsSection` component was removed from `LandingPageV2.tsx` — the keys and their `.v2-stats*` CSS (`landing-v2.css:441-653`) are dead. They are retained so the marketing copy is not lost, but they render nothing today.
 
@@ -315,17 +320,17 @@ KYC documents, top-up receipts, and generated contract PDFs are stored as object
 - `AuditLog` is append-only by application convention and supported by database grants/pgaudit initialization.
 - Secrets are environment validated and must not be committed. Server refuses to boot in production with a mocked PEP provider.
 
-### Verified compliance gaps (2026-11-09)
+### Verified compliance gaps (2026-11-10)
 
 These are **not** implemented today. They are recorded here so the architecture document does not imply a control the code does not have.
 
 | Control required by the documents | Actual code state |
 |---|---|
-| 10-year immutable retention of audit, transaction, dispute, and STR records | `AuditLog` (`schema.prisma:686-710`) has **no retention/expiry column and no purge job**. There is no WORM module and no append-only partition enforcement in application code — "append-only" is convention only, and pgaudit is enabled by the `infra/postgres` image but its grants are not verified after deployment |
-| PDPP data-subject rights (access, portability, erasure) | **No tooling exists.** Grepping `apps/backend/src` for `exportData`, `downloadMyData`, `deleteAccount`, `erasure`, or `portability` returns zero matches. There is no admin erasure tool and no "delete my data" route |
-| 72-hour ECA breach notification workflow | `apps/backend/src/lib/breachAlert.ts` writes a `logger.fatal(...)` record only. The SMS/Telegram/email dispatch to the incident-response team is **commented out** (`breachAlert.ts:36`), so the alert is log-only |
-| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). Note `src/middleware/requireKycVerified.ts` is dead code — it has zero importers; the live guard is `hardBlock.ts` |
-| Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts:35`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped |
+| 10-year immutable retention of audit, transaction, dispute, and STR records | **The audit retention is now implemented.** `AuditLog.retentionUntil` is NOT NULL and stamped at write time as `createdAt + AUDIT_RETENTION_YEARS` (default 10); a daily `audit-purge` worker calls the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which deletes a row only when both its stamp has expired and it is at least ten years old. The application role holds no `DELETE` privilege on the table — it is granted `EXECUTE` on the function only. **Still open:** there is no WORM module and no append-only partition enforcement in application code, and pgaudit's grants are not verified after deployment |
+| PDPP data-subject rights (access, portability, erasure) | **Implemented.** `GET /api/v1/users/me/export` returns the complete archive; `POST /api/v1/users/me/erasure` destroys the personal content (including the chat attachment bytes in the object store and its local-disk fallback), revokes marketing and analytics consent without deleting the consent history, closes the account, and retains the identity, financial and AML records the law requires — stating in the response exactly what was kept. **Still open:** the exact retained-field list has not been reviewed by counsel |
+| 72-hour ECA breach notification workflow | **The response chain is implemented.** Opening an incident contains it (revoking every affected user's sessions), notifies staff in-app/SMS/Telegram with the deadline, notifies each affected user, records the incident in the audit log, starts the 72-hour clock, and prepares an ECA filing template with the PDPP-required fields filled in. **Still open:** the ECA has no API, so the filing itself is a human step; detection is staff-confirmed rather than automated; and no DPO is appointed to be the named contact |
+| KYC hard-block coverage | Only 7 routes are gated by `requireKycVerified` (`src/middleware/hardBlock.ts`): job create (`jobs.routes.ts:77`), proposal create (`jobs.routes.ts:219`), gig create/update/order/order-fund (`gig.routes.ts:128,154,255,285`), and withdrawal (`escrow.routes.ts:351`). **Profile editing is deliberately not gated** (`src/modules/profiles/profile.routes.ts:59`). The dead duplicate at `src/middleware/requireKycVerified.ts` has been deleted; the live guard is `hardBlock.ts` |
+| Static withholding tax | `calculateFees` (`src/modules/escrow/fees.ts`) gates withholding on `env.TIN_FEATURE_ENABLED`, which defaults to `false`. **Withholding is therefore 0% at launch**, and the 3% (with TIN) / 30% (without TIN) rates at/above `WITHHOLDING_THRESHOLD_MINOR = 1_000_000` (10,000 ETB) only apply once the flag is flipped. The block is commented out rather than gated, so the reactivation is a one-line change |
 
 ## External Boundaries
 

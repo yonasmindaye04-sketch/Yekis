@@ -77,7 +77,7 @@ const TRUST_PILLARS: TrustPillarItem[] = [
     badge: "AUDIT-READY",
     rows: [
       { label: "VAT COMPUTATION", badge: "15% AUTO" },
-      { label: "WITHHOLDING", badge: "2% > 10K ETB" },
+      { label: "WITHHOLDING", badge: "3% / 30% > 10K" },
       { label: "FINANCE EXPORT", badge: "PDF + CSV" },
     ],
   },

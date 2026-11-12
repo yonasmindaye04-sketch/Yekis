@@ -445,10 +445,10 @@ model Contract {
   // T2-E: 7-day cooling-off right — Electronic Transactions Proclamation No. 1205/2020.
   // Client may cancel before this timestamp AND only while no milestone has progressed
   // past PAYMENT_PENDING (i.e. work has not started). See contracts.service.ts cancelDuringCoolingOff().
-  // ⚠️ Conflict note: AUTO_RELEASE_WINDOW_DAYS default is 5 days. If a milestone were somehow
-  // submitted AND the auto-release timer fires before cancellableUntil, auto-release must be
-  // skipped — see autoRelease.worker.ts for the guard added to enforce this.
-  cancellableUntil     DateTime? // set to createdAt + 7 days by createContractFromProposal()
+  // Written by createContractFromProposal() as creation + COOLING_OFF_DAYS (env).
+  // If a milestone is submitted AND the auto-release timer fires before cancellableUntil,
+  // auto-release must be skipped — see autoRelease.handler.ts for the guard.
+  cancellableUntil     DateTime? // set to createdAt + COOLING_OFF_DAYS by createContractFromProposal()
   createdAt            DateTime       @default(now())
 
   milestones Milestone[]
@@ -711,11 +711,20 @@ model AuditLog {
   ipAddress     String?   // actor's client IP at the time of the action
 
   createdAt  DateTime @default(now())
+  /// Instant after which this row may be purged. Stamped at write time as
+  /// createdAt + AUDIT_RETENTION_YEARS (default 10 years, per PDPP
+  /// No. 1321/2024 and AML record-keeping rules). NOT NULL on purpose: an
+  /// audit row without a defined expiry is the ambiguity the retention
+  /// requirement exists to remove. The purge runs through the SECURITY
+  /// DEFINER function purge_expired_audit_logs() so the application role
+  /// still cannot DELETE from this table — see prisma/README.md.
+  retentionUntil DateTime
 
   @@index([entityType, entityId])
   @@index([userId])
   @@index([action])
   @@index([createdAt])
+  @@index([retentionUntil])
 }
 
 // ---------- Support Chat ----------
@@ -1108,6 +1117,15 @@ model PhoneVerificationCode {
   userId String?
 
   phone String
+  /// What the code was issued FOR. One outstanding code per (phone, purpose),
+  /// so requesting a withdrawal code cannot invalidate a pending phone
+  /// verification (and the other way round) — they are different proofs and
+  /// clobbering one with the other would be a denial-of-service on a security
+  /// control.
+  ///   PHONE_VERIFICATION — proving control of the number (registration,
+  ///                       number recovery). Sets User.phoneVerifiedAt.
+  ///   WITHDRAWAL        — approving one specific payout.
+  purpose String @default("PHONE_VERIFICATION")
   /// sha256(salt + ":" + code), hex. Unique so verification is one index hit.
   codeHash String @unique
   salt     String

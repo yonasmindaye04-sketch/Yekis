@@ -68,7 +68,6 @@ import { NotFoundPage } from "./NotFoundPage";
 import { ThankYouPage } from "./ThankYouPage";
 import { CaseStudiesPage } from "./CaseStudiesPage";
 import { CookieBanner } from "./CookieBanner";
-import { OnboardingTour } from "./OnboardingTour";
 import { MobileCTA } from "./MobileCTA";
 import { MarketingHeader } from "./MarketingHeader";
 import { MarketingFooter } from "./MarketingFooter";
@@ -334,13 +333,10 @@ function FullPlatformAppInner() {
    */
   const [showPhoneVerification, setShowPhoneVerification] = useState(false);
   /**
-   * Onboarding-tour signals. `null` means "not known yet", which is
-   * deliberately different from 0: the tour hides a step it cannot evaluate, so
-   * an unanswered request produces no step rather than a step that says the user
-   * has done nothing.
+   * Profile-completeness signal. `null` means "not known yet", which is
+   * deliberately different from 0 so the completion nudge can wait instead of
+   * telling a user with a full profile that they have done nothing.
    */
-  const [myJobCount, setMyJobCount] = useState<number | null>(null);
-  const [myProposalCount, setMyProposalCount] = useState<number | null>(null);
   const [profileCompleteness, setProfileCompleteness] = useState<number | null>(
     null,
   );
@@ -534,12 +530,6 @@ const loadWorkspace = async () => {
       jobsResult,
       milestonesResult,
       topUpsResult,
-      // Only for the onboarding tour. Without these three the tour can evaluate
-      // just half its steps, and it hides the rest rather than showing steps
-      // nobody can complete. They are additive and allSettled, so a failure here
-      // degrades the guide instead of breaking the workspace load.
-      myJobsResult,
-      myProposalsResult,
       completenessResult,
     ] = await Promise.allSettled([
       api.getMe(),
@@ -547,8 +537,6 @@ const loadWorkspace = async () => {
       api.getJobs({ status: "OPEN" }),
       api.getMilestones(),
       api.getTopUpRequests(),
-      api.getMyJobs(),
-      api.getMyProposals(),
       api.getProfileCompleteness(),
     ]);
     if (meResult.status === "rejected") throw meResult.reason;
@@ -562,11 +550,6 @@ const loadWorkspace = async () => {
     if (milestonesResult.status === "fulfilled")
     setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
-    // Left as-is when the call fails: the tour then hides the affected step,
-    // which is better than asserting the user has not done it.
-    if (myJobsResult.status === "fulfilled") setMyJobCount(myJobsResult.value.length);
-    if (myProposalsResult.status === "fulfilled")
-    setMyProposalCount(myProposalsResult.value.length);
     if (completenessResult.status === "fulfilled")
     setProfileCompleteness(completenessResult.value.profileCompleteness);
     setLastUpdatedAt(new Date());
@@ -782,14 +765,6 @@ if (authMode === "register") {
   const platformRole: PlatformRole =
     basePlatformRole === "BOTH" ? dualRoleMode : basePlatformRole;
 
-  // Onboarding facts, built only from state this screen has actually loaded.
-  // The workspace fetches /auth/me, /wallet, open jobs and the caller's
-  // milestones; nothing here is inferred from a signal that means something
-  // else. `jobs` is deliberately NOT used as "has posted a job" -- it holds
-  // OPEN jobs, so any listing would make the step look complete for a user who
-  // has never posted anything. Steps needing data this screen does not load are
-  // left out of the tour rather than hardcoded to false, which would render a
-  // step the user could never tick off.
   const activeAvatarOverride = useMemo(
     () => loadAvatarOverride(user?.id),
     [user?.id, avatarVersion],
@@ -799,39 +774,6 @@ if (authMode === "register") {
       ? activeAvatarOverride.avatarUrl
       : user?.avatarUrl ?? null;
 
-  const tourFacts = useMemo(
-    () => ({
-      userId: user?.id,
-      role: (user?.role as "CLIENT" | "FREELANCER" | "BOTH") || "CLIENT",
-      activeMode: dualRoleMode,
-      kycStatus: user?.kyc?.status ?? "PENDING",
-      walletBalanceMinor: wallet.balanceMinor ?? 0,
-      hasFundedMilestone: milestones.some((m) => m.escrowState !== "PAYMENT_PENDING"),
-      // undefined, not false, while the answer is unknown -- the tour drops any
-      // step whose predicate returns undefined.
-      hasPostedJob: myJobCount === null ? undefined : myJobCount > 0,
-      hasSubmittedProposal:
-      myProposalCount === null ? undefined : myProposalCount > 0,
-      // Profile step stays visible until the user has both >= 80% completeness
-      // and a custom uploaded photo (or has explicitly completed their profile).
-      hasProfile:
-        profileCompleteness === null
-          ? undefined
-          : profileCompleteness >= 85 && Boolean(effectiveUserAvatarUrl),
-    }),
-    [
-      user?.id,
-      user?.role,
-      dualRoleMode,
-      user?.kyc?.status,
-      wallet.balanceMinor,
-      milestones,
-      myJobCount,
-      myProposalCount,
-      profileCompleteness,
-      effectiveUserAvatarUrl,
-    ],
-  );
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
      safe and keeps every workspace prop free of impossible ADMIN values. */
@@ -1804,10 +1746,6 @@ if (authMode === "register") {
       </aside>
 
       <main className="platform-main">
-        <OnboardingTour
-          facts={tourFacts}
-          onNavigate={(tab) => setView(tab as View)}
-        />
         <header className="platform-topbar sh-topbar">
           <div className="sh-topbar-left">
             <button

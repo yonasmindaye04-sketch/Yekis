@@ -1410,8 +1410,10 @@ export function App() {
   return (
     <div className="platform-shell mini-platform-shell">
       <CookieBanner />
-      <aside className="platform-sidebar">
-        <div className="sidebar-brand">
+      {/* Browser-style horizontal tab bar */}
+      <nav className="platform-tab-bar" aria-label="Main navigation">
+        {/* Brand */}
+        <div className="tab-bar-brand">
           <img
             src="/svgviewer-output.svg"
             alt="Yekis Logo"
@@ -1419,35 +1421,50 @@ export function App() {
           />
           <strong>Yekis</strong>
         </div>
-        <div className="sidebar-role">
-          <YekisAvatar
-            userId={userProfile?.id}
-            displayName={displayName}
-            email={userProfile?.email}
-            size={32}
-            animate="hover"
-          />
-          <span>
-            <strong>{formatRole(role)}</strong>
-            <small>{displayName}</small>
-          </span>
-        </div>
-        <nav className="sidebar-nav">
+
+        {/* Tab strip */}
+        <div className="tab-bar-tabs">
           {navItems.map((item) => (
             <button
               key={item.tab}
-              className={activeTab === item.tab ? "active" : ""}
+              className={`tab-bar-tab${activeTab === item.tab ? " active" : ""}`}
               onClick={() => {
                 setActiveTab(item.tab);
                 setShowJobForm(false);
               }}
+              aria-current={activeTab === item.tab ? "page" : undefined}
             >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
+              <span className="tab-icon">{item.icon}</span>
+              <span className="tab-label">{item.label}</span>
+              <span className="tab-dot" aria-hidden="true" />
             </button>
           ))}
-        </nav>
-      </aside>
+        </div>
+
+        {/* Right-side actions */}
+        <div className="tab-bar-actions">
+          <button
+            className="theme-toggle-btn"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "light"
+                ? "Switch to dark mode"
+                : "Switch to light mode"
+            }
+          >
+            {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
+          </button>
+          <button className="user-menu" onClick={() => setActiveTab("kyc")}>
+            <YekisAvatar
+              userId={userProfile?.id}
+              displayName={displayName}
+              email={userProfile?.email}
+              size={28}
+              animate="hover"
+            />
+          </button>
+        </div>
+      </nav>
 
       <main className="platform-main">
         <header className="platform-topbar">
@@ -1474,32 +1491,6 @@ export function App() {
                           ?.label || "Yekis"}
               </h1>
             </div>
-          </div>
-          <div
-            className="topbar-actions"
-            style={{ gap: 10, alignItems: "center" }}
-          >
-            <button
-              className="theme-toggle-btn"
-              onClick={toggleTheme}
-              aria-label={
-                theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
-              }
-            >
-              {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
-            </button>
-            <button className="user-menu" onClick={() => setActiveTab("kyc")}>
-              <YekisAvatar
-                userId={userProfile?.id}
-                displayName={displayName}
-                email={userProfile?.email}
-                size={30}
-                animate="hover"
-              />
-              <span>Profile</span>
-            </button>
           </div>
         </header>
 

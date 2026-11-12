@@ -42,6 +42,9 @@ export const PERMISSIONS = [
   "audit.view",
   "admins.manage",
   "settings.manage",
+  // Opening a data-breach incident revokes live sessions and starts the
+  // PDPP 72-hour ECA notification clock. Compliance roles own it.
+  "incidents.manage",
 ] as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[number];
@@ -79,6 +82,9 @@ const COMPLIANCE_SET: readonly PermissionKey[] = [
   // Compliance officers review manual top-up receipts today (requireStaffRole
   // ("COMPLIANCE_OFFICER", "ADMIN") in topup.routes.ts) — keep that power.
   "topups.review",
+  // Opening a breach incident: containment, staff/user notification and the
+  // ECA notification clock all start from here.
+  "incidents.manage",
 ];
 
 // === ROLE → PERMISSION MATRIX ===

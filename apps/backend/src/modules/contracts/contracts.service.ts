@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MilestonePlanItem } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
+import { env } from "../../config/env.js";
 import { uploadContractDocument } from "./contractStorage.js";
 import {
   generateServiceAgreementPdf,
@@ -71,6 +72,25 @@ export async function createContractFromProposal(proposalId: string) {
   });
 
   const contract = await prisma.$transaction(async (tx) => {
+    /**
+     * The statutory 7-day cooling-off window (Electronic Transactions
+     * Proclamation No. 1205/2020) starts the moment the contract exists.
+     *
+     * This field was documented in the schema as "set to createdAt + 7 days
+     * by createContractFromProposal()" but was never actually written, so
+     * `cancellableUntil` was always NULL. `cancelDuringCoolingOff()` treats
+     * a NULL as "the window has expired", which meant the right the Terms
+     * of Service promise the client was never actually available — the
+     * whole code path was unreachable. Writing it here is what arms it.
+     *
+     * It is computed from the creation instant rather than left to the
+     * database default so the value is explicit, testable, and can move if
+     * counsel changes the window.
+     */
+    const cancellableUntil = new Date(
+      Date.now() + env.COOLING_OFF_DAYS * 24 * 60 * 60 * 1000,
+    );
+
     const created = await tx.contract.create({
       data: {
         jobId: proposal.jobId,
@@ -78,6 +98,7 @@ export async function createContractFromProposal(proposalId: string) {
         freelancerId: proposal.freelancerId,
         templateVersion: SERVICE_AGREEMENT_TEMPLATE_VERSION,
         documentStoragePath: storagePath,
+        cancellableUntil,
         milestones: {
           create: milestonePlan.map((m) => ({
             title: m.title,
@@ -99,6 +120,8 @@ export async function createContractFromProposal(proposalId: string) {
       jobId: proposal.jobId,
       proposalId,
       templateVersion: SERVICE_AGREEMENT_TEMPLATE_VERSION,
+      cancellableUntil: contract.cancellableUntil,
+      coolingOffDays: env.COOLING_OFF_DAYS,
     },
   });
 

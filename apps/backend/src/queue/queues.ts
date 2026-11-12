@@ -33,3 +33,7 @@ export const tmsScanQueue = new Queue("tms-scan", { connection: redis });
 export const gigAutoReleaseQueue = new Queue("gig-auto-release", {
   connection: redis,
 });
+// Audit-log retention purge: deletes audit rows past their retention stamp.
+// The DELETE itself runs through a SECURITY DEFINER database function, because
+// the application role deliberately has no DELETE privilege on "AuditLog".
+export const auditPurgeQueue = new Queue("audit-purge", { connection: redis });

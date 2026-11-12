@@ -1578,8 +1578,29 @@ class ApiClient {
   }
 
 
-  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA"; payoutAccountIdentifier: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
+  async withdrawWallet(input: { amountMinor: number; provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA"; payoutAccountIdentifier: string; otpCode: string }): Promise<{ balanceMinor?: number; error?: string; message?: string }> {
     return this.request("/api/v1/escrow/wallet/withdraw", { method: "POST", body: JSON.stringify(input) });
+  }
+
+  /**
+   * Requests the SMS code that approves one payout.
+   *
+   * Deliberately separate from the withdrawal itself: the code is checked
+   * against something the user is looking at, so it has to be sent after the
+   * amount and destination are on screen, not collected up front.
+   */
+  async requestWithdrawalOtp(): Promise<{ expiresAt?: string; retryAfterSec?: number; devCode?: string }> {
+    return this.request("/api/v1/escrow/wallet/withdraw/otp", { method: "POST" });
+  }
+
+  /** Exports every category of personal data the platform holds (PDPP Art. 13). */
+  async exportMyData(): Promise<unknown> {
+    return this.request("/api/v1/users/me/export");
+  }
+
+  /** Erases personal data, retaining the AML records the law requires. */
+  async eraseMyData(): Promise<{ performedAt: string; erased: Record<string, number>; retained: string[]; accountClosed: boolean }> {
+    return this.request("/api/v1/users/me/erasure", { method: "POST" });
   }
 
   async getDisputes(): Promise<Dispute[]> { return this.request("/api/v1/disputes"); }

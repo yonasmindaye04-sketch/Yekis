@@ -238,7 +238,7 @@ describe("Statutory 7-day Cooling-Off Cancellation (ECA Proclamation No. 1205/20
 });
 
 /**
- * D-2 � what does the REAL acceptance path set cancellableUntil to?
+ * D-2 — what does the REAL acceptance path set cancellableUntil to?
  *
  * Every other test in this file hand-builds a Contract and supplies its own
  * cancellableUntil, so none of them proves that the production path sets it at
@@ -248,13 +248,22 @@ describe("Statutory 7-day Cooling-Off Cancellation (ECA Proclamation No. 1205/20
  *                              createContractFromProposal()
  *
  * and the 7-day cooling-off right (ECA Proclamation No. 1205/2020) depends on
- * it. This test creates a contract the way the application does and records
+ * it. This test creates a contract the way the application does and asserts
  * what is actually stored.
  *
- * F-15 is NOT fixed here: this is a measurement, per the batch brief.
+ * THIS USED TO BE A MEASUREMENT, NOT AN ASSERTION. It recorded the value
+ * without asserting it, and asserted the consequence instead: that
+ * cancelDuringCoolingOff always refused, because the field was never written.
+ * That was ESC-002 — the schema documented an assignment the code never made,
+ * so `cancellableUntil` was always NULL, `cancelDuringCoolingOff` treated
+ * NULL as "expired", and the cooling-off right the Terms of Service promise
+ * the client was never actually available.
+ *
+ * It is now an assertion: the field is written, it is written to the right
+ * instant, and the right it arms can actually be exercised.
  */
-describe("the real acceptance path and cancellableUntil (D-2 measurement)", () => {
-  it("records what createContractFromProposal actually stores", async () => {
+describe("the real acceptance path arms cancellableUntil (ESC-002)", () => {
+  it("sets the 7-day window on the contract the acceptance path creates", async () => {
     const stamp = Date.now();
 
     const client = await prisma.user.create({
@@ -313,23 +322,28 @@ describe("the real acceptance path and cancellableUntil (D-2 measurement)", () =
       where: { id: contract.id },
     });
 
-    // THE MEASUREMENT. Expected per schema.prisma: createdAt + 7 days.
-    // Reported, not asserted, so a future fix to F-15 shows up as this value
-    // changing rather than as a silent test edit.
-    const ageMs = fresh.createdAt.getTime() - Date.now();
-    // eslint-disable-next-line no-console
-    console.log(
-      `[D-2] cancellableUntil=${String(fresh.cancellableUntil)} createdAt=${fresh.createdAt.toISOString()} ageSeconds=${Math.round(ageMs / 1000)}`,
-    );
+    // The window must EXIST. A NULL here is what made the whole right
+    // unreachable: cancelDuringCoolingOff reads a missing value as expired.
+    expect(
+      fresh.cancellableUntil,
+      "the acceptance path must arm the cooling-off window",
+    ).toBeInstanceOf(Date);
 
-    // A cooling-off right that is never armed means cancelDuringCoolingOff
-    // always refuses. Assert that consequence, which is the real risk, and
-    // leave the missing assignment itself to the F-15 fix.
-    await expect(
-      cancelDuringCoolingOff({
-        userId: client.id,
-        contractId: contract.id,
-      }),
-    ).rejects.toThrow(CoolingOffExpiredError);
+    // And it must be seven days from the contract's creation, not merely some
+    // future instant — a window that is too long is a legal exposure and one
+    // that is too short is a broken promise.
+    const windowDays =
+      (fresh.cancellableUntil!.getTime() - fresh.createdAt.getTime()) /
+      (24 * 60 * 60 * 1000);
+    expect(windowDays).toBeGreaterThan(6.9);
+    expect(windowDays).toBeLessThan(7.1);
+
+    // The consequence, which is the part that actually matters to a client:
+    // the right can now be exercised.
+    const cancelled = await cancelDuringCoolingOff({
+      userId: client.id,
+      contractId: contract.id,
+    });
+    expect(cancelled.status).toBe("CANCELLED");
   });
 });

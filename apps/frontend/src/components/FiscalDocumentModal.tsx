@@ -35,8 +35,8 @@ export interface FiscalDocumentData {
   includeVat15?: boolean;
   includeWithholding?: boolean;
   hasVerifiedTin?: boolean;
-  clientFeeRate?: number; // default 0.025 (2.5%)
-  freelancerFeeRate?: number; // default 0.025 (2.5%)
+  clientFeeRate?: number; // default 0 — no client deposit surcharge
+  freelancerFeeRate?: number; // default 0.07 — the platform's 7% general fee
   // Initial Language Override (Defaults to 'en')
   language?: ReceiptLanguage;
 }
@@ -936,8 +936,13 @@ export function FiscalDocumentSheet({
   const railLocale = railConfig.locales[receiptLang];
 
   const principal = Math.max(0, Number(data.principalEtb) || 0);
-  const clientFeeRate = data.clientFeeRate ?? 0.025;
-  const freelancerFeeRate = data.freelancerFeeRate ?? 0.025;
+  // Mirrors the backend fee engine (apps/backend/src/modules/escrow/fees.ts):
+  // PLATFORM_FEE_RATE_CLIENT = 0, PLATFORM_FEE_RATE_FREELANCER = 0.07.
+  // The previous defaults of 2.5%/2.5% were a leftover from a two-sided
+  // take-rate that the platform no longer charges, so every receipt this
+  // component produced showed fees the platform does not actually collect.
+  const clientFeeRate = data.clientFeeRate ?? 0;
+  const freelancerFeeRate = data.freelancerFeeRate ?? 0.07;
 
   // Client Invoice Math
   const clientEscrowFee = Math.round(principal * clientFeeRate * 100) / 100;

@@ -871,8 +871,134 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .auth-footnote { margin-top: 16px; color: var(--color-text-tertiary); font-size: 0.82rem; text-align: center; }
 .form-error { padding: 8px 12px; margin-top: 8px; border: 1px solid var(--color-error); border-radius: 8px; background: var(--color-error-light); color: var(--color-error-text); font-size: 0.84rem; }
 @media (max-height: 650px) { .platform-auth { overflow-y: auto; height: auto; min-height: 100vh; } }
-.platform-shell { display: grid; grid-template-columns: 244px minmax(0, 1fr); min-height: 100vh; background: var(--color-bg); }
-.platform-sidebar { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 30px 20px; border-right: 1px solid var(--color-border); background: var(--color-bg-elevated); }
+/* ── Platform Shell: browser-tab layout ───────────────────────── */
+.platform-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: 1fr;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+/* ── Browser-style tab bar ────────────────────────────────────── */
+.platform-tab-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: stretch;
+  height: 46px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+}
+
+/* Brand pill at left of tab bar */
+.tab-bar-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 0 16px 0 14px;
+  border-right: 1px solid var(--color-border);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.tab-bar-brand .platform-logo { width: 24px; height: 24px; border-radius: 6px; }
+
+/* Tab strip — scrollable row of tab buttons */
+.tab-bar-tabs {
+  display: flex;
+  align-items: stretch;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tab-bar-tabs::-webkit-scrollbar { display: none; }
+
+/* Individual tab button */
+.tab-bar-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  min-width: 120px;
+  max-width: 220px;
+  padding: 0 16px;
+  border: 0;
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.84rem;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  outline: none;
+}
+.tab-bar-tab:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text);
+}
+.tab-bar-tab .tab-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.65;
+  transition: opacity 0.15s ease;
+}
+.tab-bar-tab:hover .tab-icon { opacity: 0.9; }
+.tab-bar-tab .tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+/* Active tab — elevated, branded bottom border, full text color */
+.tab-bar-tab.active {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-weight: 600;
+}
+.tab-bar-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 2px 2px 0 0;
+}
+.tab-bar-tab.active .tab-icon { opacity: 1; color: var(--color-primary); }
+
+/* Active tab indicator dot */
+.tab-bar-tab.active .tab-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+.tab-bar-tab:not(.active) .tab-dot { display: none; }
+
+/* Right side of tab bar: user actions */
+.tab-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding: 0 12px;
+  border-left: 1px solid var(--color-border);
+}
+
+/* Keep old sidebar styles for any other uses, but hide the sidebar itself */
+.platform-sidebar { display: none; }
 .sidebar-brand { display: flex; align-items: center; gap: 14px; padding: 0 10px 36px; font-size: 1.1rem; }
 .sidebar-role { display: flex; align-items: center; gap: 14px; padding: 12px; margin-bottom: 25px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-bg-subtle); transition: border-color .2s; }
 .sidebar-role:hover { border-color: var(--color-primary); }
@@ -1018,9 +1144,81 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .settings-list .btn-secondary { margin-top: 20px; width: fit-content; }
 .platform-mobile-nav { display: none; }
 
-@media (max-width: 900px) { .platform-auth { grid-template-columns: 1fr; overflow-y: auto; height: auto; min-height: 100vh; padding-top: 68px; }.platform-auth-art { display: none; }.auth-panel { padding: 24px 20px 36px; }.platform-shell { grid-template-columns: 76px minmax(0, 1fr); }.platform-sidebar { align-items: center; padding-inline: 10px; }.sidebar-brand strong, .sidebar-role > span:last-child, .sidebar-nav button:not(.active)::after, .sidebar-settings, .sidebar-nav button .nav-label { display: none; }.sidebar-nav { width: 100%; }.sidebar-nav button { justify-content: center; padding: 13px 8px; }.sidebar-nav button.active { justify-content: center; }.platform-topbar, .platform-content { padding-inline: 24px; }.topbar-actions .user-menu span:not(.avatar), .topbar-actions .user-menu b { display: none; }
-  .topbar-actions .user-menu { padding: 5px; background: transparent; border-color: transparent; box-shadow: none; }.platform-grid { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .platform-shell { display: block; padding-bottom: 82px; }.platform-sidebar { display: none; }.platform-topbar { padding: 20px 16px; }.platform-topbar h1 { font-size: 1.55rem; }.platform-content { padding: 20px 16px 35px; }.overview-hero, .wallet-hero, .job-platform-card { align-items: stretch; flex-direction: column; padding: 24px 18px; }.platform-metrics { grid-template-columns: 1fr 1fr; }.platform-metrics article:last-child { grid-column: 1 / -1; }.form-grid { grid-template-columns: 1fr; }.form-wide { grid-column: auto; }.payment-grid, .payment-grid-3, .withdraw-payment-grid, .browser-topup-fields, .withdraw-fields { grid-template-columns: 1fr !important; }.table-head { display: none; }.table-row { grid-template-columns: 1.5fr 1fr; gap: 8px; }.table-row span:last-child { color: var(--color-text); }.platform-mobile-nav { position: fixed; z-index: 10; right: 8px; bottom: 8px; left: 8px; display: flex; justify-content: space-around; padding: 6px; border: 1px solid var(--color-border); border-radius: 18px; background: var(--color-bg-elevated); box-shadow: var(--shadow-lg); }.platform-mobile-nav button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 4px; min-height: 46px; flex: 1; border: 0; border-radius: 12px; background: transparent; color: var(--color-text-secondary); transition: all 0.2s ease; }.platform-mobile-nav button.active { background: var(--color-primary); color: var(--color-primary-text); }.platform-mobile-nav small { font-size: 0.65rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.02em; white-space: nowrap; }.platform-mobile-nav span { font-size: 1.05rem; } }
+@media (max-width: 900px) {
+  .platform-auth { grid-template-columns: 1fr; overflow-y: auto; height: auto; min-height: 100vh; padding-top: 68px; }
+  .platform-auth-art { display: none; }
+  .auth-panel { padding: 24px 20px 36px; }
+  /* Tab bar: compact on medium — hide brand label */
+  .tab-bar-brand strong { display: none; }
+  .tab-bar-tab { min-width: 100px; }
+  .platform-topbar, .platform-content { padding-inline: 24px; }
+  .topbar-actions .user-menu span:not(.avatar), .topbar-actions .user-menu b { display: none; }
+  .topbar-actions .user-menu { padding: 5px; background: transparent; border-color: transparent; box-shadow: none; }
+  .platform-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .platform-shell { display: flex; flex-direction: column; padding-bottom: 82px; }
+  /* Hide tab bar on mobile — use the bottom mobile nav instead */
+  .platform-tab-bar { display: none; }
+  .platform-topbar { padding: 20px 16px; }
+  .platform-topbar h1 { font-size: 1.55rem; }
+  .platform-content { padding: 20px 16px 35px; }
+  .overview-hero, .wallet-hero, .job-platform-card { align-items: stretch; flex-direction: column; padding: 24px 18px; }
+  .platform-metrics { grid-template-columns: 1fr 1fr; }
+  .platform-metrics article:last-child { grid-column: 1 / -1; }
+  .form-grid { grid-template-columns: 1fr; }
+  .form-wide { grid-column: auto; }
+  .payment-grid, .payment-grid-3, .withdraw-payment-grid, .browser-topup-fields, .withdraw-fields { grid-template-columns: 1fr !important; }
+  .table-head { display: none; }
+  .table-row { grid-template-columns: 1.5fr 1fr; gap: 8px; }
+  .table-row span:last-child { color: var(--color-text); }
+  /* Mobile bottom tab bar — browser-tab style */
+  .platform-mobile-nav {
+    position: fixed;
+    z-index: 10;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    justify-content: stretch;
+    padding: 0;
+    border-top: 1px solid var(--color-border);
+    border-radius: 0;
+    background: var(--color-bg-elevated);
+    box-shadow: var(--shadow-lg);
+  }
+  .platform-mobile-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    position: relative;
+    padding: 8px 4px 10px;
+    min-height: 56px;
+    flex: 1;
+    border: 0;
+    border-top: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .platform-mobile-nav button.active {
+    border-top-color: var(--color-primary);
+    color: var(--color-primary);
+    background: transparent;
+  }
+  .platform-mobile-nav small {
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .platform-mobile-nav span { font-size: 1rem; }
+}
 
 /* Public landing page */
 .landing-page { background: var(--color-bg); color: var(--color-text); }
@@ -1530,6 +1728,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 
 :root[data-theme="dark"] .platform-shell, :root[data-theme="dark"] .platform-auth, :root[data-theme="dark"] .landing-page { background: var(--color-bg); color: var(--color-text); }
 :root[data-theme="dark"] .platform-sidebar, :root[data-theme="dark"] .staff-sidebar { background: var(--color-bg-elevated); border-color: var(--color-border); }
+:root[data-theme="dark"] .platform-tab-bar { background: var(--color-bg-elevated); border-color: var(--color-border); }
+:root[data-theme="dark"] .tab-bar-brand { border-color: var(--color-border); }
+:root[data-theme="dark"] .tab-bar-tab { border-color: var(--color-border); color: var(--color-text-secondary); }
+:root[data-theme="dark"] .tab-bar-tab:hover { background: var(--color-bg-hover); color: var(--color-text); }
+:root[data-theme="dark"] .tab-bar-tab.active { background: var(--color-bg); color: var(--color-text); }
+:root[data-theme="dark"] .tab-bar-actions { border-color: var(--color-border); }
 :root[data-theme="dark"] .platform-topbar, :root[data-theme="dark"] .staff-topbar { border-color: var(--color-border); }
 :root[data-theme="dark"] .platform-content, :root[data-theme="dark"] .staff-main { color: var(--color-text); }
 :root[data-theme="dark"] .panel, :root[data-theme="dark"] .platform-metrics article, :root[data-theme="dark"] .job-platform-card, :root[data-theme="dark"] .overview-hero, :root[data-theme="dark"] .wallet-hero, :root[data-theme="dark"] .staff-panel, :root[data-theme="dark"] .staff-metrics article { border-color: var(--color-border); background: var(--color-bg-elevated); }
@@ -1645,6 +1849,9 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .withdraw-fields label { margin-top: 0; gap: 5px; font-size: 0.84rem; font-weight: 500; }
 .withdraw-fields input { height: 38px; padding: 8px 12px; font-size: 0.88rem; }
 .withdraw-panel .btn-primary { justify-self: start; min-height: 38px; padding: 0 20px; font-size: 0.86rem; border-radius: 8px; }
+.withdraw-otp-actions { display: flex; align-items: center; gap: 10px; align-self: end; }
+.withdraw-otp-actions .btn-secondary { min-height: 38px; padding: 0 16px; font-size: 0.86rem; border-radius: 8px; }
+.withdraw-otp-dev { font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-text-secondary); }
 
 .staff-compliance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
 .staff-action-case { border-bottom: 1px solid var(--color-border); }
@@ -1667,8 +1874,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 
 @media (max-width: 640px) {
   .workflow-item { padding: 17px; }
-  .platform-mobile-nav { display: flex; overflow-x: auto; }
-  .platform-mobile-nav button { min-width: 66px; }
+  .platform-mobile-nav { display: flex; }
 }
 .verification-stack { display: grid; gap: 18px; }.browser-verification-panel { display: grid; gap: 20px; }.verification-intro { display: flex; align-items: start; gap: 14px; }.verification-intro h2 { margin-top: 5px; font-size: 1.25rem; }.verification-intro p:not(.eyebrow) { max-width: 650px; margin-top: 6px; color: var(--color-text-secondary); font-size: .82rem; }.verification-form { margin-top: 4px; }.verification-upload input[type="file"] { display: none; }.verification-upload small { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px dashed var(--color-border-strong); border-radius: 9px; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.verification-message { display: flex; align-items: center; gap: 8px; color: var(--color-primary); font-size: .78rem; }.verification-status-panel { display: flex; align-items: center; justify-content: space-between; gap: 20px; }.verification-status-panel h2 { margin: 5px 0; font-size: 1.25rem; }.verification-status-panel p:last-child { color: var(--color-text-secondary); font-size: .78rem; }
 .notification-center { position: relative; }.notification-trigger { position: relative; }.notification-trigger b { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: var(--color-error); color: #ffffff; font-size: .62rem; font-variant-numeric: tabular-nums; }.notification-popover { position: absolute; z-index: 90; top: 48px; right: 0; width: min(370px, calc(100vw - 24px)); max-height: 440px; overflow: auto; padding: 10px; border: 1px solid var(--color-border); border-radius: 13px; background: var(--color-bg-elevated); box-shadow: var(--shadow-xl); }.notification-popover-head { display: flex; justify-content: space-between; align-items: center; padding: 10px; color: var(--color-text); }.notification-popover-head span { color: var(--color-primary); font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; }.notification-item { display: flex; align-items: start; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 12px 10px; border: 0; border-top: 1px solid var(--color-border); background: transparent; color: var(--color-text); text-align: left; border-radius: 8px; transition: background 0.15s ease; }.notification-item:hover { background: var(--color-bg-hover); }.notification-item.unread { background: var(--color-bg-subtle); }.notification-item > span { display: grid; gap: 4px; }.notification-item strong { font-size: .78rem; color: var(--color-text); text-transform: capitalize; }.notification-item small { color: var(--color-text-secondary); font-size: .74rem; line-height: 1.38; }.notification-item em { color: var(--color-text-tertiary); font-size: .65rem; font-style: normal; font-variant-numeric: tabular-nums; }.notification-item > svg { flex: 0 0 auto; color: var(--color-primary); }

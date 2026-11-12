@@ -22,6 +22,12 @@ import {
 } from "../tms/tms.service.js";
 import { checkAndUpdateContractCompletion } from "../contracts/contracts.service.js";
 import {
+  assertWithdrawalApproved,
+  consumeWithdrawalApproval,
+  verifyWithdrawalOtp,
+  WithdrawalOtpRequiredError,
+} from "./withdrawalOtp.service.js";
+import {
   recordEscrowFundingLedger,
   recordMilestoneReleaseLedger,
   recordDisputeRefundLedger,
@@ -951,13 +957,19 @@ export async function releaseMilestoneFunds(
 }
 
 /**
- * Freelancer withdrawal â€” gated by Tier 2 KYC at the route layer.
+ * Freelancer withdrawal — gated by Tier 2 KYC at the route layer.
+ *
+ * `otpCode` is the SMS approval code for THIS payout. It is optional in the
+ * type so that a caller who forgets it gets a clear error rather than a
+ * crash; it is not optional in practice, because the code is verified below
+ * before any money moves.
  */
 export async function withdrawFromWallet(params: {
   userId: string;
   amountMinor: number;
   provider: PaymentProvider;
   payoutAccountIdentifier: string;
+  otpCode?: string;
 }) {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: params.userId },
@@ -1066,6 +1078,35 @@ export async function withdrawFromWallet(params: {
       "TMS pass-through check failed",
     );
   }
+
+  // Two-factor approval for the payout itself.
+  //
+  // A recent re-authentication is NOT a substitute: it proves the session is
+  // fresh, not that the person in front of the screen approved THIS payout.
+  // The Roadmap calls for 2FA to be mandatory for withdrawals, and this is a
+  // bank transfer to a phone number — the exact action an attacker with a
+  // stolen session wants to make.
+  //
+  // The check sits HERE, after the business rules and immediately before the
+  // money moves, for two reasons:
+  //
+  //   1. It is the last gate before the debit, so no path into the money can
+  //      skip it. The service owns it, not just the route.
+  //   2. A user whose contract blocks the withdrawal is told that, without
+  //      being sent an SMS they would then have to enter for a payout that
+  //      was never going to happen.
+  if (!params.otpCode) {
+    throw new WithdrawalOtpRequiredError(
+      "Confirm the withdrawal code we sent you by SMS before withdrawing.",
+    );
+  }
+  await verifyWithdrawalOtp({
+    userId: params.userId,
+    code: params.otpCode,
+  });
+  // Defence in depth: confirm the approval that the verification just
+  // recorded is live, rather than trusting the call above implicitly.
+  await assertWithdrawalApproved(params.userId);
 
   // The payment/disbursement provider fee is no longer taken here.
   //
@@ -1257,6 +1298,10 @@ export async function withdrawFromWallet(params: {
   const updatedWallet = await prisma.wallet.findUniqueOrThrow({
     where: { userId: params.userId },
   });
+
+  // The approval has been spent. Deleting it means a code approved for one
+  // payout cannot be replayed for a second one inside the approval window.
+  await consumeWithdrawalApproval(params.userId);
 
   return {
     payoutId: payout.id,

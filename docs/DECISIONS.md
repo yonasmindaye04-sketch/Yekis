@@ -118,6 +118,8 @@ The Grammy Telegram bot (`@ye_kis_bot`) achieves 100% dictionary key parity (243
 The Web SPA supports four Ethiopian national languages natively (English, Amharic, Afaan Oromoo, Tigrigna) with 314 translation keys. Language state is persisted in `localStorage` under `yekis-language`, reflected in `<html lang>`, and synchronized with `User.languagePreference` upon registration. Language selector components are strictly theme-invariant to comply with `.agents/AGENTS.md`.
 
 > **Updated 2026-11-09:** the dictionary has since grown to **625 leaf keys** (43 nested objects) per language, still at exact 4-language parity. The 314 figure above is the count at the time of the decision.
+>
+> **Updated 2026-11-12:** removing the onboarding guide took the `onboarding` namespace out of all four locales, leaving **569 leaf keys** (40 nested objects) per language, still at exact 4-language parity. Exact parity is now enforced by `node scripts/check-doc-parity.mjs`: the locale lookup falls back to English and then to the raw key, so a missing translation would otherwise reach the user silently.
 
 ## 2026-10-03
 

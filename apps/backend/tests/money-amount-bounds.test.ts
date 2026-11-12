@@ -79,13 +79,13 @@ describe("every schema on the money path uses it", () => {
     expect(SubmitTopUpInput.safeParse({ provider: "TELEBIRR", amountMinor: INT32_MAX + 1, referenceNumber: "abc" }).success).toBe(false);
     expect(SubmitTopUpInput.safeParse({ provider: "TELEBIRR", amountMinor: 100.5, referenceNumber: "abc" }).success).toBe(false);
 
-    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: INT32_MAX + 1, payoutAccountIdentifier: "+251911000000" }).success).toBe(false);
-    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: 100.5, payoutAccountIdentifier: "+251911000000" }).success).toBe(false);
+    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: INT32_MAX + 1, payoutAccountIdentifier: "+251911000000", otpCode: "123456" }).success).toBe(false);
+    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: 100.5, payoutAccountIdentifier: "+251911000000", otpCode: "123456" }).success).toBe(false);
   });
 
   it("still rejects zero and negatives on the positive-only paths", () => {
     expect(SubmitTopUpInput.safeParse({ provider: "TELEBIRR", amountMinor: 0, referenceNumber: "abc" }).success).toBe(false);
-    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: -1, payoutAccountIdentifier: "+251911000000" }).success).toBe(false);
+    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: -1, payoutAccountIdentifier: "+251911000000", otpCode: "123456" }).success).toBe(false);
   });
 
   it("still accepts valid amounts on each path", () => {
@@ -93,6 +93,6 @@ describe("every schema on the money path uses it", () => {
     // assertion above.
     expect(Money.safeParse({ amountMinor: 150_000, currency: "ETB" }).success).toBe(true);
     expect(SubmitTopUpInput.safeParse({ provider: "TELEBIRR", amountMinor: 250_000, referenceNumber: "abc" }).success).toBe(true);
-    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: 100_000, payoutAccountIdentifier: "+251911000000" }).success).toBe(true);
+    expect(WithdrawInput.safeParse({ provider: "TELEBIRR", amountMinor: 100_000, payoutAccountIdentifier: "+251911000000", otpCode: "123456" }).success).toBe(true);
   });
 });

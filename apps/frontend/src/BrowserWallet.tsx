@@ -62,6 +62,13 @@ export function BrowserWallet({
   const [messageIsError, setMessageIsError] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutIdentifier, setPayoutIdentifier] = useState("");
+  // Two-factor approval for the payout. The code is requested only once the
+  // amount and destination are on screen, so it is checked against something
+  // the user is actually looking at.
+  const [withdrawOtp, setWithdrawOtp] = useState("");
+  const [otpRequested, setOtpRequested] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
   // Anyone who can fund escrow needs the top-up panel open by default, which
   // now includes dual-role accounts. Defaulting this off for BOTH left them
   // unable to add funds without first opening the panel.
@@ -254,6 +261,35 @@ export function BrowserWallet({
     }
   };
 
+  /**
+   * Sends the SMS approval code for this payout.
+   *
+   * The code proves the person holding the phone approved this specific
+   * payout. Without it a stolen session could move money straight to an
+   * attacker's number.
+   */
+  const sendWithdrawalOtp = async () => {
+    setIsSendingOtp(true);
+    setError("");
+    setMessage("");
+    try {
+      const challenge = await api.requestWithdrawalOtp();
+      setOtpRequested(true);
+      setDevOtpCode(challenge.devCode ?? null);
+      setMessage(
+        "We sent a 6-digit approval code to the phone number on your account.",
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not send the approval code. Try again in a moment.",
+      );
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
   const withdraw = async () => {
     const amountNum = Number(withdrawAmount);
     const amountMinor = Math.round(amountNum * 100);
@@ -274,6 +310,11 @@ export function BrowserWallet({
       return;
     }
 
+    if (!/^\d{6}$/.test(withdrawOtp.trim())) {
+      setError("Enter the 6-digit approval code we sent you.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
@@ -282,6 +323,7 @@ export function BrowserWallet({
         amountMinor,
         provider: withdrawRail,
         payoutAccountIdentifier: payoutIdentifier.trim(),
+        otpCode: withdrawOtp.trim(),
       });
 
       if (result.error === "HELD_FOR_REVIEW") {
@@ -296,6 +338,9 @@ export function BrowserWallet({
       } else {
         setWithdrawAmount("");
         setPayoutIdentifier("");
+        setWithdrawOtp("");
+        setOtpRequested(false);
+        setDevOtpCode(null);
         events.payoutRequested();
         setSuccess(
           `Withdrawal request recorded for ETB ${amountNum.toLocaleString()}. Funds will be sent to your account upon staff settlement.`,
@@ -545,6 +590,42 @@ export function BrowserWallet({
             </label>
           </div>
 
+          {/* Two-factor approval. A withdrawal moves money to a phone number,
+              which is exactly what a stolen session would want to do — so the
+              code is required, not optional. */}
+          <div className="browser-topup-fields withdraw-fields">
+            <label>
+              Approval code
+              <input
+                value={withdrawOtp}
+                onChange={(e) => setWithdrawOtp(e.target.value)}
+                placeholder="6-digit code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+              />
+            </label>
+            <div className="withdraw-otp-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={isSendingOtp || isSubmitting}
+                onClick={() => void sendWithdrawalOtp()}
+              >
+                {isSendingOtp
+                  ? "Sending..."
+                  : otpRequested
+                    ? "Resend code"
+                    : "Send code"}
+              </button>
+              {devOtpCode && (
+                <span className="withdraw-otp-dev">
+                  Dev code: {devOtpCode}
+                </span>
+              )}
+            </div>
+          </div>
+
           {message && (
             <Alert variant={messageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
             >
@@ -570,7 +651,11 @@ export function BrowserWallet({
 
           <button
             className="btn-primary"
-            disabled={isSubmitting || wallet.balanceMinor <= 0}
+            disabled={
+              isSubmitting ||
+              wallet.balanceMinor <= 0 ||
+              !/^\d{6}$/.test(withdrawOtp.trim())
+            }
             onClick={() => void withdraw()}
           >
             {isSubmitting ? "Processing..." : "Request withdrawal"}

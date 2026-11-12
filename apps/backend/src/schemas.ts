@@ -260,6 +260,15 @@ export const WithdrawInput = z.object({
   provider: PaymentProvider,
   amountMinor: AmountMinor.positive(),
   payoutAccountIdentifier: z.string().min(4).max(100),
+  /**
+   * The SMS approval code for THIS payout, issued by
+   * POST /api/v1/escrow/wallet/withdraw/otp.
+   *
+   * Required, because the Roadmap makes two-factor approval mandatory for
+   * withdrawals and a bank transfer to a phone number is precisely the action
+   * a stolen session wants to make.
+   */
+  otpCode: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit code we sent you."),
 });
 export type WithdrawInput = z.infer<typeof WithdrawInput>;
 

@@ -112,7 +112,36 @@
 }
 
 /* ── Side Panel Alignment (Expanded 256px & Collapsed 68px Icon-Rail) ───── */
+
+/*
+ * The sidebar is a grid item of `.platform-shell.sh-shell`, so by default the
+ * grid STRETCHES it to the height of the row — and the row is as tall as the
+ * main content. On a long page the sidebar therefore became taller than the
+ * viewport and scrolled away with the body, taking the navigation with it:
+ * by the time the user reached the bottom of the page there was no way to
+ * change section.
+ *
+ * `position: sticky` pins the sidebar to the viewport while the grid area
+ * scrolls under it.
+ * `align-self: start` stops the grid stretching it to the row height — a
+ * sticky element with no room to travel does not stick.
+ * `height: 100vh` makes it exactly one viewport tall.
+ * `overflow-y: auto` lets it scroll its own contents when the nav is taller
+ * than the screen, rather than being clipped.
+ *
+ * These are layout and shape properties, so they live here in the un-themed
+ * base rule: the dark theme must not be able to diverge from them (AGENTS.md).
+ *
+ * The `sh-variant-inset` and `sh-variant-floating` variants override `top`
+ * and `height` (both more specific than this rule), and the ≤768px drawer
+ * overrides `position` with `position: fixed !important`.
+ */
 .platform-shell.sh-shell .platform-sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
   padding: 12px;
   display: flex;
   flex-direction: column;

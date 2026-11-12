@@ -6,6 +6,14 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 
 > **2026-11-09 correction pass.** Every statement below was re-verified against `apps/backend/src`, `apps/backend/prisma/schema.prisma`, and `apps/backend/src/config/env.ts`. Four factual errors were corrected: the withholding rate is **3% / 30%, not 2%**; the withholding is **gated off at launch** (`TIN_FEATURE_ENABLED=false`), so it is currently **0%**; **Chapa is gone** and **Telebirr is the only live collection rail** (CBE and M-Pesa are throwing stubs); and **`withdrawFromWallet` is live** (Telebirr B2C), not stubbed. Three blockers that the documents require but the code has never had were added: 10-year audit retention, PDPP data-subject rights/erasure, and the real breach-notification dispatch. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md`.
 
+> **2026-11-10 code pass.** Blockers **6**, **7** and **8** had code-only parts that did not need a decision, and those are now implemented:
+>
+> - **#6 (breach reporting)** — the response workflow now runs end to end: containment, staff notification by SMS/Telegram, user notification, an audit record, the 72-hour clock, and a prepared ECA filing template. The *filing* is still human — there is no ECA API.
+> - **#7 (10-year retention)** — `AuditLog.retentionUntil` (NOT NULL, 10 years) and a daily purge that runs through a `SECURITY DEFINER` function with a hard ten-year floor in SQL. WORM storage and the least-privilege grant verification are still open.
+> - **#8 (data-subject rights)** — a complete export and an erasure that destroys the personal content, closes the account and retains the AML and financial records. The retained-field list still needs counsel sign-off.
+>
+> What remains on each of the three is the part that is not code: the ECA filing, object lock and restore testing, and the legal review of the retained set.
+
 ## 1. Separate Bank/Telebirr Escrow Account
 **Domain**: Finance / Escrow
 **Master Design Document Section**: 4.1 Payment, Escrow, and Ledger Setup
@@ -70,41 +78,53 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 ## 6. Real-Time Data Breach Reporting to ECA
 **Domain**: Security / Legal
 **Master Design Document Section**: 3.3 Security & Breach Notification
-**Status**: Blocked on ECA portal/API
+**Status**: **Response workflow implemented** — the ECA filing itself remains a human obligation
 
 **The Block**: The law requires reporting significant data breaches to the Ethiopian Communications Authority (ECA) within 72 hours. The ECA does not have an automated webhook or API for this.
 
 **Current Code Implementation**:
-- **Correction:** `src/lib/breachAlert.ts` does **not** send a Telegram/email/SMS alert. It calls `logger.fatal({ breachAlert: true, severity, affectedSystems, estimatedUsersImpacted }, ...)`. The dispatch to the internal Security Incident Response Team is **commented out** (`breachAlert.ts:36`):
-  ```ts
-  // TODO: Send critical SMS/Telegram/Email to the Security Incident Response Team (SIRT)
-  // await notificationQueue.add("security-alert", { ...params });
-  ```
-  So today the alert is **log-only**. The `notificationQueue` exists and is live, so wiring the dispatch is a small code change, but the **72-hour ECA filing remains a human obligation** and is not automatable without an ECA API.
+- ✅ **The alert is no longer log-only.** `src/lib/breachAlert.ts` runs the whole response chain when an incident is opened:
+  - **Contain** — every active session belonging to an affected user is revoked by bumping `sessionVersion`, which invalidates their tokens immediately without touching the account or any financial record.
+  - **Notify staff** — every staff user is alerted in-app, by SMS and by Telegram, with the ECA deadline in the message. `security-breach` is a critical notification type, so it goes out over SMS.
+  - **Notify users** — each affected user is told, one message each, without being told anything about the other users.
+  - **Record** — the incident is written to the audit log as `SECURITY_BREACH_OPENED`, and the 72-hour deadline is computed from the detection instant.
+  - **Prepare the filing** — `buildEcaNotificationTemplate()` produces the ECA notification with the PDPP-required fields filled in and the ones that need a human signature marked `[TO COMPLETE: …]`, so the filing starts from a complete list of questions instead of a blank page.
+- ✅ **Staff can open an incident**: `POST /api/v1/admin/incidents/breach` (permission `incidents.manage`, fresh auth required) and `GET /api/v1/admin/incidents/breaches` lists the open incidents with the deadline and whether the filing is still inside the 72-hour window.
+- ⛔ **Still a human obligation**: the ECA has no API, so a person must submit the filing. The template is prepared, not sent.
+- ⛔ **Still open**: automated anomaly *detection* is not built — detection is staff-confirmed. A staff member opens the incident once they have confirmed a breach actually happened.
+- ⛔ **Still open**: no DPO is appointed (PDPP Art. 37), so the contact point in the filing template is still a blank.
 
 ## 7. 10-Year Record Retention and WORM Storage
 **Domain**: Compliance / Infrastructure
 **Master Design Document Section**: 11 (AML record-keeping) and the Playbook's retention matrix (10 years for transaction, KYC, audit, and dispute records)
-**Status**: **Not started in code** — the roadmap lists this as "Audit-Log Enforcement: PENDING EXECUTION CONFIRMATION"
+**Status**: **Retention column + purge job implemented** — WORM storage and the least-privilege grant verification remain open
 
 **The Block**: The AML regime requires 10-year retention of transaction, KYC, audit, dispute, and STR records, stored WORM-compliant and encrypted. Turning that on requires infrastructure work (object lock, encrypted backups, partition strategy) plus the auditor's sign-off on the retention schedule.
 
 **Current Code Implementation**:
-- `AuditLog` (`apps/backend/prisma/schema.prisma:686-710`) is append-only **by application convention only**. It has no `expiresAt`/`retainUntil` column, no `retentionClass`, and there is **no purge or archival job** anywhere in `apps/backend/src`.
-- There is **no WORM module** and no append-only partition enforcement in application code.
-- `infra/postgres` provisions a pgaudit-enabled image, but the corresponding least-privilege grants and `AuditLog` revokes are not verified after deployment (still an open `[ ]` in `docs/COMPLETENESS_CHECKLIST.md`).
-- The object store (`src/lib/objectStore.ts`) supports versioning and object lock only as a production configuration task — it is not configured, and no restore test has been run.
+- ✅ **`AuditLog.retentionUntil`** (`apps/backend/prisma/schema.prisma`) is **NOT NULL** and is stamped at write time as `createdAt + AUDIT_RETENTION_YEARS` (default 10 years) by `recordAuditEvent()`. Migration `20261110120000_audit_log_retention` backfills existing rows and adds the index.
+- ✅ **The purge exists.** `purge_expired_audit_logs(batch_size)` is a `SECURITY DEFINER` function, so the application role can trigger the purge without holding `DELETE` on `AuditLog` — the "the app cannot delete audit rows" invariant survives. The `audit-purge` BullMQ worker runs it daily at 05:00 and writes an `AUDIT_LOG_PURGE` audit row of its own.
+- ✅ **The floor is in SQL, not in configuration.** The function deletes a row only when its stamp has expired **and** the row is at least ten years old, so a misconfigured `AUDIT_RETENTION_YEARS` cannot shorten a statutory obligation.
+- ⛔ **Still open**: there is **no WORM module** and no append-only partition enforcement in application code.
+- ⛔ **Still open**: `infra/postgres` provisions a pgaudit-enabled image, but the corresponding least-privilege grants and `AuditLog` revokes are not verified after deployment (still an open `[ ]` in `docs/COMPLETENESS_CHECKLIST.md`). The new function's `GRANT EXECUTE` has the same requirement.
+- ⛔ **Still open**: the object store (`src/lib/objectStore.ts`) supports versioning and object lock only as a production configuration task — it is not configured, and no restore test has been run.
 
 ## 8. PDPP Data-Subject Rights (Access, Portability, Erasure)
 **Domain**: Data Privacy
 **Master Design Document Section**: 3.2 / Roadmap Phase 1 "Data Erasure Tooling"
-**Status**: **Not started in code**
+**Status**: **Implemented** — the exact retained-field list is still pending counsel sign-off
 
 **The Block**: Under PDPP No. 1321/2024 the platform must honour data-subject access, portability, and erasure requests. Erasure must wipe marketing data, profile photos, and chat messages while **preserving AML transaction data under the 10-year hold** — that preservation rule needs legal sign-off before an erasure tool is built.
 
 **Current Code Implementation**:
-- **No tooling exists.** Grepping `apps/backend/src` for `exportData`, `downloadMyData`, `deleteAccount`, `erasure`, and `portability` returns **zero matches**. There is no "download my data" route, no data-export job, and no admin erasure tool.
-- `User` rows, `ChatMessage` bodies, `ProfileReport`, and uploaded objects are therefore **not** erasable through any supported path today.
+- ✅ **Access and portability**: `GET /api/v1/users/me/export` returns every category of personal data the platform holds — account, profile, verification, financials, marketplace activity, communications (consents, notifications, chat, DMs) and the compliance records. It is built by `apps/backend/src/modules/privacy/privacy.service.ts`, so the export and the erasure agree on what "personal data" means.
+- ✅ **Erasure**: `POST /api/v1/users/me/erasure` (fresh auth required). It destroys the name, display name, bio, avatar, email, password, OAuth and Telegram identifiers, the chat and DM bodies, the portfolio, the skills, the marketplace copy on jobs, proposals, gigs, reviews and counter-offers, the notification preferences and notifications, and the analytics (profile views and featured-placement logs). It also deletes the chat attachments **from the object store**, including the local-disk fallback, because nulling the database row does not destroy the bytes.
+- ✅ **The account is closed**: suspended, sessions revoked, the password randomised and the email replaced with a non-routable placeholder.
+- ✅ **The AML and financial records are retained**, and the response says so explicitly rather than answering "your data has been erased" while the identity evidence is still on file. Retained: UCID, date of birth, Fayda biometric id, phone, the KYC record and documents, the wallet and its transactions, the ledger, the audit log, the transaction flags, the consent history, the contracts, milestones, disputes and evidence, and the reviews written *about* the user by other people.
+- ✅ **Consent is revoked, not deleted.** Marketing and analytics get a new `granted: false` `ConsentRecord` row — the history of what was agreed to is itself the evidence.
+- ✅ **Erasure is refused while money is in flight.** A non-zero wallet balance, a pending payout or top-up, an active contract or an open dispute each produce a specific `409 ERASURE_BLOCKED` blocker, because erasing the identity under money that is still owed would leave it unclaimable.
+- ⛔ **Still open**: the exact retained-field list has not been reviewed by counsel. The split implemented here follows the Roadmap's wording ("wipe marketing data, photos, chat; preserve AML data") and deliberately retains rather more than less: an over-retention is a complaint, an under-retention is a regulatory breach.
+- ⛔ **Still open**: if the object store is later configured with object lock in compliance mode, deletes will be rejected by the bucket rather than destroying the bytes, and erasure will need a separate retention-exception process. `deleteObject()` returns whether the delete actually took effect so that this is visible rather than silent.
 
 ## 9. Multi-Rail Payment Collection (CBE Birr and M-Pesa)
 **Domain**: Finance / Payments

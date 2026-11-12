@@ -76,7 +76,7 @@ erDiagram
 | `ChatMessage` | Messages in a support `Conversation`; `origin` and `externalId` are generic provenance/idempotency markers |
 | `DirectThread` | 1-on-1 negotiation thread between a client and freelancer (optionally scoped to a job) |
 | `DirectMessage` | Messages within a `DirectThread` |
-| `AuditLog` | Append-only event record for important state transitions; hardened with `actorRole`, `action`, `previousState`, `newState`, `amountMinor`, `requestId`, `ipAddress` |
+| `AuditLog` | Append-only event record for important state transitions; hardened with `actorRole`, `action`, `previousState`, `newState`, `amountMinor`, `requestId`, `ipAddress`. Every row carries `retentionUntil` — the instant after which it may be purged (createdAt + `AUDIT_RETENTION_YEARS`, default 10 years) |
 | `Skill` | Standardized skills available for profiles |
 | `UserSkill` | Junction table for user skills and proficiency |
 | `Review` | Double-blind contract feedback (author, target, contract, rating, comment); visible once both parties submit or 14-day window expires |
@@ -97,7 +97,7 @@ erDiagram
 | `LedgerEntry` | Individual debit or credit line item; enforces zero-sum invariant per journal |
 | `PasswordResetToken` | Time-limited token for the password reset flow |
 | `TelegramLoginCode` | Short-lived code issued during Telegram QR/web-login start, redeemed to mint a session |
-| `PhoneVerificationCode` | SMS OTP for phone number verification |
+| `PhoneVerificationCode` | SMS OTP for phone number verification. `purpose` scopes the code to the proof it gives — `PHONE_VERIFICATION` (control of the number) or `WITHDRAWAL` (approval of one payout) — so there is one outstanding code per (phone, purpose) and a login code can never approve a payment |
 
 ## Monetary Representation
 
@@ -117,6 +117,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 - A wallet and KYC record are each one-to-one with a user.
 - Release/refund/split services combine guarded updates with Prisma transactions; constraints support, but do not replace, service state checks.
 - `AuditLog` is insert-only by application convention and database privileges.
+- `AuditLog.retentionUntil` is NOT NULL: an audit row without a defined expiry is the ambiguity the ten-year retention requirement exists to remove. The purge runs through the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which the application role may call but through which it holds no `DELETE` privilege on the table. The function deletes a row only when **both** its stamp has expired **and** it is at least ten years old, so a misconfigured retention period cannot shorten a statutory obligation.
 - A contract has at most two reviews, one from each party, enforcing the double-blind system.
 - Reviews are only visible once both parties have submitted them, or the 14-day window expires.
 - Profile completeness percentage is dynamically calculated based on skills, bio, portfolio, and verified status.
@@ -179,6 +180,8 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261022150000_seed_demo_activity` | Local demo activity seed (development only) |
 | `20261109120000_rotate_seeded_demo_passwords` | Pentest remediation (C-01): replaces the four committed Argon2id demo hashes with a hash of a value stored nowhere, and bumps `sessionVersion` so tokens issued before the rotation no longer validate |
 | `20261112120000_launch_categories_ten` | Phase 0 launch-category lock: `LaunchCategory` widened from six to **ten** subcategories. **Additive only** — `ALTER TYPE ... ADD VALUE IF NOT EXISTS` per value (with `duplicate_object` guards), so existing `Job.category` and `Gig.category` rows keep their values |
+| `20261110120000_audit_log_retention` | Adds `AuditLog.retentionUntil` (NOT NULL, backfilled from `createdAt` + 10 years) with an index, and the `SECURITY DEFINER` function `purge_expired_audit_logs(batch_size)` that the retention worker calls. The application role gets EXECUTE only — it still holds no `DELETE` privilege on `AuditLog` |
+| `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
 
 ### Re-runnable migrations
 
