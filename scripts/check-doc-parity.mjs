@@ -389,6 +389,73 @@ if (fs.existsSync(designPath)) {
   }
 }
 
+// 7. Verify the four frontend locales are in EXACT key parity.
+//
+// WHY THIS IS A GATE AND NOT A NOTE
+// The locale objects are looked up with a fallback chain — `locales[lang]?.[key]
+// || locales.en?.[key] || key`. A missing Amharic key therefore does not
+// crash: it silently renders the English string, or worse, the raw key
+// ("workspace.jobs.status.SHORTLISTED") straight into the interface. Nothing
+// else would notice, and a user in Amharic would see it.
+//
+// The check evaluates the locale object directly, so it needs no TypeScript
+// toolchain.
+const i18nPath = path.join(rootDir, "apps/frontend/src/i18n.ts");
+if (fs.existsSync(i18nPath)) {
+  console.log(`\n?? Checking the frontend locales are in exact parity...`);
+  const i18nSrc = fs.readFileSync(i18nPath, "utf-8");
+  const start = i18nSrc.indexOf("export const translations = {");
+  if (start >= 0) {
+    const body = i18nSrc.slice(start);
+    const end = body.indexOf("\n};");
+    let translations = null;
+    try {
+      translations = new Function(
+        `${body.slice(0, end + 3).replace("export const translations =", "const translations =")}\nreturn translations;`,
+      )();
+    } catch (err) {
+      console.error(`? Could not evaluate the locale object: ${err.message}`);
+      hasErrors = true;
+    }
+
+    if (translations) {
+      const keyPaths = (node, prefix = "") =>
+        node === null || typeof node !== "object" || Array.isArray(node)
+          ? [prefix]
+          : Object.entries(node).flatMap(([k, v]) =>
+              keyPaths(v, prefix ? `${prefix}.${k}` : k),
+            );
+      const langs = Object.keys(translations);
+      const reference = langs[0];
+      const mismatches = [];
+      for (const lang of langs.slice(1)) {
+        const ref = new Set(keyPaths(translations[reference]));
+        const own = new Set(keyPaths(translations[lang]));
+        for (const key of ref) {
+          if (!own.has(key)) mismatches.push(`${lang} is missing "${key}"`);
+        }
+        for (const key of own) {
+          if (!ref.has(key)) mismatches.push(`${lang} has an extra "${key}"`);
+        }
+      }
+      if (mismatches.length > 0) {
+        console.error(
+          `? The frontend locales are not in exact parity (${mismatches.length} mismatch(es)):`,
+        );
+        for (const m of mismatches.slice(0, 20)) console.error(`  - ${m}`);
+        console.error(
+          `  A missing key falls back to English, or renders the raw key to the user.`,
+        );
+        hasErrors = true;
+      } else {
+        console.log(
+          `? All ${langs.length} locales have identical key sets (${langs.join(", ")}).`,
+        );
+      }
+    }
+  }
+}
+
 if (hasErrors) {
   console.error("\n❌ Documentation drift detected! Please update the corresponding documentation files.");
   process.exit(1);

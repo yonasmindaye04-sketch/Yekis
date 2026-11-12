@@ -1974,7 +1974,7 @@ Each gap is documented **next to the code it belongs to**, so a reader who opens
 | Job search never uses OpenSearch; gig edits go stale in the index; no reindex path | §3.18 |
 | The audit retention stamp and the purge that enforces it | §4.2 |
 | Five ops console actions 404; the fallback matrix drifts from the server's; orphaned mock data | §8.8 |
-| ~866 hardcoded JSX literals; registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
+| ~1,800 hardcoded JSX literals (1,127 in the 104 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
 | No offline queue for socket events; the client ping is a no-op; guest sockets cannot connect | §8.10 |
 
 ---
@@ -2377,7 +2377,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 
 #### Known gaps
 
-- **Hardcoded copy is still widespread.** 25 of 129 `.tsx` files import the i18n module; the other 104 contain hardcoded user-facing strings — roughly **866 literal JSX text nodes**, concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity.
+- **Hardcoded copy is still widespread.** 25 of 129 `.tsx` files import the i18n module; the other **104** never touch it. An exact AST count (TypeScript's own parser) finds **1,800 hardcoded JSX text nodes**, of which **1,127** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
 - **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
@@ -2886,10 +2886,10 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
 
-**Two catalogues, not one.** The frontend holds 569 nested keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+**Two catalogues, not one.** The frontend holds 569 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
 
 **Where it falls short today:**
-- Roughly **866 hardcoded JSX text literals** remain across 104 frontend files that never import the i18n module — concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more.
+- Roughly **1,800 hardcoded JSX text literals** remain across the frontend — **1,127** of them in the 104 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
 - **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
 - **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
 - **No RTL support** — the platform is left-to-right only, and `dir` is never set.

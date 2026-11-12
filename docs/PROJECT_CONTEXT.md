@@ -78,7 +78,7 @@
 > **Update 2026-11-09 (Documentation ↔ Codebase Alignment Pass):**
 > 1. **Scope:** Reconciled every Markdown document in `docs/` against the actual codebase, using the three governing source documents — *Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, and *Master Design, Legal & Compliance Document (Draft 1)* — as the **intent baseline**, and the codebase as the **truth** for implementation status.
 > 2. **Verified facts established by the pass:**
->    - Frontend i18n: **625 leaf keys** per language (43 nested objects), exact parity across `en` / `am` / `om` / `ti`. Telegram bot: **243 keys**.
+>    - Frontend i18n: **569 leaf keys** per language (40 nested objects), exact parity across `en` / `am` / `om` / `ti`. Telegram bot: **243 keys**. Reproduce with `node scripts/measure-frontend-i18n.mjs`.
 >    - Operations Console v2: **23 page components** under 23 page IDs, plus 6 shared primitives.
 >    - Background processing: **10 BullMQ queues** — `auto-release`, `gig-auto-release`, `review-reveal`, `featured-refresh`, `payment-reconcile`, `kyc-refresh`, `notifications`, `tms-scan`, `withholding-remittance`, `audit-purge`.
 >    - Vite dev server runs on **port 3000** (`vite.config.ts`), not 5173; `vite preview` on 4173.

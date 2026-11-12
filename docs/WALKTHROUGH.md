@@ -102,7 +102,7 @@ Last validated: 2026-11-09
 > **Documentation ↔ Codebase Alignment Pass (2026-11-09):**
 > - **What changed:** every documented count, constant, queue, port, route, and enum was re-verified against the running codebase and against the three governing source documents (*Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, *Master Design, Legal & Compliance Document (Draft 1)*). The documents are the intent baseline; the code is the truth for implementation status. Divergences are recorded explicitly rather than silently reconciled.
 > - **Corrected figures:**
->   - Frontend i18n **625 keys** per language (43 nested objects), exact 4-language parity — previously documented as 314.
+>   - Frontend i18n **569 keys** per language (40 nested objects), exact 4-language parity - previously documented as 314, and as 625 before the onboarding-guide removal.
 >   - Operations Console v2 **23 page components** (23 page IDs) plus 6 shared primitives — previously documented as 19 pages.
 >   - **9** BullMQ queues: `auto-release`, `gig-auto-release`, `review-reveal`, `featured-refresh`, `payment-reconcile`, `kyc-refresh`, `notifications`, `tms-scan`, `withholding-remittance` — three were missing from the architecture table.
 >   - Vite dev server on **port 3000** (`vite.config.ts`), `vite preview` on 4173.

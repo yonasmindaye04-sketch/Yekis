@@ -1,8 +1,10 @@
 # Architecture
 
-Last updated: 2026-11-09
+Last updated: 2026-11-12
 
-> **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **625** keys (43 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
+> **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **569** keys (40 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
+
+> **2026-11-12 pass.** Counts re-verified against the running codebase after the code-only compliance pass and the onboarding-guide removal: frontend i18n **569** keys (40 nested objects — the `onboarding` namespace was removed with the tour); background processing **9 → 10** queues (the `audit-purge` retention worker was added); the freelancer's net payout is **92.5%**, not 93% (the 0.5% provider fee is collected at release); withdrawals require an **SMS approval code**; the `Contract.cancellableUntil` cooling-off gap is **closed**; and `AuditLog` now carries a **10-year retention stamp** with a daily purge. The deep-dive detail lives in `docs/SYSTEM_DESIGN.md`.
 
 ## System Overview
 
@@ -279,8 +281,9 @@ sequenceDiagram
 | `notifications` | Domain events | Persists in-app notices and attempts configured SMS/Telegram delivery |
 | `tms-scan` | Every 15 minutes (`TMS_SCAN_CRON`, default `*/15 * * * *`) | Re-runs structuring/velocity/round-amounts rules; sweeps flags with expired 24h STR SLA clock; raises `STR_SLA_BREACH` audit events |
 | `withholding-remittance` | Monthly schedule (BullMQ cron) | Generates monthly withholding tax remittance reports (`WithholdingRemittanceReport`) |
+| `audit-purge` | Daily at 05:00 UTC (BullMQ cron) | Deletes audit rows past their retention stamp **and** past the hard ten-year floor, through a `SECURITY DEFINER` function the application role may execute but cannot delete past; audits the purge itself |
 
-All nine queues are declared in `apps/backend/src/queue/queues.ts` (eight) and `apps/backend/src/queue/withholdingRemittance.worker.ts` (one). Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
+All ten queues are declared in `apps/backend/src/queue/queues.ts` (nine) and `apps/backend/src/queue/withholdingRemittance.worker.ts` (one). Workers start with the backend server and depend on Redis. Retried work must remain idempotent because delivery is at least once.
 
 ## Multilingual System
 
