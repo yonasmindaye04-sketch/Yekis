@@ -30,6 +30,10 @@ import {
   WithdrawalOtpRequiredError,
   WithdrawalPhoneMissingError,
 } from "./withdrawalOtp.service.js";
+import {
+  PhoneCodeRateLimitedError,
+  PhoneCodeDeliveryFailedError,
+} from "../auth/phone-verification.service.js";
 
 export const escrowRouter = Router();
 
@@ -425,6 +429,15 @@ escrowRouter.post(
           error: "PHONE_NOT_VERIFIED",
           message: err.message,
         });
+      }
+      // The SMS provider is unavailable or the number is being spammed. Both
+      // are the caller's problem to retry, not an internal fault — answering
+      // 500 here tells the user the platform broke when the SMS gateway did.
+      if (err instanceof PhoneCodeRateLimitedError) {
+        return res.status(429).json({ error: "RATE_LIMITED", message: err.message });
+      }
+      if (err instanceof PhoneCodeDeliveryFailedError) {
+        return res.status(503).json({ error: "SMS_UNAVAILABLE", message: err.message });
       }
       if (err instanceof WithdrawalOtpRequiredError) {
         return res.status(400).json({ error: "INVALID_REQUEST", message: err.message });

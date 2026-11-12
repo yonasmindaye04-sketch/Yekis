@@ -25,9 +25,13 @@ import { buildApp } from "../src/app.js";
  * factor and a login message would double as a money approval.
  */
 
+// The SMS client is mocked so no provider is contacted. It is a `vi.fn` rather
+// than a fixed stub so a test can make one delivery fail.
 vi.mock("../src/modules/notifications/sms.client.js", () => ({
-  sendSms: async () => ({ sent: true }),
+  sendSms: vi.fn().mockResolvedValue({ sent: true }),
 }));
+
+const { sendSms } = await import("../src/modules/notifications/sms.client.js");
 
 const { createAuthTokens } = await import("../src/modules/auth/auth.service.js");
 const { requestPhoneCode } = await import(
@@ -132,6 +136,27 @@ describe("a withdrawal needs an SMS approval code", () => {
 
     expect([400, 403]).toContain(res.status);
     expect(await balanceOf(user.id)).toBe(before);
+  });
+
+  it("answers 503, not 500, when the SMS provider cannot deliver the code", async () => {
+    // The SMS gateway being down is the caller's problem to retry, not an
+    // internal fault. Answering 500 tells the user the platform broke when the
+    // gateway did — and, worse, it is what the route did until this test
+    // caught it.
+    const user = await makeUser();
+    vi.mocked(sendSms).mockResolvedValueOnce({ sent: false, reason: "not_configured" });
+
+    try {
+      const res = await request(app)
+        .post("/api/v1/escrow/wallet/withdraw/otp")
+        .set("Authorization", await authHeader(user.id))
+        .send({});
+
+      expect(res.status).toBe(503);
+      expect(res.body.error).toBe("SMS_UNAVAILABLE");
+    } finally {
+      vi.mocked(sendSms).mockResolvedValue({ sent: true });
+    }
   });
 
   it("issues a code on request and moves money with it", async () => {
