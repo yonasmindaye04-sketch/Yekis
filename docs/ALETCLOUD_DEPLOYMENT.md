@@ -169,22 +169,35 @@ vestigial when the repository carries a Dockerfile; ignore it.** Confirm it
 from the runtime log, which begins with `[yekis] starting the bundled
 redis-server`.
 
-**Environment variables must be set when the app is created.** This is the
-one that bites. `setAppEnv` writes them — `getAppEnv` reads them back
-correctly — and they are in the record. But **every deploy resets the app's
-env to the set it was created with**, so a variable added after creation
-silently disappears at the next deploy, and the container starts without it.
+**Environment variables must be in place before the app's first successful
+start.** This is the one that bites, and it fails in a precise, repeatable
+way.
 
-The symptom is precise and repeatable: the container crash-loops with
-`Prisma schema validation - Environment variable not found: DATABASE_URL`,
-even though `getAppEnv` shows `DATABASE_URL` present.
+`setAppEnv` writes the variables and `getAppEnv` reads them back
+correctly — but on an app that has **never come up**, a deploy re-derives the
+environment from the record the app was created with, so a variable added
+after creation silently disappears. The symptom is a container that
+crash-loops with
 
-So: pass the whole environment in the `deployApp` call. If a variable has to
-change later, the app has to be deleted and recreated with the new set. The
-`setAppEnv` tool is still the right way to *read* what is in effect
-(`getAppEnv`), and `connectDatabaseToApp` is still the way to get a
-database's full credential set — read it, then put it in the creation-time
-environment.
+```
+Prisma schema validation - Environment variable not found: DATABASE_URL
+```
+
+while `getAppEnv` cheerfully shows `DATABASE_URL` present. The first
+deployment of this repository did exactly that, six times over.
+
+So: pass the whole environment in the `deployApp` call that creates the app.
+
+**Once the app is healthy, the environment can be changed.** `setAppEnv`
+followed by `restartApp` applies the change, and it then **persists across
+later deploys** — verified: `TRUST_PROXY_HOPS` was added that way, and a
+push-triggered redeploy afterwards left all 48 variables in place. The rule
+that matters is the ordering, not the tool: a variable added before the app
+has ever started is lost, and one added after it has started is kept.
+
+`getAppEnv` is the way to see what is actually in effect, and
+`connectDatabaseToApp` is the way to get a database's full credential set —
+read it, then put it in the environment.
 
 **The platform sets `PORT` itself.** The app's env contains `PORT: 8080`
 without anyone setting it, which matches the `EXPOSE 8080` in the Dockerfile.
@@ -211,9 +224,9 @@ below **1.64 ETB** — exactly 24 hours of its own burn. The Pro app needs
 
 ## 5. The environment variables
 
-Set these in the console under the app's **Environment** settings — **or,
-preferably, in the `deployApp` call that creates the app**, because a deploy
-resets the environment to the set it was created with (§4.4).
+Set these in the console under the app's **Environment** settings — or,
+preferably, in the `deployApp` call that creates the app, because a variable
+added to an app that has never started is lost at the next deploy (§4.4).
 
 **A change to an environment variable triggers a redeploy**, and the `VITE_`
 variables are read at **build** time, so a change to one of those needs the
@@ -608,7 +621,7 @@ fine, but Telegram sign-in inside the Mini App cannot verify its `initData`
 without the token, so a user has to sign in with email and password. The
 bot's own commands, the `/staff` link and the webhook are all off.
 
-Setting the token means a delete-and-recreate of the app (§4.4).
+Setting the token means a `setAppEnv` and a restart (§4.4) — no rebuild.
 
 ### Teardown
 
