@@ -14,6 +14,8 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 >
 > What remains on each of the three is the part that is not code: the ECA filing, object lock and restore testing, and the legal review of the retained set.
 
+> **2026-11-13 legal-publication pass.** The public Privacy Policy and Terms of Service are now complete version 1.1 documents, with matching Markdown publications. They are aligned with the implemented seven-day release and cooling-off windows, 7%/0% fee model, consent-aware analytics, data-subject export/erasure, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. This removes the placeholder-page and stale-retention defects; it does **not** close the external Ethiopian counsel-approval dependency.
+
 ## 1. Separate Bank/Telebirr Escrow Account
 **Domain**: Finance / Escrow
 **Master Design Document Section**: 4.1 Payment, Escrow, and Ledger Setup

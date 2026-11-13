@@ -157,7 +157,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| Finalize ToS & Privacy Policy (law firm) with 7-day cooling-off + arbitration clause | ⛔ Blocked — External | The pages ship in the frontend; legal approval is outstanding. The ToS describes a 7-day cooling-off right that the code does not currently grant |
+| Finalize ToS & Privacy Policy (law firm) with 7-day cooling-off + arbitration clause | ⛔ Blocked — External | The public pages now ship complete version 1.1 documents (16 Privacy Policy sections, 22 Terms sections) through a shared accessible legal-document layout, with matching `docs/privacy-policy.md` and `docs/terms-of-service.md`. The seven-day cooling-off mechanism is armed in code (`Contract.cancellableUntil = createdAt + COOLING_OFF_DAYS`) and the seven-day auto-release is implemented. **External Ethiopian counsel approval of the legal text remains outstanding** |
 | Finalize Service Agreement template (law firm) | ⛔ Blocked — External | The template exists in code (`serviceAgreement.template.ts`) but is not counsel-approved |
 | Integrate legal text as screen-rendered text in the user's language | 🟡 Partial | Legal pages render in the app; the translated legal copy is not complete |
 | KYC/AML procedures manual | ⛔ Blocked — External | — |

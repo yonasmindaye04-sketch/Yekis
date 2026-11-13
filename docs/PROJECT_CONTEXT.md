@@ -1,5 +1,11 @@
 # Project Context
 
+> **Update 2026-11-13 (Public legal documents and AFRO-TECH header):**
+> 1. **Motivation & Scope:** The public Privacy Policy and Terms of Service were placeholder pages containing `[TODO: Date]` and a few generic statements, while the published privacy Markdown contradicted the implemented retention rules. The marketing header also needed the established AFRO-TECH public-site design rather than the earlier transparent-over-hero treatment.
+> 2. **Legal documents:** `LegalDocumentPage.tsx` and `LegalDocumentPage.css` now provide one accessible editorial shell for both documents. The Privacy Policy has 16 code-grounded sections; the Terms of Service has 22. The effective date is 13 November 2026 and the version is 1.1. The text matches the implemented seven-day auto-release and cooling-off windows, 7% freelancer fee and 0% client surcharge, consent-aware analytics, data-subject export/erasure, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. `docs/privacy-policy.md` and `docs/terms-of-service.md` are the matching published copies.
+> 3. **External dependency:** Ethiopian counsel must still approve the final production legal text. Completing the implementation and documents does not close that legal-review item.
+> 4. **Header:** `MarketingHeader.tsx` and `marketing.css` now use the AFRO-TECH fixed opaque header, flex `space-between` composition, 36px logo, Space Grotesk wordmark, 2.5rem underline navigation, active-page state, circular theme control, and 1024px right-drawer breakpoint. Yekis keeps its home/FAQ/fees/about/case-study destinations, language selector, sign-in, and registration actions; the language and authentication controls move into the drawer at tablet widths.
+
 > **Update 2026-11-09 (Multi-Language Fiscal Receipt & Payout Voucher Architecture):**
 > 1. **Motivation & Scope:** Addressed user feedback regarding receipts having mixed Amharic and English text simultaneously. Implemented 4 distinct, unmixed language versions (English, Amharic, Afaan Oromoo, and Tigrigna) with English as the default.
 > 2. **Multi-Language Architecture (`FiscalDocumentModal.tsx`, `RECEIPT_I18N`):**

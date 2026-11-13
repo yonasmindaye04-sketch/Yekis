@@ -67,19 +67,23 @@
    HEADER & NAVIGATION
    ========================================================================== */
 
+/* AFRO-TECH header pattern: fixed opaque bar, editorial wordmark,
+   underline navigation, and a compact action rail. */
 .marketing-header {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   z-index: 100;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: var(--space-6);
-  padding: var(--space-5) 6%;
-  border-bottom: none;
-  background: transparent;
+  padding: 20px 6%;
+  border-bottom: 1px solid transparent;
+  background: var(--yekis-bg);
+  color: var(--yekis-copy);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .marketing-header-left {
@@ -91,15 +95,31 @@
 .marketing-brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  color: var(--color-text);
+  gap: 10px;
+  color: var(--yekis-copy);
   text-decoration: none;
   font-weight: 700;
-  font-size: 1.125rem;
   white-space: nowrap;
 }
 
-.marketing-brand:hover { color: var(--color-primary); }
+.marketing-brand strong {
+  color: var(--yekis-copy);
+  font-family: "Space Grotesk", "Noto Sans Ethiopic", sans-serif;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.marketing-brand strong span {
+  color: var(--yekis-lime);
+}
+
+.marketing-brand:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
 
 .platform-logo {
   width: 36px;
@@ -110,7 +130,7 @@
 
 .marketing-nav-center {
   display: flex;
-  gap: var(--space-1);
+  gap: 2.5rem;
   align-items: center;
   justify-content: center;
   min-width: 0;
@@ -118,33 +138,70 @@
 
 .marketing-nav-right {
   display: flex;
-  gap: var(--space-1);
+  gap: 10px;
   align-items: center;
   justify-content: flex-end;
   min-width: max-content;
 }
 
-.marketing-nav-center button,
-.marketing-nav-right button:not(.btn-primary) {
-  background: none;
-  border: none;
+.marketing-nav-center button {
+  position: relative;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  font-size: 0.9375rem;
+  font-family: inherit;
+  font-size: 0.92rem;
   font-weight: 500;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  transition: color var(--transition-fast), background-color var(--transition-fast);
+  letter-spacing: 0.01em;
+  transition: color var(--transition-fast);
+}
+
+.marketing-nav-center button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  width: 0;
+  height: 1px;
+  background: var(--yekis-lime);
+  transition: width 0.25s ease;
 }
 
 .marketing-nav-center button:hover,
-.marketing-nav-right button:not(.btn-primary):not(.theme-toggle):hover {
+.marketing-nav-center button:focus-visible,
+.marketing-nav-center button.is-active {
   color: var(--color-text);
-  background-color: var(--color-bg-subtle);
+  outline: none;
 }
 
-.marketing-nav-right .btn-primary { 
-  margin-left: var(--space-2); 
+.marketing-nav-center button:hover::after,
+.marketing-nav-center button:focus-visible::after,
+.marketing-nav-center button.is-active::after {
+  width: 100%;
+}
+
+.marketing-nav-right button:not(.btn-primary):not(.theme-toggle):not(.yk-lang-trigger) {
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: color var(--transition-fast);
+}
+
+.marketing-nav-right button:not(.btn-primary):not(.theme-toggle):not(.yk-lang-trigger):hover,
+.marketing-nav-right button:not(.btn-primary):not(.theme-toggle):not(.yk-lang-trigger):focus-visible {
+  color: var(--color-text);
+  outline: none;
+}
+
+.marketing-nav-right .btn-primary {
+  margin-left: 2px;
   background-color: var(--color-primary);
   color: var(--color-primary-text);
 }
@@ -156,15 +213,20 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-bg-elevated);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
-.theme-toggle:hover { border-color: var(--color-primary); color: var(--color-primary); background-color: var(--color-primary-light); }
+.theme-toggle:hover,
+.theme-toggle:focus-visible {
+  color: var(--yekis-lime);
+  background: var(--color-bg-subtle);
+  outline: none;
+}
 
 .theme-toggle:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
 
@@ -371,65 +433,6 @@
 
 :root[data-theme="light"] .landing-chat-fab:hover {
   box-shadow: 0 14px 36px rgba(15, 23, 42, 0.28);
-}
-
-/* Header over hero (unscrolled): force light text and transparent bg */
-.marketing-header:not(.is-scrolled) {
-  color: #f7faf9;
-  background: transparent;
-}
-
-.marketing-header:not(.is-scrolled) .marketing-nav-center button,
-.marketing-header:not(.is-scrolled) .btn-ghost,
-.marketing-header:not(.is-scrolled) .marketing-brand strong,
-.marketing-header:not(.is-scrolled) .theme-toggle {
-  color: #f7faf9;
-}
-
-.marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
-.marketing-header:not(.is-scrolled) .btn-ghost:hover {
-  color: var(--yekis-lime);
-}
-
-/* Light mode on the landing page: dark header text over the light hero.
-   Both landing shells must be matched — `.landing-page` is the older
-   LandingPage, `.yk-v2` is LandingPageV2. Scoping to only the former left
-   the V2 header stuck on the white-text rule above, invisible on the light
-   hero. */
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled),
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) {
-  color: var(--color-text);
-}
-
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-brand strong,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .theme-toggle,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-nav-center button,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .btn-ghost,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-brand strong,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .theme-toggle {
-  color: var(--color-text);
-}
-
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
-:root[data-theme="light"] body:has(.landing-page) .marketing-header:not(.is-scrolled) .btn-ghost:hover,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .marketing-nav-center button:hover,
-:root[data-theme="light"] body:has(.yk-v2:not(.yk-cs-studio)) .marketing-header:not(.is-scrolled) .btn-ghost:hover {
-  color: var(--color-primary);
-}
-
-/* Header when scrolled: restore theme colors and background */
-.marketing-header.is-scrolled {
-  background: color-mix(in srgb, var(--color-bg) 85%, transparent);
-  color: var(--color-text);
-}
-
-.marketing-header.is-scrolled .marketing-nav-center button,
-.marketing-header.is-scrolled .btn-ghost,
-.marketing-header.is-scrolled .marketing-brand strong,
-.marketing-header.is-scrolled .theme-toggle {
-  color: var(--color-text);
 }
 
 /* ==========================================================================
@@ -1026,19 +1029,20 @@
   height: 44px;
   min-width: 44px;
   min-height: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--yekis-border);
-  background: var(--yekis-surface);
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
   color: var(--yekis-copy);
   cursor: pointer;
   padding: 0;
   flex-shrink: 0;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease;
 }
 
 .marketing-mobile-toggle:hover,
 .marketing-mobile-toggle:focus-visible {
-  border-color: var(--yekis-lime);
+  color: var(--yekis-lime);
+  background: var(--color-bg-subtle);
   outline: none;
 }
 
@@ -1061,7 +1065,7 @@
   bottom: 0;
   height: 100vh;
   height: 100dvh;
-  width: min(86vw, 340px);
+  width: min(90vw, 290px);
   background: var(--yekis-bg, #0b1116);
   border-left: 1px solid var(--yekis-border);
   z-index: 130;
@@ -1144,10 +1148,15 @@
 }
 
 .marketing-mobile-links button:hover,
-.marketing-mobile-links button:focus-visible {
-  background: rgba(22, 163, 74, 0.12);
+.marketing-mobile-links button:focus-visible,
+.marketing-mobile-links button.is-active {
+  background: var(--color-bg-subtle);
   color: var(--yekis-lime);
   outline: none;
+}
+
+.marketing-mobile-links button.is-active {
+  font-weight: 700;
 }
 
 .marketing-mobile-actions {
@@ -1159,10 +1168,50 @@
   border-top: 1px solid var(--yekis-border);
 }
 
-.marketing-mobile-actions button {
+.marketing-mobile-actions > button {
   width: 100%;
   min-height: 46px;
   justify-content: center;
+}
+
+.marketing-mobile-preferences {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 4px;
+  color: var(--yekis-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.marketing-drawer-language {
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.marketing-drawer-language .yk-lang-trigger {
+  min-height: 44px;
+}
+
+.marketing-drawer-language .yk-lang-menu {
+  right: auto;
+  left: 0;
+}
+
+.marketing-header-language .yk-lang-trigger {
+  min-height: 44px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.marketing-header-language .yk-lang-trigger:hover {
+  border-color: transparent;
+  background: var(--color-bg-subtle);
+  color: var(--color-text);
 }
 
 /* ==========================================================================
@@ -1173,9 +1222,31 @@
   .marketing-container {
     padding: 0 5%;
   }
+
   .marketing-header {
-    padding: var(--space-4) 5%;
+    padding: 20px 4%;
   }
+
+  .marketing-nav-center,
+  .marketing-header-language,
+  .marketing-nav-right .marketing-signin-btn,
+  .marketing-nav-right .marketing-cta-btn {
+    display: none !important;
+  }
+
+  .marketing-mobile-toggle {
+    display: inline-flex;
+  }
+
+  .marketing-nav-right {
+    gap: 8px;
+  }
+
+  .marketing-nav-right .theme-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .footer-grid {
     grid-template-columns: 1fr 1fr;
     gap: 36px 32px;
@@ -1193,27 +1264,8 @@
   }
 
   .marketing-header {
-    padding: 12px 5%;
+    padding: 16px 4%;
     gap: 8px;
-  }
-
-  .marketing-nav-center,
-  .marketing-nav-right .marketing-signin-btn,
-  .marketing-nav-right .marketing-cta-btn {
-    display: none !important;
-  }
-
-  .marketing-mobile-toggle {
-    display: inline-flex;
-  }
-
-  .marketing-nav-right {
-    gap: 8px;
-  }
-
-  .marketing-nav-right .theme-toggle {
-    min-width: 44px;
-    min-height: 44px;
   }
 
   .hero-section {
@@ -1304,7 +1356,7 @@
   }
 
   .marketing-header {
-    padding: 10px 16px;
+    padding: 14px 4%;
   }
 
   .marketing-brand strong {

@@ -1,6 +1,12 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-09
+Last validated: 2026-11-13
+
+> **Public Legal Documents and AFRO-TECH Header (2026-11-13):**
+> - The public Privacy Policy and Terms of Service are complete version 1.1 documents, effective 13 November 2026. `LegalDocumentPage.tsx` and `LegalDocumentPage.css` provide the shared breadcrumb, document header, sticky table of contents, numbered sections, responsive layout, and contact treatment. The Privacy Policy contains 16 sections; the Terms of Service contains 22.
+> - The legal text now matches the implementation: seven calendar days for automatic milestone release, the seven-day cooling-off window, a 7% freelancer platform fee and 0% client surcharge, consent-aware GA4 analytics, the export/erasure rights endpoints, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. The matching published copies are `docs/privacy-policy.md` and `docs/terms-of-service.md`.
+> - External Ethiopian counsel approval remains an external dependency. The pages and documents are complete implementation artifacts, not a claim of legal sign-off.
+> - The public header now follows the AFRO-TECH design: a fixed opaque 20px/6% bar, flex layout, 36px logo, Space Grotesk wordmark, 2.5rem underline navigation, active-page state, circular theme control, and a 290px right drawer beginning at 1024px. The drawer carries the language selector, sign-in, and registration actions; desktop retains the same Yekis controls.
 
 > **Multi-Language Fiscal Receipt & Payout Voucher Architecture (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09):**
 > - **Clean Language Separation & Elimination of Mixed Strings**:
@@ -693,7 +699,7 @@ Important controls:
 ```mermaid
 flowchart LR
   A["Escrow held"] --> B["Freelancer submits milestone"]
-  B --> C["Five-day review window"]
+  B --> C["Seven-day review window"]
   C --> D{"Client decision"}
   D -- Accept --> E["Release funds atomically"]
   D -- No response --> F["BullMQ auto-release"]
@@ -741,6 +747,7 @@ Important controls:
 |---|---|
 | Overview dashboard | Role greeting + hero CTA, featured talent / recommended jobs, expandable stat cards (wallet breakdown from top-ups, open-jobs by category, active-milestones by escrow state with ETB-secured total and a due-month bar chart), recent-activity feed with type/due-date filters and sort controls, inline milestone drill-down, live refresh status (realtime `notify:*` socket events + 60s visibility-gated poll) |
 | Authentication | Email registration/login and Telegram Mini App authentication |
+| Public legal documents | Complete version 1.1 Privacy Policy and Terms of Service with a shared table of contents, numbered sections, responsive layout, and matching Markdown publications |
 | Verification | Tier 1 document upload/status and Tier 2 request |
 | Jobs workspace | Search, post, view own jobs, bid, review/decide proposals, withdraw proposals |
 | Contracts workspace | List party contracts, open signed PDF URL, sign, fund, submit, accept |

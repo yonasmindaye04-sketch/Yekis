@@ -195,7 +195,8 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Dual CTA hero section
 - [x] Transparent pricing and fees page
 - [x] FAQ accordion with deep-linking
-- [x] Privacy Policy and Terms of Service (pending legal review)
+- [x] Privacy Policy and Terms of Service — complete version 1.1 public documents effective 2026-11-13, with 16 Privacy Policy sections, 22 Terms of Service sections, a shared accessible legal-document layout, and matching `docs/privacy-policy.md` / `docs/terms-of-service.md` copies. **External Ethiopian counsel approval is still outstanding.**
+- [x] AFRO-TECH public-header pattern — fixed opaque bar, Space Grotesk wordmark, underline navigation with active-page state, circular theme control, and a 1024px right-drawer breakpoint; Yekis authentication, language, and theme controls remain available
 - [x] Custom 404 and parameterized Thank You pages
 - [x] Responsive layout with Mobile CTA and Cookie Banner
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)

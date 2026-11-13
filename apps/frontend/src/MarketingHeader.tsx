@@ -8,15 +8,25 @@ import { LanguageSelector } from "./components/LanguageSelector";
 type MarketingHeaderProps = {
   onNavigate: (page: string) => void;
   onStart: (mode: "login" | "register") => void;
+  currentPage?: string;
 };
 
 export function MarketingHeader({
   onNavigate,
   onStart,
+  currentPage,
 }: MarketingHeaderProps) {
   const { theme, toggleTheme } = useTheme();
   const { t } = useI18n();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const primaryNav = [
+    { page: "home", label: t.nav.home },
+    { page: "faq", label: t.nav.faq },
+    { page: "fees", label: t.nav.fees },
+    { page: "about", label: t.nav.about },
+    { page: "case-studies", label: t.nav.caseStudies },
+  ];
 
   useEffect(() => {
     if (!mobileMenuOpen) return;
@@ -31,7 +41,7 @@ export function MarketingHeader({
     };
 
     const handleResize = () => {
-      if (window.innerWidth > 768) {
+      if (window.innerWidth > 1024) {
         setMobileMenuOpen(false);
       }
     };
@@ -85,23 +95,23 @@ export function MarketingHeader({
           </button>
         </div>
         <nav className="marketing-mobile-links" aria-label="Mobile navigation">
-          <button type="button" onClick={() => handleMobileNav("home")}>
-            Home
-          </button>
-          <button type="button" onClick={() => handleMobileNav("faq")}>
-            {t.nav.faq}
-          </button>
-          <button type="button" onClick={() => handleMobileNav("fees")}>
-            {t.nav.fees}
-          </button>
-          <button type="button" onClick={() => handleMobileNav("about")}>
-            {t.nav.about}
-          </button>
-          <button type="button" onClick={() => handleMobileNav("case-studies")}>
-            {t.nav.caseStudies}
-          </button>
+          {primaryNav.map((item) => (
+            <button
+              type="button"
+              key={item.page}
+              className={currentPage === item.page ? "is-active" : ""}
+              aria-current={currentPage === item.page ? "page" : undefined}
+              onClick={() => handleMobileNav(item.page)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
         <div className="marketing-mobile-actions">
+          <div className="marketing-mobile-preferences">
+            <span>Language</span>
+            <LanguageSelector variant="dropdown" className="marketing-drawer-language" />
+          </div>
           <button
             type="button"
             className="btn-ghost"
@@ -138,25 +148,24 @@ export function MarketingHeader({
               alt="Yekis — Ethiopian freelance marketplace logo"
               className="platform-logo"
             />
-            <strong>YEKIS</strong>
+            <strong><span>YE</span>KIS</strong>
           </a>
         </div>
         <nav className="marketing-nav-center" aria-label="Primary navigation">
-          <button type="button" onClick={() => onNavigate("faq")}>
-            {t.nav.faq}
-          </button>
-          <button type="button" onClick={() => onNavigate("fees")}>
-            {t.nav.fees}
-          </button>
-          <button type="button" onClick={() => onNavigate("about")}>
-            {t.nav.about}
-          </button>
-          <button type="button" onClick={() => onNavigate("case-studies")}>
-            {t.nav.caseStudies}
-          </button>
+          {primaryNav.map((item) => (
+            <button
+              type="button"
+              key={item.page}
+              className={currentPage === item.page ? "is-active" : ""}
+              aria-current={currentPage === item.page ? "page" : undefined}
+              onClick={() => onNavigate(item.page)}
+            >
+              {item.label}
+            </button>
+          ))}
         </nav>
         <div className="marketing-nav-right">
-          <LanguageSelector variant="dropdown" />
+          <LanguageSelector variant="dropdown" className="marketing-header-language" />
           <button
             type="button"
             className="theme-toggle"

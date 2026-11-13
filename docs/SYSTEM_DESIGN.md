@@ -2,7 +2,7 @@
 
 > **Status:** Authoritative System Design Document  
 > **Source Code Basis:** Derived directly from `apps/backend/src/`, `apps/frontend/src/`, `apps/backend/prisma/schema.prisma`, and `packages/schemas/`  
-> **Last Verified:** 2026-11-07  
+> **Last Verified:** 2026-11-13
 
 ---
 
@@ -2113,11 +2113,13 @@ Since the app is a SPA (no React Router), navigation is controlled by the `view`
 ```
 FullPlatformApp.tsx
 ├── Marketing / Public Shell (showLanding=true OR unauthenticated)
+│   ├── MarketingHeader.tsx       — AFRO-TECH-style fixed header, active navigation, theme/language/auth controls, 1024px drawer
 │   ├── LandingPage.tsx           — Hero, categories, how-it-works, CTA
 │   ├── FAQPage.tsx               — Frequently asked questions
 │   ├── FeesPage.tsx              — Platform fee structure explanation
-│   ├── PrivacyPage.tsx           — Privacy policy
-│   ├── TermsPage.tsx             — Terms of service
+│   ├── LegalDocumentPage.tsx     — Shared legal-document header, table of contents, numbered sections
+│   ├── PrivacyPage.tsx           — Complete Privacy Policy (version 1.1, 16 sections)
+│   ├── TermsPage.tsx             — Complete Terms of Service (version 1.1, 22 sections)
 │   ├── AboutPage.tsx             — Company background
 │   ├── CaseStudiesPage.tsx       — Success stories
 │   ├── ThankYouPage.tsx          — Post-registration / post-job confirmation
@@ -2456,15 +2458,17 @@ This section provides a plain-English description of every user-facing section o
 
 ### 9.1 Landing Page & Marketing Shell
 
-**What it does:** Public-facing marketing site showcasing the platform's value proposition, pricing, FAQs, terms, and privacy policy.
+**What it does:** Public-facing marketing site showcasing the platform's value proposition, pricing, FAQs, and the complete Privacy Policy and Terms of Service. Its shared header follows the AFRO-TECH public-site pattern while preserving Yekis navigation, authentication, language, and theme controls.
 
 **How it works:**
 - Served by `FullPlatformApp.tsx` when the user is unauthenticated and `showLanding = true`.
 - `LandingPage.tsx` is a static React component with no API calls — it renders hardcoded marketing content.
+- `MarketingHeader.tsx` renders a fixed opaque bar with a Space Grotesk wordmark, underline navigation, the current-page state, language and theme controls, and authentication actions. At 1024px and below, navigation and the secondary preferences move into a 290px right drawer.
+- `PrivacyPage.tsx` and `TermsPage.tsx` define the complete version 1.1 legal content and delegate layout to `LegalDocumentPage.tsx`. The shared shell provides breadcrumbs, document metadata, a linked table of contents, numbered sections, and responsive layouts. The text is grounded in the implemented seven-day release and cooling-off windows, 7%/0% fee model, consent-aware analytics, data-subject export/erasure, and ten-year retention for the records law requires. External counsel approval remains outstanding.
 - Includes a `CookieBanner.tsx` for GDPR-style consent and a `MobileCTA.tsx` encouraging mobile users to open the Telegram Mini App.
 - Navigation to sub-pages (FAQ, Fees, etc.) changes `marketingPage` state without any URL routing.
 
-**Files:** `LandingPage.tsx`, `FAQPage.tsx`, `FeesPage.tsx`, `PrivacyPage.tsx`, `TermsPage.tsx`, `AboutPage.tsx`, `CaseStudiesPage.tsx`, `CookieBanner.tsx`, `MobileCTA.tsx`
+**Files:** `MarketingHeader.tsx`, `LandingPage.tsx`, `FAQPage.tsx`, `FeesPage.tsx`, `LegalDocumentPage.tsx`, `PrivacyPage.tsx`, `TermsPage.tsx`, `AboutPage.tsx`, `CaseStudiesPage.tsx`, `CookieBanner.tsx`, `MobileCTA.tsx`
 
 ---
 

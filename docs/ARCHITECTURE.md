@@ -1,10 +1,12 @@
 # Architecture
 
-Last updated: 2026-11-12
+Last updated: 2026-11-13
 
 > **2026-11-09 alignment pass.** Every count, constant, queue name, port, and enum in this document was re-verified against the running codebase. Changes: ops console 19 → **23** page components; frontend i18n 314 → **569** keys (40 nested objects, exact 4-language parity); background processing 6 → **9** queues; added `PaymentProvider` enum vs. live-rail table; added `Continuous Integration` section; added verified-compliance-gap table; added the financial-constants table; documented the unarmed `Contract.cancellableUntil` cooling-off gap; added OpenSearch and `server.fs.deny` to the local topology. See `docs/DOCUMENT_UNIFICATION_2026-11-09.md` and `docs/ROADMAP_ALIGNMENT.md`.
 
 > **2026-11-12 pass.** Counts re-verified against the running codebase after the code-only compliance pass and the onboarding-guide removal: frontend i18n **569** keys (40 nested objects — the `onboarding` namespace was removed with the tour); background processing **9 → 10** queues (the `audit-purge` retention worker was added); the freelancer's net payout is **92.5%**, not 93% (the 0.5% provider fee is collected at release); withdrawals require an **SMS approval code**; the `Contract.cancellableUntil` cooling-off gap is **closed**; and `AuditLog` now carries a **10-year retention stamp** with a daily purge. The deep-dive detail lives in `docs/SYSTEM_DESIGN.md`.
+
+> **2026-11-13 public legal and header pass.** The browser marketing shell now includes the complete version 1.1 Privacy Policy and Terms of Service, rendered through the shared `LegalDocumentPage` view and published as matching Markdown documents. The marketing header follows the AFRO-TECH public-site pattern: fixed opaque flex bar, Space Grotesk wordmark, underline navigation with active-page state, circular theme control, and a 290px drawer at 1024px and below. The legal text and the implemented seven-day release/cooling-off, 7%/0% fee, consent-aware analytics, data-subject rights, and ten-year retention rules are aligned. Counsel approval remains external.
 
 ## System Overview
 

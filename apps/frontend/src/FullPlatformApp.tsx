@@ -851,6 +851,7 @@ if (authMode === "register") {
         <MarketingHeader
           onNavigate={handleNavigate}
           onStart={handleStart}
+          currentPage={marketingPage}
         />
         <ScrollEffects />
         {marketingPage === "home" && (
