@@ -32,7 +32,7 @@ docker build -t yekis:local .
 docker run --rm -p 8080:8080 -e DATABASE_URL=... -e REDIS_URL=... yekis:local
 ```
 
-`docs/SETUP.md` §11 has the full command; `docs/ALETCLOUD_DEPLOYMENT.md` has the deployment runbook, and `node scripts/check-deployment.mjs <base-url>` checks a deployed instance against the contract it has to meet.
+`docs/SETUP.md` §11 has the full command; `docs/ALETCLOUD_DEPLOYMENT.md` has the deployment runbook, and `node scripts/check-deployment.mjs <base-url>` checks a deployed instance against the contract it has to meet. Two scripts walk a deployed instance through the flows that only break end to end: `scripts/e2e-onboarding.mjs` (the signup — discover the channel, issue the code, create the account, sign in) and `scripts/e2e-object-store.mjs` (a real `PutObject` and read-back through the bucket).
 
 ## Checks
 

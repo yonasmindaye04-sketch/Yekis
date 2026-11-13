@@ -613,21 +613,48 @@ Recorded so the next person does not have to rediscover it.
 What was verified against the live instance:
 
 - `scripts/check-deployment.mjs` passes **11/11**.
+- `scripts/e2e-onboarding.mjs` completes the **whole onboarding flow**:
+  capability discovery, issue the code, check the code, create the account,
+  sign in, and confirm the session works. It is walked with a **mixed-case**
+  address on purpose — the form does not lower-case what the person types,
+  and every path that reads `User.email` does, so the address is the case
+  that breaks if the canonical form is not applied.
 - `scripts/e2e-object-store.mjs` completes the **whole object-store round
   trip**: register a throwaway client, sign in, upload a file through the API
   (a real `PutObject` into `t1370-yekis-test-media`), create a conversation,
   attach the file to a message, and read the bytes back out (555/555
   identical).
+- The **signup was walked in a real browser**, not only through the API: the
+  form offers the code step, the code is requested the moment the step
+  opens, the target is shown masked (`U***@Example.COM`), the expiry counts
+  down, the code is accepted, the account is created and the workspace loads
+  with the session — signed in as `ui.check…@example.com`, the canonical
+  form of the address that was typed with capitals.
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
   adds no `X-Frame-Options`.
-- The container logs show the bundled Redis starting, 36 migrations applied,
-  the object-store bucket found (`Object store bucket is ready.`) and the
-  database connected.
+- The container logs show the bundled Redis starting, **37** migrations
+  applied, the object-store bucket found (`Object store bucket is ready.`)
+  and the database connected.
 - A termination signal stops the API gracefully
   (`[yekis] termination signal received; shutting down` → `exited with
   status 143`).
+
+**Reading the onboarding code on this deployment.** With no SMTP credentials
+the code is written to the container log and returned as `devCode`. The log
+line carries the recipient and the code:
+
+```
+to: ui.check.1794591680673@example.com, subject: "Confirm your email address: 378256"
+[DEV - NOT SENT] EMAIL OTP
+```
+
+Note the recipient is already the canonical form. The transactional mail
+(password reset, escrow receipts, chat notifications) is **not** covered by
+this fallback: with no SMTP it reports `email NOT delivered`, and the
+password-reset path treats that as a failure so it invalidates the token
+rather than leaving a valid credential nobody can receive.
 
 ### One thing is still open
 
