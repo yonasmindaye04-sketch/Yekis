@@ -234,6 +234,7 @@ build to run again — which is what a redeploy does.
 | `API_PUBLIC_URL` | `https://<your-app>.app.aletcloud.com` | Where provider callbacks are sent |
 | `STAFF_CONSOLE_URL` | `https://<your-app>.app.aletcloud.com` | Where the bot's `/staff` command sends staff |
 | `HSTS_INCLUDE_SUBDOMAINS` | `false` | See §7 |
+| `TRUST_PROXY_HOPS` | `1` | See the note below — **do not leave it unset** |
 | `TELEGRAM_ENV` | `staging` | Selects webhook mode over long polling |
 | `TELEGRAM_BOT_TOKEN` | the bot token | The Mini App is opened from `@ye_kis_bot` |
 | `TELEGRAM_WEBHOOK_URL` | `https://<your-app>.app.aletcloud.com/api/v1/telegram/webhook` | The bot registers this itself at start-up |
@@ -266,6 +267,24 @@ deployment until somebody uses it.
 > screening vendor to boot. `staging` still keeps the rate limiter on and
 > still refuses a malformed configuration. Moving to `production` later
 > means supplying that whole set and setting `PEP_PROVIDER=real`.
+
+> **`TRUST_PROXY_HOPS` is not optional behind a proxy.** It is a **count of
+> proxy hops**, not a boolean. The platform's edge forwards `X-Forwarded-For`
+> with the client's address, so one hop is the right number; leaving it unset
+> means Express ignores the header entirely and takes the proxy's address as
+> the client's. Every visitor then shares **one rate-limit bucket**, so the
+> limit applies to the whole platform rather than to each user, and one
+> busy client can lock everybody else out. express-rate-limit says so in the
+> logs, once per request:
+>
+> ```
+> ValidationError: The 'X-Forwarded-For' header is set but the Express
+> 'trust proxy' setting is false (default).
+> ```
+>
+> Setting it too high is the opposite failure: a client could prepend
+> forged addresses and choose its own bucket, walking past the limit
+> entirely. One hop, matching the platform's edge.
 
 ### 5.1 The database connection string
 
@@ -555,33 +574,33 @@ Recorded so the next person does not have to rediscover it.
 |---|---|
 | URL | `https://yekis.app.aletcloud.com` |
 | Hosting project | `yekis` (`7d5a6ab0-1a03-4b2a-b9a8-6accf59a87fa`) |
-| App | `yekis-test` (`d1c542c8-b30f-4987-8ec1-0c61ef396fcc`) |
+| App | `yekis-test` (`d40f8eff-9cd7-42f2-9c24-01b750def027`) |
 | Plan | **Solo** — free, no expiry, 250m CPU / 256 MiB, 1 replica |
-| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps`, commit `2bf58a7` |
+| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` |
 | Database | `yekis-jobs` — Managed PostgreSQL **18**, Solo, free, internal network only, 10 connections |
-| Object storage | **not created** — needs 1.64 ETB of wallet balance |
+| Object storage | `yekis-test-media` (bucket `t1370-yekis-test-media`) — 5 GB, private, 50 ETB/mo |
 | Telegram bot | **not configured** — no bot token was available |
 
-What was verified against the live instance: `scripts/check-deployment.mjs`
-passes **11/11**; the SPA's JavaScript and CSS load; `/api/v1/skills` returns
-rows from the managed PostgreSQL; the `frame-ancestors` allowlist arrives as
-a response header and no `X-Frame-Options` is added by the edge; the
-container logs show the bundled Redis starting, 36 migrations applied and the
-database connected.
+What was verified against the live instance:
 
-### Two things are still open
+- `scripts/check-deployment.mjs` passes **11/11**.
+- `scripts/e2e-object-store.mjs` completes the **whole object-store round
+  trip**: register a throwaway client, sign in, upload a file through the API
+  (a real `PutObject` into `t1370-yekis-test-media`), create a conversation,
+  attach the file to a message, and read the bytes back out (555/555
+  identical).
+- The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
+  managed PostgreSQL.
+- The `frame-ancestors` allowlist arrives as a response header and the edge
+  adds no `X-Frame-Options`.
+- The container logs show the bundled Redis starting, 36 migrations applied,
+  the object-store bucket found (`Object store bucket is ready.`) and the
+  database connected.
+- A termination signal stops the API gracefully
+  (`[yekis] termination signal received; shutting down` → `exited with
+  status 143`).
 
-**The object store.** The bucket was not created because the wallet holds
-0 ETB. Until it exists, the app runs with placeholder credentials and every
-object-store call fails with a 403 — which means **document upload, receipt
-attachment and the staff KYC preview do not work**. The API still boots, and
-everything else is unaffected.
-
-To close it: top up the wallet (1.64 ETB covers 24 hours of the bucket;
-more gives it a longer life), create the bucket, then **delete and recreate
-the app** with the real credentials in the creation-time environment — a
-deploy resets the environment to the set the app was created with (§4.4), so
-`setAppEnv` alone will not do it.
+### One thing is still open
 
 **The Telegram bot.** No bot token was available, so `TELEGRAM_BOT_TOKEN` is
 unset. The Mini App's URL is configured in BotFather and the app serves it
@@ -589,14 +608,19 @@ fine, but Telegram sign-in inside the Mini App cannot verify its `initData`
 without the token, so a user has to sign in with email and password. The
 bot's own commands, the `/staff` link and the webhook are all off.
 
+Setting the token means a delete-and-recreate of the app (§4.4).
+
 ### Teardown
 
 ```bash
 # Over MCP:
-deleteApp(appId: "d1c542c8-b30f-4987-8ec1-0c61ef396fcc")   # free plan
+deleteApp(appId: "d40f8eff-9cd7-42f2-9c24-01b750def027")        # free plan
+deleteBucket(bucketId: "2719e571-5b50-445d-bf63-154aacb4c549")  # 50 ETB/mo
 deleteDatabase(instanceId: "da073380-7423-44a4-a907-e310672cf5bf")  # free plan
 ```
 
-Both are free, so deleting them costs nothing — but deleting the database
-throws away the migrated schema, and the next deployment would have to
-apply all 36 migrations again.
+The app and the database are free, so deleting them costs nothing — but
+deleting the database throws away the migrated schema, and the next
+deployment would have to apply all 36 migrations again. **The bucket is the
+one that bills**: delete it, or the wallet keeps paying 50 ETB a month for
+it.
