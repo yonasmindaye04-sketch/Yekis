@@ -153,14 +153,71 @@ The console creates the app and starts the first build. Watch the build log:
 it will show the pnpm install, the Prisma client generation, the two
 TypeScript builds and the Vite bundle.
 
+### 4.4 What the platform does with a Dockerfile
+
+This was verified by deploying, not by reading the documentation, and two of
+the answers are counter-intuitive.
+
+**The Dockerfile is used, even though the app's metadata says otherwise.**
+After the first deploy the app's record reads `renderType: STATIC`,
+`buildCommand: pnpm run build`, `outputDir: build` and `containerPort: 0` —
+every field of which is wrong for this repository, because the detection
+looked at the root `package.json`, found `vite`, and concluded "static site".
+The build ignored all of it: the container ran `infra/docker/entrypoint.sh`,
+started the bundled Redis and ran `prisma migrate deploy`. **The metadata is
+vestigial when the repository carries a Dockerfile; ignore it.** Confirm it
+from the runtime log, which begins with `[yekis] starting the bundled
+redis-server`.
+
+**Environment variables must be set when the app is created.** This is the
+one that bites. `setAppEnv` writes them — `getAppEnv` reads them back
+correctly — and they are in the record. But **every deploy resets the app's
+env to the set it was created with**, so a variable added after creation
+silently disappears at the next deploy, and the container starts without it.
+
+The symptom is precise and repeatable: the container crash-loops with
+`Prisma schema validation - Environment variable not found: DATABASE_URL`,
+even though `getAppEnv` shows `DATABASE_URL` present.
+
+So: pass the whole environment in the `deployApp` call. If a variable has to
+change later, the app has to be deleted and recreated with the new set. The
+`setAppEnv` tool is still the right way to *read* what is in effect
+(`getAppEnv`), and `connectDatabaseToApp` is still the way to get a
+database's full credential set — read it, then put it in the creation-time
+environment.
+
+**The platform sets `PORT` itself.** The app's env contains `PORT: 8080`
+without anyone setting it, which matches the `EXPOSE 8080` in the Dockerfile.
+
+**The free Solo plan is enough.** The container was measured at **88 MiB**
+resident with the API, the ten BullMQ workers, the Prisma client and the
+bundled Redis all running — against a 256 MiB limit. The build is the
+hungrier part: the Vite build wants more memory than the runtime does, so a
+free app can fail at build time where a paid one would not.
+
+**Path-style addressing works against `s3.aletcloud.com`.** The object store
+answered a `HeadBucket` on `https://s3.aletcloud.com/<bucket>` with a
+**403** — an authorisation error from a bucket that was reached — rather than
+a 404 or a DNS failure. So the application's default
+(`OBJECT_STORE_FORCE_PATH_STYLE=true`) is the right one for this provider,
+and the `false` fallback in §5.2 is not needed.
+
+**What the wallet is checked against.** A free plan needs no balance at all.
+The 5 GB bucket is charged at 0.0685 ETB/hr, and creating it is refused
+below **1.64 ETB** — exactly 24 hours of its own burn. The Pro app needs
+12.00 ETB for the same reason.
+
 ---
 
 ## 5. The environment variables
 
-Set these in the console under the app's **Environment** settings. **A change
-to an environment variable triggers a redeploy**, and the `VITE_` variables
-are read at **build** time, so a change to one of those needs the build to
-run again — which is what a redeploy does.
+Set these in the console under the app's **Environment** settings — **or,
+preferably, in the `deployApp` call that creates the app**, because a deploy
+resets the environment to the set it was created with (§4.4).
+
+**A change to an environment variable triggers a redeploy**, and the `VITE_`
+variables are read at **build** time, so a change to one of those needs the
+build to run again — which is what a redeploy does.
 
 | Variable | Value | Why |
 |---|---|---|
@@ -386,12 +443,13 @@ webhook (`TELEGRAM_ENV=staging` plus `TELEGRAM_WEBHOOK_URL`), which is
 authoritative and does not conflict — but the local bot must be stopped, or
 must not be given the same token.
 
-**The platform's proxy headers are outside the application's control.** The
-application sends `Content-Security-Policy: frame-ancestors …` and does not
-send `X-Frame-Options` for the SPA, which is what the Telegram webview
-needs. If the platform's edge adds `X-Frame-Options: DENY` of its own, the
-Mini App will not render. There is no header override documented for the
-proxy; if that happens, it is a support call (6993).
+**The platform's proxy headers — verified, and fine.** The application sends
+`Content-Security-Policy: frame-ancestors …` and does not send
+`X-Frame-Options` for the SPA, which is what the Telegram webview needs. The
+deployed instance was checked: the edge adds **no** `X-Frame-Options` of its
+own, and the `frame-ancestors` allowlist arrives on the response. The
+framing allowlist therefore survives the proxy, and the Mini App has what it
+needs.
 
 **The platform's proxy must pass WebSocket upgrades.** The chat's live
 channel is a WebSocket at `/api/v1/ws`, authenticated with the access token
@@ -486,3 +544,59 @@ following are deliberately out of scope for it:
 - Scaling. The two replicas of the Pro plan exist so a release does not
   interrupt traffic; they are not a performance strategy, and each carries
   its own Redis.
+
+---
+
+## 11. The deployment as it was actually made
+
+Recorded so the next person does not have to rediscover it.
+
+| | |
+|---|---|
+| URL | `https://yekis.app.aletcloud.com` |
+| Hosting project | `yekis` (`7d5a6ab0-1a03-4b2a-b9a8-6accf59a87fa`) |
+| App | `yekis-test` (`d1c542c8-b30f-4987-8ec1-0c61ef396fcc`) |
+| Plan | **Solo** — free, no expiry, 250m CPU / 256 MiB, 1 replica |
+| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps`, commit `2bf58a7` |
+| Database | `yekis-jobs` — Managed PostgreSQL **18**, Solo, free, internal network only, 10 connections |
+| Object storage | **not created** — needs 1.64 ETB of wallet balance |
+| Telegram bot | **not configured** — no bot token was available |
+
+What was verified against the live instance: `scripts/check-deployment.mjs`
+passes **11/11**; the SPA's JavaScript and CSS load; `/api/v1/skills` returns
+rows from the managed PostgreSQL; the `frame-ancestors` allowlist arrives as
+a response header and no `X-Frame-Options` is added by the edge; the
+container logs show the bundled Redis starting, 36 migrations applied and the
+database connected.
+
+### Two things are still open
+
+**The object store.** The bucket was not created because the wallet holds
+0 ETB. Until it exists, the app runs with placeholder credentials and every
+object-store call fails with a 403 — which means **document upload, receipt
+attachment and the staff KYC preview do not work**. The API still boots, and
+everything else is unaffected.
+
+To close it: top up the wallet (1.64 ETB covers 24 hours of the bucket;
+more gives it a longer life), create the bucket, then **delete and recreate
+the app** with the real credentials in the creation-time environment — a
+deploy resets the environment to the set the app was created with (§4.4), so
+`setAppEnv` alone will not do it.
+
+**The Telegram bot.** No bot token was available, so `TELEGRAM_BOT_TOKEN` is
+unset. The Mini App's URL is configured in BotFather and the app serves it
+fine, but Telegram sign-in inside the Mini App cannot verify its `initData`
+without the token, so a user has to sign in with email and password. The
+bot's own commands, the `/staff` link and the webhook are all off.
+
+### Teardown
+
+```bash
+# Over MCP:
+deleteApp(appId: "d1c542c8-b30f-4987-8ec1-0c61ef396fcc")   # free plan
+deleteDatabase(instanceId: "da073380-7423-44a4-a907-e310672cf5bf")  # free plan
+```
+
+Both are free, so deleting them costs nothing — but deleting the database
+throws away the migrated schema, and the next deployment would have to
+apply all 36 migrations again.
