@@ -868,6 +868,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .segmented-control button.selected { background: var(--color-primary); color: var(--color-primary-text); font-weight: 700; }
 .btn-primary.wide { width: 100%; margin-top: 12px; padding: 10px; font-size: 0.92rem; }
 .auth-switch { width: 100%; margin-top: 10px; border: 0; background: transparent; color: var(--color-primary); font-size: 0.86rem; font-weight: 600; cursor: pointer; }
+.auth-verify-hint { margin: 10px 0 0; font-size: 0.78rem; line-height: 1.5; color: var(--color-text-secondary); text-align: left; }
 .auth-footnote { margin-top: 16px; color: var(--color-text-tertiary); font-size: 0.82rem; text-align: center; }
 .form-error { padding: 8px 12px; margin-top: 8px; border: 1px solid var(--color-error); border-radius: 8px; background: var(--color-error-light); color: var(--color-error-text); font-size: 0.84rem; }
 @media (max-height: 650px) { .platform-auth { overflow-y: auto; height: auto; min-height: 100vh; } }

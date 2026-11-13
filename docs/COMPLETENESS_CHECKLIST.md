@@ -187,7 +187,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**569 leaf keys, 40 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**589 leaf keys, 41 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
 
 ## Marketing Site (Public)
 
@@ -202,7 +202,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**569 leaf keys per language, 40 nested objects, verified 2026-11-12**).
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**589 leaf keys per language, 41 nested objects, verified 2026-11-13**).
 
 ## Automated And Manual Verification
 
@@ -233,6 +233,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [ ] M-Pesa collection sandbox verification and reconciliation — ⚠️ the M-Pesa client is a **stub** that throws `PaymentProviderUnavailableError`; Master Design `PAY-003` marks M-Pesa **REMOVED**, so this needs a product decision before any work
 - [x] Real payout/disbursement API with pending, success, failure, reversal, and reconciliation states (Telebirr B2C disbursement with `PayoutTransaction` lifecycle)
 - [ ] Production SMS credentials/templates/delivery monitoring
+- [x] **Onboarding OTP over email** — the signup flow proves control of the signup address with a 6-digit code before the account is created. `POST /api/v1/auth/email/code` and `POST /api/v1/auth/email/verify` are unauthenticated (the code is proven before the account exists), the code is stored only as a salted SHA-256, and registration adopts the proof onto `User.emailVerified` / `User.emailVerifiedAt`. `GET /api/v1/auth/verification/channels` tells the client which channels the host can actually deliver. Covered by `apps/backend/tests/email-verification.test.ts`. **Still open:** production SMTP credentials and delivery monitoring — without them the code goes to the server log, which is a testing affordance, not a production one
 - [ ] Telegram account linking and production push verification
 - [ ] Confirm FIC STR filing operating procedure; the platform records but does not submit filings
 

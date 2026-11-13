@@ -747,3 +747,16 @@ authRouter.post(
 //    explicitly rather than imported, which breaks the cycle by construction.
 import { registerPhoneVerificationRoutes } from "./phone-verification.routes.js";
 registerPhoneVerificationRoutes(authRouter);
+
+// Mounts POST /auth/email/code, POST /auth/email/verify and
+// GET /auth/verification/channels onto authRouter.
+//
+// The email channel is the onboarding OTP: the SMS provider has no key on a
+// hosted testing environment, so the signup step could not be completed at
+// all. The phone routes above are untouched — they are the money-safety
+// control on the payout number and on withdrawal approval.
+//
+// The router is passed in explicitly rather than imported, which breaks the
+// import cycle by construction (the same reason the phone routes do it).
+import { registerEmailVerificationRoutes } from "./email-verification.routes.js";
+registerEmailVerificationRoutes(authRouter);

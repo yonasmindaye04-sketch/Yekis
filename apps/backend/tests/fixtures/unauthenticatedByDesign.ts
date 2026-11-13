@@ -38,6 +38,18 @@ export const UNAUTHENTICATED_BY_DESIGN: ReadonlySet<string> = new Set([
   "POST /api/v1/auth/telegram/web-login/start",
   "POST /api/v1/auth/telegram/web-login/redeem",
 
+  // ── Onboarding verification ──────────────────────────────────────────────
+  // The OTP step of registration happens BEFORE the account exists, so these
+  // cannot require a session. They are protected by rate limiting and by the
+  // code itself, and they never reveal whether an address or a number is
+  // already registered.
+  "POST /api/v1/auth/phone/code",
+  "POST /api/v1/auth/phone/verify",
+  "POST /api/v1/auth/email/code",
+  "POST /api/v1/auth/email/verify",
+  // Capability discovery: which channels can deliver. Booleans only.
+  "GET /api/v1/auth/verification/channels",
+
   // ── Inbound webhooks: authenticated by signature, not by session ─────────
   // Telegram: X-Telegram-Bot-Api-Secret-Token, constant-time compared.
   "POST /api/v1/telegram/webhook",

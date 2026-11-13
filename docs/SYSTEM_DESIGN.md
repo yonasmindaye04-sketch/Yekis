@@ -644,8 +644,8 @@ erDiagram
 
 ### 3.1 Module: Identity & Authentication (`apps/backend/src/modules/auth/`)
 
-* **Purpose:** Handles user registration, age gating (18+ requirement), credential authentication, JWT token issuance (access/refresh), password hashing (Argon2), consent capture, and Telegram Mini App session verification.
-* **Owns Models:** `User`, `ConsentRecord`.
+* **Purpose:** Handles user registration, age gating (18+ requirement), credential authentication, JWT token issuance (access/refresh), password hashing (Argon2), consent capture, Telegram Mini App session verification, and the **onboarding OTP** that proves control of the signup address before the account exists.
+* **Owns Models:** `User`, `ConsentRecord`, `PhoneVerificationCode`, `EmailVerificationCode`.
 
 #### State Machine
 Auth does not have a multi-step entity state machine, but enforces an active session gate:
@@ -673,6 +673,34 @@ sequenceDiagram
     API-->>User: HTTP 201 Created (Tokens & User Profile)
 ```
 
+##### Flow 1b: Onboarding OTP (the signup proof)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as New user
+    participant UI as Onboarding step (OnboardingVerification.tsx)
+    participant API as Auth Router (email-verification.routes.ts)
+    participant Svc as Email verification service
+    participant DB as PostgreSQL (Prisma)
+    participant Mail as SMTP transport
+
+    UI->>API: GET /api/v1/auth/verification/channels
+    API-->>UI: { email: { available }, phone: { available } }
+    Note over UI: A host with no SMS key cannot deliver a text.<br/>Offering one anyway dead-ends the signup.
+    UI->>API: POST /api/v1/auth/email/code { email }
+    Svc->>DB: INSERT EmailVerificationCode (salted SHA-256 of the code)
+    Svc->>Mail: sendEmailVerificationCodeEmail(code)
+    Mail-->>User: 6-digit code, 10-minute expiry
+    UI->>API: POST /api/v1/auth/email/verify { email, code }
+    Svc->>DB: stamp verifiedAt
+    UI->>API: POST /api/v1/auth/register
+    Note over Svc: registerUser adopts the proof:<br/>User.emailVerified = true, emailVerifiedAt = now
+```
+
+The proof is raised **before** the account exists, which is why both OTP routes are unauthenticated, and it is attached to the new row by `registerUser`. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. The SMS phone codes are deliberately left alone: `User.phone` is the payout destination and the withdrawal-approval code is money, so that flow is not weakened to make signup work.
+
+**The address is stored in one canonical form.** `registerUser` lower-cases and trims the address before it is written, and the duplicate check matches it case-insensitively. Every other path that touches `User.email` already uses that form — the login lookup lower-cases it, the OAuth path lower-cases it, and the OTP proof is issued and looked up against it — so storing the address as it was typed would put the row outside all of them. An account registered as `Alice@Example.com` could not sign in, because login searches for `alice@example.com`; and because the account existed by then, every retry hit the duplicate path and failed the same way. The canonical form also means one mailbox cannot end up with two accounts spelled differently.
+
 ##### Flow 2: Telegram Mini App Authentication
 ```mermaid
 sequenceDiagram
@@ -695,6 +723,11 @@ sequenceDiagram
 | Method | Path | Auth / Permission | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/auth/register` | Public | Register account, validate age $\ge 18$, record consents, create wallet & KYC record |
+| `POST` | `/api/v1/auth/email/code` | Public | Issue the onboarding email OTP. Stores only the salted SHA-256 of the code |
+| `POST` | `/api/v1/auth/email/verify` | Public | Check the onboarding email OTP |
+| `POST` | `/api/v1/auth/phone/code` | Public | Issue an SMS OTP (payout-number verification, withdrawal approval) |
+| `POST` | `/api/v1/auth/phone/verify` | Public | Check an SMS OTP |
+| `GET` | `/api/v1/auth/verification/channels` | Public | Which OTP channels can deliver on this host |
 | `POST` | `/api/v1/auth/login` | Public | Authenticate via email/password, return access & refresh JWTs |
 | `POST` | `/api/v1/auth/refresh` | Public (Refresh Token) | Rotate expired access token using valid refresh token |
 | `POST` | `/api/v1/auth/telegram` | Public (`initData`) | Validate Telegram WebApp hash and issue JWT session |
@@ -1974,7 +2007,7 @@ Each gap is documented **next to the code it belongs to**, so a reader who opens
 | Job search never uses OpenSearch; gig edits go stale in the index; no reindex path | §3.18 |
 | The audit retention stamp and the purge that enforces it | §4.2 |
 | Five ops console actions 404; the fallback matrix drifts from the server's; orphaned mock data | §8.8 |
-| ~1,800 hardcoded JSX literals (1,127 in the 104 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
+| ~1,915 hardcoded JSX literals (1,241 in the 105 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
 | No offline queue for socket events; the client ping is a no-op; guest sockets cannot connect | §8.10 |
 
 ---
@@ -2289,7 +2322,7 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | Environment Variable | `VITE_API_BASE_URL` |
 | Dev Server | `pnpm dev` → `http://127.0.0.1:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
-| Internationalization | `i18n.ts` — four locales, 569 keys each |
+| Internationalization | `i18n.ts` — four locales, 589 keys each |
 
 > **The React version in this table was 18 in earlier revisions; the project
 > now runs React 19** (`apps/frontend/package.json` pins `^19.3.0`).
@@ -2351,7 +2384,7 @@ There are two distinct fallback mechanisms:
 | Property | Value |
 |---|---|
 | Languages | `en`, `am` (አማርኛ), `om` (Afaan Oromoo), `ti` (ትግርኛ) |
-| Leaf keys per language | **569**, identical across all four (no missing, no extra) |
+| Leaf keys per language | **589**, identical across all four (no missing, no extra) |
 | Nested objects per language | 40 |
 | Maximum depth | 3 (e.g. `workspace.jobs.status.SHORTLISTED`) |
 | Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `workspace` |
@@ -2379,7 +2412,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 
 #### Known gaps
 
-- **Hardcoded copy is still widespread.** 25 of 129 `.tsx` files import the i18n module; the other **104** never touch it. An exact AST count (TypeScript's own parser) finds **1,800 hardcoded JSX text nodes**, of which **1,127** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
+- **Hardcoded copy is still widespread.** 25 of 130 `.tsx` files import the i18n module; the other **105** never touch it. An exact AST count (TypeScript's own parser) finds **1,915 hardcoded JSX text nodes**, of which **1,241** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
 - **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
@@ -2890,10 +2923,10 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
 
-**Two catalogues, not one.** The frontend holds 569 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+**Two catalogues, not one.** The frontend holds 589 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
 
 **Where it falls short today:**
-- Roughly **1,800 hardcoded JSX text literals** remain across the frontend — **1,127** of them in the 104 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+- Roughly **1,915 hardcoded JSX text literals** remain across the frontend — **1,241** of them in the 105 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
 - **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
 - **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
 - **No RTL support** — the platform is left-to-right only, and `dir` is never set.

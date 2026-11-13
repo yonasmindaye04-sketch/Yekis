@@ -42,6 +42,13 @@ export interface PlatformMovementEmailOptions {
   actionUrl?: string;
 }
 
+export interface EmailVerificationCodeOptions {
+  email: string;
+  code: string;
+  /** What the code is for, shown to the recipient. */
+  purposeLabel?: string;
+}
+
 // In-memory test store for automated testing assertions
 export const sentEmailsLog: EmailPayload[] = [];
 
@@ -392,5 +399,72 @@ export async function sendPlatformMovementEmail(
     to: options.email,
     subject: `Yekis: ${options.title}`,
     html,
+  });
+}
+
+/**
+ * 4. Email Verification Code (onboarding OTP)
+ *
+ * The onboarding channel while the SMS provider is unconfigured: the first
+ * signup step has to be deliverable on a host that has no SMS credit.
+ *
+ * The code is the whole point of the message, so it is rendered large, in a
+ * monospaced face, and stated once in the body as well as once in the text
+ * alternative. A recipient who reads only the plain-text part still gets the
+ * code.
+ */
+export async function sendEmailVerificationCodeEmail(
+  options: EmailVerificationCodeOptions,
+) {
+  const code = escapeHtml(options.code);
+  const purposeLabel = options.purposeLabel
+    ? escapeHtml(options.purposeLabel)
+    : "Confirm your email address";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #0f172a; margin: 0; padding: 24px; }
+          .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden; }
+          .header { background: #0b1116; padding: 28px; text-align: center; color: #ffffff; }
+          .header h1 { margin: 0; font-size: 24px; color: #22c55e; letter-spacing: -0.02em; }
+          .content { padding: 32px 28px; }
+          .code-box { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px 16px; margin: 20px 0; text-align: center; }
+          .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 34px; font-weight: 700; letter-spacing: 10px; color: #0f172a; }
+          .note { background: #f8fafc; border-left: 3px solid #16a34a; border-radius: 6px; padding: 12px 14px; margin: 20px 0 0; font-size: 13px; color: #475569; }
+          .footer { background: #f8fafc; padding: 18px 28px; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Yekis</h1>
+          </div>
+          <div class="content">
+            <h2 style="margin-top:0;">${purposeLabel}</h2>
+            <p style="color:#475569;">Enter this 6-digit code in Yekis to continue creating your account:</p>
+            <div class="code-box">
+              <span class="code">${code}</span>
+            </div>
+            <div class="note">
+              This code expires in 10 minutes and can be used once. We will never ask you to share it by phone, chat or email. If you did not request it, you can ignore this message.
+            </div>
+          </div>
+          <div class="footer">
+            &copy; ${new Date().getFullYear()} Yekis Jobs &bull; Ethiopia's freelance marketplace
+          </div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  return sendEmail({
+    to: options.email,
+    subject: `${options.purposeLabel ?? "Your Yekis verification code"}: ${options.code}`,
+    html,
+    text: `${options.purposeLabel ?? "Your Yekis verification code"}: ${options.code}\n\nThis code expires in 10 minutes and can be used once. We will never ask you to share it.`,
   });
 }

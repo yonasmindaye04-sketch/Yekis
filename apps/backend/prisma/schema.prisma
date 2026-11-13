@@ -204,6 +204,13 @@ model User {
   /// the Telebirr / M-Pesa payout destination and the TMS identity check, so an
   /// unverified value is someone else's number. NULL means never verified.
   phoneVerifiedAt         DateTime?
+  /// Set when the account holder proved control of the address by email OTP.
+  /// `email` is the login identifier and the destination of every
+  /// transactional mail (escrow receipts, payout notices, password resets), so
+  /// an unproven value is somebody else's inbox. NULL means never verified by
+  /// email; OAuth sign-ins set `emailVerified` without a timestamp because the
+  /// provider, not the platform, proved the address.
+  emailVerifiedAt         DateTime?
   passwordHash            String
   // NULL while the account only ever authenticated via a federated provider
   // (Google / Apple / Facebook / Telegram sentinel accounts). Set the moment
@@ -1152,6 +1159,54 @@ model PhoneVerificationCode {
   // index. Prisma 5.22 cannot express `@@unique(..., where:)`, and adding the
   // index with raw SQL alone would make the migrated schema diverge from this
   // file, which db:check-fresh compares.
+}
+
+/// Email OTP challenges proving a User.email belongs to the account holder.
+///
+/// User.email is the login identifier and the destination of every
+/// transactional mail, so proving ownership of the address is a
+/// takeover-prevention control, not just a contact detail.
+///
+/// Email is the onboarding channel while the SMS provider is unconfigured: the
+/// first signup step has to be deliverable on a host that has no SMS credit.
+/// The SMS phone codes stay exactly as they are — they are the money-safety
+/// control on the payout number and must not be weakened to make signup work.
+///
+/// Only the salted SHA-256 of the code is stored. Verified rows are kept, not
+/// deleted, so there is an audit trail of which address was ever proven; the
+/// stored hash is inert once the code expires.
+model EmailVerificationCode {
+  id String @id @default(cuid())
+
+  /// Intentionally NOT a relation on User, for the same reason as
+  /// PhoneVerificationCode: verification must be possible before the account
+  /// exists (registration).
+  userId String?
+
+  /// Lower-cased and trimmed. The service normalises on the way in, so the
+  /// stored value is the canonical form the account's `email` column uses.
+  email String
+  /// What the code was issued FOR. One outstanding code per (email, purpose),
+  /// so an onboarding code cannot be clobbered by — or redeemed as — a
+  /// different kind of proof.
+  ///   EMAIL_VERIFICATION — proving control of the address (registration,
+  ///                       address recovery). Sets User.emailVerifiedAt.
+  purpose String @default("EMAIL_VERIFICATION")
+  /// sha256(salt + ":" + code), hex. Unique so verification is one index hit.
+  codeHash String @unique
+  salt     String
+  /// Wrong guesses so far. Capped by the service.
+  attempts Int       @default(0)
+  expiresAt DateTime
+  verifiedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt(sort: Desc)])
+  @@index([expiresAt])
+  @@index([userId])
+  // NOTE: "at most one outstanding challenge per email" is enforced in
+  // email-verification.service.ts inside a transaction, for the same Prisma
+  // 5.22 reason documented on PhoneVerificationCode above.
 }
 
 // ---------- Gigs (Fiverr-style service packages) ----------

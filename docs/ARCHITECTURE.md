@@ -66,7 +66,7 @@ Webhook routes are deliberately mounted before `express.json()` so raw request b
 
 | Module | Mount path | Main responsibility |
 |---|---|---|
-| `auth` | `/api/v1/auth` | Registration, login, JWTs, Google/Apple/Facebook/Telegram OAuth, password reset, session refresh, Telegram Mini App & Widget verification |
+| `auth` | `/api/v1/auth` | Registration, login, JWTs, Google/Apple/Facebook/Telegram OAuth, password reset, session refresh, Telegram Mini App & Widget verification, and the onboarding OTP (email and SMS codes plus channel discovery) |
 | `kyc` | `/api/v1/kyc` | Document upload, Fayda eSignet OIDC/PAR, PEP screening, tier transitions, staff review queue |
 | `jobs` | `/api/v1/jobs` | Job search/creation, proposals, atomic serializable proposal decisions |
 | `contracts` | `/api/v1/contracts` | Contract creation, PDF storage, party access, independent signatures, 7-day cooling-off cancellation |
@@ -298,7 +298,7 @@ The platform supports four languages natively:
 | `om` | Afaan Oromoo | Latin |
 | `ti` | Tigrigna | Fidel (Ge'ez) |
 
-**Frontend (569 keys, 40 nested objects):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. All four languages (`en`, `am`, `om`, `ti`) carry an **identical 569-key leaf set** with 40 nested objects each (verified 2026-11-12 by evaluating the exported `translations` object). `Yekis_translations.csv` is the offline parity ledger.
+**Frontend (589 keys, 41 nested objects):** `apps/frontend/src/i18n.ts` — typed `LanguageProvider` / `useI18n()` hook with `localStorage` persistence, `<html lang>` synchronization, and real-time reactive re-rendering. All four languages (`en`, `am`, `om`, `ti`) carry an **identical 589-key leaf set** with 41 nested objects each (verified 2026-11-13 by evaluating the exported `translations` object). `Yekis_translations.csv` is the offline parity ledger.
 
 > **Orphaned strings (2026-11-09):** `marketing.stats` (8 keys per language) still exists in `i18n.ts`, but the `StatsSection` component was removed from `LandingPageV2.tsx` — the keys and their `.v2-stats*` CSS (`landing-v2.css:441-653`) are dead. They are retained so the marketing copy is not lost, but they render nothing today.
 

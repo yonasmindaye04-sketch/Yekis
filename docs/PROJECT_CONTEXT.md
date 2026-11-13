@@ -1,5 +1,18 @@
 # Project Context
 
+> **Update 2026-11-13 (Onboarding OTP over email):**
+> 1. **Motivation & Scope:** The signup flow proved control of the phone number over SMS and nothing else. On the hosted testing deployment the SMS provider has no key, so the first onboarding step failed for every new user and the account could not be created at all. The frontend's offline mock made it worse: the `503` was swallowed by the mock's HTTP-status fallback, which answered with a fabricated `devCode` the server had never issued, so the code could never be verified. The onboarding now uses **email**, which is the channel the deployment can actually deliver, and the step itself was rebuilt around one question: what does the person need to do next?
+> 2. **Backend** (`apps/backend/src/modules/auth/`):
+>    - New `email-verification.service.ts` and `email-verification.routes.ts`. `POST /api/v1/auth/email/code` and `POST /api/v1/auth/email/verify` are unauthenticated because the code is proven before the account exists; neither reveals whether an address is registered. The code is stored only as a salted SHA-256, expires in 10 minutes, is capped at 5 attempts, and a resend invalidates the previous code.
+>    - New `GET /api/v1/auth/verification/channels` — capability discovery, the same shape as `GET /api/v1/auth/oauth/providers`. The client asks the server which channels can deliver before offering one.
+>    - `registerUser` adopts a recent proof onto the new row (`User.emailVerified`, `User.emailVerifiedAt`), exactly as it already did for the phone number. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox.
+>    - New `EmailVerificationCode` table and `User.emailVerifiedAt` column (migration `20261113120000_email_verification_otp`).
+>    - The SMS phone codes are deliberately left alone: `User.phone` is the Telebirr / M-Pesa payout destination and the withdrawal-approval code is money. That flow is not weakened to make signup work.
+> 3. **Frontend** (`apps/frontend/src/OnboardingVerification.tsx`, replacing `PhoneVerification.tsx`): a two-step onboarding. Step 1 is the details form, with a line saying what happens next. Step 2 takes over the panel: the code is requested the moment the step opens, the target is shown masked, the expiry counts down, resend has its own cooldown, and wrong code / expired / too many attempts / undeliverable mail are four different messages. "Use a different email" returns to step 1 with the address still filled in. The escape hatch stays — a hard gate with no way through is a support queue, not a security control.
+> 4. **The `503` is no longer masked** (`apps/frontend/src/api/client.ts`): the OTP endpoints opt out of the offline mock's HTTP-status fallback, so a server that cannot deliver a code says so instead of answering with a code it never issued.
+> 5. **Outside production**, a host with no SMTP credentials writes the code to the server log instead of failing, so a testing deployment can complete the flow. In production a missing SMTP configuration is a misconfiguration and the caller is told the message was not delivered.
+> 6. **Verification:** `pnpm --filter backend type-check`, `pnpm --filter backend test` (67 files, 651 tests), `pnpm --filter backend route-audit:check` and `pnpm --filter frontend build` all pass.
+
 > **Update 2026-11-13 (Public legal documents and AFRO-TECH header):**
 > 1. **Motivation & Scope:** The public Privacy Policy and Terms of Service were placeholder pages containing `[TODO: Date]` and a few generic statements, while the published privacy Markdown contradicted the implemented retention rules. The marketing header also needed the established AFRO-TECH public-site design rather than the earlier transparent-over-hero treatment.
 > 2. **Legal documents:** `LegalDocumentPage.tsx` and `LegalDocumentPage.css` now provide one accessible editorial shell for both documents. The Privacy Policy has 16 code-grounded sections; the Terms of Service has 22. The effective date is 13 November 2026 and the version is 1.1. The text matches the implemented seven-day auto-release and cooling-off windows, 7% freelancer fee and 0% client surcharge, consent-aware analytics, data-subject export/erasure, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. `docs/privacy-policy.md` and `docs/terms-of-service.md` are the matching published copies.
@@ -36,7 +49,7 @@
 >    - Browser Wallet (`BrowserWallet.tsx`: checkout fallback banner with `TbFileAlert`, transaction message banners).
 >    - Workflow Workspace (`WorkflowWorkspace.tsx`: status feedback and error alerts across jobs, proposals, contracts, escrow milestones, and disputes).
 >    - Chat Workspace (`ChatWorkspace.tsx`: anti-circumvention safety caution with `ShieldAlert`, send error banner with `TbFileAlert`).
->    - Phone Verification (`PhoneVerification.tsx`: SMS status and failure banners).
+>    - Onboarding Verification (`OnboardingVerification.tsx`: OTP status and failure banners).
 > 4. **Theme Parity & Rules Enforcement:** 100% compliant with `.agents/AGENTS.md` and `docs/rule.md`: strictly avoids low-opacity background pills, guarantees theme-invariant layout geometry, and uses bold, solid, high-contrast avatar badge backgrounds (`bg-destructive`, `bg-amber-600`, `bg-emerald-600`, `bg-sky-600`) with white icons.
 > 5. **Verification:** `pnpm --filter frontend build` passed with zero errors; `node scripts/check-doc-parity.mjs` passed with 100% alignment.
 
@@ -84,7 +97,7 @@
 > **Update 2026-11-09 (Documentation ↔ Codebase Alignment Pass):**
 > 1. **Scope:** Reconciled every Markdown document in `docs/` against the actual codebase, using the three governing source documents — *Master Engineering & Product Roadmap (Revised)*, *(NEW) Development & Engineering Playbook*, and *Master Design, Legal & Compliance Document (Draft 1)* — as the **intent baseline**, and the codebase as the **truth** for implementation status.
 > 2. **Verified facts established by the pass:**
->    - Frontend i18n: **569 leaf keys** per language (40 nested objects), exact parity across `en` / `am` / `om` / `ti`. Telegram bot: **243 keys**. Reproduce with `node scripts/measure-frontend-i18n.mjs`.
+>    - Frontend i18n: **589 leaf keys** per language (41 nested objects), exact parity across `en` / `am` / `om` / `ti`. Telegram bot: **243 keys**. Reproduce with `node scripts/measure-frontend-i18n.mjs`.
 >    - Operations Console v2: **23 page components** under 23 page IDs, plus 6 shared primitives.
 >    - Background processing: **10 BullMQ queues** — `auto-release`, `gig-auto-release`, `review-reveal`, `featured-refresh`, `payment-reconcile`, `kyc-refresh`, `notifications`, `tms-scan`, `withholding-remittance`, `audit-purge`.
 >    - Vite dev server runs on **port 3000** (`vite.config.ts`), not 5173; `vite preview` on 4173.

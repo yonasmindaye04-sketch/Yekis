@@ -21,6 +21,14 @@ export const BASELINE_PUBLIC_ROUTES: ReadonlySet<string> = new Set([
   // Returns booleans derived from whether provider credentials are configured.
   "GET /api/v1/auth/oauth/providers",
 
+  // Capability discovery: tells the onboarding UI which verification channels
+  // can actually deliver a code. Returns booleans derived from whether SMTP
+  // and the SMS provider are configured — no account detail, no address, no
+  // number. The client needs this because a host with no SMTP key cannot send
+  // the email code, and offering it anyway is how a signup dead-ends with no
+  // explanation.
+  "GET /api/v1/auth/verification/channels",
+
   // PKCE web-login progress. Returns ONLY a state string
   // (pending | opened | approved | consumed | denied | expired) and never any
   // account detail, so an unauthenticated caller learns nothing about a user.

@@ -2,6 +2,25 @@
 
 Last validated: 2026-11-13
 
+> **Onboarding OTP Over Email (2026-11-13):**
+> - **The problem this fixes**: the signup flow proved control of the phone number over SMS and nothing else. On the hosted testing deployment the SMS provider has no key, so `sendSms()` returns `sent: false` and the first onboarding step failed for every new user — the account could not be created at all. The frontend's offline mock made it worse: the `503` was swallowed by the mock fallback, which answered with a fabricated `devCode` (482910) that the server had never issued, so the code could never be verified.
+> - **A two-step onboarding the user can follow** (`apps/frontend/src/OnboardingVerification.tsx`, replacing `PhoneVerification.tsx`):
+>   - Step 1 — the details form. A line under the button says what happens next, so the code step is never a surprise.
+>   - Step 2 — the code-entry step takes over the panel. The code is requested the moment the step opens (no "send me a code" button to hunt for), the target is shown masked (`a***@example.com`, `+251 *** 344`), the expiry counts down, and a resend is offered with its own cooldown.
+>   - Wrong code, expired code, too many attempts and undeliverable mail are four different messages, and an expired code unlocks the resend immediately.
+>   - "Use a different email" returns to step 1 with the address still filled in — a mistyped address is the most common reason the code never arrives.
+>   - The escape hatch ("Continue without verifying") stays: a hard gate with no way through is a support queue, not a security control.
+> - **Channel discovery** (`GET /api/v1/auth/verification/channels`): the client asks the server which channels can actually deliver before offering one. A host with no SMTP key cannot send an email and a host with no SMS key cannot send a text; offering either anyway is how a signup dead-ends with no explanation.
+> - **Backend** (`apps/backend/src/modules/auth/email-verification.service.ts`, `email-verification.routes.ts`):
+>   - `POST /api/v1/auth/email/code` and `POST /api/v1/auth/email/verify`, both unauthenticated because the code is proven before the account exists. They never reveal whether an address is registered.
+>   - The code is stored only as a salted SHA-256, expires in 10 minutes, is capped at 5 attempts, and a resend invalidates the previous code.
+>   - `registerUser` adopts a recent proof onto the new row (`User.emailVerified`, `User.emailVerifiedAt`), exactly as it already did for the phone number. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox.
+>   - The SMS phone codes are deliberately left alone: `User.phone` is the Telebirr / M-Pesa payout destination and the withdrawal-approval code is money. That flow is not weakened to make signup work.
+> - **The `503` is no longer masked** (`apps/frontend/src/api/client.ts`): the OTP endpoints opt out of the offline mock's HTTP-status fallback, so a server that cannot deliver a code says so instead of answering with a code it never issued.
+> - **Outside production**, a host with no SMTP credentials writes the code to the server log instead of failing, so a testing deployment can complete the flow. In production a missing SMTP configuration is a misconfiguration and the caller is told the message was not delivered.
+> - **Verification**: `pnpm --filter backend type-check`, `pnpm --filter backend test` (67 files, 651 tests), `pnpm --filter backend route-audit:check` and `pnpm --filter frontend build` all pass.
+> - **The locale catalogue moved with it**: the new `workspace.onboarding` namespace adds 32 leaf keys and the deleted `workspace.phoneVerification` namespace removes 12, so the frontend now holds **589 leaf keys** in **41 nested objects** per language, still at exact 4-language parity. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+
 > **Public Legal Documents and AFRO-TECH Header (2026-11-13):**
 > - The public Privacy Policy and Terms of Service are complete version 1.1 documents, effective 13 November 2026. `LegalDocumentPage.tsx` and `LegalDocumentPage.css` provide the shared breadcrumb, document header, sticky table of contents, numbered sections, responsive layout, and contact treatment. The Privacy Policy contains 16 sections; the Terms of Service contains 22.
 > - The legal text now matches the implementation: seven calendar days for automatic milestone release, the seven-day cooling-off window, a 7% freelancer platform fee and 0% client surcharge, consent-aware GA4 analytics, the export/erasure rights endpoints, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. The matching published copies are `docs/privacy-policy.md` and `docs/terms-of-service.md`.
@@ -50,7 +69,7 @@ Last validated: 2026-11-13
 >   - **Browser Wallet (`apps/frontend/src/BrowserWallet.tsx`)**: Replaced raw inline error boxes with `Alert` using `TbFileAlert` on the automated checkout fallback banner, and updated withdrawal and top-up status messages with avatar badges.
 >   - **Workflow & Contracts Workspace (`apps/frontend/src/WorkflowWorkspace.tsx`)**: Transformed all success messages and error alerts across Jobs, Proposals, Contracts, Escrow Milestones, and Disputes into the unified `Alert` component with `TbAlertTriangle` and `Check` avatar badges.
 >   - **Chat Workspace (`apps/frontend/src/ChatWorkspace.tsx`)**: Upgraded the anti-circumvention platform safety notices with `ShieldAlert` avatar badge and error callouts with `TbFileAlert`.
->   - **Phone Verification (`apps/frontend/src/PhoneVerification.tsx`)**: Replaced plain status paragraphs with the unified `Alert` component for SMS status updates (`Info`) and verification failures (`TbFileAlert`).
+>   - **Onboarding Verification (`apps/frontend/src/OnboardingVerification.tsx`)**: Replaced plain status paragraphs with the unified `Alert` component for SMS status updates (`Info`) and verification failures (`TbFileAlert`).
 > - **Theme Parity & Design Rules Compliance**:
 >   - 100% compliant with `.agents/AGENTS.md` and `docs/rule.md`: strictly avoids low-opacity background pills, guarantees theme-invariant layout geometry, and uses bold, solid, high-contrast avatar badge backgrounds (`bg-destructive`, `bg-amber-600`, `bg-emerald-600`, `bg-sky-600`) with white icons.
 > - **Verification**:

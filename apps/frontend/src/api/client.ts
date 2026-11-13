@@ -602,7 +602,23 @@ class ApiClient {
     return doing;
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  /**
+   * Performs a request against the API.
+   *
+   * `behaviour.strictHttpErrors` stops the offline mock from standing in for a
+   * real HTTP failure. The default is to fall back to the mock on 404/502/503/504
+   * so the frontend still runs with no backend at all, but that fallback is
+   * wrong for the verification endpoints: a server that cannot deliver a code
+   * answers 503, the mock answers with a fabricated `devCode`, and the person
+   * in front of the form is shown a code the server never issued. The code
+   * then fails to verify and the flow dead-ends with a message that points at
+   * the wrong thing. Those endpoints therefore surface the real status.
+   */
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+    behaviour: { strictHttpErrors?: boolean } = {},
+  ): Promise<T> {
     const performRequest = async (token: string | null) => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -658,11 +674,12 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        response.status === 503 ||
-        response.status === 502 ||
-        response.status === 504 ||
-        response.status === 404 ||
-        !contentType.includes("application/json")
+        !behaviour.strictHttpErrors &&
+        (response.status === 503 ||
+          response.status === 502 ||
+          response.status === 504 ||
+          response.status === 404 ||
+          !contentType.includes("application/json"))
       ) {
         return mockStore.handleApiFallback(
           path,
@@ -671,7 +688,24 @@ class ApiClient {
         ) as T;
       }
       if (response.status === 429) {
-        throw new Error("Too many requests. Please wait a moment before trying again.");
+        // The generic rate-limit wording is kept for every caller, but the
+        // server's own error code is attached when the body carries one. The
+        // onboarding step needs to tell "too many codes requested for this
+        // address" apart from "too many incorrect guesses" — the first says
+        // wait an hour, the second says request a new code — and they are both
+        // a 429.
+        let rateLimitCode: string | undefined;
+        try {
+          const body = (await response.json()) as { error?: string };
+          rateLimitCode = body?.error;
+        } catch {
+          /* a rate-limit response with no JSON body */
+        }
+        const thrown = new Error(
+          "Too many requests. Please wait a moment before trying again.",
+        ) as Error & { code?: string };
+        thrown.code = rateLimitCode;
+        throw thrown;
       }
       let error: {
         message?: string;
@@ -736,6 +770,7 @@ class ApiClient {
     path: string,
     token: string,
     options: RequestInit = {},
+    behaviour: { strictHttpErrors?: boolean } = {},
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -766,11 +801,12 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        response.status === 503 ||
-        response.status === 502 ||
-        response.status === 504 ||
-        response.status === 404 ||
-        !contentType.includes("application/json")
+        !behaviour.strictHttpErrors &&
+        (response.status === 503 ||
+          response.status === 502 ||
+          response.status === 504 ||
+          response.status === 404 ||
+          !contentType.includes("application/json"))
       ) {
         return mockStore.handleApiFallback(
           path,
@@ -779,7 +815,20 @@ class ApiClient {
         ) as T;
       }
       if (response.status === 429) {
-        throw new Error("Too many requests. Please wait a moment before trying again.");
+        // Same as `request`: keep the generic wording, attach the server's
+        // error code when there is one.
+        let rateLimitCode: string | undefined;
+        try {
+          const body = (await response.json()) as { error?: string };
+          rateLimitCode = body?.error;
+        } catch {
+          /* a rate-limit response with no JSON body */
+        }
+        const thrown = new Error(
+          "Too many requests. Please wait a moment before trying again.",
+        ) as Error & { code?: string };
+        thrown.code = rateLimitCode;
+        throw thrown;
       }
       let error: { message?: string; error?: string };
       try {
@@ -1254,20 +1303,88 @@ class ApiClient {
     retryAfterSec: number;
     devCode?: string;
   }> {
-    return this.request("/api/v1/auth/phone/code", {
-      method: "POST",
-      body: JSON.stringify({ phone }),
-    });
+    return this.request(
+      "/api/v1/auth/phone/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ phone }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async verifyPhoneCode(
     phone: string,
     code: string,
   ): Promise<{ verified: true }> {
-    return this.request("/api/v1/auth/phone/verify", {
-      method: "POST",
-      body: JSON.stringify({ phone, code }),
-    });
+    return this.request(
+      "/api/v1/auth/phone/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
+      },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Which verification channels can actually deliver right now.
+   *
+   * The onboarding step asks the server before it offers a channel: on a host
+   * with no SMTP key the email code would 503, and with no SMS key the phone
+   * code would 503. Offering either anyway is how a signup ends in a dead
+   * end with no explanation.
+   */
+  async getVerificationChannels(): Promise<{
+    email: { available: boolean; label: string };
+    phone: { available: boolean; label: string };
+  }> {
+    return this.request(
+      "/api/v1/auth/verification/channels",
+      { method: "GET" },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Requests an email OTP for an address.
+   *
+   * This is the onboarding channel while the SMS provider is unconfigured. It
+   * is unauthenticated on purpose: the code is sent and checked before the
+   * account exists, and the response never says whether the address is already
+   * registered.
+   *
+   * `devCode` is only ever present outside production, and is shown by the UI
+   * in that case so a developer can complete the flow without a mailbox.
+   */
+  async requestEmailCode(email: string): Promise<{
+    sent: boolean;
+    expiresAt: string;
+    retryAfterSec: number;
+    devCode?: string;
+  }> {
+    return this.request(
+      "/api/v1/auth/email/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+      { strictHttpErrors: true },
+    );
+  }
+
+  async verifyEmailCode(
+    email: string,
+    code: string,
+  ): Promise<{ verified: true }> {
+    return this.request(
+      "/api/v1/auth/email/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, code }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   /**

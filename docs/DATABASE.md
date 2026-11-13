@@ -53,7 +53,7 @@ erDiagram
 
 | Model | Responsibility and important invariants |
 |---|---|
-| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities |
+| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities. **`email` is stored lower-cased and trimmed** — the canonical form the login lookup, the OAuth path and the email-OTP proof all use — so an account is never unreachable by the sign-in that follows it, and one mailbox cannot hold two accounts spelled differently |
 | `ConsentRecord` | Purpose-specific consent history captured at registration |
 | `KycRecord` | One per user; tier/status, Fayda eSignet fields, PEP screening metadata, review metadata, `periodicReviewPending` |
 | `KycReviewEvent` | Immutable log of each staff KYC decision (VERIFIED/REJECTED) with tier at decision time |
@@ -98,6 +98,7 @@ erDiagram
 | `PasswordResetToken` | Time-limited token for the password reset flow |
 | `TelegramLoginCode` | Short-lived code issued during Telegram QR/web-login start, redeemed to mint a session |
 | `PhoneVerificationCode` | SMS OTP for phone number verification. `purpose` scopes the code to the proof it gives — `PHONE_VERIFICATION` (control of the number) or `WITHDRAWAL` (approval of one payout) — so there is one outstanding code per (phone, purpose) and a login code can never approve a payment |
+| `EmailVerificationCode` | Email OTP for email address verification — the **onboarding** channel, used while the SMS provider is unconfigured. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. Only the salted SHA-256 of the code is stored; verified rows are kept as the audit trail of which address was ever proven |
 
 ## Monetary Representation
 
@@ -166,6 +167,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261003140000_drop_chatwoot_bridge_columns` | Removes the four unused `Conversation` Chatwoot columns. `ChatMessage.origin` and `ChatMessage.externalId` are KEPT as generic provenance and idempotency markers |
 | `20261110120000_audit_log_retention` | Adds `AuditLog.retentionUntil` (NOT NULL, backfilled from `createdAt` + 10 years) with an index, and the `SECURITY DEFINER` function `purge_expired_audit_logs(batch_size)` that the retention worker calls. The application role gets EXECUTE only — it still holds no `DELETE` privilege on `AuditLog` |
 | `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
+| `20261113120000_email_verification_otp` | Adds the `EmailVerificationCode` table (the onboarding OTP channel: lower-cased address, purpose, salted SHA-256 of the code, attempts, expiry) and `User.emailVerifiedAt`. `User.emailVerified` already existed and is also set by the OAuth path, where the provider — not the platform — proved the address |
 
 ### Re-runnable migrations
 

@@ -256,6 +256,22 @@ build to run again — which is what a redeploy does.
 | `VITE_OBJECT_STORE_ORIGIN` | `https://s3.aletcloud.com` | Build-time; see §5.2 |
 | `VITE_GOOGLE_CLIENT_ID` | *optional* | Build-time; the sign-in button is hidden when it is absent |
 | `RUN_MIGRATIONS` | `true` | The container applies `prisma migrate deploy` before the API starts |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | *optional* | The transactional mail transport. It carries the onboarding OTP (the 6-digit code sent before an account is created) and the password-reset mail |
+| `EMAIL_FROM` | `Yekis Notifications <notifications@yekis.com>` | The sender of every platform mail |
+| `SMS_ETHIOPIA_API_KEY` | *optional* | The SMS provider. With it unset, the phone OTP channel reports itself as unavailable and the onboarding falls back to email |
+
+**The onboarding OTP on a testing deployment.** The signup flow proves control
+of the signup address with a 6-digit code before the account is created. With
+no SMTP credentials the code is written to the container log instead and the
+API response carries it as `devCode` — so the flow completes on a testing
+deployment without a mail provider. Read the code from the platform's logs, or
+set the `SMTP_*` variables to have it delivered by mail. This fallback does
+**not** exist in production, where a missing SMTP configuration answers `503
+EMAIL_UNAVAILABLE` rather than pretending the message was sent.
+
+`GET /api/v1/auth/verification/channels` reports what the running host can
+actually deliver. Check it after deploying: if `email.available` is `false`
+the signup step will not be able to send a code.
 
 **Leave the Telebirr, CBE and Fayda credentials blank.** With no Telebirr
 credentials the payment client falls back to its deterministic mock mode, so

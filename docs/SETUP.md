@@ -73,8 +73,34 @@ Confirm the following groups are configured in `apps/backend/.env`:
 - JWT: access and refresh secrets
 - Object storage: endpoint, bucket, access key, secret key
 - Provider credentials: Telebirr/CBE (CBE_WEBHOOK_SECRET) and webhook secret
+- Transactional mail: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `EMAIL_FROM`
+- SMS: `SMS_ETHIOPIA_API_KEY`
 - Policy values: minimum age, withholding threshold/rates, auto-release days
 - Observability: `SENTRY_DSN`
+
+### Transactional mail and the onboarding OTP
+
+The signup flow sends a 6-digit code over **email** before the account is
+created. The mail transport is nodemailer over SMTP; the variables above are
+what it reads.
+
+- With all of `SMTP_HOST`, `SMTP_USER` and `SMTP_PASS` set, the code is sent by
+  mail to the address being registered.
+- Without them, and **outside production**, the code is written to the server
+  log instead and the API response carries it as `devCode`. A hosted testing
+  deployment therefore completes the flow without a mail provider — read the
+  code from the container log. Set `SMTP_SECURE=true` (or `SMTP_PORT=465`) for
+  implicit TLS; port 587 uses STARTTLS.
+- In **production** there is no fallback: a missing SMTP configuration is a
+  misconfiguration, and `POST /api/v1/auth/email/code` answers `503
+  EMAIL_UNAVAILABLE` rather than pretending the message was sent.
+
+`GET /api/v1/auth/verification/channels` reports which channels the running
+host can actually use (`email.available`, `phone.available`). The onboarding
+UI asks before it offers a channel, so a host without an SMS key never shows a
+"text me a code" button that can never arrive.
+
+> Blank provider credentials use development stub behavior only.
 
 For the frontend, copy its example env file:
 
@@ -87,8 +113,6 @@ Configurable groups in `apps/frontend/.env`:
 - Google OAuth: `VITE_GOOGLE_CLIENT_ID` (must match the backend `GOOGLE_CLIENT_ID`)
 - Analytics: `VITE_GA_MEASUREMENT_ID` (GA4 `G-…` ID; leave empty to disable — analytics only loads in production builds and only after cookie consent, so keeping it empty locally is the norm). See the "Analytics (GA4)" section of the frontend README.
 - Object store: `VITE_OBJECT_STORE_ORIGIN` (the store's origin, added to the production Content-Security-Policy's `img-src` so the staff console can render a KYC document from its presigned URL; unset locally, because the local MinIO is same-origin)
-
-> Blank provider credentials use development stub behavior only.
 
 ### Demo accounts (`SEED_DEMO_PASSWORD`)
 

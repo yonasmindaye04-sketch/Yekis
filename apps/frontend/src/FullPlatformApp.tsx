@@ -16,7 +16,7 @@ import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
-import { PhoneVerification } from "./PhoneVerification";
+import { OnboardingVerification } from "./OnboardingVerification";
 import {
   ContractsWorkspace,
   DisputesWorkspace,
@@ -323,11 +323,26 @@ function FullPlatformAppInner() {
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   /**
-   * Opens the SMS confirmation step. Set when the user submits the register form
-   * with a usable Ethiopian number, and cleared on either outcome so the submit
-   * button is not left permanently disabled.
+   * The onboarding OTP step. `null` means the details form is showing; a
+   * channel means the code-entry step has taken over the panel.
+   *
+   * Email is the default channel because it is the one a hosted environment
+   * can actually deliver: the SMS provider has no key on a test deployment,
+   * and the signup used to dead-end on its first step for exactly that
+   * reason. Which channels are live is decided by the server, not guessed
+   * here — see `GET /auth/verification/channels`.
    */
-  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [onboardingChannel, setOnboardingChannel] = useState<
+    "email" | "phone" | null
+  >(null);
+  /**
+   * The channel capabilities, fetched once. Kept in state so switching to the
+   * code-entry step and back does not re-ask the server.
+   */
+  const [verificationChannels, setVerificationChannels] = useState<{
+    email: { available: boolean; label: string };
+    phone: { available: boolean; label: string };
+  } | null>(null);
   /**
    * Profile-completeness signal. `null` means "not known yet", which is
    * deliberately different from 0 so the completion nudge can wait instead of
@@ -603,6 +618,91 @@ const loadWorkspace = async () => {
     }
   };
 
+  /**
+   * Which verification channel can actually deliver a code right now.
+   *
+   * The server decides, from its own configuration: a host with no SMTP key
+   * cannot send an email and a host with no SMS key cannot send a text. Asking
+   * the server is the difference between a signup that works and a signup
+   * that offers a code which never arrives.
+   *
+   * Email is preferred. `User.email` is the login identifier and the
+   * destination of every transactional mail, so proving the address is a
+   * takeover-prevention control in its own right — and it is the channel a
+   * test deployment can actually deliver.
+   *
+   * The answer is cached: the capabilities of a running server do not change
+   * between two clicks of the same form.
+   *
+   * A failed lookup falls back to email rather than to "no channel". The
+   * lookup is a hint, not a gate: if it cannot be answered, the code request
+   * itself is the thing that knows whether a code can be delivered, and its
+   * answer is the real one. Falling back to "no channel" here would register
+   * an unproven address silently; falling back to email sends the user to
+   * the step that tells the truth.
+   */
+  const resolveVerificationChannel = async (): Promise<
+    "email" | "phone" | null
+  > => {
+    let channels = verificationChannels;
+    if (!channels) {
+      try {
+        channels = await api.getVerificationChannels();
+        setVerificationChannels(channels);
+      } catch {
+        if (email.trim()) return "email";
+        return null;
+      }
+    }
+    if (channels.email.available && email.trim()) return "email";
+    if (
+      channels.phone.available &&
+      /^\+?251[1-9]\d{8}$/.test(phone.replace(/\s/g, ""))
+    ) {
+      return "phone";
+    }
+    return null;
+  };
+
+  /**
+   * Creates the account and signs the user in.
+   *
+   * Split out of `submitAuth` because the account is now created AFTER the
+   * onboarding code is proven. The code has to be verified while the account
+   * does not exist yet — that is what lets registration attach the proof to
+   * the new row.
+   */
+  const completeRegistration = async () => {
+    await api.register({
+      email,
+      phone,
+      password,
+      role,
+      dateOfBirth,
+      languagePreference: language || "en",
+      consents: {
+        kycDataProcessing: true,
+        financialDataProcessing: true,
+        platformNotifications: consentNotifications,
+        marketingCommunications: consentMarketing,
+        analytics: consentAnalytics,
+      },
+    });
+    const session = await api.login(email, password);
+    api.setSession(session);
+    // Analytics: mark the auth visit completed before the user state flips
+    // (the abandonment effect's cleanup reads this flag on logout/exit).
+    if (authVisitRef.current) authVisitRef.current.completed = true;
+    events.signupCompleted(
+      role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
+    );
+    setProfileNudgeDismissed(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("yekis_new_user_nudge_me", "1");
+    }
+    await loadWorkspace();
+  };
+
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -629,49 +729,29 @@ const loadWorkspace = async () => {
         setPassword("");
         return;
       }
-if (authMode === "register") {
-      // Confirm the number before the account exists, which is why the backend
-      // endpoints are unauthenticated. A number we have not verified is the
-      // payout destination, so this is a money-safety step, not a nicety.
-      // Skip for now is always available: a hard gate with no escape hatch is a
-      // support queue rather than a security control.
-      if (/\+?251[1-9]\d{8}/.test(phone.replace(/\s/g, ""))) {
-        setShowPhoneVerification(true);
-        setError("");
+      if (authMode === "register") {
+        // The onboarding step. The code is proven BEFORE the account exists,
+        // which is why the backend endpoints are unauthenticated, and the
+        // proof is attached to the new row at registration.
+        //
+        // A hard gate with no escape hatch is a support queue rather than a
+        // security control, so the step keeps a way through — and when no
+        // channel can deliver at all, registration proceeds without it.
+        const channel = await resolveVerificationChannel();
+        if (channel) {
+          setOnboardingChannel(channel);
+          setError("");
+          return;
+        }
+        await completeRegistration();
         return;
-      }
-      await api.register({
-          email,
-          phone,
-          password,
-          role,
-          dateOfBirth,
-          languagePreference: language || "en",
-          consents: {
-            kycDataProcessing: true,
-            financialDataProcessing: true,
-            platformNotifications: consentNotifications,
-            marketingCommunications: consentMarketing,
-            analytics: consentAnalytics,
-          },
-        });
       }
       const session = await api.login(email, password);
       api.setSession(session);
       // Analytics: mark the auth visit completed before the user state flips
       // (the abandonment effect's cleanup reads this flag on logout/exit).
       if (authVisitRef.current) authVisitRef.current.completed = true;
-      if (authMode === "register") {
-        events.signupCompleted(
-          role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
-        );
-        setProfileNudgeDismissed(false);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem("yekis_new_user_nudge_me", "1");
-        }
-      } else {
-        events.login("email");
-      }
+      events.login("email");
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
@@ -997,6 +1077,56 @@ if (authMode === "register") {
           </div>
           <AuthVisualAnimation />
         </div>
+        {onboardingChannel ? (
+          <div className="auth-panel">
+            <div className="auth-panel-header">
+              <div>
+                <p className="eyebrow">{t.workspace.onboarding.stepsLabel}</p>
+                <h2>{t.workspace.auth.createTitle}</h2>
+              </div>
+            </div>
+            <OnboardingVerification
+              channel={onboardingChannel}
+              target={onboardingChannel === "email" ? email : phone}
+              onVerified={() => {
+                // The account is created only after the code is proven, so the
+                // proof can be attached to the new row.
+                setIsLoading(true);
+                setError("");
+                void completeRegistration()
+                  .catch((err) => {
+                    const message =
+                      err instanceof Error ? err.message : "Unable to continue";
+                    setError(
+                      message === "INVALID_CREDENTIALS"
+                        ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+                        : message,
+                    );
+                  })
+                  .finally(() => setIsLoading(false));
+              }}
+              onBack={() => {
+                setOnboardingChannel(null);
+                setError("");
+              }}
+              onSkip={() => {
+                // The escape hatch: a hard gate with no way through is a
+                // support queue rather than a security control.
+                setOnboardingChannel(null);
+                setError("");
+                setIsLoading(true);
+                void completeRegistration()
+                  .catch((err) => {
+                    const message =
+                      err instanceof Error ? err.message : "Unable to continue";
+                    setError(message);
+                  })
+                  .finally(() => setIsLoading(false));
+              }}
+            />
+            {error && <div className="form-error">{error}</div>}
+          </div>
+        ) : (
         <form className="auth-panel" onSubmit={submitAuth}>
           <div className="auth-panel-header">
             <div>
@@ -1419,19 +1549,14 @@ if (authMode === "register") {
               {successMessage}
             </div>
           )}
-          {authMode === "register" && showPhoneVerification && (
-            <PhoneVerification
-              phone={phone}
-              onVerified={() => setShowPhoneVerification(false)}
-              onSkip={() => setShowPhoneVerification(false)}
-            />
+          {authMode === "register" && (
+            <p className="auth-verify-hint">
+              {t.workspace.onboarding.verifyHint}
+            </p>
           )}
           <button
             className="btn-primary wide"
-            disabled={
-              isLoading ||
-              (authMode === "register" && (!termsAccepted || showPhoneVerification))
-            }
+            disabled={isLoading || (authMode === "register" && !termsAccepted)}
             style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
@@ -1462,6 +1587,7 @@ if (authMode === "register") {
               setAuthMode(authMode === "login" ? "register" : "login");
               setError("");
               setSuccessMessage("");
+              setOnboardingChannel(null);
             }}
           >
             {authMode === "login"
@@ -1469,6 +1595,7 @@ if (authMode === "register") {
               : t.marketing.auth.alreadyAccount}
           </button>
         </form>
+        )}
 
         {legalModal && (
           <div

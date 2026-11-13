@@ -1,7 +1,7 @@
 {
   "$comment": "Committed route inventory. Regenerate with: npx tsx scripts/route-audit.ts --write-baseline",
-  "generatedAt": "2026-11-10T19:13:00.087Z",
-  "count": 191,
+  "generatedAt": "2026-11-13T10:46:55.644Z",
+  "count": 194,
   "routes": [
     "DELETE /api/v1/auth/telegram/link",
     "DELETE /api/v1/portfolio/me/:itemId",
@@ -27,6 +27,7 @@
     "GET /api/v1/auth/me",
     "GET /api/v1/auth/oauth/providers",
     "GET /api/v1/auth/telegram/web-login/:sid/status",
+    "GET /api/v1/auth/verification/channels",
     "GET /api/v1/chat/admin/conversations",
     "GET /api/v1/chat/attachments/:key(*)",
     "GET /api/v1/chat/conversations",
@@ -96,6 +97,8 @@
     "POST /api/v1/admin/users/:id/suspend",
     "POST /api/v1/admin/users/:id/unsuspend",
     "POST /api/v1/auth/change-password",
+    "POST /api/v1/auth/email/code",
+    "POST /api/v1/auth/email/verify",
     "POST /api/v1/auth/login",
     "POST /api/v1/auth/logout",
     "POST /api/v1/auth/oauth/apple",
