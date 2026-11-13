@@ -13,8 +13,16 @@ import { logger } from "./logger.js";
 
 export const objectStoreClient = new S3Client({
   endpoint: env.OBJECT_STORE_ENDPOINT,
-  region: "us-east-1", // MinIO/most S3-compatible stores ignore this but the SDK requires a value
-  forcePathStyle: true, // required for MinIO and most non-AWS S3-compatible endpoints
+  // MinIO and most S3-compatible stores ignore the region, but the SDK
+  // requires a value and a hosted store may not. The region is configurable
+  // because the platform's own region is not `us-east-1` — AletCloud's is
+  // `et-addis-1` — and a mismatch there is a confusing 400 rather than an
+  // obvious failure.
+  region: env.OBJECT_STORE_REGION,
+  // Path-style addressing (`endpoint/bucket/key`) is what MinIO requires.
+  // A hosted S3-compatible endpoint may only offer virtual-host style
+  // (`bucket.endpoint/key`), so this is configurable rather than fixed.
+  forcePathStyle: env.OBJECT_STORE_FORCE_PATH_STYLE,
   credentials: {
     accessKeyId: env.OBJECT_STORE_ACCESS_KEY,
     secretAccessKey: env.OBJECT_STORE_SECRET_KEY,
@@ -344,3 +352,23 @@ export async function deleteObject(
 // Clauses. DO NOT point OBJECT_STORE_ENDPOINT at a foreign-hosted bucket
 // (AWS S3, Azure Blob, GCP) to make this look resolved — it isn't.
 // See COMPLIANCE_BLOCKERS.md §Data Localization for the full blocker details.
+//
+// RESOLUTION PATH (2026-11-12)
+// AletCloud is a candidate that satisfies the requirement on its face: its
+// own hardware, inside Ethio Telecom's Bole data centre in Addis Ababa, with
+// an S3-compatible object store at s3.aletcloud.com and the region
+// `et-addis-1`. A bucket there is set with:
+//
+//   OBJECT_STORE_ENDPOINT=https://s3.aletcloud.com
+//   OBJECT_STORE_REGION=et-addis-1
+//   OBJECT_STORE_BUCKET=<bucket>
+//   OBJECT_STORE_ACCESS_KEY / OBJECT_STORE_SECRET_KEY=<the scoped key>
+//
+// The AWS_* names AletCloud injects when a bucket is linked to an app
+// (AWS_ENDPOINT_URL, AWS_REGION, AWS_ACCESS_KEY_ID,
+// AWS_SECRET_ACCESS_KEY) are accepted as aliases, so a linked bucket needs
+// no renaming — see `applyObjectStoreAliases()` in config/env.ts.
+//
+// The region is not cosmetic. A bucket in Addis Ababa served to clients
+// outside Ethiopia is still a cross-border transfer of the personal data in
+// it, and that is a separate approval, not an infrastructure detail.

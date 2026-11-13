@@ -62,6 +62,61 @@ const EnvSchema = z.object({
   OBJECT_STORE_BUCKET: z.string().min(1),
   OBJECT_STORE_ACCESS_KEY: z.string().min(1),
   OBJECT_STORE_SECRET_KEY: z.string().min(1),
+  /**
+   * The region the object store is addressed as.
+   *
+   * S3-compatible stores mostly ignore it, but not all of them do, and a
+   * mismatch is a confusing 400 rather than an obvious failure. MinIO and
+   * the local development setup answer to anything, so the default keeps
+   * the previous behaviour ("us-east-1"). A hosted store in another region
+   * — AletCloud's is `et-addis-1` — sets this to its own region.
+   */
+  OBJECT_STORE_REGION: z.string().default("us-east-1"),
+  /**
+   * Whether to address the object store path-style
+   * (`https://endpoint/bucket/key`) rather than virtual-host-style
+   * (`https://bucket.endpoint/key`).
+   *
+   * MinIO requires path-style, so the default keeps it. A hosted
+   * S3-compatible endpoint may only offer virtual-host style, in which case
+   * this is set to false.
+   */
+  OBJECT_STORE_FORCE_PATH_STYLE: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
+
+  /**
+   * Serves the built frontend from the API process.
+   *
+   * Off by default: in development the SPA is served by Vite, and the API is
+   * a JSON service. It is turned on in a container deployment, where the
+   * two have to share an origin for the Telegram Mini App to load at all
+   * (see `lib/staticSite.ts`).
+   */
+  SERVE_FRONTEND: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+  /**
+   * Where the built frontend lives. Unset, it is looked up next to the
+   * compiled backend (see `resolveFrontendDistDir()`).
+   */
+  FRONTEND_DIST_DIR: z.string().optional(),
+
+  /**
+   * Whether the HSTS header carries `includeSubDomains`.
+   *
+   * On a dedicated hostname this is right. On a shared platform hostname —
+   * an app served from `<name>.app.aletcloud.com` — it is not: the browser
+   * would then require HTTPS for every sibling subdomain of
+   * `app.aletcloud.com`, which belong to other tenants. Set it to false
+   * there.
+   */
+  HSTS_INCLUDE_SUBDOMAINS: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 
   // ── Telebirr C2B Web Checkout credentials ──
   // Which Telebirr environment these credentials belong to. Required whenever
@@ -389,7 +444,51 @@ const EnvSchema = z.object({
 OPENSEARCH_URL: z.string().url().optional(),
 });
 
-const parsed = EnvSchema.safeParse(process.env);
+/**
+ * S3-compatible hosts inject the object store under the standard AWS names.
+ *
+ * The platform's own names are `OBJECT_STORE_ENDPOINT`, `OBJECT_STORE_BUCKET`,
+ * `OBJECT_STORE_ACCESS_KEY` and `OBJECT_STORE_SECRET_KEY`, because the
+ * endpoint is not always AWS and the region is often not `us-east-1`. Plenty
+ * of providers, however, inject `AWS_ENDPOINT_URL`, `AWS_REGION`,
+ * `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` when a bucket is linked to
+ * an app — AletCloud does exactly that — and an operator who pasted those in
+ * and watched the API refuse to boot deserves a working deployment rather
+ * than a lecture.
+ *
+ * The explicit names always win: this only fills in a name that was not set.
+ */
+export function applyObjectStoreAliases(
+  source: NodeJS.ProcessEnv,
+): NodeJS.ProcessEnv {
+  const result: NodeJS.ProcessEnv = { ...source };
+
+  const aliases: Array<[string, string[]]> = [
+    ["OBJECT_STORE_ENDPOINT", ["AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_S3"]],
+    ["OBJECT_STORE_REGION", ["AWS_REGION", "AWS_DEFAULT_REGION"]],
+    ["OBJECT_STORE_ACCESS_KEY", ["AWS_ACCESS_KEY_ID"]],
+    ["OBJECT_STORE_SECRET_KEY", ["AWS_SECRET_ACCESS_KEY"]],
+    [
+      "OBJECT_STORE_BUCKET",
+      ["AWS_BUCKET", "AWS_BUCKET_NAME", "AWS_S3_BUCKET", "S3_BUCKET", "BUCKET_NAME"],
+    ],
+  ];
+
+  for (const [canonical, alternatives] of aliases) {
+    if (result[canonical]) continue;
+    for (const alternative of alternatives) {
+      const value = result[alternative];
+      if (value) {
+        result[canonical] = value;
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
+const parsed = EnvSchema.safeParse(applyObjectStoreAliases(process.env));
 
 if (!parsed.success) {
   // eslint-disable-next-line no-console
@@ -653,6 +752,38 @@ export function assertProductionSafety(
   }
 
   return violations;
+}
+
+/**
+ * Whether the process may run with TLS certificate verification switched off.
+ *
+ * Node's `NODE_TLS_REJECT_UNAUTHORIZED=0` is a process-wide switch: it
+ * disables certificate checking for EVERY outbound HTTPS call the process
+ * makes — the object store, the Telegram API, a provider callback. Turning it
+ * on for a whole deployment because ONE gateway presents a self-signed
+ * certificate means an attacker who can intercept that one connection can
+ * intercept all of them.
+ *
+ * It is therefore permitted in exactly two cases:
+ *
+ *   - a development build, where nothing is at stake, and
+ *   - a deployment explicitly pointed at the Telebirr SANDBOX gateway, whose
+ *     certificate really is self-signed. `TELEBIRR_ENV` is mandatory
+ *     whenever any Telebirr credential is set (the check runs at load, below),
+ *     so "sandbox" is an explicit statement of intent rather than a default.
+ *
+ * A staging deployment that talks to real endpoints therefore verifies
+ * certificates. It did not before this function existed: the old check was
+ * `NODE_ENV !== "production"`, which left every staging box running with
+ * verification off, including the ones talking to the object store and to
+ * Telegram.
+ */
+export function tlsVerificationBypassed(cfg: {
+  NODE_ENV?: string;
+  TELEBIRR_ENV?: TelebirrEnv;
+}): boolean {
+  if (cfg.NODE_ENV === "development") return true;
+  return cfg.TELEBIRR_ENV === "sandbox";
 }
 
 // Telebirr is in use, so the deployment must declare which environment it is

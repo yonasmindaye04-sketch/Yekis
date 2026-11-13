@@ -456,6 +456,92 @@ if (fs.existsSync(i18nPath)) {
   }
 }
 
+// 8. Verify the two copies of the framing allowlist agree.
+//
+// WHY THIS EXISTS
+// `frame-ancestors` is ignored in a `<meta>` CSP, so the allowlist has to be
+// sent as a response HEADER by whatever serves the HTML. In a container
+// deployment that is the API process, which carries its own copy of the
+// list in `apps/backend/src/lib/staticSite.ts`, while the build carries the
+// other copy in `apps/frontend/vite.config.ts`.
+//
+// Two copies of a security allowlist is a drift waiting to happen: widen one
+// and not the other and the deployment silently stops rendering inside the
+// Telegram Mini App (or, worse, keeps rendering inside a frame that should
+// have been refused). The check compares them and fails CI when they differ.
+//
+// Both files declare the list the same way — `const FRAME_ANCESTORS = [ … ]
+// .join(" ")` — so the comparison is a textual extraction, and no
+// TypeScript toolchain is needed to run it.
+const frameAncestorsFiles = [
+  ["apps/frontend/vite.config.ts", "the frontend build"],
+  ["apps/backend/src/lib/staticSite.ts", "the API's static-site server"],
+];
+
+function extractFrameAncestors(filePath) {
+  const src = fs.readFileSync(filePath, "utf-8");
+  const match = src.match(
+    /const FRAME_ANCESTORS\s*=\s*\[([\s\S]*?)\]\s*\.join\(" "\)/,
+  );
+  if (!match) return null;
+  return [...match[1].matchAll(/'([^']*)'|"([^"]*)"/g)].map(
+    (m) => m[1] ?? m[2],
+  );
+}
+
+const frameAncestorsLists = frameAncestorsFiles
+  .map(([relative]) => {
+    const full = path.join(rootDir, relative);
+    if (!fs.existsSync(full)) return null;
+    return { relative, origins: extractFrameAncestors(full) };
+  })
+  .filter(Boolean);
+
+if (frameAncestorsLists.length > 1) {
+  console.log(`\n?? Checking the frame-ancestors allowlists agree...`);
+  const [reference, ...others] = frameAncestorsLists;
+  const referenceSet = new Set(reference.origins ?? []);
+  const drift = [];
+
+  for (const other of others) {
+    if (!other.origins) {
+      drift.push(`${other.relative} no longer declares FRAME_ANCESTORS`);
+      continue;
+    }
+    const otherSet = new Set(other.origins);
+    for (const origin of referenceSet) {
+      if (!otherSet.has(origin)) {
+        drift.push(
+          `${other.relative} is missing "${origin}" (present in ${reference.relative})`,
+        );
+      }
+    }
+    for (const origin of otherSet) {
+      if (!referenceSet.has(origin)) {
+        drift.push(
+          `${other.relative} has "${origin}", which ${reference.relative} does not`,
+        );
+      }
+    }
+  }
+
+  if (drift.length > 0) {
+    console.error(`? The frame-ancestors allowlists have drifted apart:`);
+    for (const d of drift) console.error(`  - ${d}`);
+    console.error(
+      `  The allowlist decides which origins may frame the app. It must be`,
+    );
+    console.error(
+      `  identical in the built index.html and in the API's response header.`,
+    );
+    hasErrors = true;
+  } else {
+    console.log(
+      `? The frame-ancestors allowlists agree (${reference.origins?.length ?? 0} origins).`,
+    );
+  }
+}
+
 if (hasErrors) {
   console.error("\n❌ Documentation drift detected! Please update the corresponding documentation files.");
   process.exit(1);

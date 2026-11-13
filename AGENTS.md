@@ -13,6 +13,7 @@ the rules and commands a new contributor needs.
 | `packages/schemas` | Shared Zod schemas used by both apps. |
 | `docs` | Project documentation. Treat it as part of the deliverable, not an afterthought. |
 | `scripts` | Repository tooling: secret scanner, doc-parity check, migration helpers, tunnel scripts. |
+| `Dockerfile`, `infra/docker` | The deployment image. One container serves the API, serves the built SPA and runs a Redis; `docs/ALETCLOUD_DEPLOYMENT.md` is the runbook. |
 
 ## Setup
 
@@ -23,6 +24,15 @@ docker compose up -d          # Postgres on :5433, Redis on :6379, MinIO on :900
 ```
 
 Run the apps in separate terminals: `pnpm dev:backend` and `pnpm --filter frontend dev`.
+
+To run the whole platform the way a deployment does — one process serving both the API and the built SPA, with its own Redis:
+
+```powershell
+docker build -t yekis:local .
+docker run --rm -p 8080:8080 -e DATABASE_URL=... -e REDIS_URL=... yekis:local
+```
+
+`docs/SETUP.md` §11 has the full command; `docs/ALETCLOUD_DEPLOYMENT.md` has the deployment runbook, and `node scripts/check-deployment.mjs <base-url>` checks a deployed instance against the contract it has to meet.
 
 ## Checks
 
@@ -35,6 +45,7 @@ pnpm --filter backend type-check                     # tsc --noEmit
 pnpm --filter backend route-audit:check              # route baseline gate
 pnpm --filter backend test                           # vitest (needs Postgres + Redis)
 pnpm --filter frontend build                         # tsc -b && vite build
+docker build -t yekis:check .                        # the deployment image
 ```
 
 ## Database safety — read before running any data command

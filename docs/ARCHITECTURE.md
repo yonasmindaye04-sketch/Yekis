@@ -308,6 +308,10 @@ Anti-circumvention: a multi-script engine strips Amharic Fidel numerals, spelled
 
 KYC documents, top-up receipts, and generated contract PDFs are stored as objects; PostgreSQL stores their paths. The object-store helper creates a missing development bucket automatically. Production must add encryption, versioning, object lock/retention, access logging, backup, and Ethiopian residency controls.
 
+The client is configured from four environment variables — `OBJECT_STORE_ENDPOINT`, `OBJECT_STORE_REGION`, `OBJECT_STORE_FORCE_PATH_STYLE` and the bucket name — rather than from hardcoded values, because the endpoint is not always AWS, the region is often not `us-east-1`, and the addressing style (path-style, which MinIO requires, versus virtual-host style, which the standard AWS SDK uses) differs between implementations. The `AWS_ENDPOINT_URL`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` and `AWS_BUCKET` names that a hosted platform injects when a bucket is linked to an app are accepted as aliases, so a linked bucket needs no renaming (`applyObjectStoreAliases()` in `config/env.ts`).
+
+Ethiopian residency (PDPP Art. 22) is a hard requirement on the bucket, not a preference: a bucket in Addis Ababa still sends personal data across a border when it is served to a client outside Ethiopia, and that is a separate approval. See `COMPLIANCE_BLOCKERS.md` §5 for the current state and `docs/ALETCLOUD_DEPLOYMENT.md` for the candidate provider.
+
 ## Security And Compliance
 
 - JWT authentication and fresh database role checks for authorization-sensitive job actions.
@@ -376,13 +380,32 @@ The production CSP is injected into `index.html` as a `<meta>` tag by `productio
 
 See `SETUP.md` for exact commands.
 
+## Container Topology
+
+The repository's root `Dockerfile` builds **one image** that runs the whole platform: the compiled API, the built SPA, and a `redis-server` on loopback. It exists because the Telegram Mini App opens the platform in a webview that refuses a page from a different origin, so the SPA and the API have to share an origin — and therefore a port and a TLS certificate.
+
+| Service | Address | Notes |
+|---|---|---|
+| SPA + API (one process) | `$PORT` (default 8080) | The API process serves `apps/frontend/dist` at `/` and keeps its own routes at `/api/v1`. The frontend calls its own origin (`VITE_API_BASE_URL` is unset), so no CORS and no second hostname are involved. |
+| Redis | `127.0.0.1:6379`, inside the container | Started by `infra/docker/entrypoint.sh`. An external Redis is used instead when `REDIS_URL` names a host other than loopback. |
+| PostgreSQL | The managed instance, over the provider's internal network | `DATABASE_URL` carries `connection_limit=5` so the Prisma pool stays inside the managed plan's connection cap. |
+| Object storage | The managed bucket | The `AWS_*` names a platform injects are accepted as aliases for the `OBJECT_STORE_*` names (`config/env.ts`), and the region and the path-style setting are configurable rather than hardcoded. |
+
+Three details in that topology are load-bearing rather than incidental:
+
+- **The API's strict security headers are scoped to the API routes.** `app.ts` gives the API `default-src 'none'` and `X-Frame-Options: DENY`, which is right for a JSON service and catastrophic for an HTML document: it would block the page's own script and style tags and refuse to let the Telegram webview frame it. The SPA gets its own headers in `lib/staticSite.ts`, including the `frame-ancestors` allowlist that has to travel as a response header. `scripts/check-doc-parity.mjs` fails CI when the two copies of that allowlist drift apart.
+- **The container applies `prisma migrate deploy` before the API starts.** A platform does not do this, and a database missing the schema behind a healthy port is a deployment that looks alive and is not.
+- **The container honours `PORT` and the API binds every interface.** `server.listen()` with no host binds the unspecified address, which accepts connections on every interface. A process bound to loopback is invisible to both a health check and every visitor — the single most common reason a build succeeds and an app never comes up.
+
+`docs/ALETCLOUD_DEPLOYMENT.md` is the runbook for deploying this image to AletCloud, including the environment variables, the verification checklist and the limitations of that platform (no managed Redis, no backups on its free database tier, and no separation between the migration role and the application role).
+
 ## Continuous Integration
 
 Two GitHub Actions workflows exist at `.github/workflows/`:
 
 | Workflow | What it actually does |
 |---|---|
-| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, and a frontend job that runs the production build. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
+| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, a frontend job that runs the production build, and a `container` job that builds the deployment image and checks the entrypoint. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
 | `deploy.yml` | **Placeholder only.** The workflow file exists but its deployment steps are a comment ("Deploy steps would go here"). No image is built, pushed, or deployed |
 
 > The `deploy.yml` placeholder is the reason the roadmap's Phase 0 DoD "auto-run tests on every PR" is now satisfied for **tests** but the release pipeline is still unbuilt. Documented in `docs/ROADMAP_ALIGNMENT.md`.

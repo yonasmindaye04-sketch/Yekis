@@ -126,6 +126,41 @@ const SECURITY_HEADERS = {
 } as const;
 
 /**
+ * The object store's origin, added to the production CSP's `img-src`.
+ *
+ * The staff console renders a KYC document as an `<img src>` whose URL is a
+ * presigned object-store URL (`getKycDocumentUrl()` returns one). The
+ * browser fetches it from the store's own origin, so the CSP has to name
+ * that origin — otherwise the compliance reviewer sees a broken image and
+ * the document cannot be reviewed at all.
+ *
+ * It is a build-time variable rather than a hardcoded provider hostname
+ * because the store is deployment-specific: MinIO locally, a sovereign
+ * cloud's S3 in a deployment, something else in production. It is also the
+ * only place the deployed origin appears in the policy, so widening it for
+ * one deployment does not widen it for any other.
+ */
+const OBJECT_STORE_ORIGIN = process.env.VITE_OBJECT_STORE_ORIGIN?.trim();
+
+/**
+ * The `img-src` list.
+ *
+ * `https://storage.yekis.et` is a placeholder for the platform's own
+ * eventual asset host; the object store's origin is appended to it when one
+ * is configured.
+ */
+const IMG_SRC = [
+  "'self'",
+  "data:",
+  "blob:",
+  "https://images.pexels.com",
+  "https://storage.yekis.et",
+  "https://api.telegram.org",
+  "https://*.googleusercontent.com",
+  ...(OBJECT_STORE_ORIGIN ? [OBJECT_STORE_ORIGIN] : []),
+].join(" ");
+
+/**
  * Content Security Policy for the built SPA.
  */
 const PRODUCTION_CSP = [
@@ -141,7 +176,7 @@ const PRODUCTION_CSP = [
   "script-src 'self' 'unsafe-inline' https://telegram.org https://www.googletagmanager.com https://*.gstatic.com https://*.google.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com data:",
-  "img-src 'self' data: blob: https://images.pexels.com https://storage.yekis.et https://api.telegram.org https://*.googleusercontent.com",
+  `img-src ${IMG_SRC}`,
   "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://api.telegram.org https://*.google.com https://*.run.app",
   "frame-src https://appleid.cdn-apple.com",
   "manifest-src 'self'",

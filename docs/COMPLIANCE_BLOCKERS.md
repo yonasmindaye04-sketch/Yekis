@@ -67,13 +67,22 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 ## 5. PDPP Data Localization for Object Storage
 **Domain**: Data Privacy
 **Master Design Document Section**: 3.2 Data Protection & Legal Requirements (PDPP No. 1321/2024 Art. 22)
-**Status**: Blocked on Cloud Provider infrastructure availability
+**Status**: **Provider identified** — AletCloud (Addis Ababa). Not yet contracted, and the backup question is still open
 
 **The Block**: The Personal Data Protection Proclamation (PDPP) mandates that biometric data, KYC documents, and dispute evidence must be hosted within Ethiopia unless explicit cross-border transfer agreements are approved by the ECA. AWS S3 / GCP are not compliant out-of-the-box.
 
 **Current Code Implementation**:
 - The code uses standard S3-compatible APIs (`src/lib/objectStore.ts`).
 - A clear warning is documented in `objectStore.ts` that the `OBJECT_STORE_ENDPOINT` must be pointed to Ethio Telecom Cloud, Safaricom Ethiopia Cloud, or a local MinIO deployment in production.
+- The endpoint, the region and the addressing style are configurable (`OBJECT_STORE_ENDPOINT`, `OBJECT_STORE_REGION`, `OBJECT_STORE_FORCE_PATH_STYLE`), and the `AWS_*` names a hosted platform injects are accepted as aliases (`applyObjectStoreAliases()` in `src/config/env.ts`). A bucket on a third-party S3-compatible provider therefore needs no code change.
+
+**Candidate provider — AletCloud (2026-11-12)**: AletCloud operates its own hardware inside Ethio Telecom's Bole data centre in Addis Ababa, region `et-addis-1`, and publishes an S3-compatible object store at `s3.aletcloud.com`. On the face of it that satisfies the residency requirement: the primary bucket, and therefore the KYC documents, the top-up receipts and the contract PDFs, would stay in Ethiopia. The deployment runbook is `docs/ALETCLOUD_DEPLOYMENT.md`.
+
+**What is still open**:
+- **No contract yet.** A provider is not a provider until there is a signed agreement, a DPA and a named data-protection contact. Until then the blocker stands.
+- **Cross-border access is still cross-border access.** A bucket in Addis Ababa served to a browser outside Ethiopia is a transfer of personal data to that client. The location of the primary store settles where the data *rests*; it does not settle who may *receive* it.
+- **Backups.** The provider's free database tier takes no backups at all, and the paid tier's backups live in the same jurisdiction. Backups outside Ethiopia would need the ECA approval the proclamation requires.
+- **The Redis is a separate question.** The rate-limit counters, session state and the cached Telebirr fabric token are personal data too. A foreign-hosted Redis would reopen the same blocker on a different store, which is why the container deployment runs Redis in-country rather than using an external one.
 
 ## 6. Real-Time Data Breach Reporting to ECA
 **Domain**: Security / Legal

@@ -30,6 +30,7 @@ import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
 import { financeRouter } from "./modules/finance/finance.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
+import { mountStaticSite } from "./lib/staticSite.js";
 import { env } from "./config/env.js";
 export function buildApp() {
   const app = express();
@@ -60,36 +61,48 @@ export function buildApp() {
   // The policy below is explicit instead: no wildcards, no unsafe-inline, no
   // unsafe-eval, and `default-src 'none'` gives every other directive a
   // fallback, so no directive is left open by omission.
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        useDefaults: false,
-        directives: {
-          "default-src": ["'none'"],
-          "base-uri": ["'none'"],
-          "form-action": ["'none'"],
-          "frame-ancestors": ["'none'"],
-          "object-src": ["'none'"],
-          "script-src": ["'none'"],
-          "style-src": ["'none'"],
-          "img-src": ["'none'"],
-          "font-src": ["'none'"],
-          "connect-src": ["'none'"],
-          "manifest-src": ["'none'"],
-          "media-src": ["'none'"],
-          "worker-src": ["'none'"],
-          "frame-src": ["'none'"],
-        },
+  //
+  // IT IS SCOPED TO THE API ROUTES, and that scoping is load-bearing.
+  //
+  // The same process can serve the built frontend (see lib/staticSite.ts),
+  // and this policy would be catastrophic for an HTML document:
+  // `default-src 'none'` blocks the page's own script and style tags, and
+  // `X-Frame-Options: DENY` stops the Telegram Mini App webview from
+  // framing the app at all. The SPA gets its own headers there instead.
+  const apiSecurityHeaders = helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        "default-src": ["'none'"],
+        "base-uri": ["'none'"],
+        "form-action": ["'none'"],
+        "frame-ancestors": ["'none'"],
+        "object-src": ["'none'"],
+        "script-src": ["'none'"],
+        "style-src": ["'none'"],
+        "img-src": ["'none'"],
+        "font-src": ["'none'"],
+        "connect-src": ["'none'"],
+        "manifest-src": ["'none'"],
+        "media-src": ["'none'"],
+        "worker-src": ["'none'"],
+        "frame-src": ["'none'"],
       },
-      // Nothing frames the API, so deny it outright rather than allowing
-      // same-origin framing.
-      frameguard: { action: "deny" },
-      strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true },
-    }),
-  );
+    },
+    // Nothing frames the API, so deny it outright rather than allowing
+    // same-origin framing.
+    frameguard: { action: "deny" },
+    strictTransportSecurity: {
+      maxAge: 31536000,
+      includeSubDomains: env.HSTS_INCLUDE_SUBDOMAINS,
+    },
+  });
+  app.use("/api", apiSecurityHeaders);
+  app.use("/health", apiSecurityHeaders);
+
   // Keep browser access explicit so future cookie-based flows cannot silently
   // become cross-origin readable.
-  app.use(cors({ origin: env.FRONTEND_URL, credentials: false }));
+  app.use("/api", cors({ origin: env.FRONTEND_URL, credentials: false }));
   app.use(pinoHttp({ logger })); // doesn't touch the body, safe to run before the raw-body webhook routes
 
   // Payment webhooks MUST be mounted before express.json() â€” their routes
@@ -111,7 +124,15 @@ export function buildApp() {
   // wallet response and hand it to the next person who asks for the same URL
   // — which is the "Re-examine Cache-control Directives" finding, and a real
   // account-mixing risk rather than a cosmetic one.
-  app.use((_req, res, next) => {
+  //
+  // Scoped to the API for the same reason as the security headers above: the
+  // built frontend has to be cacheable, or a deploy is invisible to anyone
+  // holding a cached copy of index.html.
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  app.use("/health", (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
@@ -163,6 +184,12 @@ export function buildApp() {
   app.use("/api/v1/staff", staffProfileRouter);
   app.use("/api/v1/finance", financeRouter);
   app.use("/api/v1/admin", adminRouter);
+
+  // The built frontend, when this deployment serves it. Mounted after the
+  // API routes so an unknown API path still falls through to the JSON 404
+  // below, and before it so a client-side route such as /workspace/jobs
+  // reaches the SPA rather than a JSON error.
+  mountStaticSite(app);
 
   // 404
   app.use((req, res) => {

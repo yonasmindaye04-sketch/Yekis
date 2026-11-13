@@ -4,6 +4,24 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" is the platform the client is generated on — the developer's
+  // machine, or the container build.
+  //
+  // "debian-openssl-3.0.x" is named explicitly because Prisma's detection
+  // of the installed OpenSSL failed inside the container build ("Prisma
+  // failed to detect the libssl/openssl version... Defaulting to
+  // openssl-1.1.x"), so it generated a client for a runtime the image does
+  // not have. The result was an image that started, served its port, and
+  // then failed every database query with:
+  //
+  //   Prisma Client could not locate the Query Engine for runtime
+  //   "debian-openssl-3.0.x". This happened because Prisma Client was
+  //   generated for "debian-openssl-1.1.x".
+  //
+  // Naming the target makes the build deterministic instead of dependent on
+  // what the detection manages to find. Debian 12 (bookworm), which the
+  // image is based on, ships OpenSSL 3.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {

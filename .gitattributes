@@ -1,0 +1,28 @@
+# Line endings.
+#
+# The repository is developed on Windows (core.autocrlf=true), so text files
+# are checked out with CRLF. That is fine for TypeScript and Markdown, and
+# the repository is full of them.
+#
+# It is NOT fine for the files that end up inside a Linux container:
+#
+#   * a shell script with CRLF endings has a shebang line reading
+#     "#!/bin/sh\r", which the kernel cannot resolve — the container dies
+#     with "no such file or directory" and blames the image;
+#   * its line continuations break, so `cmd \` followed by an indented
+#     pipeline becomes a syntax error;
+#
+# and the failure appears at deploy time on someone else's platform, where
+# the obvious thing to look at is not the line ending.
+#
+# So these files are LF everywhere: in the repository, in a Windows checkout,
+# and in the image.
+* text=auto
+
+*.sh text eol=lf
+Dockerfile text eol=lf
+.dockerignore text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
