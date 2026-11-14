@@ -150,6 +150,22 @@ export function App() {
   >("idle");
   const [telegramAuthError, setTelegramAuthError] = useState("");
 
+  /**
+   * True when the host cannot verify a Telegram credential.
+   *
+   * Two different things cause it — the server has no bot token, or the
+   * server said so — and the person in front of the Mini App cannot tell
+   * them apart. It does not matter: either way the answer is the same.
+   * Telegram sign-in is unavailable, so the phone and password path is
+   * offered and the reason is stated in words the person can act on.
+   *
+   * It used to be shown as a developer instruction ("add your bot token to
+   * apps/backend/.env"), which is both unreadable and untrue as a
+   * description of what happened: the Mini App had not failed to find a
+   * token, it had been handed a successful sign-in that was never real.
+   */
+  const [telegramUnavailable, setTelegramUnavailable] = useState(false);
+
   // Mobile Auth states
   const [showMobileLogin, setShowMobileLogin] = useState(false);
   const [mobileAuthMode, setMobileAuthMode] = useState<"signin" | "signup">(
@@ -341,6 +357,36 @@ export function App() {
     initAnalytics();
   }, []);
 
+  // === Can this host verify a Telegram credential? ===
+  //
+  // A Mini App opened on a host with no bot token cannot verify `initData`,
+  // so the sign-in always ends in a 503. Finding that out BEFORE the person
+  // picks a role turns a dead end into a choice: the phone and password
+  // path is offered straight away.
+  //
+  // The probe is advisory. If it cannot answer, the sign-in is attempted
+  // anyway and the server's own error is what the person sees — a failed
+  // probe must never remove the only way in.
+  useEffect(() => {
+    if (!telegram.isTelegram) return;
+    let cancelled = false;
+    api
+      .getOAuthProviders()
+      .then((res) => {
+        if (cancelled || res.telegram) return;
+        setTelegramUnavailable(true);
+        // Open the path that works rather than leaving the person on a tab
+        // that cannot succeed.
+        setShowMobileLogin(true);
+      })
+      .catch(() => {
+        // The server could not be asked. Leave the state alone.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [telegram.isTelegram]);
+
   // Derived display flags (moved above the effects so they can guard them)
   const isPaymentReturn = window.location.pathname === "/payment/return";
   const isNonTelegram = !telegram.isTelegram;
@@ -442,6 +488,13 @@ export function App() {
       return;
     }
 
+    // The host already said it cannot verify a Telegram credential. Going
+    // through the attempt anyway would only produce a 503 and a dead end.
+    if (telegramUnavailable) {
+      setShowMobileLogin(true);
+      return;
+    }
+
     setTelegramAuthStatus("loading");
     try {
       const freshInitData = getTelegramWebApp()?.initData || telegram.initData;
@@ -466,15 +519,20 @@ export function App() {
         msg.includes("TELEGRAM_BOT_TOKEN") ||
         msg.includes("TELEGRAM_NOT_CONFIGURED")
       ) {
-        setTelegramAuthError(
-          "TELEGRAM_BOT_TOKEN is missing or empty in your environment. Add your bot token to apps/backend/.env and restart the backend server.",
-        );
+        // The server answered, and the answer is that it cannot verify a
+        // Telegram credential here. The person in front of the Mini App
+        // cannot act on a bot token, so the message says what is true and
+        // the phone and password path is offered instead. The developer
+        // detail stays in the server log, where it belongs.
+        setTelegramUnavailable(true);
+        setTelegramAuthError("");
+        setShowMobileLogin(true);
       } else if (
         msg.includes("signature is invalid") ||
         msg.includes("TELEGRAM_AUTH_FAILED")
       ) {
         setTelegramAuthError(
-          "Telegram signature mismatch: Ensure the TELEGRAM_BOT_TOKEN belongs to the exact bot opening this Mini App.",
+          "This Telegram session could not be verified. It may have expired — reopen the Mini App from the bot, or sign in with your phone number and password.",
         );
       } else {
         setTelegramAuthError(
@@ -488,10 +546,21 @@ export function App() {
 
   const handleMobileAuth = async () => {
     if (!mobilePhone.trim() || !mobilePassword.trim()) {
-      alert("Please enter both phone number and password.");
+      alert("Please enter both your phone number or email and your password.");
       return;
     }
     const normalizedPhone = normalizeEthiopianPhone(mobilePhone);
+    const isEmailIdentifier = normalizedPhone.includes("@");
+    // Creating an account needs a phone number: it is the payout
+    // destination, and the address the account would be created with is
+    // derived from it. An email can only be used to SIGN IN — an account
+    // made from one would have no phone at all.
+    if (mobileAuthMode === "signup" && isEmailIdentifier) {
+      setTelegramAuthError(
+        "To create an account, enter your Ethiopian phone number. You can sign in with your email address once the account exists.",
+      );
+      return;
+    }
     setTelegramAuthStatus("loading");
     setTelegramAuthError("");
     // Registration answers 202 for both new and existing accounts, so the
@@ -992,6 +1061,33 @@ export function App() {
               marginBottom: 20,
             }}
           >
+            {!telegramUnavailable && (
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "12px 14px",
+                  borderRadius: 9,
+                  border: "none",
+                  background: !showMobileLogin
+                    ? "var(--color-primary)"
+                    : "transparent",
+                  color: !showMobileLogin
+                    ? "#ffffff"
+                    : "var(--color-text-secondary)",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onClick={() => {
+                  setShowMobileLogin(false);
+                  setTelegramAuthError("");
+                }}
+              >
+                Telegram Login
+              </button>
+            )}
             <button
               type="button"
               style={{
@@ -999,35 +1095,10 @@ export function App() {
                 padding: "12px 14px",
                 borderRadius: 9,
                 border: "none",
-                background: !showMobileLogin
+                background: showMobileLogin || telegramUnavailable
                   ? "var(--color-primary)"
                   : "transparent",
-                color: !showMobileLogin
-                  ? "#ffffff"
-                  : "var(--color-text-secondary)",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onClick={() => {
-                setShowMobileLogin(false);
-                setTelegramAuthError("");
-              }}
-            >
-              Telegram Login
-            </button>
-            <button
-              type="button"
-              style={{
-                flex: 1,
-                padding: "12px 14px",
-                borderRadius: 9,
-                border: "none",
-                background: showMobileLogin
-                  ? "var(--color-primary)"
-                  : "transparent",
-                color: showMobileLogin
+                color: showMobileLogin || telegramUnavailable
                   ? "#ffffff"
                   : "var(--color-text-secondary)",
                 fontWeight: 700,
@@ -1040,7 +1111,7 @@ export function App() {
                 setTelegramAuthError("");
               }}
             >
-              Mobile Phone
+              {telegramUnavailable ? "Phone & Password" : "Mobile Phone"}
             </button>
           </div>
           {telegram.unsafeUser && !showMobileLogin && (
@@ -1087,6 +1158,29 @@ export function App() {
             >
               <p style={{ margin: 0, fontWeight: 600 }}>
                 Securing your session...
+              </p>
+            </div>
+          )}
+          {telegramUnavailable && (
+            <div
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "rgba(245, 158, 11, 0.12)",
+                border: "1px solid #f59e0b",
+                borderRadius: "10px",
+                color: "var(--color-text)",
+                fontSize: "0.82rem",
+                marginBottom: "16px",
+                textAlign: "left",
+              }}
+            >
+              <strong>Telegram sign-in is unavailable</strong>
+              <p style={{ margin: "4px 0 0 0", lineHeight: 1.4 }}>
+                This server cannot verify a Telegram account yet, so signing
+                in with Telegram will not work. Use your phone number and
+                password below — it works now, and your account is the same
+                one you get everywhere else on Yekis.
               </p>
             </div>
           )}
@@ -1262,12 +1356,14 @@ export function App() {
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  Ethiopian Phone Number
+                  Ethiopian Phone Number or Email
                   <input
-                    type="tel"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
                     value={mobilePhone}
                     onChange={(e) => setMobilePhone(e.target.value)}
-                    placeholder="0911223344 or +251..."
+                    placeholder="0911223344 or you@example.com"
                     style={{
                       padding: "10px",
                       borderRadius: "8px",

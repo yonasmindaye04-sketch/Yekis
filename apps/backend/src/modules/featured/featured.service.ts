@@ -211,10 +211,16 @@ export async function pinUser(
 
 // === HELPERS ===
 function buildFeaturedCard(user: any, reason: string) {
+  const resolvedDisplayName =
+    user.displayName?.trim() ||
+    [user.firstName, user.lastName].filter(Boolean).join(" ").trim() ||
+    (user.email ? user.email.split("@")[0] : null) ||
+    "Verified Freelancer";
+
   return {
     id: user.id,
     ucid: user.ucid,
-    displayName: user.displayName,
+    displayName: resolvedDisplayName,
     avatarUrl: user.avatarUrl,
     primarySkill: user.primarySkill
       ? {

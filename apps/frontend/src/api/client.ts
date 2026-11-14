@@ -715,6 +715,14 @@ class ApiClient {
       try {
         error = await response.json();
       } catch {
+        // The server answered, but not with anything this client can read.
+        // For a strict call that is still a failure, and it must not be
+        // turned into a fabricated success: an unreadable 401 once produced
+        // a mock session with `accessToken: "mock-jwt-access-token"`, so a
+        // rejected sign-in looked like a successful one.
+        if (behaviour.strictHttpErrors) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         return mockStore.handleApiFallback(
           path,
           options.method || "GET",
@@ -737,6 +745,9 @@ class ApiClient {
     }
 
     if (!contentType.includes("application/json")) {
+      if (behaviour.strictHttpErrors) {
+        throw new Error(`HTTP ${response.status}: unexpected response format`);
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -755,6 +766,9 @@ class ApiClient {
       }
       return data as T;
     } catch {
+      if (behaviour.strictHttpErrors) {
+        throw new Error(`HTTP ${response.status}: unreadable response`);
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -916,15 +930,32 @@ class ApiClient {
   }
 
   // Auth
+  //
+  // Every authentication call below opts out of the offline mock. The mock
+  // stands in for the ABSENCE of a server — no backend at all, or the dev
+  // proxy's explicit `X-Yekis-Offline: 1` — and for nothing else. A server
+  // that answered with an error has answered, and its answer must reach the
+  // caller.
+  //
+  // The distinction matters most here. A host with no bot token answers
+  // `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for
+  // it and hand back `accessToken: "mock-jwt-access-token"` — a token the
+  // server has never heard of. The Mini App looked like it had signed in,
+  // every request that followed was refused with a 401, and the real reason
+  // never reached the person in front of the screen.
   async loginWithTelegram(authData: string | Record<string, unknown>, role?: string): Promise<TelegramAuthResponse> {
     const body =
       typeof authData === "string"
         ? { initData: authData, role }
         : { ...authData, role };
-    return this.request("/api/v1/auth/telegram", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    return this.request(
+      "/api/v1/auth/telegram",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   // ---------- Social sign-in (server verifies provider credentials) ----------
@@ -940,14 +971,22 @@ class ApiClient {
   }
 
   async linkTelegram(initData: string): Promise<{ telegramUserId: string; telegramChatId: string }> {
-    return this.request("/api/v1/auth/telegram/link", {
-      method: "POST",
-      body: JSON.stringify({ initData }),
-    });
+    return this.request(
+      "/api/v1/auth/telegram/link",
+      {
+        method: "POST",
+        body: JSON.stringify({ initData }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async unlinkTelegram(): Promise<{ unlinked: boolean }> {
-    return this.request("/api/v1/auth/telegram/link", { method: "DELETE" });
+    return this.request(
+      "/api/v1/auth/telegram/link",
+      { method: "DELETE" },
+      { strictHttpErrors: true },
+    );
   }
 
   /**
@@ -956,10 +995,14 @@ class ApiClient {
    * registered with @BotFather, or telegram.org blocked).
    */
   async loginWithTelegramCode(code: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/telegram/code", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    });
+    return this.request(
+      "/api/v1/auth/telegram/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async loginWithGoogleOAuth(idToken: string, role?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
@@ -1032,11 +1075,23 @@ class ApiClient {
     return this.request("/api/v1/users/me/export");
   }
 
+  /**
+   * Signs in with a phone number (or an email address, or either identifier)
+   * and a password. The Mini App's fallback path when Telegram sign-in is
+   * unavailable.
+   *
+   * Like every other authentication call, the real HTTP status is surfaced:
+   * the mock must not hand back a session the server never issued.
+   */
   async loginWithMobile(input: { phone?: string; email?: string; identifier?: string; password: string }): Promise<{ accessToken: string; refreshToken?: string; user?: AuthUser }> {
-    return this.request("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
+    return this.request(
+      "/api/v1/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async getMe(): Promise<MeResponse> {
@@ -1270,8 +1325,20 @@ class ApiClient {
     return this.request("/api/v1/tms/activity");
   }
 
+  /**
+   * Signs in with an email address and a password.
+   *
+   * The real HTTP status is always surfaced. A fabricated session is worse
+   * than a failed one: the offline mock answers `mock-jwt-access-token`,
+   * which no server has issued, so every request that followed it would be
+   * refused and the person would be told they had signed in.
+   */
   async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    return this.request(
+      "/api/v1/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password }) },
+      { strictHttpErrors: true },
+    );
   }
 
   async register(input: {
@@ -1284,7 +1351,11 @@ class ApiClient {
     dateOfBirth: string;
     consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
   }): Promise<{ ok: boolean; message: string }> {
-    return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
+    return this.request(
+      "/api/v1/auth/register",
+      { method: "POST", body: JSON.stringify(input) },
+      { strictHttpErrors: true },
+    );
   }
 
   /**

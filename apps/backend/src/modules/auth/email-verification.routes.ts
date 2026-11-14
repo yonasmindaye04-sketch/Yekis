@@ -113,10 +113,19 @@ export function registerEmailVerificationRoutes(router: Router): void {
         label: "Email",
       },
       phone: {
-        // The SMS provider key is the only thing that decides this. No key, no
-        // SMS, and the UI must not offer a code that can never arrive.
-        available: Boolean(env.SMS_ETHIOPIA_API_KEY),
-        label: "SMS",
+        // Available when SMS is configured, OR in non-production (devCode
+        // path keeps the flow working), OR when the Telegram bot is
+        // configured (Telegram fallback delivery). This matches the same
+        // pattern that isEmailDeliveryConfigured() uses for email.
+        available:
+          Boolean(env.SMS_ETHIOPIA_API_KEY) ||
+          env.NODE_ENV !== "production" ||
+          Boolean(env.TELEGRAM_BOT_TOKEN),
+        label: env.SMS_ETHIOPIA_API_KEY
+          ? "SMS"
+          : env.TELEGRAM_BOT_TOKEN
+            ? "Telegram"
+            : "Phone",
       },
     });
   });

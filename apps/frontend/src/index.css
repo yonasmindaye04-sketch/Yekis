@@ -2618,22 +2618,36 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 
 /* Featured Carousel */
 .carousel-section {
-  margin: 32px 0 24px;
+  margin: 28px 0 20px;
 }
 .carousel-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-end;
   margin-bottom: 16px;
+  gap: 12px;
+}
+.carousel-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 .carousel-header h2 {
   font-size: 1.15rem;
+  font-weight: 700;
   color: var(--color-text);
   margin: 0;
+  letter-spacing: -0.01em;
+}
+.carousel-subtitle {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-weight: 400;
 }
 .carousel-controls {
   display: flex;
   gap: 8px;
+  flex-shrink: 0;
 }
 .carousel-btn {
   display: flex;
@@ -2651,34 +2665,55 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .carousel-btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+  background: var(--color-bg);
 }
 .carousel-list {
   display: flex;
   gap: 16px;
   overflow-x: auto;
-  padding-bottom: 8px;
+  padding: 4px 4px 14px 4px;
   scroll-behavior: smooth;
   scrollbar-width: thin;
 }
+.carousel-list::-webkit-scrollbar {
+  height: 6px;
+}
+.carousel-list::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 9999px;
+}
 .carousel-card {
-  flex: 0 0 200px;
-  padding: 16px;
+  flex: 0 0 216px;
+  min-width: 216px;
+  max-width: 216px;
+  padding: 18px 16px 14px;
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 14px;
   text-align: center;
   cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  user-select: none;
 }
 .carousel-card:hover {
-  transform: translateY(-2px);
+  transform: translateY(-3px);
   border-color: var(--color-primary);
+  box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.08);
 }
 .carousel-avatar-wrap {
   position: relative;
-  width: 64px;
-  height: 64px;
-  margin: 0 auto 10px;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 .carousel-avatar-wrap img {
   width: 100%;
@@ -2702,43 +2737,106 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 }
 .carousel-badge {
   position: absolute;
-  bottom: -2px;
-  right: -2px;
+  bottom: 0px;
+  right: 0px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-bg-elevated);
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  z-index: 2;
 }
 .carousel-badge.tier-2 { color: var(--color-primary); }
 .carousel-badge.tier-1 { color: var(--color-teal); }
+.carousel-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
 .carousel-name {
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-text);
-  margin: 0 0 4px;
+  margin: 0 0 3px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.3;
 }
 .carousel-skill {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--color-text-secondary);
   margin: 0 0 8px;
+  width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.3;
+}
+.carousel-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 2px;
 }
 .carousel-rating {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 4px;
-  font-size: 0.82rem;
+  gap: 3px;
+  font-size: 0.78rem;
   font-weight: 600;
   color: var(--color-text);
 }
-.carousel-rating svg {
+.carousel-star.filled {
   color: var(--color-warning);
   fill: var(--color-warning);
+}
+.carousel-star-new {
+  color: var(--color-primary);
+}
+.carousel-new-label {
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.76rem;
+}
+.carousel-meta-divider {
+  color: var(--color-text-secondary);
+  opacity: 0.4;
+  font-size: 0.7rem;
+}
+.carousel-jobs {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: 0.76rem;
+}
+.carousel-view-btn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.carousel-card:hover .carousel-view-btn {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
 }
 
 /* === Proposal Attachments & Job Detail UI === */

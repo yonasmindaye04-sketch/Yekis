@@ -4,6 +4,7 @@ import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
 import { sendSms } from "../notifications/sms.client.js";
+import { sendVerificationCodeViaTelegram } from "../notifications/telegram.client.js";
 
 // === TYPES ===
 export class PhoneCodeNotFoundError extends Error {}
@@ -25,6 +26,12 @@ export interface PhoneChallenge {
   devCode?: string;
   expiresAt: Date;
   retryAfterSec: number;
+  /**
+   * Which channel actually delivered the code. 'sms' when SMSEthiopia was
+   * used, 'telegram' when the bot was the fallback, 'dev' when neither is
+   * configured and the code lands in the server log (non-production only).
+   */
+  channel?: "sms" | "telegram" | "dev";
 }
 
 // === CONSTANTS ===
@@ -167,29 +174,79 @@ export async function requestPhoneCode(params: {
     return created;
   });
 
-  const { sent } = await sendSms({
+  const smsResult = await sendSms({
     phone,
     message: params.message
       ? params.message.replace("{code}", code)
       : `Your Yekis verification code is ${code}. It expires in 10 minutes. Never share it.`,
   });
 
-  if (!sent) {
-    // Do not leave a live code behind that the user could never receive, and do
-    // not report success for a message that was not delivered.
+  let deliveredChannel: PhoneChallenge["channel"];
+
+  if (smsResult.sent) {
+    deliveredChannel = "sms";
+  } else if (smsResult.reason === "not_configured") {
+    // SMS is not configured. Try the Telegram bot as a fallback when the
+    // user has a linked telegramChatId. This covers test environments and
+    // production hosts that rely on the bot instead of SMS.
+    const userRecord = await prisma.user.findFirst({
+      where: { phone },
+      select: { telegramChatId: true },
+    });
+
+    if (userRecord?.telegramChatId) {
+      const tgResult = await sendVerificationCodeViaTelegram(
+        userRecord.telegramChatId,
+        code,
+      );
+      if (tgResult.sent) {
+        deliveredChannel = "telegram";
+      }
+    }
+
+    if (!deliveredChannel) {
+      // Neither SMS nor Telegram is available. In non-production the code is
+      // returned in the API response and printed to the server log — the same
+      // pattern that email-verification.service.ts uses in
+      // deliverVerificationCode(). Do not delete the row or throw: the devCode
+      // path in the response is the delivery mechanism.
+      if (env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.log(
+          `\n================== [DEV - NOT SENT] PHONE OTP ==================\n` +
+            `To: ${phone}\n` +
+            `Code: ${code}\n` +
+            `SMS is not configured and no Telegram chat linked. Code not delivered.\n` +
+            `===============================================================\n`,
+        );
+        deliveredChannel = "dev";
+      } else {
+        // Production with no SMS key and no Telegram fallback: clean up the
+        // row so we do not leave an undeliverable live code, then surface the
+        // failure to the caller.
+        await prisma.phoneVerificationCode.delete({ where: { id: row.id } });
+        throw new PhoneCodeDeliveryFailedError(
+          "Could not send a verification code to that number. Check it and try again.",
+        );
+      }
+    }
+  } else {
+    // SMS is configured but returned a hard failure (timeout, HTTP error, etc.).
+    // Do not leave a live code behind that the user could never receive.
     await prisma.phoneVerificationCode.delete({ where: { id: row.id } });
     throw new PhoneCodeDeliveryFailedError(
       "Could not send an SMS to that number. Check it and try again.",
     );
   }
 
-  logger.info({ phone }, "Phone verification code issued");
+  logger.info({ phone, channel: deliveredChannel }, "Phone verification code issued");
 
   return {
     // Never leak the code outside development.
     ...(env.NODE_ENV !== "production" ? { devCode: code } : {}),
     expiresAt,
     retryAfterSec: Math.ceil(RESEND_COOLDOWN_MS / 1000),
+    channel: deliveredChannel,
   };
 }
 
