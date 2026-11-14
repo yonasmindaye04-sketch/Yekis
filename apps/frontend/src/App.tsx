@@ -34,6 +34,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
+import { OnboardingVerification } from "./OnboardingVerification";
 import { useTheme } from "./theme/ThemeContext";
 import { useI18n, isLanguage } from "./i18n";
 import "./telegram/miniApp.css";
@@ -179,6 +180,17 @@ export function App() {
    * token, it had been handed a successful sign-in that was never real.
    */
   const [telegramUnavailable, setTelegramUnavailable] = useState(false);
+
+  /**
+   * The address being proven for an email sign-up, or null.
+   *
+   * An address has to be proven before the account exists — it is the login
+   * identifier and the destination of every transactional mail, so an
+   * unproven one is somebody else's inbox. The web signup proves it with the
+   * same six-digit code, and the Mini App now does the same for an address
+   * that is used to create an account.
+   */
+  const [miniSignupEmail, setMiniSignupEmail] = useState<string | null>(null);
 
   // Mobile Auth states
   const [showMobileLogin, setShowMobileLogin] = useState(false);
@@ -575,14 +587,14 @@ export function App() {
     }
     const normalizedPhone = normalizeEthiopianPhone(mobilePhone);
     const isEmailIdentifier = normalizedPhone.includes("@");
-    // Creating an account needs a phone number: it is the payout
-    // destination, and the address the account would be created with is
-    // derived from it. An email can only be used to SIGN IN — an account
-    // made from one would have no phone at all.
+    // An address can create an account as well as sign in to one. The
+    // address is proven with a six-digit code first, exactly as in the web
+    // signup, and the account is created without a number — it gets the
+    // reserved placeholder the federated sign-ins use, so no real
+    // subscriber's number is written into the PII store.
     if (mobileAuthMode === "signup" && isEmailIdentifier) {
-      setTelegramAuthError(
-        "To create an account, enter your Ethiopian phone number. You can sign in with your email address once the account exists.",
-      );
+      setTelegramAuthError("");
+      setMiniSignupEmail(normalizedPhone);
       return;
     }
     setTelegramAuthStatus("loading");
@@ -653,6 +665,77 @@ export function App() {
         raw.includes("DUPLICATE_USER") ||
         raw.includes("PHONE_IN_USE")
       ) {
+        setTelegramAuthError(
+          "An account with this phone number already exists. Please switch to Sign In.",
+        );
+      } else {
+        setTelegramAuthError(raw);
+      }
+    }
+  };
+
+  /**
+   * Creates the account once its address has been proven.
+   *
+   * No number was given, so the account is created without one and the
+   * server gives it the reserved placeholder the federated sign-ins use. The
+   * account can be used immediately; the number has to be claimed before it
+   * can receive a payout, and that is a KYC step, not a sign-up one.
+   */
+  const completeEmailSignup = async () => {
+    const address = miniSignupEmail;
+    if (!address) return;
+    setTelegramAuthStatus("loading");
+    setTelegramAuthError("");
+    try {
+      await api.register({
+        email: address,
+        password: mobilePassword,
+        role: mobileRole,
+        languagePreference: language || "en",
+        dateOfBirth: "1995-01-01",
+        consents: {
+          kycDataProcessing: true,
+          financialDataProcessing: true,
+          platformNotifications: false,
+          marketingCommunications: false,
+          analytics: false,
+        },
+      });
+      // Analytics: account created (role only — never the address).
+      events.signupCompleted(
+        mobileRole === "CLIENT"
+          ? "client"
+          : mobileRole === "BOTH"
+            ? "both"
+            : "freelancer",
+      );
+
+      const res = await api.loginWithMobile({
+        identifier: address,
+        password: mobilePassword,
+      });
+
+      api.setSession(res);
+      markMobileAuthCompletedOrAbandon(true);
+      events.login("mobile");
+      const me = await api.getMe();
+      setUserProfile(me);
+      const backendRole = me.role === "ADMIN" ? "ADMIN" : (me.role as Role);
+      setRole(backendRole);
+      window.localStorage.setItem("yekis-role", backendRole);
+      setMiniSignupEmail(null);
+      setTelegramAuthStatus("ready");
+      await loadData();
+    } catch (err) {
+      setTelegramAuthStatus("error");
+      const raw = err instanceof Error ? err.message : "Sign-up failed";
+      const code = (err as { code?: string })?.code ?? "";
+      if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
+        setTelegramAuthError(
+          "We could not create the account. If that email address is already registered, sign in with it instead.",
+        );
+      } else if (code === "PHONE_IN_USE" || raw.includes("PHONE_IN_USE")) {
         setTelegramAuthError(
           "An account with this phone number already exists. Please switch to Sign In.",
         );
@@ -1081,17 +1164,18 @@ export function App() {
             and keeping every payment clear.
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              width: "100%",
-              background: "var(--color-bg-elevated)",
-              padding: 5,
-              borderRadius: 12,
-              border: "1px solid var(--color-border)",
-              marginBottom: 20,
-            }}
-          >
+          {!miniSignupEmail && (
+            <div
+              style={{
+                display: "flex",
+                width: "100%",
+                background: "var(--color-bg-elevated)",
+                padding: 5,
+                borderRadius: 12,
+                border: "1px solid var(--color-border)",
+                marginBottom: 20,
+              }}
+            >
             {!telegramUnavailable && (
               <button
                 type="button"
@@ -1142,9 +1226,13 @@ export function App() {
                 setTelegramAuthError("");
               }}
             >
-              {telegramUnavailable ? "Phone & Password" : "Mobile Phone"}
+              {/* The fallback takes an address or a number, for signing in
+                  and for signing up, so the label says both. "Mobile Phone"
+                  was true when the field took a number only. */}
+              Phone or Email
             </button>
-          </div>
+            </div>
+          )}
           {telegram.unsafeUser && !showMobileLogin && (
             <div
               style={{
@@ -1209,9 +1297,9 @@ export function App() {
               <strong>Telegram sign-in is unavailable</strong>
               <p style={{ margin: "4px 0 0 0", lineHeight: 1.4 }}>
                 This server cannot verify a Telegram account yet, so signing
-                in with Telegram will not work. Use your phone number and
-                password below — it works now, and your account is the same
-                one you get everywhere else on Yekis.
+                in with Telegram will not work. Use your phone number or
+                email address and your password below — it works now, and your
+                account is the same one you get everywhere else on Yekis.
               </p>
             </div>
           )}
@@ -1245,7 +1333,20 @@ export function App() {
               )}
             </div>
           )}
-          {!showMobileLogin ? (
+          {miniSignupEmail ? (
+            <OnboardingVerification
+              channel="email"
+              target={miniSignupEmail}
+              onVerified={() => {
+                void completeEmailSignup();
+              }}
+              onBack={() => {
+                setMiniSignupEmail(null);
+                setTelegramAuthStatus("idle");
+                setTelegramAuthError("");
+              }}
+            />
+          ) : !showMobileLogin ? (
             <div
               className="role-options"
               style={{
@@ -1338,9 +1439,11 @@ export function App() {
                 <strong
                   style={{ fontSize: "1rem", color: "var(--color-text)" }}
                 >
+                  {/* Both modes take an address or a number. "Mobile" was
+                      true when the field took a number only. */}
                   {mobileAuthMode === "signin"
-                    ? "Sign In with Mobile"
-                    : "Create Mobile Account"}
+                    ? "Sign In with Phone or Email"
+                    : "Create an Account"}
                 </strong>
                 <button
                   type="button"

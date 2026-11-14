@@ -28,6 +28,7 @@ const TEST_EMAILS = [
   `newaddress.${SUFFIX}@example.com`,
   `resetcaps.${SUFFIX}@example.com`,
   `bothcollide.${SUFFIX}@example.com`,
+  `nonumber.${SUFFIX}@example.com`,
 ];
 
 async function cleanup() {
@@ -252,6 +253,35 @@ describe("Registration collisions", () => {
       where: { userId: user.id, eventType: "PASSWORD_RESET_REQUESTED" },
     });
     expect(events.length).toBeGreaterThan(0);
+  });
+});
+
+describe("An account with no number", () => {
+  afterAll(async () => {
+    await cleanup();
+  });
+
+  it("is created with the reserved placeholder and can sign in by address", async () => {
+    // An address can create an account on its own. There is no number to be
+    // the payout destination, so the account gets the reserved block — the
+    // `+2510` range no operator is allocated, which is what the federated
+    // sign-ins use too. Writing a made-up `+2519…` would put somebody else's
+    // real subscriber number into the PII store.
+    const input = validRegistration({
+      email: TEST_EMAILS[8],
+      phone: undefined,
+    });
+    const user = await registerUser(input);
+
+    expect(user.phone).toMatch(/^\+2510\d{6}$/);
+    // No number was proven, so it is not marked as verified.
+    expect(user.phoneVerifiedAt).toBeNull();
+
+    const session = await loginUser({
+      identifier: TEST_EMAILS[8],
+      password: input.password,
+    });
+    expect(session.accessToken).toBeTruthy();
   });
 });
 

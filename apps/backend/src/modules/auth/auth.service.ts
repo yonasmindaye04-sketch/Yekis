@@ -11,6 +11,7 @@ import { env } from "../../config/env.js";
 import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 import type { AuthMethod } from "./auth-methods.js";
 import { hasRecentVerifiedCode } from "./phone-verification.service.js";
+import { withPlaceholderPhone } from "./identity.js";
 import {
   hasRecentVerifiedEmailCode,
   normalizeEmail,
@@ -136,9 +137,11 @@ export async function registerUser(input: RegisterInput) {
     throw new DuplicateUserError("Email already registered.");
   }
 
-  const phoneTaken = await prisma.user.findFirst({
-    where: { phone: input.phone },
-  });
+  const phoneTaken = input.phone
+    ? await prisma.user.findFirst({
+        where: { phone: input.phone },
+      })
+    : null;
   if (phoneTaken) {
     throw new PhoneInUseError("Phone number already registered.");
   }
@@ -146,7 +149,10 @@ export async function registerUser(input: RegisterInput) {
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven
   // weeks ago says nothing about who is registering now.
-  const phoneVerifiedAt = (await hasRecentVerifiedCode(input.phone)) ? new Date() : null;
+  const phoneVerifiedAt =
+    input.phone && (await hasRecentVerifiedCode(input.phone))
+      ? new Date()
+      : null;
 
   // The same adoption for the email address.
   //
@@ -158,51 +164,67 @@ export async function registerUser(input: RegisterInput) {
   const emailProven = await hasRecentVerifiedEmailCode(input.email);
   const emailVerifiedAt = emailProven ? new Date() : null;
 
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: {
-        email: canonicalEmail,
-        phone: input.phone,
-        phoneVerifiedAt,
-        emailVerified: emailProven,
-        emailVerifiedAt,
-        passwordHash,
-        // Marks the account as password-owned: a later social sign-in that
-        // merely matches this email must not be merged into it.
-        passwordSetAt: new Date(),
-        role: input.role,
-        languagePreference: input.languagePreference,
-        dateOfBirth: dob,
-        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
-        wallet: { create: { balanceMinor: 0 } },
-        consents: {
-          // Master Design Â§12.2: granular, unbundled consent â€” two purposes
-          // are legally required (no opt-out), three are optional opt-ins
-          // recorded individually with timestamps (PDPP Arts. 8 & 11).
-          create: [
-            {
-              purpose: "kyc_data_processing",
-              granted: input.consents.kycDataProcessing,
-            },
-            {
-              purpose: "financial_data_processing",
-              granted: input.consents.financialDataProcessing,
-            },
-            {
-              purpose: "platform_notifications",
-              granted: input.consents.platformNotifications,
-            },
-            {
-              purpose: "marketing_communications",
-              granted: input.consents.marketingCommunications,
-            },
-            { purpose: "analytics", granted: input.consents.analytics },
-          ],
+  const createWithPhone = (phone: string) =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: canonicalEmail,
+          phone,
+          phoneVerifiedAt,
+          emailVerified: emailProven,
+          emailVerifiedAt,
+          passwordHash,
+          // Marks the account as password-owned: a later social sign-in that
+          // merely matches this email must not be merged into it.
+          passwordSetAt: new Date(),
+          role: input.role,
+          languagePreference: input.languagePreference,
+          dateOfBirth: dob,
+          kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+          wallet: { create: { balanceMinor: 0 } },
+          consents: {
+            // Master Design Â§12.2: granular, unbundled consent â€” two purposes
+            // are legally required (no opt-out), three are optional opt-ins
+            // recorded individually with timestamps (PDPP Arts. 8 & 11).
+            create: [
+              {
+                purpose: "kyc_data_processing",
+                granted: input.consents.kycDataProcessing,
+              },
+              {
+                purpose: "financial_data_processing",
+                granted: input.consents.financialDataProcessing,
+              },
+              {
+                purpose: "platform_notifications",
+                granted: input.consents.platformNotifications,
+              },
+              {
+                purpose: "marketing_communications",
+                granted: input.consents.marketingCommunications,
+              },
+              { purpose: "analytics", granted: input.consents.analytics },
+            ],
+          },
         },
-      },
+      });
+      return created;
     });
-    return created;
-  });
+
+  // An account created from an address alone has no number to be the payout
+  // destination, so it is given the reserved placeholder block — the same
+  // answer the federated sign-ins give (Google, Apple, Facebook, Telegram all
+  // hand out no number). `User.phone` is a non-null unique column, so there
+  // is no way to leave it empty, and the placeholder is not in an
+  // operator-allocated range, so no real subscriber's number is written into
+  // the PII store.
+  //
+  // The placeholder is drawn at random and two accounts can draw the same one,
+  // so the create is retried on a unique-constraint violation — the same
+  // recovery the federated path uses.
+  const user = input.phone
+    ? await createWithPhone(input.phone)
+    : await withPlaceholderPhone((phone) => createWithPhone(phone));
 
   await recordAuditEvent({
     userId: user.id,

@@ -1326,24 +1326,30 @@ class ApiClient {
   }
 
   /**
-   * Signs in with an email address and a password.
+   * Signs in with an email address or a phone number, and a password.
+   *
+   * The identifier is sent as `identifier`, which is what the route reads:
+   * an address is looked up as an address and a number is normalised to
+   * `+251…` first, so `0911223344`, `251911223344` and `+251911223344` all
+   * reach the same account.
    *
    * The real HTTP status is always surfaced. A fabricated session is worse
    * than a failed one: the offline mock answers `mock-jwt-access-token`,
    * which no server has issued, so every request that followed it would be
    * refused and the person would be told they had signed in.
    */
-  async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+  async login(identifier: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
     return this.request(
       "/api/v1/auth/login",
-      { method: "POST", body: JSON.stringify({ email, password }) },
+      { method: "POST", body: JSON.stringify({ identifier, password }) },
       { strictHttpErrors: true },
     );
   }
 
   async register(input: {
     email: string;
-    phone: string;
+    /** The payout destination. Omitted for an account created from an address alone. */
+    phone?: string;
     password: string;
     languagePreference: Language;
     /** BOTH is a real UserRole (see the Prisma enum and RegisterInput). */

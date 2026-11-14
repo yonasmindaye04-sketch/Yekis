@@ -1180,12 +1180,24 @@ const loadWorkspace = async () => {
             authMode === "register" ||
             authMode === "forgot-password") && (
             <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-              {t.workspace.auth.emailLabel}
+              {authMode === "login"
+                ? `${t.workspace.auth.emailLabel} / ${t.workspace.auth.phoneLabel}`
+                : t.workspace.auth.emailLabel}
               <input
-                type="email"
+                // The sign-in field takes an address OR a number: the API
+                // accepts either as the identifier, and the backend
+                // normalises a number to +251… before it looks the account
+                // up. `type="email"` refused a number in the browser's own
+                // validation, so the request never left the page.
+                type={authMode === "login" ? "text" : "email"}
+                autoComplete={authMode === "login" ? "username" : "email"}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
+                placeholder={
+                  authMode === "login"
+                    ? "you@example.com or 0911223344"
+                    : "you@example.com"
+                }
                 required
                 style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
               />

@@ -712,6 +712,12 @@ The second row discloses that a *number* is registered. It never discloses wheth
 
 The frontend names the cause: a registration that ends in `INVALID_CREDENTIALS` says that the number may already be registered and offers the two ways forward — sign in with the address used the first time, or use a different number.
 
+**An account can be created from an address alone.** `User.phone` is a non-null unique column because escrow payouts, KYC and the SMS codes depend on it, and the number is the Telebirr / M-Pesa payout destination. It is still **optional at registration**: the Mini App's sign-up offers an address as well as a number, and an account created from an address alone is given the **reserved placeholder** — the `+2510…` block no operator is allocated, which is what the federated sign-ins (Google, Apple, Facebook, Telegram all hand out no number) have always used. Writing a made-up `+2519…` would put somebody else's real subscriber number into the PII store and could collide with a live subscriber, breaking that person's login.
+
+The consequence is honest and worth stating: such an account can use the platform, and it is identified by its address, but it cannot receive a payout until a number is claimed for it. Claiming one is a KYC step, not a sign-up step.
+
+**Sign-in takes an address or a number.** The login route accepts `identifier`, `email` and `phone`, and `normalizeLoginIdentifier` turns a number into `+251…` before the lookup — so `0911223344`, `251911223344` and `+251911223344` all reach the same account. The sign-in form used to be `type="email"`, which made the browser's own validation refuse a number before the request was ever sent; the field now takes either, and sends the value as `identifier`.
+
 ##### Flow 2: Telegram Mini App Authentication
 ```mermaid
 sequenceDiagram
@@ -1422,6 +1428,16 @@ finding **H3**). `PlatformFeeCredit` already carries a `gigOrderId` column, so
 the schema anticipated it.
 
 #### Gig Disputes
+
+#### Frontend Afro-Tech Gig Marketplace (`GigMarketplace.tsx` & `GigMarketplace.css`)
+
+The frontend discovery experience for gigs is built with the AFRO-TECH visual language:
+- **Command Hero & Escrow Ribbon**: Afro-Tech technical eyebrow with live pulse indicator, Space Grotesk headline, and a 3-part trust strip highlighting 100% escrow protection, direct Ethiopian rails (Telebirr, CBE Birr, M-Pesa), and guaranteed turnarounds.
+- **Interactive Category Rail**: Horizontal scrollable category chips with dedicated Lucide glyphs for all launch categories.
+- **Search & Multi-Criteria Sorting**: Search with instant clear, live count indicator, and sorting by recommendation, rating, price (asc/desc), or fastest turnaround.
+- **Afro-Tech Gig Cards**: Card architecture with geometric fallback cover banners, bare icon glyphs, zero-emoji typography, bold status indicators without background fills, `YekisAvatar` seller spotlight with verified freelancer badges, 2-line clamped titles, technical skill tags, and tabular ETB starting prices.
+- **Two-Column Detail & Escrow Checkout**: Breadcrumb navigation, seller credibility card, service overview, checklist of buyer requirements, FAQ accordion, escrow security guarantee banner, and an interactive 3-tier package comparison matrix (Basic, Standard, Premium) with direct wallet-debited escrow checkout.
+- **Strict Theme Parity**: Fully responsive layout matching light and dark themes with zero geometric shift.
 
 `Dispute` is polymorphic: exactly one of `contractId` or `gigOrderId` is set,
 enforced by the DB constraint `Dispute_subject_check`. A gig dispute uses the
@@ -2149,9 +2165,23 @@ it can do before the person picks a role:
 4. A `503 TELEGRAM_NOT_CONFIGURED` from the sign-in itself sets the same
    state: the tab stays hidden and the fallback opens.
 
-The fallback accepts **a phone number or an email address**; creating an
-account still needs a phone number, because it is the payout destination and
-the address the account would be created with is derived from it.
+The fallback accepts **a phone number or an email address**, for signing in
+and for signing up. Its tab is labelled **"Phone or Email"**, the panel
+headings are **"Sign In with Phone or Email"** and **"Create an Account"**,
+and the unavailable-notice says "your phone number or email address and your
+password" — the labels were "Mobile Phone", "Sign In with Mobile", "Create
+Mobile Account" and "your phone number and password" while the field took an
+address, which told the truth about the backend and lied about the product.
+
+**An address can create an account in the Mini App too.** The Mini App's
+sign-up takes either a number or an address, and an address is **proven with
+the same six-digit code** the web sign-up uses (`OnboardingVerification`,
+which is channel-generic) before the account exists — an unproven address is
+somebody else's inbox, and it is the login identifier. The account is then
+created without a number and is given the reserved placeholder the federated
+sign-ins use (§3.1). The code step replaces the form in place, with the tab
+switcher hidden while it is showing, and the component's own "use a different
+email" link returns to the form with the address still in it.
 
 **A failure is reported in words, not in the server's codes.** The host
 answers a credential it cannot verify with `{"error":"TELEGRAM_AUTH_FAILED",
