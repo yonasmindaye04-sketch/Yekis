@@ -772,6 +772,67 @@ this instance, because transactional mail needs SMTP credentials (§5) that
 are not configured — with no SMTP the reset token is never delivered and is
 invalidated, by design.
 
+### Sign-in takes a number, and an address can create an account
+
+Deployed as `1ccffc9` (`feat(auth): sign in with a number, and sign up with an
+address`). Two things a person could not do on this instance, both of them in
+the form rather than in the server.
+
+**Sign-in refused a phone number.** The API has always accepted one —
+`identifier`, `email` and `phone` are all read, and `normalizeLoginIdentifier`
+turns `0911223344`, `251911223344` and `+251911223344` into the same `+251…`
+before the lookup — but the **sign-in field was `type="email"`**, so the
+browser's own validation refused the number ("Please include an '@' in the
+email address") and the request never left the page. The field now takes
+either, sends the value as `identifier`, and is labelled **"Email / Phone"**
+in every language.
+
+**An address could not create an account.** The Mini App's sign-up took a
+number only and derived a synthetic `@yekis.local` address from it. An address
+is accepted now, and it is **proven with the same six-digit code** the web
+sign-up uses (`OnboardingVerification`, which is channel-generic) before the
+account exists — an unproven address is somebody else's inbox, and it is the
+login identifier.
+
+**The account gets the reserved placeholder number.** `User.phone` is non-null
+and unique because it is the payout destination, so it cannot be left empty;
+an account created from an address alone is given the `+2510…` block no
+operator is allocated, exactly what the federated sign-ins use. Such an
+account can use the platform and is identified by its address, but it cannot
+receive a payout until a number is claimed for it — a KYC step, not a sign-up
+one.
+
+**What was verified against the live instance after the deploy:**
+
+- `scripts/check-deployment.mjs` passes **11/11**, and
+  `scripts/e2e-onboarding.mjs` completes the whole onboarding flow.
+- `POST /api/v1/auth/register` with **no number** answers `202`, and
+  `POST /api/v1/auth/login` with `identifier` set to the address answers
+  `200` with a real JWT. `GET /api/v1/auth/me` then reports the reserved
+  placeholder (`+2510537361`) and the address that was typed.
+- `POST /api/v1/auth/register` **with** a number answers `202`, and the same
+  account signs in with `0983397699` and answers `200` with a real JWT. A
+  wrong password answers `401`.
+- The **Mini App's email sign-up** was walked in a simulated Telegram webview
+  against this instance: the address is accepted, the six-digit code step
+  replaces the panel ("We sent a 6-digit code to m***@example.com"), the code
+  is accepted, the account is created and the workspace loads with a real
+  session (`yekis-api-token` is a JWT, not the mock's). `GET /auth/me` then
+  reports `phone=+2510386706` — the reserved block — with the KYC tier still
+  `PENDING`.
+- The **web sign-in was walked with a phone number** in a browser: the field
+  reads "Email / Phone", the workspace loads, and the profile button shows
+  the account that was created with that number.
+- The deployed bundle is the new one (`/assets/index-DW4Isqrs.js`, carrying
+  "Phone or Email", "Sign In with Phone or Email" and "Create an Account").
+- The app came back **LIVE** with all **50** environment variables, the bot
+  token and `TRUST_PROXY_HOPS=1` included.
+
+**What this means for the instance:** a person can now sign in with the
+number they registered with, and can create an account with an address alone.
+An account created that way has no payout number yet — it is identified by
+its address, and the number has to be claimed before it can receive money.
+
 ### Teardown
 
 ```bash
