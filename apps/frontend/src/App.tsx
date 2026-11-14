@@ -615,13 +615,20 @@ export function App() {
     } catch (err) {
       setTelegramAuthStatus("error");
       const raw = err instanceof Error ? err.message : "Login failed";
+      // The server's error code rides on `err.code`; the message it carries
+      // is the server's own wording, which is what the person should read.
+      const code = (err as { code?: string })?.code ?? "";
       if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
         setTelegramAuthError(
           wasSigningUp
-            ? "We could not sign you in with those details. If you already have an account, sign in instead."
+            ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
             : "Invalid phone number or password. Please check your credentials.",
         );
-      } else if (raw.includes("DUPLICATE_USER") || raw.includes("409")) {
+      } else if (
+        code === "PHONE_IN_USE" ||
+        raw.includes("DUPLICATE_USER") ||
+        raw.includes("PHONE_IN_USE")
+      ) {
         setTelegramAuthError(
           "An account with this phone number already exists. Please switch to Sign In.",
         );

@@ -23,7 +23,7 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered accounts |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered **addresses**. `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account and the address is not — no account can be created for that registration, so the answer says so instead of accepting it and dropping it. `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
 | `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Never reveals whether the address is registered. `429` when throttled, `503` when mail cannot be delivered |
 | `POST` | `/api/v1/auth/email/verify` | Public | Check a 6-digit email OTP. `400 INVALID_CODE` for both "no such code" and "wrong code", `410 CODE_EXPIRED`, `429 TOO_MANY_ATTEMPTS` |
 | `POST` | `/api/v1/auth/phone/code` | Public | Issue a 6-digit SMS OTP. Same shape as the email route; used for the payout number and for withdrawal approval |
@@ -31,7 +31,7 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 | `GET` | `/api/v1/auth/verification/channels` | Public | Capability discovery: which verification channels can actually deliver on this host (`email.available`, `phone.available`). Booleans derived from the SMTP and SMS configuration — no account detail |
 | `POST` | `/api/v1/auth/login` | Public | Return access/refresh JWTs and user |
 | `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange a valid refresh token for a new access+refresh pair. Suspended accounts are refused here too â€” a suspension takes effect at the next silent refresh. |
-| `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
+| `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert. `503 TELEGRAM_NOT_CONFIGURED` when the host has no bot token — the signature cannot be checked without it |
 
 Registration body:
 
@@ -639,7 +639,7 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered accounts |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. Returns `202` with a generic body for both new and already-registered **addresses**. `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account and the address is not — no account can be created for that registration, so the answer says so instead of accepting it and dropping it. `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
 | `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Never reveals whether the address is registered. `429` when throttled, `503` when mail cannot be delivered |
 | `POST` | `/api/v1/auth/email/verify` | Public | Check a 6-digit email OTP. `400 INVALID_CODE` for both "no such code" and "wrong code", `410 CODE_EXPIRED`, `429 TOO_MANY_ATTEMPTS` |
 | `POST` | `/api/v1/auth/phone/code` | Public | Issue a 6-digit SMS OTP. Same shape as the email route; used for the payout number and for withdrawal approval |
@@ -649,7 +649,7 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange refresh token for new access+refresh pair. Suspended accounts refused. |
 | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidates the current session |
 | `GET` | `/api/v1/auth/me` | Authenticated | Returns current user profile |
-| `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert |
+| `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert. `503 TELEGRAM_NOT_CONFIGURED` when the host has no bot token — the signature cannot be checked without it |
 | `POST` | `/api/v1/auth/telegram/miniapp` | Public | Alias for Mini App login |
 | `POST` | `/api/v1/auth/telegram/miniapp/register` | Public | Register a new account via Telegram Mini App |
 | `POST` | `/api/v1/auth/telegram/widget` | Public | Verify Telegram Login Widget payload (browser-based) |

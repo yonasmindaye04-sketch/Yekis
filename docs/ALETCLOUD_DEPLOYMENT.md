@@ -630,6 +630,21 @@ What was verified against the live instance:
   down, the code is accepted, the account is created and the workspace loads
   with the session — signed in as `ui.check…@example.com`, the canonical
   form of the address that was typed with capitals.
+- The **sign-up was walked in a real browser** against the live instance, not
+  only through the API: the details form, the emailed code step (the code is
+  returned to the caller outside production), and then the two calls that
+  matter — `POST /api/v1/auth/register` answers **202** and
+  `POST /api/v1/auth/login` answers **200**, and the workspace loads with a
+  real session (`yekis-api-token` holds a real JWT, not the mock's).
+- The **phone-collision experiment** was run against the live instance using
+  only an account this work created: a new address on a registered number
+  answered `202` and could not sign in (`401`), and the same address on a
+  free number answered `202` and signed in (`200`). That is the defect
+  described above, reproduced rather than reasoned about.
+- The **Mini App's fallback** was driven in a simulated Telegram webview: with
+  the host unable to verify a Telegram credential, the Mini App shows "Telegram
+  sign-in is unavailable", hides the Telegram tab, stores **no** token, and
+  signs in through the phone-and-password path with a real JWT.
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
@@ -656,15 +671,70 @@ this fallback: with no SMTP it reports `email NOT delivered`, and the
 password-reset path treats that as a failure so it invalidates the token
 rather than leaving a valid credential nobody can receive.
 
-### One thing is still open
+### The Telegram bot — why the Mini App could not sign in
 
-**The Telegram bot.** No bot token was available, so `TELEGRAM_BOT_TOKEN` is
-unset. The Mini App's URL is configured in BotFather and the app serves it
-fine, but Telegram sign-in inside the Mini App cannot verify its `initData`
-without the token, so a user has to sign in with email and password. The
-bot's own commands, the `/staff` link and the webhook are all off.
+**No bot token was available, so `TELEGRAM_BOT_TOKEN` is unset.** The Mini
+App's URL is configured in BotFather and the app serves it fine, but
+Telegram sign-in inside the Mini App cannot verify its `initData` without the
+token. The bot's own commands, the `/staff` link and the webhook are all off.
 
 Setting the token means a `setAppEnv` and a restart (§4.4) — no rebuild.
+
+**What the person in the Mini App saw, and why.** With no token, the host
+answers `503 TELEGRAM_NOT_CONFIGURED` to `POST /api/v1/auth/telegram`. That
+answer was swallowed by the frontend's offline mock, which stood in for it
+and handed back `accessToken: "mock-jwt-access-token"` — a session the server
+had never issued. The Mini App looked signed in, every request that followed
+was refused with a 401, and the error on screen was a developer instruction
+("TELEGRAM_BOT_TOKEN is missing or empty in your environment…") that the
+person could not act on and that did not describe what had happened. The
+client defect and the message are both fixed (`docs/CHANGELOG.md`): the
+Mini App now says that Telegram sign-in is unavailable and offers the
+phone-and-password path, and no authentication call can fabricate a session.
+**The sign-in itself still needs the token.**
+
+**The exact token needed**, from @BotFather for the bot named `ye_kis_bot`:
+
+```
+TELEGRAM_BOT_TOKEN=<the token @BotFather gives you>
+```
+
+The Mini App URL in BotFather must be `https://yekis.app.aletcloud.com`. The
+webhook is already configured on the host
+(`TELEGRAM_WEBHOOK_URL=https://yekis.app.aletcloud.com/api/v1/telegram/webhook`,
+and `TELEGRAM_WEBHOOK_SECRET` is set). **Do not use a token belonging to a
+different bot**: the `initData` HMAC is keyed on the bot's own token, so a
+token from another bot fails every signature check.
+
+**One limit to know about while testing.** The sign-in route allows 10
+attempts per 15 minutes per IP. Repeated probes answer `429
+TOO_MANY_LOGIN_ATTEMPTS` rather than `401`, which looks like a different
+failure than it is.
+
+### The second dead end: a registration that disappeared
+
+Testing sign-up on this instance found a defect that has nothing to do with
+Telegram. `registerUser` checked for duplicates with a single `OR` over the
+address and the number, so the two collisions were the same event and the
+route answered `202` for both. With a **new address on a number that was
+already registered**, no account was created at all: the address that had
+just been proven never became an account, the sign-in that followed answered
+`401`, and the page told the person to sign in with an address that had no
+account. The signup could never complete, and there was nothing on screen
+that named the cause.
+
+The two collisions are separate now. An address that is already on file still
+answers `202` with the same body as a successful registration — nothing
+about the account is disclosed. A number that is already on file, with an
+address that is not, answers `409 {"error":"PHONE_IN_USE"}` and names the
+action: use a different number, or sign in to the account that has it.
+
+**What this means for the instance:** an account that was created against a
+number which has since been used elsewhere can only be recovered by using
+the number it was created with. The password-reset path cannot recover it on
+this instance, because transactional mail needs SMTP credentials (§5) that
+are not configured — with no SMTP the reset token is never delivered and is
+invalidated, by design.
 
 ### Teardown
 

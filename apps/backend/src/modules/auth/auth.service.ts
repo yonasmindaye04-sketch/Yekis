@@ -22,6 +22,7 @@ const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 // === MAIN FUNCTIONS ===
 export class AgeRestrictionError extends Error {}
 export class DuplicateUserError extends Error {}
+export class PhoneInUseError extends Error {}
 export class InvalidCredentialsError extends Error {}
 export class InvalidTokenError extends Error {}
 
@@ -108,19 +109,39 @@ export async function registerUser(input: RegisterInput) {
   // case-insensitively so the same mailbox cannot end up with two accounts.
   const canonicalEmail = normalizeEmail(input.email);
 
-  const existing = await prisma.user.findFirst({
-    where: {
-      OR: [
-        // `equals` is case-sensitive on PostgreSQL, so the mode is stated
-        // rather than relied on. Without it, `Bob@example.com` would not be
-        // seen as the same inbox as the `bob@example.com` already on file.
-        { email: { equals: canonicalEmail, mode: "insensitive" } },
-        { phone: input.phone },
-      ],
-    },
+  // The two collisions are not the same event, and reporting them as one is
+  // what made a registration silently disappear.
+  //
+  // An EMAIL collision is recoverable: the account exists, so the next step
+  // is to sign in with it. The route answers 202 either way, so nothing about
+  // the account is disclosed.
+  //
+  // A PHONE collision with a NEW email is not recoverable at all. The email
+  // has just been proven, but no account can be created for it, so the
+  // address never becomes an account and every retry fails the same way. The
+  // 202 hid that, the sign-in that followed answered 401, and the person was
+  // told to "sign in" with an address that had no account — a dead end with
+  // no way out and nothing to act on.
+  //
+  // So the phone collision is reported as itself. It discloses that a number
+  // is registered to somebody on the platform; it never discloses whether an
+  // EMAIL is registered, which is the guarantee the enumeration rule (L-02)
+  // is about. The address being registered is the person's own input, and
+  // the only way to learn anything from the answer is to already be trying to
+  // register.
+  const emailTaken = await prisma.user.findFirst({
+    where: { email: { equals: canonicalEmail, mode: "insensitive" } },
   });
-  if (existing)
-    throw new DuplicateUserError("Email or phone already registered.");
+  if (emailTaken) {
+    throw new DuplicateUserError("Email already registered.");
+  }
+
+  const phoneTaken = await prisma.user.findFirst({
+    where: { phone: input.phone },
+  });
+  if (phoneTaken) {
+    throw new PhoneInUseError("Phone number already registered.");
+  }
 
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven
@@ -410,7 +431,15 @@ export async function refreshSession(refreshToken: string) {
 }
 
 export async function requestPasswordReset(email: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  // The stored address is the canonical one — lower-cased and trimmed — so a
+  // lookup by the raw string misses an account whose address was typed with
+  // capitals. The person is then told a reset token was sent, nothing is
+  // sent, and the recovery path they were told to use is the one thing that
+  // does not work. The same defect as the mixed-case registration, in the
+  // one place a locked-out person goes looking for a way in.
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizeEmail(email), mode: "insensitive" } },
+  });
   if (!user) {
     // Return early to prevent email enumeration, but simulate success
     return;

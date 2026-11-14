@@ -7,6 +7,7 @@ import {
   loginUser,
   AgeRestrictionError,
   DuplicateUserError,
+  PhoneInUseError,
   InvalidCredentialsError,
   InvalidTokenError,
   requestPasswordReset,
@@ -162,7 +163,23 @@ authRouter.post("/register", registrationLimiter, async (req, res) => {
         .json({ error: "AGE_RESTRICTED", message: err.message });
     }
     if (err instanceof DuplicateUserError) {
+      // The address is already on file. The account exists, so signing in is
+      // the next step, and saying so would disclose that the address is
+      // registered — which is what the enumeration rule (L-02) forbids. The
+      // answer is the same one a successful registration gets.
       return res.status(202).json(accepted);
+    }
+    if (err instanceof PhoneInUseError) {
+      // The number is on file and the address is not, so no account can be
+      // created for this registration. Answering 202 here is what made the
+      // signup a dead end: the person was told to sign in with an address
+      // that had no account. This says what is true and names the action.
+      return res.status(409).json({
+        error: "PHONE_IN_USE",
+        message:
+          "That phone number is already registered to another account. " +
+          "Use a different number, or sign in to the account that has it.",
+      });
     }
     logger.error({ err }, "Unexpected error during registration");
     return res.status(500).json({ error: "INTERNAL_ERROR" });

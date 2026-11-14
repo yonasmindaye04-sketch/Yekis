@@ -759,7 +759,7 @@ const loadWorkspace = async () => {
         message === "DUPLICATE_USER"
           ? "This email or phone already has an account. Switch to Sign in."
           : wasRegistering && message === "INVALID_CREDENTIALS"
-            ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+            ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
             : message,
       );
     } finally {
@@ -1099,7 +1099,7 @@ const loadWorkspace = async () => {
                       err instanceof Error ? err.message : "Unable to continue";
                     setError(
                       message === "INVALID_CREDENTIALS"
-                        ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+                        ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
                         : message,
                     );
                   })

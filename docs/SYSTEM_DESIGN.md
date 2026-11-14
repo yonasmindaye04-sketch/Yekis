@@ -699,7 +699,18 @@ sequenceDiagram
 
 The proof is raised **before** the account exists, which is why both OTP routes are unauthenticated, and it is attached to the new row by `registerUser`. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. The SMS phone codes are deliberately left alone: `User.phone` is the payout destination and the withdrawal-approval code is money, so that flow is not weakened to make signup work.
 
-**The address is stored in one canonical form.** `registerUser` lower-cases and trims the address before it is written, and the duplicate check matches it case-insensitively. Every other path that touches `User.email` already uses that form — the login lookup lower-cases it, the OAuth path lower-cases it, and the OTP proof is issued and looked up against it — so storing the address as it was typed would put the row outside all of them. An account registered as `Alice@Example.com` could not sign in, because login searches for `alice@example.com`; and because the account existed by then, every retry hit the duplicate path and failed the same way. The canonical form also means one mailbox cannot end up with two accounts spelled differently.
+**The address is stored in one canonical form.** `registerUser` lower-cases and trims the address before it is written, and the duplicate check matches it case-insensitively. Every other path that touches `User.email` already uses that form — the login lookup lower-cases it, the OAuth path lower-cases it, and the OTP proof is issued and looked up against it — so storing the address as it was typed would put the row outside all of them. An account registered as `Alice@Example.com` could not sign in, because login searches for `alice@example.com`; and because the account existed by then, every retry hit the duplicate path and failed the same way. The canonical form also means one mailbox cannot end up with two accounts spelled differently. The password-reset lookup uses the same canonical form: a lookup by the raw string is case-sensitive on PostgreSQL and would miss the account entirely, and the person would be told a reset token was on its way when none had been created.
+
+**The two registration collisions are separate events.** An address that is already on file and a number that is already on file are different situations, and treating them as one is what made a registration disappear.
+
+| The collision | What the person is told | Why |
+|---|---|---|
+| The **address** is on file | `202` — the same body a successful registration gets | The account exists, so signing in is the next step. Saying otherwise would disclose that the address is registered, which is what the enumeration rule (L-02) forbids. |
+| The **number** is on file, the address is not | `409 {"error":"PHONE_IN_USE"}` | **No account can be created.** Answering `202` here is what made the signup a dead end: the address that had just been proven never became an account, the sign-in that followed answered `401`, and the person was told to sign in with an address that had no account. |
+
+The second row discloses that a *number* is registered. It never discloses whether an *address* is registered, and it tells the person nothing about an address they are not registering. The alternative — accepting the registration and dropping it — is the dead end above, and a dead end with nothing to act on is a support queue rather than a control.
+
+The frontend names the cause: a registration that ends in `INVALID_CREDENTIALS` says that the number may already be registered and offers the two ways forward — sign in with the address used the first time, or use a different number.
 
 ##### Flow 2: Telegram Mini App Authentication
 ```mermaid
@@ -2119,12 +2130,41 @@ sequenceDiagram
     end
 ```
 
+#### When Telegram sign-in is unavailable
+
+A Mini App opened on a host with no bot token cannot verify `initData`, so
+the sign-in always ends in a `503`. The shell therefore asks the host what
+it can do before the person picks a role:
+
+1. It reads `GET /api/v1/auth/oauth/providers`. When the host answers
+   `telegram: false`, the shell sets `telegramUnavailable`, hides the
+   "Telegram Login" tab, opens the phone-and-password path, and says
+   **"Telegram sign-in is unavailable"** with the reason in words the person
+   can act on.
+2. The probe is **advisory**. If it cannot answer, the sign-in is attempted
+   anyway and the server's own error is what the person sees — a failed
+   probe must never remove the only way in.
+3. `startSession` refuses to attempt a Telegram sign-in the host has already
+   said cannot work, so the person is not walked into a `503`.
+4. A `503 TELEGRAM_NOT_CONFIGURED` from the sign-in itself sets the same
+   state: the tab stays hidden and the fallback opens.
+
+The fallback accepts **a phone number or an email address**; creating an
+account still needs a phone number, because it is the payout destination and
+the address the account would be created with is derived from it.
+
+**The failure this replaces.** The Mini App used to be handed a fabricated
+session (`mock-jwt-access-token`) and a developer-facing message ("Add your
+bot token to apps/backend/.env and restart the backend server"). See §8.4 for
+why a server's error must never be answered by the offline mock.
+
 #### State Managed in `App.tsx`
 
 | State Variable | Type | Purpose |
 |---|---|---|
 | `telegramSession` | `TelegramAuthResponse \| null` | Full Telegram auth response after login |
 | `telegramAuthStatus` | `"idle" \| "loading" \| "ready" \| "error"` | Authentication phase gate |
+| `telegramUnavailable` | `boolean` | The host cannot verify a Telegram credential — the Telegram tab is hidden and the phone/password path is offered |
 | `role` | `"CLIENT" \| "FREELANCER" \| "ADMIN"` | User's active platform role |
 | `activeTab` | `Tab` | Which section is currently displayed |
 | `walletBalance` | `number` | Wallet balance in ETB (derived from balanceMinor / 100) |
@@ -2248,10 +2288,18 @@ All HTTP calls are centralized in a single `api` object exported from `client.ts
 
 #### Key Design Properties
 
-- **Token Storage:** `api.setToken()` stores the token in a module-level variable (no `localStorage`) for the session lifetime.
-- **Base URL:** Reads from `import.meta.env.VITE_API_BASE_URL` at build time (falls back to `http://localhost:3000`).
-- **Error Handling:** Non-2xx responses throw `Error` with the JSON `message` field from the API.
+- **Token Storage:** the access and refresh tokens live in `localStorage` under `yekis-api-token` and `yekis-refresh-token`, so a reload keeps the session. `api.setSession()` writes both; `api.clearToken()` removes them.
+- **Base URL:** reads from `import.meta.env.VITE_API_BASE_URL` at build time and defaults to the empty string, so the API is same-origin. A deployment therefore serves the SPA and the API from one origin — which is also what the Telegram Mini App requires, because it refuses a page that is not same-origin with its own host.
+- **Error Handling:** a non-2xx response throws an `Error` carrying the API's own `message` (falling back to its `error` code, then `HTTP <status>`). The error's `code` is the API's machine-readable code, so a caller can tell `INVALID_CREDENTIALS` from `PHONE_IN_USE` from `TOO_MANY_LOGIN_ATTEMPTS` without matching on the wording.
 - **FormData Support:** Methods like `createTopUpRequest`, `submitKycDocuments`, and `submitFreelancerFaydaSelfie` send `multipart/form-data` for file uploads.
+
+#### The offline mock, and when it may answer
+
+`mockStore` (`apps/frontend/src/api/mockData.ts`) is a **stand-in for the absence of a server**: no backend at all, or the dev proxy's explicit `X-Yekis-Offline: 1` header. It lets the frontend run with nothing behind it.
+
+It is **not** a stand-in for a server that answered with an error. A server that answered has answered, and its answer must reach the caller. So by default a 404/502/503/504 falls back to the mock, and a call can opt out with `strictHttpErrors: true`, which makes it throw the real status **and** refuses to fabricate a response on any path — a status code, an unreadable body, a non-JSON content type, or a parse failure.
+
+**Every authentication call opts out.** `loginWithTelegram`, `loginWithTelegramCode`, `linkTelegram`, `unlinkTelegram`, `login`, `loginWithMobile` and `register` are all strict. The reason is concrete: a host with no bot token answers `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for it and hand back `accessToken: "mock-jwt-access-token"` — a token no server issued. The Mini App looked signed in, every request that followed was refused with a 401, and the real reason never reached the person. A fabricated session is worse than a failed one, because it is a failure the person cannot see.
 
 #### Key API Methods
 
