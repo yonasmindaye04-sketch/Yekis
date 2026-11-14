@@ -608,7 +608,7 @@ Recorded so the next person does not have to rediscover it.
 | Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` |
 | Database | `yekis-jobs` — Managed PostgreSQL **18**, Solo, free, internal network only, 10 connections |
 | Object storage | `yekis-test-media` (bucket `t1370-yekis-test-media`) — 5 GB, private, 50 ETB/mo |
-| Telegram bot | **not configured** — no bot token was available |
+| Telegram bot | `@ye_kis_bot` — **live** since 2026-11-14; webhook registered at `https://yekis.app.aletcloud.com/api/v1/telegram/webhook` |
 
 What was verified against the live instance:
 
@@ -644,7 +644,10 @@ What was verified against the live instance:
 - The **Mini App's fallback** was driven in a simulated Telegram webview: with
   the host unable to verify a Telegram credential, the Mini App shows "Telegram
   sign-in is unavailable", hides the Telegram tab, stores **no** token, and
-  signs in through the phone-and-password path with a real JWT.
+  signs in through the phone-and-password path with a real JWT. Once the bot
+  token was set, the same webview kept **both** tabs, sent its `initData` to
+  the host and was refused with `BAD_SIGNATURE` — a real signature check, and
+  still no session.
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
@@ -671,17 +674,47 @@ this fallback: with no SMTP it reports `email NOT delivered`, and the
 password-reset path treats that as a failure so it invalidates the token
 rather than leaving a valid credential nobody can receive.
 
-### The Telegram bot — why the Mini App could not sign in
+### The Telegram bot — live since 2026-11-14
 
-**No bot token was available, so `TELEGRAM_BOT_TOKEN` is unset.** The Mini
-App's URL is configured in BotFather and the app serves it fine, but
-Telegram sign-in inside the Mini App cannot verify its `initData` without the
-token. The bot's own commands, the `/staff` link and the webhook are all off.
+**`TELEGRAM_BOT_TOKEN` is set**, for the bot `@ye_kis_bot` (id `8967646633`,
+"Yekis Jobs"). `TELEGRAM_BOT_USERNAME=ye_kis_bot` is set too, which is what
+`botUsername()` reads — a hardcoded or missing handle produces deep links to
+the wrong bot and stops the Login Widget rendering, because the widget
+refuses a handle that does not match the bot whose token signs the payload.
 
-Setting the token means a `setAppEnv` and a restart (§4.4) — no rebuild.
+The bot registered its own webhook on boot and the app confirms it:
 
-**What the person in the Mini App saw, and why.** With no token, the host
-answers `503 TELEGRAM_NOT_CONFIGURED` to `POST /api/v1/auth/telegram`. That
+```
+{"msg":"Bot webhook set","webhookUrl":"https://yekis.app.aletcloud.com/api/v1/telegram/webhook"}
+{"msg":"🤖 Telegram bot started"}
+```
+
+`getWebhookInfo` reports that URL with no delivery error, and the bot's
+**menu button is already a `web_app` pointing at
+`https://yekis.app.aletcloud.com/`** ("Open Yekis Jobs"), so the Mini App
+opens from the bot's menu.
+
+**What was verified against the live instance once the token was set:**
+
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"telegram": true, "telegramBotUsername": "ye_kis_bot"}` — the Mini App's
+  capability probe now sees a host that can verify a Telegram credential.
+- `POST /api/v1/auth/telegram` with a **forged** `initData` answers
+  **`401 {"error":"TELEGRAM_AUTH_FAILED","message":"BAD_SIGNATURE"}`** — not
+  `503`. The signature is genuinely checked against the bot's token, and the
+  Mini App stores **no** session when it fails.
+- The Mini App in a browser shows **both** tabs ("Telegram Login" and
+  "Mobile Phone") and no "unavailable" notice, because the host can now
+  verify a Telegram credential.
+
+**The token is in the app's environment, never in the repository.** It was
+applied with `setAppEnv` (which replaces the whole set, so the 48 existing
+variables were read and merged first) and a restart — no rebuild. It is a
+live credential: **rotate it from @BotFather if it is ever exposed**, and
+keep it out of `apps/backend/.env` in a commit.
+
+**What the person in the Mini App saw before the token was set.** The host
+answered `503 TELEGRAM_NOT_CONFIGURED` to `POST /api/v1/auth/telegram`. That
 answer was swallowed by the frontend's offline mock, which stood in for it
 and handed back `accessToken: "mock-jwt-access-token"` — a session the server
 had never issued. The Mini App looked signed in, every request that followed
@@ -691,25 +724,28 @@ person could not act on and that did not describe what had happened. The
 client defect and the message are both fixed (`docs/CHANGELOG.md`): the
 Mini App now says that Telegram sign-in is unavailable and offers the
 phone-and-password path, and no authentication call can fabricate a session.
-**The sign-in itself still needs the token.**
-
-**The exact token needed**, from @BotFather for the bot named `ye_kis_bot`:
-
-```
-TELEGRAM_BOT_TOKEN=<the token @BotFather gives you>
-```
-
-The Mini App URL in BotFather must be `https://yekis.app.aletcloud.com`. The
-webhook is already configured on the host
-(`TELEGRAM_WEBHOOK_URL=https://yekis.app.aletcloud.com/api/v1/telegram/webhook`,
-and `TELEGRAM_WEBHOOK_SECRET` is set). **Do not use a token belonging to a
-different bot**: the `initData` HMAC is keyed on the bot's own token, so a
-token from another bot fails every signature check.
 
 **One limit to know about while testing.** The sign-in route allows 10
 attempts per 15 minutes per IP. Repeated probes answer `429
 TOO_MANY_LOGIN_ATTEMPTS` rather than `401`, which looks like a different
 failure than it is.
+
+**If the token ever has to be set again**, it comes from @BotFather for the
+bot named `ye_kis_bot`:
+
+```
+TELEGRAM_BOT_TOKEN=<the token @BotFather gives you>
+```
+
+Apply it with `setAppEnv` — reading the current variables first, because it
+**replaces** the whole set — and restart the app (§4.4). No rebuild. The
+Mini App URL in BotFather must be `https://yekis.app.aletcloud.com`. The
+webhook is already configured on the host
+(`TELEGRAM_WEBHOOK_URL=https://yekis.app.aletcloud.com/api/v1/telegram/webhook`,
+and `TELEGRAM_WEBHOOK_SECRET` is set), and the app re-registers it on boot.
+**Do not use a token belonging to a different bot**: the `initData` HMAC is
+keyed on the bot's own token, so a token from another bot fails every
+signature check.
 
 ### The second dead end: a registration that disappeared
 

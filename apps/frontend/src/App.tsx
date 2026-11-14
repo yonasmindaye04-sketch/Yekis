@@ -118,6 +118,20 @@ function formatRole(role: Role) {
       : "Client";
 }
 
+/**
+ * The server's vocabulary for a Telegram credential it could not verify
+ * (`apps/backend/src/modules/auth/telegram.service.ts`). These are codes, not
+ * sentences: a person cannot act on "BAD_SIGNATURE", so the Mini App maps
+ * them to something they can.
+ */
+const TELEGRAM_VERIFY_CODES = [
+  "BAD_SIGNATURE",
+  "STALE_AUTH_DATE",
+  "INVALID_AUTH_DATE",
+  "NO_AUTH_DATE",
+  "NO_USER",
+] as const;
+
 function normalizeEthiopianPhone(input: string): string {
   const trimmed = input.trim();
   if (trimmed.includes("@")) return trimmed.toLowerCase();
@@ -515,6 +529,12 @@ export function App() {
       setTelegramAuthStatus("error");
       const msg =
         err instanceof Error ? err.message : "Sign-in could not be completed";
+      // The server's machine-readable code rides on `err.code`, and the
+      // message it sends is its own vocabulary (`BAD_SIGNATURE`,
+      // `STALE_AUTH_DATE`, …). Neither is something a person can act on, so
+      // the codes are mapped to sentences here rather than shown raw.
+      const code = (err as { code?: string })?.code ?? "";
+      const verifyCode = TELEGRAM_VERIFY_CODES.find((c) => msg === c || msg.includes(c));
       if (
         msg.includes("TELEGRAM_BOT_TOKEN") ||
         msg.includes("TELEGRAM_NOT_CONFIGURED")
@@ -528,16 +548,20 @@ export function App() {
         setTelegramAuthError("");
         setShowMobileLogin(true);
       } else if (
+        code === "TELEGRAM_AUTH_FAILED" ||
         msg.includes("signature is invalid") ||
-        msg.includes("TELEGRAM_AUTH_FAILED")
+        Boolean(verifyCode)
       ) {
         setTelegramAuthError(
-          "This Telegram session could not be verified. It may have expired — reopen the Mini App from the bot, or sign in with your phone number and password.",
+          verifyCode === "STALE_AUTH_DATE"
+            ? "This Telegram session has expired. Reload the Mini App, then try Telegram Login again."
+            : "This Telegram session could not be verified. It may have expired — reopen the Mini App from the bot, or sign in with your phone number and password.",
         );
       } else {
         setTelegramAuthError(
-          msg.includes("STALE_AUTH_DATE")
-            ? "This Telegram session has expired. Reload the Mini App, then try Telegram Login again."
+          // A bare code would read as a machine talking to a machine.
+          /^[A-Z][A-Z_]{3,}$/.test(msg)
+            ? "Sign-in could not be completed. Try again, or sign in with your phone number and password."
             : `${msg}. Try again or use mobile sign in.`,
         );
       }

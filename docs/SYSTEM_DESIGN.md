@@ -2153,6 +2153,16 @@ The fallback accepts **a phone number or an email address**; creating an
 account still needs a phone number, because it is the payout destination and
 the address the account would be created with is derived from it.
 
+**A failure is reported in words, not in the server's codes.** The host
+answers a credential it cannot verify with `{"error":"TELEGRAM_AUTH_FAILED",
+"message":"BAD_SIGNATURE"}` — and its vocabulary is `BAD_SIGNATURE`,
+`STALE_AUTH_DATE`, `INVALID_AUTH_DATE`, `NO_AUTH_DATE`, `NO_USER`. Those are
+codes, not sentences: a person cannot act on "BAD_SIGNATURE". The shell maps
+them to something they can (an expired session says so and offers a reload;
+an unverifiable one says to reopen the Mini App or use the phone and
+password), and a bare code that reaches the screen anyway is replaced with a
+plain sentence.
+
 **The failure this replaces.** The Mini App used to be handed a fabricated
 session (`mock-jwt-access-token`) and a developer-facing message ("Add your
 bot token to apps/backend/.env and restart the backend server"). See §8.4 for
