@@ -131,6 +131,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 
 - [x] Responsive React/Vite shell and role-aware navigation
 - [x] Browser registration/login and verification screens
+- [x] Profile completion flow — a new account is taken to the profile section with the checklist open (`ProfileCompletionDialog`: photo, name and bio, and the skills for a freelancer), the "Finish your profile" banner waits until the session has warmed up (45 seconds in the workspace, or three or more views opened) so it never greets someone who has just arrived, and a dismissal is remembered per account until the profile is complete. The Mini App lands a new account on its Profile tab (account details and the Fayda identity check)
 - [x] Jobs/proposals workspace with current shared-schema payload conversion
 - [x] Contracts/milestones workspace with signing, PDF access, funding (Telebirr redirect), delivery, and acceptance
 - [x] Payment return page (`PaymentReturn.tsx`) for processing post-checkout browser redirects

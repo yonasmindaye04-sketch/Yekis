@@ -173,6 +173,29 @@ export const categoryLabels: Record<string, string> = {
 
 export const categories = Object.keys(categoryLabels);
 
+/**
+ * How long the "Finish your profile" reminder waits before it says anything.
+ *
+ * The banner used to be on screen the moment the workspace loaded, which is
+ * the worst moment for it: the person has just arrived, has not looked at
+ * anything yet, and a bar about their missing photo is the least useful
+ * thing on the page. It now waits until they have actually started moving
+ * around the platform — either because they have been in here for a while,
+ * or because they have opened a second view — and only then says what is
+ * still missing.
+ */
+const PROFILE_NUDGE_DELAY_MS = 45_000;
+
+/**
+ * Where a dismissed reminder is remembered.
+ *
+ * The dismissal used to last for one page load, so the banner came back on
+ * the next visit as if it had never been answered. It is remembered per
+ * account now, and forgotten the moment the profile is complete.
+ */
+const profileNudgeDismissedKey = (userId: string) =>
+  `yekis_profile_nudge_dismissed_${userId}`;
+
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
   /* BOTH previously fell through to "Client", so a dual-role account saw
@@ -352,6 +375,22 @@ function FullPlatformAppInner() {
     null,
   );
   const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(false);
+  /**
+   * Whether the reminder is allowed to speak yet.
+   *
+   * It is not allowed to speak the moment the workspace loads — it waits
+   * until the person has been here a while or has opened a second view (see
+   * `PROFILE_NUDGE_DELAY_MS`). A new account is taken to the profile
+   * section directly instead, so it never has to be told at all.
+   */
+  const [profileNudgeArmed, setProfileNudgeArmed] = useState(false);
+  /**
+   * The views this session has opened.
+   *
+   * Two or more means the person has started moving around the platform,
+   * which is what arms the reminder.
+   */
+  const visitedViewsRef = useRef<Set<View>>(new Set());
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   useEffect(() => {
@@ -573,6 +612,63 @@ const loadWorkspace = async () => {
     loadWorkspaceRef.current = loadWorkspace;
   });
 
+  /**
+   * The account in the workspace, by id.
+   *
+   * The effects below key on this rather than on the whole `user` object,
+   * because `loadWorkspace` replaces that object every 60 seconds — keying
+   * on it would restart the waiting timer on every poll.
+   */
+  const currentUserId = user?.id;
+
+  /**
+   * When the profile reminder may speak.
+   *
+   * Two ways to earn it, and both mean the same thing: the person is
+   * actually using the platform. Either they have been in here for a while
+   * (`PROFILE_NUDGE_DELAY_MS`), or they have opened three or more views —
+   * they are moving around, and now is the moment to tell them what is still
+   * missing.
+   *
+   * Three, not two: a new account lands on the profile section by itself, so
+   * two views is what every new account sees before it has done anything.
+   * That is the checklist's job, not the banner's.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    visitedViewsRef.current.add(view);
+    if (visitedViewsRef.current.size >= 3) setProfileNudgeArmed(true);
+  }, [currentUserId, view]);
+
+  useEffect(() => {
+    if (!currentUserId || profileNudgeArmed) return;
+    const timer = window.setTimeout(() => {
+      setProfileNudgeArmed(true);
+    }, PROFILE_NUDGE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentUserId, profileNudgeArmed]);
+
+  /**
+   * A dismissed reminder stays dismissed — for this account, across page
+   * loads — until the profile is complete. It used to last for a single page
+   * load, so the banner came back on the next visit as if it had never been
+   * answered.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    setProfileNudgeDismissed(
+      window.localStorage.getItem(profileNudgeDismissedKey(currentUserId)) ===
+        "1",
+    );
+  }, [currentUserId]);
+
+  const dismissProfileNudge = () => {
+    setProfileNudgeDismissed(true);
+    if (currentUserId) {
+      window.localStorage.setItem(profileNudgeDismissedKey(currentUserId), "1");
+    }
+  };
+
   // Near-real-time overview: instant reload on notify:* socket events (the
   // same events the NotificationCenter already listens to) plus a light 60s
   // poll that pauses while the tab is hidden. No new backend endpoints.
@@ -699,8 +795,27 @@ const loadWorkspace = async () => {
     setProfileNudgeDismissed(false);
     if (typeof window !== "undefined") {
       window.localStorage.setItem("yekis_new_user_nudge_me", "1");
+      // The account is new, so a dismissal from a previous life on this
+      // device must not silence the reminder that is about to be shown.
+      window.localStorage.removeItem(
+        profileNudgeDismissedKey(session.user.id),
+      );
     }
     await loadWorkspace();
+
+    // Take a new account straight to the profile section, with the checklist
+    // open.
+    //
+    // The platform is going to keep asking for a photo, a name and a bio
+    // until they are there, so it asks now — while the account is brand new
+    // and the person has not done anything else yet. The reminder banner
+    // waits until they have started moving around; this does not, because
+    // this is the moment it is relevant.
+    setView("profile");
+    hashNavigate("/profile", {
+      replace: true,
+      state: { ...hashLocation.state, showProfileCompletion: true },
+    });
   };
 
   const submitAuth = async (event: FormEvent) => {
@@ -849,6 +964,23 @@ const loadWorkspace = async () => {
     activeAvatarOverride && "avatarUrl" in activeAvatarOverride
       ? activeAvatarOverride.avatarUrl
       : user?.avatarUrl ?? null;
+
+  /**
+   * A finished profile ends the reminder for good.
+   *
+   * The dismissal is remembered, so it has to be forgotten when the reason
+   * for the reminder disappears — otherwise an account that later filled its
+   * profile in would still be carrying "do not remind me" forever.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    const complete =
+      Boolean(effectiveUserAvatarUrl) &&
+      profileCompleteness !== null &&
+      profileCompleteness >= 85;
+    if (!complete) return;
+    window.localStorage.removeItem(profileNudgeDismissedKey(currentUserId));
+  }, [currentUserId, effectiveUserAvatarUrl, profileCompleteness]);
 
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
@@ -1993,7 +2125,18 @@ const loadWorkspace = async () => {
           </div>
         </header>
 
+        {/*
+          The reminder banner.
+
+          It waits on purpose: it only appears once the person has been in
+          the platform a while or has opened a second view, so it never
+          greets someone who has just arrived and has not looked at anything
+          yet. It also stays out of the profile section itself — that is
+          where the work is done, and a banner about it there is noise.
+        */}
         {view !== "profile-edit" &&
+          view !== "profile" &&
+          profileNudgeArmed &&
           !profileNudgeDismissed &&
           (!effectiveUserAvatarUrl ||
             (profileCompleteness !== null && profileCompleteness < 85)) && (
@@ -2051,8 +2194,8 @@ const loadWorkspace = async () => {
                 <button
                   type="button"
                   className="sh-icon-only-btn"
-                  onClick={() => setProfileNudgeDismissed(true)}
-                  title="Dismiss for this session"
+                  onClick={dismissProfileNudge}
+                  title="Dismiss — it will not come back until your profile is complete"
                   aria-label="Dismiss profile setup banner"
                 >
                   <X size={15} />

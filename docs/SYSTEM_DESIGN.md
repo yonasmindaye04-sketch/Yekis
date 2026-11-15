@@ -2265,6 +2265,47 @@ FullPlatformApp.tsx
         └── "profile-edit"    → ProfileEditPage (edit bio, skills, portfolio)
 ```
 
+#### Finishing the profile: when the platform asks, and when it waits
+
+A new account has no photo, no name, no bio and no verified identity, and the
+platform needs all four before it can be trusted with anyone's money. Two
+mechanisms ask for them, and they are deliberately not the same mechanism.
+
+**A new account is taken to the profile section, and the checklist is opened.**
+Registration does not drop the person on the dashboard. `completeRegistration`
+navigates to `/profile` and puts `showProfileCompletion` in the router state,
+which opens `ProfileCompletionDialog` — the checklist that says exactly what
+is missing (photo, name and bio, and for a freelancer the skills). This is
+the moment the ask is relevant: the account is brand new and the person has
+not done anything else yet. The Mini App does the same thing its own way —
+a new account lands on its **Profile** tab (account details and the Fayda
+identity check), because that is the Mini App's profile section. Signing in
+to an account that already exists changes nothing.
+
+**The banner waits.** The "Finish your profile" banner used to be on screen
+the moment the workspace loaded, which is the worst moment for it: the person
+has just arrived, has not looked at anything, and a bar about their missing
+photo is the least useful thing on the page. It is now **armed** — allowed to
+speak at all — only when the session has warmed up:
+
+| Arming condition | What it means |
+|---|---|
+| 45 seconds in the workspace (`PROFILE_NUDGE_DELAY_MS`) | The person is reading and thinking |
+| Three or more distinct views opened in the session | The person is moving around the platform |
+
+Three, not two: every new account lands on the profile section by itself, so
+two views is what an account sees before it has done anything — that is the
+checklist's job, not the banner's. The banner also stays out of the profile
+section (`profile` and `profile-edit`), because that is where the work is
+done and a banner about it there is noise.
+
+**A dismissal is remembered, and forgotten when it no longer applies.** The
+dismissal used to last for one page load, so the banner came back on the next
+visit as if it had never been answered. It is now remembered per account
+(`yekis_profile_nudge_dismissed_<userId>`) and cleared the moment the profile
+is complete — a photo and a completeness score of 85 or more — so an account
+that filled its profile in later is not carrying "do not remind me" forever.
+
 #### The Sidebar Is Frozen (does not scroll with the body)
 
 `.platform-shell.sh-shell` is a **grid** (`256px minmax(0, 1fr)`), so the

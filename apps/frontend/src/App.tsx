@@ -648,6 +648,13 @@ export function App() {
       window.localStorage.setItem("yekis-role", backendRole);
       setTelegramAuthStatus("ready");
       await loadData();
+      // A brand-new account lands in the profile section.
+      //
+      // The platform asks a new account for its identity and its details
+      // until they are there, so it asks in the profile section rather than
+      // over the home feed. Signing in to an account that already exists
+      // leaves the person where they were.
+      if (wasSigningUp) setActiveTab("kyc");
     } catch (err) {
       setTelegramAuthStatus("error");
       const raw = err instanceof Error ? err.message : "Login failed";
@@ -727,6 +734,9 @@ export function App() {
       setMiniSignupEmail(null);
       setTelegramAuthStatus("ready");
       await loadData();
+      // A brand-new account lands in the profile section, the same as the
+      // phone sign-up does.
+      setActiveTab("kyc");
     } catch (err) {
       setTelegramAuthStatus("error");
       const raw = err instanceof Error ? err.message : "Sign-up failed";
