@@ -584,6 +584,8 @@ export const translations = {
       profile: {
         publicHeading: "Public Marketplace Profile",
         publicDesc: "Verified credentials, portfolio highlights, and completed contract history.",
+        /** The heading over somebody else's profile — never "My Profile". */
+        memberProfileLabel: "Member Profile",
         editProfileBtn: "Edit Profile",
         backToProfileBtn: "Back to Profile",
         editHeading: "Edit Marketplace Profile",
@@ -1256,6 +1258,7 @@ export const translations = {
       profile: {
         publicHeading: "የህዝብ የገበያ ፕሮፋይል",
         publicDesc: "የተረጋገጡ መረጃዎች፣ የፖርትፎሊዮ ሥራዎች እና የተጠናቀቁ ውሎች ታሪክ።",
+        memberProfileLabel: "የአባል ፕሮፋይል",
         editProfileBtn: "ፕሮፋይል አስተካክል",
         backToProfileBtn: "ወደ ፕሮፋይል ተመለስ",
         editHeading: "የገበያ ፕሮፋይል አስተካክል",
@@ -1928,6 +1931,7 @@ export const translations = {
       profile: {
         publicHeading: "Piroofaayila Gabaa Ummataa",
         publicDesc: "Ragaa mirkanaa'e, hojiiwwan poortifooliyoo fi seenaa waliigaltee xumuramee.",
+        memberProfileLabel: "Piroofaayila Miseensaa",
         editProfileBtn: "Piroofaayila Gulaali",
         backToProfileBtn: "Gara Piroofaayilaatti Deebi'i",
         editHeading: "Piroofaayila Gabaa Gulaali",
@@ -2600,6 +2604,7 @@ export const translations = {
       profile: {
         publicHeading: "ህዝባዊ ናይ ዕዳጋ ፕሮፋይል",
         publicDesc: "ዝተረጋገጹ መረዳእታታት፣ ናሙና ስራሕትን ዛንታ ዝተዛዘሙ ውዕላትን።",
+        memberProfileLabel: "የኣባል ፕሮፋይል",
         editProfileBtn: "ፕሮፋይል ኣስተኻኽል",
         backToProfileBtn: "ናብ ፕሮፋይል ተመለስ",
         editHeading: "ናይ ዕዳጋ ፕሮፋይል ኣስተኻኽል",

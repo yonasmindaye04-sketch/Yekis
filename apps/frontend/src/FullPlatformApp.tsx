@@ -413,7 +413,27 @@ function FullPlatformAppInner() {
   const [jobError, setJobError] = useState("");
   const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
+  /**
+   * Whose profile the workspace is showing.
+   *
+   * `null` is my own profile. Anything else is somebody else's, and the
+   * shell has to know which: the breadcrumb must not say "My Profile" over
+   * another person's page, and "Edit Profile" must not be offered on a page
+   * that is not mine — clicking it would open the editor for *my* profile
+   * while the screen showed theirs.
+   */
   const [viewUserId, setViewUserId] = useState<string | null>(null);
+  /**
+   * The name of the profile on screen, once it has loaded.
+   *
+   * It arrives from the profile itself (`ProfilePage` reports what it
+   * fetched), so it is right for every path that can open a profile — the
+   * featured carousel, the gig seller, a chat partner — and not only for the
+   * ones that happen to know the name already.
+   */
+  const [viewedProfileName, setViewedProfileName] = useState<string | null>(
+    null,
+  );
   const [focusContractId, setFocusContractId] = useState<string | null>(null);
   const [focusChatConversationId, setFocusChatConversationId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
@@ -464,6 +484,56 @@ function FullPlatformAppInner() {
       setDualRoleMode(mode);
     }
   };
+
+  /**
+   * Opens MY profile.
+   *
+   * Every entry point that means "my profile" goes through here: the
+   * sidebar item, the avatar in the topbar, the chip at the foot of the
+   * sidebar, the command palette and the end of a registration. They used
+   * to call `setView("profile")` directly, which kept whatever profile was
+   * last opened — so clicking "My Profile" after looking at somebody else
+   * showed that person again, and the workspace was left counting somebody
+   * else's page as yours.
+   */
+  const openMyProfile = () => {
+    setViewUserId(null);
+    setViewedProfileName(null);
+    setView("profile");
+  };
+
+  /**
+   * Opens somebody else's profile.
+   *
+   * The name is not known here — it arrives from the profile itself once it
+   * has loaded — so it is cleared here and set again by `ProfilePage`.
+   */
+  const openProfileOf = (userId: string) => {
+    setViewUserId(userId);
+    setViewedProfileName(null);
+    setView("profile");
+  };
+
+  /**
+   * The workspace's own navigation.
+   *
+   * "profile" always means MY profile, whoever was last opened.
+   */
+  const navigateToView = (next: View) => {
+    if (next === "profile") {
+      openMyProfile();
+      return;
+    }
+    setView(next);
+  };
+
+  /**
+   * True when the profile on screen is the signed-in person's own.
+   *
+   * It is the shell's own answer, not the profile's: the shell knows which
+   * id it asked for, and the profile can be private, missing or slow.
+   */
+  const viewingOwnProfile = !viewUserId || viewUserId === user?.id;
 
 
   useEffect(() => {
@@ -811,7 +881,7 @@ const loadWorkspace = async () => {
     // and the person has not done anything else yet. The reminder banner
     // waits until they have started moving around; this does not, because
     // this is the moment it is relevant.
-    setView("profile");
+    openMyProfile();
     hashNavigate("/profile", {
       replace: true,
       state: { ...hashLocation.state, showProfileCompletion: true },
@@ -889,6 +959,10 @@ const loadWorkspace = async () => {
     setResetToken("");
     setDualRoleMode("BOTH");
     setView("overview");
+    // The next person to sign in on this device must not land on the
+    // profile the last one was looking at.
+    setViewUserId(null);
+    setViewedProfileName(null);
     setShowLanding(true);
   };
 
@@ -1939,9 +2013,22 @@ const loadWorkspace = async () => {
             <button
               key={item.view}
               type="button"
-              className={view === item.view ? "active" : ""}
+              className={
+                view === item.view &&
+                // "My Profile" is not highlighted while somebody else's
+                // profile is on screen — it is not my profile.
+                !(item.view === "profile" && !viewingOwnProfile)
+                  ? "active"
+                  : ""
+              }
               onClick={() => {
-                setView(item.view);
+                // "My Profile" always means my own profile — not whichever
+                // person was last opened.
+                if (item.view === "profile") {
+                  openMyProfile();
+                } else {
+                  setView(item.view);
+                }
                 setMobileDrawerOpen(false);
               }}
               title={item.label}
@@ -1972,7 +2059,7 @@ const loadWorkspace = async () => {
               type="button"
               className="user-chip-main"
               onClick={() => {
-                setView("profile");
+                openMyProfile();
                 setMobileDrawerOpen(false);
               }}
               title={`${roleLabel(platformRole)} — ${user.email}`}
@@ -2057,8 +2144,16 @@ const loadWorkspace = async () => {
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
                   ? t.workspace.nav.overview
-                  : navItems.find((item) => item.view === view)?.label ||
-                    t.nav.settings}
+                  : view === "profile" && !viewingOwnProfile
+                    ? // Somebody else's profile: name the person. The
+                      // sidebar item's label ("My Profile") would say the
+                      // page is mine, which it is not.
+                      // `||` and not `??`: a profile with no display name
+                      // reports an empty string, and an empty heading is
+                      // worse than the generic one.
+                      viewedProfileName || t.workspace.profile.memberProfileLabel
+                    : navItems.find((item) => item.view === view)?.label ||
+                      t.nav.settings}
               </strong>
             </div>
           </div>
@@ -2068,7 +2163,7 @@ const loadWorkspace = async () => {
             style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
           >
             <WorkspaceCommandPalette
-              onNavigateView={(v) => setView(v as View)}
+              onNavigateView={(v) => navigateToView(v as View)}
               onSwitchRoleMode={basePlatformRole === "BOTH" ? switchDualRoleMode : undefined}
               currentRole={platformRole}
             />
@@ -2103,11 +2198,11 @@ const loadWorkspace = async () => {
             >
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
-            <NotificationCenter onNavigate={(v) => setView(v as View)} />
+            <NotificationCenter onNavigate={(v) => navigateToView(v as View)} />
             <button
               type="button"
               className="user-menu"
-              onClick={() => setView("profile")}
+              onClick={openMyProfile}
               title={`${roleLabel(platformRole)} — ${user.email}`}
               aria-label={`Open profile (${user.email})`}
             >
@@ -2222,11 +2317,8 @@ const loadWorkspace = async () => {
               canWork={canWork}
               isRefreshing={isRefreshing}
               onRefresh={() => void refreshDashboard()}
-              onNavigateView={(v) => setView(v as View)}
-              onSelectProfile={(id) => {
-                setViewUserId(id);
-                setView("profile");
-              }}
+              onNavigateView={(v) => navigateToView(v as View)}
+              onSelectProfile={(id) => openProfileOf(id)}
             />
 
             <div className="overview-meta" style={{ padding: "0 24px 28px", maxWidth: 1440, margin: "0 auto" }}>
@@ -2526,20 +2618,35 @@ const loadWorkspace = async () => {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {t.workspace.profile.publicHeading}
+                  {viewingOwnProfile
+                    ? t.workspace.profile.publicHeading
+                    : viewedProfileName || t.workspace.profile.memberProfileLabel}
                 </h2>
                 <p className="sh-card-desc">
                   {t.workspace.profile.publicDesc}
                 </p>
               </div>
-              <button
-                className="sh-btn sh-btn-secondary"
-                onClick={() => setView("profile-edit")}
-              >
-                <Edit size={14} /> {t.workspace.profile.editProfileBtn}
-              </button>
+              {/* "Edit Profile" edits MY profile. Offering it over somebody
+                  else's page said that their page was mine — and the editor
+                  it opened was mine too, which is worse. */}
+              {viewingOwnProfile && (
+                <button
+                  className="sh-btn sh-btn-secondary"
+                  onClick={() => setView("profile-edit")}
+                >
+                  <Edit size={14} /> {t.workspace.profile.editProfileBtn}
+                </button>
+              )}
             </div>
-            <ProfilePage userId={viewUserId || user.id} />
+            <ProfilePage
+              userId={viewUserId || user.id}
+              onProfileLoaded={(loaded) =>
+                // A profile with no display name reports an empty string.
+                // Keep that out of the heading, so the generic label stands
+                // in until the person has a name.
+                setViewedProfileName(loaded.displayName || null)
+              }
+            />
           </section>
         )}
 
@@ -2556,7 +2663,7 @@ const loadWorkspace = async () => {
               </div>
               <button
                 className="sh-btn sh-btn-secondary"
-                onClick={() => setView("profile")}
+                onClick={openMyProfile}
               >
                 <ArrowLeft size={14} /> {t.workspace.profile.backToProfileBtn}
               </button>

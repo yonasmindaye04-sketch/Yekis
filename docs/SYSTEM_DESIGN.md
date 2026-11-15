@@ -2306,6 +2306,43 @@ visit as if it had never been answered. It is now remembered per account
 is complete — a photo and a completeness score of 85 or more — so an account
 that filled its profile in later is not carrying "do not remind me" forever.
 
+#### Whose profile is on screen
+
+The `profile` view shows **one** profile, and the shell has to know **whose**.
+
+`viewUserId` is the answer: `null` means my own profile, anything else means
+somebody else's. Everything that follows from it:
+
+| | My own profile | Somebody else's |
+|---|---|---|
+| Breadcrumb | "My Profile" | The person's name (their profile reports it once it has loaded) |
+| Section heading | "Public Marketplace Profile" | The person's name |
+| "Edit Profile" button | Shown | **Not shown** — it opens the editor for *my* profile, so offering it over somebody else's page said their page was mine, and the editor it opened was mine too |
+| "Report Profile" button | Not shown | Shown (`ProfilePage` asks the server whether the profile is mine) |
+| "My Profile" in the sidebar | Highlighted | Not highlighted — it is not my profile |
+
+**Every entry point that means "my profile" goes through `openMyProfile()`**:
+the sidebar item, the avatar in the topbar, the chip at the foot of the
+sidebar, the command palette, the "Back to Profile" button in the editor and
+the end of a registration. They used to call `setView("profile")` directly,
+which kept whichever profile was last opened — so clicking "My Profile" after
+looking at somebody else showed that person again, and the workspace counted
+somebody else's page as yours. Opening somebody else's profile goes through
+`openProfileOf(id)`, and signing out clears both.
+
+**The name comes from the profile, not from the caller.** `ProfilePage`
+reports the profile it loaded (`onProfileLoaded`), so the breadcrumb names the
+person for every path that can open a profile — the featured carousel, a gig
+seller, a chat partner — not only for the ones that happen to know the name
+already. The name arrives a moment after the click, so the breadcrumb shows
+"Member Profile" until it does. A profile with **no name at all** reports an
+empty display name, and the generic label stands in for that too — an empty
+heading is worse than the generic one.
+
+The Mini App has no other people's profiles — its Profile tab is the
+signed-in account's own details and identity check — so this is a
+browser-platform rule.
+
 #### The Sidebar Is Frozen (does not scroll with the body)
 
 `.platform-shell.sh-shell` is a **grid** (`256px minmax(0, 1fr)`), so the

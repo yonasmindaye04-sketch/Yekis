@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Shield,
   CheckCircle,
@@ -56,7 +56,20 @@ interface PublicProfileData {
   canViewFullProfile: boolean;
 }
 
-export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
+export const ProfilePage = ({
+  userId = "me",
+  onProfileLoaded,
+}: {
+  userId?: string;
+  /**
+   * Reports who was loaded.
+   *
+   * The shell needs it to say the person's name instead of "My Profile" over
+   * somebody else's page. It is a callback rather than a prop the shell
+   * passes down, because only the profile knows the name it fetched.
+   */
+  onProfileLoaded?: (profile: { id: string; displayName: string }) => void;
+}) => {
   const { t, language: lang } = useI18n();
   const pr = t.workspace.profile;
   const [profile, setProfile] = useState<PublicProfileData | null>(null);
@@ -70,6 +83,15 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
   const [reportDone, setReportDone] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  /**
+   * The callback in a ref, so a new function identity on every render does
+   * not re-fetch the profile.
+   */
+  const onProfileLoadedRef = useRef(onProfileLoaded);
+  useEffect(() => {
+    onProfileLoadedRef.current = onProfileLoaded;
+  });
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -80,7 +102,12 @@ export const ProfilePage = ({ userId = "me" }: { userId?: string }) => {
     ])
       .then(([profileRes, reviewsRes]) => {
         if (cancelled) return;
-        setProfile(profileRes as unknown as PublicProfileData);
+        const loaded = profileRes as unknown as PublicProfileData;
+        setProfile(loaded);
+        onProfileLoadedRef.current?.({
+          id: loaded.id,
+          displayName: loaded.displayName,
+        });
         const r = reviewsRes as { items?: ReviewItem[] } | ReviewItem[] | null;
         setReviews(Array.isArray(r) ? r : (r?.items ?? []));
       })
