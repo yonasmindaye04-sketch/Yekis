@@ -648,6 +648,15 @@ What was verified against the live instance:
   token was set, the same webview kept **both** tabs, sent its `initData` to
   the host and was refused with `BAD_SIGNATURE` — a real signature check, and
   still no session.
+- The **profile-view ownership** was walked against the live instance in a
+  real browser: opening a featured talent's profile shows **their** name in
+  the breadcrumb and in the section heading, offers **no** "Edit Profile",
+  offers "Report Profile", and highlights **no** sidebar item; "My Profile"
+  then shows the signed-in account's own profile again, with the editor and
+  no report button. The backend was already correct — `getPublicProfile`
+  resolves the id it is given, and `recordProfileView` counts the view
+  against the **target**, never the viewer (confirmed in the database: the
+  viewed talent's `profileViewCount` rose and the viewer's did not).
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
