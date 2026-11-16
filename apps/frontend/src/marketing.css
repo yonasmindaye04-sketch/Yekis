@@ -1201,14 +1201,23 @@
   left: 0;
 }
 
-.marketing-header-language .yk-lang-trigger {
+/* The header's language control is a bare label, not a boxed button.
+   The dark-theme rules in LanguageSelector.css are more specific than a
+   plain `.marketing-header-language .yk-lang-trigger`, so they were
+   winning: the box came back in dark mode and nowhere else, which is
+   where it was seen. The dark rule has to be matched here too.
+   The border keeps its width and only loses its colour, so nothing
+   moves. */
+.marketing-header-language .yk-lang-trigger,
+:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger {
   min-height: 44px;
   border-color: transparent;
   background: transparent;
   color: var(--color-text-secondary);
 }
 
-.marketing-header-language .yk-lang-trigger:hover {
+.marketing-header-language .yk-lang-trigger:hover,
+:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger:hover {
   border-color: transparent;
   background: var(--color-bg-subtle);
   color: var(--color-text);

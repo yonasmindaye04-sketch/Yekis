@@ -413,7 +413,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 /* Grounded subheadline */
 .yk-v2 .v2-hero-sub {
   max-width: 680px;
-  margin: 22px auto 0;
+  /* The title is very large and its descenders come close to the line
+     below it. The gap is what tells the eye that the sentence is a
+     sentence and not part of the headline. */
+  margin: 44px auto 0;
   font-size: clamp(1.05rem, 1.45vw, 1.25rem);
   line-height: 1.65;
   color: var(--v2-text2);
@@ -429,7 +432,9 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  margin-top: 30px;
+  /* The buttons sit clear of the sentence above them, so the eye reads
+     the heading, then the promise, then the way to act on it. */
+  margin-top: 42px;
   animation: v2-fp-up 0.35s ease 0.15s both;
 }
 
