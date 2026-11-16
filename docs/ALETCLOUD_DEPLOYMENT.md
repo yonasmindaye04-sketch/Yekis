@@ -657,6 +657,12 @@ What was verified against the live instance:
   resolves the id it is given, and `recordProfileView` counts the view
   against the **target**, never the viewer (confirmed in the database: the
   viewed talent's `profileViewCount` rose and the viewer's did not).
+- The **category artwork is 3D**: the six cards in "Find the right expertise."
+  render a transparent WebP each from `/icons/*.webp` (800×800, 23–59 KB), all six
+  decode on the live instance, and the footer carries the "Icons by Icons8"
+  credit the licence asks for. The image is **20.8 MB lighter** than before —
+  the category Lottie animations and their GIF fallbacks are gone and only the
+  escrow animation in the about section remains.
 - The **marketing pages and the Gigs section** were walked in a real browser against
   the live instance: the seven Lottie animations (six category cards and the escrow
   handshake) load as WebM and play, the Gigs section answers with the Afro-Tech
