@@ -657,6 +657,12 @@ What was verified against the live instance:
   resolves the id it is given, and `recordProfileView` counts the view
   against the **target**, never the viewer (confirmed in the database: the
   viewed talent's `profileViewCount` rose and the viewer's did not).
+- The **marketing pages and the Gigs section** were walked in a real browser against
+  the live instance: the seven Lottie animations (six category cards and the escrow
+  handshake) load as WebM and play, the Gigs section answers with the Afro-Tech
+  hero, the category rail, the search and sort controls and the gig cards, and
+  the workspace header's controls are borderless. The animations are served as
+  static assets from the image (`/lottie/*.webm` and `/lottie/*.gif`).
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
