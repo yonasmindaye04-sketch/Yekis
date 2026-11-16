@@ -865,37 +865,43 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     {
       kicker: t.marketing.categories.c1Class,
       title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
-      img: "/stack/img-1.jpg",
+      video: "/lottie/developer.webm",
+      gif: "/lottie/developer.gif",
       bg: "#c75a35",
     },
     {
       kicker: t.marketing.categories.c2Class,
       title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
-      img: "/stack/img-2.jpg",
+      video: "/lottie/design.webm",
+      gif: "/lottie/design.gif",
       bg: "#1f4d4a",
     },
     {
       kicker: t.marketing.categories.c3Class,
       title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
-      img: "/stack/img-3.jpg",
+      video: "/lottie/marketing.webm",
+      gif: "/lottie/marketing.gif",
       bg: "#2d2a66",
     },
     {
       kicker: t.marketing.categories.c4Class,
       title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
-      img: "/stack/img-4.jpg",
+      video: "/lottie/content.webm",
+      gif: "/lottie/content.gif",
       bg: "#0e3f36",
     },
     {
       kicker: t.marketing.categories.c5Class,
       title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
-      img: "/stack/img-5.jpg",
+      video: "/lottie/translation.webm",
+      gif: "/lottie/translation.gif",
       bg: "#4a224f",
     },
     {
       kicker: t.marketing.categories.c6Class,
       title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
-      img: "/stack/img-6.jpg",
+      video: "/lottie/data.webm",
+      gif: "/lottie/data.gif",
       bg: "#1a1613",
     },
   ];
@@ -1039,10 +1045,23 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
             <h2>{c.title}</h2>
           </div>
           <div className="stk-col stk-media">
-            <div
-              className="stk-img"
-              style={{ backgroundImage: `url(${c.img})` }}
-            />
+            <video
+              className="stk-lottie-media"
+              autoPlay
+              loop
+              muted
+              playsInline
+              poster={c.gif}
+              aria-label={`${c.kicker}: ${c.title}`}
+            >
+              <source src={c.video} type="video/webm" />
+              <img
+                src={c.gif}
+                alt={c.title}
+                className="stk-lottie-media stk-lottie-fallback"
+                loading="lazy"
+              />
+            </video>
           </div>
         </div>
       ))}
@@ -1279,14 +1298,28 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
               </button>
             </div>
 
-            {/* Right: editorial workspace image */}
-            <div className="v2-about-visual">
-              <img
-                src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1400"
-                alt="Freelancers and a client collaborating around a shared workspace"
-                loading="eager"
-                fetchPriority="high"
-              />
+            {/* Right: Lottie business handshake & escrow payment animation */}
+            <div
+              className="v2-about-visual"
+              aria-label="Escrow agreement and guaranteed milestone payout animation"
+            >
+              <video
+                className="v2-about-lottie-video"
+                autoPlay
+                loop
+                muted
+                playsInline
+                poster="/lottie/escrow-deal.gif"
+                aria-label="Escrow agreement and guaranteed milestone payout animation"
+              >
+                <source src="/lottie/escrow-deal.webm" type="video/webm" />
+                <img
+                  src="/lottie/escrow-deal.gif"
+                  alt="Escrow agreement and guaranteed milestone payout animation"
+                  loading="eager"
+                  className="v2-about-lottie-fallback"
+                />
+              </video>
               <div className="v2-about-visual-bar">
                 <span>{t.marketing.about.visualEscrow}</span>
                 <span>{t.marketing.about.visualKyc}</span>

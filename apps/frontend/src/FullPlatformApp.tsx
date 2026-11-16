@@ -1974,17 +1974,40 @@ const loadWorkspace = async () => {
               <strong className="sidebar-brand-name">Yekis</strong>
             )}
           </button>
-          {isMobileViewport && (
-            <button
-              type="button"
-              className="sh-icon-only-btn"
-              onClick={() => setMobileDrawerOpen(false)}
-              aria-label="Close navigation drawer"
-              title="Close navigation drawer"
-            >
+          {/* Sidebar toggle lives here — collapses on desktop, closes drawer on mobile */}
+          <button
+            type="button"
+            className="sh-icon-only-btn sidebar-brand-toggle"
+            onClick={() =>
+              isMobileViewport
+                ? setMobileDrawerOpen(false)
+                : toggleSidebarCollapsed()
+            }
+            aria-expanded={isMobileViewport ? mobileDrawerOpen : !sidebarCollapsed}
+            aria-controls="workspace-mobile-drawer"
+            title={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+            aria-label={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+          >
+            {isMobileViewport ? (
               <X size={16} />
-            </button>
-          )}
+            ) : sidebarCollapsed ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
         </div>
         {isMobileViewport && basePlatformRole === "BOTH" && (
           <div className="sh-mobile-drawer-role-switch">
@@ -2103,38 +2126,29 @@ const loadWorkspace = async () => {
       <main className="platform-main">
         <header className="platform-topbar sh-topbar">
           <div className="sh-topbar-left">
+            {/* Mobile: open drawer. Desktop: hidden (toggle lives in sidebar brand row) */}
+            {isMobileViewport && (
+              <button
+                type="button"
+                className="sh-icon-only-btn sh-topbar-menu-btn"
+                onClick={() => setMobileDrawerOpen((prev) => !prev)}
+                aria-expanded={mobileDrawerOpen}
+                aria-controls="workspace-mobile-drawer"
+                title="Open navigation drawer"
+                aria-label="Open navigation drawer"
+              >
+                <Menu size={17} />
+              </button>
+            )}
+            {/* Universal back button */}
             <button
               type="button"
-              className="sh-icon-only-btn sh-topbar-menu-btn"
-              onClick={() =>
-                isMobileViewport
-                  ? setMobileDrawerOpen((prev) => !prev)
-                  : toggleSidebarCollapsed()
-              }
-              aria-expanded={isMobileViewport ? mobileDrawerOpen : !sidebarCollapsed}
-              aria-controls="workspace-mobile-drawer"
-              title={
-                isMobileViewport
-                  ? "Open navigation drawer"
-                  : sidebarCollapsed
-                    ? "Expand sidebar"
-                    : "Collapse sidebar"
-              }
-              aria-label={
-                isMobileViewport
-                  ? "Open navigation drawer"
-                  : sidebarCollapsed
-                    ? "Expand sidebar"
-                    : "Collapse sidebar"
-              }
+              className="sh-icon-only-btn sh-topbar-back-btn"
+              onClick={() => window.history.back()}
+              title="Go back"
+              aria-label="Go back"
             >
-              {isMobileViewport ? (
-                <Menu size={17} />
-              ) : sidebarCollapsed ? (
-                <PanelLeftOpen size={16} />
-              ) : (
-                <PanelLeftClose size={16} />
-              )}
+              <ArrowLeft size={17} />
             </button>
             <div className="sh-breadcrumb">
               <span className="sh-breadcrumb-muted">

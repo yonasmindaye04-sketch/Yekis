@@ -1037,8 +1037,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .platform-topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; max-width: 1240px; padding: 30px 5vw 24px; margin: 0 auto; border-bottom: 1px solid var(--color-border); background: var(--color-bg); }
 .platform-topbar h1 { margin-top: 7px; font-size: 2rem; letter-spacing: -.04em; color: var(--color-text); }
 .topbar-actions { display: flex; align-items: center; gap: 14px; }
-.topbar-actions .icon-button { position: relative; transition: all .18s; }
-.topbar-actions .icon-button:hover { border-color: var(--color-primary); color: var(--color-primary); transform: scale(1.06); }
+.topbar-actions .icon-button { position: relative; border: 1px solid transparent; background: transparent; transition: all .18s; }
+.topbar-actions .icon-button:hover { border-color: transparent; background: var(--color-bg-hover); color: var(--color-primary); transform: none; }
 .user-menu {
   display: flex;
   align-items: center;
@@ -1059,6 +1059,15 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
   border-color: var(--color-primary);
   background: var(--color-bg-hover);
   transform: scale(1.04);
+}
+.topbar-actions .user-menu {
+  border: 1px solid transparent;
+  background: transparent;
+}
+.topbar-actions .user-menu:hover {
+  border-color: transparent;
+  background: var(--color-bg-hover);
+  transform: none;
 }
 .user-menu .avatar {
   width: 32px;

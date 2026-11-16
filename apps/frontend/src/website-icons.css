@@ -48,18 +48,18 @@
   }
 }
 
-/* Keep workspace header controls on the original dark surface. */
+/* Keep workspace header controls borderless and box-free across themes. */
 :root[data-theme="dark"] .topbar-actions .notification-trigger,
 :root[data-theme="dark"] .topbar-actions .user-menu {
-  border-color: #26343d !important;
-  background: #121c23 !important;
+  border-color: transparent !important;
+  background: transparent !important;
   color: #f7faf9 !important;
 }
 
 :root[data-theme="dark"] .topbar-actions .notification-trigger:hover,
 :root[data-theme="dark"] .topbar-actions .user-menu:hover {
-  border-color: #d8f36b !important;
-  background: #18272f !important;
+  border-color: transparent !important;
+  background: rgba(255, 255, 255, 0.08) !important;
 }
 
 :root[data-theme="dark"] .topbar-actions .notification-trigger svg,

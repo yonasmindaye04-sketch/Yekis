@@ -1321,6 +1321,89 @@
   margin: 0 0 12px;
 }
 
+/* Sidebar toggle button inside the brand row */
+.sidebar-brand-toggle {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sidebar-brand-toggle:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06));
+  border-color: var(--color-border);
+}
+
+/* When sidebar is collapsed on desktop, show only the toggle (centered) */
+.platform-shell.sh-shell.sh-collapsed .sidebar-brand-toggle {
+  margin-inline: auto;
+}
+
+/* Universal back button in the topbar (clean borderless aesthetic) */
+.sh-topbar-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-topbar-back-btn:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--color-text);
+  border-color: transparent;
+}
+
+/* Header icon controls: remove background box and border so icons float cleanly with ghost hover */
+.sh-topbar .sh-icon-only-btn,
+.sh-topbar .sh-topbar-back-btn,
+.sh-topbar .sh-topbar-menu-btn,
+.platform-topbar .sh-icon-only-btn,
+.platform-topbar .theme-toggle,
+.platform-topbar .notification-trigger,
+.platform-topbar .user-menu,
+.topbar-actions .icon-button,
+.topbar-actions .notification-trigger,
+.topbar-actions .user-menu {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.sh-topbar .sh-icon-only-btn:not(:disabled):hover,
+.sh-topbar .sh-topbar-back-btn:hover,
+.sh-topbar .sh-topbar-menu-btn:hover,
+.platform-topbar .sh-icon-only-btn:not(:disabled):hover,
+.platform-topbar .theme-toggle:hover,
+.platform-topbar .notification-trigger:hover,
+.platform-topbar .user-menu:hover,
+.topbar-actions .icon-button:hover,
+.topbar-actions .notification-trigger:hover,
+.topbar-actions .user-menu:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06)) !important;
+  border-color: transparent !important;
+  color: var(--color-text);
+  transform: none;
+}
+
 .platform-shell.sh-shell.sh-collapsed .sidebar-nav {
   align-items: center;
 }

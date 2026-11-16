@@ -1,6 +1,18 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-14
+Last validated: 2026-11-15
+
+> **Lottie Business Animations for Categories & Escrow (2026-11-15):**
+> - The category cards in "Find the right expertise." (`LandingPageV2.tsx`) and the escrow agreement visual in "Great work deserves guaranteed payment." were upgraded to use business Lottie animations from IconScout.
+> - **Categories**: Integrated 6 focused digital expertise animations: Web & App Development (`developer`), Graphic Design & Branding (`design`), Digital Marketing (`marketing`), Content Writing (`content`), Language Translation (`translation`), and Data Processing (`data`).
+> - **Escrow & Trust**: The about section visual was upgraded from a static stock photo to an animated Google / IconScout business handshake Lottie file (`escrow-deal`), reinforcing milestone escrow safety and mutual agreement.
+> - **Zero-latency delivery**: Bundled under `apps/frontend/public/lottie/` with dual-format `<video>`/`<img>` fallback, zero layout shift, and full theme parity.
+
+> **Dashboard Shell: Sidebar Toggle & Universal Back Button (2026-11-15):**
+> - The sidebar collapse/expand toggle (desktop) and drawer close button (mobile) were unified into a single `sidebar-brand-toggle` button now living inside the `sidebar-brand-row` at the top of the sidebar, next to the Yekis logo. This keeps the toggle visually anchored to the sidebar and cleans up the topbar.
+> - A universal back button (`ArrowLeft`) was added to the topbar (`sh-topbar-left`), immediately left of the breadcrumb ("Client Workspace / <view>"). Calls `window.history.back()` to navigate to the previous view.
+> - On mobile, the topbar still shows a hamburger to open the drawer. On desktop, the topbar no longer has a sidebar toggle — it lives in the sidebar brand row exclusively.
+> - New CSS classes `.sidebar-brand-toggle` and `.sh-topbar-back-btn` are theme-parity compliant: layout geometry in un-themed base rules; color/background/border-color only in theme-conditional overrides.
 
 > **Afro-Tech Gigs Section Overhaul (2026-11-14):**
 > - The Gigs section (`GigMarketplace.tsx` and `GigMarketplace.css`) was redesigned from the initial prototype into a high-end Afro-Tech digital services marketplace.

@@ -1346,24 +1346,31 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
   min-height: 540px;
   overflow: hidden;
   background: var(--v2-surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.yk-v2 .v2-about-visual img {
+.yk-v2 .v2-about-visual img,
+.yk-v2 .v2-about-visual video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   display: block;
-  object-fit: cover;
-  object-position: 58% center;
-  filter: saturate(0.82) contrast(0.96);
+  object-fit: contain;
+  object-position: center;
+  padding: 2.5rem 2.5rem 5rem;
+  box-sizing: border-box;
+  filter: saturate(0.92) contrast(0.98);
   transform: scale(1.015);
   transition:
     transform 0.85s var(--v2-ease),
     filter 0.85s var(--v2-ease);
 }
-.yk-v2 .v2-about-visual:hover img {
-  filter: saturate(0.95) contrast(1);
-  transform: scale(1.055);
+.yk-v2 .v2-about-visual:hover img,
+.yk-v2 .v2-about-visual:hover video {
+  filter: saturate(1) contrast(1);
+  transform: scale(1.045);
 }
 .yk-v2 .v2-about-visual-bar {
   position: absolute;
@@ -2308,6 +2315,10 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
     margin-top: 32px;
   }
   .yk-v2 .v2-about-visual { min-height: 440px; }
+  .yk-v2 .v2-about-visual img,
+  .yk-v2 .v2-about-visual video {
+    padding: 1.25rem 1.25rem 4.5rem;
+  }
   .yk-v2 .v2-about-visual-bar { right: 14px; bottom: 14px; left: 14px; padding: 13px; }
   .yk-v2 .v2-fees-card { padding: 26px 20px; }
   /* testimonials — single column */
@@ -2851,12 +2862,36 @@ font-size: clamp(2.6rem, 7.6vw, 7.1rem);
 .yk-v2 .stk-media {
   border-radius: 0.7rem;
   overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.22);
 }
 .yk-v2 .stk-img {
   width: 100%;
   height: 100%;
   background-size: cover;
   background-position: center;
+}
+.yk-v2 .stk-lottie-media {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  padding: 1.2rem;
+  box-sizing: border-box;
+  transform: scale(1.02);
+  transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.yk-v2 .stk-lottie-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.yk-v2 .stk-card:hover .stk-lottie-media {
+  transform: scale(1.08);
 }
 
 /* ── outro panel (always dark) ── */
