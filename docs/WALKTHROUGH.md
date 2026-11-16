@@ -2,10 +2,16 @@
 
 Last validated: 2026-11-15
 
-> **Lottie Business Animations for Categories & Escrow (2026-11-15):**
-> - The category cards in "Find the right expertise." (`LandingPageV2.tsx`) and the escrow agreement visual in "Great work deserves guaranteed payment." were upgraded to use business Lottie animations from IconScout.
-> - **Categories**: Integrated 6 focused digital expertise animations: Web & App Development (`developer`), Graphic Design & Branding (`design`), Digital Marketing (`marketing`), Content Writing (`content`), Language Translation (`translation`), and Data Processing (`data`).
-> - **Escrow & Trust**: The about section visual was upgraded from a static stock photo to an animated Google / IconScout business handshake Lottie file (`escrow-deal`), reinforcing milestone escrow safety and mutual agreement.
+> **The category artwork is 3D (2026-11-16):**
+> - The six category cards in "Find the right expertise." now carry a **3D render** each instead of a flat line-art scene — the flat scenes all looked like the same picture (a person at a desk), so a card did not tell you what it was about until you read it.
+> - **The set** — Icons8's **3D Fluency** style (the Microsoft Fluent 3D look), bundled locally in `apps/frontend/public/icons/`: `web-development` (a browser window with `</>`), `graphic-design` (paint swatches), `digital-marketing` (a megaphone), `content-copywriting` (a document page), `translation` (a globe) and `data-processing` (a pie chart). Each is a transparent WebP at 800px, 23–59 KB.
+> - **They float on the card.** `LandingPageV2.tsx` renders `<img className="stk-3d-icon">` where the Lottie `<video>` was, and `landing-v2.css` gives it a soft drop shadow and the same hover scale the video had. The card's own colour shows through behind it, so the card is unchanged in both themes.
+> - **Bundled, not hotlinked** — the site's Content-Security-Policy allows images only from `'self'`, so a remote icon would not load at all. The set is served from our own origin like every other asset.
+> - **The credit is in the footer** — "Icons by Icons8" (the new `marketing.footer.iconCredit` key, in all four locales), because Icons8's free licence asks for one wherever their work appears.
+> - **20.8 MB lighter** — the six category animations and their GIF fallbacks are gone; the artwork they carried is now 271 KB of transparent WebP. The escrow handshake animation in "Great work deserves guaranteed payment." is unchanged.
+
+> **Lottie Business Animation for Escrow (2026-11-15):**
+> - The escrow agreement visual in "Great work deserves guaranteed payment." was upgraded from a static stock photo to an animated Google / IconScout business handshake Lottie file (`escrow-deal`), reinforcing milestone escrow safety and mutual agreement.
 > - **Zero-latency delivery**: Bundled under `apps/frontend/public/lottie/` with dual-format `<video>`/`<img>` fallback, zero layout shift, and full theme parity.
 
 > **Dashboard Shell: Sidebar Toggle & Universal Back Button (2026-11-15):**

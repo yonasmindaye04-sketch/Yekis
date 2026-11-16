@@ -865,43 +865,37 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     {
       kicker: t.marketing.categories.c1Class,
       title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
-      video: "/lottie/developer.webm",
-      gif: "/lottie/developer.gif",
+      icon: "/icons/web-development.webp",
       bg: "#c75a35",
     },
     {
       kicker: t.marketing.categories.c2Class,
       title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
-      video: "/lottie/design.webm",
-      gif: "/lottie/design.gif",
+      icon: "/icons/graphic-design.webp",
       bg: "#1f4d4a",
     },
     {
       kicker: t.marketing.categories.c3Class,
       title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
-      video: "/lottie/marketing.webm",
-      gif: "/lottie/marketing.gif",
+      icon: "/icons/digital-marketing.webp",
       bg: "#2d2a66",
     },
     {
       kicker: t.marketing.categories.c4Class,
       title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
-      video: "/lottie/content.webm",
-      gif: "/lottie/content.gif",
+      icon: "/icons/content-copywriting.webp",
       bg: "#0e3f36",
     },
     {
       kicker: t.marketing.categories.c5Class,
       title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
-      video: "/lottie/translation.webm",
-      gif: "/lottie/translation.gif",
+      icon: "/icons/translation.webp",
       bg: "#4a224f",
     },
     {
       kicker: t.marketing.categories.c6Class,
       title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
-      video: "/lottie/data.webm",
-      gif: "/lottie/data.gif",
+      icon: "/icons/data-processing.webp",
       bg: "#1a1613",
     },
   ];
@@ -1045,23 +1039,18 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
             <h2>{c.title}</h2>
           </div>
           <div className="stk-col stk-media">
-            <video
-              className="stk-lottie-media"
-              autoPlay
-              loop
-              muted
-              playsInline
-              poster={c.gif}
-              aria-label={`${c.kicker}: ${c.title}`}
-            >
-              <source src={c.video} type="video/webm" />
-              <img
-                src={c.gif}
-                alt={c.title}
-                className="stk-lottie-media stk-lottie-fallback"
-                loading="lazy"
-              />
-            </video>
+            {/* The category artwork is a 3D render (Fluent 3D, via Icons8):
+                a single object floating on the card's own colour, which
+                reads at a glance where the flat line-art scenes did not —
+                they all looked like the same picture. */}
+            <img
+              className="stk-3d-icon"
+              src={c.icon}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
+            />
           </div>
         </div>
       ))}
@@ -1879,6 +1868,16 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
             <LanguageSelector variant="segmented" />
             <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
             <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
+            {/* The 3D icon set is Icons8's, and their free licence asks for
+                a credit wherever their work appears. */}
+            <a
+              href="https://icons8.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="v2-footer-icon-credit"
+            >
+              {t.marketing.footer.iconCredit}
+            </a>
           </div>
         </div>
       </div>

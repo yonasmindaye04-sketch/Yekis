@@ -334,6 +334,8 @@ export const translations = {
         emailUs: "Email Us",
         copyright: "© 2026 Yekis. All rights reserved.",
         escrowNote: "Payments secured by Yekis Escrow",
+        /** Credit for the 3D icon set — the Icons8 licence requires it. */
+        iconCredit: "Icons by Icons8",
         langToggle: "EN / አማ / ORO / ትግ",
       },
       "404": {
@@ -1008,6 +1010,7 @@ export const translations = {
         emailUs: "ኢሜይል ይላኩልን",
         copyright: "© 2026 ዬኪስ። መብቱ በህግ የተጠበቀ ነው።",
         escrowNote: "ክፍያዎች በዬኪስ ኤስክሮው የተጠበቁ ናቸው",
+        iconCredit: "አይኮኖች በ Icons8",
         langToggle: "EN / አማ / ORO / ትግ",
       },
       "404": {
@@ -1681,6 +1684,7 @@ export const translations = {
         emailUs: "Imeeyilii Nuuf Ergaa",
         copyright: "© 2026 Yekis. Mirgi hunduu seeraan eegamaadha.",
         escrowNote: "Kaffaltiin Qabsiisa Yekis tiin eegamaadha",
+        iconCredit: "Awwaamoota Icons8",
         langToggle: "EN / አማ / ORO / ትግ",
       },
       "404": {
@@ -2354,6 +2358,7 @@ export const translations = {
         emailUs: "ኢመይል ስደዱልና",
         copyright: "© 2026 ዬኪስ። ኩሉ መሰላት ብሕጊ ዝተሓለወ እዩ።",
         escrowNote: "ክፍሊታት ብናይ ዬኪስ ኤስክሮው ዝተሓለዉ እዮም",
+        iconCredit: "አይኮኖች ከ Icons8",
         langToggle: "EN / አማ / ORO / ትግ",
       },
       "404": {
