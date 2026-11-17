@@ -8,7 +8,6 @@ import {
   FileText,
   Gavel,
   MessageSquare,
-  Paperclip,
   Search,
   Send,
   WalletCards,
@@ -32,6 +31,7 @@ import {
 import { TbAlertTriangle } from "react-icons/tb";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
+import { FileUploader } from "@/components/ui/file-upload-1";
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
@@ -96,12 +96,26 @@ export function JobsWorkspace({
   onChanged,
   categories = DEFAULT_CATEGORIES,
   categoryLabels = DEFAULT_CATEGORY_LABELS,
+  section = "jobs",
+  onBrowseJobs,
 }: {
   role: MarketplaceRole;
   openJobs: Job[];
   onChanged: () => Promise<void>;
   categories?: string[];
   categoryLabels?: Record<string, string>;
+  /**
+   * Which half of the jobs workspace to render.
+   *
+   * Jobs and Proposals are two sidebar tabs, not two sub-tabs: the sidebar
+   * owns the split, so the workspace just renders the half it was asked for.
+   * "jobs" is the brief board — browse, publish, and the briefs you own.
+   * "proposals" is the proposal pipeline — the bids you sent and the bids
+   * you are receiving.
+   */
+  section?: "jobs" | "proposals";
+  /** Called when the person asks to go back to the briefs board. */
+  onBrowseJobs?: () => void;
 }) {
   const { t } = useI18n();
   const jf = t.workspace.jobsFlow;
@@ -113,7 +127,7 @@ export function JobsWorkspace({
   const [proposalsByJob, setProposalsByJob] = useState<
     Record<string, Proposal[]>
   >({});
-  const [jobsSubTab, setJobsSubTab] = useState<"browse" | "proposals">("browse");
+  const showProposals = section === "proposals";
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [detailJobId, setDetailJobId] = useState<string | null>(null);
   const [attachments, setAttachments] = useState<File[]>([]);
@@ -241,14 +255,68 @@ export function JobsWorkspace({
     }
   };
 
+  /**
+   * The client's own briefs — the Jobs tab half.
+   *
+   * The proposals that came in against these briefs live on the Proposals
+   * tab, so this is a plain list of what you have published and how much
+   * interest each brief has drawn.
+   */
+  const myBriefsPanel = isHiring(role) ? (
+    <div className="sh-card">
+      <div className="sh-card-header">
+        <div>
+          <h3 className="sh-card-title">{jf.tabMyBriefs}</h3>
+          <p className="sh-card-desc">{jf.tabMyBriefsDesc}</p>
+        </div>
+        <span className="sh-kbd">{ownedJobs.length} Active Briefs</span>
+      </div>
+      {ownedJobs.length === 0 ? (
+        <p className="empty-state">{jf.noBriefsYet}</p>
+      ) : (
+        <div className="workflow-stack">
+          {ownedJobs.map((job) => (
+            <article className="workflow-item sh-subcard" key={job.id}>
+              <div className="workflow-item-head">
+                <div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                    <span className="sh-status-inline emerald">
+                      {label(job.status, statuses)}
+                    </span>
+                    <span className="sh-mono" style={{ fontSize: "0.84rem", fontWeight: 700, color: "var(--color-primary)" }}>
+                      {money(job.budgetMinMinor)} – {money(job.budgetMaxMinor)}
+                    </span>
+                  </div>
+                  <h3>{job.title}</h3>
+                  <small className="sh-cell-meta">
+                    Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
+                    <span className="sh-mono">{date(job.deadline)}</span>
+                  </small>
+                </div>
+                <span className="sh-kbd">
+                  {proposalsByJob[job.id]?.length ?? 0} proposals
+                </span>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  /**
+   * The proposal pipeline — the Proposals tab half.
+   *
+   * Every brief the client has published, and the proposals that came in
+   * against it. Shortlisting, accepting and rejecting all happen here,
+   * because this is the tab that a proposal notification points at.
+   */
   const hiringPanel = isHiring(role) ? (
     <div className="sh-card">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Published Hiring Briefs & Proposal Pipeline</h3>
-          <p className="sh-card-desc">
-            Review incoming freelancer proposals, shortlist candidates, and generate escrow contracts
-          </p>
+          <h3 className="sh-card-title">{jf.pipelineTitle}</h3>
+          <p className="sh-card-desc">{jf.pipelineDesc}</p>
         </div>
         <span className="sh-kbd">{ownedJobs.length} Active Briefs</span>
       </div>
@@ -512,47 +580,9 @@ export function JobsWorkspace({
           <AlertTitle>{errorMessage}</AlertTitle>
         </Alert>
       )}
-      {hiringPanel}
+      {showProposals ? hiringPanel : myBriefsPanel}
 
-      {/* Freelancer Sub-Navigation: Browse Open Briefs vs My Submitted Proposals (FR-12) */}
-      {isWorking(role) && (
-        <div className="sh-subnav-bar" style={{ marginBottom: 4 }}>
-          <div className="sh-subnav-left">
-            <div
-              className="sh-segmented"
-              role="tablist"
-              aria-label="Jobs and proposals view"
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={jobsSubTab === "browse"}
-                className={`sh-seg-btn ${jobsSubTab === "browse" ? "active" : ""}`}
-                onClick={() => setJobsSubTab("browse")}
-              >
-                <Briefcase size={14} />
-                <span>
-                  {jf.tabBrowseBriefs} ({effectiveOpenJobs.length})
-                </span>
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={jobsSubTab === "proposals"}
-                className={`sh-seg-btn ${jobsSubTab === "proposals" ? "active" : ""}`}
-                onClick={() => setJobsSubTab("proposals")}
-              >
-                <Send size={14} />
-                <span>
-                  {jf.tabMyProposals} ({myProposals.length})
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {isWorking(role) && jobsSubTab === "proposals" && (
+      {isWorking(role) && showProposals && (
         <section className="sh-card">
           <div className="sh-card-header">
             <div>
@@ -574,7 +604,7 @@ export function JobsWorkspace({
               <button
                 type="button"
                 className="sh-btn sh-btn-primary"
-                onClick={() => setJobsSubTab("browse")}
+                onClick={() => onBrowseJobs?.()}
               >
                 <Briefcase size={14} /> {jf.tabBrowseBriefs}
               </button>
@@ -623,7 +653,7 @@ export function JobsWorkspace({
         </section>
       )}
 
-      {(!isWorking(role) || jobsSubTab === "browse") && (
+      {!showProposals && (
         <div className="sh-card">
           <div className="sh-card-header">
             <div>
@@ -992,41 +1022,22 @@ export function JobsWorkspace({
                         </div>
 
                         <div className="proposal-attachments form-wide" style={{ gridColumn: "1 / -1" }}>
-                          <label className="file-upload-btn">
-                            <Paperclip size={15} /> {jf.attachSpecBtn}
-                            <input
-                              type="file"
-                              multiple
-                              accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                              onChange={(e) => {
-                                if (e.target.files?.length) {
-                                  setAttachments((prev) => [
-                                    ...prev,
-                                    ...Array.from(e.target.files!),
-                                  ]);
-                                }
-                              }}
-                            />
-                          </label>
-                          {attachments.length > 0 && (
-                            <div style={{ marginTop: 10 }}>
-                              {attachments.map((file, idx) => (
-                                <span key={idx} className="attachment-chip">
-                                  {file.name}
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setAttachments((prev) =>
-                                        prev.filter((_, i) => i !== idx),
-                                      )
-                                    }
-                                  >
-                                    <X size={13} />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
+                            {jf.attachSpecBtn}
+                          </span>
+                          <FileUploader
+                            compact
+                            showCard={false}
+                            showHeader={false}
+                            maxFiles={6}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                            acceptedLabel="PDF, DOCX, PNG, JPG · up to 25 MB each"
+                            maxSizeMB={25}
+                            onFilesChange={(files) => setAttachments(files)}
+                            value={attachments}
+                            showFooter={false}
+                            showEncryptionBadge={true}
+                          />
                         </div>
 
                         <button

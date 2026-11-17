@@ -1,15 +1,19 @@
 // === IMPORTS ===
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, Check, CornerDownRight } from "lucide-react";
 import { api, type NotificationItem } from "./api/client";
 import { appTargetFor } from "./api/notificationTargets";
-import { realtimeSocket } from "./api/socket";
+import {
+  markNotificationsReadLocally,
+  useNotifications,
+} from "./api/notificationFeed";
 import { useI18n } from "./i18n";
 
 /** Views this component may navigate to; kept in step with FullPlatformApp's View. */
 const ROUTABLE = new Set([
   "overview",
   "jobs",
+  "proposals",
   "gigs",
   "contracts",
   "escrow",
@@ -22,32 +26,9 @@ const ROUTABLE = new Set([
 // === MAIN COMPONENT ===
 export function NotificationCenter({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const { t } = useI18n();
-  const [items, setItems] = useState<NotificationItem[]>([]);
+  const items = useNotifications();
   const [open, setOpen] = useState(false);
   const unread = items.filter((item) => !item.isRead).length;
-  const load = async () => {
-    try {
-      setItems(await api.getNotifications());
-    } catch {
-      /* unavailable notifications should not block the workspace */
-    }
-  };
-  useEffect(() => {
-    void load();
-
-    // Real-time: refresh instantly when the server pushes a notify:* event,
-    // instead of waiting for the next poll tick.
-    realtimeSocket.connect();
-    const offAny = realtimeSocket.onAny(({ event }) => {
-      if (event.startsWith("notify:")) void load();
-    });
-
-    const timer = window.setInterval(() => void load(), 15000);
-    return () => {
-      window.clearInterval(timer);
-      offAny();
-    };
-  }, []);
   /* Mark read, then jump to the view the event came from. Marking is attempted
    even when there is no destination, so a click always clears the badge. */
   const read = async (item: NotificationItem) => {
@@ -57,13 +38,13 @@ export function NotificationCenter({ onNavigate }: { onNavigate?: (view: string)
       setOpen(false);
     }
     if (item.isRead) return;
+    // The badge clears on this render pass; the server confirms on the next
+    // poll, and a failed read relights the row instead of hiding it.
+    markNotificationsReadLocally([item.id]);
     try {
+      // The shared feed refreshes on its own; marking the row read on the
+      // server is enough for the badge and the dot to clear.
       await api.markNotificationRead(item.id);
-      setItems((current) =>
-        current.map((entry) =>
-          entry.id === item.id ? { ...entry, isRead: true } : entry,
-        ),
-      );
     } catch {
       /* a failed read should not block navigation */
     }

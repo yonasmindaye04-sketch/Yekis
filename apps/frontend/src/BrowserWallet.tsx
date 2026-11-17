@@ -33,6 +33,7 @@ import { TbFileAlert, TbAlertCircle } from "react-icons/tb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { cn } from "@/lib/utils";
+import { FileUploader } from "@/components/ui/file-upload-1";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -1000,16 +1001,23 @@ export function BrowserWallet({
                       }
                     />
                   </label>
-                  <label style={{ gridColumn: "1 / -1" }}>
-                    Receipt image or document (PDF/Photo)
-                    <input
-                      type="file"
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
+                      Receipt image or document (PDF/Photo)
+                    </span>
+                    <FileUploader
+                      compact
+                      showCard={false}
+                      showHeader={false}
+                      maxFiles={1}
                       accept="image/*,.pdf"
-                      onChange={(e) =>
-                        setReceipt(e.target.files?.[0] || null)
-                      }
+                      acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                      maxSizeMB={10}
+                      onFileSelect={(file) => setReceipt(file)}
+                      showFooter={false}
+                      showEncryptionBadge={true}
                     />
-                  </label>
+                  </div>
                 </div>
                 <button
                   className="btn-primary"
@@ -1145,40 +1153,73 @@ export function BrowserWallet({
                   <div
                     style={{
                       background: "var(--color-bg-subtle)",
-                      padding: 12,
-                      borderRadius: 8,
+                      padding: 16,
+                      borderRadius: 12,
                       border: "1px dashed var(--color-border)",
-                      display: "grid",
-                      gap: 8,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                      marginTop: 12,
                     }}
                   >
-                    <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                      If your automated checkout didn’t complete automatically, submit your provider transaction reference code and receipt photo below for manual verification:
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 600, color: "var(--color-text)" }}>
+                        Submit Provider Receipt for Staff Verification
+                      </h4>
+                      <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
+                        If your automated checkout didn’t complete automatically, submit your provider transaction reference code and receipt photo below for manual verification:
+                      </p>
+                    </div>
+
+                    <div>
+                      <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 500, marginBottom: 4, color: "var(--color-text)" }}>
+                        Transaction / Reference Code
+                      </label>
                       <input
                         type="text"
-                        placeholder="Transaction / Reference Code"
+                        placeholder="e.g. TB-12345 or CBE-REF"
                         value={attachRef}
                         onChange={(e) => setAttachRef(e.target.value)}
-                        style={{ fontSize: "0.82rem", padding: "6px 8px" }}
-                      />
-                      <input
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                        style={{ fontSize: "0.82rem", padding: "4px 8px" }}
+                        style={{ fontSize: "0.82rem", padding: "8px 12px", width: "100%", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-bg-elevated)", color: "var(--color-text)" }}
                       />
                     </div>
-                    <button
-                      type="button"
-                      className="btn-primary"
-                      style={{ width: "fit-content", fontSize: "0.82rem", padding: "6px 14px" }}
-                      disabled={isAttachingSubmitting || !attachRef.trim() || !attachFile}
-                      onClick={() => void handleAttachReceipt(item.id)}
-                    >
-                      {isAttachingSubmitting ? "Submitting..." : "Submit for Staff Verification"}
-                    </button>
+
+                    <FileUploader
+                      compact
+                      showCard={false}
+                      showHeader={false}
+                      maxFiles={1}
+                      accept="image/*,.pdf"
+                      acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                      maxSizeMB={10}
+                      onFileSelect={(file) => setAttachFile(file)}
+                      showFooter={false}
+                      showEncryptionBadge={true}
+                    />
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        style={{ fontSize: "0.82rem", padding: "6px 14px" }}
+                        onClick={() => {
+                          setAttachingTopUpId(null);
+                          setAttachRef("");
+                          setAttachFile(null);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-primary"
+                        style={{ fontSize: "0.82rem", padding: "6px 18px" }}
+                        disabled={isAttachingSubmitting || !attachRef.trim() || !attachFile}
+                        onClick={() => void handleAttachReceipt(item.id)}
+                      >
+                        {isAttachingSubmitting ? "Submitting..." : "Submit for Staff Verification"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1483,39 +1524,72 @@ export function BrowserWallet({
                     <div
                       style={{
                         background: "var(--color-bg-subtle)",
-                        padding: 12,
-                        borderRadius: 8,
-                        display: "grid",
-                        gap: 8,
-                        border: "1px solid var(--color-border)",
+                        padding: 16,
+                        borderRadius: 12,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                        marginTop: 10,
+                        border: "1px dashed var(--color-border)",
                       }}
                     >
-                      <p style={{ margin: 0, fontSize: "0.82rem", color: "var(--color-text-secondary)" }}>
-                        Payment didn't clear automatically? Attach your receipt and reference code below for manual staff approval.
-                      </p>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <div>
+                        <h4 style={{ margin: 0, fontSize: "0.88rem", fontWeight: 600, color: "var(--color-text)" }}>
+                          Attach Provider Receipt
+                        </h4>
+                        <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>
+                          Payment didn't clear automatically? Attach your receipt and reference code below for manual staff approval.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label style={{ display: "block", fontSize: "0.8rem", fontWeight: 500, marginBottom: 4, color: "var(--color-text)" }}>
+                          Transaction / Reference Code
+                        </label>
                         <input
-                          placeholder="Transaction / reference code"
+                          placeholder="e.g. TB-12345 or transaction reference"
                           value={attachRef}
                           onChange={(e) => setAttachRef(e.target.value)}
-                          style={{ fontSize: "0.82rem" }}
-                        />
-                        <input
-                          type="file"
-                          accept="image/*,.pdf"
-                          onChange={(e) => setAttachFile(e.target.files?.[0] || null)}
-                          style={{ fontSize: "0.82rem" }}
+                          style={{ fontSize: "0.82rem", padding: "8px 12px", width: "100%", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-bg-elevated)", color: "var(--color-text)" }}
                         />
                       </div>
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        style={{ width: "fit-content", fontSize: "0.82rem", padding: "6px 14px" }}
-                        disabled={isAttachingSubmitting || !attachRef.trim() || !attachFile}
-                        onClick={() => void handleAttachReceipt(topUpId)}
-                      >
-                        {isAttachingSubmitting ? "Submitting..." : "Submit for Staff Verification"}
-                      </button>
+
+                      <FileUploader
+                        compact
+                        showCard={false}
+                        showHeader={false}
+                        maxFiles={1}
+                        accept="image/*,.pdf"
+                        acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                        maxSizeMB={10}
+                        onFileSelect={(file) => setAttachFile(file)}
+                        showFooter={false}
+                        showEncryptionBadge={true}
+                      />
+
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: "0.82rem", padding: "6px 14px" }}
+                          onClick={() => {
+                            setAttachingTopUpId(null);
+                            setAttachRef("");
+                            setAttachFile(null);
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          style={{ fontSize: "0.82rem", padding: "6px 18px" }}
+                          disabled={isAttachingSubmitting || !attachRef.trim() || !attachFile}
+                          onClick={() => void handleAttachReceipt(topUpId)}
+                        >
+                          {isAttachingSubmitting ? "Submitting..." : "Submit for Staff Verification"}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>

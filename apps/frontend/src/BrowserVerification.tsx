@@ -1,9 +1,10 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useState } from "react";
-import { Check, CheckCircle2, Fingerprint, ShieldCheck, Upload, X } from "lucide-react";
+import { Check, CheckCircle2, Fingerprint, ShieldCheck } from "lucide-react";
 import { api, type KycStatusResponse } from "./api/client";
 import { useI18n } from "./i18n";
 import { formatStatusLabel, statusTone } from "./pages/ops/components/ui";
+import { FileUploader } from "@/components/ui/file-upload-1";
 
 // === MAIN COMPONENT ===
 export function BrowserVerification() {
@@ -265,34 +266,22 @@ export function BrowserVerification() {
             />
           </label>
           <div className="verification-upload form-wide" style={{ gridColumn: "1 / -1" }}>
-            <label style={{ display: "grid", gap: 6 }}>
-              <span>{k.faydaPhotoLabel}</span>
-              <small style={{ minHeight: 48, cursor: "pointer" }}>
-                <Upload size={16} />
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {idPhoto
-                    ? `${idPhoto.name} (${(idPhoto.size / 1024).toFixed(1)} KB)`
-                    : k.chooseIdPhoto}
-                </span>
-              </small>
-              <input
-                type="file"
-                accept="image/*,.pdf"
-                onChange={(event) => setIdPhoto(event.target.files?.[0] ?? null)}
-              />
-            </label>
-            {idPhoto && (
-              <div style={{ marginTop: 8 }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  style={{ minHeight: 38, padding: "6px 12px", fontSize: "0.8rem" }}
-                  onClick={() => setIdPhoto(null)}
-                >
-                  <X size={14} /> {k.clearFile}
-                </button>
-              </div>
-            )}
+            <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
+              {k.faydaPhotoLabel}
+            </span>
+            <FileUploader
+              compact
+              showCard={false}
+              showHeader={false}
+              maxFiles={1}
+              accept="image/*,.pdf"
+              acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+              maxSizeMB={10}
+              value={idPhoto}
+              onFileSelect={(file) => setIdPhoto(file)}
+              showFooter={false}
+              showEncryptionBadge={true}
+            />
           </div>
         </div>
         <p className="wallet-help" style={{ marginTop: "4px" }}>

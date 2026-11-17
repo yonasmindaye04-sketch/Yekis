@@ -2034,7 +2034,7 @@ Each gap is documented **next to the code it belongs to**, so a reader who opens
 | Job search never uses OpenSearch; gig edits go stale in the index; no reindex path | §3.18 |
 | The audit retention stamp and the purge that enforces it | §4.2 |
 | Five ops console actions 404; the fallback matrix drifts from the server's; orphaned mock data | §8.8 |
-| ~1,915 hardcoded JSX literals (1,241 in the 105 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
+| ~1,974 hardcoded JSX literals (1,296 in the 106 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
 | No offline queue for socket events; the client ping is a no-op; guest sockets cannot connect | §8.10 |
 
 ---
@@ -2251,7 +2251,8 @@ FullPlatformApp.tsx
     ├── FeaturedCarousel.tsx      — Featured freelancer cards
     └── View Content (by view state):
         ├── "overview"        → Dashboard metrics, featured talent
-        ├── "jobs"            → JobsWorkspace (post + browse)
+        ├── "jobs"            → JobsWorkspace section="jobs" (post + browse + my briefs)
+        ├── "proposals"       → JobsWorkspace section="proposals" (bids sent + pipeline received)
         ├── "gigs"            → GigMarketplace (browse gigs)
         ├── "my-gigs"         → MyGigsWorkspace (a freelancer's own listings)
         ├── "contracts"       → ContractsWorkspace (sign, fund, milestones)
@@ -2382,9 +2383,50 @@ the only one that scrolled.
 
 | Role | Nav Items Shown |
 |---|---|
-| `CLIENT` | Overview, Post a Job, My Contracts, Wallet, Chat, Verification, Profile |
-| `FREELANCER` | Overview, Find Work, My Work, Wallet, Chat, Verification, Profile |
-| `ADMIN` / `MEDIATOR` | Overview, Escrow, Disputes, Wallet, Chat, Verification + Staff Dashboard link |
+| `CLIENT` | Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Chat, Verification, Profile |
+| `FREELANCER` | Overview, Find Work, Proposals, Gigs, My Gigs, Contracts, Escrow, Wallet, Chat, Verification, Profile |
+| `ADMIN` / `MEDIATOR` | Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Chat, Verification + Staff Dashboard link |
+
+Jobs and Proposals are two separate tabs. **Jobs** is the brief board — browse
+open briefs, publish a brief, and (for a client) the briefs you have published.
+**Proposals** is the proposal pipeline — the bids a freelancer has sent, and the
+bids a client has received against their own briefs, where shortlisting,
+accepting and rejecting happen. The old browse/proposals segmented control
+inside the Jobs workspace is gone; the sidebar owns the split.
+
+#### Sidebar Activity Dots
+
+A sidebar tab lights a small dot when something in it has not been looked at
+yet. The dot is anchored to the tab's icon, so it sits in the same place
+whether the sidebar is expanded or collapsed into an icon rail.
+
+Two signals feed it, and both mean **"not looked at yet"**:
+
+1. **Unread notifications routed to that view.** The mapping in
+   `apps/frontend/src/api/notificationTargets.ts` is the single source of
+   truth for both deep-linking and dot counts: if clicking a notification
+   takes you to the Proposals tab, then an unread proposal notification is
+   what lights the Proposals tab up. A notification with no destination
+   lights nothing up — there would be nowhere for the person to go.
+2. **New briefs on the Jobs tab.** The backend has no "a brief was published"
+   notification type, so the Jobs tab tracks it on the client with a per-user
+   watermark of the newest brief the person has already been shown
+   (`yekis:jobs-seen-at:<userId>` in `localStorage`). Only accounts that work
+   (freelancers) get this, and their own briefs are excluded from the count.
+
+The bell and the dots read **one shared feed**
+(`apps/frontend/src/api/notificationFeed.ts`): a single poller and a single
+immutable snapshot published through `useSyncExternalStore`, so the badge on
+the bell and the dot on a tab can never disagree about what is unread. The
+snapshot keeps its identity when a poll returns the same records, so a
+consumer does not re-render every fifteen seconds for nothing.
+
+Opening a view **is** looking at it: the notifications routed to that view are
+marked read (`POST /api/v1/notifications/:id/read`) and the Jobs watermark
+moves forward to the newest brief. The dot therefore always means "not looked
+at yet" and never "something happened at some point" — which is the only way a
+signal survives. The count itself lives in the tab's accessible label
+(`aria-label` and `title`); the dot is only a dot.
 
 #### Staff Dashboard (`StaffDashboard.tsx`)
 
@@ -2488,7 +2530,7 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | Environment Variable | `VITE_API_BASE_URL` |
 | Dev Server | `pnpm dev` → `http://127.0.0.1:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
-| Internationalization | `i18n.ts` — four locales, 589 keys each |
+| Internationalization | `i18n.ts` — four locales, 598 keys each |
 
 > **The React version in this table was 18 in earlier revisions; the project
 > now runs React 19** (`apps/frontend/package.json` pins `^19.3.0`).
@@ -2550,7 +2592,7 @@ There are two distinct fallback mechanisms:
 | Property | Value |
 |---|---|
 | Languages | `en`, `am` (አማርኛ), `om` (Afaan Oromoo), `ti` (ትግርኛ) |
-| Leaf keys per language | **589**, identical across all four (no missing, no extra) |
+| Leaf keys per language | **598**, identical across all four (no missing, no extra) |
 | Nested objects per language | 40 |
 | Maximum depth | 3 (e.g. `workspace.jobs.status.SHORTLISTED`) |
 | Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `workspace` |
@@ -2578,7 +2620,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 
 #### Known gaps
 
-- **Hardcoded copy is still widespread.** 25 of 130 `.tsx` files import the i18n module; the other **105** never touch it. An exact AST count (TypeScript's own parser) finds **1,915 hardcoded JSX text nodes**, of which **1,241** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
+- **Hardcoded copy is still widespread.** 25 of 131 `.tsx` files import the i18n module; the other **106** never touch it. An exact AST count (TypeScript's own parser) finds **1,974 hardcoded JSX text nodes**, of which **1,296** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
 - **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
@@ -3089,10 +3131,10 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
 
-**Two catalogues, not one.** The frontend holds 589 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+**Two catalogues, not one.** The frontend holds 598 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
 
 **Where it falls short today:**
-- Roughly **1,915 hardcoded JSX text literals** remain across the frontend — **1,241** of them in the 105 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+- Roughly **1,974 hardcoded JSX text literals** remain across the frontend — **1,296** of them in the 106 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
 - **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
 - **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
 - **No RTL support** — the platform is left-to-right only, and `dir` is never set.

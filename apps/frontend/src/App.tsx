@@ -31,12 +31,12 @@ import {
   ShieldAlert,
   RefreshCw,
   X,
-  Paperclip,
 } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
 import { OnboardingVerification } from "./OnboardingVerification";
 import { useTheme } from "./theme/ThemeContext";
 import { useI18n, isLanguage } from "./i18n";
+import { FileUploader } from "@/components/ui/file-upload-1";
 import "./telegram/miniApp.css";
 
 // === INTERFACES & TYPES ===
@@ -2012,14 +2012,24 @@ export function App() {
                   />
                 </label>
 
-                <label>
-                  Receipt File (Image or PDF)
-                  <input
-                    type="file"
+                <div className="flex flex-col gap-1.5">
+                  <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                    Receipt File (Image or PDF)
+                  </span>
+                  <FileUploader
+                    compact
+                    showCard={false}
+                    showHeader={false}
+                    maxFiles={1}
                     accept="image/*,.pdf"
-                    onChange={(e) => setAttachReceiptFile(e.target.files?.[0] || null)}
+                    acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                    maxSizeMB={10}
+                    value={attachReceiptFile}
+                    onFileSelect={(file) => setAttachReceiptFile(file)}
+                    showFooter={false}
+                    showEncryptionBadge={true}
                   />
-                </label>
+                </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                   <button
@@ -2137,41 +2147,28 @@ export function App() {
                 </label>
               </div>
 
-              <div className="proposal-attachments form-wide">
-                <label className="file-upload-btn">
-                  <Paperclip size={16} /> Attach Files
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files?.length) {
-                        setProposalModal(prev => ({
-                          ...prev,
-                          attachments: [...prev.attachments, ...Array.from(e.target.files!)]
-                        }));
-                      }
-                    }}
-                  />
-                </label>
-                {proposalModal.attachments.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    {proposalModal.attachments.map((file, idx) => (
-                      <span key={idx} className="attachment-chip">
-                        {file.name}
-                        <button
-                          type="button"
-                          onClick={() => setProposalModal(prev => ({
-                            ...prev,
-                            attachments: prev.attachments.filter((_, i) => i !== idx)
-                          }))}
-                        >
-                          <X size={14} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="proposal-attachments form-wide" style={{ marginTop: 8 }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
+                  Attach Files
+                </span>
+                <FileUploader
+                  compact
+                  showCard={false}
+                  showHeader={false}
+                  maxFiles={6}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  acceptedLabel="PDF, DOCX, PNG, JPG · up to 25 MB each"
+                  maxSizeMB={25}
+                  value={proposalModal.attachments}
+                  onFilesChange={(files) =>
+                    setProposalModal((prev) => ({
+                      ...prev,
+                      attachments: files,
+                    }))
+                  }
+                  showFooter={false}
+                  showEncryptionBadge={true}
+                />
               </div>
 
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
@@ -2838,16 +2835,24 @@ export function App() {
                               placeholder="e.g. TB-12345"
                             />
                           </label>
-                          <label>
-                            Receipt image
-                            <input
-                              type="file"
+                          <div className="flex flex-col gap-1.5">
+                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                              Receipt image
+                            </span>
+                            <FileUploader
+                              compact
+                              showCard={false}
+                              showHeader={false}
+                              maxFiles={1}
                               accept="image/*,.pdf"
-                              onChange={(event) =>
-                                setTopUpReceipt(event.target.files?.[0] ?? null)
-                              }
+                              acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                              maxSizeMB={10}
+                              value={topUpReceipt}
+                              onFileSelect={(file) => setTopUpReceipt(file)}
+                              showFooter={false}
+                              showEncryptionBadge={true}
                             />
-                          </label>
+                          </div>
                           <button
                             className="btn-primary"
                             style={{ marginTop: 16 }}
@@ -3030,28 +3035,42 @@ export function App() {
                           placeholder="Enter your Fayda ID number"
                         />
                       </label>
-                      <label>
-                        Fayda ID photo
-                        <input
-                          type="file"
+                      <div className="flex flex-col gap-1.5">
+                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                          Fayda ID photo
+                        </span>
+                        <FileUploader
+                          compact
+                          showCard={false}
+                          showHeader={false}
+                          maxFiles={1}
                           accept="image/*"
-                          onChange={(event) =>
-                            setFaydaIdPhoto(event.target.files?.[0] ?? null)
-                          }
+                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                          maxSizeMB={10}
+                          value={faydaIdPhoto}
+                          onFileSelect={(file) => setFaydaIdPhoto(file)}
+                          showFooter={false}
+                          showEncryptionBadge={true}
                         />
-                      </label>
-                      <label>
-                        Selfie holding Fayda ID
-                        <input
-                          type="file"
+                      </div>
+                      <div className="flex flex-col gap-1.5" style={{ marginTop: 8 }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                          Selfie holding Fayda ID
+                        </span>
+                        <FileUploader
+                          compact
+                          showCard={false}
+                          showHeader={false}
+                          maxFiles={1}
                           accept="image/*"
-                          onChange={(event) =>
-                            setSelfieWithIdPhoto(
-                              event.target.files?.[0] ?? null,
-                            )
-                          }
+                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                          maxSizeMB={10}
+                          value={selfieWithIdPhoto}
+                          onFileSelect={(file) => setSelfieWithIdPhoto(file)}
+                          showFooter={false}
+                          showEncryptionBadge={true}
                         />
-                      </label>
+                      </div>
                       <button
                         className="btn-primary"
                         style={{ marginTop: 16 }}

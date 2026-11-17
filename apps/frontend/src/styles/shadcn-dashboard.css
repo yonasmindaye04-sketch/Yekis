@@ -241,6 +241,10 @@
   flex: 0 0 20px;
   color: var(--color-text-secondary);
   transition: color 0.18s ease;
+  /* The activity dot is anchored to the icon, not to the button, so it sits
+     in the same place whether the sidebar is expanded or collapsed into an
+     icon rail. */
+  position: relative;
 }
 
 .platform-shell.sh-shell .sidebar-nav button:hover .nav-icon,
@@ -259,6 +263,41 @@
 .platform-shell.sh-shell .sidebar-nav button.active .nav-icon,
 .platform-shell.sh-shell .sidebar-settings.active .nav-icon {
   color: var(--color-primary-text);
+}
+
+/* ── Sidebar Activity Dot ───────────────────────────────────────────────────
+   A tab lights a dot when something in it has not been looked at yet. The
+   dot hangs off the ICON rather than the button, so it lands in the same
+   place whether the sidebar is expanded or collapsed into an icon rail.
+
+   The geometry lives here, in the un-themed base rule: only the colours come
+   from tokens, so the dark theme cannot diverge in shape (AGENTS.md). The
+   ring matches whatever the dot is sitting on — the page background in the
+   default variant, the primary fill on the active item — so the dot reads as
+   a hole punched through the button rather than a blob stuck on top of it.
+   ─────────────────────────────────────────────────────────────────────────── */
+.platform-shell.sh-shell .platform-mobile-nav button .nav-mobile-icon {
+  position: relative;
+}
+
+.platform-shell.sh-shell .nav-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-error);
+  box-shadow: 0 0 0 2px var(--color-bg);
+  pointer-events: none;
+}
+
+.platform-shell.sh-shell .sidebar-nav button.active .nav-dot {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.platform-shell.sh-shell .platform-mobile-nav button .nav-dot {
+  box-shadow: 0 0 0 2px var(--color-bg-elevated);
 }
 
 .platform-shell.sh-shell .sidebar-settings {

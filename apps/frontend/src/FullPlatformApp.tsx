@@ -10,6 +10,11 @@ import {
   type WalletResponse,
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
+import {
+  markViewNotificationsRead,
+  useNotifications,
+  useUnreadByView,
+} from "./api/notificationFeed";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { OpsConsole } from "./pages/ops/OpsConsole";
@@ -29,6 +34,7 @@ import {
   Search,
   FileText,
   FileSignature,
+  FileCheck,
   Wallet,
   MessageCircle,
   ShieldCheck,
@@ -136,6 +142,7 @@ function capabilitiesFor(role: PlatformRole): PlatformCapabilities {
 type View =
   | "overview"
   | "jobs"
+  | "proposals"
   | "gigs"
   | "my-gigs"
   | "contracts"
@@ -215,6 +222,7 @@ const navIconMap: Record<string, React.ReactNode> = {
   overview: <LayoutDashboard size={18} />,
   jobs: <Briefcase size={18} />,
   "find-work": <Search size={18} />,
+  proposals: <FileCheck size={18} />,
   gigs: <Package size={18} />,
   contracts: <FileSignature size={18} />,
   escrow: <FileText size={18} />,
@@ -1063,12 +1071,105 @@ const loadWorkspace = async () => {
     ? "CLIENT"
     : (platformRole as MarketplaceRole);
 
+  /* ── Sidebar activity dots ───────────────────────────────────────────────
+     A tab lights a dot when something in it has not been looked at yet.
+     Two signals feed it:
+
+     1. Unread notifications routed to that view. The bell and the dots read
+        one shared feed (api/notificationFeed.ts), so the badge on the bell
+        and the dot on the tab can never disagree about what is unread.
+     2. New briefs on the Jobs tab. The backend has no "a brief was
+        published" notification type, so a per-user watermark of the newest
+        brief the person has already seen stands in for one.
+
+     Opening a view IS looking at it: its notifications are marked read and
+     its watermark moves forward. So the dot always means "not looked at yet",
+     never "something happened at some point". */
+  const notifications = useNotifications(Boolean(user));
+  const unreadByView = useUnreadByView(Boolean(user));
+
+  /**
+   * The newest brief this person has already been shown.
+   *
+   * The backend has no notification type for "a new brief was published", so
+   * the Jobs tab tracks it on the client: a per-user timestamp of the newest
+   * brief that was on screen when the person last looked. Anything published
+   * after that is a brief they have not seen.
+   */
+  const jobsSeenKey = user?.id ? `yekis:jobs-seen-at:${user.id}` : null;
+  const [jobsSeenAt, setJobsSeenAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!jobsSeenKey) {
+      setJobsSeenAt(null);
+      return;
+    }
+    const raw = window.localStorage.getItem(jobsSeenKey);
+    const parsed = raw === null ? Number.NaN : Number(raw);
+    setJobsSeenAt(Number.isFinite(parsed) ? parsed : null);
+  }, [jobsSeenKey]);
+
+  /** The publication time of the newest brief on the board. */
+  const newestBriefAt = useMemo(() => {
+    let newest = 0;
+    for (const job of jobs) {
+      const ts = job.createdAt ? Date.parse(job.createdAt) : Number.NaN;
+      if (Number.isFinite(ts) && ts > newest) newest = ts;
+    }
+    return newest;
+  }, [jobs]);
+
+  useEffect(() => {
+    if (!jobsSeenKey || !canWork) return;
+    // On the Jobs tab the briefs are on screen, so the watermark moves up to
+    // the newest one. Anywhere else a missing watermark is seeded once with
+    // the newest brief, so the briefs that were already published do not
+    // light the tab up on the first visit.
+    if (view !== "jobs" && jobsSeenAt !== null) return;
+    const next = newestBriefAt || Date.now();
+    window.localStorage.setItem(jobsSeenKey, String(next));
+    setJobsSeenAt(next);
+  }, [canWork, jobsSeenAt, jobsSeenKey, newestBriefAt, view]);
+
+  /**
+   * How many briefs are newer than the watermark — the Jobs tab's dot.
+   *
+   * Only for people who work. A hiring-only account does not browse the
+   * board for opportunities, so a brief appearing there is not news to them,
+   * and their own briefs are excluded from the count as well.
+   */
+  const newBriefsCount = useMemo(() => {
+    if (!canWork || jobsSeenAt === null || view === "jobs") return 0;
+    let count = 0;
+    for (const job of jobs) {
+      if (job.clientId && job.clientId === user?.id) continue;
+      const ts = job.createdAt ? Date.parse(job.createdAt) : Number.NaN;
+      if (Number.isFinite(ts) && ts > jobsSeenAt) count += 1;
+    }
+    return count;
+  }, [canWork, jobs, jobsSeenAt, user?.id, view]);
+
+  /** How much unlooked-at activity a sidebar tab is holding. */
+  const navActivityCount = (tabView: string): number =>
+    tabView === "jobs" ? newBriefsCount : (unreadByView[tabView] ?? 0);
+
+  // Opening a view IS looking at it: its notifications are marked read, so
+  // the dot means "not looked at yet" rather than "something happened once".
+  useEffect(() => {
+    if (!user) return;
+    void markViewNotificationsRead(view, notifications);
+  }, [notifications, user, view]);
+
   const navItems = useMemo(() => {
     const jobsLabel = canWork ? (canHire ? `${t.nav.findWork} / ${t.nav.postJob}` : t.nav.findWork) : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const common = [
       { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
+      // Proposals are their own tab, not a sub-tab of Jobs: the bids a
+      // freelancer sends and the bids a client receives both live here, and
+      // that is where a proposal notification points.
+      { view: "proposals" as View, iconKey: "proposals", label: t.nav.proposals },
       { view: "gigs" as View, iconKey: "gigs", label: t.workspace.nav.gigs },
       { view: "contracts" as View, iconKey: "contracts", label: t.nav.contracts },
       { view: "escrow" as View, iconKey: "escrow", label: t.nav.escrow },
@@ -2032,34 +2133,50 @@ const loadWorkspace = async () => {
           </div>
         )}
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              className={
-                view === item.view &&
-                // "My Profile" is not highlighted while somebody else's
-                // profile is on screen — it is not my profile.
-                !(item.view === "profile" && !viewingOwnProfile)
-                  ? "active"
-                  : ""
-              }
-              onClick={() => {
-                // "My Profile" always means my own profile — not whichever
-                // person was last opened.
-                if (item.view === "profile") {
-                  openMyProfile();
-                } else {
-                  setView(item.view);
+          {navItems.map((item) => {
+            // How much has happened in this tab that the person has not
+            // looked at yet. The count rides in the accessible label; the
+            // dot itself says only "there is something here".
+            const activity = navActivityCount(item.view);
+            const activityLabel =
+              activity > 0
+                ? t.workspace.nav.newActivity.replace("{count}", String(activity))
+                : "";
+            return (
+              <button
+                key={item.view}
+                type="button"
+                className={
+                  view === item.view &&
+                  // "My Profile" is not highlighted while somebody else's
+                  // profile is on screen — it is not my profile.
+                  !(item.view === "profile" && !viewingOwnProfile)
+                    ? "active"
+                    : ""
                 }
-                setMobileDrawerOpen(false);
-              }}
-              title={item.label}
-            >
-              <span className="nav-icon">{navIconMap[item.iconKey]}</span>
-              <span className="nav-label">{item.label}</span>
-            </button>
-          ))}
+                onClick={() => {
+                  // "My Profile" always means my own profile — not whichever
+                  // person was last opened.
+                  if (item.view === "profile") {
+                    openMyProfile();
+                  } else {
+                    setView(item.view);
+                  }
+                  setMobileDrawerOpen(false);
+                }}
+                title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
+                aria-label={
+                  activityLabel ? `${item.label} — ${activityLabel}` : undefined
+                }
+              >
+                <span className="nav-icon">
+                  {navIconMap[item.iconKey]}
+                  {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
+                </span>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
         <button
           type="button"
@@ -2359,7 +2476,7 @@ const loadWorkspace = async () => {
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
                   {canHire && canWork
-                    ? "Marketplace Briefs & Proposals"
+                    ? "Marketplace Briefs & Your Posts"
                     : canHire
                       ? "Job Postings & Talent Pipeline"
                       : "Browse Open Marketplace Briefs"}
@@ -2482,6 +2599,40 @@ const loadWorkspace = async () => {
               onChanged={loadWorkspace}
               categories={categories}
               categoryLabels={categoryLabels}
+              section="jobs"
+              onBrowseJobs={() => setView("jobs")}
+            />
+          </section>
+        )}
+
+        {view === "proposals" && (
+          <section className="sh-dashboard-wrap">
+            <div className="sh-card-header">
+              <div>
+                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+                  {canHire && canWork
+                    ? "Proposals You Sent & Received"
+                    : canHire
+                      ? "Talent Pipeline"
+                      : "My Submitted Proposals"}
+                </h2>
+                <p className="sh-card-desc">
+                  {canHire && canWork
+                    ? "Track the bids you have sent, and review the proposals that came in against your own briefs."
+                    : canHire
+                      ? "Review incoming proposals, shortlist candidates, and generate escrow contracts."
+                      : "Track the milestone quotes you have sent and the client's decision on each one."}
+                </p>
+              </div>
+            </div>
+            <JobsWorkspace
+              role={marketplaceRole}
+              openJobs={jobs}
+              onChanged={loadWorkspace}
+              categories={categories}
+              categoryLabels={categoryLabels}
+              section="proposals"
+              onBrowseJobs={() => setView("jobs")}
             />
           </section>
         )}
@@ -2711,20 +2862,35 @@ const loadWorkspace = async () => {
       </main>
 
       <nav className="platform-mobile-nav" aria-label="Primary mobile navigation">
-        {navItems.slice(0, 4).map((item) => (
-          <button
-            key={item.view}
-            type="button"
-            className={view === item.view && !mobileDrawerOpen ? "active" : ""}
-            onClick={() => {
-              setView(item.view);
-              setMobileDrawerOpen(false);
-            }}
-          >
-            <span>{navIconMap[item.iconKey]}</span>
-            <small>{item.label}</small>
-          </button>
-        ))}
+        {navItems.slice(0, 4).map((item) => {
+          // The same dot the sidebar shows, so the thumb-zone bar and the
+          // drawer never disagree about what is waiting.
+          const activity = navActivityCount(item.view);
+          const activityLabel =
+            activity > 0
+              ? t.workspace.nav.newActivity.replace("{count}", String(activity))
+              : "";
+          return (
+            <button
+              key={item.view}
+              type="button"
+              className={view === item.view && !mobileDrawerOpen ? "active" : ""}
+              onClick={() => {
+                setView(item.view);
+                setMobileDrawerOpen(false);
+              }}
+              aria-label={
+                activityLabel ? `${item.label} — ${activityLabel}` : undefined
+              }
+            >
+              <span className="nav-mobile-icon">
+                {navIconMap[item.iconKey]}
+                {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
+              </span>
+              <small>{item.label}</small>
+            </button>
+          );
+        })}
         <button
           type="button"
           className={mobileDrawerOpen ? "active" : ""}

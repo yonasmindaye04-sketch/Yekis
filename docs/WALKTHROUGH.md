@@ -1,6 +1,14 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-15
+Last validated: 2026-11-17
+
+> **Jobs and Proposals are two tabs now, and a tab lights a dot when something is waiting (2026-11-17):**
+> - **Two tabs.** The Jobs tab used to carry the brief board *and* the proposal pipeline behind a segmented control that only a freelancer ever saw — so a client's incoming bids sat underneath a row of open briefs, and a freelancer's own bids were one click away from a page they were not on. **Jobs** is now the brief board (browse, publish, and the briefs you have published, each with its proposal count); **Proposals** is the pipeline (the bids you sent, and the bids you received, where shortlisting, accepting and rejecting happen). `JobsWorkspace` takes a `section` prop and renders the half it was asked for. No backend change was needed.
+> - **The dot.** A sidebar tab lights a small dot when something in it has not been looked at yet. It is anchored to the tab's **icon**, so it sits in the same place whether the sidebar is expanded or collapsed into an icon rail. The count lives in the tab's `aria-label`/`title`; the dot stays a dot.
+> - **One mapping decides both.** `apps/frontend/src/api/notificationTargets.ts` is the single source of truth for where a notification goes, so `proposal-received`, `proposal-accepted` and `proposal-rejected` point at **Proposals** now. The dot uses the same mapping the bell uses to deep-link, so the two can never disagree: if clicking a notification takes you to Proposals, then an unread proposal notification is what lights Proposals up.
+> - **One feed, not two.** `apps/frontend/src/api/notificationFeed.ts` owns the polling of `GET /api/v1/notifications`, the socket subscription and the records, and publishes one immutable snapshot through `useSyncExternalStore`. The bell and the dots read that one snapshot. The snapshot keeps its identity when a poll returns the same records, so nothing re-renders every fifteen seconds for nothing.
+> - **Opening a view is looking at it.** The notifications routed to the view you open are marked read, and the bell badge and the tab dot clear together. The dot always means "not looked at yet", never "something happened at some point".
+> - **New briefs on the Jobs tab.** The backend has no "a brief was published" notification type, so the Jobs tab tracks it on the client with a per-user watermark of the newest brief already seen (`yekis:jobs-seen-at:<userId>`). Only accounts that work get this, and their own briefs do not count.
 
 > **The category artwork is 3D (2026-11-16):**
 > - The six category cards in "Find the right expertise." now carry a **3D render** each instead of a flat line-art scene — the flat scenes all looked like the same picture (a person at a desk), so a card did not tell you what it was about until you read it.
@@ -81,7 +89,7 @@ Last validated: 2026-11-15
 > - **The `503` is no longer masked** (`apps/frontend/src/api/client.ts`): the OTP endpoints opt out of the offline mock's HTTP-status fallback, so a server that cannot deliver a code says so instead of answering with a code it never issued.
 > - **Outside production**, a host with no SMTP credentials writes the code to the server log instead of failing, so a testing deployment can complete the flow. In production a missing SMTP configuration is a misconfiguration and the caller is told the message was not delivered.
 > - **Verification**: `pnpm --filter backend type-check`, `pnpm --filter backend test` (67 files, 651 tests), `pnpm --filter backend route-audit:check` and `pnpm --filter frontend build` all pass.
-> - **The locale catalogue moved with it**: the new `workspace.onboarding` namespace adds 32 leaf keys and the deleted `workspace.phoneVerification` namespace removes 12, so the frontend now holds **589 leaf keys** in **41 nested objects** per language, still at exact 4-language parity. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+> - **The locale catalogue moved with it**: the new `workspace.onboarding` namespace adds 32 leaf keys and the deleted `workspace.phoneVerification` namespace removes 12, so the frontend now holds **598 leaf keys** in **41 nested objects** per language, still at exact 4-language parity. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
 
 > **Public Legal Documents and AFRO-TECH Header (2026-11-13):**
 > - The public Privacy Policy and Terms of Service are complete version 1.1 documents, effective 13 November 2026. `LegalDocumentPage.tsx` and `LegalDocumentPage.css` provide the shared breadcrumb, document header, sticky table of contents, numbered sections, responsive layout, and contact treatment. The Privacy Policy contains 16 sections; the Terms of Service contains 22.
@@ -830,11 +838,12 @@ Important controls:
 | Authentication | Email registration/login and Telegram Mini App authentication |
 | Public legal documents | Complete version 1.1 Privacy Policy and Terms of Service with a shared table of contents, numbered sections, responsive layout, and matching Markdown publications |
 | Verification | Tier 1 document upload/status and Tier 2 request |
-| Jobs workspace | Search, post, view own jobs, bid, review/decide proposals, withdraw proposals |
+| Jobs workspace | Search, post, view own briefs, apply to a brief, withdraw a proposal |
+| Proposals workspace | The bids you sent (status, quote, withdraw) and, for a client, the pipeline of proposals against your own briefs (shortlist / accept / reject) |
 | Contracts workspace | List party contracts, open signed PDF URL, sign, fund, submit, accept |
 | Disputes workspace | List, raise, inspect, escalate, add evidence, request arbitration |
 | Wallet | Balance, manual top-up, top-up history, Tier 2 withdrawal |
-| Notifications | List unread/all notifications and mark read |
+| Notifications | List unread/all notifications and mark read; a dot on each sidebar tab that has something waiting in it |
 | Support chat | Guest or authenticated conversations and messages |
 | Staff dashboard | KYC/top-up queues, dispute resolution, TMS filing and dismissal |
 

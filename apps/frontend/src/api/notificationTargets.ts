@@ -34,6 +34,7 @@ export interface NotificationTarget {
 type AppView =
   | "overview"
   | "jobs"
+  | "proposals"
   | "gigs"
   | "contracts"
   | "escrow"
@@ -89,9 +90,9 @@ const APP_TARGETS: Record<string, AppView> = {
   "dispute-resolved": "cases",
   "dispute-mutual-withdrawal-proposed": "cases",
   "dispute-mutual-withdrawal-confirmed": "cases",
-  "proposal-received": "jobs",
-  "proposal-accepted": "jobs",
-  "proposal-rejected": "jobs",
+  "proposal-received": "proposals",
+  "proposal-accepted": "proposals",
+  "proposal-rejected": "proposals",
   "gig-order-funded": "gigs",
   "gig-delivery-submitted": "gigs",
   "gig-revision-requested": "gigs",
@@ -159,13 +160,15 @@ export function appTargetFor(n: NotificationItem): NotificationTarget | null {
       ? ["contractId", "milestoneId"]
       : page === "cases"
         ? ["disputeId"]
-        : page === "jobs"
-          ? ["jobId", "proposalId"]
-          : page === "chat"
-            ? ["conversationId"]
-            : page === "gigs"
-              ? ["gigOrderId"]
-              : undefined;
+        : page === "proposals"
+          ? ["proposalId", "jobId"]
+          : page === "jobs"
+            ? ["jobId", "proposalId"]
+            : page === "chat"
+              ? ["conversationId"]
+              : page === "gigs"
+                ? ["gigOrderId"]
+                : undefined;
   return target(page, keys, n.metadata);
 }
 

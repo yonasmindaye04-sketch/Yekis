@@ -26,7 +26,8 @@ export const translations = {
       home: "Home",
       dashboard: "Dashboard",
       kyc: "KYC Verification",
-      jobs: "Jobs & Proposals",
+      jobs: "Jobs",
+      proposals: "Proposals",
       contracts: "Contracts",
       escrow: "Escrow Center",
       disputes: "Disputes & Mediation",
@@ -399,6 +400,7 @@ export const translations = {
         menu: "Menu",
         overview: "Dashboard Overview",
         workspaceLabel: "Workspace",
+        newActivity: "{count} new",
       },
       roles: {
         client: "Client",
@@ -648,6 +650,13 @@ export const translations = {
       jobsFlow: {
         tabBrowseBriefs: "Browse Open Briefs",
         tabMyProposals: "My Submitted Proposals",
+        tabMyBriefs: "My Published Briefs",
+        tabMyBriefsDesc:
+          "The briefs you have published, and how many proposals each one has drawn.",
+        noBriefsYet: "You have not published any briefs yet.",
+        pipelineTitle: "Published Hiring Briefs & Proposal Pipeline",
+        pipelineDesc:
+          "Review incoming freelancer proposals, shortlist candidates, and generate escrow contracts",
         searchPlaceholder: "Filter briefs by title or keyword...",
         clearSearchBtn: "Reset filter",
         noMatchingJobs: "No matching open jobs found.",
@@ -702,7 +711,8 @@ export const translations = {
       home: "መነሻ",
       dashboard: "ዳሽቦርድ",
       kyc: "የማንነት ማረጋገጫ (KYC)",
-      jobs: "ስራዎች እና ፕሮፖዛሎች",
+      jobs: "ስራዎች",
+      proposals: "ፕሮፖዛሎች",
       contracts: "ውሎች (Contracts)",
       escrow: "የኤስክሮው ማዕከል",
       disputes: "ክሮች እና እርቅ",
@@ -1074,6 +1084,7 @@ export const translations = {
         menu: "ዝርዝር",
         overview: "አጠቃላይ ዳሽቦርድ",
         workspaceLabel: "የሥራ ቦታ",
+        newActivity: "{count} አዲስ",
       },
       roles: {
         client: "ደንበኛ",
@@ -1322,6 +1333,13 @@ export const translations = {
       jobsFlow: {
         tabBrowseBriefs: "ክፍት ሥራዎችን ፈልግ",
         tabMyProposals: "ያስገባኋቸው ፕሮፖዛሎች",
+        tabMyBriefs: "የእኔ የተገለጹ ሥራዎች",
+        tabMyBriefsDesc:
+          "የገለጹት ሥራዎችና እያንዳንዱ የተቀረበው የፕሮፖዛል ብዛት።",
+        noBriefsYet: "እስካሁን ምንም ሥራ አላገለጹም።",
+        pipelineTitle: "የተገለጹ የቅጭበት ሥራዎችና የፕሮፖዛል ቧንቧ",
+        pipelineDesc:
+          "የመጣመሩ የፍሪላንስ ፕሮፖዛሎችን ይመልከቱ፣ ቅድሚያ የሰጡትን ይምረጡና የኤስክሮ ውሎችን ይፍጠሩ።",
         searchPlaceholder: "ሥራዎችን በርዕስ ወይም በቁልፍ ቃል ይፈልጉ...",
         clearSearchBtn: "ፍለጋ አጽዳ",
         noMatchingJobs: "ከፍለጋዎ ጋር የሚዛመድ ክፍት ሥራ አልተገኘም።",
@@ -1376,7 +1394,8 @@ export const translations = {
       home: "Fuula Dura",
       dashboard: "Daashboordii",
       kyc: "Mirkaneessa Eenyummaa (KYC)",
-      jobs: "Hojiiwwanii fi Yaadolee",
+      jobs: "Hojiiwwanii",
+      proposals: "Yaadolee",
       contracts: "Waliigalteewwan",
       escrow: "Wiirtuu Qabsiisaa (Escrow)",
       disputes: "Falmii fi Jaarsummaa",
@@ -1748,6 +1767,7 @@ export const translations = {
         menu: "Baafata",
         overview: "Daashboordii Waliigalaa",
         workspaceLabel: "Bakka Hojii",
+        newActivity: "{count} haaraa",
       },
       roles: {
         client: "Maamila",
@@ -1996,6 +2016,13 @@ export const translations = {
       jobsFlow: {
         tabBrowseBriefs: "Hojiiwwan Banaa Ilaali",
         tabMyProposals: "Piropoozaalota Koo",
+        tabMyBriefs: "Hojiiwwan Koo Maxxanse",
+        tabMyBriefsDesc:
+          "Hojiiwwan maxxanse yoo ta'e, piropoozaalota isaan qabuufata.",
+        noBriefsYet: "Hojii hin maxxansin",
+        pipelineTitle: "Hojiiwwan Maxxanse Hiri'i fi Piropoozaalota Koo",
+        pipelineDesc:
+          "Piropoozaalota freelancer hiri'aa ilaali, filannoo saliisin, qabsiisumma waliigalaa uumii.",
         searchPlaceholder: "Mata-duree ykn jecha ijoon barbaadi...",
         clearSearchBtn: "Calallii haqi",
         noMatchingJobs: "Hojiin banaa wal-simu hin argamne.",
@@ -2050,7 +2077,8 @@ export const translations = {
       home: "መበገሲ",
       dashboard: "ዳሽቦርድ",
       kyc: "ምርግጋጽ መንነት (KYC)",
-      jobs: "ስራሕትን ፕሮፖዛላትን",
+      jobs: "ሥራሕትን",
+      proposals: "ፕሮፖዛላት",
       contracts: "ውዕላት",
       escrow: "ማእከል ኤስክሮው",
       disputes: "ክርክርን ዕርቅን",
@@ -2422,6 +2450,7 @@ export const translations = {
         menu: "ዝርዝር",
         overview: "ሓፈሻዊ ዳሽቦርድ",
         workspaceLabel: "ናይ ስራሕ ቦታ",
+        newActivity: "{count} አዲስ",
       },
       roles: {
         client: "ዓሚል",
@@ -2670,6 +2699,13 @@ export const translations = {
       jobsFlow: {
         tabBrowseBriefs: "ክፍቲ ስራሕቲ ድለ",
         tabMyProposals: "ዝሰደድክዎም ፕሮፖዛላት",
+        tabMyBriefs: "ዝመጣናትን ሥራሕትን",
+        tabMyBriefsDesc:
+          "ዝመጣናትን ሥራሕትንና እያንዳንዱ የተቀረበው የፕሮፖዛል ብዛት።",
+        noBriefsYet: "ምንም ሥራሕ አላዘጋጁም።",
+        pipelineTitle: "የተገለጹ የቅጭበት ሥራሕትና የፕሮፖዛል ቧንቧ",
+        pipelineDesc:
+          "የመጡ የፍሪላንስ ፕሮፖዛላትን ይመልከቱ፣ የተመረጡትን ይምረጡና የኤስክሮ ውሎችን ይፍጠሩ።",
         searchPlaceholder: "ስራሕቲ ብኣርእስቲ ወይ ብቓል ድለዩ...",
         clearSearchBtn: "ድለያ ኣጽሪ",
         noMatchingJobs: "ዝሰማማዕ ክፍቲ ስራሕ ኣይተረኽበን።",

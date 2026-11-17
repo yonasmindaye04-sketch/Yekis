@@ -132,7 +132,8 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Responsive React/Vite shell and role-aware navigation
 - [x] Browser registration/login and verification screens
 - [x] Profile completion flow — a new account is taken to the profile section with the checklist open (`ProfileCompletionDialog`: photo, name and bio, and the skills for a freelancer), the "Finish your profile" banner waits until the session has warmed up (45 seconds in the workspace, or three or more views opened) so it never greets someone who has just arrived, and a dismissal is remembered per account until the profile is complete. The Mini App lands a new account on its Profile tab (account details and the Fayda identity check)
-- [x] Jobs/proposals workspace with current shared-schema payload conversion
+- [x] Jobs workspace (brief board) and Proposals workspace (the pipeline) as two separate sidebar tabs — browse and publish briefs in one, review and decide bids in the other
+- [x] Sidebar activity dots — a tab lights a dot when something in it has not been looked at yet (unread notifications routed to that view, plus a per-user watermark for new briefs on the Jobs tab); the bell and the dots read one shared notification feed, and opening a view marks its notifications read
 - [x] Contracts/milestones workspace with signing, PDF access, funding (Telebirr redirect), delivery, and acceptance
 - [x] Payment return page (`PaymentReturn.tsx`) for processing post-checkout browser redirects
 - [x] Disputes workspace with party actions
@@ -188,7 +189,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**589 leaf keys, 41 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**598 leaf keys, 41 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
 
 ## Marketing Site (Public)
 
@@ -203,7 +204,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**589 leaf keys per language, 41 nested objects, verified 2026-11-13**).
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**598 leaf keys per language, 41 nested objects, verified 2026-11-17**).
 
 ## Automated And Manual Verification
 

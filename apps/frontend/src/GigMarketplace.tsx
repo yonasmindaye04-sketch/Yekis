@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  ChevronDown,
   Clock,
   Code,
   Database,
@@ -23,6 +24,21 @@ import {
 import { api, type Gig, type GigPackage } from "./api/client";
 import { events } from "./analytics";
 import { YekisAvatar } from "./components/YekisAvatar";
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "./components/ui/breadcrumb";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./components/ui/dropdown-menu";
+import { cn } from "./lib/utils";
 import "./GigMarketplace.css";
 
 // === CONSTANTS & LABELS ===
@@ -175,9 +191,10 @@ export function GigMarketplace() {
 
     return (
       <section className="afro-gigs-section">
-        {/* Navigation Breadcrumb */}
+        {/* Navigation Breadcrumb (shadcn UI) */}
         <div className="afro-detail-header-nav">
           <button
+            type="button"
             className="afro-back-btn"
             onClick={() => {
               setSelected(null);
@@ -186,11 +203,42 @@ export function GigMarketplace() {
           >
             <ArrowLeft size={16} /> Back to Marketplace
           </button>
-          <div className="afro-breadcrumb-text">
-            <span>Gigs</span> /{" "}
-            <span>{categoryInfo?.label ?? selected.category}</span> /{" "}
-            <span className="afro-breadcrumb-current">{selected.title}</span>
-          </div>
+          <Breadcrumb className="afro-breadcrumb-text">
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelected(null);
+                    setNotice("");
+                  }}
+                  className="cursor-pointer"
+                >
+                  Gigs
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelected(null);
+                    setCategory(selected.category);
+                    setNotice("");
+                  }}
+                  className="cursor-pointer"
+                >
+                  {categoryInfo?.label ?? selected.category}
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage className="afro-breadcrumb-current truncate max-w-[280px] sm:max-w-[420px]">
+                  {selected.title}
+                </BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
         </div>
 
         {/* Global Alert Notification */}
@@ -484,29 +532,173 @@ export function GigMarketplace() {
         </div>
       </div>
 
-      {/* Category Rail Filter */}
-      <div className="afro-category-rail-wrap">
-        <div className="afro-category-rail">
+      {/* Category Header & Breadcrumb Navigation (shadcn / Watermelon UI) */}
+      <nav
+        className="afro-category-header-shell"
+        aria-label="Category and Service Navigation"
+      >
+        {/* Tier 1: Breadcrumb Trail & Quick Meta Controls */}
+        <div className="afro-cat-header-top">
+          <div className="afro-cat-header-left">
+            {category && (
+              <button
+                type="button"
+                className="afro-cat-back-crumb"
+                onClick={() => setCategory("")}
+                title="Reset to all services"
+                aria-label="Back to all services"
+              >
+                <ArrowLeft size={14} />
+              </button>
+            )}
+
+            <Breadcrumb>
+              <BreadcrumbList className="afro-breadcrumb-list">
+                <BreadcrumbItem>
+                  <BreadcrumbLink
+                    className="afro-breadcrumb-link cursor-pointer"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setCategory("");
+                    }}
+                  >
+                    Services
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+
+                <BreadcrumbSeparator />
+
+                <BreadcrumbItem>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      type="button"
+                      className="afro-breadcrumb-dropdown-trigger"
+                      aria-label="Select category"
+                    >
+                      <span className="afro-breadcrumb-trigger-content">
+                        {category ? (
+                          <>
+                            <span className="afro-breadcrumb-icon">
+                              {categoryConfig[category]?.icon}
+                            </span>
+                            <span className="afro-breadcrumb-active-label">
+                              {categoryConfig[category]?.label}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="afro-breadcrumb-icon">
+                              <Layers size={14} />
+                            </span>
+                            <span className="afro-breadcrumb-active-label">
+                              All Services
+                            </span>
+                          </>
+                        )}
+                        <ChevronDown size={13} className="afro-breadcrumb-chevron" />
+                      </span>
+                    </DropdownMenuTrigger>
+
+                    <DropdownMenuContent align="start" className="afro-cat-dropdown-menu">
+                      <DropdownMenuItem
+                        onClick={() => setCategory("")}
+                        className={cn(
+                          "afro-cat-dropdown-item cursor-pointer",
+                          category === "" && "font-bold text-primary"
+                        )}
+                      >
+                        <Layers size={14} />
+                        <span className="flex-1">All Services</span>
+                        {category === "" && <Check size={14} className="text-primary" />}
+                      </DropdownMenuItem>
+
+                      {categories.map((c) => {
+                        const conf = categoryConfig[c];
+                        const isCurrent = category === c;
+                        return (
+                          <DropdownMenuItem
+                            key={c}
+                            onClick={() => setCategory(c)}
+                            className={cn(
+                              "afro-cat-dropdown-item cursor-pointer",
+                              isCurrent && "font-bold text-primary"
+                            )}
+                          >
+                            {conf.icon}
+                            <span className="flex-1">{conf.label}</span>
+                            {isCurrent && <Check size={14} className="text-primary" />}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+
+          <div className="afro-cat-header-right">
+            {category && (
+              <button
+                type="button"
+                className="afro-cat-clear-btn"
+                onClick={() => setCategory("")}
+                title="Clear selected category filter"
+                aria-label="Clear selected category filter"
+              >
+                <X size={12} />
+                <span>Clear filter</span>
+              </button>
+            )}
+
+            <span className="afro-cat-count-badge">
+              {total || sortedGigs.length}{" "}
+              {(total || sortedGigs.length) === 1 ? "service" : "services"}
+            </span>
+          </div>
+        </div>
+
+        {/* Tier 2: Watermelon UI / shadcn Horizontal Tab Rail */}
+        <div
+          className="afro-cat-header-tabs-wrap"
+          role="tablist"
+          aria-label="Service categories"
+        >
           <button
-            className={`afro-cat-btn ${category === "" ? "active" : ""}`}
+            type="button"
+            role="tab"
+            aria-selected={category === ""}
+            className={cn(
+              "afro-cat-tab-btn",
+              category === "" && "active"
+            )}
             onClick={() => setCategory("")}
           >
-            <Layers size={15} /> All Services
+            <Layers size={14} />
+            <span>All Services</span>
           </button>
           {categories.map((c) => {
             const conf = categoryConfig[c];
+            const isCurrent = category === c;
             return (
               <button
                 key={c}
-                className={`afro-cat-btn ${category === c ? "active" : ""}`}
+                type="button"
+                role="tab"
+                aria-selected={isCurrent}
+                className={cn(
+                  "afro-cat-tab-btn",
+                  isCurrent && "active"
+                )}
                 onClick={() => setCategory(c)}
               >
-                {conf.icon} {conf.label}
+                {conf.icon}
+                <span>{conf.label}</span>
               </button>
             );
           })}
         </div>
-      </div>
+      </nav>
 
       {/* Search & Control Toolbar */}
       <div className="afro-toolbar">
