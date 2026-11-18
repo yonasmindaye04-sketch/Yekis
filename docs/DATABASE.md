@@ -38,6 +38,7 @@ erDiagram
   User ||--o{ Review : receives
   Contract ||--o{ Review : contains
   User ||--o{ PortfolioItem : showcases
+  User ||--o{ UserAvatar : uploads
   User ||--o{ FeaturedLog : featured_in
   User ||--o{ ProfileReport : reported_in
   User ||--o{ ProfileView : viewed_in
@@ -81,6 +82,7 @@ erDiagram
 | `UserSkill` | Junction table for user skills and proficiency |
 | `Review` | Double-blind contract feedback (author, target, contract, rating, comment); visible once both parties submit or 14-day window expires |
 | `PortfolioItem` | Freelancer work samples (title, description, URL, attachments) |
+| `UserAvatar` | Uploaded profile photo bytes (`BYTEA`, JPEG/PNG/WebP, ≤2 MB) with `contentType` and `sizeBytes`. `User.avatarUrl` stores the short public URL `/api/v1/users/avatars/<id>`, never the image itself — that column is `VARCHAR(500)` and is selected by chat, contract, gig and featured queries. Each upload creates a new id (so the URL is immutable and can be cached forever); the previous row for that user is deleted in the same transaction. PDPP erasure deletes the rows explicitly because erasure retains the `User` row |
 | `FeaturedLog` | History of users featured in the talent carousel |
 | `ProfileReport` | Moderation flags against inappropriate profile content |
 | `ProfileView` | Analytical tracking of profile views |

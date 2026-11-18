@@ -1,6 +1,28 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-17
+Last validated: 2026-11-18
+
+> **A profile photo saves, and Settings stops returning 500 (2026-11-18):**
+> - **The bug.** Choosing a photo compressed it into a JPEG data URL and sent it as `avatarUrl`. Zod allowed 1.5 MB; the column is `VARCHAR(500)`; Postgres refused the write and the API answered `500 INTERNAL_ERROR`. The photo was never the problem — the **save** was, and it failed for every member who had picked one.
+> - **What happens now.** The editor compresses the photo to a 320px JPEG and uploads it to `POST /api/v1/users/me/avatar`. The server stores the bytes in `UserAvatar` and returns `/api/v1/users/avatars/<id>`; that short URL is what the form keeps and what `PATCH /users/me/profile` stores. The photo appears immediately; the rest of the form still waits for **Save Changes**.
+> - **Why not just widen the column.** `avatarUrl` is copied into chat, contract, gig and featured responses. A base64 image there would be sent on every one of them. The column stays 500 characters and keeps holding a URL.
+> - **Public but not enumerable.** `GET /avatars/:id` needs no session because signed-out visitors see public profiles and an `<img>` cannot send a token. The id is random, and replacing a photo creates a new id, so the response is cached as immutable; the old id stops working. Unknown ids are `404`.
+> - **Old local photos are dropped.** A data URL left in `localStorage` by an older build is cleared on load instead of being sent back and rejected.
+> - **Verified:** `tests/avatar-profile.test.ts` (11 tests: storage, replacement, ownership, over-long/data-URL rejection, public serving) and the PDPP erasure suite pass; `pnpm --filter frontend build`, `pnpm --filter backend type-check`, `route-audit:check` and `node scripts/check-doc-parity.mjs` pass.
+
+> **Fayda Identity Review Redesign — Calm Enterprise & Trust Direction (2026-11-18):**
+> - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
+>   - **Card Shell Architecture (`.idv-card`)**: Redesigned the Fayda / Tier 1 KYC verification component into a high-trust, calm enterprise card shell featuring a custom biometric fingerprint emblem, overline (`Fayda Identity Review`), primary heading, descriptive subtext, live tier status indicator (`Tier 1 · Awaiting documents` / `Tier 1 · In review` / `Tier 1 · Verified`), and a verified trust badge (`Secured by Fayda eSignet`).
+>   - **Interactive File Dropzone (`.idv-drop`)**: Built an accessible, responsive dropzone with drag-and-drop file upload, file validation for JPG, PNG, WebP, and PDF up to 10 MB, image thumbnail / PDF icon preview, file size formatting, "Ready to submit" indicator, and quick "Replace" / "Remove" controls.
+>   - **Integrated Form Validation**: Configured validation rules with inline error messages for full name (min 2 characters), date of birth (bounded to today max to prevent future birthdays), Fayda ID number, and document upload. Errors clear instantly upon user input.
+>   - **Submission State & "What Happens Next"**: Integrated submitting spinner state (`Submitting…` -> `Submitted`), success confirmation banner with "Edit details" reset capability, and a three-step footer progression strip (`1. Submit ID` -> `2. Biometric selfie in secure popup` -> `3. Tier 1 decision`).
+>   - **Theme Parity & Zero-Emoji Enforcement**: Strict compliance with Yekis zero-emoji standards (pure inline SVGs) and 100% theme-invariant layout geometry between dark and light modes.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+>   - `pnpm --filter backend type-check` passes with exit code 0.
+>   - `pnpm --filter backend route-audit:check` passes with exit code 0.
+
 
 > **Jobs and Proposals are two tabs now, and a tab lights a dot when something is waiting (2026-11-17):**
 > - **Two tabs.** The Jobs tab used to carry the brief board *and* the proposal pipeline behind a segmented control that only a freelancer ever saw — so a client's incoming bids sat underneath a row of open briefs, and a freelancer's own bids were one click away from a page they were not on. **Jobs** is now the brief board (browse, publish, and the briefs you have published, each with its proposal count); **Proposals** is the pipeline (the bids you sent, and the bids you received, where shortlisting, accepting and rejecting happen). `JobsWorkspace` takes a `section` prop and renders the half it was asked for. No backend change was needed.

@@ -4,6 +4,24 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+- **A profile photo can be saved again — the image is uploaded instead of pasted into a 500-character column (2026-11-18)** — `ProfileEditPage.tsx` compressed a chosen photo into a JPEG **data URL** and sent it as `avatarUrl`. Zod allowed 1.5 MB, but `User.avatarUrl` is `VARCHAR(500)`, so Postgres rejected it and `PATCH /api/v1/users/me/profile` answered `500 INTERNAL_ERROR`. **Any member who picked a profile photo could not save the Settings page at all**, and the same pattern was in `ProfileCompletionDialog.tsx`.
+  - **`POST /api/v1/users/me/avatar`** takes a multipart image (JPEG/PNG/WebP, ≤2 MB), identifies the format by magic number rather than trusting the filename, stores the bytes in a new `UserAvatar` table, points `User.avatarUrl` at `/api/v1/users/avatars/<id>`, and deletes the previous photo in the same transaction.
+  - **`GET /api/v1/users/avatars/:avatarId`** serves the photo publicly with `Cache-Control: immutable` and `X-Content-Type-Options: nosniff`. Public profiles render for signed-out visitors and an `<img>` cannot send a bearer token; the id is random, and a replacement upload gets a new id, so a cached URL never shows a different image. Unknown ids are `404`.
+  - **Why a separate table:** `avatarUrl` is selected by chat, contract, gig and featured queries. Widening the column to hold the image would have put tens of kilobytes of base64 on every one of those responses. The column stays `VARCHAR(500)` and keeps holding a URL, which is what OAuth and Telegram already write.
+  - **Validation now matches the column:** `updateProfileSchema.avatarUrl` caps at 500 characters, rejects `data:` URLs, and accepts only an app path or an `https://` URL. An over-long value is a **`400`** with a readable message, never a 500. A member also cannot attach another member's uploaded avatar id.
+  - **Frontend:** both editors compress to a JPEG `Blob` (`apps/frontend/src/lib/avatarImage.ts`), upload it, and keep the returned URL. The data-URL fallback is gone. A data URL left in localStorage by an older build is discarded on load instead of being sent back.
+  - **PDPP:** erasure now deletes the `UserAvatar` row (the `User` row is retained for the AML record), and the erasure summary counts the photo.
+
+### Changed
+- **Fayda KYC Identity Verification component redesigned with calm enterprise / trust direction (2026-11-18)** — Redesigned the Fayda / Tier 1 identity review interface in `BrowserVerification.tsx` and created `BrowserVerification.css`:
+  - **Calm Enterprise Card Shell (`.idv-card`)**: Integrated the calm enterprise trust aesthetic with dedicated theme tokens, custom header emblem with biometric fingerprint glyph, overline, live status chip (`Tier 1 · Awaiting documents` / `Tier 1 · In review` / `Tier 1 · Verified`), and "Secured by Fayda eSignet" badge.
+  - **Dropzone & Document Upload**: Replaced raw file input with an interactive drag-and-drop zone (`.idv-drop`) supporting JPG, PNG, WebP and PDF up to 10MB, real-time image thumbnail or PDF icon preview, file size formatting, "Ready to submit" indicator, and quick "Replace" / "Remove" controls.
+  - **Form Validation & Interactive Feedback**: Inlined full-name, date of birth (bounded to today max), and Fayda ID number inputs with dedicated validation error states, instant field-level error clearing on input, and security note explaining Fayda eSignet biometrics.
+  - **Submission Flow & Next Steps Strip**: Loading spinner and submit status feedback (`Submitting…` -> `Submitted`), success notification banner with "Edit details" reset capability, and a three-step footer progression strip (`1. Submit ID` -> `2. Biometric selfie in secure popup` -> `3. Tier 1 decision`).
+  - **Strict Zero-Emoji & Theme Parity**: 100% SVG icons, zero emojis, and mathematically invariant box layout across dark and light themes (`:root[data-theme="light"] .idv-card`).
+
+
 ### Added
 - **Watermelon UI FileUploader (`file-upload-1`) integrated site-wide across all file upload workflows (2026-11-17)** — Installed `https://registry.watermelon.sh/r/file-upload-1.json` via shadcn CLI and upgraded every unstyled browser `<input type="file">` task into a modern, accessible, drag-and-drop file uploader component with simulated progress, file-type icons, size formatting, and 256-bit audit encryption badges:
   - **Component**: `apps/frontend/src/components/ui/file-upload-1.tsx` provides full Card or compact inline layouts, single or multi-file modes with automatic single-file replacement, simulated upload progress bars, file preview chips with FontAwesome file-type glyphs (`FaFilePdf`, `FaFileImage`, `FaFileVideo`, `FaFileCode`, `FaFileAlt`), clear/remove controls, and flexible callback props (`onFilesChange`, `onFileSelect`, `onSubmit`).
