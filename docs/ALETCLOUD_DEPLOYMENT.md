@@ -96,7 +96,13 @@ schema, so the next test starts from a migrated database.
 ## 3. Before you start
 
 - The repository pushed to GitHub, on a **testing branch** — not `main`.
-  Every push to the connected branch redeploys.
+  A push to the connected branch is *meant* to redeploy, and it usually does —
+  but it is not a guarantee. Commit `2ff173d` sat on the connected branch for
+  twenty hours while the host went on serving the previous build, and only an
+  explicit `redeployApp` built it. **After every push, confirm the host moved:**
+  `getApp` shows `status` and `lastDeployedAt`, and the served `index.html` names
+  the bundle (`/assets/index-<hash>.js`). If `lastDeployedAt` has not changed,
+  call `redeployApp` — it pulls the latest commit on the branch.
 - A GitHub account authorised with AletCloud (private repositories are
   supported).
 - A wallet balance of at least **15 ETB** (12 for the app, ~2 for the
@@ -190,8 +196,9 @@ So: pass the whole environment in the `deployApp` call that creates the app.
 
 **Once the app is healthy, the environment can be changed.** `setAppEnv`
 followed by `restartApp` applies the change, and it then **persists across
-later deploys** — verified: `TRUST_PROXY_HOPS` was added that way, and a
-push-triggered redeploy afterwards left all 48 variables in place. The rule
+later deploys** — verified twice: `TRUST_PROXY_HOPS` was added that way and
+survived the next redeploy, and a later rebuild left all fifty variables in
+place, bot token and bucket key included. The rule
 that matters is the ordering, not the tool: a variable added before the app
 has ever started is lost, and one added after it has started is kept.
 
@@ -664,11 +671,20 @@ What was verified against the live instance:
   the category Lottie animations and their GIF fallbacks are gone and only the
   escrow animation in the about section remains.
 - The **marketing pages and the Gigs section** were walked in a real browser against
-  the live instance: the seven Lottie animations (six category cards and the escrow
-  handshake) load as WebM and play, the Gigs section answers with the Afro-Tech
-  hero, the category rail, the search and sort controls and the gig cards, and
-  the workspace header's controls are borderless. The animations are served as
-  static assets from the image (`/lottie/*.webm` and `/lottie/*.gif`).
+  the live instance: the Gigs section answers with the Afro-Tech hero, the
+  category rail, the search and sort controls and the gig cards, and the
+  workspace header's controls are borderless. One animation is left on the page —
+  the escrow handshake in the about section — served as a static asset from the
+  image (`/lottie/escrow-deal.webm`, with `/lottie/escrow-deal.gif` as its
+  fallback). The six category animations are gone with the 3D rework above; those
+  paths now fall through to the SPA, which is why they answer `200 text/html`
+  rather than `404`.
+- The **Jobs / Proposals split** (`2ff173d`) is in the served build: the bundle
+  is `/assets/index-DcJqTnD6.js` and it carries the strings that only that commit
+  introduced — "Published Hiring Briefs & Proposal Pipeline", "My Published
+  Briefs", "{count} new" and the "The briefs you have published" description.
+  This one is a build check, not a browser walk: the evidence is that the asset
+  containing the feature is the asset the host serves.
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
