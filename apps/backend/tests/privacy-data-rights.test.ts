@@ -91,6 +91,17 @@ async function makeUserWithContent() {
   });
   userIds.push(u.id);
 
+  // An uploaded profile photo: stored in its own table, so erasure has to
+  // delete the row explicitly (the User row is retained under the AML hold).
+  await prisma.userAvatar.create({
+    data: {
+      userId: u.id,
+      contentType: "image/jpeg",
+      data: Buffer.from([0xff, 0xd8, 0xff, 0xd9]),
+      sizeBytes: 4,
+    },
+  });
+
   await prisma.portfolioItem.create({
     data: {
       userId: u.id,
@@ -232,6 +243,8 @@ describe("erasure destroys the personal content", () => {
     expect(after.displayName).toBeNull();
     expect(after.bio).toBeNull();
     expect(after.avatarUrl).toBeNull();
+    // The bytes behind the avatar are personal data too.
+    expect(await prisma.userAvatar.count({ where: { userId: user.id } })).toBe(0);
     expect(after.email).not.toBe(user.email);
     expect(after.email).toContain("erased");
     expect(after.passwordHash).not.toBe(user.passwordHash);

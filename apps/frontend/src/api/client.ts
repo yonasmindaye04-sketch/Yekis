@@ -1830,6 +1830,47 @@ class ApiClient {
   async updateProfile(data: UpdateProfilePayload): Promise<SelfProfile> {
     return this.request(`/api/v1/users/me/profile`, { method: "PATCH", body: JSON.stringify(data) });
   }
+  /**
+   * Uploads a profile photo and returns the short URL to store in `avatarUrl`.
+   *
+   * There is deliberately no data-URL fallback. `avatarUrl` is a VARCHAR(500)
+   * and a base64 image is far larger: falling back would reintroduce the 500
+   * that made every Settings save with a custom photo fail. If the upload
+   * cannot reach the server, the editor reports it and keeps the previous
+   * photo rather than persisting an unsendable value.
+   */
+  async uploadAvatar(file: Blob): Promise<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append("file", file, "avatar.jpg");
+
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    let body: { avatarUrl?: string; error?: string; message?: string } = {};
+    try {
+      body = await res.json();
+    } catch {
+      // The response was not JSON (a proxy error page, for example).
+    }
+
+    if (!res.ok || !body.avatarUrl) {
+      throw new Error(
+        body.message ||
+          body.error ||
+          `Could not upload the photo (HTTP ${res.status}).`,
+      );
+    }
+
+    return { avatarUrl: body.avatarUrl };
+  }
   async getProfileCompleteness(): Promise<{ profileCompleteness: number }> {
     return this.request(`/api/v1/users/me/profile/completeness`);
   }

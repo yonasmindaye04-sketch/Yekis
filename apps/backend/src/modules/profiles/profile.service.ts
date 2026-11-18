@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { sanitizeContactInfo } from "../../middleware/circumvention.middleware.js";
 import { UpdateProfileInput } from "./profile.validation.js";
+import * as avatarService from "./avatar.service.js";
 
 // === MAIN FUNCTIONS ===
 
@@ -159,6 +160,26 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     data.bio = sanitizeContactInfo(data.bio).sanitized;
   }
 
+  // A URL this platform issued must belong to the caller. Without this, a
+  // member could paste somebody else's avatar id into their own profile and
+  // present that person's photo as theirs. External provider URLs (Google,
+  // Telegram) are not ours to verify and were written by the auth services.
+  if (data.avatarUrl) {
+    await avatarService.assertOwnedAvatarUrl(userId, data.avatarUrl);
+  }
+
+  // Remember what the profile pointed at before the update, so a photo that
+  // is being replaced or removed does not stay in the database unread.
+  const previousAvatarUrl =
+    data.avatarUrl === undefined
+      ? null
+      : ((
+          await prisma.user.findUnique({
+            where: { id: userId },
+            select: { avatarUrl: true },
+          })
+        )?.avatarUrl ?? null);
+
   if (data.skillIds && data.skillIds.length > 0) {
     const skills = await prisma.skill.findMany({
       where: { id: { in: data.skillIds }, isActive: true },
@@ -226,6 +247,14 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
     where: { id: userId },
     data: { profileCompleteness: completeness },
   });
+
+  if (
+    data.avatarUrl !== undefined &&
+    previousAvatarUrl &&
+    previousAvatarUrl !== (data.avatarUrl || null)
+  ) {
+    await avatarService.deleteAvatarForUrl(userId, previousAvatarUrl);
+  }
 
   return getPublicProfile(userId, userId);
 }

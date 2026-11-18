@@ -310,6 +310,7 @@ circumventionAlertCount Int        @default(0)
   // --- PROFILE RELATIONS ---
   skills               UserSkill[]
   portfolioItems       PortfolioItem[]
+  avatars              UserAvatar[]
   reviewsReceived      Review[]             @relation("ReviewTarget")
   reviewsGiven         Review[]             @relation("ReviewAuthor")
   featuredLogs         FeaturedLog[]
@@ -896,6 +897,30 @@ model PortfolioItem {
   updatedAt DateTime @updatedAt
 
   @@index([userId, isActive])
+}
+
+// ---------- Profile Avatars ----------
+//
+// Uploaded profile photos live here, not in User.avatarUrl. `avatarUrl` holds a
+// short, cacheable URL (/api/v1/users/avatars/<id>) because it is selected by
+// chat, contract, gig and featured queries; embedding tens of kilobytes of
+// base64 in that column would put an image on every one of those responses.
+//
+// A row is immutable: a new upload creates a new id, so the URL can be served
+// with `Cache-Control: immutable`. The previous row is deleted in the same
+// transaction as the User.avatarUrl swap. `onDelete: Cascade` covers account
+// deletion; PDPP erasure deletes the rows explicitly (it retains the User row).
+
+model UserAvatar {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentType String   @db.VarChar(64)
+  data        Bytes
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ---------- Featured Selection Log ----------

@@ -202,6 +202,7 @@ erDiagram
     User ||--o{ TransactionFlag : "flagged in AML"
     User ||--o{ UserSkill : "possesses"
     User ||--o{ PortfolioItem : "showcases"
+    User ||--o{ UserAvatar : "uploads"
     User ||--o{ Review : "authors (ReviewAuthor)"
     User ||--o{ Review : "receives (ReviewTarget)"
     User ||--o{ FeaturedLog : "featured in"
@@ -561,6 +562,15 @@ erDiagram
         int displayOrder
         datetime createdAt
         datetime updatedAt
+    }
+
+    UserAvatar {
+        string id PK
+        string userId FK
+        string contentType
+        bytes data
+        int sizeBytes
+        datetime createdAt
     }
 
     FeaturedLog {
@@ -1343,11 +1353,11 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 
 * **Purpose:** Manages user discovery and reputation:
   * **Skills (`apps/backend/src/modules/skills/`):** Amharic/English localized skills taxonomy.
-  * **Profiles (`apps/backend/src/modules/profiles/`):** Profile completeness scores, privacy visibility (`PUBLIC`, `PROPOSERS`, `PRIVATE`), and moderation reporting.
+  * **Profiles (`apps/backend/src/modules/profiles/`):** Profile completeness scores, privacy visibility (`PUBLIC`, `PROPOSERS`, `PRIVATE`), and moderation reporting. Profile photos are uploaded to `POST /api/v1/users/me/avatar`, stored in `UserAvatar`, and referenced from `User.avatarUrl` by a short public URL (`/api/v1/users/avatars/<id>`) served with an immutable cache. The image bytes never enter `avatarUrl`: that column is `VARCHAR(500)` and is selected by chat, contract, gig and featured queries, so a base64 payload there would ride along on every one of those responses.
   * **Reviews (`apps/backend/src/modules/reviews/`):** Mutual double-blind reviews revealed after 14 days or mutual submission, with Bayesian sorting (`ratingBayesianScore`).
   * **Featured Talent (`apps/backend/src/modules/featured/`):** Cold-start carousel rotation algorithm balancing top-rated, recently verified, and staff-pinned talent.
   * **Portfolio (`apps/backend/src/modules/portfolio/`):** Freelancer work showcase items.
-* **Owns Models:** `Skill`, `UserSkill`, `Review`, `PortfolioItem`, `FeaturedLog`, `ProfileReport`, `ProfileView`.
+* **Owns Models:** `Skill`, `UserSkill`, `Review`, `PortfolioItem`, `UserAvatar`, `FeaturedLog`, `ProfileReport`, `ProfileView`.
 
 #### Double-Blind Review Mechanism
 1. Client and freelancer can review each other only after contract completion (`isEligible: true`).
@@ -3020,7 +3030,8 @@ flowchart LR
 *Profile:*
 - `ProfilePage.tsx` renders public profile: avatar, bio, skills, portfolio items, completed jobs count, Bayesian rating.
 - Visibility controlled by `User.profileVisibility` (`PUBLIC`, `PROPOSERS`, `PRIVATE`).
-- `ProfileEditPage.tsx` → `PATCH /api/v1/profiles/me` — updates bio, skills, availability.
+- `ProfileEditPage.tsx` → `PATCH /api/v1/users/me/profile` — updates name, bio, skills, availability and visibility. A chosen photo is compressed to a 320px JPEG in `apps/frontend/src/lib/avatarImage.ts` and uploaded to `POST /api/v1/users/me/avatar`; the returned `/api/v1/users/avatars/<id>` URL is what the PATCH stores in `avatarUrl`. The photo is applied immediately, while the rest of the form waits for **Save Changes**.
+- `GET /api/v1/users/avatars/:avatarId` serves the stored image publicly with `Cache-Control: immutable`. A replacement upload creates a new id and deletes the old row, so a cached URL can never show somebody else's newer photo; clearing the avatar (`avatarUrl: null`) deletes the bytes.
 - `ProfileView` records are written each time a profile is viewed (analytics).
 
 *Skills Taxonomy:*

@@ -23,6 +23,7 @@ import {
   loadAvatarOverride,
   saveAvatarOverride,
 } from "./YekisAvatar";
+import { compressAvatarImage } from "../lib/avatarImage";
 import { useLocation, useNavigate } from "../router/HashRouter";
 import { useI18n } from "../i18n";
 
@@ -43,49 +44,6 @@ export interface ProfileCompletionSummary {
   totalCount: number;
   percentage: number;
   isComplete: boolean;
-}
-
-/** Compress & square-crop uploaded avatar image to a lightweight JPEG Data URL */
-function compressAvatarFile(file: File, maxDim = 320): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("Please select a valid image file (JPG, PNG, WEBP, or GIF)."));
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      reject(new Error("Image must be smaller than 10 MB."));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Unable to read image file."));
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onerror = () => resolve(dataUrl);
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const size = Math.min(img.width, img.height);
-          const sx = Math.max(0, Math.floor((img.width - size) / 2));
-          const sy = Math.max(0, Math.floor((img.height - size) / 2));
-          const target = Math.min(maxDim, size || maxDim);
-          canvas.width = target;
-          canvas.height = target;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            resolve(dataUrl);
-            return;
-          }
-          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
-          resolve(canvas.toDataURL("image/jpeg", 0.88));
-        } catch {
-          resolve(dataUrl);
-        }
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 export function evaluateProfileCompletion(params: {
@@ -154,7 +112,13 @@ export function ProfileCompletionDialog({
   const [firstName, setFirstName] = useState(user.firstName ?? "");
   const [lastName, setLastName] = useState(user.lastName ?? "");
   const [bio, setBio] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(user.avatarUrl ?? null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(
+    // A data URL cannot be persisted in User.avatarUrl (VARCHAR(500)); treat
+    // any legacy value as "no custom photo" rather than failing the save.
+    user.avatarUrl && !user.avatarUrl.startsWith("data:")
+      ? user.avatarUrl
+      : null,
+  );
   const [avatarSeed, setAvatarSeed] = useState<string>(user.id || "me");
   const [primarySkillId, setPrimarySkillId] = useState<string>("");
   const [skillIds, setSkillIds] = useState<string[]>([]);
@@ -277,10 +241,14 @@ export function ProfileCompletionDialog({
     setPhotoError(null);
     setUploadingPhoto(true);
     try {
-      const compressedDataUrl = await compressAvatarFile(file);
-      setAvatarUrl(compressedDataUrl);
+      // Upload immediately and keep the URL, not the image: `avatarUrl` is
+      // VARCHAR(500) and the PATCH below stores a reference to the uploaded
+      // photo. Sending the JPEG itself is what overflowed the column.
+      const compressed = await compressAvatarImage(file);
+      const { avatarUrl: uploadedUrl } = await api.uploadAvatar(compressed);
+      setAvatarUrl(uploadedUrl);
       saveAvatarOverride(user.id, {
-        avatarUrl: compressedDataUrl,
+        avatarUrl: uploadedUrl,
         seed: avatarSeed,
       });
     } catch (err) {

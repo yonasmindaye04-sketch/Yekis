@@ -59,6 +59,13 @@ export const UNAUTHENTICATED_BY_DESIGN: ReadonlySet<string> = new Set([
   // CBE: shared-secret header check.
   "POST /api/v1/webhooks/cbe",
 
+  // ── Public profile photos ────────────────────────────────────────────────
+  // An <img> on a signed-out public profile page cannot send a bearer token.
+  // The id is random and the response is the photo the profile already shows;
+  // there is no account detail to disclose. Unknown ids answer 404, so the
+  // route cannot be used to probe for accounts either.
+  "GET /api/v1/users/avatars/:avatarId",
+
   // ── Health probes ────────────────────────────────────────────────────────
   "GET /health",
   "GET /api/v1/telegram/health",

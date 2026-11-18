@@ -1,6 +1,7 @@
 // === IMPORTS ===
 import { Router } from "express";
 import type { Response } from "express";
+import multer from "multer";
 import {
   requireAuth,
   requireFreshAuth,
@@ -8,6 +9,7 @@ import {
   type AuthedRequest,
 } from "../../middleware/auth.js";
 import * as profileService from "./profile.service.js";
+import * as avatarService from "./avatar.service.js";
 import {
   updateProfileSchema,
   reportProfileSchema,
@@ -32,6 +34,104 @@ function handleKnownErrors(err: unknown, res: Response): boolean {
   }
   return false;
 }
+
+// Avatar uploads are images, not documents. The client compresses to a 320px
+// JPEG before sending, so 2 MB leaves ample room for a large source that a
+// browser failed to re-encode while still refusing a 40 MB camera original.
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: avatarService.MAX_AVATAR_BYTES },
+});
+
+/**
+ * Multer reports an oversized file by calling back with `MulterError` before
+ * the route handler runs. Without this wrapper that error reaches Express's
+ * default handler and the client sees an HTML 500 instead of the reason.
+ */
+function receiveAvatarUpload(
+  req: AuthedRequest,
+  res: Response,
+  next: (err?: unknown) => void,
+) {
+  avatarUpload.single("file")(req, res, (err: unknown) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        return res.status(413).json({
+          error: "AVATAR_TOO_LARGE",
+          message: "Avatar images must be smaller than 2 MB.",
+        });
+      }
+      return res.status(400).json({
+        error: "INVALID_AVATAR_UPLOAD",
+        message: "The avatar upload could not be read.",
+      });
+    }
+    return res.status(400).json({
+      error: "INVALID_AVATAR_UPLOAD",
+      message: "The avatar upload could not be read.",
+    });
+  });
+}
+
+// POST /me/avatar
+// Stores an uploaded profile photo and points User.avatarUrl at the short,
+// public URL that serves it. This is a separate endpoint from PATCH /me/profile
+// because `avatarUrl` must never carry the image itself: the column is
+// VARCHAR(500) and the value is copied into every chat, contract and gig
+// response that selects an avatar.
+profileRouter.post(
+  "/me/avatar",
+  requireAuth,
+  receiveAvatarUpload,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: "MISSING_FILE",
+          message: "Choose an image to upload.",
+        });
+      }
+
+      const saved = await avatarService.saveAvatar({
+        userId: req.user!.id,
+        fileBuffer: req.file.buffer,
+      });
+
+      return res.json(saved);
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error storing avatar");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// GET /avatars/:avatarId
+//
+// Public on purpose. Public profile pages render for signed-out visitors, and
+// an <img> cannot send a bearer token. The id is random and the content is the
+// same photo every member already sees; it is not a bearer secret. The URL is
+// immutable — a new upload gets a new id — so it can be cached indefinitely.
+profileRouter.get(
+  "/avatars/:avatarId",
+  async (req, res: Response) => {
+    try {
+      const avatar = await avatarService.getAvatar(req.params.avatarId as string);
+      if (!avatar) {
+        return res.status(404).json({ error: "NOT_FOUND" });
+      }
+
+      res.set("Cache-Control", "public, max-age=31536000, immutable");
+      res.set("X-Content-Type-Options", "nosniff");
+      res.type(avatar.contentType);
+      return res.send(avatar.data);
+    } catch (error) {
+      logger.error({ err: error }, "Error serving avatar");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // GET /:userId/profile
 profileRouter.get(
@@ -80,9 +180,13 @@ profileRouter.patch(
       res.json(updatedProfile);
     } catch (error: any) {
       if (error.name === "ZodError") {
-        return res
-          .status(400)
-          .json({ error: "VALIDATION_FAILED", details: error.errors });
+        return res.status(400).json({
+          error: "VALIDATION_FAILED",
+          // The client shows `message`, not the raw issue list. Without this
+          // the person editing the profile saw only "VALIDATION_FAILED".
+          message: error.errors?.[0]?.message ?? "The profile could not be saved.",
+          details: error.errors,
+        });
       }
       if (handleKnownErrors(error, res)) return;
       logger.error({ err: error }, "Error updating profile");

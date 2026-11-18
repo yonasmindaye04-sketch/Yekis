@@ -6,6 +6,7 @@ import {
   loadAvatarOverride,
   saveAvatarOverride,
 } from "./components/YekisAvatar";
+import { compressAvatarImage } from "./lib/avatarImage";
 import { useI18n } from "./i18n";
 import "./ProfilePage.css";
 
@@ -47,49 +48,6 @@ export function saveLocalPortfolio(
   } catch {
     // ignore storage errors
   }
-}
-
-/** Resize and compress an uploaded image file into a clean square-friendly data URL */
-function compressProfileImage(file: File, maxDim = 320): Promise<string> {
-  return new Promise((resolve, reject) => {
-    if (!file.type.startsWith("image/")) {
-      reject(new Error("Please choose a valid image file (JPG, PNG, WEBP, or GIF)."));
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      reject(new Error("Image must be smaller than 10 MB."));
-      return;
-    }
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read image file."));
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onerror = () => resolve(dataUrl);
-      img.onload = () => {
-        try {
-          const canvas = document.createElement("canvas");
-          const size = Math.min(img.width, img.height);
-          const sx = Math.max(0, Math.floor((img.width - size) / 2));
-          const sy = Math.max(0, Math.floor((img.height - size) / 2));
-          const target = Math.min(maxDim, size || maxDim);
-          canvas.width = target;
-          canvas.height = target;
-          const ctx = canvas.getContext("2d");
-          if (!ctx) {
-            resolve(dataUrl);
-            return;
-          }
-          ctx.drawImage(img, sx, sy, size, size, 0, 0, target, target);
-          resolve(canvas.toDataURL("image/jpeg", 0.88));
-        } catch {
-          resolve(dataUrl);
-        }
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-  });
 }
 
 interface ProfileFormState {
@@ -162,10 +120,22 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
           profileCompleteness?: number;
         };
 
-        const resolvedAvatarUrl =
+        const storedAvatar =
           storedOverride && "avatarUrl" in storedOverride
             ? (storedOverride.avatarUrl ?? null)
             : (p.avatarUrl ?? me.avatarUrl ?? null);
+
+        // Older builds kept the JPEG itself in localStorage and sent it as
+        // `avatarUrl`. That value can never be saved (the column is 500
+        // characters), so drop it rather than resurrecting it on Save.
+        const resolvedAvatarUrl =
+          storedAvatar && storedAvatar.startsWith("data:") ? null : storedAvatar;
+        if (storedAvatar && storedAvatar.startsWith("data:")) {
+          saveAvatarOverride(me.id, {
+            avatarUrl: null,
+            seed: storedOverride?.seed || me.id,
+          });
+        }
 
         setFormData({
           firstName: p.firstName ?? me.firstName ?? "",
@@ -232,9 +202,13 @@ export const ProfileEditPage = ({ onSaved }: ProfileEditPageProps = {}) => {
     setPhotoError(null);
     setUploadingPhoto(true);
     try {
-      const dataUrl = await compressProfileImage(file);
-      setFormData((prev) => ({ ...prev, avatarUrl: dataUrl }));
-      saveAvatarOverride(userId, { avatarUrl: dataUrl, seed: avatarSeed });
+      // The photo is uploaded now and applied immediately; the rest of the
+      // form still waits for "Save Changes". Sending the image itself in the
+      // PATCH is what used to overflow User.avatarUrl and fail the whole save.
+      const compressed = await compressAvatarImage(file);
+      const { avatarUrl } = await api.uploadAvatar(compressed);
+      setFormData((prev) => ({ ...prev, avatarUrl }));
+      saveAvatarOverride(userId, { avatarUrl, seed: avatarSeed });
     } catch (err) {
       setPhotoError(
         err instanceof Error ? err.message : "Could not process image.",

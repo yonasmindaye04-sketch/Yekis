@@ -20,9 +20,20 @@ export const updateProfileSchema = z.object({
   profileVisibility: z.enum(["PUBLIC", "PROPOSERS", "PRIVATE"]).optional(),
   languagePreference: z.enum(["en", "am", "om", "ti"]).optional(),
   timezone: z.string().max(60).optional(),
+  // `avatarUrl` is stored in VARCHAR(500), and it is copied into every chat,
+  // contract, gig and featured response that selects an avatar. Accept only a
+  // short, referenceable URL — the bytes are uploaded separately to
+  // POST /me/avatar. A data URL here is the bug that made every profile save
+  // with a custom photo fail with a 500: Zod allowed 1.5 MB and Postgres
+  // rejected anything over 500 characters.
   avatarUrl: z
     .string()
-    .max(1_500_000, "Avatar image data is too large")
+    .max(500, "Avatar URL cannot exceed 500 characters")
+    .refine(
+      (value) =>
+        value === "" || value.startsWith("/") || /^https:\/\//i.test(value),
+      "Avatar must be an uploaded image or an https URL.",
+    )
     .nullable()
     .optional(),
 });

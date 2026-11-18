@@ -359,7 +359,9 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | `GET` | `/api/v1/users/:userId/profile` | Public/Authenticated | Get user profile and portfolio |
-| `PATCH` | `/api/v1/users/me/profile` | Authenticated | Update bio, title, location, etc. |
+| `PATCH` | `/api/v1/users/me/profile` | Authenticated | Update name, bio, skills, availability, visibility and `avatarUrl` (a short URL only — max 500 characters; `data:` values are rejected with `400`) |
+| `POST` | `/api/v1/users/me/avatar` | Authenticated | Upload a profile photo as multipart `file` (JPEG/PNG/WebP, ≤2 MB). Stores the bytes in `UserAvatar`, points `User.avatarUrl` at the returned `/api/v1/users/avatars/<id>`, and returns `{ avatarUrl, contentType, sizeBytes }`. A replacement deletes the previous photo |
+| `GET` | `/api/v1/users/avatars/:avatarId` | Public | Serve an uploaded profile photo with `Cache-Control: public, max-age=31536000, immutable` and `X-Content-Type-Options: nosniff`. Unknown or malformed ids return `404` |
 | `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
 | `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
 | `GET` | `/api/v1/users/me/export` | Authenticated | Export the complete PDPP data-subject archive as JSON — account, profile, verification, financials, marketplace activity, communications (consents, notifications, chat, DMs) and the compliance records the platform holds |
