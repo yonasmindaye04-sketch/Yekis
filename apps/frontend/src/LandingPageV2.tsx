@@ -842,240 +842,539 @@ function FeesSection() {
 
 /* ─────────────────────────────────────────────────
    Categories — pinned editorial card stack
-───────────────────────────────────────────────── */
-const STK_Y_OFFSET = 5; // % each waiting card sits below the one in front
-const STK_SCALE_STEP = 0.075; // each waiting card is this much smaller
-const STK_LOOP_MS = 7000;
+   ───────────────────────────────────────────────── */
+const STK_Y_OFFSET = 3.2;
+const STK_SCALE_STEP = 0.06;
+const STK_ENTER_Y = 62;
+const STK_ENTER_RX = -16;
+const STK_ENTER_SCALE = 0.88;
+const STK_CARD_MS = 950;
+const STK_STAGGER_MS = 110;
+const STK_TILT_X = 2.6;
+const STK_TILT_Y = 3.4;
+const STK_VEL_KICK = 240;
+const STK_VEL_MAX = 6;
+const STK_PARALLAX = 7;
+const STK_CARD_LOOP_MS = 7000;
+const STK_CARD_REVEAL_MS = 6000;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp = (v: number, lo: number, hi: number) =>
   v < lo ? lo : v > hi ? hi : v;
+const easeOutExpo = (t: number) => {
+  const c = clamp(t, 0, 1);
+  return c >= 1 ? 1 : 1 - Math.pow(2, -10 * c);
+};
 
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+  const copyRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const mediaRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const outroRef = useRef<HTMLDivElement>(null);
+  const pinRef = useRef<HTMLElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const outroRef = useRef<HTMLElement>(null);
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hudOn, setHudOn] = useState(false);
+  const [isReduced, setIsReduced] = useState(prefersReduced);
 
   const isCard =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("card");
 
-  const cards = [
-    {
-      kicker: t.marketing.categories.c1Class,
-      title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
-      icon: "/icons/web-development.webp",
-      bg: "#c75a35",
-    },
-    {
-      kicker: t.marketing.categories.c2Class,
-      title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
-      icon: "/icons/graphic-design.webp",
-      bg: "#1f4d4a",
-    },
-    {
-      kicker: t.marketing.categories.c3Class,
-      title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
-      icon: "/icons/digital-marketing.webp",
-      bg: "#2d2a66",
-    },
-    {
-      kicker: t.marketing.categories.c4Class,
-      title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
-      icon: "/icons/content-copywriting.webp",
-      bg: "#0e3f36",
-    },
-    {
-      kicker: t.marketing.categories.c5Class,
-      title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
-      icon: "/icons/translation.webp",
-      bg: "#4a224f",
-    },
-    {
-      kicker: t.marketing.categories.c6Class,
-      title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
-      icon: "/icons/data-processing.webp",
-      bg: "#1a1613",
-    },
-  ];
+  const cards = useMemo(
+    () => [
+      {
+        num: "01",
+        category: "Engineering",
+        kicker: t.marketing.categories.c1Class || "01 / Engineering",
+        title1: t.marketing.categories.c1Title1 || "Web & App",
+        title2: t.marketing.categories.c1Title2 || "Development",
+        roles: t.marketing.categories.c1Roles || "148 open roles",
+        tag: t.marketing.categories.c1Tag || "Full\u2011stack \u00b7 Mobile \u00b7 API",
+        bg: "#123f36",
+        ac: "#5eead4",
+        glow: "rgba(94,234,212,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+        ),
+      },
+      {
+        num: "02",
+        category: "Design",
+        kicker: t.marketing.categories.c2Class || "02 / Design",
+        title1: t.marketing.categories.c2Title1 || "Graphic Design",
+        title2: t.marketing.categories.c2Title2 || "& Branding",
+        roles: t.marketing.categories.c2Roles || "96 open roles",
+        tag: t.marketing.categories.c2Tag || "Identity \u00b7 Print \u00b7 UI",
+        bg: "#332a5e",
+        ac: "#b7a4fb",
+        glow: "rgba(183,164,251,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" />
+            <circle cx="17.5" cy="10.5" r=".5" />
+            <circle cx="8.5" cy="7.5" r=".5" />
+            <circle cx="6.5" cy="12.5" r=".5" />
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C19.965 6.012 15.463 2 12 2z" />
+          </svg>
+        ),
+      },
+      {
+        num: "03",
+        category: "Marketing",
+        kicker: t.marketing.categories.c3Class || "03 / Marketing",
+        title1: t.marketing.categories.c3Title1 || "Digital",
+        title2: t.marketing.categories.c3Title2 || "Marketing",
+        roles: t.marketing.categories.c3Roles || "74 open roles",
+        tag: t.marketing.categories.c3Tag || "SEO \u00b7 Social \u00b7 Paid",
+        bg: "#3c4510",
+        ac: "#d3f16a",
+        glow: "rgba(211,241,106,.18)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3 11 18-5v12L3 14v-3z" />
+            <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+          </svg>
+        ),
+      },
+      {
+        num: "04",
+        category: "Content",
+        kicker: t.marketing.categories.c4Class || "04 / Content",
+        title1: t.marketing.categories.c4Title1 || "Content &",
+        title2: t.marketing.categories.c4Title2 || "Copywriting",
+        roles: t.marketing.categories.c4Roles || "61 open roles",
+        tag: t.marketing.categories.c4Tag || "Editorial \u00b7 UX \u00b7 Scripts",
+        bg: "#0f3e3d",
+        ac: "#6ee7d8",
+        glow: "rgba(110,231,216,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m12 19 7-7 3 3-7 7-3-3z" />
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+            <path d="M2 2l7.586 7.586" />
+            <circle cx="11" cy="11" r="2" />
+          </svg>
+        ),
+      },
+      {
+        num: "05",
+        category: "Language",
+        kicker: t.marketing.categories.c5Class || "05 / Language",
+        title1: t.marketing.categories.c5Title1 || "Amharic / English",
+        title2: t.marketing.categories.c5Title2 || "Translation",
+        roles: t.marketing.categories.c5Roles || "53 open roles",
+        tag: t.marketing.categories.c5Tag || "Localisation \u00b7 Subtitling",
+        bg: "#401d52",
+        ac: "#e0aaff",
+        glow: "rgba(224,170,255,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m5 8 6 6" />
+            <path d="m4 14 6-6 2-3" />
+            <path d="M2 5h12" />
+            <path d="M7 2h1" />
+            <path d="m22 22-5-10-5 10" />
+            <path d="M14 18h6" />
+          </svg>
+        ),
+      },
+      {
+        num: "06",
+        category: "Data",
+        kicker: t.marketing.categories.c6Class || "06 / Data",
+        title1: t.marketing.categories.c6Title1 || "Data",
+        title2: t.marketing.categories.c6Title2 || "Processing",
+        roles: t.marketing.categories.c6Roles || "88 open roles",
+        tag: t.marketing.categories.c6Tag || "Annotation \u00b7 ETL \u00b7 QA",
+        bg: "#423610",
+        ac: "#fde047",
+        glow: "rgba(253,224,71,.18)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+            <path d="M3 12a9 3 0 0 0 18 0V5" />
+          </svg>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const total = cards.length;
+  const segment = 1 / Math.max(1, total - 1);
+
+  const goToCard = (i: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
+    const span = Math.max(1, wrap.offsetHeight - window.innerHeight);
+    const p = i >= total - 1 ? 1 : i === 0 ? 0 : Math.min(1, i * segment + 0.002);
+    window.scrollTo({
+      top: wrapTop + p * span,
+      behavior: prefersReduced() ? "auto" : "smooth",
+    });
+  };
 
   useEffect(() => {
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const cardEls = cardRefs.current.filter(Boolean) as HTMLDivElement[];
-    const total = cardEls.length;
-    if (total === 0) return;
-    const segment = 1 / total;
+    const reduced = prefersReduced();
+    setIsReduced(reduced);
+
+    const wrap = wrapRef.current;
+    const pin = pinRef.current;
+    const stage = stageRef.current;
     const outro = outroRef.current;
+    const cardEls = cardRefs.current.filter(Boolean) as HTMLElement[];
+    const copyEls = copyRefs.current.filter(Boolean) as HTMLElement[];
+    const mediaEls = mediaRefs.current.filter(Boolean) as HTMLElement[];
 
-    // Write the deck for a given normalised progress p∈[0,1].
-    const render = (p: number) => {
-      const active = Math.min(Math.floor(p / segment), total - 1);
-      const segP = (p - active * segment) / segment;
+    if (!wrap || !pin || !stage || cardEls.length === 0) return;
 
-      cardEls.forEach((card, i) => {
-        let y: number;
-        let rx: number;
-        let scale: number;
-        if (i < active) {
-          y = -250;
-          rx = 35;
-          scale = 1;
-        } else if (i === active) {
-          y = lerp(-50, -200, segP);
-          rx = lerp(0, 35, segP);
-          scale = 1;
-        } else {
-          const behind = i - active;
-          y = -50 + (behind - segP) * STK_Y_OFFSET;
-          rx = 0;
-          scale = 1 - (behind - segP) * STK_SCALE_STEP;
-        }
-        card.style.transform = `translate(-50%, ${y}%) rotateX(${rx.toFixed(
-          2
-        )}deg) scale(${scale.toFixed(3)})`;
-      });
+    const introTotal = (total - 1) * STK_STAGGER_MS + STK_CARD_MS;
+    let wrapTop = 0;
+    let span = 1;
+
+    const measure = () => {
+      wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
+      span = Math.max(1, wrap.offsetHeight - window.innerHeight);
     };
+    measure();
+
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(measure);
+      ro.observe(wrap);
+    }
+    window.addEventListener("resize", measure, { passive: true });
+
+    const deckPose = (
+      i: number,
+      p: number,
+      out: { y: number; rx: number; sc: number; t: number }
+    ) => {
+      const active = Math.min(Math.floor(p / segment), total - 1);
+      const segP = clamp((p - active * segment) / segment, 0, 1);
+      if (i < active) {
+        out.y = -250;
+        out.rx = 35;
+        out.sc = 1;
+        out.t = 1;
+        return active;
+      }
+      if (i === active) {
+        out.y = lerp(-50, -200, segP);
+        out.rx = lerp(0, 35, segP);
+        out.sc = 1;
+        out.t = segP;
+        return active;
+      }
+      const behind = i - active;
+      out.y = -50 + (behind - segP) * STK_Y_OFFSET;
+      out.rx = 0;
+      out.sc = 1 - (behind - segP) * STK_SCALE_STEP;
+      out.t = 0;
+      return active;
+    };
+
+    const pose = { y: 0, rx: 0, sc: 1, t: 0 };
+    const render = (p: number, elapsed: number) => {
+      let active = 0;
+      cardEls.forEach((card, i) => {
+        active = deckPose(i, p, pose);
+        const e =
+          elapsed >= introTotal
+            ? 1
+            : easeOutExpo((elapsed - i * STK_STAGGER_MS) / STK_CARD_MS);
+        const y = lerp(STK_ENTER_Y, pose.y, e);
+        const rx = lerp(STK_ENTER_RX, pose.rx, e);
+        const sc = lerp(STK_ENTER_SCALE, pose.sc, e);
+        card.style.opacity = clamp(e * 1.6, 0, 1).toFixed(3);
+        card.style.transform = `translate(-50%, ${y.toFixed(2)}%) rotateX(${rx.toFixed(
+          2
+        )}deg) scale(${sc.toFixed(3)})`;
+        const tVal = pose.t * e;
+        if (copyEls[i]) {
+          copyEls[i].style.transform = `translate3d(0,${(tVal * -STK_PARALLAX).toFixed(2)}%,0)`;
+        }
+        if (mediaEls[i]) {
+          mediaEls[i].style.transform = `translate3d(0,${(tVal * STK_PARALLAX).toFixed(
+            2
+          )}%,0) scale(${(1 - tVal * 0.05).toFixed(3)})`;
+        }
+      });
+      return active;
+    };
+
+    let lastActive = -1;
+    let didHudOn = false;
+
+    const syncHud = (active: number) => {
+      if (active !== lastActive) {
+        lastActive = active;
+        setActiveIndex(active);
+      }
+    };
+
+    const progressFromScroll = () => clamp((window.scrollY - wrapTop) / span, 0, 1);
+
+    let outroIO: IntersectionObserver | null = null;
+    if (outro) {
+      if (reduced || isCard) {
+        outro.classList.add("is-active");
+      } else if ("IntersectionObserver" in window) {
+        outroIO = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((en) => {
+              if (en.isIntersecting) {
+                outro.classList.add("is-active");
+              } else if (en.boundingClientRect.top > (window.innerHeight || 800)) {
+                outro.classList.remove("is-active");
+              }
+            });
+          },
+          { threshold: 0.15 }
+        );
+        outroIO.observe(outro);
+      } else {
+        outro.classList.add("is-active");
+      }
+    }
 
     if (reduced) {
-      render(0);
-      outro?.classList.add("is-active");
-      return;
+      const staticRender = () => {
+        const p = isCard ? 0 : progressFromScroll();
+        const active = render(p, Infinity);
+        syncHud(active);
+        if (!didHudOn) {
+          didHudOn = true;
+          setHudOn(true);
+        }
+      };
+      staticRender();
+      if (!isCard) window.addEventListener("scroll", staticRender, { passive: true });
+      return () => {
+        window.removeEventListener("resize", measure);
+        if (!isCard) window.removeEventListener("scroll", staticRender);
+        if (ro) ro.disconnect();
+        if (outroIO) outroIO.disconnect();
+      };
     }
 
+    cardEls.forEach((c) => {
+      c.style.opacity = "0";
+    });
+
+    let tx = 0;
+    let ty = 0;
+    let sx = 0;
+    let sy = 0;
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const r = pin.getBoundingClientRect();
+      tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
+      ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
+    };
+    const onPointerLeave = () => {
+      tx = 0;
+      ty = 0;
+    };
+
+    if (!isCard) {
+      pin.addEventListener("pointermove", onPointerMove);
+      pin.addEventListener("pointerleave", onPointerLeave);
+    }
+
+    let introStarted = isCard || wrap.getBoundingClientRect().top <= window.innerHeight * 0.92;
+    let introStart = introStarted ? performance.now() : 0;
+    let wrapIO: IntersectionObserver | null = null;
+    if (!introStarted && "IntersectionObserver" in window) {
+      wrapIO = new IntersectionObserver(
+        (entries) => {
+          for (const en of entries) {
+            if (en.isIntersecting) {
+              introStarted = true;
+              introStart = performance.now();
+              wrapIO?.disconnect();
+              break;
+            }
+          }
+        },
+        { threshold: 0.04 }
+      );
+      wrapIO.observe(wrap);
+    }
+
+    const cardStart = performance.now();
+    let lastP = 0;
+    let vel = 0;
     let raf = 0;
 
-    if (isCard) {
-      // No scroll inside the card — auto-play the timeline on a loop.
-      const start = performance.now();
-      const tick = (now: number) => {
-        const t = ((now - start) % STK_LOOP_MS) / STK_LOOP_MS;
-        // ease through the reveal (first ~0.86), then hold on the last frame
-        const revealEnd = 6000 / STK_LOOP_MS;
-        const p = t < revealEnd ? t / revealEnd : 1;
-        render(clamp(p, 0, 1));
-        if (p >= 0.96) {
-          outro?.classList.add("is-active");
-        } else {
-          outro?.classList.remove("is-active");
-        }
-        raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(raf);
-    }
-
-    // IntersectionObserver triggers word loading animation as outro enters
-    let io: IntersectionObserver | null = null;
-    if (outro && "IntersectionObserver" in window) {
-      io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              outro.classList.add("is-active");
-            } else if (entry.boundingClientRect.top > (window.innerHeight || 800)) {
-              outro.classList.remove("is-active");
-            }
-          });
-        },
-        { threshold: 0.15 }
-      );
-      io.observe(outro);
-    }
-
-    // Standalone: drive by the pinned wrapper's scroll position.
-    let autoScrolled = false;
-    const wrap = wrapRef.current || document.getElementById("stk-wrap");
-    const tick = () => {
-      if (wrap) {
-        const top = wrap.getBoundingClientRect().top;
-        const span = wrap.offsetHeight - window.innerHeight;
-        const p = clamp(-top / span, 0, 1);
-        render(p);
-
-        // Bring the "Let's Build" section automatically with clean motion when the cards finish dealing
-        if (p >= 0.96 && !autoScrolled && outro) {
-          autoScrolled = true;
-          outro.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else if (p < 0.82) {
-          autoScrolled = false;
-        }
+    const loop = (now: number) => {
+      if (!introStarted && wrap.getBoundingClientRect().top <= window.innerHeight * 0.95) {
+        introStarted = true;
+        introStart = now;
       }
-      raf = requestAnimationFrame(tick);
+      const elapsed = introStarted ? now - introStart : 0;
+      let p: number;
+      if (isCard) {
+        const loopT = ((now - cardStart) % STK_CARD_LOOP_MS) / STK_CARD_LOOP_MS;
+        const revealEnd = STK_CARD_REVEAL_MS / STK_CARD_LOOP_MS;
+        p = loopT < revealEnd ? loopT / revealEnd : 1;
+      } else {
+        p = progressFromScroll();
+      }
+      vel = lerp(vel, clamp((p - lastP) * STK_VEL_KICK, -STK_VEL_MAX, STK_VEL_MAX), 0.12);
+      lastP = p;
+      sx = lerp(sx, tx, 0.06);
+      sy = lerp(sy, ty, 0.06);
+      stage.style.transform = `rotateX(${(vel - sy * STK_TILT_X).toFixed(
+        2
+      )}deg) rotateY(${(sx * STK_TILT_Y).toFixed(2)}deg)`;
+
+      const active = render(p, elapsed);
+      syncHud(active);
+      if (elapsed >= introTotal && !didHudOn) {
+        didHudOn = true;
+        setHudOn(true);
+      }
+      raf = requestAnimationFrame(loop);
     };
-    raf = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(loop);
 
     return () => {
       cancelAnimationFrame(raf);
-      if (io) io.disconnect();
+      window.removeEventListener("resize", measure);
+      if (!isCard) {
+        pin.removeEventListener("pointermove", onPointerMove);
+        pin.removeEventListener("pointerleave", onPointerLeave);
+      }
+      if (ro) ro.disconnect();
+      if (wrapIO) wrapIO.disconnect();
+      if (outroIO) outroIO.disconnect();
     };
-  }, [isCard, cards.length]);
+  }, [isCard, segment, total]);
 
-  const stage = (
-    <div className="stk-stage">
-      {cards.map((c, i) => (
-        <div
-          key={c.kicker}
-          ref={(el) => {
-            cardRefs.current[i] = el;
-          }}
-          className="stk-card"
-          style={{ background: c.bg, zIndex: cards.length - i, cursor: "pointer" }}
-          onClick={() => onStart("register")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onStart("register");
-            }
-          }}
-          aria-label={`Browse ${c.kicker}: ${c.title}`}
-        >
-          <div className="stk-col stk-copy">
-            <p>{c.kicker}</p>
-            <h2>{c.title}</h2>
-          </div>
-          <div className="stk-col stk-media">
-            {/* The category artwork is a 3D render (Fluent 3D, via Icons8):
-                a single object floating on the card's own colour, which
-                reads at a glance where the flat line-art scenes did not —
-                they all looked like the same picture. */}
-            <img
-              className="stk-3d-icon"
-              src={c.icon}
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        </div>
-      ))}
-    </div>
+  const outroWords = useMemo(
+    () => (t.marketing.categories.outroTitle || "Let's Build").split(" "),
+    [t.marketing.categories.outroTitle]
   );
 
   return (
-    <section className="v2-section stk-root" id="categories" style={{ paddingTop: 12, paddingBottom: 0 }}>
-      {/* section header */}
-      <div className="v2-container">
-        <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
+    <section className="v2-section stk-root" id="categories" aria-label="Explore expertise">
+      <div className="v2-container stk-section-head">
+        <Reveal delay={0.05}>
+          <h2 className="v2-sec-title">{t.marketing.categories.title}</h2>
+        </Reveal>
         <Reveal delay={0.1}>
-          <p className="v2-sec-sub" style={{ marginBottom: 18 }}>
-            {t.marketing.categories.subtitle}
-          </p>
+          <p className="v2-sec-sub">{t.marketing.categories.subtitle}</p>
         </Reveal>
       </div>
 
       <div id="stk-wrap" className="stk-wrap" ref={wrapRef}>
-        <section className="stk-pin">
-          <div className="stk-chrome">
-            <span className="stk-mark">Yekis®</span>
-            <span className="stk-tag">Stack · Scroll</span>
+        <section className="stk-pin" ref={pinRef} aria-label="Pinned category card stack">
+          <div className="stk-stage" ref={stageRef}>
+            {cards.map((c, i) => {
+              const isActive = isReduced || activeIndex === i;
+              return (
+                <article
+                  key={c.num}
+                  ref={(el) => {
+                    cardRefs.current[i] = el;
+                  }}
+                  className="stk-card"
+                  data-category={c.category}
+                  style={
+                    {
+                      background: c.bg,
+                      "--ac": c.ac,
+                      "--glow": c.glow,
+                      zIndex: total - i,
+                    } as React.CSSProperties
+                  }
+                  role="button"
+                  tabIndex={isActive ? 0 : -1}
+                  aria-hidden={isActive ? "false" : "true"}
+                  aria-label={`Browse ${c.category}: ${c.title1} ${c.title2}`}
+                  onClick={() => onStart("register")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onStart("register");
+                    }
+                  }}
+                >
+                  <div
+                    className="stk-col stk-copy"
+                    ref={(el) => {
+                      copyRefs.current[i] = el;
+                    }}
+                  >
+                    <div>
+                      <p className="k">{c.kicker}</p>
+                      <h2>
+                        {c.title1}
+                        <br />
+                        {c.title2}
+                      </h2>
+                    </div>
+                    <div className="row">
+                      <span className="roles">{c.roles}</span>
+                      <span className="chip" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12h14" />
+                          <path d="m12 5 7 7-7 7" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className="stk-col stk-media"
+                    ref={(el) => {
+                      mediaRefs.current[i] = el;
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span className="tag">{c.tag}</span>
+                    <span className="ic">{c.icon}</span>
+                    <p className="num">{c.num}</p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          {stage}
+
+          <div className={`stk-hud-right${hudOn ? " on" : ""}`}>
+            <nav className="stk-dots" aria-label="Jump to category">
+              {cards.map((c, i) => (
+                <button
+                  key={c.num}
+                  type="button"
+                  className="stk-dot"
+                  title={c.category}
+                  aria-label={`Jump to ${c.category}`}
+                  aria-current={activeIndex === i ? "true" : undefined}
+                  onClick={() => goToCard(i)}
+                />
+              ))}
+            </nav>
+            <div className="stk-count" aria-live="polite">
+              <b>{String(activeIndex + 1).padStart(2, "0")}</b> / {String(total).padStart(2, "0")}
+            </div>
+          </div>
         </section>
       </div>
 
@@ -1092,15 +1391,15 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
           className="stk-outro-title"
           aria-label={t.marketing.categories.outroTitle || "Let's Build"}
         >
-          {(t.marketing.categories.outroTitle || "Let's Build").split(" ").map((word, wi, arr) => (
+          {outroWords.map((word, wi) => (
             <span key={`${word}-${wi}`} className="stk-word-wrap" aria-hidden="true">
               <span
                 className="stk-word"
-                style={{ "--wi": wi, "--total": arr.length } as React.CSSProperties}
+                style={{ "--wi": wi, "--total": outroWords.length } as React.CSSProperties}
               >
                 {word}
               </span>
-              {wi < arr.length - 1 && <span className="stk-word-space">&nbsp;</span>}
+              {wi < outroWords.length - 1 && <span className="stk-word-space">&nbsp;</span>}
             </span>
           ))}
         </h1>
@@ -1109,15 +1408,21 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
           <div className="stk-load-bar-fill" />
         </div>
 
-        <p className="stk-outro-sub">
-          {t.marketing.categories.outroSubtitle}
-        </p>
+        <p className="stk-outro-sub">{t.marketing.categories.outroSubtitle}</p>
 
         <div className="stk-cta-row">
-          <button className="stk-outro-btn" onClick={() => onStart("register")}>
+          <button
+            className="stk-outro-btn"
+            type="button"
+            onClick={() => onStart("register")}
+          >
             {t.nav.getStarted}
           </button>
-          <button className="stk-outro-ghost" onClick={() => onStart("login")}>
+          <button
+            className="stk-outro-ghost"
+            type="button"
+            onClick={() => onStart("login")}
+          >
             {t.nav.signIn}
           </button>
         </div>

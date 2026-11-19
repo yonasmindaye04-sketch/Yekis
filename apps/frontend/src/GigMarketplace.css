@@ -73,7 +73,7 @@
 }
 
 .afro-eyebrow {
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -84,7 +84,7 @@
 
 .afro-headline {
   margin: 0;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: clamp(1.6rem, 2.8vw, 2.4rem);
   font-weight: 800;
   line-height: 1.15;
@@ -684,7 +684,7 @@
 
 /* Indicators conform to RULE 2: BOLD COLORED TEXT ONLY! No background pills! */
 .afro-category-tag {
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.74rem;
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -758,7 +758,7 @@
 
 .afro-card-title {
   margin: 0;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.98rem;
   font-weight: 700;
   line-height: 1.35;
@@ -840,7 +840,7 @@
 }
 
 .afro-price-value {
-  font-family: "Space Grotesk", var(--font-mono), monospace;
+  font-family: var(--font-mono);
   font-size: 1.05rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -932,7 +932,7 @@
 
 .afro-detail-title {
   margin: 0;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: clamp(1.5rem, 2.4vw, 2.1rem);
   font-weight: 800;
   line-height: 1.25;
@@ -1027,7 +1027,7 @@
 
 .afro-section-heading {
   margin: 0;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 1.15rem;
   font-weight: 700;
   color: var(--color-text);
@@ -1174,7 +1174,7 @@
   padding: 12px 8px;
   border: none;
   background: transparent;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.82rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -1218,14 +1218,14 @@
 }
 
 .afro-pkg-tier-name {
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 1.1rem;
   font-weight: 800;
   color: var(--color-text);
 }
 
 .afro-pkg-price-major {
-  font-family: "Space Grotesk", var(--font-mono), monospace;
+  font-family: var(--font-mono);
   font-size: 1.5rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
@@ -1281,7 +1281,7 @@
   padding: 0 20px;
   border-radius: 8px;
   border: none;
-  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-family: var(--font-heading);
   font-size: 0.94rem;
   font-weight: 700;
   cursor: pointer;
