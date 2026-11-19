@@ -17,6 +17,17 @@
   font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   cursor: pointer;
   user-select: none;
+  background: transparent;
+}
+
+.yk-hw::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 24%, #000 76%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 24%, #000 76%, transparent 100%);
 }
 
 .yk-hw *,
@@ -44,6 +55,7 @@
 /* Stage container holding the circle and content */
 .yk-hw-stage {
   position: relative;
+  z-index: 2;
   width: min(960px, 100%);
   height: clamp(280px, 46svh, 380px);
   margin-top: 16px;
@@ -160,37 +172,19 @@
    ============================================================ */
 
 /* Default / Dark theme colors */
-.yk-hw {
-  background:
-    radial-gradient(ellipse at 50% 55%, rgba(16, 90, 46, 0.55), transparent 62%),
-    linear-gradient(180deg, #030604 0%, #07130c 50%, #030604 100%);
-}
-
-.yk-hw-pill {
-  background: #22c55e;
-  color: #06240f;
-  border-color: #22c55e;
-  box-shadow: 0 0 24px rgba(34, 197, 94, 0.35);
-}
-
-.yk-hw-circle {
-  color: #22b455;
-}
-
-.yk-hw-title {
-  color: #f4f7f5;
-}
-
-.yk-hw-sub {
-  color: #9fb0a8;
-}
-
+.yk-hw,
 :root[data-theme="dark"] .yk-hw {
-  background:
-    radial-gradient(ellipse at 50% 55%, rgba(16, 90, 46, 0.55), transparent 62%),
-    linear-gradient(180deg, #030604 0%, #07130c 50%, #030604 100%);
+  background: transparent;
 }
 
+.yk-hw::before,
+:root[data-theme="dark"] .yk-hw::before {
+  background:
+    radial-gradient(ellipse 68% 58% at 50% 52%, rgba(22, 140, 68, 0.36), transparent 68%),
+    linear-gradient(180deg, transparent 0%, rgba(7, 22, 13, 0.42) 50%, transparent 100%);
+}
+
+.yk-hw-pill,
 :root[data-theme="dark"] .yk-hw-pill {
   background: #22c55e;
   color: #06240f;
@@ -198,22 +192,29 @@
   box-shadow: 0 0 24px rgba(34, 197, 94, 0.35);
 }
 
+.yk-hw-circle,
 :root[data-theme="dark"] .yk-hw-circle {
   color: #22b455;
 }
 
+.yk-hw-title,
 :root[data-theme="dark"] .yk-hw-title {
   color: #f4f7f5;
 }
 
+.yk-hw-sub,
 :root[data-theme="dark"] .yk-hw-sub {
   color: #9fb0a8;
 }
 
 :root[data-theme="light"] .yk-hw {
+  background: transparent;
+}
+
+:root[data-theme="light"] .yk-hw::before {
   background:
-    radial-gradient(ellipse at 50% 55%, rgba(34, 197, 94, 0.16), transparent 62%),
-    linear-gradient(180deg, #f0fdf4 0%, #eefbf1 50%, #f8fafc 100%);
+    radial-gradient(ellipse 68% 58% at 50% 52%, rgba(34, 197, 94, 0.16), transparent 68%),
+    linear-gradient(180deg, transparent 0%, rgba(220, 252, 231, 0.42) 50%, transparent 100%);
 }
 
 :root[data-theme="light"] .yk-hw-pill {

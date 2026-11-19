@@ -456,14 +456,16 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
 
   return (
     <section className="v2-hero" id="top" ref={heroRef}>
-      {/* ambient glow orbs */}
-      <div className="v2-fp-glow v2-fp-glow-one" />
-      <div className="v2-fp-glow v2-fp-glow-two" />
+      <div className="v2-hero-backdrop" aria-hidden="true">
+        {/* ambient glow orbs */}
+        <div className="v2-fp-glow v2-fp-glow-one" />
+        <div className="v2-fp-glow v2-fp-glow-two" />
 
-      {/* floating path field */}
-      <div className="v2-fp-layer" ref={layerRef}>
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+        {/* floating path field */}
+        <div className="v2-fp-layer" ref={layerRef}>
+          <FloatingPaths position={1} />
+          <FloatingPaths position={-1} />
+        </div>
       </div>
 
       {/* hero content */}
@@ -740,10 +742,12 @@ function EscrowSection() {
         aria-label="How YEKIS works, step by step"
       >
         <div className="stage-pin" id="pin">
-          <div ref={(el) => { glowRefs.current[0] = el; }} className="glow g1 on" />
-          <div ref={(el) => { glowRefs.current[1] = el; }} className="glow g2" />
-          <div ref={(el) => { glowRefs.current[2] = el; }} className="glow g3" />
-          <div ref={(el) => { glowRefs.current[3] = el; }} className="glow g4" />
+          <div className="stage-glows" aria-hidden="true">
+            <div ref={(el) => { glowRefs.current[0] = el; }} className="glow g1 on" />
+            <div ref={(el) => { glowRefs.current[1] = el; }} className="glow g2" />
+            <div ref={(el) => { glowRefs.current[2] = el; }} className="glow g3" />
+            <div ref={(el) => { glowRefs.current[3] = el; }} className="glow g4" />
+          </div>
 
           <div className="cols">
             {/* LEFT : bold topic */}
@@ -2217,11 +2221,105 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
 }
 
 /* ─────────────────────────────────────────────────
+   Shared scroll-reactive ambient background layer
+───────────────────────────────────────────────── */
+function ScrollAmbientCanvas() {
+  return (
+    <div className="v2-ambient-canvas" aria-hidden="true">
+      <span className="v2-ambient-orb v2-ambient-orb-1" />
+      <span className="v2-ambient-orb v2-ambient-orb-2" />
+      <span className="v2-ambient-orb v2-ambient-orb-3" />
+      <span className="v2-ambient-wash" />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────
    Root export
 ───────────────────────────────────────────────── */
 export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const setVars = (p: number) => {
+      const clamped = Math.max(0, Math.min(1, p));
+      const x1 = Math.sin(clamped * Math.PI * 2.2) * 14;
+      const y1 = Math.cos(clamped * Math.PI * 1.6) * 10 - clamped * 10;
+      const x2 = Math.cos(clamped * Math.PI * 1.8) * -15;
+      const y2 = Math.sin(clamped * Math.PI * 2.0) * 11 + clamped * 8;
+      const x3 = Math.sin(clamped * Math.PI * 2.6 + 1.1) * 12;
+      const y3 = Math.cos(clamped * Math.PI * 2.1 + 0.6) * -9;
+
+      const em = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 1.7 - 0.3));
+      const tl = 0.52 + 0.48 * (0.5 + 0.5 * Math.cos(clamped * Math.PI * 2.4));
+      const vl = 0.36 + 0.54 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 3.0 + 0.8));
+
+      root.style.setProperty("--amb-p", clamped.toFixed(4));
+      root.style.setProperty("--amb-x1", `${x1.toFixed(2)}vw`);
+      root.style.setProperty("--amb-y1", `${y1.toFixed(2)}vh`);
+      root.style.setProperty("--amb-x2", `${x2.toFixed(2)}vw`);
+      root.style.setProperty("--amb-y2", `${y2.toFixed(2)}vh`);
+      root.style.setProperty("--amb-x3", `${x3.toFixed(2)}vw`);
+      root.style.setProperty("--amb-y3", `${y3.toFixed(2)}vh`);
+      root.style.setProperty("--amb-em", em.toFixed(3));
+      root.style.setProperty("--amb-tl", tl.toFixed(3));
+      root.style.setProperty("--amb-vl", vl.toFixed(3));
+    };
+
+    if (prefersReduced()) {
+      setVars(0.15);
+      return;
+    }
+
+    let curP = 0;
+    let targetP = 0;
+    let raf = 0;
+
+    const measureTarget = () => {
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      targetP = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+    };
+
+    const tick = () => {
+      raf = 0;
+      const diff = targetP - curP;
+      if (Math.abs(diff) < 0.0004) {
+        curP = targetP;
+        setVars(curP);
+        return;
+      }
+      curP += diff * 0.085;
+      setVars(curP);
+      raf = requestAnimationFrame(tick);
+    };
+
+    const kick = () => {
+      measureTarget();
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+
+    measureTarget();
+    curP = targetP;
+    setVars(curP);
+
+    window.addEventListener("scroll", kick, { passive: true });
+    window.addEventListener("resize", kick, { passive: true });
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", kick);
+      window.removeEventListener("resize", kick);
+    };
+  }, []);
+
   return (
-    <div className="yk-v2">
+    <div className="yk-v2" ref={rootRef}>
+      {/* Shared scroll-reactive background canvas */}
+      <ScrollAmbientCanvas />
+
       {/* Hero */}
       <HeroSection onStart={onStart} />
 

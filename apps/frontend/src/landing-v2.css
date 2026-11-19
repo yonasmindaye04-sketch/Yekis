@@ -93,6 +93,10 @@
   --v2-out-word-mask: rgba(0, 0, 0, 1);
   --v2-out-ghost: rgba(255, 255, 255, 0.05);
   --v2-out-ghost-border: rgba(255, 255, 255, 0.16);
+  --v2-amb-c1: rgba(34, 197, 94, 0.16);
+  --v2-amb-c2: rgba(20, 184, 166, 0.14);
+  --v2-amb-c3: rgba(139, 108, 255, 0.13);
+  --v2-amb-wash: rgba(16, 185, 129, 0.05);
 }
 
 /* ── theme: light ── */
@@ -163,10 +167,24 @@
   --v2-out-word-mask: rgba(0, 0, 0, 1);
   --v2-out-ghost: rgba(255, 255, 255, 0.74);
   --v2-out-ghost-border: rgba(15, 23, 42, 0.15);
+  --v2-amb-c1: rgba(22, 163, 74, 0.11);
+  --v2-amb-c2: rgba(13, 148, 136, 0.10);
+  --v2-amb-c3: rgba(79, 70, 229, 0.07);
+  --v2-amb-wash: rgba(22, 163, 74, 0.035);
 }
 
 /* ── base ── */
 .yk-v2 {
+  --amb-p: 0;
+  --amb-x1: 0vw;
+  --amb-y1: 0vh;
+  --amb-x2: 0vw;
+  --amb-y2: 0vh;
+  --amb-x3: 0vw;
+  --amb-y3: 0vh;
+  --amb-em: 0.75;
+  --amb-tl: 0.75;
+  --amb-vl: 0.55;
   position: relative;
   min-height: 100vh;
   overflow-x: clip;
@@ -174,11 +192,68 @@
   color: var(--v2-text);
   font-family: var(--v2-font-body);
   -webkit-font-smoothing: antialiased;
-  background-image:
-    radial-gradient(1100px 620px at 82% -8%, color-mix(in srgb, var(--v2-violet) 16%, transparent), transparent 62%),
-    radial-gradient(900px 520px at 8% 4%, color-mix(in srgb, var(--v2-teal) 13%, transparent), transparent 60%);
 }
 .yk-v2 *, .yk-v2 *::before, .yk-v2 *::after { box-sizing: border-box; }
+
+/* ── shared scroll-reactive atmospheric canvas ── */
+.yk-v2 .v2-ambient-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+  contain: layout style paint;
+}
+.yk-v2 .v2-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+  filter: blur(88px);
+}
+.yk-v2 .v2-ambient-orb-1 {
+  top: -18vmax;
+  left: -14vmax;
+  width: 68vmax;
+  height: 68vmax;
+  background: radial-gradient(circle, var(--v2-amb-c1) 0%, transparent 66%);
+  opacity: var(--amb-em);
+  transform: translate3d(var(--amb-x1), var(--amb-y1), 0);
+}
+.yk-v2 .v2-ambient-orb-2 {
+  top: 24vh;
+  right: -18vmax;
+  width: 64vmax;
+  height: 64vmax;
+  background: radial-gradient(circle, var(--v2-amb-c2) 0%, transparent 66%);
+  opacity: var(--amb-tl);
+  transform: translate3d(var(--amb-x2), var(--amb-y2), 0);
+}
+.yk-v2 .v2-ambient-orb-3 {
+  bottom: -22vmax;
+  left: 22vw;
+  width: 58vmax;
+  height: 58vmax;
+  background: radial-gradient(circle, var(--v2-amb-c3) 0%, transparent 66%);
+  opacity: var(--amb-vl);
+  transform: translate3d(var(--amb-x3), var(--amb-y3), 0);
+}
+.yk-v2 .v2-ambient-wash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 95% 65% at 50% calc(22% + var(--amb-p) * 56%),
+    var(--v2-amb-wash) 0%,
+    transparent 72%
+  );
+  opacity: var(--amb-em);
+}
+
+.yk-v2 > section,
+.yk-v2 > footer {
+  position: relative;
+  z-index: 1;
+}
 .yk-v2 h1, .yk-v2 h2, .yk-v2 h3, .yk-v2 h4 {
   font-family: var(--v2-font-head);
   margin: 0;
@@ -337,6 +412,15 @@
   display: grid;
   place-items: center;
   overflow: hidden;
+}
+
+.yk-v2 .v2-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 80%, transparent 100%);
 }
 
 /* ambient glow orbs */
@@ -676,6 +760,15 @@
   overflow: hidden;
   display: flex;
   align-items: center;
+  background: transparent;
+}
+
+.yk-v2 .stage-glows {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 
 /* colour wash that crossfades per step */
@@ -914,9 +1007,11 @@
 }
 .yk-v2 .stage-pin,
 :root[data-theme="dark"] .yk-v2 .stage-pin {
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(255, 255, 255, 0.045), transparent 60%),
-    #060907;
+  background: transparent;
+}
+.yk-v2 .stage-glows,
+:root[data-theme="dark"] .yk-v2 .stage-glows {
+  background: radial-gradient(1200px 600px at 85% 8%, rgba(255, 255, 255, 0.04), transparent 62%);
 }
 .yk-v2 .ghost,
 :root[data-theme="dark"] .yk-v2 .ghost {
@@ -942,9 +1037,10 @@
   color: #111827;
 }
 :root[data-theme="light"] .yk-v2 .stage-pin {
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(0, 0, 0, 0.035), transparent 60%),
-    #f8fafc;
+  background: transparent;
+}
+:root[data-theme="light"] .yk-v2 .stage-glows {
+  background: radial-gradient(1200px 600px at 85% 8%, rgba(0, 0, 0, 0.03), transparent 62%);
 }
 :root[data-theme="light"] .yk-v2 .ghost {
   -webkit-text-stroke: 1px rgba(0, 0, 0, 0.07);
@@ -1166,9 +1262,11 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(56% 40% at 50% 0%, color-mix(in srgb, var(--v2-primary) 13%, transparent), transparent 70%),
-    radial-gradient(28% 24% at 4% 32%, color-mix(in srgb, var(--v2-teal) 12%, transparent), transparent 70%),
-    radial-gradient(28% 24% at 96% 68%, color-mix(in srgb, var(--v2-violet) 12%, transparent), transparent 70%);
+    radial-gradient(56% 42% at 50% 24%, color-mix(in srgb, var(--v2-primary) 13%, transparent), transparent 72%),
+    radial-gradient(30% 26% at 6% 36%, color-mix(in srgb, var(--v2-teal) 12%, transparent), transparent 70%),
+    radial-gradient(30% 26% at 94% 66%, color-mix(in srgb, var(--v2-violet) 12%, transparent), transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
 }
 .yk-v2 .v2-testi-title { display: block; }
 .yk-v2 .v2-testi-word {
@@ -1460,7 +1558,11 @@
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
 }
-.yk-v2 .v2-faq-leaves { z-index: 1; }
+.yk-v2 .v2-faq-leaves {
+  z-index: 1;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+}
 .yk-v2 .v2-faq-blob {
   position: absolute;
   border-radius: 50%;
@@ -1890,8 +1992,8 @@
   justify-content: center;
   align-items: center;
   width: 100%;
-  min-height: clamp(320px, 46svh, 400px);
-  padding: clamp(32px, 4svh, 48px) 0;
+  min-height: clamp(340px, 48svh, 420px);
+  padding: clamp(56px, 7.5svh, 88px) 0 clamp(32px, 4svh, 48px);
   scroll-margin-top: 76px;
   overflow: hidden;
   border-radius: 0 0 35px 35px;
@@ -1906,6 +2008,8 @@
   box-shadow:
     0 22px 42px var(--v2-out-ambient-shadow),
     inset 0 -1px 0 var(--v2-out-edge);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 100%);
 }
 /* the spotlight that follows the cursor */
 .yk-v2 .v2-outro-cta::before {
@@ -2420,7 +2524,7 @@
   overflow: hidden;
   background:
     radial-gradient(circle at 50% 73%, var(--v2-out-floor-glow), transparent 37%),
-    var(--v2-out-panel);
+    linear-gradient(to bottom, transparent 0%, var(--v2-out-panel) 14%, var(--v2-out-panel) 100%);
 }
 .yk-v2 .v2-footer-divider {
   position: relative;
@@ -2825,6 +2929,17 @@
   height: 100svh;
   overflow: hidden;
   perspective: 1200px;
+  background: transparent;
+}
+
+.yk-v2 .stk-pin::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 
 .yk-v2 .stk-pin::after {
@@ -2834,6 +2949,8 @@
   pointer-events: none;
   z-index: 2;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.05'/%3E%3C/svg%3E");
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
 }
 
 .yk-v2 .stk-stage {
@@ -3143,10 +3260,15 @@
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  filter: blur(100px);
+  filter: blur(110px);
   opacity: 0;
   transform: translate(-50%, -50%) scale(0.65);
   transition: opacity 1.2s var(--stk-ease-out), transform 1.2s var(--stk-ease-out);
+}
+
+.yk-v2 .stk-outro {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
 }
 
 .yk-v2 .stk-outro.is-active .stk-outro-ambient {
@@ -3343,21 +3465,25 @@
    ════════════════════════════════════════════════ */
 .yk-v2 .stk-root,
 :root[data-theme="dark"] .yk-v2 .stk-root {
-  background: #0a0c0d;
+  background: transparent;
   color: #f2f5f4;
 }
 
 .yk-v2 .stk-pin,
 :root[data-theme="dark"] .yk-v2 .stk-pin {
+  background: transparent;
+}
+
+.yk-v2 .stk-pin::before,
+:root[data-theme="dark"] .yk-v2 .stk-pin::before {
   background:
-    radial-gradient(90% 70% at 50% 110%, rgba(34, 197, 94, 0.09), transparent 60%),
-    radial-gradient(60% 45% at 85% 0%, rgba(94, 234, 212, 0.05), transparent 65%),
-    #0a0c0d;
+    radial-gradient(90% 70% at 50% 96%, rgba(34, 197, 94, 0.11), transparent 62%),
+    radial-gradient(60% 45% at 85% 8%, rgba(94, 234, 212, 0.06), transparent 65%);
 }
 
 .yk-v2 .stk-pin::after,
 :root[data-theme="dark"] .yk-v2 .stk-pin::after {
-  opacity: 0.5;
+  opacity: 0.42;
 }
 
 .yk-v2 .stk-dot,
@@ -3388,7 +3514,7 @@
 
 .yk-v2 .stk-outro,
 :root[data-theme="dark"] .yk-v2 .stk-outro {
-  background: #0a0c0d;
+  background: transparent;
 }
 
 .yk-v2 .stk-outro-ambient,
@@ -3431,19 +3557,22 @@
    THEME: LIGHT
    ════════════════════════════════════════════════ */
 :root[data-theme="light"] .yk-v2 .stk-root {
-  background: #f8fafc;
+  background: transparent;
   color: #0f172a;
 }
 
 :root[data-theme="light"] .yk-v2 .stk-pin {
+  background: transparent;
+}
+
+:root[data-theme="light"] .yk-v2 .stk-pin::before {
   background:
-    radial-gradient(90% 70% at 50% 110%, rgba(22, 163, 74, 0.08), transparent 60%),
-    radial-gradient(60% 45% at 85% 0%, rgba(20, 184, 166, 0.06), transparent 65%),
-    #f8fafc;
+    radial-gradient(90% 70% at 50% 96%, rgba(22, 163, 74, 0.09), transparent 62%),
+    radial-gradient(60% 45% at 85% 8%, rgba(20, 184, 166, 0.06), transparent 65%);
 }
 
 :root[data-theme="light"] .yk-v2 .stk-pin::after {
-  opacity: 0.25;
+  opacity: 0.22;
 }
 
 :root[data-theme="light"] .yk-v2 .stk-dot {
@@ -3468,7 +3597,7 @@
 }
 
 :root[data-theme="light"] .yk-v2 .stk-outro {
-  background: #f8fafc;
+  background: transparent;
 }
 
 :root[data-theme="light"] .yk-v2 .stk-outro-ambient {
@@ -3721,6 +3850,10 @@
   .yk-v2 .stk-outro-btn:hover,
   .yk-v2 .stk-outro-ghost:hover {
     transform: none;
+  }
+  .yk-v2 .v2-ambient-orb {
+    transform: none !important;
+    transition: none !important;
   }
 }
 
