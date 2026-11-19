@@ -527,7 +527,7 @@ installs the whole pnpm workspace, generates the Prisma client and its
 engines, compiles the API and bundles the SPA — ten minutes or more from
 Addis Ababa, because the npm registry is a long way off. Twenty-odd deploys
 a month is therefore the working budget on Pro, not hundreds. Push to the
-testing branch deliberately rather than on every commit.
+deployed branch deliberately rather than on every commit.
 
 ---
 
