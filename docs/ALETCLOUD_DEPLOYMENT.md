@@ -95,10 +95,14 @@ schema, so the next test starts from a migrated database.
 
 ## 3. Before you start
 
-- The repository pushed to GitHub, on a **testing branch** — not `main`.
-  A push to the connected branch is *meant* to redeploy, and it usually does —
-  but it is not a guarantee. Commit `2ff173d` sat on the connected branch for
-  twenty hours while the host went on serving the previous build, and only an
+- The repository pushed to GitHub. **`main` is the canonical branch.** The app
+  is connected to `fix/code-only-compliance-gaps`, which is kept **identical to
+  `main`**: after every merge to main, fast-forward it with
+  `git merge --ff-only main` and push, so the deployed commit and `main` are
+  the same. A push to the connected branch is *meant* to redeploy, and it
+  usually does — but it is not a guarantee. Commit `2ff173d` sat on the
+  connected branch for twenty hours while the host went on serving the
+  previous build, and only an
   explicit `redeployApp` built it. **After every push, confirm the host moved:**
   `getApp` shows `status` and `lastDeployedAt`, and the served `index.html` names
   the bundle (`/assets/index-<hash>.js`). If `lastDeployedAt` has not changed,
@@ -142,7 +146,9 @@ variable names the platform uses.
 
 Open **App hosting** → **Create app**:
 
-1. Connect GitHub, pick the repository and the **testing branch**.
+1. Connect GitHub, pick the repository and the branch the app should track —
+   in this deployment `fix/code-only-compliance-gaps`, kept identical to
+   `main` (§3).
 2. AletCloud reads the repository and detects a stack. **Ignore what it
    detects** — it will find `vite` and `react-dom` in the root
    `package.json` and offer to build a static site with `npm run build`,
@@ -612,7 +618,7 @@ Recorded so the next person does not have to rediscover it.
 | Hosting project | `yekis` (`7d5a6ab0-1a03-4b2a-b9a8-6accf59a87fa`) |
 | App | `yekis-test` (`d40f8eff-9cd7-42f2-9c24-01b750def027`) |
 | Plan | **Solo** — free, no expiry, 250m CPU / 256 MiB, 1 replica |
-| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` |
+| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` — kept identical to `main` (aligned 2026-11-19) |
 | Database | `yekis-jobs` — Managed PostgreSQL **18**, Solo, free, internal network only, 10 connections |
 | Object storage | `yekis-test-media` (bucket `t1370-yekis-test-media`) — 5 GB, private, 50 ETB/mo |
 | Telegram bot | `@ye_kis_bot` — **live** since 2026-11-14; webhook registered at `https://yekis.app.aletcloud.com/api/v1/telegram/webhook` |
@@ -892,6 +898,55 @@ one.
 number they registered with, and can create an account with an address alone.
 An account created that way has no payout number yet — it is identified by
 its address, and the number has to be claimed before it can receive money.
+
+### The merge to main — one deployed commit, 2026-11-19
+
+The fix branch was merged into `main` (`0965326`, then `b7774e7` for the
+featured-talent work), and `fix/code-only-compliance-gaps` was fast-forwarded
+to the same commit. **The host now serves the same tree as `main`** — the app
+branch and `main` both point at `b7774e7`, so there is no longer a code path
+that exists only on the deployed branch.
+
+What the merge put on the host that the previous build did not have:
+
+- **The fee engine.** Quote and settlement arithmetic is computed once in the
+  backend (`modules/fees`), with the 7.5% platform fee and the 0.5% payment
+  provider fee, instead of being redrawn in each screen.
+- **The helpdesk and dispute SLAs.** `Conversation.firstRespondedAt`,
+  `Conversation.resolvedAt` and `Dispute.firstRespondedAt` are written when the
+  obligation is met, and the deadlines are derived from
+  `SUPPORT_FIRST_RESPONSE_SLA_HOURS`, `SUPPORT_RESOLUTION_SLA_HOURS`,
+  `DISPUTE_FIRST_RESPONSE_SLA_BUSINESS_DAYS` and
+  `DISPUTE_RESOLUTION_SLA_BUSINESS_DAYS`. The ops console reads the server's
+  clock (`sla` on the conversation and dispute rows); it does not compute one.
+  `GET /api/v1/admin/sla/summary` is the reporting endpoint behind it.
+- **The featured-talent redesign**, whose cards now carry `skills`, `bio` and
+  `kycTier`.
+- **The ten launch categories**, including Video Production, Accounting &
+  Bookkeeping, Legal Research and Data Analytics.
+
+**What was verified against the live instance after the merge:**
+
+- `scripts/check-deployment.mjs` passes **11/11**.
+- The app came back **LIVE** at `2026-11-19T18:56:41Z`, serving
+  `/assets/index-HHEAoNJM.js`.
+- That bundle carries `yekis_saved_talents` (the redesigned carousel),
+  `7.5%` (the fee engine's platform fee), `/api/v1/users/me/avatar` and both
+  "Video Production" and "Data Analytics" (all ten categories).
+- `GET /api/v1/featured` answers `200` with two cards, and each one carries
+  `skills`, `bio` and `kycTier` — the merged card builder, not the old one.
+- `GET /api/v1/admin/sla/summary` answers **`401`** with
+  `Missing or malformed Authorization header`, while an unknown API route
+  answers `404` with `{"error":"NOT_FOUND"}`. The SLA route is therefore
+  mounted on the live instance; the console reads the same clocks inline on
+  each conversation and dispute rather than calling that endpoint, which is
+  why the path is not in the browser bundle.
+
+The SLA migration (`20261112140000_sla_tracking`) ships in this commit and is
+applied by the container's start-up `prisma migrate deploy`. The platform did
+not retain the start-up lines for this build, so the migration output is not
+quoted here; what the host proves is the mounted route and the inline SLA
+fields on the rows it returns.
 
 ### Teardown
 
