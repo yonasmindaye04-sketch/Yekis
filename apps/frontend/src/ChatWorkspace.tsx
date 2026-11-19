@@ -3,27 +3,38 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Bot,
+  Briefcase,
   CheckCheck,
+  CornerDownLeft,
   FileText,
   Loader2,
   Paperclip,
+  PenLine,
   Plus,
+  RefreshCw,
   Search,
   Send,
   ShieldAlert,
   Sparkles,
+  Wand2,
   X,
 } from "lucide-react";
 import { YekisAvatar } from "./components/YekisAvatar";
 import { SecureAttachment } from "./components/SecureAttachment";
+import { AutoResizeTextarea } from "./components/AutoResizeTextarea";
 import { getAttachmentLabel, isImageAttachment } from "./components/attachmentMeta";
 import {
   api,
   type ChatConversation,
   type ChatMessage,
+  type Contract,
   type ConversationSummaryResponse,
   type DealTermsResponse,
+  type Gig,
   type MeResponse,
+  type MiniMeContextBadge,
+  type MiniMeTone,
+  type SmartReplyItem,
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
 import "./ChatWorkspace.css";
@@ -75,7 +86,14 @@ export function ChatWorkspace({
   const typingTimerRef = useRef<number | null>(null);
 
   // Mini-Me AI Co-Pilot state
-  const [smartReplies, setSmartReplies] = useState<string[]>([]);
+  const [smartReplyItems, setSmartReplyItems] = useState<SmartReplyItem[]>([]);
+  const [miniMeContext, setMiniMeContext] = useState<MiniMeContextBadge | null>(null);
+  const [miniMeNote, setMiniMeNote] = useState<string>("");
+  const [miniMeTone, setMiniMeTone] = useState<MiniMeTone>("PROFESSIONAL");
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [showCustomPromptInput, setShowCustomPromptInput] = useState(false);
+  const [platformContracts, setPlatformContracts] = useState<Contract[]>([]);
+  const [platformGigs, setPlatformGigs] = useState<Gig[]>([]);
   const [isLoadingReplies, setIsLoadingReplies] = useState(false);
   const [summaryData, setSummaryData] = useState<ConversationSummaryResponse | null>(null);
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
@@ -102,7 +120,21 @@ export function ChatWorkspace({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const composerTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const miniMeMenuRef = useRef<HTMLDivElement>(null);
   const typingDispatchTimeout = useRef<number | null>(null);
+
+  // Close Mini-Me popover on outside click
+  useEffect(() => {
+    if (!showCustomPromptInput) return;
+    const handleClickOutside = (ev: MouseEvent) => {
+      if (miniMeMenuRef.current && !miniMeMenuRef.current.contains(ev.target as Node)) {
+        setShowCustomPromptInput(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showCustomPromptInput]);
 
   // --- Realtime socket status listener ---
   useEffect(() => {
@@ -130,6 +162,19 @@ export function ChatWorkspace({
 
   useEffect(() => {
     void loadConversations();
+    void api
+      .getContracts()
+      .then((res) => setPlatformContracts(Array.isArray(res) ? res : []))
+      .catch(() => {});
+    void api
+      .listMyGigs()
+      .then((res) => setPlatformGigs(Array.isArray(res) ? res : []))
+      .catch(() => {
+        void api
+          .searchGigs({ pageSize: 4 })
+          .then((res) => setPlatformGigs(Array.isArray(res?.items) ? res.items : []))
+          .catch(() => {});
+      });
   }, []);
 
   useEffect(() => {
@@ -198,19 +243,18 @@ export function ChatWorkspace({
       prev.map((c) => (c.id === activeConversationId ? { ...c, unread: false } : c))
     );
 
-    // Fetch messages
+    // Fetch messages & initial Mini-Me suggestions grounded in thread history
     const fetchThread = async () => {
       try {
         const msgs = await api.getChatMessages(activeConversationId);
         setMessages(msgs);
+        void fetchSmartReplies(activeConversationId, { threadMessages: msgs });
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load messages");
+        void fetchSmartReplies(activeConversationId);
       }
     };
     void fetchThread();
-
-    // Fetch initial smart replies from Mini-Me AI Co-Pilot
-    fetchSmartReplies(activeConversationId);
 
     // Subscribe to live messages on this specific conversation
     const unsubMessage = realtimeSocket.on<ChatMessage>("chat:message", (msg) => {
@@ -261,16 +305,107 @@ export function ChatWorkspace({
   }, [messages.length, isRemoteTyping]);
 
   // --- Fetch Mini-Me Smart Replies ---
-  const fetchSmartReplies = async (convId: string) => {
+  const fetchSmartReplies = async (
+    convId: string,
+    overrideOptions?: {
+      tone?: MiniMeTone;
+      customPrompt?: string;
+      currentDraft?: string;
+      threadMessages?: ChatMessage[];
+    },
+  ) => {
     setIsLoadingReplies(true);
     try {
-      const res = await api.getSmartReplies(convId);
-      setSmartReplies(res.suggestions || []);
+      const targetTone = overrideOptions?.tone ?? miniMeTone;
+      const targetPrompt = overrideOptions?.customPrompt ?? customPrompt;
+      const targetDraft = overrideOptions?.currentDraft ?? draft;
+      const threadMsgs = overrideOptions?.threadMessages ?? messages;
+      const convObj = conversations.find((c) => c.id === convId);
+
+      const res = await api.getSmartReplies(convId, {
+        tone: targetTone,
+        customPrompt: targetPrompt.trim() || undefined,
+        currentDraft: targetDraft.trim() || undefined,
+        activeRole: role,
+        subject: convObj?.subject,
+        messages: threadMsgs.slice(-8).map((m) => ({
+          senderId: m.senderId,
+          senderName: m.sender.displayName || m.sender.email || "Participant",
+          senderRole: m.sender.role,
+          body: m.body,
+          createdAt: m.createdAt,
+        })),
+        contracts: platformContracts.slice(0, 4).map((c) => ({
+          id: c.id,
+          title: c.job?.title || "Escrow Contract",
+          status: c.status,
+          milestones: (c.milestones || []).map((ms) => ({
+            id: ms.id,
+            title: ms.title,
+            amountMinor: ms.amountMinor,
+            escrowState: ms.escrowState,
+            dueDate: ms.dueDate,
+          })),
+        })),
+        gigs: platformGigs.slice(0, 4).map((g) => ({
+          id: g.id,
+          title: g.title,
+          category: g.category,
+          status: g.status,
+        })),
+      });
+
+      const suggestions = res.suggestions || [];
+
+      if (res.items && res.items.length > 0) {
+        setSmartReplyItems(res.items);
+      } else {
+        setSmartReplyItems(
+          suggestions.map((text, idx) => ({
+            id: `reply-${idx}`,
+            label: idx === 0 ? "Recommended Reply" : idx === 1 ? "Alternative" : "Follow-Up",
+            text,
+          })),
+        );
+      }
+
+      setMiniMeContext(res.context || null);
+      setMiniMeNote(res.agentNote || "");
     } catch {
-      setSmartReplies([]);
+      setSmartReplyItems([]);
     } finally {
       setIsLoadingReplies(false);
     }
+  };
+
+  const handleInsertReplyIntoComposer = (text: string) => {
+    setDraft(text);
+    window.requestAnimationFrame(() => {
+      const el = composerTextareaRef.current;
+      if (el) {
+        el.focus();
+        const len = text.length;
+        el.setSelectionRange(len, len);
+      }
+    });
+  };
+
+  const handleToneChange = (newTone: MiniMeTone) => {
+    setMiniMeTone(newTone);
+    if (activeConversationId) {
+      void fetchSmartReplies(activeConversationId, { tone: newTone });
+    }
+  };
+
+  const handleApplyCustomPrompt = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!activeConversationId) return;
+    setShowCustomPromptInput(false);
+    void fetchSmartReplies(activeConversationId, {
+      tone: miniMeTone,
+      customPrompt,
+      currentDraft: draft,
+    });
   };
 
   // --- Mini-Me Summarize Thread ---
@@ -370,15 +505,20 @@ export function ChatWorkspace({
         finalAttachmentUrl || undefined
       );
 
-      setMessages((prev) =>
-        prev.some((message) => message.id === newMsg.id)
-          ? prev
-          : [...prev, newMsg],
-      );
-      if (!customText) setDraft("");
+      const nextMessages = messages.some((message) => message.id === newMsg.id)
+        ? messages
+        : [...messages, newMsg];
+      setMessages(nextMessages);
+      if (!customText || draft.trim() === customText.trim()) {
+        setDraft("");
+      }
       setAttachmentUrl(null);
       setAttachedFile(null);
       setAttachmentName(null);
+      void fetchSmartReplies(activeConversationId, {
+        threadMessages: nextMessages,
+        currentDraft: "",
+      });
 
       // Update conversations list with latest message
       setConversations((prev) =>
@@ -802,33 +942,207 @@ export function ChatWorkspace({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* ── MINI-ME SMART REPLY CHIPS ── */}
-            {(smartReplies.length > 0 || isLoadingReplies) && (
-              <div className="chat-smart-replies-bar">
-                <div className="smart-replies-label">
+            {/* ── MINI-ME MINIMAL SUGGESTION BAR ── */}
+            <div className="mini-me-agent-dock">
+              <div className="mini-me-minimal-row">
+                <div
+                  className="smart-replies-label"
+                  title={
+                    miniMeContext?.milestoneTitle
+                      ? `Grounded in ${miniMeContext.milestoneTitle}${
+                          miniMeContext.milestoneAmountETB ? ` · ${miniMeContext.milestoneAmountETB}` : ""
+                        }${miniMeContext.escrowState ? ` (${miniMeContext.escrowState})` : ""}`
+                      : miniMeNote || "Mini-Me context-aware reply suggestions"
+                  }
+                >
                   <Sparkles size={13} />
-                  <span>Mini-Me:</span>
+                  <span>Mini-Me</span>
+                  {miniMeContext?.milestoneTitle && <span className="mini-me-context-dot" />}
                 </div>
-                {isLoadingReplies ? (
-                  <span style={{ fontSize: "0.75rem", color: "var(--color-text-tertiary)", fontStyle: "italic" }}>
-                    Analyzing context...
-                  </span>
-                ) : (
-                  <div className="smart-replies-list">
-                    {smartReplies.map((reply, idx) => (
-                      <button
-                        key={idx}
-                        className="smart-reply-chip"
-                        onClick={() => handleSendMessage(reply)}
-                        title="Click to send this response"
+
+                <div className="smart-replies-pills-strip">
+                  {isLoadingReplies ? (
+                    <div className="mini-me-loading-row">
+                      <Loader2 size={12} className="spin" />
+                      <span>Drafting replies...</span>
+                    </div>
+                  ) : (
+                    smartReplyItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`smart-reply-pill ${
+                          draft === item.text ? "selected-in-composer" : ""
+                        }`}
                       >
-                        {reply}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                        <button
+                          type="button"
+                          className="smart-reply-pill-main"
+                          onClick={() => handleInsertReplyIntoComposer(item.text)}
+                        >
+                          <CornerDownLeft size={11} className="pill-insert-icon" />
+                          <span className="smart-reply-pill-label">{item.label}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="smart-reply-pill-send"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void handleSendMessage(item.text);
+                          }}
+                          disabled={isSending}
+                          title="Send immediately"
+                          aria-label={`Quick send: ${item.label}`}
+                        >
+                          <Send size={11} />
+                        </button>
+
+                        {/* Hover Preview Tooltip */}
+                        <div className="smart-reply-hover-preview" role="tooltip">
+                          <div className="hover-preview-header">
+                            <span className="hover-preview-title">{item.label}</span>
+                            <span className="hover-preview-hint">Click to edit · Send icon to send</span>
+                          </div>
+                          <p className="hover-preview-body">{item.text}</p>
+                          {item.rationale && (
+                            <span className="hover-preview-rationale">{item.rationale}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="mini-me-minimal-actions" ref={miniMeMenuRef}>
+                  <button
+                    type="button"
+                    className={`mini-me-prompt-toggle ${
+                      showCustomPromptInput || customPrompt || miniMeTone !== "PROFESSIONAL"
+                        ? "active"
+                        : ""
+                    }`}
+                    onClick={() => setShowCustomPromptInput((v) => !v)}
+                    title="Adjust reply tone or guide Mini-Me with a custom instruction"
+                  >
+                    <Wand2 size={12} />
+                    <span>
+                      {customPrompt
+                        ? "Custom"
+                        : miniMeTone !== "PROFESSIONAL"
+                        ? miniMeTone.charAt(0) + miniMeTone.slice(1).toLowerCase()
+                        : "Tune"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="mini-me-refresh-btn"
+                    onClick={() =>
+                      activeConversationId &&
+                      void fetchSmartReplies(activeConversationId, {
+                        tone: miniMeTone,
+                        customPrompt,
+                        currentDraft: draft,
+                      })
+                    }
+                    disabled={isLoadingReplies}
+                    title="Regenerate Mini-Me suggestions"
+                  >
+                    <RefreshCw size={12} className={isLoadingReplies ? "spin" : ""} />
+                  </button>
+
+                  {showCustomPromptInput && (
+                    <div className="mini-me-tune-popover">
+                      <div className="mini-me-popover-header">
+                        <div className="mini-me-popover-title">
+                          <Sparkles size={12} />
+                          <span>Mini-Me Tone & Prompt</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="mini-me-popover-close"
+                          onClick={() => setShowCustomPromptInput(false)}
+                          aria-label="Close Mini-Me menu"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+
+                      {miniMeContext?.milestoneTitle && (
+                        <div className="mini-me-popover-context">
+                          <Briefcase size={11} />
+                          <span>
+                            {miniMeContext.milestoneTitle}
+                            {miniMeContext.milestoneAmountETB
+                              ? ` · ${miniMeContext.milestoneAmountETB}`
+                              : ""}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="mini-me-tone-switcher" role="group" aria-label="Reply tone">
+                        {(
+                          [
+                            { id: "PROFESSIONAL", label: "Professional" },
+                            { id: "FRIENDLY", label: "Friendly" },
+                            { id: "NEGOTIATION", label: "Negotiation" },
+                            { id: "CONCISE", label: "Concise" },
+                          ] as { id: MiniMeTone; label: string }[]
+                        ).map((t) => (
+                          <button
+                            key={t.id}
+                            type="button"
+                            className={`mini-me-tone-btn ${miniMeTone === t.id ? "active" : ""}`}
+                            onClick={() => handleToneChange(t.id)}
+                            disabled={isLoadingReplies}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <form className="mini-me-custom-prompt-bar" onSubmit={handleApplyCustomPrompt}>
+                        <PenLine size={12} className="mini-me-prompt-icon" />
+                        <input
+                          type="text"
+                          value={customPrompt}
+                          onChange={(e) => setCustomPrompt(e.target.value)}
+                          placeholder={
+                            draft.trim()
+                              ? "Refine current draft (e.g., 'Make firmer')..."
+                              : "Custom instruction (e.g., 'Ask for CBE receipt')..."
+                          }
+                        />
+                        {customPrompt && (
+                          <button
+                            type="button"
+                            className="mini-me-prompt-clear"
+                            onClick={() => {
+                              setCustomPrompt("");
+                              if (activeConversationId) {
+                                void fetchSmartReplies(activeConversationId, {
+                                  tone: miniMeTone,
+                                  customPrompt: "",
+                                });
+                              }
+                            }}
+                            title="Clear custom instruction"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                        <button
+                          type="submit"
+                          className="mini-me-prompt-apply"
+                          disabled={isLoadingReplies}
+                        >
+                          Apply
+                        </button>
+                      </form>
+                    </div>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
 
             {/* ── ANTI-CIRCUMVENTION CAUTION ── */}
             {circumventionAlert && (
@@ -852,7 +1166,8 @@ export function ChatWorkspace({
             {/* ── COMPOSER ── */}
             <div className="chat-composer-section">
               <div className="composer-input-box">
-                <textarea
+                <AutoResizeTextarea
+                  ref={composerTextareaRef}
                   value={draft}
                   onChange={handleDraftChange}
                   onKeyDown={(e) => {
@@ -865,10 +1180,10 @@ export function ChatWorkspace({
                     activeConversation.isSupport
                       ? "Describe your question or issue... (Enter to send)"
                       : role === "CLIENT"
-                      ? "Type a message or discuss milestone terms... (Enter to send)"
-                      : "Type a message or milestone proposal... (Enter to send)"
+                      ? "Type a message or click a Mini-Me suggestion above to edit... (Enter to send)"
+                      : "Type a message or click a Mini-Me suggestion above to edit... (Enter to send)"
                   }
-                  rows={1}
+                  minHeight={24}
                 />
 
                 <div className="composer-actions">

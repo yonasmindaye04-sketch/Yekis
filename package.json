@@ -24,6 +24,7 @@
   "packageManager": "pnpm@9.0.0",
   "dependencies": {
     "@blobatar/react": "^2.7.0",
+    "@google/genai": "^3.6.1",
     "blobatar": "^2.7.0",
     "framer-motion": "^14.0.0",
     "lucide-react": "^1.50.0",

@@ -1058,12 +1058,12 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
   );
 
   return (
-    <section className="v2-section stk-root" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
+    <section className="v2-section stk-root" id="categories" style={{ paddingTop: 12, paddingBottom: 0 }}>
       {/* section header */}
       <div className="v2-container">
         <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
         <Reveal delay={0.1}>
-          <p className="v2-sec-sub" style={{ marginBottom: 38 }}>
+          <p className="v2-sec-sub" style={{ marginBottom: 18 }}>
             {t.marketing.categories.subtitle}
           </p>
         </Reveal>
@@ -1250,7 +1250,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   ];
 
   return (
-    <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title" style={{ paddingTop: 10 }}>
+    <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title">
       <div className="v2-container">
         <Reveal amount={0.15}>
           <div className="v2-about-panel">

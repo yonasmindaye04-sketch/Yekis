@@ -2813,33 +2813,352 @@ class MockStore {
       return this.getMessages(convId);
     }
     if (cleanPath.endsWith("/assistant/suggest-replies")) {
+      const parts = cleanPath.split("/");
+      const convId = parts[3] || "conv-101";
+      const conv = this.conversations.find((c) => c.id === convId) || this.conversations[0];
+      const threadMsgs = this.messagesByConv[convId] ?? [];
+      const b = (parsedBody ?? {}) as {
+        tone?: "PROFESSIONAL" | "FRIENDLY" | "NEGOTIATION" | "CONCISE";
+        customPrompt?: string;
+        currentDraft?: string;
+        activeRole?: string;
+      };
+      const tone = b.tone || "PROFESSIONAL";
+      const customPrompt = (b.customPrompt || "").trim();
+      const currentDraft = (b.currentDraft || "").trim();
+      const activeRole = b.activeRole || this.getCurrentUser().role || "CLIENT";
+
+      const contracts = this.getContracts();
+      const subjectLower = (conv?.subject || "").toLowerCase();
+      const matchedContract =
+        contracts.find(
+          (c) =>
+            subjectLower.includes(c.job.title.toLowerCase().slice(0, 12)) ||
+            c.job.title.toLowerCase().includes(subjectLower.slice(0, 12)),
+        ) || contracts[0];
+
+      const activeMilestone =
+        matchedContract?.milestones.find(
+          (m) => m.escrowState === "DELIVERED" || m.escrowState === "FUNDED",
+        ) || matchedContract?.milestones[0];
+
+      const matchedGig = this.gigs[0];
+      const milestoneETB = activeMilestone
+        ? `${(activeMilestone.amountMinor / 100).toLocaleString()} ETB`
+        : "50,000 ETB";
+
+      const lastMsg = threadMsgs[threadMsgs.length - 1];
+      const lastBody = (lastMsg?.body || "").toLowerCase();
+      const isSupportThread = Boolean(conv?.isSupport || subjectLower.includes("support") || subjectLower.includes("top-up"));
+
+      const formatByTone = (core: string, friendlyPrefix: string, negSuffix: string, conciseForm: string) => {
+        if (tone === "CONCISE") return conciseForm;
+        if (tone === "FRIENDLY") return `${friendlyPrefix} ${core}`;
+        if (tone === "NEGOTIATION") return `${core} ${negSuffix}`;
+        return core;
+      };
+
+      let items: Array<{
+        id: string;
+        label: string;
+        text: string;
+        rationale: string;
+        category: "APPROVAL" | "NEGOTIATION" | "DELIVERY" | "CLARIFICATION" | "FOLLOW_UP";
+      }>;
+
+      if (customPrompt) {
+        const draftLead = currentDraft ? `${currentDraft.replace(/[.!\s]+$/, "")}. ` : "";
+        items = [
+          {
+            id: `custom-${convId}-1`,
+            label: "Direct Custom Reply",
+            text: formatByTone(
+              `${draftLead}Regarding ${customPrompt}: let's tie this directly to ${activeMilestone ? `milestone "${activeMilestone.title}" (${milestoneETB})` : "our Yekis escrow terms"} so we can proceed today.`,
+              "Thanks for the update!",
+              "Once both sides confirm in the contract ledger, I will lock the schedule.",
+              `${draftLead}Let's align on "${customPrompt}" under ${activeMilestone?.title || "escrow"} (${milestoneETB}).`,
+            ),
+            rationale: `Tailored to your custom prompt ("${customPrompt}") with active milestone context.`,
+            category: "NEGOTIATION",
+          },
+          {
+            id: `custom-${convId}-2`,
+            label: "Milestone-Backed Proposal",
+            text: formatByTone(
+              `To address "${customPrompt}", I suggest we document the acceptance checklist on ${matchedContract?.job.title || "the contract"} before releasing the ${milestoneETB} tranche.`,
+              "Happy to work with you on this!",
+              "This protects both deliverable quality and instant payout upon QA sign-off.",
+              `Let's attach "${customPrompt}" to the ${milestoneETB} milestone QA checklist.`,
+            ),
+            rationale: "Connects your instruction to verifiable escrow acceptance criteria.",
+            category: "CLARIFICATION",
+          },
+          {
+            id: `custom-${convId}-3`,
+            label: "Confirm & Schedule",
+            text: formatByTone(
+              `Can we finalize "${customPrompt}" within the next few hours so our delivery timeline for ${activeMilestone?.title || "this phase"} stays on track?`,
+              "Sounds like a great direction!",
+              "If we agree now, we can avoid any deadline extension.",
+              `Please confirm "${customPrompt}" today so we stay on schedule.`,
+            ),
+            rationale: "Action-oriented follow-up to close open loop.",
+            category: "FOLLOW_UP",
+          },
+        ];
+      } else if (isSupportThread) {
+        items = [
+          {
+            id: `sup-${convId}-1`,
+            label: "Share Receipt Reference",
+            text: formatByTone(
+              "I have uploaded the high-resolution Telebirr / CBE Birr receipt screenshot along with transaction referenceFT26114X992. Please verify my wallet credit.",
+              "Hello Yonael! Thanks for checking this.",
+              "Please expedite the ledger reconciliation so I can fund my active contract milestone.",
+              "Uploaded receipt FT26114X992 for verification. Please credit my wallet.",
+            ),
+            rationale: "Responds directly to support's receipt verification request.",
+            category: "DELIVERY",
+          },
+          {
+            id: `sup-${convId}-2`,
+            label: "Request Escrow Hold Check",
+            text: formatByTone(
+              `Could you confirm when the top-up will clear into my available balance for "${matchedContract?.job.title || "my active contract"}"?`,
+              "Appreciate your quick help!",
+              "My freelancer is waiting on milestone funding to begin work.",
+              "When will the top-up clear for milestone funding?",
+            ),
+            rationale: "Links support ticket to pending contract funding.",
+            category: "CLARIFICATION",
+          },
+          {
+            id: `sup-${convId}-3`,
+            label: "Confirm Issue Resolved",
+            text: formatByTone(
+              "Thank you! The balance update is now visible in my Yekis Wallet and I have funded the milestone.",
+              "Awesome support, thank you so much!",
+              "Everything is reconciled on the ledger now.",
+              "Confirmed — balance is updated and milestone is funded.",
+            ),
+            rationale: "Closes support thread once verified.",
+            category: "APPROVAL",
+          },
+        ];
+      } else if (
+        lastBody.includes("uploaded") ||
+        lastBody.includes("deliverable") ||
+        lastBody.includes("inspect") ||
+        lastBody.includes("release") ||
+        activeMilestone?.escrowState === "DELIVERED"
+      ) {
+        items =
+          activeRole === "FREELANCER"
+            ? [
+                {
+                  id: `del-f-${convId}-1`,
+                  label: "Request Milestone Release",
+                  text: formatByTone(
+                    `I have verified the ${activeMilestone?.title || "Phase 2"} build and Telebirr/CBE Birr test logs. Whenever your QA check is complete, please release the ${milestoneETB} escrow milestone.`,
+                    "Hope the review is going smoothly!",
+                    "As soon as this tranche releases, I will immediately kick off the next milestone.",
+                    `Build & logs are verified — ready for ${milestoneETB} milestone release.`,
+                  ),
+                  rationale: `Grounded in ${activeMilestone?.title || "delivered milestone"} (${milestoneETB}, ${activeMilestone?.escrowState || "DELIVERED"}).`,
+                  category: "DELIVERY",
+                },
+                {
+                  id: `del-f-${convId}-2`,
+                  label: "Offer Live QA Walkthrough",
+                  text: formatByTone(
+                    `Happy to jump on a quick 10-minute walkthrough of the ${conv?.subject || "submitted deliverable"} or share additional sandbox credentials if helpful.`,
+                    "Let me know if you'd like a quick demo!",
+                    "Walking through the test cases together can help us close sign-off today.",
+                    "Available for a 10-min QA walkthrough if needed.",
+                  ),
+                  rationale: "Accelerates client QA sign-off.",
+                  category: "FOLLOW_UP",
+                },
+                {
+                  id: `del-f-${convId}-3`,
+                  label: "Propose Next Phase Scope",
+                  text: formatByTone(
+                    `While you review ${activeMilestone?.title || "this submission"}, I have drafted the technical checklist for the next phase${matchedGig ? ` based on my "${matchedGig.title}" package` : ""}.`,
+                    "Excited for the next steps!",
+                    "We can lock the next milestone budget as soon as this one settles.",
+                    "Drafted next phase checklist while you complete QA.",
+                  ),
+                  rationale: "Cross-references freelancer's active gig & next milestone.",
+                  category: "NEGOTIATION",
+                },
+              ]
+            : [
+                {
+                  id: `del-c-${convId}-1`,
+                  label: "Approve & Release Escrow",
+                  text: formatByTone(
+                    `Looks great! I have inspected the submission for "${activeMilestone?.title || "Phase 2"}" and verified the sandbox logs. Releasing the ${milestoneETB} escrow milestone now.`,
+                    "Fantastic work on this build!",
+                    "Once released, let's immediately lock the timeline for the final production rollout.",
+                    `QA passed for "${activeMilestone?.title || "Phase 2"}". Releasing ${milestoneETB} now.`,
+                  ),
+                  rationale: `Matches delivered state on "${activeMilestone?.title || "active milestone"}" (${milestoneETB}).`,
+                  category: "APPROVAL",
+                },
+                {
+                  id: `del-c-${convId}-2`,
+                  label: "Request Minor Adjustment",
+                  text: formatByTone(
+                    `Thank you for uploading the build for "${activeMilestone?.title || "this milestone"}". The core flow works well, but could we tighten the webhook retry timeout before I release the ${milestoneETB} escrow?`,
+                    "Really solid progress so far!",
+                    "As soon as that tweak is pushed, I will release the full milestone amount today.",
+                    `Core flow looks good — please adjust webhook retry timeout before ${milestoneETB} release.`,
+                  ),
+                  rationale: "Specific revision request tied to milestone release.",
+                  category: "NEGOTIATION",
+                },
+                {
+                  id: `del-c-${convId}-3`,
+                  label: "Confirm QA In Progress",
+                  text: formatByTone(
+                    `I have downloaded your deliverable package for "${matchedContract?.job.title || conv?.subject}" and our team is running verification tests this afternoon.`,
+                    "Thanks for the prompt delivery!",
+                    "We will complete review before the auto-release window and share feedback shortly.",
+                    "Downloaded deliverable package; running QA verification today.",
+                  ),
+                  rationale: "Acknowledges delivery and sets clear review timeline.",
+                  category: "CLARIFICATION",
+                },
+              ];
+      } else {
+        items = [
+          {
+            id: `gen-${convId}-1`,
+            label: "Lock Escrow Milestone",
+            text: formatByTone(
+              `Let's formalize this under "${matchedContract?.job.title || conv?.subject}" with ${activeMilestone ? `"${activeMilestone.title}" funded at ${milestoneETB}` : "a dedicated Yekis Escrow milestone"}.`,
+              "Sounds like a solid plan!",
+              "Splitting deliverables into verifiable escrow tranches keeps both sides protected.",
+              `Let's lock this scope under "${activeMilestone?.title || "Escrow Milestone"}" (${milestoneETB}).`,
+            ),
+            rationale: "Connects chat negotiation to active contract & escrow protection.",
+            category: "APPROVAL",
+          },
+          {
+            id: `gen-${convId}-2`,
+            label: "Propose 2-Phase Split",
+            text: formatByTone(
+              `Can we split the scope into two milestones — Phase 1: Core Build & Sandbox QA (45,000 ETB) and Phase 2: Production Handover (40,000 ETB)?`,
+              "To make things super smooth for both of us,",
+              "This structure gives us a clear checkpoint midway through delivery.",
+              "Let's split into Phase 1 (45,000 ETB) and Phase 2 (40,000 ETB).",
+            ),
+            rationale: "Structured milestone counter-offer.",
+            category: "NEGOTIATION",
+          },
+          {
+            id: `gen-${convId}-3`,
+            label: "Clarify Acceptance Criteria",
+            text: formatByTone(
+              `Before we kick off ${activeMilestone?.title || "the next phase"}, could we confirm the exact deliverables and target completion date?`,
+              "Quick question before we dive in:",
+              "Clear acceptance criteria ensure instant escrow release upon delivery.",
+              "Please confirm exact deliverables and target due date.",
+            ),
+            rationale: "Prevents scope creep prior to milestone submission.",
+            category: "CLARIFICATION",
+          },
+        ];
+      }
+
       return {
-        suggestions: [
-          "Looks great! I have reviewed the build and will release the escrow milestone now.",
-          "Can we split this into two milestones—Phase 1 (ETB 45,000) and Phase 2 (ETB 40,000)?",
-          "I have uploaded the Telebirr sandbox logs and deliverable zip for your inspection.",
+        suggestions: items.map((it) => it.text),
+        items,
+        context: {
+          stage: isSupportThread
+            ? "Support & Ledger Verification"
+            : activeMilestone?.escrowState === "DELIVERED"
+              ? "Deliverable QA & Escrow Release"
+              : "Active Contract & Milestone Alignment",
+          contractId: matchedContract?.id || null,
+          contractTitle: matchedContract?.job.title || null,
+          milestoneId: activeMilestone?.id || null,
+          milestoneTitle: activeMilestone?.title || null,
+          milestoneAmountETB: milestoneETB,
+          escrowState: activeMilestone?.escrowState || null,
+          gigTitle: matchedGig?.title || null,
+        },
+        actionChips: [
+          { id: "act-extract", label: "Extract Deal Terms", actionType: "EXTRACT_DEAL" },
+          { id: "act-summary", label: "Thread Digest", actionType: "SUMMARIZE" },
+          ...(matchedContract
+            ? [{ id: "act-contracts", label: `Open Contract (${matchedContract.id})`, actionType: "OPEN_CONTRACTS", payload: matchedContract.id }]
+            : []),
+          ...(activeMilestone
+            ? [
+                {
+                  id: "act-ms-status",
+                  label: `Quote ${activeMilestone.title} (${milestoneETB})`,
+                  actionType: "INSERT_MILESTONE_UPDATE",
+                  payload: `Regarding milestone "${activeMilestone.title}" (${milestoneETB}, status: ${activeMilestone.escrowState}): let's confirm the final QA sign-off and next steps.`,
+                },
+              ]
+            : []),
         ],
+        agentNote: customPrompt
+          ? `Synthesized 3 ${tone.toLowerCase()} replies for "${customPrompt}" using ${matchedContract?.job.title || "thread context"}.`
+          : isSupportThread
+            ? `Grounded in support ticket "${conv?.subject}" (${threadMsgs.length} messages) · ${tone.toLowerCase()} tone.`
+            : `Grounded in ${matchedContract?.job.title || "contract"} · ${activeMilestone?.title || "Milestone"} (${milestoneETB}, ${activeMilestone?.escrowState || "FUNDED"}) · ${tone.toLowerCase()} tone.`,
+        toneUsed: tone,
       };
     }
     if (cleanPath.endsWith("/assistant/summarize")) {
+      const parts = cleanPath.split("/");
+      const convId = parts[3] || "conv-101";
+      const conv = this.conversations.find((c) => c.id === convId) || this.conversations[0];
+      const threadMsgs = this.messagesByConv[convId] ?? [];
+      const contracts = this.getContracts();
+      const matchedContract = contracts[0];
+      const activeMilestone =
+        matchedContract?.milestones.find((m) => m.escrowState === "DELIVERED") ||
+        matchedContract?.milestones[0];
+      const milestoneETB = activeMilestone
+        ? `${(activeMilestone.amountMinor / 100).toLocaleString()} ETB`
+        : "50,000 ETB";
+
       return {
-        topic: "Telebirr H5 Checkout & CBE Birr Receipt Fallback Review",
-        keyPoints: [
-          "Phase 1 RSA signature verification was approved and released.",
-          "Phase 2 CBE Birr fallback build is uploaded and awaiting client QA sign-off.",
-          "Both parties agreed on a 50,000 ETB milestone release upon verification.",
-        ],
-        agreedBudgetETB: "50,000 ETB",
+        topic: conv?.subject || "Telebirr H5 Checkout & CBE Birr Receipt Fallback Review",
+        keyPoints:
+          threadMsgs.length > 0
+            ? threadMsgs.slice(-3).map((m) => `${m.sender.displayName || m.sender.role}: "${m.body.slice(0, 110)}${m.body.length > 110 ? "..." : ""}"`)
+            : [
+                "Phase 1 RSA signature verification was approved and released.",
+                "Phase 2 CBE Birr fallback build is uploaded and awaiting client QA sign-off.",
+                `Active escrow milestone is ${activeMilestone?.title || "Phase 2"} (${milestoneETB}).`,
+              ],
+        agreedBudgetETB: milestoneETB,
         detectedTimeline: "4 days remaining",
-        nextStep: "Inspect Phase 2 deliverable and release escrow milestone #MS-202.",
-        messageCount: 6,
-        lastActivity: new Date().toISOString(),
+        nextStep: activeMilestone
+          ? `Review "${activeMilestone.title}" deliverable and release ${milestoneETB} in Contracts & Escrow.`
+          : "Confirm scope and fund the next escrow milestone.",
+        messageCount: threadMsgs.length || 3,
+        lastActivity: conv?.updatedAt || new Date().toISOString(),
       };
     }
     if (cleanPath.endsWith("/assistant/extract-deal")) {
+      const parts = cleanPath.split("/");
+      const convId = parts[3] || "conv-101";
+      const conv = this.conversations.find((c) => c.id === convId) || this.conversations[0];
+      const contracts = this.getContracts();
+      const matchedContract = contracts[0];
+      const activeMilestone =
+        matchedContract?.milestones.find((m) => m.escrowState === "DELIVERED" || m.escrowState === "FUNDED") ||
+        matchedContract?.milestones[0];
+
       return {
-        suggestedTitle: "Phase 2: Multi-Rail Escrow Checkout & CBE Birr Flow",
-        suggestedBudgetETB: 50000,
+        suggestedTitle: activeMilestone?.title || conv?.subject || "Phase 2: Multi-Rail Escrow Checkout & CBE Birr Flow",
+        suggestedBudgetETB: activeMilestone ? Math.round(activeMilestone.amountMinor / 100) : 50000,
         estimatedDays: 5,
         confidence: "HIGH",
         readyForEscrow: true,
