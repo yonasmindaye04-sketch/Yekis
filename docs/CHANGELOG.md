@@ -4,6 +4,14 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Changed
+- **Featured Talent section redesigned with modern portfolio cards, shortlist bookmarking, and interactive quick-view modal (2026-11-18)** — Redesigned `FeaturedCarousel.tsx` and updated carousel styles in `index.css`:
+  - **Clean, Modern Card Architecture**: Soft pastel-tinted gradients with dynamic per-card hue (`--h`), 58px `YekisAvatar` with Fayda ID verification badge overlay, bold colored status indicators (`✦ New`, `★ Top rated` conforming to Rule 2 zero-pill policy), skill pill tags, and a 3-column stats row (Bayesian Rating, Completed Jobs / Hourly Rate, and SVG Ethiopian flag).
+  - **Shortlist Bookmarking & Filtering**: Integrated local shortlist bookmarking (`localStorage`), quick share link copying to clipboard with toast notification, and an `All` vs `Saved` filter toggle so clients can easily review their shortlisted freelancers.
+  - **Interactive Quick-View Modal**: Clicking any talent card opens a rich modal dialog inspired by the reference design with large avatar, role, location, languages, Fayda Tier 1/2 verification badge, stat strip (Rating, Jobs done, On-time rate, Response time), About bio, full skills list, client reviews, engagement details, and direct "Hire [Name]", "Message", and "Open Full Profile" action buttons.
+  - **Live Timestamp & Navigation Controls**: Added pulsating live update indicator (`Live · Updated [time]`) and smooth scroll controls with disabled boundary states.
+  - **Strict Rule Compliance**: Zero emojis, 100% theme variable parity across dark and light modes, and seamless fallback data so the carousel is always vibrant and fully interactive.
+
 ### Fixed
 - **A profile photo can be saved again — the image is uploaded instead of pasted into a 500-character column (2026-11-18)** — `ProfileEditPage.tsx` compressed a chosen photo into a JPEG **data URL** and sent it as `avatarUrl`. Zod allowed 1.5 MB, but `User.avatarUrl` is `VARCHAR(500)`, so Postgres rejected it and `PATCH /api/v1/users/me/profile` answered `500 INTERNAL_ERROR`. **Any member who picked a profile photo could not save the Settings page at all**, and the same pattern was in `ProfileCompletionDialog.tsx`.
   - **`POST /api/v1/users/me/avatar`** takes a multipart image (JPEG/PNG/WebP, ≤2 MB), identifies the format by magic number rather than trusting the filename, stores the bytes in a new `UserAvatar` table, points `User.avatarUrl` at `/api/v1/users/avatars/<id>`, and deletes the previous photo in the same transaction.
