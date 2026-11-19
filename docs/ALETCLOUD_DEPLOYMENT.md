@@ -681,10 +681,33 @@ What was verified against the live instance:
   rather than `404`.
 - The **Jobs / Proposals split** (`2ff173d`) is in the served build: the bundle
   is `/assets/index-DcJqTnD6.js` and it carries the strings that only that commit
-  introduced — "Published Hiring Briefs & Proposal Pipeline", "My Published
+  introduced - "Published Hiring Briefs & Proposal Pipeline", "My Published
   Briefs", "{count} new" and the "The briefs you have published" description.
   This one is a build check, not a browser walk: the evidence is that the asset
   containing the feature is the asset the host serves.
+- **A profile photo can be saved again** (`4a97470`), deployed
+  `2026-11-18T20:02:49Z`. The served bundle is `/assets/index-CvT9-vwH.js` and
+  it contains `/api/v1/users/me/avatar`; the container log shows **38**
+  migrations found and `Applying migration '20261118190000_user_avatar'`.
+  A throwaway account then walked the path end to end on the live host:
+  - `POST /api/v1/users/me/avatar` stored a 160-byte JPEG and returned
+    `/api/v1/users/avatars/cmwn1oxd7000lhqokcegjcu5c` - **47** characters,
+    against a `VARCHAR(500)`.
+  - The public `GET` answered **`200 image/jpeg`** with
+    `Cache-Control: public, max-age=31536000, immutable` and
+    `X-Content-Type-Options: nosniff`, and the bytes matched the upload
+    exactly.
+  - `PATCH /api/v1/users/me/profile` stored that URL; a 600-character URL and
+    a 2 KB data URL answered **`400`** with "Avatar URL cannot exceed 500
+    characters" where the previous build answered a bare **`500
+    INTERNAL_ERROR`**; another member's avatar id answered **`400`** "That
+    avatar does not belong to this account."; and the profile still held the
+    real photo after each refusal.
+  - Erasure answered **`200`** with `avatarsDeleted: 1`, and the public URL
+    then answered **`404`** - the bytes are gone with the account.
+  The account was erased in the same run. The defect had been reproduced
+  first: a 600-character value, a 2 KB data URL and a 400 KB data URL each
+  answered `500 INTERNAL_ERROR`, while a short `https://` URL answered 200.
 - The SPA's JavaScript and CSS load; `/api/v1/skills` returns rows from the
   managed PostgreSQL.
 - The `frame-ancestors` allowlist arrives as a response header and the edge
