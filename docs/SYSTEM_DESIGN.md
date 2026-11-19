@@ -2,7 +2,7 @@
 
 > **Status:** Authoritative System Design Document  
 > **Source Code Basis:** Derived directly from `apps/backend/src/`, `apps/frontend/src/`, `apps/backend/prisma/schema.prisma`, and `packages/schemas/`  
-> **Last Verified:** 2026-11-07  
+> **Last Verified:** 2026-11-13
 
 ---
 
@@ -203,6 +203,7 @@ erDiagram
     User ||--o{ TransactionFlag : "flagged in AML"
     User ||--o{ UserSkill : "possesses"
     User ||--o{ PortfolioItem : "showcases"
+    User ||--o{ UserAvatar : "uploads"
     User ||--o{ Review : "authors (ReviewAuthor)"
     User ||--o{ Review : "receives (ReviewTarget)"
     User ||--o{ FeaturedLog : "featured in"
@@ -564,6 +565,15 @@ erDiagram
         datetime updatedAt
     }
 
+    UserAvatar {
+        string id PK
+        string userId FK
+        string contentType
+        bytes data
+        int sizeBytes
+        datetime createdAt
+    }
+
     FeaturedLog {
         string id PK
         string userId FK
@@ -645,8 +655,8 @@ erDiagram
 
 ### 3.1 Module: Identity & Authentication (`apps/backend/src/modules/auth/`)
 
-* **Purpose:** Handles user registration, age gating (18+ requirement), credential authentication, JWT token issuance (access/refresh), password hashing (Argon2), consent capture, and Telegram Mini App session verification.
-* **Owns Models:** `User`, `ConsentRecord`.
+* **Purpose:** Handles user registration, age gating (18+ requirement), credential authentication, JWT token issuance (access/refresh), password hashing (Argon2), consent capture, Telegram Mini App session verification, and the **onboarding OTP** that proves control of the signup address before the account exists.
+* **Owns Models:** `User`, `ConsentRecord`, `PhoneVerificationCode`, `EmailVerificationCode`.
 
 #### State Machine
 Auth does not have a multi-step entity state machine, but enforces an active session gate:
@@ -674,6 +684,51 @@ sequenceDiagram
     API-->>User: HTTP 201 Created (Tokens & User Profile)
 ```
 
+##### Flow 1b: Onboarding OTP (the signup proof)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as New user
+    participant UI as Onboarding step (OnboardingVerification.tsx)
+    participant API as Auth Router (email-verification.routes.ts)
+    participant Svc as Email verification service
+    participant DB as PostgreSQL (Prisma)
+    participant Mail as SMTP transport
+
+    UI->>API: GET /api/v1/auth/verification/channels
+    API-->>UI: { email: { available }, phone: { available } }
+    Note over UI: A host with no SMS key cannot deliver a text.<br/>Offering one anyway dead-ends the signup.
+    UI->>API: POST /api/v1/auth/email/code { email }
+    Svc->>DB: INSERT EmailVerificationCode (salted SHA-256 of the code)
+    Svc->>Mail: sendEmailVerificationCodeEmail(code)
+    Mail-->>User: 6-digit code, 10-minute expiry
+    UI->>API: POST /api/v1/auth/email/verify { email, code }
+    Svc->>DB: stamp verifiedAt
+    UI->>API: POST /api/v1/auth/register
+    Note over Svc: registerUser adopts the proof:<br/>User.emailVerified = true, emailVerifiedAt = now
+```
+
+The proof is raised **before** the account exists, which is why both OTP routes are unauthenticated, and it is attached to the new row by `registerUser`. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. The SMS phone codes are deliberately left alone: `User.phone` is the payout destination and the withdrawal-approval code is money, so that flow is not weakened to make signup work.
+
+**The address is stored in one canonical form.** `registerUser` lower-cases and trims the address before it is written, and the duplicate check matches it case-insensitively. Every other path that touches `User.email` already uses that form — the login lookup lower-cases it, the OAuth path lower-cases it, and the OTP proof is issued and looked up against it — so storing the address as it was typed would put the row outside all of them. An account registered as `Alice@Example.com` could not sign in, because login searches for `alice@example.com`; and because the account existed by then, every retry hit the duplicate path and failed the same way. The canonical form also means one mailbox cannot end up with two accounts spelled differently. The password-reset lookup uses the same canonical form: a lookup by the raw string is case-sensitive on PostgreSQL and would miss the account entirely, and the person would be told a reset token was on its way when none had been created.
+
+**The two registration collisions are separate events.** An address that is already on file and a number that is already on file are different situations, and treating them as one is what made a registration disappear.
+
+| The collision | What the person is told | Why |
+|---|---|---|
+| The **address** is on file | `202` — the same body a successful registration gets | The account exists, so signing in is the next step. Saying otherwise would disclose that the address is registered, which is what the enumeration rule (L-02) forbids. |
+| The **number** is on file, the address is not | `409 {"error":"PHONE_IN_USE"}` | **No account can be created.** Answering `202` here is what made the signup a dead end: the address that had just been proven never became an account, the sign-in that followed answered `401`, and the person was told to sign in with an address that had no account. |
+
+The second row discloses that a *number* is registered. It never discloses whether an *address* is registered, and it tells the person nothing about an address they are not registering. The alternative — accepting the registration and dropping it — is the dead end above, and a dead end with nothing to act on is a support queue rather than a control.
+
+The frontend names the cause: a registration that ends in `INVALID_CREDENTIALS` says that the number may already be registered and offers the two ways forward — sign in with the address used the first time, or use a different number.
+
+**An account can be created from an address alone.** `User.phone` is a non-null unique column because escrow payouts, KYC and the SMS codes depend on it, and the number is the Telebirr / M-Pesa payout destination. It is still **optional at registration**: the Mini App's sign-up offers an address as well as a number, and an account created from an address alone is given the **reserved placeholder** — the `+2510…` block no operator is allocated, which is what the federated sign-ins (Google, Apple, Facebook, Telegram all hand out no number) have always used. Writing a made-up `+2519…` would put somebody else's real subscriber number into the PII store and could collide with a live subscriber, breaking that person's login.
+
+The consequence is honest and worth stating: such an account can use the platform, and it is identified by its address, but it cannot receive a payout until a number is claimed for it. Claiming one is a KYC step, not a sign-up step.
+
+**Sign-in takes an address or a number.** The login route accepts `identifier`, `email` and `phone`, and `normalizeLoginIdentifier` turns a number into `+251…` before the lookup — so `0911223344`, `251911223344` and `+251911223344` all reach the same account. The sign-in form used to be `type="email"`, which made the browser's own validation refuse a number before the request was ever sent; the field now takes either, and sends the value as `identifier`.
+
 ##### Flow 2: Telegram Mini App Authentication
 ```mermaid
 sequenceDiagram
@@ -696,6 +751,11 @@ sequenceDiagram
 | Method | Path | Auth / Permission | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/auth/register` | Public | Register account, validate age $\ge 18$, record consents, create wallet & KYC record |
+| `POST` | `/api/v1/auth/email/code` | Public | Issue the onboarding email OTP. Stores only the salted SHA-256 of the code |
+| `POST` | `/api/v1/auth/email/verify` | Public | Check the onboarding email OTP |
+| `POST` | `/api/v1/auth/phone/code` | Public | Issue an SMS OTP (payout-number verification, withdrawal approval) |
+| `POST` | `/api/v1/auth/phone/verify` | Public | Check an SMS OTP |
+| `GET` | `/api/v1/auth/verification/channels` | Public | Which OTP channels can deliver on this host |
 | `POST` | `/api/v1/auth/login` | Public | Authenticate via email/password, return access & refresh JWTs |
 | `POST` | `/api/v1/auth/refresh` | Public (Refresh Token) | Rotate expired access token using valid refresh token |
 | `POST` | `/api/v1/auth/telegram` | Public (`initData`) | Validate Telegram WebApp hash and issue JWT session |
@@ -1294,11 +1354,11 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 
 * **Purpose:** Manages user discovery and reputation:
   * **Skills (`apps/backend/src/modules/skills/`):** Amharic/English localized skills taxonomy.
-  * **Profiles (`apps/backend/src/modules/profiles/`):** Profile completeness scores, privacy visibility (`PUBLIC`, `PROPOSERS`, `PRIVATE`), and moderation reporting.
+  * **Profiles (`apps/backend/src/modules/profiles/`):** Profile completeness scores, privacy visibility (`PUBLIC`, `PROPOSERS`, `PRIVATE`), and moderation reporting. Profile photos are uploaded to `POST /api/v1/users/me/avatar`, stored in `UserAvatar`, and referenced from `User.avatarUrl` by a short public URL (`/api/v1/users/avatars/<id>`) served with an immutable cache. The image bytes never enter `avatarUrl`: that column is `VARCHAR(500)` and is selected by chat, contract, gig and featured queries, so a base64 payload there would ride along on every one of those responses.
   * **Reviews (`apps/backend/src/modules/reviews/`):** Mutual double-blind reviews revealed after 14 days or mutual submission, with Bayesian sorting (`ratingBayesianScore`).
   * **Featured Talent (`apps/backend/src/modules/featured/`):** Cold-start carousel rotation algorithm balancing top-rated, recently verified, and staff-pinned talent.
   * **Portfolio (`apps/backend/src/modules/portfolio/`):** Freelancer work showcase items.
-* **Owns Models:** `Skill`, `UserSkill`, `Review`, `PortfolioItem`, `FeaturedLog`, `ProfileReport`, `ProfileView`.
+* **Owns Models:** `Skill`, `UserSkill`, `Review`, `PortfolioItem`, `UserAvatar`, `FeaturedLog`, `ProfileReport`, `ProfileView`.
 
 #### Double-Blind Review Mechanism
 1. Client and freelancer can review each other only after contract completion (`isEligible: true`).
@@ -1379,6 +1439,16 @@ finding **H3**). `PlatformFeeCredit` already carries a `gigOrderId` column, so
 the schema anticipated it.
 
 #### Gig Disputes
+
+#### Frontend Afro-Tech Gig Marketplace (`GigMarketplace.tsx` & `GigMarketplace.css`)
+
+The frontend discovery experience for gigs is built with the AFRO-TECH visual language:
+- **Command Hero & Escrow Ribbon**: Afro-Tech technical eyebrow with live pulse indicator, Space Grotesk headline, and a 3-part trust strip highlighting 100% escrow protection, direct Ethiopian rails (Telebirr, CBE Birr, M-Pesa), and guaranteed turnarounds.
+- **Interactive Category Rail**: Horizontal scrollable category chips with dedicated Lucide glyphs for all launch categories.
+- **Search & Multi-Criteria Sorting**: Search with instant clear, live count indicator, and sorting by recommendation, rating, price (asc/desc), or fastest turnaround.
+- **Afro-Tech Gig Cards**: Card architecture with geometric fallback cover banners, bare icon glyphs, zero-emoji typography, bold status indicators without background fills, `YekisAvatar` seller spotlight with verified freelancer badges, 2-line clamped titles, technical skill tags, and tabular ETB starting prices.
+- **Two-Column Detail & Escrow Checkout**: Breadcrumb navigation, seller credibility card, service overview, checklist of buyer requirements, FAQ accordion, escrow security guarantee banner, and an interactive 3-tier package comparison matrix (Basic, Standard, Premium) with direct wallet-debited escrow checkout.
+- **Strict Theme Parity**: Fully responsive layout matching light and dark themes with zero geometric shift.
 
 `Dispute` is polymorphic: exactly one of `contractId` or `gigOrderId` is set,
 enforced by the DB constraint `Dispute_subject_check`. A gig dispute uses the
@@ -2008,7 +2078,7 @@ Each gap is documented **next to the code it belongs to**, so a reader who opens
 | Job search never uses OpenSearch; gig edits go stale in the index; no reindex path | §3.18 |
 | The audit retention stamp and the purge that enforces it | §4.2 |
 | Five ops console actions 404; the fallback matrix drifts from the server's; orphaned mock data | §8.8 |
-| ~1,800 hardcoded JSX literals (1,127 in the 104 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
+| ~1,974 hardcoded JSX literals (1,296 in the 106 files that never import the i18n module); registration rejects `om`/`ti`; the bot collapses the language to am/en; no RTL | §8.9, §9.17 |
 | No offline queue for socket events; the client ping is a no-op; guest sockets cannot connect | §8.10 |
 
 ---
@@ -2120,12 +2190,65 @@ sequenceDiagram
     end
 ```
 
+#### When Telegram sign-in is unavailable
+
+A Mini App opened on a host with no bot token cannot verify `initData`, so
+the sign-in always ends in a `503`. The shell therefore asks the host what
+it can do before the person picks a role:
+
+1. It reads `GET /api/v1/auth/oauth/providers`. When the host answers
+   `telegram: false`, the shell sets `telegramUnavailable`, hides the
+   "Telegram Login" tab, opens the phone-and-password path, and says
+   **"Telegram sign-in is unavailable"** with the reason in words the person
+   can act on.
+2. The probe is **advisory**. If it cannot answer, the sign-in is attempted
+   anyway and the server's own error is what the person sees — a failed
+   probe must never remove the only way in.
+3. `startSession` refuses to attempt a Telegram sign-in the host has already
+   said cannot work, so the person is not walked into a `503`.
+4. A `503 TELEGRAM_NOT_CONFIGURED` from the sign-in itself sets the same
+   state: the tab stays hidden and the fallback opens.
+
+The fallback accepts **a phone number or an email address**, for signing in
+and for signing up. Its tab is labelled **"Phone or Email"**, the panel
+headings are **"Sign In with Phone or Email"** and **"Create an Account"**,
+and the unavailable-notice says "your phone number or email address and your
+password" — the labels were "Mobile Phone", "Sign In with Mobile", "Create
+Mobile Account" and "your phone number and password" while the field took an
+address, which told the truth about the backend and lied about the product.
+
+**An address can create an account in the Mini App too.** The Mini App's
+sign-up takes either a number or an address, and an address is **proven with
+the same six-digit code** the web sign-up uses (`OnboardingVerification`,
+which is channel-generic) before the account exists — an unproven address is
+somebody else's inbox, and it is the login identifier. The account is then
+created without a number and is given the reserved placeholder the federated
+sign-ins use (§3.1). The code step replaces the form in place, with the tab
+switcher hidden while it is showing, and the component's own "use a different
+email" link returns to the form with the address still in it.
+
+**A failure is reported in words, not in the server's codes.** The host
+answers a credential it cannot verify with `{"error":"TELEGRAM_AUTH_FAILED",
+"message":"BAD_SIGNATURE"}` — and its vocabulary is `BAD_SIGNATURE`,
+`STALE_AUTH_DATE`, `INVALID_AUTH_DATE`, `NO_AUTH_DATE`, `NO_USER`. Those are
+codes, not sentences: a person cannot act on "BAD_SIGNATURE". The shell maps
+them to something they can (an expired session says so and offers a reload;
+an unverifiable one says to reopen the Mini App or use the phone and
+password), and a bare code that reaches the screen anyway is replaced with a
+plain sentence.
+
+**The failure this replaces.** The Mini App used to be handed a fabricated
+session (`mock-jwt-access-token`) and a developer-facing message ("Add your
+bot token to apps/backend/.env and restart the backend server"). See §8.4 for
+why a server's error must never be answered by the offline mock.
+
 #### State Managed in `App.tsx`
 
 | State Variable | Type | Purpose |
 |---|---|---|
 | `telegramSession` | `TelegramAuthResponse \| null` | Full Telegram auth response after login |
 | `telegramAuthStatus` | `"idle" \| "loading" \| "ready" \| "error"` | Authentication phase gate |
+| `telegramUnavailable` | `boolean` | The host cannot verify a Telegram credential — the Telegram tab is hidden and the phone/password path is offered |
 | `role` | `"CLIENT" \| "FREELANCER" \| "ADMIN"` | User's active platform role |
 | `activeTab` | `Tab` | Which section is currently displayed |
 | `walletBalance` | `number` | Wallet balance in ETB (derived from balanceMinor / 100) |
@@ -2147,11 +2270,13 @@ Since the app is a SPA (no React Router), navigation is controlled by the `view`
 ```
 FullPlatformApp.tsx
 ├── Marketing / Public Shell (showLanding=true OR unauthenticated)
+│   ├── MarketingHeader.tsx       — AFRO-TECH-style fixed header, active navigation, theme/language/auth controls, 1024px drawer
 │   ├── LandingPage.tsx           — Hero, categories, how-it-works, CTA
 │   ├── FAQPage.tsx               — Frequently asked questions
 │   ├── FeesPage.tsx              — Platform fee structure explanation
-│   ├── PrivacyPage.tsx           — Privacy policy
-│   ├── TermsPage.tsx             — Terms of service
+│   ├── LegalDocumentPage.tsx     — Shared legal-document header, table of contents, numbered sections
+│   ├── PrivacyPage.tsx           — Complete Privacy Policy (version 1.1, 16 sections)
+│   ├── TermsPage.tsx             — Complete Terms of Service (version 1.1, 22 sections)
 │   ├── AboutPage.tsx             — Company background
 │   ├── CaseStudiesPage.tsx       — Success stories
 │   ├── ThankYouPage.tsx          — Post-registration / post-job confirmation
@@ -2170,7 +2295,8 @@ FullPlatformApp.tsx
     ├── FeaturedCarousel.tsx      — Featured freelancer cards
     └── View Content (by view state):
         ├── "overview"        → Dashboard metrics, featured talent
-        ├── "jobs"            → JobsWorkspace (post + browse)
+        ├── "jobs"            → JobsWorkspace section="jobs" (post + browse + my briefs)
+        ├── "proposals"       → JobsWorkspace section="proposals" (bids sent + pipeline received)
         ├── "gigs"            → GigMarketplace (browse gigs)
         ├── "my-gigs"         → MyGigsWorkspace (a freelancer's own listings)
         ├── "contracts"       → ContractsWorkspace (sign, fund, milestones)
@@ -2183,6 +2309,84 @@ FullPlatformApp.tsx
         ├── "profile"         → ProfilePage (public view)
         └── "profile-edit"    → ProfileEditPage (edit bio, skills, portfolio)
 ```
+
+#### Finishing the profile: when the platform asks, and when it waits
+
+A new account has no photo, no name, no bio and no verified identity, and the
+platform needs all four before it can be trusted with anyone's money. Two
+mechanisms ask for them, and they are deliberately not the same mechanism.
+
+**A new account is taken to the profile section, and the checklist is opened.**
+Registration does not drop the person on the dashboard. `completeRegistration`
+navigates to `/profile` and puts `showProfileCompletion` in the router state,
+which opens `ProfileCompletionDialog` — the checklist that says exactly what
+is missing (photo, name and bio, and for a freelancer the skills). This is
+the moment the ask is relevant: the account is brand new and the person has
+not done anything else yet. The Mini App does the same thing its own way —
+a new account lands on its **Profile** tab (account details and the Fayda
+identity check), because that is the Mini App's profile section. Signing in
+to an account that already exists changes nothing.
+
+**The banner waits.** The "Finish your profile" banner used to be on screen
+the moment the workspace loaded, which is the worst moment for it: the person
+has just arrived, has not looked at anything, and a bar about their missing
+photo is the least useful thing on the page. It is now **armed** — allowed to
+speak at all — only when the session has warmed up:
+
+| Arming condition | What it means |
+|---|---|
+| 45 seconds in the workspace (`PROFILE_NUDGE_DELAY_MS`) | The person is reading and thinking |
+| Three or more distinct views opened in the session | The person is moving around the platform |
+
+Three, not two: every new account lands on the profile section by itself, so
+two views is what an account sees before it has done anything — that is the
+checklist's job, not the banner's. The banner also stays out of the profile
+section (`profile` and `profile-edit`), because that is where the work is
+done and a banner about it there is noise.
+
+**A dismissal is remembered, and forgotten when it no longer applies.** The
+dismissal used to last for one page load, so the banner came back on the next
+visit as if it had never been answered. It is now remembered per account
+(`yekis_profile_nudge_dismissed_<userId>`) and cleared the moment the profile
+is complete — a photo and a completeness score of 85 or more — so an account
+that filled its profile in later is not carrying "do not remind me" forever.
+
+#### Whose profile is on screen
+
+The `profile` view shows **one** profile, and the shell has to know **whose**.
+
+`viewUserId` is the answer: `null` means my own profile, anything else means
+somebody else's. Everything that follows from it:
+
+| | My own profile | Somebody else's |
+|---|---|---|
+| Breadcrumb | "My Profile" | The person's name (their profile reports it once it has loaded) |
+| Section heading | "Public Marketplace Profile" | The person's name |
+| "Edit Profile" button | Shown | **Not shown** — it opens the editor for *my* profile, so offering it over somebody else's page said their page was mine, and the editor it opened was mine too |
+| "Report Profile" button | Not shown | Shown (`ProfilePage` asks the server whether the profile is mine) |
+| "My Profile" in the sidebar | Highlighted | Not highlighted — it is not my profile |
+
+**Every entry point that means "my profile" goes through `openMyProfile()`**:
+the sidebar item, the avatar in the topbar, the chip at the foot of the
+sidebar, the command palette, the "Back to Profile" button in the editor and
+the end of a registration. They used to call `setView("profile")` directly,
+which kept whichever profile was last opened — so clicking "My Profile" after
+looking at somebody else showed that person again, and the workspace counted
+somebody else's page as yours. Opening somebody else's profile goes through
+`openProfileOf(id)`, and signing out clears both.
+
+**The name comes from the profile, not from the caller.** `ProfilePage`
+reports the profile it loaded (`onProfileLoaded`), so the breadcrumb names the
+person for every path that can open a profile — the featured carousel, a gig
+seller, a chat partner — not only for the ones that happen to know the name
+already. The name arrives a moment after the click, so the breadcrumb shows
+"Member Profile" until it does. A profile with **no name at all** reports an
+empty display name, and the generic label stands in for that too — an empty
+heading is worse than the generic one.
+
+The Mini App has no other people's profiles — its Profile tab is the
+signed-in account's own details and identity check — so this is a
+browser-platform rule.
 
 #### The Sidebar Is Frozen (does not scroll with the body)
 
@@ -2223,9 +2427,50 @@ the only one that scrolled.
 
 | Role | Nav Items Shown |
 |---|---|
-| `CLIENT` | Overview, Post a Job, My Contracts, Wallet, Chat, Verification, Profile |
-| `FREELANCER` | Overview, Find Work, My Work, Wallet, Chat, Verification, Profile |
-| `ADMIN` / `MEDIATOR` | Overview, Escrow, Disputes, Wallet, Chat, Verification + Staff Dashboard link |
+| `CLIENT` | Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Chat, Verification, Profile |
+| `FREELANCER` | Overview, Find Work, Proposals, Gigs, My Gigs, Contracts, Escrow, Wallet, Chat, Verification, Profile |
+| `ADMIN` / `MEDIATOR` | Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Chat, Verification + Staff Dashboard link |
+
+Jobs and Proposals are two separate tabs. **Jobs** is the brief board — browse
+open briefs, publish a brief, and (for a client) the briefs you have published.
+**Proposals** is the proposal pipeline — the bids a freelancer has sent, and the
+bids a client has received against their own briefs, where shortlisting,
+accepting and rejecting happen. The old browse/proposals segmented control
+inside the Jobs workspace is gone; the sidebar owns the split.
+
+#### Sidebar Activity Dots
+
+A sidebar tab lights a small dot when something in it has not been looked at
+yet. The dot is anchored to the tab's icon, so it sits in the same place
+whether the sidebar is expanded or collapsed into an icon rail.
+
+Two signals feed it, and both mean **"not looked at yet"**:
+
+1. **Unread notifications routed to that view.** The mapping in
+   `apps/frontend/src/api/notificationTargets.ts` is the single source of
+   truth for both deep-linking and dot counts: if clicking a notification
+   takes you to the Proposals tab, then an unread proposal notification is
+   what lights the Proposals tab up. A notification with no destination
+   lights nothing up — there would be nowhere for the person to go.
+2. **New briefs on the Jobs tab.** The backend has no "a brief was published"
+   notification type, so the Jobs tab tracks it on the client with a per-user
+   watermark of the newest brief the person has already been shown
+   (`yekis:jobs-seen-at:<userId>` in `localStorage`). Only accounts that work
+   (freelancers) get this, and their own briefs are excluded from the count.
+
+The bell and the dots read **one shared feed**
+(`apps/frontend/src/api/notificationFeed.ts`): a single poller and a single
+immutable snapshot published through `useSyncExternalStore`, so the badge on
+the bell and the dot on a tab can never disagree about what is unread. The
+snapshot keeps its identity when a poll returns the same records, so a
+consumer does not re-render every fifteen seconds for nothing.
+
+Opening a view **is** looking at it: the notifications routed to that view are
+marked read (`POST /api/v1/notifications/:id/read`) and the Jobs watermark
+moves forward to the newest brief. The dot therefore always means "not looked
+at yet" and never "something happened at some point" — which is the only way a
+signal survives. The count itself lives in the tab's accessible label
+(`aria-label` and `title`); the dot is only a dot.
 
 #### Staff Dashboard (`StaffDashboard.tsx`)
 
@@ -2247,10 +2492,18 @@ All HTTP calls are centralized in a single `api` object exported from `client.ts
 
 #### Key Design Properties
 
-- **Token Storage:** `api.setToken()` stores the token in a module-level variable (no `localStorage`) for the session lifetime.
-- **Base URL:** Reads from `import.meta.env.VITE_API_BASE_URL` at build time (falls back to `http://localhost:3000`).
-- **Error Handling:** Non-2xx responses throw `Error` with the JSON `message` field from the API.
+- **Token Storage:** the access and refresh tokens live in `localStorage` under `yekis-api-token` and `yekis-refresh-token`, so a reload keeps the session. `api.setSession()` writes both; `api.clearToken()` removes them.
+- **Base URL:** reads from `import.meta.env.VITE_API_BASE_URL` at build time and defaults to the empty string, so the API is same-origin. A deployment therefore serves the SPA and the API from one origin — which is also what the Telegram Mini App requires, because it refuses a page that is not same-origin with its own host.
+- **Error Handling:** a non-2xx response throws an `Error` carrying the API's own `message` (falling back to its `error` code, then `HTTP <status>`). The error's `code` is the API's machine-readable code, so a caller can tell `INVALID_CREDENTIALS` from `PHONE_IN_USE` from `TOO_MANY_LOGIN_ATTEMPTS` without matching on the wording.
 - **FormData Support:** Methods like `createTopUpRequest`, `submitKycDocuments`, and `submitFreelancerFaydaSelfie` send `multipart/form-data` for file uploads.
+
+#### The offline mock, and when it may answer
+
+`mockStore` (`apps/frontend/src/api/mockData.ts`) is a **stand-in for the absence of a server**: no backend at all, or the dev proxy's explicit `X-Yekis-Offline: 1` header. It lets the frontend run with nothing behind it.
+
+It is **not** a stand-in for a server that answered with an error. A server that answered has answered, and its answer must reach the caller. So by default a 404/502/503/504 falls back to the mock, and a call can opt out with `strictHttpErrors: true`, which makes it throw the real status **and** refuses to fabricate a response on any path — a status code, an unreadable body, a non-JSON content type, or a parse failure.
+
+**Every authentication call opts out.** `loginWithTelegram`, `loginWithTelegramCode`, `linkTelegram`, `unlinkTelegram`, `login`, `loginWithMobile` and `register` are all strict. The reason is concrete: a host with no bot token answers `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for it and hand back `accessToken: "mock-jwt-access-token"` — a token no server issued. The Mini App looked signed in, every request that followed was refused with a 401, and the real reason never reached the person. A fabricated session is worse than a failed one, because it is a failure the person cannot see.
 
 #### Key API Methods
 
@@ -2321,7 +2574,7 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | Environment Variable | `VITE_API_BASE_URL` |
 | Dev Server | `pnpm dev` → `http://127.0.0.1:3000` |
 | Public Assets | `/public/` (SVG logo, payment provider images) |
-| Internationalization | `i18n.ts` — four locales, 569 keys each |
+| Internationalization | `i18n.ts` — four locales, 598 keys each |
 
 > **The React version in this table was 18 in earlier revisions; the project
 > now runs React 19** (`apps/frontend/package.json` pins `^19.3.0`).
@@ -2383,7 +2636,7 @@ There are two distinct fallback mechanisms:
 | Property | Value |
 |---|---|
 | Languages | `en`, `am` (አማርኛ), `om` (Afaan Oromoo), `ti` (ትግርኛ) |
-| Leaf keys per language | **569**, identical across all four (no missing, no extra) |
+| Leaf keys per language | **598**, identical across all four (no missing, no extra) |
 | Nested objects per language | 40 |
 | Maximum depth | 3 (e.g. `workspace.jobs.status.SHORTLISTED`) |
 | Top-level namespaces | `appName`, `tagline`, `nav`, `kyc`, `escrow`, `jobs`, `dispute`, `marketing`, `workspace` |
@@ -2411,7 +2664,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 
 #### Known gaps
 
-- **Hardcoded copy is still widespread.** 25 of 129 `.tsx` files import the i18n module; the other **104** never touch it. An exact AST count (TypeScript's own parser) finds **1,800 hardcoded JSX text nodes**, of which **1,127** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
+- **Hardcoded copy is still widespread.** 25 of 131 `.tsx` files import the i18n module; the other **106** never touch it. An exact AST count (TypeScript's own parser) finds **1,974 hardcoded JSX text nodes**, of which **1,296** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
 - **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
@@ -2490,15 +2743,17 @@ This section provides a plain-English description of every user-facing section o
 
 ### 9.1 Landing Page & Marketing Shell
 
-**What it does:** Public-facing marketing site showcasing the platform's value proposition, pricing, FAQs, terms, and privacy policy.
+**What it does:** Public-facing marketing site showcasing the platform's value proposition, pricing, FAQs, and the complete Privacy Policy and Terms of Service. Its shared header follows the AFRO-TECH public-site pattern while preserving Yekis navigation, authentication, language, and theme controls.
 
 **How it works:**
 - Served by `FullPlatformApp.tsx` when the user is unauthenticated and `showLanding = true`.
 - `LandingPage.tsx` is a static React component with no API calls — it renders hardcoded marketing content.
+- `MarketingHeader.tsx` renders a fixed opaque bar with a Space Grotesk wordmark, underline navigation, the current-page state, language and theme controls, and authentication actions. At 1024px and below, navigation and the secondary preferences move into a 290px right drawer.
+- `PrivacyPage.tsx` and `TermsPage.tsx` define the complete version 1.1 legal content and delegate layout to `LegalDocumentPage.tsx`. The shared shell provides breadcrumbs, document metadata, a linked table of contents, numbered sections, and responsive layouts. The text is grounded in the implemented seven-day release and cooling-off windows, 7%/0% fee model, consent-aware analytics, data-subject export/erasure, and ten-year retention for the records law requires. External counsel approval remains outstanding.
 - Includes a `CookieBanner.tsx` for GDPR-style consent and a `MobileCTA.tsx` encouraging mobile users to open the Telegram Mini App.
 - Navigation to sub-pages (FAQ, Fees, etc.) changes `marketingPage` state without any URL routing.
 
-**Files:** `LandingPage.tsx`, `FAQPage.tsx`, `FeesPage.tsx`, `PrivacyPage.tsx`, `TermsPage.tsx`, `AboutPage.tsx`, `CaseStudiesPage.tsx`, `CookieBanner.tsx`, `MobileCTA.tsx`
+**Files:** `MarketingHeader.tsx`, `LandingPage.tsx`, `FAQPage.tsx`, `FeesPage.tsx`, `LegalDocumentPage.tsx`, `PrivacyPage.tsx`, `TermsPage.tsx`, `AboutPage.tsx`, `CaseStudiesPage.tsx`, `CookieBanner.tsx`, `MobileCTA.tsx`
 
 ---
 
@@ -2809,7 +3064,8 @@ flowchart LR
 *Profile:*
 - `ProfilePage.tsx` renders public profile: avatar, bio, skills, portfolio items, completed jobs count, Bayesian rating.
 - Visibility controlled by `User.profileVisibility` (`PUBLIC`, `PROPOSERS`, `PRIVATE`).
-- `ProfileEditPage.tsx` → `PATCH /api/v1/profiles/me` — updates bio, skills, availability.
+- `ProfileEditPage.tsx` → `PATCH /api/v1/users/me/profile` — updates name, bio, skills, availability and visibility. A chosen photo is compressed to a 320px JPEG in `apps/frontend/src/lib/avatarImage.ts` and uploaded to `POST /api/v1/users/me/avatar`; the returned `/api/v1/users/avatars/<id>` URL is what the PATCH stores in `avatarUrl`. The photo is applied immediately, while the rest of the form waits for **Save Changes**.
+- `GET /api/v1/users/avatars/:avatarId` serves the stored image publicly with `Cache-Control: immutable`. A replacement upload creates a new id and deletes the old row, so a cached URL can never show somebody else's newer photo; clearing the avatar (`avatarUrl: null`) deletes the bytes.
 - `ProfileView` records are written each time a profile is viewed (analytics).
 
 *Skills Taxonomy:*
@@ -2920,10 +3176,10 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **How the language is chosen:** the browser reads `localStorage["yekis-language"]`, then `navigator.language`, then English. The choice is written back to `User.languagePreference` and re-applied on login, so the language follows the user between devices. The bot offers a language keyboard, stores the choice on the session *and* on the user, and renders push notifications in the user's own language.
 
-**Two catalogues, not one.** The frontend holds 569 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
+**Two catalogues, not one.** The frontend holds 598 leaf keys in `i18n.ts`; the bot holds 243 flat keys in `modules/bot/locales/*.json`. The bot's keys are a different namespace from the frontend's.
 
 **Where it falls short today:**
-- Roughly **1,800 hardcoded JSX text literals** remain across the frontend — **1,127** of them in the 104 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+- Roughly **1,974 hardcoded JSX text literals** remain across the frontend — **1,296** of them in the 106 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
 - **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
 - **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
 - **No RTL support** — the platform is left-to-right only, and `dir` is never set.

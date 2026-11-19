@@ -405,6 +405,7 @@ export async function eraseUserData(userId: string): Promise<ErasureResult> {
     profileViewsDeleted: 0,
     featuredLogsDeleted: 0,
     authArtefactsDeleted: 0,
+    avatarsDeleted: 0,
   };
 
   // --- 1. Chat content and the bytes behind it ---------------------------
@@ -610,6 +611,13 @@ export async function eraseUserData(userId: string): Promise<ErasureResult> {
   // The UCID, phone, date of birth and Fayda biometric id are deliberately
   // NOT touched: they are the AML join keys for this person's financial
   // history, and the records that use them must stay usable.
+
+  // The photo bytes are a separate table, so nulling `avatarUrl` alone would
+  // leave the face on disk. Delete them first; the FK would only cascade when
+  // the User row itself is deleted, and erasure deliberately keeps that row.
+  const avatars = await prisma.userAvatar.deleteMany({ where: { userId } });
+  counts.avatarsDeleted += avatars.count;
+
   const erasedEmail = `erased-${user.ucid}@${ERASED_EMAIL_DOMAIN}`;
   await prisma.user.update({
     where: { id: userId },

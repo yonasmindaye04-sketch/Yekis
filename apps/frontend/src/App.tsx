@@ -31,11 +31,12 @@ import {
   ShieldAlert,
   RefreshCw,
   X,
-  Paperclip,
 } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
+import { OnboardingVerification } from "./OnboardingVerification";
 import { useTheme } from "./theme/ThemeContext";
 import { useI18n, isLanguage } from "./i18n";
+import { FileUploader } from "@/components/ui/file-upload-1";
 import "./telegram/miniApp.css";
 
 // === INTERFACES & TYPES ===
@@ -118,6 +119,20 @@ function formatRole(role: Role) {
       : "Client";
 }
 
+/**
+ * The server's vocabulary for a Telegram credential it could not verify
+ * (`apps/backend/src/modules/auth/telegram.service.ts`). These are codes, not
+ * sentences: a person cannot act on "BAD_SIGNATURE", so the Mini App maps
+ * them to something they can.
+ */
+const TELEGRAM_VERIFY_CODES = [
+  "BAD_SIGNATURE",
+  "STALE_AUTH_DATE",
+  "INVALID_AUTH_DATE",
+  "NO_AUTH_DATE",
+  "NO_USER",
+] as const;
+
 function normalizeEthiopianPhone(input: string): string {
   const trimmed = input.trim();
   if (trimmed.includes("@")) return trimmed.toLowerCase();
@@ -149,6 +164,33 @@ export function App() {
     "idle" | "loading" | "ready" | "error"
   >("idle");
   const [telegramAuthError, setTelegramAuthError] = useState("");
+
+  /**
+   * True when the host cannot verify a Telegram credential.
+   *
+   * Two different things cause it — the server has no bot token, or the
+   * server said so — and the person in front of the Mini App cannot tell
+   * them apart. It does not matter: either way the answer is the same.
+   * Telegram sign-in is unavailable, so the phone and password path is
+   * offered and the reason is stated in words the person can act on.
+   *
+   * It used to be shown as a developer instruction ("add your bot token to
+   * apps/backend/.env"), which is both unreadable and untrue as a
+   * description of what happened: the Mini App had not failed to find a
+   * token, it had been handed a successful sign-in that was never real.
+   */
+  const [telegramUnavailable, setTelegramUnavailable] = useState(false);
+
+  /**
+   * The address being proven for an email sign-up, or null.
+   *
+   * An address has to be proven before the account exists — it is the login
+   * identifier and the destination of every transactional mail, so an
+   * unproven one is somebody else's inbox. The web signup proves it with the
+   * same six-digit code, and the Mini App now does the same for an address
+   * that is used to create an account.
+   */
+  const [miniSignupEmail, setMiniSignupEmail] = useState<string | null>(null);
 
   // Mobile Auth states
   const [showMobileLogin, setShowMobileLogin] = useState(false);
@@ -341,6 +383,36 @@ export function App() {
     initAnalytics();
   }, []);
 
+  // === Can this host verify a Telegram credential? ===
+  //
+  // A Mini App opened on a host with no bot token cannot verify `initData`,
+  // so the sign-in always ends in a 503. Finding that out BEFORE the person
+  // picks a role turns a dead end into a choice: the phone and password
+  // path is offered straight away.
+  //
+  // The probe is advisory. If it cannot answer, the sign-in is attempted
+  // anyway and the server's own error is what the person sees — a failed
+  // probe must never remove the only way in.
+  useEffect(() => {
+    if (!telegram.isTelegram) return;
+    let cancelled = false;
+    api
+      .getOAuthProviders()
+      .then((res) => {
+        if (cancelled || res.telegram) return;
+        setTelegramUnavailable(true);
+        // Open the path that works rather than leaving the person on a tab
+        // that cannot succeed.
+        setShowMobileLogin(true);
+      })
+      .catch(() => {
+        // The server could not be asked. Leave the state alone.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [telegram.isTelegram]);
+
   // Derived display flags (moved above the effects so they can guard them)
   const isPaymentReturn = window.location.pathname === "/payment/return";
   const isNonTelegram = !telegram.isTelegram;
@@ -442,6 +514,13 @@ export function App() {
       return;
     }
 
+    // The host already said it cannot verify a Telegram credential. Going
+    // through the attempt anyway would only produce a 503 and a dead end.
+    if (telegramUnavailable) {
+      setShowMobileLogin(true);
+      return;
+    }
+
     setTelegramAuthStatus("loading");
     try {
       const freshInitData = getTelegramWebApp()?.initData || telegram.initData;
@@ -462,24 +541,39 @@ export function App() {
       setTelegramAuthStatus("error");
       const msg =
         err instanceof Error ? err.message : "Sign-in could not be completed";
+      // The server's machine-readable code rides on `err.code`, and the
+      // message it sends is its own vocabulary (`BAD_SIGNATURE`,
+      // `STALE_AUTH_DATE`, …). Neither is something a person can act on, so
+      // the codes are mapped to sentences here rather than shown raw.
+      const code = (err as { code?: string })?.code ?? "";
+      const verifyCode = TELEGRAM_VERIFY_CODES.find((c) => msg === c || msg.includes(c));
       if (
         msg.includes("TELEGRAM_BOT_TOKEN") ||
         msg.includes("TELEGRAM_NOT_CONFIGURED")
       ) {
-        setTelegramAuthError(
-          "TELEGRAM_BOT_TOKEN is missing or empty in your environment. Add your bot token to apps/backend/.env and restart the backend server.",
-        );
+        // The server answered, and the answer is that it cannot verify a
+        // Telegram credential here. The person in front of the Mini App
+        // cannot act on a bot token, so the message says what is true and
+        // the phone and password path is offered instead. The developer
+        // detail stays in the server log, where it belongs.
+        setTelegramUnavailable(true);
+        setTelegramAuthError("");
+        setShowMobileLogin(true);
       } else if (
+        code === "TELEGRAM_AUTH_FAILED" ||
         msg.includes("signature is invalid") ||
-        msg.includes("TELEGRAM_AUTH_FAILED")
+        Boolean(verifyCode)
       ) {
         setTelegramAuthError(
-          "Telegram signature mismatch: Ensure the TELEGRAM_BOT_TOKEN belongs to the exact bot opening this Mini App.",
+          verifyCode === "STALE_AUTH_DATE"
+            ? "This Telegram session has expired. Reload the Mini App, then try Telegram Login again."
+            : "This Telegram session could not be verified. It may have expired — reopen the Mini App from the bot, or sign in with your phone number and password.",
         );
       } else {
         setTelegramAuthError(
-          msg.includes("STALE_AUTH_DATE")
-            ? "This Telegram session has expired. Reload the Mini App, then try Telegram Login again."
+          // A bare code would read as a machine talking to a machine.
+          /^[A-Z][A-Z_]{3,}$/.test(msg)
+            ? "Sign-in could not be completed. Try again, or sign in with your phone number and password."
             : `${msg}. Try again or use mobile sign in.`,
         );
       }
@@ -488,10 +582,21 @@ export function App() {
 
   const handleMobileAuth = async () => {
     if (!mobilePhone.trim() || !mobilePassword.trim()) {
-      alert("Please enter both phone number and password.");
+      alert("Please enter both your phone number or email and your password.");
       return;
     }
     const normalizedPhone = normalizeEthiopianPhone(mobilePhone);
+    const isEmailIdentifier = normalizedPhone.includes("@");
+    // An address can create an account as well as sign in to one. The
+    // address is proven with a six-digit code first, exactly as in the web
+    // signup, and the account is created without a number — it gets the
+    // reserved placeholder the federated sign-ins use, so no real
+    // subscriber's number is written into the PII store.
+    if (mobileAuthMode === "signup" && isEmailIdentifier) {
+      setTelegramAuthError("");
+      setMiniSignupEmail(normalizedPhone);
+      return;
+    }
     setTelegramAuthStatus("loading");
     setTelegramAuthError("");
     // Registration answers 202 for both new and existing accounts, so the
@@ -543,16 +648,104 @@ export function App() {
       window.localStorage.setItem("yekis-role", backendRole);
       setTelegramAuthStatus("ready");
       await loadData();
+      // A brand-new account lands in the profile section.
+      //
+      // The platform asks a new account for its identity and its details
+      // until they are there, so it asks in the profile section rather than
+      // over the home feed. Signing in to an account that already exists
+      // leaves the person where they were.
+      if (wasSigningUp) setActiveTab("kyc");
     } catch (err) {
       setTelegramAuthStatus("error");
       const raw = err instanceof Error ? err.message : "Login failed";
+      // The server's error code rides on `err.code`; the message it carries
+      // is the server's own wording, which is what the person should read.
+      const code = (err as { code?: string })?.code ?? "";
       if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
         setTelegramAuthError(
           wasSigningUp
-            ? "We could not sign you in with those details. If you already have an account, sign in instead."
+            ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
             : "Invalid phone number or password. Please check your credentials.",
         );
-      } else if (raw.includes("DUPLICATE_USER") || raw.includes("409")) {
+      } else if (
+        code === "PHONE_IN_USE" ||
+        raw.includes("DUPLICATE_USER") ||
+        raw.includes("PHONE_IN_USE")
+      ) {
+        setTelegramAuthError(
+          "An account with this phone number already exists. Please switch to Sign In.",
+        );
+      } else {
+        setTelegramAuthError(raw);
+      }
+    }
+  };
+
+  /**
+   * Creates the account once its address has been proven.
+   *
+   * No number was given, so the account is created without one and the
+   * server gives it the reserved placeholder the federated sign-ins use. The
+   * account can be used immediately; the number has to be claimed before it
+   * can receive a payout, and that is a KYC step, not a sign-up one.
+   */
+  const completeEmailSignup = async () => {
+    const address = miniSignupEmail;
+    if (!address) return;
+    setTelegramAuthStatus("loading");
+    setTelegramAuthError("");
+    try {
+      await api.register({
+        email: address,
+        password: mobilePassword,
+        role: mobileRole,
+        languagePreference: language || "en",
+        dateOfBirth: "1995-01-01",
+        consents: {
+          kycDataProcessing: true,
+          financialDataProcessing: true,
+          platformNotifications: false,
+          marketingCommunications: false,
+          analytics: false,
+        },
+      });
+      // Analytics: account created (role only — never the address).
+      events.signupCompleted(
+        mobileRole === "CLIENT"
+          ? "client"
+          : mobileRole === "BOTH"
+            ? "both"
+            : "freelancer",
+      );
+
+      const res = await api.loginWithMobile({
+        identifier: address,
+        password: mobilePassword,
+      });
+
+      api.setSession(res);
+      markMobileAuthCompletedOrAbandon(true);
+      events.login("mobile");
+      const me = await api.getMe();
+      setUserProfile(me);
+      const backendRole = me.role === "ADMIN" ? "ADMIN" : (me.role as Role);
+      setRole(backendRole);
+      window.localStorage.setItem("yekis-role", backendRole);
+      setMiniSignupEmail(null);
+      setTelegramAuthStatus("ready");
+      await loadData();
+      // A brand-new account lands in the profile section, the same as the
+      // phone sign-up does.
+      setActiveTab("kyc");
+    } catch (err) {
+      setTelegramAuthStatus("error");
+      const raw = err instanceof Error ? err.message : "Sign-up failed";
+      const code = (err as { code?: string })?.code ?? "";
+      if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
+        setTelegramAuthError(
+          "We could not create the account. If that email address is already registered, sign in with it instead.",
+        );
+      } else if (code === "PHONE_IN_USE" || raw.includes("PHONE_IN_USE")) {
         setTelegramAuthError(
           "An account with this phone number already exists. Please switch to Sign In.",
         );
@@ -981,42 +1174,45 @@ export function App() {
             and keeping every payment clear.
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              width: "100%",
-              background: "var(--color-bg-elevated)",
-              padding: 5,
-              borderRadius: 12,
-              border: "1px solid var(--color-border)",
-              marginBottom: 20,
-            }}
-          >
-            <button
-              type="button"
+          {!miniSignupEmail && (
+            <div
               style={{
-                flex: 1,
-                padding: "12px 14px",
-                borderRadius: 9,
-                border: "none",
-                background: !showMobileLogin
-                  ? "var(--color-primary)"
-                  : "transparent",
-                color: !showMobileLogin
-                  ? "#ffffff"
-                  : "var(--color-text-secondary)",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onClick={() => {
-                setShowMobileLogin(false);
-                setTelegramAuthError("");
+                display: "flex",
+                width: "100%",
+                background: "var(--color-bg-elevated)",
+                padding: 5,
+                borderRadius: 12,
+                border: "1px solid var(--color-border)",
+                marginBottom: 20,
               }}
             >
-              Telegram Login
-            </button>
+            {!telegramUnavailable && (
+              <button
+                type="button"
+                style={{
+                  flex: 1,
+                  padding: "12px 14px",
+                  borderRadius: 9,
+                  border: "none",
+                  background: !showMobileLogin
+                    ? "var(--color-primary)"
+                    : "transparent",
+                  color: !showMobileLogin
+                    ? "#ffffff"
+                    : "var(--color-text-secondary)",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onClick={() => {
+                  setShowMobileLogin(false);
+                  setTelegramAuthError("");
+                }}
+              >
+                Telegram Login
+              </button>
+            )}
             <button
               type="button"
               style={{
@@ -1024,10 +1220,10 @@ export function App() {
                 padding: "12px 14px",
                 borderRadius: 9,
                 border: "none",
-                background: showMobileLogin
+                background: showMobileLogin || telegramUnavailable
                   ? "var(--color-primary)"
                   : "transparent",
-                color: showMobileLogin
+                color: showMobileLogin || telegramUnavailable
                   ? "#ffffff"
                   : "var(--color-text-secondary)",
                 fontWeight: 700,
@@ -1040,9 +1236,13 @@ export function App() {
                 setTelegramAuthError("");
               }}
             >
-              Mobile Phone
+              {/* The fallback takes an address or a number, for signing in
+                  and for signing up, so the label says both. "Mobile Phone"
+                  was true when the field took a number only. */}
+              Phone or Email
             </button>
-          </div>
+            </div>
+          )}
           {telegram.unsafeUser && !showMobileLogin && (
             <div
               style={{
@@ -1090,6 +1290,29 @@ export function App() {
               </p>
             </div>
           )}
+          {telegramUnavailable && (
+            <div
+              style={{
+                width: "100%",
+                padding: "12px",
+                background: "rgba(245, 158, 11, 0.12)",
+                border: "1px solid #f59e0b",
+                borderRadius: "10px",
+                color: "var(--color-text)",
+                fontSize: "0.82rem",
+                marginBottom: "16px",
+                textAlign: "left",
+              }}
+            >
+              <strong>Telegram sign-in is unavailable</strong>
+              <p style={{ margin: "4px 0 0 0", lineHeight: 1.4 }}>
+                This server cannot verify a Telegram account yet, so signing
+                in with Telegram will not work. Use your phone number or
+                email address and your password below — it works now, and your
+                account is the same one you get everywhere else on Yekis.
+              </p>
+            </div>
+          )}
           {telegramAuthError && (
             <div
               style={{
@@ -1120,7 +1343,20 @@ export function App() {
               )}
             </div>
           )}
-          {!showMobileLogin ? (
+          {miniSignupEmail ? (
+            <OnboardingVerification
+              channel="email"
+              target={miniSignupEmail}
+              onVerified={() => {
+                void completeEmailSignup();
+              }}
+              onBack={() => {
+                setMiniSignupEmail(null);
+                setTelegramAuthStatus("idle");
+                setTelegramAuthError("");
+              }}
+            />
+          ) : !showMobileLogin ? (
             <div
               className="role-options"
               style={{
@@ -1213,9 +1449,11 @@ export function App() {
                 <strong
                   style={{ fontSize: "1rem", color: "var(--color-text)" }}
                 >
+                  {/* Both modes take an address or a number. "Mobile" was
+                      true when the field took a number only. */}
                   {mobileAuthMode === "signin"
-                    ? "Sign In with Mobile"
-                    : "Create Mobile Account"}
+                    ? "Sign In with Phone or Email"
+                    : "Create an Account"}
                 </strong>
                 <button
                   type="button"
@@ -1262,12 +1500,14 @@ export function App() {
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  Ethiopian Phone Number
+                  Ethiopian Phone Number or Email
                   <input
-                    type="tel"
+                    type="text"
+                    inputMode="text"
+                    autoComplete="username"
                     value={mobilePhone}
                     onChange={(e) => setMobilePhone(e.target.value)}
-                    placeholder="0911223344 or +251..."
+                    placeholder="0911223344 or you@example.com"
                     style={{
                       padding: "10px",
                       borderRadius: "8px",
@@ -1772,14 +2012,24 @@ export function App() {
                   />
                 </label>
 
-                <label>
-                  Receipt File (Image or PDF)
-                  <input
-                    type="file"
+                <div className="flex flex-col gap-1.5">
+                  <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                    Receipt File (Image or PDF)
+                  </span>
+                  <FileUploader
+                    compact
+                    showCard={false}
+                    showHeader={false}
+                    maxFiles={1}
                     accept="image/*,.pdf"
-                    onChange={(e) => setAttachReceiptFile(e.target.files?.[0] || null)}
+                    acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                    maxSizeMB={10}
+                    value={attachReceiptFile}
+                    onFileSelect={(file) => setAttachReceiptFile(file)}
+                    showFooter={false}
+                    showEncryptionBadge={true}
                   />
-                </label>
+                </div>
 
                 <div style={{ display: "flex", gap: 10, marginTop: 6 }}>
                   <button
@@ -1897,41 +2147,28 @@ export function App() {
                 </label>
               </div>
 
-              <div className="proposal-attachments form-wide">
-                <label className="file-upload-btn">
-                  <Paperclip size={16} /> Attach Files
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                    onChange={(e) => {
-                      if (e.target.files?.length) {
-                        setProposalModal(prev => ({
-                          ...prev,
-                          attachments: [...prev.attachments, ...Array.from(e.target.files!)]
-                        }));
-                      }
-                    }}
-                  />
-                </label>
-                {proposalModal.attachments.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    {proposalModal.attachments.map((file, idx) => (
-                      <span key={idx} className="attachment-chip">
-                        {file.name}
-                        <button
-                          type="button"
-                          onClick={() => setProposalModal(prev => ({
-                            ...prev,
-                            attachments: prev.attachments.filter((_, i) => i !== idx)
-                          }))}
-                        >
-                          <X size={14} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div className="proposal-attachments form-wide" style={{ marginTop: 8 }}>
+                <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
+                  Attach Files
+                </span>
+                <FileUploader
+                  compact
+                  showCard={false}
+                  showHeader={false}
+                  maxFiles={6}
+                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  acceptedLabel="PDF, DOCX, PNG, JPG · up to 25 MB each"
+                  maxSizeMB={25}
+                  value={proposalModal.attachments}
+                  onFilesChange={(files) =>
+                    setProposalModal((prev) => ({
+                      ...prev,
+                      attachments: files,
+                    }))
+                  }
+                  showFooter={false}
+                  showEncryptionBadge={true}
+                />
               </div>
 
               <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
@@ -2604,16 +2841,24 @@ export function App() {
                               placeholder="e.g. TB-12345"
                             />
                           </label>
-                          <label>
-                            Receipt image
-                            <input
-                              type="file"
+                          <div className="flex flex-col gap-1.5">
+                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                              Receipt image
+                            </span>
+                            <FileUploader
+                              compact
+                              showCard={false}
+                              showHeader={false}
+                              maxFiles={1}
                               accept="image/*,.pdf"
-                              onChange={(event) =>
-                                setTopUpReceipt(event.target.files?.[0] ?? null)
-                              }
+                              acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                              maxSizeMB={10}
+                              value={topUpReceipt}
+                              onFileSelect={(file) => setTopUpReceipt(file)}
+                              showFooter={false}
+                              showEncryptionBadge={true}
                             />
-                          </label>
+                          </div>
                           <button
                             className="btn-primary"
                             style={{ marginTop: 16 }}
@@ -2796,28 +3041,42 @@ export function App() {
                           placeholder="Enter your Fayda ID number"
                         />
                       </label>
-                      <label>
-                        Fayda ID photo
-                        <input
-                          type="file"
+                      <div className="flex flex-col gap-1.5">
+                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                          Fayda ID photo
+                        </span>
+                        <FileUploader
+                          compact
+                          showCard={false}
+                          showHeader={false}
+                          maxFiles={1}
                           accept="image/*"
-                          onChange={(event) =>
-                            setFaydaIdPhoto(event.target.files?.[0] ?? null)
-                          }
+                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                          maxSizeMB={10}
+                          value={faydaIdPhoto}
+                          onFileSelect={(file) => setFaydaIdPhoto(file)}
+                          showFooter={false}
+                          showEncryptionBadge={true}
                         />
-                      </label>
-                      <label>
-                        Selfie holding Fayda ID
-                        <input
-                          type="file"
+                      </div>
+                      <div className="flex flex-col gap-1.5" style={{ marginTop: 8 }}>
+                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
+                          Selfie holding Fayda ID
+                        </span>
+                        <FileUploader
+                          compact
+                          showCard={false}
+                          showHeader={false}
+                          maxFiles={1}
                           accept="image/*"
-                          onChange={(event) =>
-                            setSelfieWithIdPhoto(
-                              event.target.files?.[0] ?? null,
-                            )
-                          }
+                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                          maxSizeMB={10}
+                          value={selfieWithIdPhoto}
+                          onFileSelect={(file) => setSelfieWithIdPhoto(file)}
+                          showFooter={false}
+                          showEncryptionBadge={true}
                         />
-                      </label>
+                      </div>
                       <button
                         className="btn-primary"
                         style={{ marginTop: 16 }}

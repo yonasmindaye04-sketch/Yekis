@@ -1,0 +1,1457 @@
+/* ==========================================================================
+   Yekis Afro-Tech Gigs Section Design System
+   Sleek Ethiopian FinTech & Digital Services Marketplace
+   ========================================================================== */
+
+/* Main Container */
+.afro-gigs-section {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+}
+
+/* ==========================================================================
+   HERO / COMMAND BANNER
+   ========================================================================== */
+
+.afro-hero-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 32px 36px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .afro-hero-card {
+  background: linear-gradient(135deg, #10171d 0%, #152028 100%);
+  border-color: #26343d;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+:root[data-theme="light"] .afro-hero-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f4f6f8 100%);
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.afro-hero-bg-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 100%;
+  opacity: 0.08;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: right center;
+  background-size: contain;
+}
+
+.afro-eyebrow-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.afro-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.afro-eyebrow {
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.afro-headline {
+  margin: 0;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: clamp(1.6rem, 2.8vw, 2.4rem);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: var(--color-text);
+}
+
+.afro-subtitle {
+  margin: 0;
+  max-width: 780px;
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+/* Trust & Assurance Strip */
+.afro-trust-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.afro-trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.afro-trust-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.afro-trust-content {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.afro-trust-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.afro-trust-desc {
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+/* ==========================================================================
+   CATEGORY HEADER & BREADCRUMB NAVIGATION (SHADCN / WATERMELON UI)
+   ========================================================================== */
+
+.afro-category-header-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--sh-radius, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+:root[data-theme="dark"] .afro-category-header-shell {
+  background: #111a22;
+  border-color: #263540;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+:root[data-theme="light"] .afro-category-header-shell {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+/* Tier 1: Header / Breadcrumb Top Row */
+.afro-cat-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--color-border);
+  min-height: 48px;
+  box-sizing: border-box;
+  flex-wrap: wrap;
+}
+
+:root[data-theme="dark"] .afro-cat-header-top {
+  border-bottom-color: #263540;
+}
+
+:root[data-theme="light"] .afro-cat-header-top {
+  border-bottom-color: #e2e8f0;
+}
+
+.afro-cat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.afro-cat-back-crumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.afro-cat-back-crumb:hover {
+  color: var(--color-text);
+  border-color: var(--color-primary);
+  background: var(--color-bg-subtle);
+}
+
+.afro-breadcrumb-list {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.afro-breadcrumb-link {
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  cursor: pointer;
+}
+
+.afro-breadcrumb-link:hover {
+  color: var(--color-text);
+}
+
+.afro-breadcrumb-dropdown-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.afro-breadcrumb-dropdown-trigger:hover {
+  background: var(--color-bg-subtle);
+  border-color: var(--color-border);
+}
+
+.afro-breadcrumb-trigger-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.afro-breadcrumb-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
+}
+
+.afro-breadcrumb-active-label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.afro-breadcrumb-chevron {
+  color: var(--color-text-tertiary);
+  margin-left: 2px;
+  transition: transform 0.15s ease;
+}
+
+.afro-cat-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.afro-cat-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+
+.afro-cat-clear-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* Indicators conform to RULE 2: BOLD COLORED TEXT ONLY! No background pills! */
+.afro-cat-count-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+  white-space: nowrap;
+}
+
+/* Tier 2: Category Tabs Horizontal Rail (Watermelon UI / shadcn style) */
+.afro-cat-header-tabs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  background: var(--color-bg-subtle);
+}
+
+:root[data-theme="dark"] .afro-cat-header-tabs-wrap {
+  background: rgba(15, 23, 30, 0.6);
+}
+
+:root[data-theme="light"] .afro-cat-header-tabs-wrap {
+  background: #f8fafc;
+}
+
+.afro-cat-header-tabs-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+.afro-cat-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.afro-cat-tab-btn:hover {
+  color: var(--color-text);
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.afro-cat-tab-btn.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 700;
+}
+
+:root[data-theme="dark"] .afro-cat-tab-btn.active {
+  background: #1a2632;
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+:root[data-theme="light"] .afro-cat-tab-btn.active {
+  background: #ffffff;
+  border-color: var(--color-primary);
+  color: #0f172a;
+}
+
+.afro-cat-tab-btn.active svg {
+  color: var(--color-primary);
+}
+
+.afro-cat-dropdown-menu {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  min-width: 220px;
+  z-index: 60;
+}
+
+.afro-cat-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.84rem;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.afro-cat-dropdown-item:hover {
+  background: var(--color-bg-subtle);
+  color: var(--color-primary);
+}
+
+/* Fallback rail definitions for backwards compatibility */
+.afro-category-rail-wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
+.afro-category-rail-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+
+.afro-category-rail-wrap::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+.afro-category-rail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: max-content;
+}
+
+.afro-cat-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.afro-cat-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+.afro-cat-btn.active {
+  border-color: var(--color-primary);
+  color: var(--color-text);
+}
+
+/* ==========================================================================
+   COMMAND & TOOLBAR
+   ========================================================================== */
+
+.afro-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.afro-search-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 280px;
+}
+
+.afro-search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  max-width: 480px;
+}
+
+.afro-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-text-tertiary);
+  pointer-events: none;
+}
+
+.afro-search-input {
+  width: 100%;
+  height: 42px;
+  padding: 0 36px 0 38px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.88rem;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.afro-search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
+}
+
+.afro-search-clear {
+  position: absolute;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.afro-search-clear:hover {
+  color: var(--color-text);
+}
+
+.afro-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.afro-sort-select {
+  height: 42px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.afro-sort-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.afro-count-pill {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   GIGS CARD GRID
+   ========================================================================== */
+
+.afro-gigs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: 20px;
+  width: 100%;
+}
+
+.afro-gig-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .afro-gig-card {
+  background: #141b21;
+  border-color: #26343d;
+}
+
+:root[data-theme="light"] .afro-gig-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.afro-gig-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--color-primary);
+}
+
+:root[data-theme="dark"] .afro-gig-card:hover {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(34, 197, 94, 0.3);
+}
+
+:root[data-theme="light"] .afro-gig-card:hover {
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(22, 163, 74, 0.3);
+}
+
+/* Card Cover Graphic */
+.afro-card-cover {
+  position: relative;
+  width: 100%;
+  height: 130px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:root[data-theme="dark"] .afro-card-cover {
+  background: linear-gradient(135deg, #18232c 0%, #0d151c 100%);
+}
+
+:root[data-theme="light"] .afro-card-cover {
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+}
+
+.afro-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.afro-card-cover-pattern {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-primary);
+  opacity: 0.14;
+}
+
+.afro-card-meta-bar {
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  z-index: 2;
+}
+
+/* Indicators conform to RULE 2: BOLD COLORED TEXT ONLY! No background pills! */
+.afro-category-tag {
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.afro-delivery-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+/* Card Body */
+.afro-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  flex: 1;
+}
+
+.afro-seller-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.afro-seller-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.afro-seller-name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.afro-seller-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.afro-verified-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.afro-seller-title {
+  font-size: 0.74rem;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.afro-card-title {
+  margin: 0;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+
+.afro-tags-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.afro-tech-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.afro-card-metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
+}
+
+.afro-rating-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.afro-star-icon {
+  color: #eab308;
+  fill: #eab308;
+}
+
+.afro-review-count {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* Card Bottom Rail */
+.afro-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.afro-price-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.afro-price-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-tertiary);
+}
+
+.afro-price-value {
+  font-family: "Space Grotesk", var(--font-mono), monospace;
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
+.afro-card-cta-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.afro-gig-card:hover .afro-card-cta-link {
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   DETAIL & ESCROW CHECKOUT VIEW
+   ========================================================================== */
+
+.afro-detail-header-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.afro-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.afro-back-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.afro-breadcrumb-text {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}
+
+.afro-breadcrumb-current {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* Two-column layout for gig details */
+.afro-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 28px;
+  align-items: start;
+}
+
+/* Left Column */
+.afro-detail-main {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.afro-detail-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.afro-detail-title {
+  margin: 0;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: clamp(1.5rem, 2.4vw, 2.1rem);
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+
+.afro-detail-meta-line {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
+
+/* Freelancer Spotlight Card */
+.afro-seller-detail-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+:root[data-theme="dark"] .afro-seller-detail-card {
+  background: #141b21;
+}
+
+:root[data-theme="light"] .afro-seller-detail-card {
+  background: #ffffff;
+}
+
+.afro-seller-detail-bio {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 6px 0 0;
+}
+
+.afro-seller-badges {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+/* Media Showcase Banner */
+.afro-detail-showcase {
+  position: relative;
+  width: 100%;
+  height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.afro-detail-showcase-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Description & Content Panels */
+.afro-section-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+:root[data-theme="dark"] .afro-section-panel {
+  background: #141b21;
+}
+
+:root[data-theme="light"] .afro-section-panel {
+  background: #ffffff;
+}
+
+.afro-section-heading {
+  margin: 0;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.afro-prose {
+  font-size: 0.94rem;
+  line-height: 1.65;
+  color: var(--color-text-secondary);
+  white-space: pre-line;
+}
+
+/* Requirements list */
+.afro-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.afro-checklist-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--color-text);
+}
+
+.afro-check-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+/* FAQ Accordion */
+.afro-faq-item {
+  border-bottom: 1px solid var(--color-border);
+  padding: 12px 0;
+}
+
+.afro-faq-item:last-child {
+  border-bottom: none;
+}
+
+.afro-faq-q {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 6px;
+}
+
+.afro-faq-a {
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* Escrow Shield Callout */
+.afro-escrow-promise-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-surface);
+}
+
+:root[data-theme="dark"] .afro-escrow-promise-box {
+  background: rgba(34, 197, 94, 0.05);
+}
+
+:root[data-theme="light"] .afro-escrow-promise-box {
+  background: rgba(22, 163, 74, 0.05);
+}
+
+.afro-escrow-promise-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.afro-escrow-promise-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0;
+}
+
+.afro-escrow-promise-text {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ==========================================================================
+   RIGHT COLUMN: PACKAGE CHECKOUT MATRIX
+   ========================================================================== */
+
+.afro-detail-sidebar {
+  position: sticky;
+  top: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.afro-checkout-card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+:root[data-theme="dark"] .afro-checkout-card {
+  background: #141b21;
+  border-color: #26343d;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+}
+
+:root[data-theme="light"] .afro-checkout-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Package Tier Switcher Tabs */
+.afro-package-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.afro-pkg-tab {
+  padding: 12px 8px;
+  border: none;
+  background: transparent;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.afro-pkg-tab:hover {
+  color: var(--color-text);
+}
+
+.afro-pkg-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+:root[data-theme="dark"] .afro-pkg-tab.active {
+  background: #141b21;
+}
+
+:root[data-theme="light"] .afro-pkg-tab.active {
+  background: #ffffff;
+}
+
+/* Package Body */
+.afro-pkg-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 22px;
+}
+
+.afro-pkg-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.afro-pkg-tier-name {
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.afro-pkg-price-major {
+  font-family: "Space Grotesk", var(--font-mono), monospace;
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-primary);
+}
+
+.afro-pkg-title {
+  font-size: 0.94rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.afro-pkg-description {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.afro-pkg-specs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.afro-spec-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.afro-spec-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* Order Button */
+.afro-order-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 8px;
+  border: none;
+  font-family: "Space Grotesk", var(--font-heading), sans-serif;
+  font-size: 0.94rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--color-primary);
+  color: #ffffff;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.afro-order-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.afro-order-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.afro-order-note {
+  font-size: 0.74rem;
+  text-align: center;
+  line-height: 1.4;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+/* Notice and Alerts */
+.afro-notice-banner {
+  padding: 14px 18px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.afro-notice-success {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-surface);
+}
+
+.afro-notice-error {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: var(--color-surface);
+}
+
+/* Empty State */
+.afro-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  background: var(--color-bg-elevated);
+  gap: 12px;
+}
+
+.afro-empty-icon {
+  color: var(--color-text-tertiary);
+  margin-bottom: 4px;
+}
+
+.afro-empty-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.afro-empty-desc {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  max-width: 420px;
+}
+
+.afro-empty-reset-btn {
+  margin-top: 6px;
+  min-height: 38px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Skeleton Loading */
+.afro-skeleton-card {
+  height: 320px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  animation: afro-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes afro-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+}
+
+/* ==========================================================================
+   RESPONSIVENESS (Rule 4 Compliance)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .afro-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .afro-detail-sidebar {
+    position: static;
+    width: 100%;
+  }
+
+  .afro-hero-card {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .afro-gigs-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .afro-trust-strip {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .afro-hero-card {
+    padding: 20px 18px;
+    gap: 14px;
+  }
+
+  .afro-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .afro-search-group {
+    width: 100%;
+    min-width: 100%;
+  }
+
+  .afro-search-input-wrap {
+    max-width: 100%;
+  }
+
+  .afro-filter-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .afro-sort-select {
+    flex: 1;
+  }
+
+  .afro-detail-showcase {
+    height: 190px;
+  }
+
+  .afro-pkg-specs {
+    grid-template-columns: 1fr;
+  }
+}

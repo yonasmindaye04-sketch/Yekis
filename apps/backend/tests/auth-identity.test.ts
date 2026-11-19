@@ -5,7 +5,9 @@ import {
   registerUser,
   InvalidCredentialsError,
   DuplicateUserError,
+  PhoneInUseError,
   AgeRestrictionError,
+  requestPasswordReset,
   resetPassword,
 } from "../src/modules/auth/auth.service.js";
 import { prisma } from "../src/lib/prisma.js";
@@ -22,6 +24,11 @@ const TEST_EMAILS = [
   `reset.${SUFFIX}@example.com`,
   `malformed.${SUFFIX}@example.com`,
   `federated.${SUFFIX}@example.com`,
+  `holder.${SUFFIX}@example.com`,
+  `newaddress.${SUFFIX}@example.com`,
+  `resetcaps.${SUFFIX}@example.com`,
+  `bothcollide.${SUFFIX}@example.com`,
+  `nonumber.${SUFFIX}@example.com`,
 ];
 
 async function cleanup() {
@@ -172,6 +179,107 @@ describe("Password login", () => {
     const session = await loginUser({
       identifier: TEST_EMAILS[3],
       password: "BrandNewSecret!1",
+    });
+    expect(session.accessToken).toBeTruthy();
+  });
+});
+
+describe("Registration collisions", () => {
+  afterAll(async () => {
+    await cleanup();
+  });
+
+  it("reports a number that is already registered as its own error", async () => {
+    // The number belongs to an account that already exists.
+    const holder = validRegistration({
+      email: TEST_EMAILS[4],
+      phone: `+25109${String((SUFFIX + 4) % 1000000).padStart(6, "0")}`,
+    });
+    await registerUser(holder);
+
+    // A DIFFERENT address on that number cannot become an account. When
+    // both collisions answered the same way, the registration was accepted
+    // on the page and no account existed, so the sign-in that followed
+    // answered 401 and the person was told to sign in with an address that
+    // had no account.
+    const err = await registerUser(
+      validRegistration({
+        email: TEST_EMAILS[5],
+        phone: holder.phone,
+      }),
+    ).catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(PhoneInUseError);
+    // It must NOT be reported as a duplicate account: that answer means
+    // "this address is on file, sign in with it", and this address is not.
+    expect(err).not.toBeInstanceOf(DuplicateUserError);
+  });
+
+  it("keeps a duplicate address a duplicate account even when the number collides too", async () => {
+    const registered = await registerUser(
+      validRegistration({
+        email: TEST_EMAILS[7],
+        phone: `+25109${String((SUFFIX + 7) % 1000000).padStart(6, "0")}`,
+      }),
+    );
+
+    // The same address with capitals, on the SAME number. The address
+    // collision is checked first, so the answer stays "this address is on
+    // file" — which is what the enumeration rule (L-02) protects.
+    await expect(
+      registerUser(
+        validRegistration({
+          email: TEST_EMAILS[7].toUpperCase(),
+          phone: registered.phone,
+        }),
+      ),
+    ).rejects.toThrow(DuplicateUserError);
+  });
+
+  it("finds the account for a password reset when the address was typed with capitals", async () => {
+    const user = await registerUser(
+      validRegistration({
+        email: TEST_EMAILS[6],
+        phone: `+25109${String((SUFFIX + 6) % 1000000).padStart(6, "0")}`,
+      }),
+    );
+
+    // The address as it was typed. The stored form is the canonical one, so
+    // a lookup by the raw string missed the account, no token was created,
+    // and the person was told a reset token was on its way.
+    await requestPasswordReset(TEST_EMAILS[6].toUpperCase());
+
+    const events = await prisma.auditLog.findMany({
+      where: { userId: user.id, eventType: "PASSWORD_RESET_REQUESTED" },
+    });
+    expect(events.length).toBeGreaterThan(0);
+  });
+});
+
+describe("An account with no number", () => {
+  afterAll(async () => {
+    await cleanup();
+  });
+
+  it("is created with the reserved placeholder and can sign in by address", async () => {
+    // An address can create an account on its own. There is no number to be
+    // the payout destination, so the account gets the reserved block — the
+    // `+2510` range no operator is allocated, which is what the federated
+    // sign-ins use too. Writing a made-up `+2519…` would put somebody else's
+    // real subscriber number into the PII store.
+    const input = validRegistration({
+      email: TEST_EMAILS[8],
+      phone: undefined,
+    });
+    const user = await registerUser(input);
+
+    expect(user.phone).toMatch(/^\+2510\d{6}$/);
+    // No number was proven, so it is not marked as verified.
+    expect(user.phoneVerifiedAt).toBeNull();
+
+    const session = await loginUser({
+      identifier: TEST_EMAILS[8],
+      password: input.password,
     });
     expect(session.accessToken).toBeTruthy();
   });

@@ -11,6 +11,11 @@ import { env } from "../../config/env.js";
 import { sendPasswordResetEmail } from "../../lib/email/email.service.js";
 import type { AuthMethod } from "./auth-methods.js";
 import { hasRecentVerifiedCode } from "./phone-verification.service.js";
+import { withPlaceholderPhone } from "./identity.js";
+import {
+  hasRecentVerifiedEmailCode,
+  normalizeEmail,
+} from "./email-verification.service.js";
 
 const accessSecret = new TextEncoder().encode(env.JWT_ACCESS_SECRET);
 const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
@@ -18,6 +23,7 @@ const refreshSecret = new TextEncoder().encode(env.JWT_REFRESH_SECRET);
 // === MAIN FUNCTIONS ===
 export class AgeRestrictionError extends Error {}
 export class DuplicateUserError extends Error {}
+export class PhoneInUseError extends Error {}
 export class InvalidCredentialsError extends Error {}
 export class InvalidTokenError extends Error {}
 
@@ -84,60 +90,141 @@ export async function registerUser(input: RegisterInput) {
   // either way; keeping the timing close removes the remaining oracle.
   const passwordHash = await hashPassword(input.password);
 
-  const existing = await prisma.user.findFirst({
-    where: { OR: [{ email: input.email }, { phone: input.phone }] },
+  // The canonical form of the address: lower-cased and trimmed.
+  //
+  // Every other path that touches `User.email` already uses this form — the
+  // login lookup lower-cases it, the OAuth path lower-cases it, and the email
+  // OTP proof is issued and looked up against it. Storing the address as it
+  // was typed would put the row outside every one of those lookups: an
+  // account registered as `Alice@Example.com` could not sign in, because
+  // login searches for `alice@example.com`.
+  //
+  // That is not hypothetical. The onboarding step proves the address and then
+  // creates the account with the address exactly as the form held it, so a
+  // mixed-case address produced an account that was created, marked
+  // email-verified, and then refused its own password at the sign-in that
+  // immediately followed. Because the account existed by then, every retry
+  // hit the duplicate path and failed the same way — a permanent lockout.
+  //
+  // The address is stored in this form, and the duplicate check matches it
+  // case-insensitively so the same mailbox cannot end up with two accounts.
+  const canonicalEmail = normalizeEmail(input.email);
+
+  // The two collisions are not the same event, and reporting them as one is
+  // what made a registration silently disappear.
+  //
+  // An EMAIL collision is recoverable: the account exists, so the next step
+  // is to sign in with it. The route answers 202 either way, so nothing about
+  // the account is disclosed.
+  //
+  // A PHONE collision with a NEW email is not recoverable at all. The email
+  // has just been proven, but no account can be created for it, so the
+  // address never becomes an account and every retry fails the same way. The
+  // 202 hid that, the sign-in that followed answered 401, and the person was
+  // told to "sign in" with an address that had no account — a dead end with
+  // no way out and nothing to act on.
+  //
+  // So the phone collision is reported as itself. It discloses that a number
+  // is registered to somebody on the platform; it never discloses whether an
+  // EMAIL is registered, which is the guarantee the enumeration rule (L-02)
+  // is about. The address being registered is the person's own input, and
+  // the only way to learn anything from the answer is to already be trying to
+  // register.
+  const emailTaken = await prisma.user.findFirst({
+    where: { email: { equals: canonicalEmail, mode: "insensitive" } },
   });
-  if (existing)
-    throw new DuplicateUserError("Email or phone already registered.");
+  if (emailTaken) {
+    throw new DuplicateUserError("Email already registered.");
+  }
+
+  const phoneTaken = input.phone
+    ? await prisma.user.findFirst({
+        where: { phone: input.phone },
+      })
+    : null;
+  if (phoneTaken) {
+    throw new PhoneInUseError("Phone number already registered.");
+  }
 
   // The OTP was verified while the account did not exist yet, so this is where
   // the proof attaches. Bounded by the code's own lifetime: a number proven
   // weeks ago says nothing about who is registering now.
-  const phoneVerifiedAt = (await hasRecentVerifiedCode(input.phone)) ? new Date() : null;
+  const phoneVerifiedAt =
+    input.phone && (await hasRecentVerifiedCode(input.phone))
+      ? new Date()
+      : null;
 
-  const user = await prisma.$transaction(async (tx) => {
-    const created = await tx.user.create({
-      data: {
-        email: input.email,
-        phone: input.phone,
-        phoneVerifiedAt,
-        passwordHash,
-        // Marks the account as password-owned: a later social sign-in that
-        // merely matches this email must not be merged into it.
-        passwordSetAt: new Date(),
-        role: input.role,
-        languagePreference: input.languagePreference,
-        dateOfBirth: dob,
-        kyc: { create: { tier: "TIER_1", status: "PENDING" } },
-        wallet: { create: { balanceMinor: 0 } },
-        consents: {
-          // Master Design Â§12.2: granular, unbundled consent â€” two purposes
-          // are legally required (no opt-out), three are optional opt-ins
-          // recorded individually with timestamps (PDPP Arts. 8 & 11).
-          create: [
-            {
-              purpose: "kyc_data_processing",
-              granted: input.consents.kycDataProcessing,
-            },
-            {
-              purpose: "financial_data_processing",
-              granted: input.consents.financialDataProcessing,
-            },
-            {
-              purpose: "platform_notifications",
-              granted: input.consents.platformNotifications,
-            },
-            {
-              purpose: "marketing_communications",
-              granted: input.consents.marketingCommunications,
-            },
-            { purpose: "analytics", granted: input.consents.analytics },
-          ],
+  // The same adoption for the email address.
+  //
+  // `email` is the login identifier and the destination of every transactional
+  // mail, so an account whose address was never proven is an account anybody
+  // can register over and then lock the real owner out of. The proof is
+  // attached here rather than demanded at the route, which keeps the
+  // enumeration-safe "202 for new and duplicate alike" contract intact.
+  const emailProven = await hasRecentVerifiedEmailCode(input.email);
+  const emailVerifiedAt = emailProven ? new Date() : null;
+
+  const createWithPhone = (phone: string) =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: canonicalEmail,
+          phone,
+          phoneVerifiedAt,
+          emailVerified: emailProven,
+          emailVerifiedAt,
+          passwordHash,
+          // Marks the account as password-owned: a later social sign-in that
+          // merely matches this email must not be merged into it.
+          passwordSetAt: new Date(),
+          role: input.role,
+          languagePreference: input.languagePreference,
+          dateOfBirth: dob,
+          kyc: { create: { tier: "TIER_1", status: "PENDING" } },
+          wallet: { create: { balanceMinor: 0 } },
+          consents: {
+            // Master Design Â§12.2: granular, unbundled consent â€” two purposes
+            // are legally required (no opt-out), three are optional opt-ins
+            // recorded individually with timestamps (PDPP Arts. 8 & 11).
+            create: [
+              {
+                purpose: "kyc_data_processing",
+                granted: input.consents.kycDataProcessing,
+              },
+              {
+                purpose: "financial_data_processing",
+                granted: input.consents.financialDataProcessing,
+              },
+              {
+                purpose: "platform_notifications",
+                granted: input.consents.platformNotifications,
+              },
+              {
+                purpose: "marketing_communications",
+                granted: input.consents.marketingCommunications,
+              },
+              { purpose: "analytics", granted: input.consents.analytics },
+            ],
+          },
         },
-      },
+      });
+      return created;
     });
-    return created;
-  });
+
+  // An account created from an address alone has no number to be the payout
+  // destination, so it is given the reserved placeholder block — the same
+  // answer the federated sign-ins give (Google, Apple, Facebook, Telegram all
+  // hand out no number). `User.phone` is a non-null unique column, so there
+  // is no way to leave it empty, and the placeholder is not in an
+  // operator-allocated range, so no real subscriber's number is written into
+  // the PII store.
+  //
+  // The placeholder is drawn at random and two accounts can draw the same one,
+  // so the create is retried on a unique-constraint violation — the same
+  // recovery the federated path uses.
+  const user = input.phone
+    ? await createWithPhone(input.phone)
+    : await withPlaceholderPhone((phone) => createWithPhone(phone));
 
   await recordAuditEvent({
     userId: user.id,
@@ -366,7 +453,15 @@ export async function refreshSession(refreshToken: string) {
 }
 
 export async function requestPasswordReset(email: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  // The stored address is the canonical one — lower-cased and trimmed — so a
+  // lookup by the raw string misses an account whose address was typed with
+  // capitals. The person is then told a reset token was sent, nothing is
+  // sent, and the recovery path they were told to use is the one thing that
+  // does not work. The same defect as the mixed-case registration, in the
+  // one place a locked-out person goes looking for a way in.
+  const user = await prisma.user.findFirst({
+    where: { email: { equals: normalizeEmail(email), mode: "insensitive" } },
+  });
   if (!user) {
     // Return early to prevent email enumeration, but simulate success
     return;

@@ -241,6 +241,10 @@
   flex: 0 0 20px;
   color: var(--color-text-secondary);
   transition: color 0.18s ease;
+  /* The activity dot is anchored to the icon, not to the button, so it sits
+     in the same place whether the sidebar is expanded or collapsed into an
+     icon rail. */
+  position: relative;
 }
 
 .platform-shell.sh-shell .sidebar-nav button:hover .nav-icon,
@@ -259,6 +263,41 @@
 .platform-shell.sh-shell .sidebar-nav button.active .nav-icon,
 .platform-shell.sh-shell .sidebar-settings.active .nav-icon {
   color: var(--color-primary-text);
+}
+
+/* ── Sidebar Activity Dot ───────────────────────────────────────────────────
+   A tab lights a dot when something in it has not been looked at yet. The
+   dot hangs off the ICON rather than the button, so it lands in the same
+   place whether the sidebar is expanded or collapsed into an icon rail.
+
+   The geometry lives here, in the un-themed base rule: only the colours come
+   from tokens, so the dark theme cannot diverge in shape (AGENTS.md). The
+   ring matches whatever the dot is sitting on — the page background in the
+   default variant, the primary fill on the active item — so the dot reads as
+   a hole punched through the button rather than a blob stuck on top of it.
+   ─────────────────────────────────────────────────────────────────────────── */
+.platform-shell.sh-shell .platform-mobile-nav button .nav-mobile-icon {
+  position: relative;
+}
+
+.platform-shell.sh-shell .nav-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-error);
+  box-shadow: 0 0 0 2px var(--color-bg);
+  pointer-events: none;
+}
+
+.platform-shell.sh-shell .sidebar-nav button.active .nav-dot {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.platform-shell.sh-shell .platform-mobile-nav button .nav-dot {
+  box-shadow: 0 0 0 2px var(--color-bg-elevated);
 }
 
 .platform-shell.sh-shell .sidebar-settings {
@@ -1319,6 +1358,89 @@
 .platform-shell.sh-shell.sh-collapsed .sidebar-brand-row {
   justify-content: center;
   margin: 0 0 12px;
+}
+
+/* Sidebar toggle button inside the brand row */
+.sidebar-brand-toggle {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sidebar-brand-toggle:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06));
+  border-color: var(--color-border);
+}
+
+/* When sidebar is collapsed on desktop, show only the toggle (centered) */
+.platform-shell.sh-shell.sh-collapsed .sidebar-brand-toggle {
+  margin-inline: auto;
+}
+
+/* Universal back button in the topbar (clean borderless aesthetic) */
+.sh-topbar-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-topbar-back-btn:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06));
+  color: var(--color-text);
+  border-color: transparent;
+}
+
+/* Header icon controls: remove background box and border so icons float cleanly with ghost hover */
+.sh-topbar .sh-icon-only-btn,
+.sh-topbar .sh-topbar-back-btn,
+.sh-topbar .sh-topbar-menu-btn,
+.platform-topbar .sh-icon-only-btn,
+.platform-topbar .theme-toggle,
+.platform-topbar .notification-trigger,
+.platform-topbar .user-menu,
+.topbar-actions .icon-button,
+.topbar-actions .notification-trigger,
+.topbar-actions .user-menu {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+}
+
+.sh-topbar .sh-icon-only-btn:not(:disabled):hover,
+.sh-topbar .sh-topbar-back-btn:hover,
+.sh-topbar .sh-topbar-menu-btn:hover,
+.platform-topbar .sh-icon-only-btn:not(:disabled):hover,
+.platform-topbar .theme-toggle:hover,
+.platform-topbar .notification-trigger:hover,
+.platform-topbar .user-menu:hover,
+.topbar-actions .icon-button:hover,
+.topbar-actions .notification-trigger:hover,
+.topbar-actions .user-menu:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.06)) !important;
+  border-color: transparent !important;
+  color: var(--color-text);
+  transform: none;
 }
 
 .platform-shell.sh-shell.sh-collapsed .sidebar-nav {

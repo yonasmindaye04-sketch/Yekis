@@ -125,7 +125,19 @@ export type Money = z.infer<typeof Money>;
 
 export const RegisterInput = z.object({
   email: z.string().email(),
-  phone: z.string().regex(/^\+251\d{9}$/, "Must be a valid Ethiopian phone number (+251XXXXXXXXX)"),
+  // The number is the payout destination, so an account that will move money
+  // needs one. It is optional because an account can also be created from an
+  // address alone (the Mini App's email sign-up), and such an account is given
+  // the reserved placeholder number the federated sign-ins use — the `+2510`
+  // block no operator is allocated, so no real subscriber's number is written
+  // into the PII store and nothing can collide with a live subscriber.
+  phone: z
+    .string()
+    .regex(
+      /^\+251(?:\d{9}|0\d{6})$/,
+      "Must be a valid Ethiopian phone number (+251XXXXXXXXX)",
+    )
+    .optional(),
   password: z.string().min(10),
   languagePreference: z.enum(["am", "en"]),
   role: UserRole,

@@ -10,13 +10,18 @@ import {
   type WalletResponse,
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
+import {
+  markViewNotificationsRead,
+  useNotifications,
+  useUnreadByView,
+} from "./api/notificationFeed";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
-import { PhoneVerification } from "./PhoneVerification";
+import { OnboardingVerification } from "./OnboardingVerification";
 import {
   ContractsWorkspace,
   DisputesWorkspace,
@@ -29,6 +34,7 @@ import {
   Search,
   FileText,
   FileSignature,
+  FileCheck,
   Wallet,
   MessageCircle,
   ShieldCheck,
@@ -136,6 +142,7 @@ function capabilitiesFor(role: PlatformRole): PlatformCapabilities {
 type View =
   | "overview"
   | "jobs"
+  | "proposals"
   | "gigs"
   | "my-gigs"
   | "contracts"
@@ -177,6 +184,29 @@ export const categoryLabels: Record<string, string> = {
 
 export const categories = Object.keys(categoryLabels);
 
+/**
+ * How long the "Finish your profile" reminder waits before it says anything.
+ *
+ * The banner used to be on screen the moment the workspace loaded, which is
+ * the worst moment for it: the person has just arrived, has not looked at
+ * anything yet, and a bar about their missing photo is the least useful
+ * thing on the page. It now waits until they have actually started moving
+ * around the platform — either because they have been in here for a while,
+ * or because they have opened a second view — and only then says what is
+ * still missing.
+ */
+const PROFILE_NUDGE_DELAY_MS = 45_000;
+
+/**
+ * Where a dismissed reminder is remembered.
+ *
+ * The dismissal used to last for one page load, so the banner came back on
+ * the next visit as if it had never been answered. It is remembered per
+ * account now, and forgotten the moment the profile is complete.
+ */
+const profileNudgeDismissedKey = (userId: string) =>
+  `yekis_profile_nudge_dismissed_${userId}`;
+
 // === MAIN COMPONENT ===
 function roleLabel(role: PlatformRole) {
   /* BOTH previously fell through to "Client", so a dual-role account saw
@@ -196,6 +226,7 @@ const navIconMap: Record<string, React.ReactNode> = {
   overview: <LayoutDashboard size={18} />,
   jobs: <Briefcase size={18} />,
   "find-work": <Search size={18} />,
+  proposals: <FileCheck size={18} />,
   gigs: <Package size={18} />,
   contracts: <FileSignature size={18} />,
   escrow: <FileText size={18} />,
@@ -327,11 +358,26 @@ function FullPlatformAppInner() {
   const [resetToken, setResetToken] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
   /**
-   * Opens the SMS confirmation step. Set when the user submits the register form
-   * with a usable Ethiopian number, and cleared on either outcome so the submit
-   * button is not left permanently disabled.
+   * The onboarding OTP step. `null` means the details form is showing; a
+   * channel means the code-entry step has taken over the panel.
+   *
+   * Email is the default channel because it is the one a hosted environment
+   * can actually deliver: the SMS provider has no key on a test deployment,
+   * and the signup used to dead-end on its first step for exactly that
+   * reason. Which channels are live is decided by the server, not guessed
+   * here — see `GET /auth/verification/channels`.
    */
-  const [showPhoneVerification, setShowPhoneVerification] = useState(false);
+  const [onboardingChannel, setOnboardingChannel] = useState<
+    "email" | "phone" | null
+  >(null);
+  /**
+   * The channel capabilities, fetched once. Kept in state so switching to the
+   * code-entry step and back does not re-ask the server.
+   */
+  const [verificationChannels, setVerificationChannels] = useState<{
+    email: { available: boolean; label: string };
+    phone: { available: boolean; label: string };
+  } | null>(null);
   /**
    * Profile-completeness signal. `null` means "not known yet", which is
    * deliberately different from 0 so the completion nudge can wait instead of
@@ -341,6 +387,22 @@ function FullPlatformAppInner() {
     null,
   );
   const [profileNudgeDismissed, setProfileNudgeDismissed] = useState(false);
+  /**
+   * Whether the reminder is allowed to speak yet.
+   *
+   * It is not allowed to speak the moment the workspace loads — it waits
+   * until the person has been here a while or has opened a second view (see
+   * `PROFILE_NUDGE_DELAY_MS`). A new account is taken to the profile
+   * section directly instead, so it never has to be told at all.
+   */
+  const [profileNudgeArmed, setProfileNudgeArmed] = useState(false);
+  /**
+   * The views this session has opened.
+   *
+   * Two or more means the person has started moving around the platform,
+   * which is what arms the reminder.
+   */
+  const visitedViewsRef = useRef<Set<View>>(new Set());
   const [avatarVersion, setAvatarVersion] = useState(0);
 
   useEffect(() => {
@@ -363,7 +425,27 @@ function FullPlatformAppInner() {
   const [jobError, setJobError] = useState("");
   const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
+  /**
+   * Whose profile the workspace is showing.
+   *
+   * `null` is my own profile. Anything else is somebody else's, and the
+   * shell has to know which: the breadcrumb must not say "My Profile" over
+   * another person's page, and "Edit Profile" must not be offered on a page
+   * that is not mine — clicking it would open the editor for *my* profile
+   * while the screen showed theirs.
+   */
   const [viewUserId, setViewUserId] = useState<string | null>(null);
+  /**
+   * The name of the profile on screen, once it has loaded.
+   *
+   * It arrives from the profile itself (`ProfilePage` reports what it
+   * fetched), so it is right for every path that can open a profile — the
+   * featured carousel, the gig seller, a chat partner — and not only for the
+   * ones that happen to know the name already.
+   */
+  const [viewedProfileName, setViewedProfileName] = useState<string | null>(
+    null,
+  );
   const [focusContractId, setFocusContractId] = useState<string | null>(null);
   const [focusChatConversationId, setFocusChatConversationId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
@@ -414,6 +496,56 @@ function FullPlatformAppInner() {
       setDualRoleMode(mode);
     }
   };
+
+  /**
+   * Opens MY profile.
+   *
+   * Every entry point that means "my profile" goes through here: the
+   * sidebar item, the avatar in the topbar, the chip at the foot of the
+   * sidebar, the command palette and the end of a registration. They used
+   * to call `setView("profile")` directly, which kept whatever profile was
+   * last opened — so clicking "My Profile" after looking at somebody else
+   * showed that person again, and the workspace was left counting somebody
+   * else's page as yours.
+   */
+  const openMyProfile = () => {
+    setViewUserId(null);
+    setViewedProfileName(null);
+    setView("profile");
+  };
+
+  /**
+   * Opens somebody else's profile.
+   *
+   * The name is not known here — it arrives from the profile itself once it
+   * has loaded — so it is cleared here and set again by `ProfilePage`.
+   */
+  const openProfileOf = (userId: string) => {
+    setViewUserId(userId);
+    setViewedProfileName(null);
+    setView("profile");
+  };
+
+  /**
+   * The workspace's own navigation.
+   *
+   * "profile" always means MY profile, whoever was last opened.
+   */
+  const navigateToView = (next: View) => {
+    if (next === "profile") {
+      openMyProfile();
+      return;
+    }
+    setView(next);
+  };
+
+  /**
+   * True when the profile on screen is the signed-in person's own.
+   *
+   * It is the shell's own answer, not the profile's: the shell knows which
+   * id it asked for, and the profile can be private, missing or slow.
+   */
+  const viewingOwnProfile = !viewUserId || viewUserId === user?.id;
 
 
   useEffect(() => {
@@ -562,6 +694,63 @@ const loadWorkspace = async () => {
     loadWorkspaceRef.current = loadWorkspace;
   });
 
+  /**
+   * The account in the workspace, by id.
+   *
+   * The effects below key on this rather than on the whole `user` object,
+   * because `loadWorkspace` replaces that object every 60 seconds — keying
+   * on it would restart the waiting timer on every poll.
+   */
+  const currentUserId = user?.id;
+
+  /**
+   * When the profile reminder may speak.
+   *
+   * Two ways to earn it, and both mean the same thing: the person is
+   * actually using the platform. Either they have been in here for a while
+   * (`PROFILE_NUDGE_DELAY_MS`), or they have opened three or more views —
+   * they are moving around, and now is the moment to tell them what is still
+   * missing.
+   *
+   * Three, not two: a new account lands on the profile section by itself, so
+   * two views is what every new account sees before it has done anything.
+   * That is the checklist's job, not the banner's.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    visitedViewsRef.current.add(view);
+    if (visitedViewsRef.current.size >= 3) setProfileNudgeArmed(true);
+  }, [currentUserId, view]);
+
+  useEffect(() => {
+    if (!currentUserId || profileNudgeArmed) return;
+    const timer = window.setTimeout(() => {
+      setProfileNudgeArmed(true);
+    }, PROFILE_NUDGE_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [currentUserId, profileNudgeArmed]);
+
+  /**
+   * A dismissed reminder stays dismissed — for this account, across page
+   * loads — until the profile is complete. It used to last for a single page
+   * load, so the banner came back on the next visit as if it had never been
+   * answered.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    setProfileNudgeDismissed(
+      window.localStorage.getItem(profileNudgeDismissedKey(currentUserId)) ===
+        "1",
+    );
+  }, [currentUserId]);
+
+  const dismissProfileNudge = () => {
+    setProfileNudgeDismissed(true);
+    if (currentUserId) {
+      window.localStorage.setItem(profileNudgeDismissedKey(currentUserId), "1");
+    }
+  };
+
   // Near-real-time overview: instant reload on notify:* socket events (the
   // same events the NotificationCenter already listens to) plus a light 60s
   // poll that pauses while the tab is hidden. No new backend endpoints.
@@ -607,6 +796,110 @@ const loadWorkspace = async () => {
     }
   };
 
+  /**
+   * Which verification channel can actually deliver a code right now.
+   *
+   * The server decides, from its own configuration: a host with no SMTP key
+   * cannot send an email and a host with no SMS key cannot send a text. Asking
+   * the server is the difference between a signup that works and a signup
+   * that offers a code which never arrives.
+   *
+   * Email is preferred. `User.email` is the login identifier and the
+   * destination of every transactional mail, so proving the address is a
+   * takeover-prevention control in its own right — and it is the channel a
+   * test deployment can actually deliver.
+   *
+   * The answer is cached: the capabilities of a running server do not change
+   * between two clicks of the same form.
+   *
+   * A failed lookup falls back to email rather than to "no channel". The
+   * lookup is a hint, not a gate: if it cannot be answered, the code request
+   * itself is the thing that knows whether a code can be delivered, and its
+   * answer is the real one. Falling back to "no channel" here would register
+   * an unproven address silently; falling back to email sends the user to
+   * the step that tells the truth.
+   */
+  const resolveVerificationChannel = async (): Promise<
+    "email" | "phone" | null
+  > => {
+    let channels = verificationChannels;
+    if (!channels) {
+      try {
+        channels = await api.getVerificationChannels();
+        setVerificationChannels(channels);
+      } catch {
+        if (email.trim()) return "email";
+        return null;
+      }
+    }
+    if (channels.email.available && email.trim()) return "email";
+    if (
+      channels.phone.available &&
+      /^\+?251[1-9]\d{8}$/.test(phone.replace(/\s/g, ""))
+    ) {
+      return "phone";
+    }
+    return null;
+  };
+
+  /**
+   * Creates the account and signs the user in.
+   *
+   * Split out of `submitAuth` because the account is now created AFTER the
+   * onboarding code is proven. The code has to be verified while the account
+   * does not exist yet — that is what lets registration attach the proof to
+   * the new row.
+   */
+  const completeRegistration = async () => {
+    await api.register({
+      email,
+      phone,
+      password,
+      role,
+      dateOfBirth,
+      languagePreference: language || "en",
+      consents: {
+        kycDataProcessing: true,
+        financialDataProcessing: true,
+        platformNotifications: consentNotifications,
+        marketingCommunications: consentMarketing,
+        analytics: consentAnalytics,
+      },
+    });
+    const session = await api.login(email, password);
+    api.setSession(session);
+    // Analytics: mark the auth visit completed before the user state flips
+    // (the abandonment effect's cleanup reads this flag on logout/exit).
+    if (authVisitRef.current) authVisitRef.current.completed = true;
+    events.signupCompleted(
+      role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
+    );
+    setProfileNudgeDismissed(false);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("yekis_new_user_nudge_me", "1");
+      // The account is new, so a dismissal from a previous life on this
+      // device must not silence the reminder that is about to be shown.
+      window.localStorage.removeItem(
+        profileNudgeDismissedKey(session.user.id),
+      );
+    }
+    await loadWorkspace();
+
+    // Take a new account straight to the profile section, with the checklist
+    // open.
+    //
+    // The platform is going to keep asking for a photo, a name and a bio
+    // until they are there, so it asks now — while the account is brand new
+    // and the person has not done anything else yet. The reminder banner
+    // waits until they have started moving around; this does not, because
+    // this is the moment it is relevant.
+    openMyProfile();
+    hashNavigate("/profile", {
+      replace: true,
+      state: { ...hashLocation.state, showProfileCompletion: true },
+    });
+  };
+
   const submitAuth = async (event: FormEvent) => {
     event.preventDefault();
     setError("");
@@ -633,49 +926,29 @@ const loadWorkspace = async () => {
         setPassword("");
         return;
       }
-if (authMode === "register") {
-      // Confirm the number before the account exists, which is why the backend
-      // endpoints are unauthenticated. A number we have not verified is the
-      // payout destination, so this is a money-safety step, not a nicety.
-      // Skip for now is always available: a hard gate with no escape hatch is a
-      // support queue rather than a security control.
-      if (/\+?251[1-9]\d{8}/.test(phone.replace(/\s/g, ""))) {
-        setShowPhoneVerification(true);
-        setError("");
+      if (authMode === "register") {
+        // The onboarding step. The code is proven BEFORE the account exists,
+        // which is why the backend endpoints are unauthenticated, and the
+        // proof is attached to the new row at registration.
+        //
+        // A hard gate with no escape hatch is a support queue rather than a
+        // security control, so the step keeps a way through — and when no
+        // channel can deliver at all, registration proceeds without it.
+        const channel = await resolveVerificationChannel();
+        if (channel) {
+          setOnboardingChannel(channel);
+          setError("");
+          return;
+        }
+        await completeRegistration();
         return;
-      }
-      await api.register({
-          email,
-          phone,
-          password,
-          role,
-          dateOfBirth,
-          languagePreference: language || "en",
-          consents: {
-            kycDataProcessing: true,
-            financialDataProcessing: true,
-            platformNotifications: consentNotifications,
-            marketingCommunications: consentMarketing,
-            analytics: consentAnalytics,
-          },
-        });
       }
       const session = await api.login(email, password);
       api.setSession(session);
       // Analytics: mark the auth visit completed before the user state flips
       // (the abandonment effect's cleanup reads this flag on logout/exit).
       if (authVisitRef.current) authVisitRef.current.completed = true;
-      if (authMode === "register") {
-        events.signupCompleted(
-          role === "CLIENT" ? "client" : role === "BOTH" ? "both" : "freelancer",
-        );
-        setProfileNudgeDismissed(false);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem("yekis_new_user_nudge_me", "1");
-        }
-      } else {
-        events.login("email");
-      }
+      events.login("email");
       await loadWorkspace();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unable to continue";
@@ -683,7 +956,7 @@ if (authMode === "register") {
         message === "DUPLICATE_USER"
           ? "This email or phone already has an account. Switch to Sign in."
           : wasRegistering && message === "INVALID_CREDENTIALS"
-            ? "We could not sign you in with those details. If you already have an account, use Sign in instead."
+            ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
             : message,
       );
     } finally {
@@ -698,6 +971,10 @@ if (authMode === "register") {
     setResetToken("");
     setDualRoleMode("BOTH");
     setView("overview");
+    // The next person to sign in on this device must not land on the
+    // profile the last one was looking at.
+    setViewUserId(null);
+    setViewedProfileName(null);
     setShowLanding(true);
   };
 
@@ -774,6 +1051,23 @@ if (authMode === "register") {
       ? activeAvatarOverride.avatarUrl
       : user?.avatarUrl ?? null;
 
+  /**
+   * A finished profile ends the reminder for good.
+   *
+   * The dismissal is remembered, so it has to be forgotten when the reason
+   * for the reminder disappears — otherwise an account that later filled its
+   * profile in would still be carrying "do not remind me" forever.
+   */
+  useEffect(() => {
+    if (!currentUserId) return;
+    const complete =
+      Boolean(effectiveUserAvatarUrl) &&
+      profileCompleteness !== null &&
+      profileCompleteness >= 85;
+    if (!complete) return;
+    window.localStorage.removeItem(profileNudgeDismissedKey(currentUserId));
+  }, [currentUserId, effectiveUserAvatarUrl, profileCompleteness]);
+
   const { canHire, canWork, isStaff } = capabilitiesFor(platformRole);
   /* Staff are redirected into OpsConsole before render, so narrowing here is
      safe and keeps every workspace prop free of impossible ADMIN values. */
@@ -781,12 +1075,105 @@ if (authMode === "register") {
     ? "CLIENT"
     : (platformRole as MarketplaceRole);
 
+  /* ── Sidebar activity dots ───────────────────────────────────────────────
+     A tab lights a dot when something in it has not been looked at yet.
+     Two signals feed it:
+
+     1. Unread notifications routed to that view. The bell and the dots read
+        one shared feed (api/notificationFeed.ts), so the badge on the bell
+        and the dot on the tab can never disagree about what is unread.
+     2. New briefs on the Jobs tab. The backend has no "a brief was
+        published" notification type, so a per-user watermark of the newest
+        brief the person has already seen stands in for one.
+
+     Opening a view IS looking at it: its notifications are marked read and
+     its watermark moves forward. So the dot always means "not looked at yet",
+     never "something happened at some point". */
+  const notifications = useNotifications(Boolean(user));
+  const unreadByView = useUnreadByView(Boolean(user));
+
+  /**
+   * The newest brief this person has already been shown.
+   *
+   * The backend has no notification type for "a new brief was published", so
+   * the Jobs tab tracks it on the client: a per-user timestamp of the newest
+   * brief that was on screen when the person last looked. Anything published
+   * after that is a brief they have not seen.
+   */
+  const jobsSeenKey = user?.id ? `yekis:jobs-seen-at:${user.id}` : null;
+  const [jobsSeenAt, setJobsSeenAt] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!jobsSeenKey) {
+      setJobsSeenAt(null);
+      return;
+    }
+    const raw = window.localStorage.getItem(jobsSeenKey);
+    const parsed = raw === null ? Number.NaN : Number(raw);
+    setJobsSeenAt(Number.isFinite(parsed) ? parsed : null);
+  }, [jobsSeenKey]);
+
+  /** The publication time of the newest brief on the board. */
+  const newestBriefAt = useMemo(() => {
+    let newest = 0;
+    for (const job of jobs) {
+      const ts = job.createdAt ? Date.parse(job.createdAt) : Number.NaN;
+      if (Number.isFinite(ts) && ts > newest) newest = ts;
+    }
+    return newest;
+  }, [jobs]);
+
+  useEffect(() => {
+    if (!jobsSeenKey || !canWork) return;
+    // On the Jobs tab the briefs are on screen, so the watermark moves up to
+    // the newest one. Anywhere else a missing watermark is seeded once with
+    // the newest brief, so the briefs that were already published do not
+    // light the tab up on the first visit.
+    if (view !== "jobs" && jobsSeenAt !== null) return;
+    const next = newestBriefAt || Date.now();
+    window.localStorage.setItem(jobsSeenKey, String(next));
+    setJobsSeenAt(next);
+  }, [canWork, jobsSeenAt, jobsSeenKey, newestBriefAt, view]);
+
+  /**
+   * How many briefs are newer than the watermark — the Jobs tab's dot.
+   *
+   * Only for people who work. A hiring-only account does not browse the
+   * board for opportunities, so a brief appearing there is not news to them,
+   * and their own briefs are excluded from the count as well.
+   */
+  const newBriefsCount = useMemo(() => {
+    if (!canWork || jobsSeenAt === null || view === "jobs") return 0;
+    let count = 0;
+    for (const job of jobs) {
+      if (job.clientId && job.clientId === user?.id) continue;
+      const ts = job.createdAt ? Date.parse(job.createdAt) : Number.NaN;
+      if (Number.isFinite(ts) && ts > jobsSeenAt) count += 1;
+    }
+    return count;
+  }, [canWork, jobs, jobsSeenAt, user?.id, view]);
+
+  /** How much unlooked-at activity a sidebar tab is holding. */
+  const navActivityCount = (tabView: string): number =>
+    tabView === "jobs" ? newBriefsCount : (unreadByView[tabView] ?? 0);
+
+  // Opening a view IS looking at it: its notifications are marked read, so
+  // the dot means "not looked at yet" rather than "something happened once".
+  useEffect(() => {
+    if (!user) return;
+    void markViewNotificationsRead(view, notifications);
+  }, [notifications, user, view]);
+
   const navItems = useMemo(() => {
     const jobsLabel = canWork ? (canHire ? `${t.nav.findWork} / ${t.nav.postJob}` : t.nav.findWork) : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const common = [
       { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
       { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
+      // Proposals are their own tab, not a sub-tab of Jobs: the bids a
+      // freelancer sends and the bids a client receives both live here, and
+      // that is where a proposal notification points.
+      { view: "proposals" as View, iconKey: "proposals", label: t.nav.proposals },
       { view: "gigs" as View, iconKey: "gigs", label: t.workspace.nav.gigs },
       { view: "contracts" as View, iconKey: "contracts", label: t.nav.contracts },
       { view: "escrow" as View, iconKey: "escrow", label: t.nav.escrow },
@@ -855,6 +1242,7 @@ if (authMode === "register") {
         <MarketingHeader
           onNavigate={handleNavigate}
           onStart={handleStart}
+          currentPage={marketingPage}
         />
         <ScrollEffects />
         {marketingPage === "home" && (
@@ -1000,6 +1388,56 @@ if (authMode === "register") {
           </div>
           <AuthVisualAnimation />
         </div>
+        {onboardingChannel ? (
+          <div className="auth-panel">
+            <div className="auth-panel-header">
+              <div>
+                <p className="eyebrow">{t.workspace.onboarding.stepsLabel}</p>
+                <h2>{t.workspace.auth.createTitle}</h2>
+              </div>
+            </div>
+            <OnboardingVerification
+              channel={onboardingChannel}
+              target={onboardingChannel === "email" ? email : phone}
+              onVerified={() => {
+                // The account is created only after the code is proven, so the
+                // proof can be attached to the new row.
+                setIsLoading(true);
+                setError("");
+                void completeRegistration()
+                  .catch((err) => {
+                    const message =
+                      err instanceof Error ? err.message : "Unable to continue";
+                    setError(
+                      message === "INVALID_CREDENTIALS"
+                        ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
+                        : message,
+                    );
+                  })
+                  .finally(() => setIsLoading(false));
+              }}
+              onBack={() => {
+                setOnboardingChannel(null);
+                setError("");
+              }}
+              onSkip={() => {
+                // The escape hatch: a hard gate with no way through is a
+                // support queue rather than a security control.
+                setOnboardingChannel(null);
+                setError("");
+                setIsLoading(true);
+                void completeRegistration()
+                  .catch((err) => {
+                    const message =
+                      err instanceof Error ? err.message : "Unable to continue";
+                    setError(message);
+                  })
+                  .finally(() => setIsLoading(false));
+              }}
+            />
+            {error && <div className="form-error">{error}</div>}
+          </div>
+        ) : (
         <form className="auth-panel" onSubmit={submitAuth}>
           <div className="auth-panel-header">
             <div>
@@ -1053,12 +1491,24 @@ if (authMode === "register") {
             authMode === "register" ||
             authMode === "forgot-password") && (
             <label style={{ fontSize: "0.8rem", fontWeight: 600 }}>
-              {t.workspace.auth.emailLabel}
+              {authMode === "login"
+                ? `${t.workspace.auth.emailLabel} / ${t.workspace.auth.phoneLabel}`
+                : t.workspace.auth.emailLabel}
               <input
-                type="email"
+                // The sign-in field takes an address OR a number: the API
+                // accepts either as the identifier, and the backend
+                // normalises a number to +251… before it looks the account
+                // up. `type="email"` refused a number in the browser's own
+                // validation, so the request never left the page.
+                type={authMode === "login" ? "text" : "email"}
+                autoComplete={authMode === "login" ? "username" : "email"}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
+                placeholder={
+                  authMode === "login"
+                    ? "you@example.com or 0911223344"
+                    : "you@example.com"
+                }
                 required
                 style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
               />
@@ -1422,19 +1872,14 @@ if (authMode === "register") {
               {successMessage}
             </div>
           )}
-          {authMode === "register" && showPhoneVerification && (
-            <PhoneVerification
-              phone={phone}
-              onVerified={() => setShowPhoneVerification(false)}
-              onSkip={() => setShowPhoneVerification(false)}
-            />
+          {authMode === "register" && (
+            <p className="auth-verify-hint">
+              {t.workspace.onboarding.verifyHint}
+            </p>
           )}
           <button
             className="btn-primary wide"
-            disabled={
-              isLoading ||
-              (authMode === "register" && (!termsAccepted || showPhoneVerification))
-            }
+            disabled={isLoading || (authMode === "register" && !termsAccepted)}
             style={{ marginTop: "14px", padding: "11px", fontSize: "0.92rem" }}
           >
             {isLoading
@@ -1465,6 +1910,7 @@ if (authMode === "register") {
               setAuthMode(authMode === "login" ? "register" : "login");
               setError("");
               setSuccessMessage("");
+              setOnboardingChannel(null);
             }}
           >
             {authMode === "login"
@@ -1472,6 +1918,7 @@ if (authMode === "register") {
               : t.marketing.auth.alreadyAccount}
           </button>
         </form>
+        )}
 
         {legalModal && (
           <div
@@ -1632,17 +2079,40 @@ if (authMode === "register") {
               <strong className="sidebar-brand-name">Yekis</strong>
             )}
           </button>
-          {isMobileViewport && (
-            <button
-              type="button"
-              className="sh-icon-only-btn"
-              onClick={() => setMobileDrawerOpen(false)}
-              aria-label="Close navigation drawer"
-              title="Close navigation drawer"
-            >
+          {/* Sidebar toggle lives here — collapses on desktop, closes drawer on mobile */}
+          <button
+            type="button"
+            className="sh-icon-only-btn sidebar-brand-toggle"
+            onClick={() =>
+              isMobileViewport
+                ? setMobileDrawerOpen(false)
+                : toggleSidebarCollapsed()
+            }
+            aria-expanded={isMobileViewport ? mobileDrawerOpen : !sidebarCollapsed}
+            aria-controls="workspace-mobile-drawer"
+            title={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+            aria-label={
+              isMobileViewport
+                ? "Close navigation drawer"
+                : sidebarCollapsed
+                  ? "Expand sidebar"
+                  : "Collapse sidebar"
+            }
+          >
+            {isMobileViewport ? (
               <X size={16} />
-            </button>
-          )}
+            ) : sidebarCollapsed ? (
+              <PanelLeftOpen size={16} />
+            ) : (
+              <PanelLeftClose size={16} />
+            )}
+          </button>
         </div>
         {isMobileViewport && basePlatformRole === "BOTH" && (
           <div className="sh-mobile-drawer-role-switch">
@@ -1667,21 +2137,50 @@ if (authMode === "register") {
           </div>
         )}
         <nav className="sidebar-nav">
-          {navItems.map((item) => (
-            <button
-              key={item.view}
-              type="button"
-              className={view === item.view ? "active" : ""}
-              onClick={() => {
-                setView(item.view);
-                setMobileDrawerOpen(false);
-              }}
-              title={item.label}
-            >
-              <span className="nav-icon">{navIconMap[item.iconKey]}</span>
-              <span className="nav-label">{item.label}</span>
-            </button>
-          ))}
+          {navItems.map((item) => {
+            // How much has happened in this tab that the person has not
+            // looked at yet. The count rides in the accessible label; the
+            // dot itself says only "there is something here".
+            const activity = navActivityCount(item.view);
+            const activityLabel =
+              activity > 0
+                ? t.workspace.nav.newActivity.replace("{count}", String(activity))
+                : "";
+            return (
+              <button
+                key={item.view}
+                type="button"
+                className={
+                  view === item.view &&
+                  // "My Profile" is not highlighted while somebody else's
+                  // profile is on screen — it is not my profile.
+                  !(item.view === "profile" && !viewingOwnProfile)
+                    ? "active"
+                    : ""
+                }
+                onClick={() => {
+                  // "My Profile" always means my own profile — not whichever
+                  // person was last opened.
+                  if (item.view === "profile") {
+                    openMyProfile();
+                  } else {
+                    setView(item.view);
+                  }
+                  setMobileDrawerOpen(false);
+                }}
+                title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
+                aria-label={
+                  activityLabel ? `${item.label} — ${activityLabel}` : undefined
+                }
+              >
+                <span className="nav-icon">
+                  {navIconMap[item.iconKey]}
+                  {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
+                </span>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
         <button
           type="button"
@@ -1704,7 +2203,7 @@ if (authMode === "register") {
               type="button"
               className="user-chip-main"
               onClick={() => {
-                setView("profile");
+                openMyProfile();
                 setMobileDrawerOpen(false);
               }}
               title={`${roleLabel(platformRole)} — ${user.email}`}
@@ -1748,38 +2247,29 @@ if (authMode === "register") {
       <main className="platform-main">
         <header className="platform-topbar sh-topbar">
           <div className="sh-topbar-left">
+            {/* Mobile: open drawer. Desktop: hidden (toggle lives in sidebar brand row) */}
+            {isMobileViewport && (
+              <button
+                type="button"
+                className="sh-icon-only-btn sh-topbar-menu-btn"
+                onClick={() => setMobileDrawerOpen((prev) => !prev)}
+                aria-expanded={mobileDrawerOpen}
+                aria-controls="workspace-mobile-drawer"
+                title="Open navigation drawer"
+                aria-label="Open navigation drawer"
+              >
+                <Menu size={17} />
+              </button>
+            )}
+            {/* Universal back button */}
             <button
               type="button"
-              className="sh-icon-only-btn sh-topbar-menu-btn"
-              onClick={() =>
-                isMobileViewport
-                  ? setMobileDrawerOpen((prev) => !prev)
-                  : toggleSidebarCollapsed()
-              }
-              aria-expanded={isMobileViewport ? mobileDrawerOpen : !sidebarCollapsed}
-              aria-controls="workspace-mobile-drawer"
-              title={
-                isMobileViewport
-                  ? "Open navigation drawer"
-                  : sidebarCollapsed
-                    ? "Expand sidebar"
-                    : "Collapse sidebar"
-              }
-              aria-label={
-                isMobileViewport
-                  ? "Open navigation drawer"
-                  : sidebarCollapsed
-                    ? "Expand sidebar"
-                    : "Collapse sidebar"
-              }
+              className="sh-icon-only-btn sh-topbar-back-btn"
+              onClick={() => window.history.back()}
+              title="Go back"
+              aria-label="Go back"
             >
-              {isMobileViewport ? (
-                <Menu size={17} />
-              ) : sidebarCollapsed ? (
-                <PanelLeftOpen size={16} />
-              ) : (
-                <PanelLeftClose size={16} />
-              )}
+              <ArrowLeft size={17} />
             </button>
             <div className="sh-breadcrumb">
               <span className="sh-breadcrumb-muted">
@@ -1789,8 +2279,16 @@ if (authMode === "register") {
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
                   ? t.workspace.nav.overview
-                  : navItems.find((item) => item.view === view)?.label ||
-                    t.nav.settings}
+                  : view === "profile" && !viewingOwnProfile
+                    ? // Somebody else's profile: name the person. The
+                      // sidebar item's label ("My Profile") would say the
+                      // page is mine, which it is not.
+                      // `||` and not `??`: a profile with no display name
+                      // reports an empty string, and an empty heading is
+                      // worse than the generic one.
+                      viewedProfileName || t.workspace.profile.memberProfileLabel
+                    : navItems.find((item) => item.view === view)?.label ||
+                      t.nav.settings}
               </strong>
             </div>
           </div>
@@ -1800,7 +2298,7 @@ if (authMode === "register") {
             style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
           >
             <WorkspaceCommandPalette
-              onNavigateView={(v) => setView(v as View)}
+              onNavigateView={(v) => navigateToView(v as View)}
               onSwitchRoleMode={basePlatformRole === "BOTH" ? switchDualRoleMode : undefined}
               currentRole={platformRole}
             />
@@ -1835,11 +2333,11 @@ if (authMode === "register") {
             >
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
-            <NotificationCenter onNavigate={(v) => setView(v as View)} />
+            <NotificationCenter onNavigate={(v) => navigateToView(v as View)} />
             <button
               type="button"
               className="user-menu"
-              onClick={() => setView("profile")}
+              onClick={openMyProfile}
               title={`${roleLabel(platformRole)} — ${user.email}`}
               aria-label={`Open profile (${user.email})`}
             >
@@ -1857,7 +2355,18 @@ if (authMode === "register") {
           </div>
         </header>
 
+        {/*
+          The reminder banner.
+
+          It waits on purpose: it only appears once the person has been in
+          the platform a while or has opened a second view, so it never
+          greets someone who has just arrived and has not looked at anything
+          yet. It also stays out of the profile section itself — that is
+          where the work is done, and a banner about it there is noise.
+        */}
         {view !== "profile-edit" &&
+          view !== "profile" &&
+          profileNudgeArmed &&
           !profileNudgeDismissed &&
           (!effectiveUserAvatarUrl ||
             (profileCompleteness !== null && profileCompleteness < 85)) && (
@@ -1915,8 +2424,8 @@ if (authMode === "register") {
                 <button
                   type="button"
                   className="sh-icon-only-btn"
-                  onClick={() => setProfileNudgeDismissed(true)}
-                  title="Dismiss for this session"
+                  onClick={dismissProfileNudge}
+                  title="Dismiss — it will not come back until your profile is complete"
                   aria-label="Dismiss profile setup banner"
                 >
                   <X size={15} />
@@ -1943,11 +2452,8 @@ if (authMode === "register") {
               canWork={canWork}
               isRefreshing={isRefreshing}
               onRefresh={() => void refreshDashboard()}
-              onNavigateView={(v) => setView(v as View)}
-              onSelectProfile={(id) => {
-                setViewUserId(id);
-                setView("profile");
-              }}
+              onNavigateView={(v) => navigateToView(v as View)}
+              onSelectProfile={(id) => openProfileOf(id)}
             />
 
             <div className="overview-meta" style={{ padding: "0 24px 28px", maxWidth: 1440, margin: "0 auto" }}>
@@ -1974,7 +2480,7 @@ if (authMode === "register") {
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
                   {canHire && canWork
-                    ? "Marketplace Briefs & Proposals"
+                    ? "Marketplace Briefs & Your Posts"
                     : canHire
                       ? "Job Postings & Talent Pipeline"
                       : "Browse Open Marketplace Briefs"}
@@ -2097,6 +2603,40 @@ if (authMode === "register") {
               onChanged={loadWorkspace}
               categories={categories}
               categoryLabels={categoryLabels}
+              section="jobs"
+              onBrowseJobs={() => setView("jobs")}
+            />
+          </section>
+        )}
+
+        {view === "proposals" && (
+          <section className="sh-dashboard-wrap">
+            <div className="sh-card-header">
+              <div>
+                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+                  {canHire && canWork
+                    ? "Proposals You Sent & Received"
+                    : canHire
+                      ? "Talent Pipeline"
+                      : "My Submitted Proposals"}
+                </h2>
+                <p className="sh-card-desc">
+                  {canHire && canWork
+                    ? "Track the bids you have sent, and review the proposals that came in against your own briefs."
+                    : canHire
+                      ? "Review incoming proposals, shortlist candidates, and generate escrow contracts."
+                      : "Track the milestone quotes you have sent and the client's decision on each one."}
+                </p>
+              </div>
+            </div>
+            <JobsWorkspace
+              role={marketplaceRole}
+              openJobs={jobs}
+              onChanged={loadWorkspace}
+              categories={categories}
+              categoryLabels={categoryLabels}
+              section="proposals"
+              onBrowseJobs={() => setView("jobs")}
             />
           </section>
         )}
@@ -2247,20 +2787,35 @@ if (authMode === "register") {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {t.workspace.profile.publicHeading}
+                  {viewingOwnProfile
+                    ? t.workspace.profile.publicHeading
+                    : viewedProfileName || t.workspace.profile.memberProfileLabel}
                 </h2>
                 <p className="sh-card-desc">
                   {t.workspace.profile.publicDesc}
                 </p>
               </div>
-              <button
-                className="sh-btn sh-btn-secondary"
-                onClick={() => setView("profile-edit")}
-              >
-                <Edit size={14} /> {t.workspace.profile.editProfileBtn}
-              </button>
+              {/* "Edit Profile" edits MY profile. Offering it over somebody
+                  else's page said that their page was mine — and the editor
+                  it opened was mine too, which is worse. */}
+              {viewingOwnProfile && (
+                <button
+                  className="sh-btn sh-btn-secondary"
+                  onClick={() => setView("profile-edit")}
+                >
+                  <Edit size={14} /> {t.workspace.profile.editProfileBtn}
+                </button>
+              )}
             </div>
-            <ProfilePage userId={viewUserId || user.id} />
+            <ProfilePage
+              userId={viewUserId || user.id}
+              onProfileLoaded={(loaded) =>
+                // A profile with no display name reports an empty string.
+                // Keep that out of the heading, so the generic label stands
+                // in until the person has a name.
+                setViewedProfileName(loaded.displayName || null)
+              }
+            />
           </section>
         )}
 
@@ -2277,7 +2832,7 @@ if (authMode === "register") {
               </div>
               <button
                 className="sh-btn sh-btn-secondary"
-                onClick={() => setView("profile")}
+                onClick={openMyProfile}
               >
                 <ArrowLeft size={14} /> {t.workspace.profile.backToProfileBtn}
               </button>
@@ -2311,20 +2866,35 @@ if (authMode === "register") {
       </main>
 
       <nav className="platform-mobile-nav" aria-label="Primary mobile navigation">
-        {navItems.slice(0, 4).map((item) => (
-          <button
-            key={item.view}
-            type="button"
-            className={view === item.view && !mobileDrawerOpen ? "active" : ""}
-            onClick={() => {
-              setView(item.view);
-              setMobileDrawerOpen(false);
-            }}
-          >
-            <span>{navIconMap[item.iconKey]}</span>
-            <small>{item.label}</small>
-          </button>
-        ))}
+        {navItems.slice(0, 4).map((item) => {
+          // The same dot the sidebar shows, so the thumb-zone bar and the
+          // drawer never disagree about what is waiting.
+          const activity = navActivityCount(item.view);
+          const activityLabel =
+            activity > 0
+              ? t.workspace.nav.newActivity.replace("{count}", String(activity))
+              : "";
+          return (
+            <button
+              key={item.view}
+              type="button"
+              className={view === item.view && !mobileDrawerOpen ? "active" : ""}
+              onClick={() => {
+                setView(item.view);
+                setMobileDrawerOpen(false);
+              }}
+              aria-label={
+                activityLabel ? `${item.label} — ${activityLabel}` : undefined
+              }
+            >
+              <span className="nav-mobile-icon">
+                {navIconMap[item.iconKey]}
+                {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
+              </span>
+              <small>{item.label}</small>
+            </button>
+          );
+        })}
         <button
           type="button"
           className={mobileDrawerOpen ? "active" : ""}

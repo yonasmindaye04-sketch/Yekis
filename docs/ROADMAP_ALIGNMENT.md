@@ -115,7 +115,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| User registration & login — email + phone OTP, language preference on the record | ✅ **Implemented** | `User.languagePreference`; email/password + phone OTP + Google/Apple/Facebook/Telegram OAuth + Telegram Mini App |
+| User registration & login — email + phone OTP, language preference on the record | ✅ **Implemented** | `User.languagePreference`; email/password + email OTP (the onboarding channel) + phone OTP + Google/Apple/Facebook/Telegram OAuth + Telegram Mini App. The signup proof is sent over **email** (`POST /api/v1/auth/email/code` → `POST /api/v1/auth/email/verify`, then `registerUser` adopts the proof onto `User.emailVerified` / `User.emailVerifiedAt`), because the SMS provider has no key on a hosted test deployment; `GET /api/v1/auth/verification/channels` tells the client which channels the host can actually deliver. **Sign-in takes an address or a number** (`identifier` / `email` / `phone`, normalised to `+251…` before the lookup), and **the number is optional at registration**: an account created from an address alone is given the reserved `+2510…` placeholder number the federated sign-ins use, and can use the platform immediately but cannot receive a payout until a number is claimed for it |
 | Role system — CLIENT / FREELANCER / BOTH | ✅ **Implemented** | `User.role` |
 | Session management — JWT + refresh tokens, secure cookie storage | ✅ **Implemented** | `JWT_ACCESS_TTL = "1h"`, `JWT_REFRESH_TTL = "30d"` (`env.ts:43-44`). The Playbook's "24h access / 7d refresh" is stale. Staff sessions are additionally capped at 12 h (`auth.service.ts:342`) |
 | 2FA (SMS OTP) optional at MVP, **mandatory for withdrawals** | ✅ **Implemented** | A withdrawal requires an SMS approval code for **that** payout (`POST /api/v1/escrow/wallet/withdraw/otp` → `otpCode` on `POST /wallet/withdraw`). The code is consumed when the payout completes, so one code cannot authorise two payouts. `PhoneVerificationCode.purpose` scopes it, so a phone-verification code cannot approve a payment. `requireFreshAuth(300)` remains as well |
@@ -168,7 +168,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| Bilingual (Amharic/English) toggle on first screen | ✅ **Implemented** | 4 languages (`en`/`am`/`om`/`ti`), **569 leaf keys** each, 40 nested objects, exact parity |
+| Bilingual (Amharic/English) toggle on first screen | ✅ **Implemented** | 4 languages (`en`/`am`/`om`/`ti`), **598 leaf keys** each, 41 nested objects, exact parity |
 | KYC upload & status screen with tier guidance | ✅ **Implemented** | `BrowserVerification.tsx` |
 | Client job posting wizard — category selector, milestone builder | 🟡 Partial | Job posting + milestone builder exist; the **step-by-step wizard** does not |
 | Freelancer browse & bid — job board with filters, proposal form | ✅ **Implemented** | — |
@@ -180,7 +180,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 | Wallet & withdrawal — balance, destination, transparent withholding before confirm | ✅ **Implemented** | The ops console fee breakdown shows the 7% commission and the 0.5% provider fee separately, totalling the **92.5%** net; `FeesPage.tsx` shows the same, and the stale "2% WITHHOLDING" copy is gone (withholding is deferred, 0%) |
 | Notifications centre — in-app list, SMS for critical events | 🟡 Partial | In-app notifications ship; the SMS worker client exists but no production credentials |
 | Mobile-first, bandwidth-first — Lighthouse ≥80 on simulated 3G; no image >200 KB | ⚪ **Not Started** | No Lighthouse gate in CI and no measured score |
-| **Amharic/English i18n — all strings in i18n files, no hardcoded copy** | 🟡 Partial | 569 keys in `i18n.ts` and 243 in the bot's locale JSONs, but hardcoded copy still exists in components |
+| **Amharic/English i18n — all strings in i18n files, no hardcoded copy** | 🟡 Partial | 598 keys in `i18n.ts` and 243 in the bot's locale JSONs, but hardcoded copy still exists in components |
 | Ethiopic font support — Noto Sans Ethiopic | ✅ **Implemented** | `index.css:1` imports Noto Sans Ethiopic; `--font-sans` / `--font-heading` fall back to it |
 | Accessible — unique IDs, labels on all inputs, keyboard navigable | 🟡 Partial | Many `id`/`aria` attributes ship; **no formal accessibility audit** has been performed |
 | Design system, UX research, wireframes, mockups, usability testing, design QA | ⛔ Blocked — External | Design artifacts, not code. No automated accessibility audit exists |
@@ -189,7 +189,7 @@ The Phase 1 rule is "build only what is necessary for the trust loop": Register 
 
 | Roadmap item | Status | Evidence / note |
 |---|---|---|
-| Finalize ToS & Privacy Policy (law firm) with 7-day cooling-off + arbitration clause | ⛔ Blocked — External | The pages ship in the frontend; legal approval is outstanding. The ToS describes a 7-day cooling-off right that the code does not currently grant |
+| Finalize ToS & Privacy Policy (law firm) with 7-day cooling-off + arbitration clause | ⛔ Blocked — External | The public pages now ship complete version 1.1 documents (16 Privacy Policy sections, 22 Terms sections) through a shared accessible legal-document layout, with matching `docs/privacy-policy.md` and `docs/terms-of-service.md`. The seven-day cooling-off mechanism is armed in code (`Contract.cancellableUntil = createdAt + COOLING_OFF_DAYS`) and the seven-day auto-release is implemented. **External Ethiopian counsel approval of the legal text remains outstanding** |
 | Finalize Service Agreement template (law firm) | ⛔ Blocked — External | The template exists in code (`serviceAgreement.template.ts`) but is not counsel-approved |
 | Integrate legal text as screen-rendered text in the user's language | 🟡 Partial | Legal pages render in the app; the translated legal copy is not complete |
 | KYC/AML procedures manual | ⛔ Blocked — External | — |

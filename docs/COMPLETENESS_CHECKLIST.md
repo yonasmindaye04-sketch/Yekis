@@ -137,7 +137,9 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 
 - [x] Responsive React/Vite shell and role-aware navigation
 - [x] Browser registration/login and verification screens
-- [x] Jobs/proposals workspace with current shared-schema payload conversion
+- [x] Profile completion flow — a new account is taken to the profile section with the checklist open (`ProfileCompletionDialog`: photo, name and bio, and the skills for a freelancer), the "Finish your profile" banner waits until the session has warmed up (45 seconds in the workspace, or three or more views opened) so it never greets someone who has just arrived, and a dismissal is remembered per account until the profile is complete. The Mini App lands a new account on its Profile tab (account details and the Fayda identity check)
+- [x] Jobs workspace (brief board) and Proposals workspace (the pipeline) as two separate sidebar tabs — browse and publish briefs in one, review and decide bids in the other
+- [x] Sidebar activity dots — a tab lights a dot when something in it has not been looked at yet (unread notifications routed to that view, plus a per-user watermark for new briefs on the Jobs tab); the bell and the dots read one shared notification feed, and opening a view marks its notifications read
 - [x] Contracts/milestones workspace with signing, PDF access, funding (Telebirr redirect), delivery, and acceptance
 - [x] Payment return page (`PaymentReturn.tsx`) for processing post-checkout browser redirects
 - [x] Disputes workspace with party actions
@@ -193,7 +195,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Gig order disputes via the polymorphic Dispute machine (raise / evidence / staff resolution with fee-aware ledger)
 - [ ] Automated browser tests across client, freelancer, and staff roles
 - [ ] Formal accessibility audit and assistive-technology testing
-- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**569 leaf keys, 40 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
+- [x] Multilingual translation integration for Amharic (አማርኛ), Oromiffa (Afaan Oromoo), and Tigrigna (ትግርኛ) alongside English with typed i18n system (**598 leaf keys, 41 nested objects, exact parity across all four languages**), persistent language selection (localStorage + `<html lang>`), theme-invariant header/footer language switchers, dynamic registration language preference sync, and full coverage across Landing V2, workspace navigation, auth header, subpages, `Yekis_translations.csv`, and Telegram bot ecosystem (243 bot keys).
 
 ## Marketing Site (Public)
 
@@ -201,13 +203,14 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] Dual CTA hero section
 - [x] Transparent pricing and fees page
 - [x] FAQ accordion with deep-linking
-- [x] Privacy Policy and Terms of Service (pending legal review)
+- [x] Privacy Policy and Terms of Service — complete version 1.1 public documents effective 2026-11-13, with 16 Privacy Policy sections, 22 Terms of Service sections, a shared accessible legal-document layout, and matching `docs/privacy-policy.md` / `docs/terms-of-service.md` copies. **External Ethiopian counsel approval is still outstanding.**
+- [x] AFRO-TECH public-header pattern — fixed opaque bar, Space Grotesk wordmark, underline navigation with active-page state, circular theme control, and a 1024px right-drawer breakpoint; Yekis authentication, language, and theme controls remain available
 - [x] Custom 404 and parameterized Thank You pages
 - [x] Responsive layout with Mobile CTA and Cookie Banner
 - [x] Technical SEO (robots.txt, sitemap.xml, dynamic titles, meta descriptions, FAQPage schema)
 - [x] Consent-aware GA4 analytics infrastructure
 - [ ] Real case studies, reviews, and live proof counters (currently stubbed)
-- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**569 leaf keys per language, 40 nested objects, verified 2026-11-12**).
+- [x] Multilingual translation integration — 4 languages supported: English (`en`), Amharic (`am` / አማርኛ), Oromiffa (`om` / Afaan Oromoo), and Tigrigna (`ti` / ትግርኛ) with real-time reactive switching, theme-invariant switcher components, and complete parity across all marketing surfaces and `Yekis_translations.csv` (**598 leaf keys per language, 41 nested objects, verified 2026-11-17**).
 
 ## Automated And Manual Verification
 
@@ -240,6 +243,8 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [ ] M-Pesa collection sandbox verification and reconciliation — ⚠️ the M-Pesa client is a **stub** that throws `PaymentProviderUnavailableError`; Master Design `PAY-003` marks M-Pesa **REMOVED**, so this needs a product decision before any work
 - [x] Real payout/disbursement API with pending, success, failure, reversal, and reconciliation states (Telebirr B2C disbursement with `PayoutTransaction` lifecycle)
 - [ ] Production SMS credentials/templates/delivery monitoring
+- [x] **Onboarding OTP over email** — the signup flow proves control of the signup address with a 6-digit code before the account is created. `POST /api/v1/auth/email/code` and `POST /api/v1/auth/email/verify` are unauthenticated (the code is proven before the account exists), the code is stored only as a salted SHA-256, and registration adopts the proof onto `User.emailVerified` / `User.emailVerifiedAt`. `GET /api/v1/auth/verification/channels` tells the client which channels the host can actually deliver. Covered by `apps/backend/tests/email-verification.test.ts`. **Still open:** production SMTP credentials and delivery monitoring — without them the code goes to the server log, which is a testing affordance, not a production one
+- [x] **Sign-in takes a number or an address; an address can create an account** — `POST /api/v1/auth/login` reads `identifier`, `email` and `phone`, and `normalizeLoginIdentifier` turns `0911223344`, `251911223344` and `+251911223344` into the same `+251…` before the lookup, so the four forms reach the same account. The browser sign-in field is `type="text"` and sends the value as `identifier` (it was `type="email"`, so the browser's own validation refused a number and the request never left the page). `RegisterInput.phone` is **optional**: an account created from an address alone is given the reserved `+2510…` placeholder number the federated sign-ins use — no real subscriber's number is written into the PII store — and it can use the platform immediately, but it cannot receive a payout until a number is claimed for it (a KYC step, not a sign-up one). The Mini App proves the address with the same six-digit code the web sign-up uses before the account is created. Covered by `apps/backend/tests/auth-identity.test.ts`
 - [ ] Telegram account linking and production push verification
 - [ ] Confirm FIC STR filing operating procedure; the platform records but does not submit filings
 

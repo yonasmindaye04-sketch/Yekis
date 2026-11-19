@@ -104,6 +104,36 @@
   flex-shrink: 0;
 }
 
+/* ─────────────────────────────────────────────────
+   Header-level controls are bare labels
+   ─────────────────────────────────────────────────
+   The dropdown trigger carries a box by default, which is right where it
+   stands on its own (the mobile drawer). In a header it is one control
+   among several — a theme switch, a sign-in link — and a box around the
+   language alone reads as a form field that the others do not have.
+
+   The dark-theme rules below are more specific than a plain
+   `.yk-lang-trigger`, so every context has to be named for dark mode as
+   well or the box comes back in one theme and not the other.
+
+   The border keeps its width and only loses its colour: nothing moves,
+   and a border is recoloured rather than removed. */
+.auth-header-actions .yk-lang-trigger,
+.sh-topbar-right .yk-lang-trigger,
+:root[data-theme="dark"] .auth-header-actions .yk-lang-trigger,
+:root[data-theme="dark"] .sh-topbar-right .yk-lang-trigger {
+  border-color: transparent;
+  background: transparent;
+}
+
+.auth-header-actions .yk-lang-trigger:hover,
+.sh-topbar-right .yk-lang-trigger:hover,
+:root[data-theme="dark"] .auth-header-actions .yk-lang-trigger:hover,
+:root[data-theme="dark"] .sh-topbar-right .yk-lang-trigger:hover {
+  border-color: transparent;
+  background: var(--color-bg-hover, #f3f4f6);
+}
+
 /* Segmented layout */
 .yk-lang-segmented {
   display: inline-flex;

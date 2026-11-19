@@ -38,6 +38,7 @@ erDiagram
   User ||--o{ Review : receives
   Contract ||--o{ Review : contains
   User ||--o{ PortfolioItem : showcases
+  User ||--o{ UserAvatar : uploads
   User ||--o{ FeaturedLog : featured_in
   User ||--o{ ProfileReport : reported_in
   User ||--o{ ProfileView : viewed_in
@@ -53,7 +54,7 @@ erDiagram
 
 | Model | Responsibility and important invariants |
 |---|---|
-| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities |
+| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities. **`email` is stored lower-cased and trimmed** — the canonical form the login lookup, the OAuth path and the email-OTP proof all use — so an account is never unreachable by the sign-in that follows it, and one mailbox cannot hold two accounts spelled differently |
 | `ConsentRecord` | Purpose-specific consent history captured at registration |
 | `KycRecord` | One per user; tier/status, Fayda eSignet fields, PEP screening metadata, review metadata, `periodicReviewPending` |
 | `KycReviewEvent` | Immutable log of each staff KYC decision (VERIFIED/REJECTED) with tier at decision time |
@@ -81,6 +82,7 @@ erDiagram
 | `UserSkill` | Junction table for user skills and proficiency |
 | `Review` | Double-blind contract feedback (author, target, contract, rating, comment); visible once both parties submit or 14-day window expires |
 | `PortfolioItem` | Freelancer work samples (title, description, URL, attachments) |
+| `UserAvatar` | Uploaded profile photo bytes (`BYTEA`, JPEG/PNG/WebP, ≤2 MB) with `contentType` and `sizeBytes`. `User.avatarUrl` stores the short public URL `/api/v1/users/avatars/<id>`, never the image itself — that column is `VARCHAR(500)` and is selected by chat, contract, gig and featured queries. Each upload creates a new id (so the URL is immutable and can be cached forever); the previous row for that user is deleted in the same transaction. PDPP erasure deletes the rows explicitly because erasure retains the `User` row |
 | `FeaturedLog` | History of users featured in the talent carousel |
 | `ProfileReport` | Moderation flags against inappropriate profile content |
 | `ProfileView` | Analytical tracking of profile views |
@@ -98,6 +100,7 @@ erDiagram
 | `PasswordResetToken` | Time-limited token for the password reset flow |
 | `TelegramLoginCode` | Short-lived code issued during Telegram QR/web-login start, redeemed to mint a session |
 | `PhoneVerificationCode` | SMS OTP for phone number verification. `purpose` scopes the code to the proof it gives — `PHONE_VERIFICATION` (control of the number) or `WITHDRAWAL` (approval of one payout) — so there is one outstanding code per (phone, purpose) and a login code can never approve a payment |
+| `EmailVerificationCode` | Email OTP for email address verification — the **onboarding** channel, used while the SMS provider is unconfigured. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. Only the salted SHA-256 of the code is stored; verified rows are kept as the audit trail of which address was ever proven |
 
 ## Monetary Representation
 
@@ -183,6 +186,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261112120000_launch_categories_ten` | Phase 0 launch-category lock: `LaunchCategory` widened from six to **ten** subcategories at launch. **Ten is not a ceiling** — the enum grows by `ALTER TYPE ... ADD VALUE IF NOT EXISTS` (with `duplicate_object` guards), so existing `Job.category` and `Gig.category` rows keep their values and more categories can be added at any time |
 | `20261110120000_audit_log_retention` | Adds `AuditLog.retentionUntil` (NOT NULL, backfilled from `createdAt` + 10 years) with an index, and the `SECURITY DEFINER` function `purge_expired_audit_logs(batch_size)` that the retention worker calls. The application role gets EXECUTE only — it still holds no `DELETE` privilege on `AuditLog` |
 | `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
+| `20261113120000_email_verification_otp` | Adds the `EmailVerificationCode` table (the onboarding OTP channel: lower-cased address, purpose, salted SHA-256 of the code, attempts, expiry) and `User.emailVerifiedAt`. `User.emailVerified` already existed and is also set by the OAuth path, where the provider — not the platform — proved the address |
 
 ### Re-runnable migrations
 

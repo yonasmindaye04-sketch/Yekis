@@ -1,0 +1,64 @@
+# =============================================================================
+# Docker build context for the Yekis container image.
+# =============================================================================
+#
+# Everything excluded here is either rebuilt inside the image, never shipped,
+# or must never enter the build context. The last category is the important
+# one: a context that carries .env files and private keys is a context where a
+# secret can be baked into a layer and pushed to a registry.
+
+# ── Dependencies and build output ───────────────────────────────────────────
+# Reinstalled and rebuilt inside the image. Copying a host node_modules into a
+# Linux image is also a functional bug, not just a size problem: the host
+# tree holds Windows binaries.
+node_modules/
+**/node_modules/
+dist/
+apps/frontend/dist/
+apps/backend/dist/
+
+# ── Secrets ─────────────────────────────────────────────────────────────────
+.env
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ── Runtime data ────────────────────────────────────────────────────────────
+# Uploaded chat attachments, evidence bundles and the local-disk fallback
+# copies. They belong to a running instance, never to an image.
+apps/backend/uploads/
+**/uploads/
+backups/
+*.dump
+*.sql
+
+# ── Repository metadata and local state ─────────────────────────────────────
+.git/
+.gitignore
+.github/
+.deepcode/
+logs/
+scratch/
+resource_to_read/
+node_modules/.cache/
+
+# ── Documentation, tests and audits ─────────────────────────────────────────
+# Not needed to build or run the image. The docs live in the repository and
+# in docs/; the deployment runbook is docs/ALETCLOUD_DEPLOYMENT.md.
+docs/
+**/*.md
+security/
+apps/backend/tests/
+apps/frontend/src/**/*.test.ts
+apps/frontend/src/**/*.test.tsx
+
+# ── Editor and OS noise ─────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

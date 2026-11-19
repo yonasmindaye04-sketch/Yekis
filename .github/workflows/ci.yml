@@ -187,3 +187,37 @@ jobs:
       # frontend has no test runner yet (Phase 6 / T6.5 territory), so this job
       # deliberately does not pretend to have test coverage.
       - run: pnpm run build
+
+  # The container image is what a deployment actually runs, and it is built
+  # from the repository root rather than from either package: it installs the
+  # pnpm workspace, generates the Prisma client, compiles the API and builds
+  # the SPA, and copies the result into a runtime image with redis-server in
+  # it. Nothing else in CI exercises that path, so a break in the Dockerfile —
+  # a dependency that no longer resolves, a build script that needs a
+  # context file, a stage that copies a path that moved — would otherwise
+  # only be discovered at deploy time, on the platform, under time pressure.
+  container:
+    name: Container image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build --tag yekis:test .
+      # The image is built FROM this Dockerfile, so a Dockerfile that cannot
+      # even parse fails the job here rather than at the platform.
+      - name: Inspect the image
+        run: |
+          docker image inspect yekis:test --format '{{.Config.Entrypoint}} {{.Config.Cmd}} {{.Config.ExposedPorts}}'
+      - name: The entrypoint is executable and syntactically valid
+        run: |
+          docker run --rm --entrypoint sh yekis:test -c 'test -x /usr/local/bin/yekis-entrypoint && sh -n /usr/local/bin/yekis-entrypoint && echo entrypoint-ok'
+      # The entrypoint's own logic: which Redis it starts, what it rewrites
+      # REDIS_URL to, and that it launches the API and exits cleanly. A shell
+      # script's failure modes are silent until the container starts, so they
+      # are worth asserting here rather than on the platform.
+      - name: The entrypoint's Redis handling is exercised
+        run: |
+          docker run --rm -v "$PWD/infra/docker:/d:ro" --entrypoint sh redis:7-alpine -c 'sh /d/entrypoint-test.sh'
+      - name: The Redis URL parsing is exercised
+        run: |
+          docker run --rm -v "$PWD/infra/docker:/d:ro" --entrypoint sh node:20-bookworm-slim -c 'sh /d/redis-host-test.sh'

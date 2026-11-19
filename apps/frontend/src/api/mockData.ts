@@ -1933,6 +1933,25 @@ class MockStore {
     if (cleanPath === "/auth/phone/verify") {
       return { verified: true };
     }
+    if (cleanPath === "/auth/verification/channels") {
+      // The mock environment has no provider credentials, but the dev mail
+      // fallback prints the code to the console, so email counts as available.
+      return {
+        email: { available: true, label: "Email" },
+        phone: { available: true, label: "SMS" },
+      };
+    }
+    if (cleanPath === "/auth/email/code") {
+      return {
+        sent: true,
+        expiresAt: new Date(Date.now() + 600_000).toISOString(),
+        retryAfterSec: 60,
+        devCode: "482910",
+      };
+    }
+    if (cleanPath === "/auth/email/verify") {
+      return { verified: true };
+    }
     if (cleanPath.startsWith("/auth/")) {
       const rawEmail =
         typeof parsedBody?.email === "string"

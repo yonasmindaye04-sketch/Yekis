@@ -602,7 +602,23 @@ class ApiClient {
     return doing;
   }
 
-  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  /**
+   * Performs a request against the API.
+   *
+   * `behaviour.strictHttpErrors` stops the offline mock from standing in for a
+   * real HTTP failure. The default is to fall back to the mock on 404/502/503/504
+   * so the frontend still runs with no backend at all, but that fallback is
+   * wrong for the verification endpoints: a server that cannot deliver a code
+   * answers 503, the mock answers with a fabricated `devCode`, and the person
+   * in front of the form is shown a code the server never issued. The code
+   * then fails to verify and the flow dead-ends with a message that points at
+   * the wrong thing. Those endpoints therefore surface the real status.
+   */
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+    behaviour: { strictHttpErrors?: boolean } = {},
+  ): Promise<T> {
     const performRequest = async (token: string | null) => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -658,11 +674,12 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        response.status === 503 ||
-        response.status === 502 ||
-        response.status === 504 ||
-        response.status === 404 ||
-        !contentType.includes("application/json")
+        !behaviour.strictHttpErrors &&
+        (response.status === 503 ||
+          response.status === 502 ||
+          response.status === 504 ||
+          response.status === 404 ||
+          !contentType.includes("application/json"))
       ) {
         return mockStore.handleApiFallback(
           path,
@@ -671,7 +688,24 @@ class ApiClient {
         ) as T;
       }
       if (response.status === 429) {
-        throw new Error("Too many requests. Please wait a moment before trying again.");
+        // The generic rate-limit wording is kept for every caller, but the
+        // server's own error code is attached when the body carries one. The
+        // onboarding step needs to tell "too many codes requested for this
+        // address" apart from "too many incorrect guesses" — the first says
+        // wait an hour, the second says request a new code — and they are both
+        // a 429.
+        let rateLimitCode: string | undefined;
+        try {
+          const body = (await response.json()) as { error?: string };
+          rateLimitCode = body?.error;
+        } catch {
+          /* a rate-limit response with no JSON body */
+        }
+        const thrown = new Error(
+          "Too many requests. Please wait a moment before trying again.",
+        ) as Error & { code?: string };
+        thrown.code = rateLimitCode;
+        throw thrown;
       }
       let error: {
         message?: string;
@@ -681,6 +715,14 @@ class ApiClient {
       try {
         error = await response.json();
       } catch {
+        // The server answered, but not with anything this client can read.
+        // For a strict call that is still a failure, and it must not be
+        // turned into a fabricated success: an unreadable 401 once produced
+        // a mock session with `accessToken: "mock-jwt-access-token"`, so a
+        // rejected sign-in looked like a successful one.
+        if (behaviour.strictHttpErrors) {
+          throw new Error(`HTTP ${response.status}`);
+        }
         return mockStore.handleApiFallback(
           path,
           options.method || "GET",
@@ -703,6 +745,9 @@ class ApiClient {
     }
 
     if (!contentType.includes("application/json")) {
+      if (behaviour.strictHttpErrors) {
+        throw new Error(`HTTP ${response.status}: unexpected response format`);
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -721,6 +766,9 @@ class ApiClient {
       }
       return data as T;
     } catch {
+      if (behaviour.strictHttpErrors) {
+        throw new Error(`HTTP ${response.status}: unreadable response`);
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -736,6 +784,7 @@ class ApiClient {
     path: string,
     token: string,
     options: RequestInit = {},
+    behaviour: { strictHttpErrors?: boolean } = {},
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -766,11 +815,12 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        response.status === 503 ||
-        response.status === 502 ||
-        response.status === 504 ||
-        response.status === 404 ||
-        !contentType.includes("application/json")
+        !behaviour.strictHttpErrors &&
+        (response.status === 503 ||
+          response.status === 502 ||
+          response.status === 504 ||
+          response.status === 404 ||
+          !contentType.includes("application/json"))
       ) {
         return mockStore.handleApiFallback(
           path,
@@ -779,7 +829,20 @@ class ApiClient {
         ) as T;
       }
       if (response.status === 429) {
-        throw new Error("Too many requests. Please wait a moment before trying again.");
+        // Same as `request`: keep the generic wording, attach the server's
+        // error code when there is one.
+        let rateLimitCode: string | undefined;
+        try {
+          const body = (await response.json()) as { error?: string };
+          rateLimitCode = body?.error;
+        } catch {
+          /* a rate-limit response with no JSON body */
+        }
+        const thrown = new Error(
+          "Too many requests. Please wait a moment before trying again.",
+        ) as Error & { code?: string };
+        thrown.code = rateLimitCode;
+        throw thrown;
       }
       let error: { message?: string; error?: string };
       try {
@@ -867,15 +930,32 @@ class ApiClient {
   }
 
   // Auth
+  //
+  // Every authentication call below opts out of the offline mock. The mock
+  // stands in for the ABSENCE of a server — no backend at all, or the dev
+  // proxy's explicit `X-Yekis-Offline: 1` — and for nothing else. A server
+  // that answered with an error has answered, and its answer must reach the
+  // caller.
+  //
+  // The distinction matters most here. A host with no bot token answers
+  // `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for
+  // it and hand back `accessToken: "mock-jwt-access-token"` — a token the
+  // server has never heard of. The Mini App looked like it had signed in,
+  // every request that followed was refused with a 401, and the real reason
+  // never reached the person in front of the screen.
   async loginWithTelegram(authData: string | Record<string, unknown>, role?: string): Promise<TelegramAuthResponse> {
     const body =
       typeof authData === "string"
         ? { initData: authData, role }
         : { ...authData, role };
-    return this.request("/api/v1/auth/telegram", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    return this.request(
+      "/api/v1/auth/telegram",
+      {
+        method: "POST",
+        body: JSON.stringify(body),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   // ---------- Social sign-in (server verifies provider credentials) ----------
@@ -891,14 +971,22 @@ class ApiClient {
   }
 
   async linkTelegram(initData: string): Promise<{ telegramUserId: string; telegramChatId: string }> {
-    return this.request("/api/v1/auth/telegram/link", {
-      method: "POST",
-      body: JSON.stringify({ initData }),
-    });
+    return this.request(
+      "/api/v1/auth/telegram/link",
+      {
+        method: "POST",
+        body: JSON.stringify({ initData }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async unlinkTelegram(): Promise<{ unlinked: boolean }> {
-    return this.request("/api/v1/auth/telegram/link", { method: "DELETE" });
+    return this.request(
+      "/api/v1/auth/telegram/link",
+      { method: "DELETE" },
+      { strictHttpErrors: true },
+    );
   }
 
   /**
@@ -907,10 +995,14 @@ class ApiClient {
    * registered with @BotFather, or telegram.org blocked).
    */
   async loginWithTelegramCode(code: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/telegram/code", {
-      method: "POST",
-      body: JSON.stringify({ code }),
-    });
+    return this.request(
+      "/api/v1/auth/telegram/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async loginWithGoogleOAuth(idToken: string, role?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
@@ -983,11 +1075,23 @@ class ApiClient {
     return this.request("/api/v1/users/me/export");
   }
 
+  /**
+   * Signs in with a phone number (or an email address, or either identifier)
+   * and a password. The Mini App's fallback path when Telegram sign-in is
+   * unavailable.
+   *
+   * Like every other authentication call, the real HTTP status is surfaced:
+   * the mock must not hand back a session the server never issued.
+   */
   async loginWithMobile(input: { phone?: string; email?: string; identifier?: string; password: string }): Promise<{ accessToken: string; refreshToken?: string; user?: AuthUser }> {
-    return this.request("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
+    return this.request(
+      "/api/v1/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify(input),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async getMe(): Promise<MeResponse> {
@@ -1221,13 +1325,31 @@ class ApiClient {
     return this.request("/api/v1/tms/activity");
   }
 
-  async login(email: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  /**
+   * Signs in with an email address or a phone number, and a password.
+   *
+   * The identifier is sent as `identifier`, which is what the route reads:
+   * an address is looked up as an address and a number is normalised to
+   * `+251…` first, so `0911223344`, `251911223344` and `+251911223344` all
+   * reach the same account.
+   *
+   * The real HTTP status is always surfaced. A fabricated session is worse
+   * than a failed one: the offline mock answers `mock-jwt-access-token`,
+   * which no server has issued, so every request that followed it would be
+   * refused and the person would be told they had signed in.
+   */
+  async login(identifier: string, password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    return this.request(
+      "/api/v1/auth/login",
+      { method: "POST", body: JSON.stringify({ identifier, password }) },
+      { strictHttpErrors: true },
+    );
   }
 
   async register(input: {
     email: string;
-    phone: string;
+    /** The payout destination. Omitted for an account created from an address alone. */
+    phone?: string;
     password: string;
     languagePreference: Language;
     /** BOTH is a real UserRole (see the Prisma enum and RegisterInput). */
@@ -1235,7 +1357,11 @@ class ApiClient {
     dateOfBirth: string;
     consents: { kycDataProcessing: true; financialDataProcessing: true; platformNotifications: boolean; marketingCommunications: boolean; analytics: boolean };
   }): Promise<{ ok: boolean; message: string }> {
-    return this.request("/api/v1/auth/register", { method: "POST", body: JSON.stringify(input) });
+    return this.request(
+      "/api/v1/auth/register",
+      { method: "POST", body: JSON.stringify(input) },
+      { strictHttpErrors: true },
+    );
   }
 
   /**
@@ -1254,20 +1380,88 @@ class ApiClient {
     retryAfterSec: number;
     devCode?: string;
   }> {
-    return this.request("/api/v1/auth/phone/code", {
-      method: "POST",
-      body: JSON.stringify({ phone }),
-    });
+    return this.request(
+      "/api/v1/auth/phone/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ phone }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async verifyPhoneCode(
     phone: string,
     code: string,
   ): Promise<{ verified: true }> {
-    return this.request("/api/v1/auth/phone/verify", {
-      method: "POST",
-      body: JSON.stringify({ phone, code }),
-    });
+    return this.request(
+      "/api/v1/auth/phone/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ phone, code }),
+      },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Which verification channels can actually deliver right now.
+   *
+   * The onboarding step asks the server before it offers a channel: on a host
+   * with no SMTP key the email code would 503, and with no SMS key the phone
+   * code would 503. Offering either anyway is how a signup ends in a dead
+   * end with no explanation.
+   */
+  async getVerificationChannels(): Promise<{
+    email: { available: boolean; label: string };
+    phone: { available: boolean; label: string };
+  }> {
+    return this.request(
+      "/api/v1/auth/verification/channels",
+      { method: "GET" },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Requests an email OTP for an address.
+   *
+   * This is the onboarding channel while the SMS provider is unconfigured. It
+   * is unauthenticated on purpose: the code is sent and checked before the
+   * account exists, and the response never says whether the address is already
+   * registered.
+   *
+   * `devCode` is only ever present outside production, and is shown by the UI
+   * in that case so a developer can complete the flow without a mailbox.
+   */
+  async requestEmailCode(email: string): Promise<{
+    sent: boolean;
+    expiresAt: string;
+    retryAfterSec: number;
+    devCode?: string;
+  }> {
+    return this.request(
+      "/api/v1/auth/email/code",
+      {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      },
+      { strictHttpErrors: true },
+    );
+  }
+
+  async verifyEmailCode(
+    email: string,
+    code: string,
+  ): Promise<{ verified: true }> {
+    return this.request(
+      "/api/v1/auth/email/verify",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, code }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   /**
@@ -1635,6 +1829,47 @@ class ApiClient {
   }
   async updateProfile(data: UpdateProfilePayload): Promise<SelfProfile> {
     return this.request(`/api/v1/users/me/profile`, { method: "PATCH", body: JSON.stringify(data) });
+  }
+  /**
+   * Uploads a profile photo and returns the short URL to store in `avatarUrl`.
+   *
+   * There is deliberately no data-URL fallback. `avatarUrl` is a VARCHAR(500)
+   * and a base64 image is far larger: falling back would reintroduce the 500
+   * that made every Settings save with a custom photo fail. If the upload
+   * cannot reach the server, the editor reports it and keeps the previous
+   * photo rather than persisting an unsendable value.
+   */
+  async uploadAvatar(file: Blob): Promise<{ avatarUrl: string }> {
+    const formData = new FormData();
+    formData.append("file", file, "avatar.jpg");
+
+    const headers: Record<string, string> = {};
+    if (this.accessToken) {
+      headers.Authorization = `Bearer ${this.accessToken}`;
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/v1/users/me/avatar`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    let body: { avatarUrl?: string; error?: string; message?: string } = {};
+    try {
+      body = await res.json();
+    } catch {
+      // The response was not JSON (a proxy error page, for example).
+    }
+
+    if (!res.ok || !body.avatarUrl) {
+      throw new Error(
+        body.message ||
+          body.error ||
+          `Could not upload the photo (HTTP ${res.status}).`,
+      );
+    }
+
+    return { avatarUrl: body.avatarUrl };
   }
   async getProfileCompleteness(): Promise<{ profileCompleteness: number }> {
     return this.request(`/api/v1/users/me/profile/completeness`);

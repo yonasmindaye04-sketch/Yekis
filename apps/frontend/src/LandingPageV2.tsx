@@ -865,37 +865,37 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     {
       kicker: t.marketing.categories.c1Class,
       title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
-      img: "/stack/img-1.jpg",
+      icon: "/icons/web-development.webp",
       bg: "#c75a35",
     },
     {
       kicker: t.marketing.categories.c2Class,
       title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
-      img: "/stack/img-2.jpg",
+      icon: "/icons/graphic-design.webp",
       bg: "#1f4d4a",
     },
     {
       kicker: t.marketing.categories.c3Class,
       title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
-      img: "/stack/img-3.jpg",
+      icon: "/icons/digital-marketing.webp",
       bg: "#2d2a66",
     },
     {
       kicker: t.marketing.categories.c4Class,
       title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
-      img: "/stack/img-4.jpg",
+      icon: "/icons/content-copywriting.webp",
       bg: "#0e3f36",
     },
     {
       kicker: t.marketing.categories.c5Class,
       title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
-      img: "/stack/img-5.jpg",
+      icon: "/icons/translation.webp",
       bg: "#4a224f",
     },
     {
       kicker: t.marketing.categories.c6Class,
       title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
-      img: "/stack/img-6.jpg",
+      icon: "/icons/data-processing.webp",
       bg: "#1a1613",
     },
   ];
@@ -1039,9 +1039,17 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
             <h2>{c.title}</h2>
           </div>
           <div className="stk-col stk-media">
-            <div
-              className="stk-img"
-              style={{ backgroundImage: `url(${c.img})` }}
+            {/* The category artwork is a 3D render (Fluent 3D, via Icons8):
+                a single object floating on the card's own colour, which
+                reads at a glance where the flat line-art scenes did not —
+                they all looked like the same picture. */}
+            <img
+              className="stk-3d-icon"
+              src={c.icon}
+              alt=""
+              aria-hidden="true"
+              loading="lazy"
+              decoding="async"
             />
           </div>
         </div>
@@ -1279,14 +1287,28 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
               </button>
             </div>
 
-            {/* Right: editorial workspace image */}
-            <div className="v2-about-visual">
-              <img
-                src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=1400"
-                alt="Freelancers and a client collaborating around a shared workspace"
-                loading="eager"
-                fetchPriority="high"
-              />
+            {/* Right: Lottie business handshake & escrow payment animation */}
+            <div
+              className="v2-about-visual"
+              aria-label="Escrow agreement and guaranteed milestone payout animation"
+            >
+              <video
+                className="v2-about-lottie-video"
+                autoPlay
+                loop
+                muted
+                playsInline
+                poster="/lottie/escrow-deal.gif"
+                aria-label="Escrow agreement and guaranteed milestone payout animation"
+              >
+                <source src="/lottie/escrow-deal.webm" type="video/webm" />
+                <img
+                  src="/lottie/escrow-deal.gif"
+                  alt="Escrow agreement and guaranteed milestone payout animation"
+                  loading="eager"
+                  className="v2-about-lottie-fallback"
+                />
+              </video>
               <div className="v2-about-visual-bar">
                 <span>{t.marketing.about.visualEscrow}</span>
                 <span>{t.marketing.about.visualKyc}</span>
@@ -1846,6 +1868,16 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
             <LanguageSelector variant="segmented" />
             <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
             <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
+            {/* The 3D icon set is Icons8's, and their free licence asks for
+                a credit wherever their work appears. */}
+            <a
+              href="https://icons8.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="v2-footer-icon-credit"
+            >
+              {t.marketing.footer.iconCredit}
+            </a>
           </div>
         </div>
       </div>

@@ -1,5 +1,124 @@
 # Yekis Jobs Functional Walkthrough
 
+Last validated: 2026-11-18
+
+> **A profile photo saves, and Settings stops returning 500 (2026-11-18):**
+> - **The bug.** Choosing a photo compressed it into a JPEG data URL and sent it as `avatarUrl`. Zod allowed 1.5 MB; the column is `VARCHAR(500)`; Postgres refused the write and the API answered `500 INTERNAL_ERROR`. The photo was never the problem — the **save** was, and it failed for every member who had picked one.
+> - **What happens now.** The editor compresses the photo to a 320px JPEG and uploads it to `POST /api/v1/users/me/avatar`. The server stores the bytes in `UserAvatar` and returns `/api/v1/users/avatars/<id>`; that short URL is what the form keeps and what `PATCH /users/me/profile` stores. The photo appears immediately; the rest of the form still waits for **Save Changes**.
+> - **Why not just widen the column.** `avatarUrl` is copied into chat, contract, gig and featured responses. A base64 image there would be sent on every one of them. The column stays 500 characters and keeps holding a URL.
+> - **Public but not enumerable.** `GET /avatars/:id` needs no session because signed-out visitors see public profiles and an `<img>` cannot send a token. The id is random, and replacing a photo creates a new id, so the response is cached as immutable; the old id stops working. Unknown ids are `404`.
+> - **Old local photos are dropped.** A data URL left in `localStorage` by an older build is cleared on load instead of being sent back and rejected.
+> - **Verified:** `tests/avatar-profile.test.ts` (11 tests: storage, replacement, ownership, over-long/data-URL rejection, public serving) and the PDPP erasure suite pass; `pnpm --filter frontend build`, `pnpm --filter backend type-check`, `route-audit:check` and `node scripts/check-doc-parity.mjs` pass. The deployed instance applied migration `20261118190000_user_avatar` (38 in total) and a throwaway account uploaded, served and cleared a real JPEG there: the public URL answered `200 image/jpeg` with an immutable cache, the 600-character URL and the data URL answered `400` instead of the old `500`, another member's id was refused, and erasure reported `avatarsDeleted: 1` and left the URL `404`. See `docs/ALETCLOUD_DEPLOYMENT.md` §11.
+
+> **Fayda Identity Review Redesign — Calm Enterprise & Trust Direction (2026-11-18):**
+> - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
+>   - **Card Shell Architecture (`.idv-card`)**: Redesigned the Fayda / Tier 1 KYC verification component into a high-trust, calm enterprise card shell featuring a custom biometric fingerprint emblem, overline (`Fayda Identity Review`), primary heading, descriptive subtext, live tier status indicator (`Tier 1 · Awaiting documents` / `Tier 1 · In review` / `Tier 1 · Verified`), and a verified trust badge (`Secured by Fayda eSignet`).
+>   - **Interactive File Dropzone (`.idv-drop`)**: Built an accessible, responsive dropzone with drag-and-drop file upload, file validation for JPG, PNG, WebP, and PDF up to 10 MB, image thumbnail / PDF icon preview, file size formatting, "Ready to submit" indicator, and quick "Replace" / "Remove" controls.
+>   - **Integrated Form Validation**: Configured validation rules with inline error messages for full name (min 2 characters), date of birth (bounded to today max to prevent future birthdays), Fayda ID number, and document upload. Errors clear instantly upon user input.
+>   - **Submission State & "What Happens Next"**: Integrated submitting spinner state (`Submitting…` -> `Submitted`), success confirmation banner with "Edit details" reset capability, and a three-step footer progression strip (`1. Submit ID` -> `2. Biometric selfie in secure popup` -> `3. Tier 1 decision`).
+>   - **Theme Parity & Zero-Emoji Enforcement**: Strict compliance with Yekis zero-emoji standards (pure inline SVGs) and 100% theme-invariant layout geometry between dark and light modes.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+>   - `pnpm --filter backend type-check` passes with exit code 0.
+>   - `pnpm --filter backend route-audit:check` passes with exit code 0.
+
+
+> **Jobs and Proposals are two tabs now, and a tab lights a dot when something is waiting (2026-11-17):**
+> - **Two tabs.** The Jobs tab used to carry the brief board *and* the proposal pipeline behind a segmented control that only a freelancer ever saw — so a client's incoming bids sat underneath a row of open briefs, and a freelancer's own bids were one click away from a page they were not on. **Jobs** is now the brief board (browse, publish, and the briefs you have published, each with its proposal count); **Proposals** is the pipeline (the bids you sent, and the bids you received, where shortlisting, accepting and rejecting happen). `JobsWorkspace` takes a `section` prop and renders the half it was asked for. No backend change was needed.
+> - **The dot.** A sidebar tab lights a small dot when something in it has not been looked at yet. It is anchored to the tab's **icon**, so it sits in the same place whether the sidebar is expanded or collapsed into an icon rail. The count lives in the tab's `aria-label`/`title`; the dot stays a dot.
+> - **One mapping decides both.** `apps/frontend/src/api/notificationTargets.ts` is the single source of truth for where a notification goes, so `proposal-received`, `proposal-accepted` and `proposal-rejected` point at **Proposals** now. The dot uses the same mapping the bell uses to deep-link, so the two can never disagree: if clicking a notification takes you to Proposals, then an unread proposal notification is what lights Proposals up.
+> - **One feed, not two.** `apps/frontend/src/api/notificationFeed.ts` owns the polling of `GET /api/v1/notifications`, the socket subscription and the records, and publishes one immutable snapshot through `useSyncExternalStore`. The bell and the dots read that one snapshot. The snapshot keeps its identity when a poll returns the same records, so nothing re-renders every fifteen seconds for nothing.
+> - **Opening a view is looking at it.** The notifications routed to the view you open are marked read, and the bell badge and the tab dot clear together. The dot always means "not looked at yet", never "something happened at some point".
+> - **New briefs on the Jobs tab.** The backend has no "a brief was published" notification type, so the Jobs tab tracks it on the client with a per-user watermark of the newest brief already seen (`yekis:jobs-seen-at:<userId>`). Only accounts that work get this, and their own briefs do not count.
+
+> **The category artwork is 3D (2026-11-16):**
+> - The six category cards in "Find the right expertise." now carry a **3D render** each instead of a flat line-art scene — the flat scenes all looked like the same picture (a person at a desk), so a card did not tell you what it was about until you read it.
+> - **The set** — Icons8's **3D Fluency** style (the Microsoft Fluent 3D look), bundled locally in `apps/frontend/public/icons/`: `web-development` (a browser window with `</>`), `graphic-design` (paint swatches), `digital-marketing` (a megaphone), `content-copywriting` (a document page), `translation` (a globe) and `data-processing` (a pie chart). Each is a transparent WebP at 800px, 23–59 KB.
+> - **They float on the card.** `LandingPageV2.tsx` renders `<img className="stk-3d-icon">` where the Lottie `<video>` was, and `landing-v2.css` gives it a soft drop shadow and the same hover scale the video had. The card's own colour shows through behind it, so the card is unchanged in both themes.
+> - **Bundled, not hotlinked** — the site's Content-Security-Policy allows images only from `'self'`, so a remote icon would not load at all. The set is served from our own origin like every other asset.
+> - **The credit is in the footer** — "Icons by Icons8" (the new `marketing.footer.iconCredit` key, in all four locales), because Icons8's free licence asks for one wherever their work appears.
+> - **20.8 MB lighter** — the six category animations and their GIF fallbacks are gone; the artwork they carried is now 271 KB of transparent WebP. The escrow handshake animation in "Great work deserves guaranteed payment." is unchanged.
+
+> **Lottie Business Animation for Escrow (2026-11-15):**
+> - The escrow agreement visual in "Great work deserves guaranteed payment." was upgraded from a static stock photo to an animated Google / IconScout business handshake Lottie file (`escrow-deal`), reinforcing milestone escrow safety and mutual agreement.
+> - **Zero-latency delivery**: Bundled under `apps/frontend/public/lottie/` with dual-format `<video>`/`<img>` fallback, zero layout shift, and full theme parity.
+
+> **Dashboard Shell: Sidebar Toggle & Universal Back Button (2026-11-15):**
+> - The sidebar collapse/expand toggle (desktop) and drawer close button (mobile) were unified into a single `sidebar-brand-toggle` button now living inside the `sidebar-brand-row` at the top of the sidebar, next to the Yekis logo. This keeps the toggle visually anchored to the sidebar and cleans up the topbar.
+> - A universal back button (`ArrowLeft`) was added to the topbar (`sh-topbar-left`), immediately left of the breadcrumb ("Client Workspace / <view>"). Calls `window.history.back()` to navigate to the previous view.
+> - On mobile, the topbar still shows a hamburger to open the drawer. On desktop, the topbar no longer has a sidebar toggle — it lives in the sidebar brand row exclusively.
+> - New CSS classes `.sidebar-brand-toggle` and `.sh-topbar-back-btn` are theme-parity compliant: layout geometry in un-themed base rules; color/background/border-color only in theme-conditional overrides.
+
+> **Afro-Tech Gigs Section Overhaul (2026-11-14):**
+> - The Gigs section (`GigMarketplace.tsx` and `GigMarketplace.css`) was redesigned from the initial prototype into a high-end Afro-Tech digital services marketplace.
+> - **Marketplace Browser**: Editorial command hero with escrow assurance ribbon, interactive horizontal category filter rail with category icons, live search with multi-criteria sorting (ratings, pricing, turnaround), and responsive Afro-Tech cards featuring `YekisAvatar`, verified freelancer badges, turnaround metrics, and starting ETB prices.
+> - **Two-Column Detail Workspace**: Split view with breadcrumb navigation, full service overview, seller spotlight (response times, location, completeness), buyer requirements checklist, FAQ accordion, escrow protection guarantees, and interactive Basic/Standard/Premium package tabs with 1-click escrow checkout.
+> - **Design Integrity**: Strict compliance with zero-emoji policy, bold-text-only status indicator rules (no low-opacity pills), bare icon glyphs, touch-friendly 44px hit targets, and full light/dark theme parity.
+
+> **Sign-in takes a number, and an address can create an account (2026-11-14):**
+> - **The sign-in field refused a phone number.** The API has always accepted one — `identifier`, `email` and `phone` are all read, and `normalizeLoginIdentifier` turns `0911223344`, `251911223344` and `+251911223344` into the same `+251…` before the lookup — but the field was `type="email"`, so the **browser's own validation** refused the number ("Please include an '@' in the email address") and the request never left the page. The field now takes either, sends the value as `identifier`, and says "Email / Phone" in every language.
+> - **An address can create an account** (`apps/frontend/src/App.tsx`). The Mini App's sign-up took a number only and derived a synthetic `@yekis.local` address from it. An address is accepted now and is **proven with the same six-digit code** the web sign-up uses (`OnboardingVerification`, which is channel-generic) before the account exists — an unproven address is somebody else's inbox, and it is the login identifier. The code step takes over the panel, with the tab switcher hidden while it shows and the component's own "use a different email" link back to the form.
+> - **The account gets the reserved placeholder number** (`apps/backend/src/modules/auth/auth.service.ts`, `schemas.ts`). `User.phone` is non-null and unique because it is the payout destination, so it cannot be left empty; an account created from an address alone is given the `+2510…` block no operator is allocated, exactly what the federated sign-ins use. The consequence is honest: such an account can use the platform and is identified by its address, but it cannot receive a payout until a number is claimed for it — a KYC step, not a sign-up one.
+> - **The labels now say so** (`apps/frontend/src/App.tsx`): the Mini App's fallback tab was "Mobile Phone" (or "Phone & Password" when Telegram is unavailable), the headings were "Sign In with Mobile" and "Create Mobile Account", and the notice said "your phone number and password" — while the field took an address. They now read "Phone or Email", "Sign In with Phone or Email" and "Create an Account", and the notice says "your phone number or email address and your password".
+> - **Verified** — against a local instance (Postgres + Redis from `docker compose`, the backend on `127.0.0.1:4000`, the Vite dev server on `127.0.0.1:3000`), and in a real browser: the four identifier forms all sign in with a real JWT and a wrong password answers `401`; an account created from an address alone is stored with a `+2510…` placeholder, `emailVerified` true and `phoneVerifiedAt` null; the **web sign-in was driven with a phone number** (the field reads "Email / Phone", the workspace loads, the session token is a real JWT); and the **Mini App's email sign-up was driven in a simulated Telegram webview** (the six-digit code step replaces the panel, the code is accepted, the account is created and the workspace loads with a real session). **Deployed** (`1ccffc9`) and re-verified on `https://yekis.app.aletcloud.com` — registration with and without a number, sign-in by both, and both browser walks.
+>
+> **The header's language control has no box, and the hero breathes (2026-11-16):**
+> - **The "EN ⌄" control in the marketing header is no longer a boxed button** (`apps/frontend/src/marketing.css`). It sat inside a rounded rectangle while the sun switch, "Sign in" and "Get started" beside it were bare — a box around one control reads as a form field the others do not have. The rule was already there (`border-color: transparent; background: transparent`), but the dark-theme rules in `LanguageSelector.css` are more specific and were winning, so the box came back in **dark mode only** — which is where it was seen.
+> - **The same box is gone from the sign-in screen's header and from the workspace topbar** (`apps/frontend/src/components/LanguageSelector.css`). The control keeps its box in the mobile drawer, where it stands on its own and the box belongs.
+> - **The border keeps its width and only loses its colour**, so nothing moves and no border is removed in one theme.
+> - **The hero's sentence and buttons were lowered** (`apps/frontend/src/landing-v2.css`). The title is set very large and its descenders came close enough to the line below it that "Hire top Ethiopian talent safely…" read as part of the headline. The gap under the title is now 44px (was 22px) and the gap under the sentence is 42px (was 30px).
+> - **Verified** in a browser in both themes: the language control computes a transparent border and a transparent background in the marketing header, on the sign-in screen and in the workspace topbar; the theme switch and "Sign in" stay borderless; and the hero's sentence and buttons sit clear of the title.
+>
+> **Opening somebody else's profile no longer counts it as your own (2026-11-15):**
+> - **"Edit Profile" is no longer offered over another person's page** (`apps/frontend/src/FullPlatformApp.tsx`). Clicking it opened the editor for **your** profile while the screen showed theirs — the clearest form of "this is my profile" the product could send. It is shown only on your own profile.
+> - **The breadcrumb and the heading name the person.** The breadcrumb used to say "My Profile" over somebody else's page and the heading said "Public Marketplace Profile" - a heading with no name on it. Both now carry the person's name, which the profile itself reports once it has loaded (`ProfilePage` gained an `onProfileLoaded` callback). A profile with no name at all falls back to the generic "Member Profile" label rather than showing an empty heading.
+> - **"My Profile" is the way back to your own profile — and now it is.** Every entry point that means "my profile" (the sidebar item, the topbar avatar, the chip at the foot of the sidebar, the command palette, the editor's "Back to Profile", the end of a registration) used to call `setView("profile")` directly, which kept whichever profile was last opened — so clicking "My Profile" after looking at somebody else showed that person again. They now all go through `openMyProfile()`, which clears the viewed profile first; opening somebody else goes through `openProfileOf(id)`, and signing out clears both.
+> - **The sidebar no longer highlights "My Profile"** while somebody else's profile is on screen, and the "Finish your profile" banner stays off other people's pages.
+> - **Verified** in a browser against a local instance: clicking a featured talent shows their name in the breadcrumb and the heading, offers no "Edit Profile", offers "Report Profile", and highlights no sidebar item; "My Profile" then shows your own profile again, with the editor and no report button.
+>
+> **The profile reminder waits, and a new account goes straight to its profile (2026-11-15):**
+> - **A new account is taken to the profile section, with the checklist open** (`apps/frontend/src/FullPlatformApp.tsx`). Registration does not drop the person on the dashboard: `completeRegistration` navigates to `/profile` and puts `showProfileCompletion` in the router state, which opens `ProfileCompletionDialog` — the checklist that names what is missing (photo, name and bio, and for a freelancer the skills). The Mini App does the same thing its own way: a new account lands on its **Profile** tab (`App.tsx`), which carries the account details and the Fayda identity check.
+> - **The banner waits** (`apps/frontend/src/FullPlatformApp.tsx`). The "Finish your profile" banner was on screen the moment the workspace loaded — the worst moment for it, because the person has just arrived and has not looked at anything yet. It is now armed only when the session has warmed up: **45 seconds** in the workspace, or **three or more distinct views** opened. It also stays out of the profile section, where a banner about the work is noise.
+> - **A dismissal is remembered** — per account (`yekis_profile_nudge_dismissed_<userId>`), and cleared the moment the profile is complete. It used to last for a single page load, so the banner came back on the next visit as if it had never been answered.
+
+> **The Mini App can no longer sign in with a session the server never issued, and a registration can no longer disappear (2026-11-13):**
+> - **The Mini App's fabricated session** (`apps/frontend/src/api/client.ts`): `loginWithTelegram()` did not opt out of the offline mock's HTTP-status fallback, so a host with no bot token — which answers `503 TELEGRAM_NOT_CONFIGURED` — was stood in for by the mock, and the mock answered `accessToken: "mock-jwt-access-token"`. The Mini App looked signed in, every request that followed was refused with a 401, and the reason never reached the person. The hole was deeper than the status code: `strictHttpErrors` guarded only the status-code branch, so an error response whose body could not be read made `response.json()` throw and fall through to the mock — the same fabricated session, out of a rejected sign-in.
+>   - Every authentication call is strict now: `loginWithTelegram`, `loginWithTelegramCode`, `linkTelegram`, `unlinkTelegram`, `login`, `loginWithMobile` and `register`. A strict call never fabricates a response — not on a status code, not on an unreadable body, not on a non-JSON content type, not on a parse failure.
+>   - The mock still stands in for the **absence** of a server, which is the only thing it is for.
+> - **The Mini App now says what is true** (`apps/frontend/src/App.tsx`): the shell reads `GET /api/v1/auth/oauth/providers` and, when the host cannot verify a Telegram credential, hides the "Telegram Login" tab, opens the phone-and-password path and says "Telegram sign-in is unavailable". The probe is advisory — a failed probe never removes the only way in. The developer-facing string ("Add your bot token to apps/backend/.env…") is gone. The fallback accepts a phone number **or** an email address, for signing in and for signing up.
+> - **A registration can no longer disappear** (`apps/backend/src/modules/auth/auth.service.ts`, `auth.routes.ts`): the duplicate check used one `OR` over the address and the number, so a number collision and an address collision were the same event and the route answered `202` for both. With a new address on a number that was already registered, no account was created — the address that had just been proven never became an account, the sign-in that followed answered `401`, and the person was told to sign in with an address that had no account.
+>   - An **address** that is on file still answers `202` with the same body as a successful registration: the enumeration rule (L-02) is untouched.
+>   - A **number** that is on file, with an address that is not, answers `409 {"error":"PHONE_IN_USE"}` and names the action. This discloses that a number is registered; it never discloses whether an address is registered.
+>   - The frontend names the cause when a registration ends in `INVALID_CREDENTIALS`: the number may already be registered — sign in with the address used the first time, or use a different number.
+> - **The password reset could not find a mixed-case address** (`auth.service.ts`): `requestPasswordReset` looked the account up with a case-sensitive `findUnique`, while the stored address is the canonical lower-cased form. The account was never found, no token was created, and the person was told a reset token was on its way. The lookup is canonical now.
+> - **Verified against the live deployment**: `loginWithTelegram` throws `TELEGRAM_NOT_CONFIGURED`, `login`/`loginWithMobile` throw `INVALID_CREDENTIALS`, `loginWithTelegramCode` throws `HTTP 400` — none fabricates a session; in a simulated Telegram webview the Mini App stores no token at all and signs in through the fallback with a real JWT; a new address on a registered number answers `202` and cannot sign in, while the same address on a free number answers `202` and signs in with `200`.
+
+> **Onboarding OTP Over Email (2026-11-13):**
+> - **The problem this fixes**: the signup flow proved control of the phone number over SMS and nothing else. On the hosted testing deployment the SMS provider has no key, so `sendSms()` returns `sent: false` and the first onboarding step failed for every new user — the account could not be created at all. The frontend's offline mock made it worse: the `503` was swallowed by the mock fallback, which answered with a fabricated `devCode` (482910) that the server had never issued, so the code could never be verified.
+> - **A two-step onboarding the user can follow** (`apps/frontend/src/OnboardingVerification.tsx`, replacing `PhoneVerification.tsx`):
+>   - Step 1 — the details form. A line under the button says what happens next, so the code step is never a surprise.
+>   - Step 2 — the code-entry step takes over the panel. The code is requested the moment the step opens (no "send me a code" button to hunt for), the target is shown masked (`a***@example.com`, `+251 *** 344`), the expiry counts down, and a resend is offered with its own cooldown.
+>   - Wrong code, expired code, too many attempts and undeliverable mail are four different messages, and an expired code unlocks the resend immediately.
+>   - "Use a different email" returns to step 1 with the address still filled in — a mistyped address is the most common reason the code never arrives.
+>   - The escape hatch ("Continue without verifying") stays: a hard gate with no way through is a support queue, not a security control.
+> - **Channel discovery** (`GET /api/v1/auth/verification/channels`): the client asks the server which channels can actually deliver before offering one. A host with no SMTP key cannot send an email and a host with no SMS key cannot send a text; offering either anyway is how a signup dead-ends with no explanation.
+> - **Backend** (`apps/backend/src/modules/auth/email-verification.service.ts`, `email-verification.routes.ts`):
+>   - `POST /api/v1/auth/email/code` and `POST /api/v1/auth/email/verify`, both unauthenticated because the code is proven before the account exists. They never reveal whether an address is registered.
+>   - The code is stored only as a salted SHA-256, expires in 10 minutes, is capped at 5 attempts, and a resend invalidates the previous code.
+>   - `registerUser` adopts a recent proof onto the new row (`User.emailVerified`, `User.emailVerifiedAt`), exactly as it already did for the phone number. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox.
+>   - The SMS phone codes are deliberately left alone: `User.phone` is the Telebirr / M-Pesa payout destination and the withdrawal-approval code is money. That flow is not weakened to make signup work.
+> - **The `503` is no longer masked** (`apps/frontend/src/api/client.ts`): the OTP endpoints opt out of the offline mock's HTTP-status fallback, so a server that cannot deliver a code says so instead of answering with a code it never issued.
+> - **Outside production**, a host with no SMTP credentials writes the code to the server log instead of failing, so a testing deployment can complete the flow. In production a missing SMTP configuration is a misconfiguration and the caller is told the message was not delivered.
+> - **Verification**: `pnpm --filter backend type-check`, `pnpm --filter backend test` (67 files, 651 tests), `pnpm --filter backend route-audit:check` and `pnpm --filter frontend build` all pass.
+> - **The locale catalogue moved with it**: the new `workspace.onboarding` namespace adds 32 leaf keys and the deleted `workspace.phoneVerification` namespace removes 12, so the frontend now holds **598 leaf keys** in **41 nested objects** per language, still at exact 4-language parity. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
+
+> **Public Legal Documents and AFRO-TECH Header (2026-11-13):**
+> - The public Privacy Policy and Terms of Service are complete version 1.1 documents, effective 13 November 2026. `LegalDocumentPage.tsx` and `LegalDocumentPage.css` provide the shared breadcrumb, document header, sticky table of contents, numbered sections, responsive layout, and contact treatment. The Privacy Policy contains 16 sections; the Terms of Service contains 22.
+> - The legal text now matches the implementation: seven calendar days for automatic milestone release, the seven-day cooling-off window, a 7% freelancer platform fee and 0% client surcharge, consent-aware GA4 analytics, the export/erasure rights endpoints, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. The matching published copies are `docs/privacy-policy.md` and `docs/terms-of-service.md`.
+> - External Ethiopian counsel approval remains an external dependency. The pages and documents are complete implementation artifacts, not a claim of legal sign-off.
+> - The public header now follows the AFRO-TECH design: a fixed opaque 20px/6% bar, flex layout, 36px logo, Space Grotesk wordmark, 2.5rem underline navigation, active-page state, circular theme control, and a 290px right drawer beginning at 1024px. The drawer carries the language selector, sign-in, and registration actions; desktop retains the same Yekis controls.
+
 Last validated: 2026-11-12
 
 > **Phase 0 Decision Lock — what the user actually sees (2026-11-12):**
@@ -8,7 +127,7 @@ Last validated: 2026-11-12
 > - **No withholding yet**: the statutory withholding toggle on the fees page is labelled *deferred* and the backend deduction is commented out. Withholding is 0 until the accountant confirms the ERA remittance procedure.
 > - **Ten launch categories, and that is not a ceiling**: job posting, gig browsing and the search filters now offer Video Production, Accounting & Bookkeeping, Legal Research and Data Analytics alongside the original six, in all four languages. More can be added at any time — the list grows by an additive migration, so nothing already posted is rewritten.
 > - **CBE Birr and M-Pesa are approved rails handled manually.** Selecting either one in the wallet goes straight to the manual transfer flow with that rail's account details, a reference to quote, and a receipt upload for staff verification — no failed checkout to interpret. Telebirr is the only rail with an automated checkout.
-> - **Support**: the in-app support desk is the helpdesk. No external vendor, and the 24-hour / 3-business-day SLAs are **not** enforced by the platform yet.
+> - **Support**: the in-app support desk is the helpdesk. No external vendor; the 24-hour / 3-business-day SLAs are enforced server-side, shown on both staff queues, and counted by `GET /api/v1/admin/sla/summary`. A breach is visible and reportable, not auto-escalated.
 
 > **Multi-Language Fiscal Receipt & Payout Voucher Architecture (English Default, Amharic, Afaan Oromoo, Tigrigna) (2026-11-09):**
 > - **Clean Language Separation & Elimination of Mixed Strings**:
@@ -52,7 +171,7 @@ Last validated: 2026-11-12
 >   - **Browser Wallet (`apps/frontend/src/BrowserWallet.tsx`)**: Replaced raw inline error boxes with `Alert` using `TbFileAlert` on the automated checkout fallback banner, and updated withdrawal and top-up status messages with avatar badges.
 >   - **Workflow & Contracts Workspace (`apps/frontend/src/WorkflowWorkspace.tsx`)**: Transformed all success messages and error alerts across Jobs, Proposals, Contracts, Escrow Milestones, and Disputes into the unified `Alert` component with `TbAlertTriangle` and `Check` avatar badges.
 >   - **Chat Workspace (`apps/frontend/src/ChatWorkspace.tsx`)**: Upgraded the anti-circumvention platform safety notices with `ShieldAlert` avatar badge and error callouts with `TbFileAlert`.
->   - **Phone Verification (`apps/frontend/src/PhoneVerification.tsx`)**: Replaced plain status paragraphs with the unified `Alert` component for SMS status updates (`Info`) and verification failures (`TbFileAlert`).
+>   - **Onboarding Verification (`apps/frontend/src/OnboardingVerification.tsx`)**: Replaced plain status paragraphs with the unified `Alert` component for SMS status updates (`Info`) and verification failures (`TbFileAlert`).
 > - **Theme Parity & Design Rules Compliance**:
 >   - 100% compliant with `.agents/AGENTS.md` and `docs/rule.md`: strictly avoids low-opacity background pills, guarantees theme-invariant layout geometry, and uses bold, solid, high-contrast avatar badge backgrounds (`bg-destructive`, `bg-amber-600`, `bg-emerald-600`, `bg-sky-600`) with white icons.
 > - **Verification**:
@@ -701,7 +820,7 @@ Important controls:
 ```mermaid
 flowchart LR
   A["Escrow held"] --> B["Freelancer submits milestone"]
-  B --> C["Five-day review window"]
+  B --> C["Seven-day review window"]
   C --> D{"Client decision"}
   D -- Accept --> E["Release funds atomically"]
   D -- No response --> F["BullMQ auto-release"]
@@ -749,12 +868,14 @@ Important controls:
 |---|---|
 | Overview dashboard | Role greeting + hero CTA, featured talent / recommended jobs, expandable stat cards (wallet breakdown from top-ups, open-jobs by category, active-milestones by escrow state with ETB-secured total and a due-month bar chart), recent-activity feed with type/due-date filters and sort controls, inline milestone drill-down, live refresh status (realtime `notify:*` socket events + 60s visibility-gated poll) |
 | Authentication | Email registration/login and Telegram Mini App authentication |
+| Public legal documents | Complete version 1.1 Privacy Policy and Terms of Service with a shared table of contents, numbered sections, responsive layout, and matching Markdown publications |
 | Verification | Tier 1 document upload/status and Tier 2 request |
-| Jobs workspace | Search, post, view own jobs, bid, review/decide proposals, withdraw proposals |
+| Jobs workspace | Search, post, view own briefs, apply to a brief, withdraw a proposal |
+| Proposals workspace | The bids you sent (status, quote, withdraw) and, for a client, the pipeline of proposals against your own briefs (shortlist / accept / reject) |
 | Contracts workspace | List party contracts, open signed PDF URL, sign, fund, submit, accept |
 | Disputes workspace | List, raise, inspect, escalate, add evidence, request arbitration |
 | Wallet | Balance, manual top-up, top-up history, Tier 2 withdrawal |
-| Notifications | List unread/all notifications and mark read |
+| Notifications | List unread/all notifications and mark read; a dot on each sidebar tab that has something waiting in it |
 | Support chat | Guest or authenticated conversations and messages |
 | Staff dashboard | KYC/top-up queues, dispute resolution, TMS filing and dismissal |
 

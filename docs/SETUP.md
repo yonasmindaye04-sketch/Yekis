@@ -73,8 +73,34 @@ Confirm the following groups are configured in `apps/backend/.env`:
 - JWT: access and refresh secrets
 - Object storage: endpoint, bucket, access key, secret key
 - Provider credentials: Telebirr/CBE (CBE_WEBHOOK_SECRET) and webhook secret
+- Transactional mail: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE`, `EMAIL_FROM`
+- SMS: `SMS_ETHIOPIA_API_KEY`
 - Policy values: minimum age, withholding threshold/rates, auto-release days
 - Observability: `SENTRY_DSN`
+
+### Transactional mail and the onboarding OTP
+
+The signup flow sends a 6-digit code over **email** before the account is
+created. The mail transport is nodemailer over SMTP; the variables above are
+what it reads.
+
+- With all of `SMTP_HOST`, `SMTP_USER` and `SMTP_PASS` set, the code is sent by
+  mail to the address being registered.
+- Without them, and **outside production**, the code is written to the server
+  log instead and the API response carries it as `devCode`. A hosted testing
+  deployment therefore completes the flow without a mail provider — read the
+  code from the container log. Set `SMTP_SECURE=true` (or `SMTP_PORT=465`) for
+  implicit TLS; port 587 uses STARTTLS.
+- In **production** there is no fallback: a missing SMTP configuration is a
+  misconfiguration, and `POST /api/v1/auth/email/code` answers `503
+  EMAIL_UNAVAILABLE` rather than pretending the message was sent.
+
+`GET /api/v1/auth/verification/channels` reports which channels the running
+host can actually use (`email.available`, `phone.available`). The onboarding
+UI asks before it offers a channel, so a host without an SMS key never shows a
+"text me a code" button that can never arrive.
+
+> Blank provider credentials use development stub behavior only.
 
 For the frontend, copy its example env file:
 
@@ -86,8 +112,7 @@ Configurable groups in `apps/frontend/.env`:
 
 - Google OAuth: `VITE_GOOGLE_CLIENT_ID` (must match the backend `GOOGLE_CLIENT_ID`)
 - Analytics: `VITE_GA_MEASUREMENT_ID` (GA4 `G-…` ID; leave empty to disable — analytics only loads in production builds and only after cookie consent, so keeping it empty locally is the norm). See the "Analytics (GA4)" section of the frontend README.
-
-> Blank provider credentials use development stub behavior only.
+- Object store: `VITE_OBJECT_STORE_ORIGIN` (the store's origin, added to the production Content-Security-Policy's `img-src` so the staff console can render a KYC document from its presigned URL; unset locally, because the local MinIO is same-origin)
 
 ### Demo accounts (`SEED_DEMO_PASSWORD`)
 
@@ -231,3 +256,41 @@ Do not manually edit applied SQL.
 - Provider webhook failure: send raw JSON with the expected HMAC.
 
 See `TROUBLESHOOTING.md` for further diagnostics and `WALKTHROUGH.md` for verification scenarios.
+
+## 11. Running the whole platform in a container
+
+The repository's root `Dockerfile` builds one image that runs the API, serves the built SPA and starts a `redis-server` on loopback. It is the shape a deployment takes, because the Telegram Mini App needs the SPA and the API on one origin.
+
+```powershell
+# Build the image.
+docker build -t yekis:local .
+
+# Run it against the local infrastructure in docker-compose.yml.
+docker run --rm --name yekis-app -p 8080:8080 `
+  -e DATABASE_URL="postgresql://marketplace:marketplace_dev_only@host.docker.internal:5433/marketplace" `
+  -e REDIS_URL="redis://host.docker.internal:6379" `
+  -e JWT_ACCESS_SECRET="a-development-secret-at-least-32-characters-long" `
+  -e JWT_REFRESH_SECRET="another-development-secret-at-least-32-chars" `
+  -e OBJECT_STORE_ENDPOINT="http://host.docker.internal:9000" `
+  -e OBJECT_STORE_BUCKET="marketplace" `
+  -e OBJECT_STORE_ACCESS_KEY="marketplace" `
+  -e OBJECT_STORE_SECRET_KEY="marketplace_dev_only" `
+  -e FRONTEND_URL="http://127.0.0.1:8080" `
+  yekis:local
+```
+
+Then open `http://127.0.0.1:8080`. The API health check is `http://127.0.0.1:8080/health`, which answers `{"status":"ok"}`.
+
+What the container does at start-up, in order:
+
+1. **Redis.** Unless `REDIS_URL` names a host other than loopback, it starts the bundled `redis-server` with a generated password and rewrites `REDIS_URL` to match. Point `REDIS_URL` at the compose Redis to use that one instead.
+2. **Migrations.** `prisma migrate deploy` runs before the API starts, so the schema is never behind the code. Set `RUN_MIGRATIONS=false` to skip it.
+3. **The API.** `node apps/backend/dist/server.js`, on `$PORT` (8080 by default), binding every interface so a platform health check can reach it.
+
+Notes:
+
+- `SERVE_FRONTEND` is on in the image, so the same process serves the SPA at `/` and the API at `/api/v1`. Set `SERVE_FRONTEND=false` to serve JSON only.
+- The container runs as the unprivileged `node` user. `uploads/` (the local-disk fallback for chat attachments) is writable but **ephemeral** — it is replaced on every release, which is why the object store is the durable copy.
+- The container's `NODE_ENV` is `staging`. `production` switches on the fail-closed checks in `apps/backend/src/config/env.ts`, which require a real sanctions-screening provider and a full set of credentials.
+
+`docs/ALETCLOUD_DEPLOYMENT.md` is the runbook for deploying this image to AletCloud: the resources to create, the environment variables to set, the verification checklist, and the limitations of that platform.

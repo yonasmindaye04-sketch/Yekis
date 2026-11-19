@@ -7,6 +7,7 @@ import {
   loginUser,
   AgeRestrictionError,
   DuplicateUserError,
+  PhoneInUseError,
   InvalidCredentialsError,
   InvalidTokenError,
   requestPasswordReset,
@@ -162,7 +163,23 @@ authRouter.post("/register", registrationLimiter, async (req, res) => {
         .json({ error: "AGE_RESTRICTED", message: err.message });
     }
     if (err instanceof DuplicateUserError) {
+      // The address is already on file. The account exists, so signing in is
+      // the next step, and saying so would disclose that the address is
+      // registered — which is what the enumeration rule (L-02) forbids. The
+      // answer is the same one a successful registration gets.
       return res.status(202).json(accepted);
+    }
+    if (err instanceof PhoneInUseError) {
+      // The number is on file and the address is not, so no account can be
+      // created for this registration. Answering 202 here is what made the
+      // signup a dead end: the person was told to sign in with an address
+      // that had no account. This says what is true and names the action.
+      return res.status(409).json({
+        error: "PHONE_IN_USE",
+        message:
+          "That phone number is already registered to another account. " +
+          "Use a different number, or sign in to the account that has it.",
+      });
     }
     logger.error({ err }, "Unexpected error during registration");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
@@ -747,3 +764,16 @@ authRouter.post(
 //    explicitly rather than imported, which breaks the cycle by construction.
 import { registerPhoneVerificationRoutes } from "./phone-verification.routes.js";
 registerPhoneVerificationRoutes(authRouter);
+
+// Mounts POST /auth/email/code, POST /auth/email/verify and
+// GET /auth/verification/channels onto authRouter.
+//
+// The email channel is the onboarding OTP: the SMS provider has no key on a
+// hosted testing environment, so the signup step could not be completed at
+// all. The phone routes above are untouched — they are the money-safety
+// control on the payout number and on withdrawal approval.
+//
+// The router is passed in explicitly rather than imported, which breaks the
+// import cycle by construction (the same reason the phone routes do it).
+import { registerEmailVerificationRoutes } from "./email-verification.routes.js";
+registerEmailVerificationRoutes(authRouter);

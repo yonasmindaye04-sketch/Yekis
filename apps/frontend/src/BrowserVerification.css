@@ -1,0 +1,797 @@
+/* ── Fayda Identity Review Redesign Styles ───────────────────────────── */
+
+.idv-card {
+  color-scheme: dark;
+  --bg: #0c1117;
+  --bg-glow: rgba(43, 160, 110, 0.05);
+  --surface: #121820;
+  --surface-2: #171f29;
+  --surface-3: #1d2733;
+  --border: #243040;
+  --border-strong: #334154;
+  --text: #e7edf3;
+  --text-muted: #9fadbb;
+  --text-faint: #6e7d8c;
+  --accent: #2ba06e;
+  --accent-hover: #33b47d;
+  --accent-contrast: #042417;
+  --accent-soft: rgba(43, 160, 110, 0.13);
+  --accent-ring: rgba(43, 160, 110, 0.28);
+  --accent-text: #4cc794;
+  --warn: #d9a733;
+  --warn-soft: rgba(217, 167, 51, 0.12);
+  --danger: #e0655f;
+  --danger-soft: rgba(224, 101, 95, 0.12);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -12px rgba(0, 0, 0, 0.55);
+  --radius: 14px;
+  --radius-sm: 10px;
+
+  width: 100%;
+  max-width: 880px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  font-family: inherit;
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+:root[data-theme="light"] .idv-card,
+[data-theme="light"] .idv-card {
+  color-scheme: light;
+  --bg: #eef1f4;
+  --bg-glow: rgba(12, 122, 82, 0.05);
+  --surface: #ffffff;
+  --surface-2: #f6f8fa;
+  --surface-3: #eef2f5;
+  --border: #e2e8ee;
+  --border-strong: #c6d0da;
+  --text: #1b2530;
+  --text-muted: #55677a;
+  --text-faint: #8b98a6;
+  --accent: #0c7a52;
+  --accent-hover: #0a6a47;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(12, 122, 82, 0.09);
+  --accent-ring: rgba(12, 122, 82, 0.22);
+  --accent-text: #0c7a52;
+  --warn: #9a6f0e;
+  --warn-soft: rgba(180, 130, 20, 0.12);
+  --danger: #c2413b;
+  --danger-soft: rgba(194, 65, 59, 0.09);
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 16px 40px -16px rgba(16, 24, 40, 0.18);
+}
+
+.idv-card *,
+.idv-card *::before,
+.idv-card *::after {
+  box-sizing: border-box;
+}
+
+.idv-inner {
+  padding: 30px 34px 26px;
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+.idv-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.idv-header-main {
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.idv-emblem {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+  display: grid;
+  place-items: center;
+  color: var(--accent-text);
+}
+
+.idv-overline {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  margin-bottom: 5px;
+}
+
+.idv-title {
+  font-size: 23px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  margin: 0 0 7px;
+  color: var(--text);
+}
+
+.idv-sub {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 56ch;
+  margin: 0;
+}
+
+.idv-header-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.idv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.idv-chip .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+
+.idv-chip.is-review {
+  color: var(--accent-text);
+  border-color: var(--accent-ring);
+  background: var(--accent-soft);
+}
+
+.idv-chip.is-review .dot {
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+  animation: idv-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes idv-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.idv-secured {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.idv-secured svg {
+  color: var(--text-faint);
+  display: block;
+}
+
+.idv-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 24px 0;
+  border: 0;
+}
+
+/* ── Success banner (after submit) ─────────────────────────────── */
+.idv-banner {
+  display: none;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-ring);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 22px;
+}
+
+.idv-banner.show {
+  display: flex;
+}
+
+.idv-banner svg {
+  flex: none;
+  color: var(--accent-text);
+  margin-top: 1px;
+  display: block;
+}
+
+.idv-banner strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 2px;
+  color: var(--text);
+}
+
+.idv-banner p {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.idv-banner button {
+  margin-left: auto;
+  flex: none;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Fields ────────────────────────────────────────────────────── */
+.idv-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 22px;
+}
+
+.idv-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.idv-field.span-2 {
+  grid-column: 1 / -1;
+}
+
+.idv-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.idv-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+
+.idv-label-hint {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+.idv-control {
+  position: relative;
+}
+
+.idv-control > svg {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+  display: block;
+}
+
+.idv-card .idv-input,
+.idv-input {
+  width: 100%;
+  height: 46px;
+  font: inherit;
+  font-size: 14.5px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0 14px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.25s ease;
+}
+
+.idv-card .idv-control.has-icon .idv-input,
+.idv-control.has-icon .idv-input {
+  padding-left: 41px;
+}
+
+.idv-card .idv-input::placeholder,
+.idv-input::placeholder {
+  color: var(--text-faint);
+}
+
+.idv-card .idv-input:hover,
+.idv-input:hover {
+  border-color: var(--border-strong);
+}
+
+.idv-card .idv-input:focus,
+.idv-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+  background: var(--surface);
+  outline: none;
+}
+
+.idv-card .idv-input:disabled,
+.idv-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.idv-card .idv-input[type="date"],
+.idv-input[type="date"] {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 13.5px;
+}
+
+.idv-help {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.idv-error {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--danger);
+  margin: 0;
+}
+
+.idv-error svg {
+  flex: none;
+  display: block;
+}
+
+.idv-field.invalid .idv-error {
+  display: flex;
+}
+
+.idv-field.invalid .idv-input,
+.idv-field.invalid .idv-drop {
+  border-color: var(--danger);
+}
+
+.idv-field.invalid .idv-input:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+/* ── Upload zone ───────────────────────────────────────────────── */
+.idv-drop {
+  margin-top: 2px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 12px;
+  background: var(--surface-2);
+  padding: 26px 20px;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.idv-drop:hover {
+  border-color: var(--accent);
+  background: var(--surface-3);
+}
+
+.idv-drop:focus-visible {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.idv-drop.dragover {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.idv-drop-icon {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.idv-drop-icon svg {
+  display: block;
+}
+
+.idv-drop:hover .idv-drop-icon,
+.idv-drop.dragover .idv-drop-icon {
+  color: var(--accent-text);
+  border-color: var(--accent-ring);
+}
+
+.idv-drop-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.idv-drop-title .browse {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.idv-drop-sub {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.idv-drop.has-file {
+  cursor: default;
+  padding: 14px 16px;
+  text-align: left;
+  border-style: solid;
+  border-color: var(--border);
+}
+
+.idv-drop.has-file:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+}
+
+.idv-file {
+  display: none;
+  align-items: center;
+  gap: 13px;
+}
+
+.idv-drop.has-file .idv-file {
+  display: flex;
+}
+
+.idv-drop.has-file .idv-drop-empty {
+  display: none;
+}
+
+.idv-file-thumb {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-3);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.idv-file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.idv-file-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.idv-file-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 3px;
+  color: var(--text);
+}
+
+.idv-file-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+.idv-file-status .ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.idv-file-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.idv-file-actions .replace {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.idv-file-actions .replace:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.idv-file-actions .remove {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: 0;
+  border-radius: 7px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.idv-file-actions .remove:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* ── Security note ─────────────────────────────────────────────── */
+.idv-note {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 22px;
+  padding: 13px 15px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.idv-note-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  display: grid;
+  place-items: center;
+  color: var(--accent-text);
+}
+
+.idv-note-icon svg {
+  display: block;
+}
+
+.idv-note p {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  padding-top: 4px;
+  margin: 0;
+}
+
+.idv-note strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── Submit row ────────────────────────────────────────────────── */
+.idv-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 24px;
+}
+
+.idv-consent {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  max-width: 42ch;
+  margin: 0;
+}
+
+.idv-submit {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  height: 46px;
+  padding: 0 22px;
+  color: var(--accent-contrast);
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.15s ease, transform 0.1s ease, opacity 0.15s ease;
+}
+
+.idv-submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.idv-submit:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.idv-submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring), 0 0 0 5px var(--surface);
+}
+
+.idv-submit:disabled {
+  opacity: 0.75;
+  cursor: default;
+}
+
+.idv-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: idv-spin 0.7s linear infinite;
+  display: none;
+}
+
+.idv-submit.loading .idv-spinner {
+  display: block;
+}
+
+.idv-submit.loading .idv-submit-icon {
+  display: none;
+}
+
+@keyframes idv-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── "What happens next" strip ─────────────────────────────────── */
+.idv-steps {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px 34px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  flex-wrap: wrap;
+}
+
+.idv-steps-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-right: 4px;
+}
+
+.idv-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.idv-step b {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.idv-step.current b {
+  background: var(--accent-soft);
+  border-color: var(--accent-ring);
+  color: var(--accent-text);
+}
+
+.idv-step.current {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.idv-step-arrow {
+  color: var(--text-faint);
+  flex: none;
+  display: block;
+}
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .idv-inner {
+    padding: 24px 20px 22px;
+  }
+  .idv-steps {
+    padding: 14px 20px;
+  }
+  .idv-header {
+    flex-direction: column;
+  }
+  .idv-header-side {
+    flex-direction: row;
+    align-items: center;
+    padding-top: 0;
+  }
+  .idv-grid {
+    grid-template-columns: 1fr;
+  }
+  .idv-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .idv-submit {
+    justify-content: center;
+  }
+  .idv-consent {
+    max-width: none;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idv-card *,
+  .idv-card *::before,
+  .idv-card *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

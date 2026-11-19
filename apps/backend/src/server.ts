@@ -3,12 +3,19 @@
 // async route handlers forward to the central error handler instead of
 // becoming unhandled rejections (which crash Node >= 15).
 import "express-async-errors";
-import { env } from "./config/env.js";
+import { env, tlsVerificationBypassed } from "./config/env.js";
 
 // Telebirr's developer portal uses a self-signed/untrusted certificate.
-// We must bypass Node's strict TLS validation in development, otherwise
-// fetch() calls to their API will fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
-if (env.NODE_ENV !== "production") {
+// We must bypass Node's strict TLS validation there, otherwise fetch() calls
+// to their API will fail with UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+//
+// The bypass is deliberately narrow: NODE_TLS_REJECT_UNAUTHORIZED is a
+// process-wide switch, so it is only enabled for a development build or for a
+// deployment explicitly pointed at the Telebirr sandbox. See
+// `tlsVerificationBypassed()` for why "not production" is not the right
+// test — a staging box used to run with every outbound certificate check
+// disabled.
+if (tlsVerificationBypassed(env)) {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
@@ -70,6 +77,18 @@ if (env.NODE_ENV === "production" && env.FAYDA_SIMULATE_UNAVAILABLE) {
 
 const app = buildApp();
 
+// NOTE ON THE BIND ADDRESS
+// ------------------------
+// No host is passed to `listen()`, so Node binds the unspecified address:
+// `::` where IPv6 is available, `0.0.0.0` otherwise. Both accept connections
+// on every interface, which is what a container platform's health check
+// needs — a process bound to `localhost` is invisible both to the check and
+// to every visitor, and that is the single most common reason a build
+// succeeds and an app never comes up.
+//
+// It is left unbound on purpose. Passing "0.0.0.0" explicitly would narrow
+// it to IPv4 only, and `http://localhost:4000` resolves to `::1` first on
+// several systems, so a local `fetch` would start failing with ECONNREFUSED.
 const server = app.listen(env.PORT, async () => {
   logger.info(`🚀 API listening on port ${env.PORT} (${env.NODE_ENV})`);
 

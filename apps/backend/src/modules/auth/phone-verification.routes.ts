@@ -109,6 +109,7 @@ export function registerPhoneVerificationRoutes(router: Router): void {
           sent: true,
           expiresAt: challenge.expiresAt,
           retryAfterSec: challenge.retryAfterSec,
+          ...(challenge.channel ? { channel: challenge.channel } : {}),
           ...(challenge.devCode && env.NODE_ENV !== "production"
             ? { devCode: challenge.devCode }
             : {}),
