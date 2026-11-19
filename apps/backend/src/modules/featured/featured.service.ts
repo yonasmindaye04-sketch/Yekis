@@ -32,6 +32,7 @@ export async function refreshFeaturedCarousel() {
         user: {
           include: {
             primarySkill: true,
+            skills: { include: { skill: true } },
             kyc: true,
           },
         },
@@ -63,6 +64,7 @@ export async function refreshFeaturedCarousel() {
       take: 10,
       include: {
         primarySkill: true,
+        skills: { include: { skill: true } },
         kyc: true,
       },
     });
@@ -99,6 +101,7 @@ export async function refreshFeaturedCarousel() {
       take: 10,
       include: {
         primarySkill: true,
+        skills: { include: { skill: true } },
         kyc: true,
       },
     });
@@ -131,6 +134,7 @@ export async function refreshFeaturedCarousel() {
       take: 5,
       include: {
         primarySkill: true,
+        skills: { include: { skill: true } },
         kyc: true,
       },
     });
@@ -217,11 +221,19 @@ function buildFeaturedCard(user: any, reason: string) {
     (user.email ? user.email.split("@")[0] : null) ||
     "Verified Freelancer";
 
+  const skillNames: string[] = Array.isArray(user.skills)
+    ? user.skills
+        .map((s: any) => s.skill?.nameEn || s.skill?.nameAm || s.skill?.id)
+        .filter(Boolean)
+    : [];
+
   return {
     id: user.id,
     ucid: user.ucid,
     displayName: resolvedDisplayName,
     avatarUrl: user.avatarUrl,
+    bio: user.bio || null,
+    skills: skillNames,
     primarySkill: user.primarySkill
       ? {
           id: user.primarySkill.id,
@@ -234,6 +246,12 @@ function buildFeaturedCard(user: any, reason: string) {
     ratingCount: user.ratingCount,
     totalJobsCompleted: user.totalJobsCompleted,
     kycBadge: user.kyc?.status === "VERIFIED" ? "shield" : null,
+    kycTier:
+      user.kyc?.tier === "TIER_3"
+        ? 3
+        : user.kyc?.tier === "TIER_2"
+          ? 2
+          : 1,
     isAvailableForWork: user.isAvailableForWork,
     reason,
   };

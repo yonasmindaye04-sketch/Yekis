@@ -15,10 +15,16 @@ export interface StoredAvatarOverride {
 export function loadAvatarOverride(userId?: string | null): StoredAvatarOverride | null {
   if (typeof window === "undefined") return null;
   try {
-    const keys = [
-      userId ? `${AVATAR_OVERRIDE_PREFIX}${userId}` : null,
-      `${AVATAR_OVERRIDE_PREFIX}me`,
-    ].filter(Boolean) as string[];
+    // Only look up by explicit userId. Never fall back to the "me" shortcut
+    // when a userId is supplied — that would leak the signed-in user's photo
+    // onto other users' avatar cards.
+    const keys: string[] = [];
+    if (userId) {
+      keys.push(`${AVATAR_OVERRIDE_PREFIX}${userId}`);
+    } else {
+      // No userId at all — only then use the "me" shortcut (own-profile contexts).
+      keys.push(`${AVATAR_OVERRIDE_PREFIX}me`);
+    }
     for (const k of keys) {
       const raw = window.localStorage.getItem(k);
       if (raw) {
@@ -43,7 +49,12 @@ export function saveAvatarOverride(
     };
     const serialized = JSON.stringify(payload);
     window.localStorage.setItem(`${AVATAR_OVERRIDE_PREFIX}${userId}`, serialized);
-    window.localStorage.setItem(`${AVATAR_OVERRIDE_PREFIX}me`, serialized);
+    // Only mirror to the "me" shortcut when the real ID is not yet resolved.
+    // Writing it unconditionally would cause the signed-in user's photo to
+    // leak onto every other user's avatar card that lacks an explicit userId.
+    if (userId === "me") {
+      window.localStorage.setItem(`${AVATAR_OVERRIDE_PREFIX}me`, serialized);
+    }
     window.dispatchEvent(
       new CustomEvent(AVATAR_UPDATED_EVENT, { detail: { userId, ...payload } }),
     );

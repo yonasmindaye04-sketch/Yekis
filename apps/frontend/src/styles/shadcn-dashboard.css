@@ -6,8 +6,104 @@
    - Supports Sidebar, Inset, and Floating shell variants + Compact/Comfortable density
    ============================================================================ */
 
+/* === Dashboard design tokens ==============================================
+   The dashboard blocks read as one flat, hairline-bordered surface: neutral
+   fills, no stacked shadows, a 14–18px card radius and a compact medium-weight
+   type scale. These tokens capture that language once so the shell, cards,
+   charts and tables can share it instead of repeating hardcoded values.
+
+   Shape, spacing and type are theme-invariant (AGENTS.md). Only the colour
+   tokens are redefined for the dark theme below.
+   ========================================================================= */
+
 :root {
-  --sh-radius: 0.5rem;
+  /* Shape */
+  --sh-radius-xs: 6px;
+  --sh-radius-control: 10px;
+  --sh-radius-card: 14px;
+  --sh-radius-panel: 18px;
+  --sh-radius: 0.5rem; /* Legacy default; the overview opts into the card radius. */
+  --sh-radius-pill: 999px;
+
+  /* Spacing */
+  --sh-card-pad-x: 20px;
+  --sh-card-pad-y: 18px;
+  --sh-gap: 16px;
+  --sh-gap-lg: 24px;
+
+  /* Typography */
+  --sh-font-sans: "Geist", var(--font-sans);
+  --sh-text-meta: 0.75rem; /* 12px */
+  --sh-text-label: 0.8125rem; /* 13px */
+  --sh-text-body: 0.875rem; /* 14px */
+  --sh-text-title: 1.0625rem; /* 17px */
+  --sh-text-metric: 2rem; /* 32px */
+  --sh-weight-label: 500;
+  --sh-weight-metric: 500;
+  --sh-tracking-tight: -0.02em;
+
+  /* Elevation — flat by default, one hairline lift where needed. */
+  --sh-shadow-card: none;
+  --sh-shadow-raised: 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+:root,
+:root[data-theme="light"] {
+  /* Surfaces */
+  --sh-page-bg: #f7f8f9;
+  --sh-surface: #ffffff;
+  --sh-surface-muted: #f6f7f8;
+  --sh-surface-hover: #eef1f3;
+  --sh-border-color: #e9edef;
+  --sh-border-strong: #d9e1e5;
+
+  /* Text */
+  --sh-text: #0f172a;
+  --sh-text-secondary: #475569;
+  --sh-text-muted: #7c8794;
+
+  /* Accents — Yekis emerald stays the primary; the tones are for KPI icons. */
+  --sh-accent: var(--color-primary);
+  --sh-accent-soft: var(--color-primary-light);
+  --sh-positive: var(--color-success);
+  --sh-tone-green: #16a34a;
+  --sh-tone-blue: #2f80ff;
+  --sh-tone-teal: #0d9488;
+  --sh-tone-amber: #d97706;
+  --sh-tone-violet: #7c3aed;
+}
+
+:root[data-theme="dark"],
+.dark {
+  /* Neutral near-black canvas, matching the installed blocks. */
+  --sh-page-bg: #0a0c0d;
+  --sh-surface: #16191b;
+  --sh-surface-muted: #1d2124;
+  --sh-surface-hover: #242a2e;
+  --sh-border-color: rgb(255 255 255 / 9%);
+  --sh-border-strong: rgb(255 255 255 / 16%);
+
+  --sh-text: #f4f6f7;
+  --sh-text-secondary: #c3ccd2;
+  --sh-text-muted: #8d99a2;
+
+  --sh-accent: var(--color-primary);
+  --sh-accent-soft: var(--color-primary-light);
+  --sh-positive: var(--color-success);
+  --sh-tone-green: #4ade80;
+  --sh-tone-blue: #4d8dff;
+  --sh-tone-teal: #2dd4bf;
+  --sh-tone-amber: #f0b429;
+  --sh-tone-violet: #a78bfa;
+}
+
+/* The overview workspace opts into the block typography first. The shell,
+   KPI cards, charts and tables consume the rest of the token layer in the
+   following passes. */
+.sh-workspace-view {
+  --sh-radius: var(--sh-radius-card);
+  font-family: var(--sh-font-sans);
+  color: var(--sh-text);
 }
 
 .sh-mono {
