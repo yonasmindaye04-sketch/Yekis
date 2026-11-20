@@ -998,6 +998,10 @@ all, and a deploy of `main` would have failed in the image build.
 - The app came back **LIVE** at `2026-11-20T13:15:51Z` (previously
   `2026-11-19T19:14:51Z`), serving `/assets/index-DJckh7C0.js` (previously
   `/assets/index-DW4Isqrs.js`), with all **50** environment variables intact.
+  The host was rebuilt once more at `2026-11-20T14:19:02Z` after the
+  documentation commit below, and the verification here was taken against that
+  build (the code is identical — the follow-up commit touches documentation
+  only, so the bundle hash is the same).
 - `POST /api/v1/auth/email/code` now answers **`503`
   `{"error":"EMAIL_UNAVAILABLE","message":"Could not send an email to that
   address. Check it and try again."}`** — **no code, no `devCode`**. The row is

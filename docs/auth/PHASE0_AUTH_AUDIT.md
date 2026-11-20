@@ -883,9 +883,11 @@ signup flow end to end once the mail transport works.
 ## Appendix A — evidence log (2026-11-19, re-probed 2026-11-20)
 
 The first nine rows are the **pre-fix** probes of 2026-11-19 — the evidence for
-F-01, F-02 and F-08. Rows E-10 to E-13 are the **post-fix** re-probes of
+F-01, F-02 and F-08. Rows E-10 to E-14 are the **post-fix** re-probes of
 2026-11-20, taken against the deployment of `57dc847` on
-`https://yekis.app.aletcloud.com` (`lastDeployedAt` `2026-11-20T13:15:51Z`).
+`https://yekis.app.aletcloud.com` (`lastDeployedAt` `2026-11-20T13:15:51Z`;
+the host was rebuilt again at `2026-11-20T14:19:02Z` for a documentation-only
+commit, and the probes below were taken against that build).
 
 | # | Check | Result |
 |---|---|---|
