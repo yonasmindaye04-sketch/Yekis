@@ -33,7 +33,7 @@ import { HandWrittenTitle } from "./components/HandWrittenTitle";
 import { ProximityPopTitle } from "./components/ProximityPopTitle";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
-import { LanguageSelector } from "./components/LanguageSelector";
+import { FooterV2 } from "./MarketingFooter";
 import "./landing-v2.css";
 
 /* ─────────────────────────────────────────────────
@@ -201,6 +201,41 @@ const prefersReduced = () =>
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+function useSectionVisible(
+  ref: React.RefObject<HTMLElement | null>,
+  rootMargin = "160px 0px",
+  threshold = 0.01,
+  once = false
+) {
+  const [visible, setVisible] = useState(() => (typeof window === "undefined" ? true : prefersReduced()));
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (prefersReduced() || !("IntersectionObserver" in window)) {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) {
+          if (en.isIntersecting) {
+            setVisible(true);
+            if (once) io.disconnect();
+          } else if (!once) {
+            setVisible(false);
+          }
+        }
+      },
+      { rootMargin, threshold }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, rootMargin, threshold, once]);
+
+  return visible;
+}
+
 /* ─────────────────────────────────────────────────
    Toast bus (isolated to V2)
 ───────────────────────────────────────────────── */
@@ -259,7 +294,7 @@ function Reveal({
   dir = "up",
   delay = 0,
   className,
-  amount = 0.08,
+  amount = 0.1,
   style,
 }: {
   children: React.ReactNode;
@@ -271,12 +306,12 @@ function Reveal({
 }) {
   const hidden =
     dir === "left"
-      ? { opacity: 0, x: -18 }
+      ? { opacity: 0, x: -28 }
       : dir === "right"
-        ? { opacity: 0, x: 18 }
+        ? { opacity: 0, x: 28 }
         : dir === "zoom"
-          ? { opacity: 0, scale: 0.97 }
-          : { opacity: 0, y: 16 };
+          ? { opacity: 0, y: 18, scale: 0.96 }
+          : { opacity: 0, y: 28 };
   return (
     <motion.div
       className={className}
@@ -284,7 +319,7 @@ function Reveal({
       initial={hidden}
       whileInView={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       viewport={{ once: true, amount }}
-      transition={{ duration: 0.26, delay: Math.min(delay, 0.06), ease: EASE }}
+      transition={{ duration: 0.52, delay: Math.min(delay, 0.14), ease: EASE }}
     >
       {children}
     </motion.div>
@@ -422,6 +457,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
+  const heroInView = useSectionVisible(heroRef, "180px 0px");
 
   useEffect(() => {
     if (settled) return;
@@ -437,6 +473,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
     if (!layer || !inner) return;
     let raf = 0;
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
       if (window.scrollY > window.innerHeight) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
@@ -455,7 +492,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
   }, []);
 
   return (
-    <section className="v2-hero" id="top" ref={heroRef}>
+    <section className={`v2-hero${heroInView ? " v2-inview" : ""}`} id="top" ref={heroRef}>
       <div className="v2-hero-backdrop" aria-hidden="true">
         {/* ambient glow orbs */}
         <div className="v2-fp-glow v2-fp-glow-one" />
@@ -666,6 +703,7 @@ function EscrowSection() {
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const ghostRefs = useRef<(HTMLDivElement | null)[]>([]);
   const glowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const stageInView = useSectionVisible(stageRef, "180px 0px");
 
   const isCard =
     typeof window !== "undefined" &&
@@ -702,9 +740,8 @@ function EscrowSection() {
       return;
     }
 
-    let raf = 0;
-
     if (isCard) {
+      let raf = 0;
       const LOOP_MS = 6000;
       const start = performance.now();
       const autoTick = (now: number) => {
@@ -717,19 +754,48 @@ function EscrowSection() {
       return () => cancelAnimationFrame(raf);
     }
 
-    const progress = () => {
-      const rect = stage.getBoundingClientRect();
-      const total = stage.offsetHeight - window.innerHeight;
-      const passed = Math.min(Math.max(-rect.top, 0), Math.max(total, 0));
-      return total > 0 ? passed / total : 0;
+    let stageTop = 0;
+    let totalScrollable = 1;
+    let raf = 0;
+
+    const measure = () => {
+      stageTop = stage.getBoundingClientRect().top + window.scrollY;
+      totalScrollable = Math.max(1, stage.offsetHeight - window.innerHeight);
     };
 
-    const tick = () => {
-      apply(Math.min(N - 1, Math.floor(progress() * N + 1e-4)));
-      raf = requestAnimationFrame(tick);
+    const updateFromScroll = () => {
+      raf = 0;
+      const passed = Math.min(Math.max(window.scrollY - stageTop, 0), totalScrollable);
+      const p = passed / totalScrollable;
+      apply(Math.min(N - 1, Math.floor(p * N + 1e-4)));
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(updateFromScroll);
+    };
+
+    const onResize = () => {
+      measure();
+      updateFromScroll();
+    };
+
+    measure();
+    updateFromScroll();
+
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(stage);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      if (ro) ro.disconnect();
+    };
   }, [isCard]);
 
   return (
@@ -737,7 +803,7 @@ function EscrowSection() {
       <EscrowSvgDefs />
       <section
         ref={stageRef}
-        className="stage"
+        className={`stage${stageInView ? " v2-inview" : ""}`}
         id="how-it-works"
         aria-label="How YEKIS works, step by step"
       >
@@ -833,13 +899,22 @@ function EscrowSection() {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
+  const feesRef = useRef<HTMLElement>(null);
+  const feesInView = useSectionVisible(feesRef, "180px 0px");
+
   return (
-    <section id="fees">
-      <HandWrittenTitle
-        eyebrow="Yekis Jobs"
-        title="Make ideas visible."
-        subtitle="Where verified Ethiopian talent and ambitious teams build together."
-      />
+    <section
+      id="fees"
+      ref={feesRef}
+      className={`v2-fees-section${feesInView ? " v2-inview" : ""}`}
+    >
+      <Reveal dir="zoom" amount={0.14}>
+        <HandWrittenTitle
+          eyebrow="Yekis Jobs"
+          title="Make ideas visible."
+          subtitle="Where verified Ethiopian talent and ambitious teams build together."
+        />
+      </Reveal>
     </section>
   );
 }
@@ -872,6 +947,7 @@ const easeOutExpo = (t: number) => {
 
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
+  const rootRef = useRef<HTMLElement>(null);
   const cardRefs = useRef<(HTMLElement | null)[]>([]);
   const copyRefs = useRef<(HTMLDivElement | null)[]>([]);
   const mediaRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -879,6 +955,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
   const pinRef = useRef<HTMLElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const outroRef = useRef<HTMLElement>(null);
+  const catInView = useSectionVisible(rootRef, "240px 0px");
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [hudOn, setHudOn] = useState(false);
@@ -1044,10 +1121,19 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     const introTotal = (total - 1) * STK_STAGGER_MS + STK_CARD_MS;
     let wrapTop = 0;
     let span = 1;
+    let pinLeft = 0;
+    let pinTop = 0;
+    let pinWidth = 1;
+    let pinHeight = 1;
 
     const measure = () => {
       wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
       span = Math.max(1, wrap.offsetHeight - window.innerHeight);
+      const pr = pin.getBoundingClientRect();
+      pinLeft = pr.left + window.scrollX;
+      pinTop = pr.top + window.scrollY;
+      pinWidth = Math.max(1, pr.width);
+      pinHeight = Math.max(1, pr.height);
     };
     measure();
 
@@ -1100,7 +1186,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
         const rx = lerp(STK_ENTER_RX, pose.rx, e);
         const sc = lerp(STK_ENTER_SCALE, pose.sc, e);
         card.style.opacity = clamp(e * 1.6, 0, 1).toFixed(3);
-        card.style.transform = `translate(-50%, ${y.toFixed(2)}%) rotateX(${rx.toFixed(
+        card.style.transform = `translate3d(-50%, ${y.toFixed(2)}%, 0) rotateX(${rx.toFixed(
           2
         )}deg) scale(${sc.toFixed(3)})`;
         const tVal = pose.t * e;
@@ -1179,54 +1265,27 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
     let ty = 0;
     let sx = 0;
     let sy = 0;
-
-    const onPointerMove = (e: PointerEvent) => {
-      if (e.pointerType === "touch") return;
-      const r = pin.getBoundingClientRect();
-      tx = ((e.clientX - r.left) / r.width - 0.5) * 2;
-      ty = ((e.clientY - r.top) / r.height - 0.5) * 2;
-    };
-    const onPointerLeave = () => {
-      tx = 0;
-      ty = 0;
-    };
-
-    if (!isCard) {
-      pin.addEventListener("pointermove", onPointerMove);
-      pin.addEventListener("pointerleave", onPointerLeave);
-    }
+    let isNear = true;
+    let raf = 0;
 
     let introStarted = isCard || wrap.getBoundingClientRect().top <= window.innerHeight * 0.92;
     let introStart = introStarted ? performance.now() : 0;
-    let wrapIO: IntersectionObserver | null = null;
-    if (!introStarted && "IntersectionObserver" in window) {
-      wrapIO = new IntersectionObserver(
-        (entries) => {
-          for (const en of entries) {
-            if (en.isIntersecting) {
-              introStarted = true;
-              introStart = performance.now();
-              wrapIO?.disconnect();
-              break;
-            }
-          }
-        },
-        { threshold: 0.04 }
-      );
-      wrapIO.observe(wrap);
-    }
 
     const cardStart = performance.now();
-    let lastP = 0;
+    let lastP = progressFromScroll();
+    let lastRenderedP = -1;
     let vel = 0;
-    let raf = 0;
 
     const loop = (now: number) => {
-      if (!introStarted && wrap.getBoundingClientRect().top <= window.innerHeight * 0.95) {
+      raf = 0;
+      if (!isCard && !isNear) return;
+
+      if (!introStarted && window.scrollY + window.innerHeight * 0.95 >= wrapTop) {
         introStarted = true;
         introStart = now;
       }
-      const elapsed = introStarted ? now - introStart : 0;
+
+      const elapsed = introStarted ? Math.max(0, now - introStart) : 0;
       let p: number;
       if (isCard) {
         const loopT = ((now - cardStart) % STK_CARD_LOOP_MS) / STK_CARD_LOOP_MS;
@@ -1235,28 +1294,105 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       } else {
         p = progressFromScroll();
       }
-      vel = lerp(vel, clamp((p - lastP) * STK_VEL_KICK, -STK_VEL_MAX, STK_VEL_MAX), 0.12);
-      lastP = p;
-      sx = lerp(sx, tx, 0.06);
-      sy = lerp(sy, ty, 0.06);
-      stage.style.transform = `rotateX(${(vel - sy * STK_TILT_X).toFixed(
-        2
-      )}deg) rotateY(${(sx * STK_TILT_Y).toFixed(2)}deg)`;
 
-      const active = render(p, elapsed);
-      syncHud(active);
+      vel = lerp(vel, clamp((p - lastP) * STK_VEL_KICK, -STK_VEL_MAX, STK_VEL_MAX), 0.14);
+      lastP = p;
+      sx = lerp(sx, tx, 0.09);
+      sy = lerp(sy, ty, 0.09);
+
+      const tiltX = vel - sy * STK_TILT_X;
+      const tiltY = sx * STK_TILT_Y;
+      stage.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)`;
+
+      const introRunning = introStarted && elapsed < introTotal;
+      if (introRunning || Math.abs(p - lastRenderedP) > 1e-5) {
+        lastRenderedP = p;
+        const active = render(p, elapsed);
+        syncHud(active);
+      }
+
       if (elapsed >= introTotal && !didHudOn) {
         didHudOn = true;
         setHudOn(true);
       }
-      raf = requestAnimationFrame(loop);
+
+      const settled =
+        !isCard &&
+        (!introStarted || elapsed >= introTotal) &&
+        Math.abs(vel) < 0.015 &&
+        Math.abs(sx - tx) < 0.002 &&
+        Math.abs(sy - ty) < 0.002 &&
+        Math.abs(p - progressFromScroll()) < 1e-5;
+
+      if (!settled) {
+        raf = requestAnimationFrame(loop);
+      } else {
+        vel = 0;
+        sx = tx;
+        sy = ty;
+        stage.style.transform = `rotateX(${(-sy * STK_TILT_X).toFixed(2)}deg) rotateY(${(
+          sx * STK_TILT_Y
+        ).toFixed(2)}deg)`;
+      }
     };
-    raf = requestAnimationFrame(loop);
+
+    const ensureLoop = () => {
+      if (!raf && (isCard || isNear)) {
+        raf = requestAnimationFrame(loop);
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const pinViewportTop = pinTop - window.scrollY;
+      tx = ((e.clientX + window.scrollX - pinLeft) / pinWidth - 0.5) * 2;
+      ty = ((e.clientY - pinViewportTop) / pinHeight - 0.5) * 2;
+      ensureLoop();
+    };
+    const onPointerLeave = () => {
+      tx = 0;
+      ty = 0;
+      ensureLoop();
+    };
+
+    let wrapIO: IntersectionObserver | null = null;
+    if (!isCard && "IntersectionObserver" in window) {
+      wrapIO = new IntersectionObserver(
+        (entries) => {
+          for (const en of entries) {
+            isNear = en.isIntersecting;
+            if (en.isIntersecting) {
+              if (!introStarted) {
+                introStarted = true;
+                introStart = performance.now();
+              }
+              ensureLoop();
+            }
+          }
+        },
+        { rootMargin: "250px 0px", threshold: 0.01 }
+      );
+      wrapIO.observe(wrap);
+    }
+
+    const onScroll = () => ensureLoop();
+
+    if (!isCard) {
+      window.addEventListener("scroll", onScroll, { passive: true });
+      pin.addEventListener("pointermove", onPointerMove, { passive: true });
+      pin.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    }
+
+    // Initial render so cards are positioned properly at current scroll offset
+    const initActive = render(lastP, introStarted ? 0 : 0);
+    syncHud(initActive);
+    if (isNear || isCard) ensureLoop();
 
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       window.removeEventListener("resize", measure);
       if (!isCard) {
+        window.removeEventListener("scroll", onScroll);
         pin.removeEventListener("pointermove", onPointerMove);
         pin.removeEventListener("pointerleave", onPointerLeave);
       }
@@ -1272,9 +1408,14 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
   );
 
   return (
-    <section className="v2-section stk-root" id="categories" aria-label="Explore expertise">
+    <section
+      ref={rootRef}
+      className={`v2-section stk-root${catInView ? " v2-inview" : ""}`}
+      id="categories"
+      aria-label="Explore expertise"
+    >
       <div className="v2-container stk-section-head">
-        <Reveal delay={0.05}>
+        <Reveal delay={0.04}>
           <h2 className="v2-sec-title">{t.marketing.categories.title}</h2>
         </Reveal>
         <Reveal delay={0.1}>
@@ -1495,6 +1636,8 @@ function ReviewCard({ review }: { review: MemberReview }) {
 
 function TestimonialsSection() {
   const { t } = useI18n();
+  const sectionRef = useRef<HTMLElement>(null);
+  const inView = useSectionVisible(sectionRef, "180px 0px");
   const columns = useMemo(() => {
     const cols: MemberReview[][] = [[], [], []];
     REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
@@ -1502,46 +1645,54 @@ function TestimonialsSection() {
   }, []);
 
   return (
-    <section className="v2-section v2-testi" aria-labelledby="v2-testi-title">
+    <section
+      ref={sectionRef}
+      className={`v2-section v2-testi${inView ? " v2-inview" : ""}`}
+      aria-labelledby="v2-testi-title"
+    >
       <div className="v2-testi-aurora" aria-hidden="true" />
       <div className="v2-container">
         <div className="v2-center">
-          <Reveal delay={0.06}>
+          <Reveal delay={0.04}>
             <h2 className="v2-sec-title" id="v2-testi-title">
               {t.marketing.testimonials.title}
             </h2>
           </Reveal>
-          <Reveal delay={0.14}>
+          <Reveal delay={0.1}>
             <p className="v2-sec-sub v2-testi-sub">
               {t.marketing.testimonials.subtitle}
             </p>
           </Reveal>
         </div>
 
-        <div className="v2-testi-marquee">
-          {columns.map((col, i) => (
-            <div
-              className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
-              key={`col-${i}`}
-              style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
-            >
-              <div className="v2-testi-track">
-                <div className="v2-testi-copy">
-                  {col.map((r) => (
-                    <ReviewCard key={r.name} review={r} />
-                  ))}
-                </div>
-                <div className="v2-testi-copy" aria-hidden="true">
-                  {col.map((r) => (
-                    <ReviewCard key={`${r.name}-loop`} review={r} />
-                  ))}
+        <Reveal dir="up" amount={0.08} delay={0.08}>
+          <div className="v2-testi-marquee">
+            {columns.map((col, i) => (
+              <div
+                className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
+                key={`col-${i}`}
+                style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
+              >
+                <div className="v2-testi-track">
+                  <div className="v2-testi-copy">
+                    {col.map((r) => (
+                      <ReviewCard key={r.name} review={r} />
+                    ))}
+                  </div>
+                  <div className="v2-testi-copy" aria-hidden="true">
+                    {col.map((r) => (
+                      <ReviewCard key={`${r.name}-loop`} review={r} />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
 
-        <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
+        <Reveal delay={0.06}>
+          <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
+        </Reveal>
       </div>
     </section>
   );
@@ -1638,6 +1789,8 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   const { t } = useI18n();
   const sectionRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const faqVisible = useSectionVisible(sectionRef, "0px 0px", 0.12, true);
+  const faqInView = useSectionVisible(sectionRef, "160px 0px");
 
   /* rows are flattened on the way in so one index drives the whole list —
      the open state, the --i stagger and the filter all key off it */
@@ -1729,7 +1882,12 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   let i = 0;
 
   return (
-    <section className="v2-faq" id="faq" ref={sectionRef} aria-labelledby="v2-faq-title">
+    <section
+      className={`v2-faq${faqVisible ? " is-visible" : ""}${faqInView ? " v2-inview" : ""}`}
+      id="faq"
+      ref={sectionRef}
+      aria-labelledby="v2-faq-title"
+    >
       {/* ambient motion layer */}
       <div className="v2-faq-blobs" aria-hidden="true">
         <span className="v2-faq-blob b1" />
@@ -1888,30 +2046,43 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLElement | null>(null);
+  const ctaVisible = useSectionVisible(panelRef, "0px 0px", 0.14, true);
+  const ctaInView = useSectionVisible(panelRef, "160px 0px");
 
   /* the spotlight gradient follows the pointer across the panel */
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
+    let raf = 0;
+    let lastX = 0;
+    let lastY = 0;
     const onMove = (e: PointerEvent) => {
-      const r = panel.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      panel.style.setProperty(
-        "--mouse-x",
-        `${((e.clientX - r.left) / r.width) * 100}%`,
-      );
-      panel.style.setProperty(
-        "--mouse-y",
-        `${((e.clientY - r.top) / r.height) * 100}%`,
-      );
+      if (e.pointerType === "touch") return;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const r = panel.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        panel.style.setProperty(
+          "--mouse-x",
+          `${((lastX - r.left) / r.width) * 100}%`,
+        );
+        panel.style.setProperty(
+          "--mouse-y",
+          `${((lastY - r.top) / r.height) * 100}%`,
+        );
+      });
     };
     const onLeave = () => {
       panel.style.setProperty("--mouse-x", "50%");
       panel.style.setProperty("--mouse-y", "0%");
     };
-    panel.addEventListener("pointermove", onMove);
-    panel.addEventListener("pointerleave", onLeave);
+    panel.addEventListener("pointermove", onMove, { passive: true });
+    panel.addEventListener("pointerleave", onLeave, { passive: true });
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       panel.removeEventListener("pointermove", onMove);
       panel.removeEventListener("pointerleave", onLeave);
     };
@@ -1919,7 +2090,7 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
 
   return (
     <section
-      className="v2-outro-cta"
+      className={`v2-outro-cta${ctaVisible ? " is-visible" : ""}${ctaInView ? " v2-inview" : ""}`}
       id="ready"
       ref={panelRef}
       aria-labelledby="ready-heading"
@@ -1994,238 +2165,15 @@ function BackToTop() {
 }
 
 /* ─────────────────────────────────────────────────
-   Footer — frosted card over a panel, giant word below
-───────────────────────────────────────────────── */
-function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
-  const { t } = useI18n();
-
-  const NAV_COLS = [
-    {
-      heading: t.marketing.footer.platform,
-      links: [
-        { label: t.marketing.footer.faq, page: "faq" },
-        { label: t.marketing.footer.fees, page: "fees" },
-        { label: t.marketing.footer.caseStudies, page: "case-studies" },
-      ],
-    },
-    {
-      heading: t.marketing.footer.company,
-      links: [
-        { label: t.marketing.footer.about, page: "about" },
-        { label: t.marketing.footer.contactSupport, href: "mailto:support@yekis.com" },
-      ],
-    },
-    {
-      heading: t.marketing.footer.legal,
-      links: [
-        { label: t.marketing.footer.privacy, page: "privacy" },
-        { label: t.marketing.footer.terms, page: "terms" },
-      ],
-    },
-  ];
-
-  const SOCIAL = [
-    {
-      label: "TikTok",
-      href: "#",
-      svg: '<path fill="currentColor" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 1 1 .77-5.06V9.7a5.68 5.68 0 0 0-.77-.05A5.68 5.68 0 1 0 15.54 15.3V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3a4.29 4.29 0 0 1-3.24-1.48Z"/>',
-    },
-    {
-      label: "Telegram",
-      href: "https://t.me/yekis_channel",
-      svg: '<path fill="currentColor" d="M21.94 4.6 18.9 19.2c-.23 1.02-.84 1.27-1.7.79l-4.7-3.46-2.27 2.18c-.25.25-.46.46-.94.46l.33-4.79 8.72-7.88c.38-.34-.08-.53-.59-.19L6.06 13.1l-4.65-1.45c-1.01-.32-1.03-1.01.21-1.5l18.17-7c.84-.31 1.58.2 1.15 1.44Z"/>',
-    },
-    {
-      label: "Instagram",
-      href: "#",
-      svg: '<rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.7" r="1.1" fill="currentColor"/>',
-    },
-    {
-      label: "Facebook",
-      href: "#",
-      svg: '<path fill="currentColor" d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.5-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z"/>',
-    },
-  ];
-
-  const year = new Date().getFullYear();
-
-  /* reveal the card + giant word the moment they scroll into view */
-  const areaRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const area = areaRef.current;
-    const card = area?.querySelector<HTMLElement>(".v2-footer-card");
-    const word = area?.querySelector<HTMLElement>(".v2-footer-word");
-    if (!area || !card || !word) return;
-    if (prefersReduced() || !("IntersectionObserver" in window)) {
-      card.classList.add("is-visible");
-      area.classList.add("is-visible");
-      return;
-    }
-
-    /* the card fades up on its own threshold; the wordmark pops separately so
-       the animation is never missed above the fold */
-    const cardIO = new IntersectionObserver(
-      (entries) => {
-        for (const en of entries) {
-          if (!en.isIntersecting) continue;
-          en.target.classList.add("is-visible");
-          cardIO.disconnect();
-        }
-      },
-      { threshold: 0.12 },
-    );
-    cardIO.observe(card);
-
-    const wordIO = new IntersectionObserver(
-      (entries) => {
-        for (const en of entries) {
-          if (!en.isIntersecting) continue;
-          area.classList.add("is-visible");
-          wordIO.disconnect();
-        }
-      },
-      { threshold: 0.3 },
-    );
-    wordIO.observe(word);
-
-    return () => {
-      cardIO.disconnect();
-      wordIO.disconnect();
-    };
-  }, []);
-
-  return (
-    <footer className="v2-footer-area" id="yk-footer" ref={areaRef}>
-      <div className="v2-footer-divider" aria-hidden />
-
-      <span className="v2-footer-glow v2-footer-glow-l" aria-hidden />
-      <span className="v2-footer-glow v2-footer-glow-r" aria-hidden />
-
-      <div className="v2-footer-card">
-        <div className="v2-footer-top">
-          {/* Brand column */}
-          <div className="v2-footer-lead">
-            <button
-              className="v2-footer-logo"
-              onClick={() => onNavigate("home")}
-              aria-label="Go to homepage"
-            >
-              <span className="v2-footer-symbol" aria-hidden>
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 4l7 9v7" />
-                  <path d="M19 4l-7 9" />
-                </svg>
-              </span>
-              <span>Yekis</span>
-            </button>
-            <p className="v2-footer-desc">
-              {t.marketing.footer.desc}
-            </p>
-            <nav className="v2-footer-social" aria-label="Social links">
-              {SOCIAL.map(({ label, href, svg }) => (
-                <a
-                  key={label}
-                  href={href}
-                  title={label}
-                  aria-label={label}
-                  target={href.startsWith("http") ? "_blank" : undefined}
-                  rel="noopener noreferrer"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Nav columns */}
-          <div className="v2-footer-nav">
-            {NAV_COLS.map((col) => (
-              <nav key={col.heading} aria-label={col.heading}>
-                <h4>{col.heading}</h4>
-                <div className="v2-footer-nav-links">
-                  {col.links.map((lk) =>
-                    "href" in lk ? (
-                      <a key={lk.label} href={lk.href}>
-                        {lk.label}
-                      </a>
-                    ) : (
-                      <button key={lk.label} onClick={() => onNavigate(lk.page!)}>
-                        {lk.label}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </nav>
-            ))}
-          </div>
-        </div>
-
-        <div className="v2-footer-rule" aria-hidden />
-
-        {/* Bottom bar */}
-        <div className="v2-footer-base">
-          <div className="v2-footer-meta">
-            <p>
-              &copy; {year} Yekis &mdash; Addis Ababa &middot; {t.marketing.footer.copyright}
-            </p>
-            <span className="v2-footer-escrow">
-              <ShieldCheck />
-              {t.marketing.footer.escrowNote}
-            </span>
-          </div>
-          <div className="v2-footer-legal">
-            <LanguageSelector variant="segmented" />
-            <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
-            <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
-            {/* The 3D icon set is Icons8's, and their free licence asks for
-                a credit wherever their work appears. */}
-            <a
-              href="https://icons8.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="v2-footer-icon-credit"
-            >
-              {t.marketing.footer.iconCredit}
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="v2-footer-word" aria-hidden>
-        Yekis
-      </div>
-
-      {/* Structured data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            name: "Yekis",
-            url: "https://yekis.com",
-            logo: "https://yekis.com/svgviewer-output.svg",
-            description:
-              "Ethiopia's freelance marketplace. Fund a milestone, review the work, release payment.",
-            sameAs: ["https://t.me/yekis_channel", "https://t.me/yekis_group"],
-            contactPoint: {
-              "@type": "ContactPoint",
-              contactType: "customer support",
-              availableLanguage: ["English", "Amharic"],
-            },
-          }),
-        }}
-      />
-    </footer>
-  );
-}
-
-/* ─────────────────────────────────────────────────
    Shared scroll-reactive ambient background layer
 ───────────────────────────────────────────────── */
-function ScrollAmbientCanvas() {
+function ScrollAmbientCanvas({
+  canvasRef,
+}: {
+  canvasRef: React.RefObject<HTMLDivElement | null>;
+}) {
   return (
-    <div className="v2-ambient-canvas" aria-hidden="true">
+    <div className="v2-ambient-canvas" ref={canvasRef} aria-hidden="true">
       <span className="v2-ambient-orb v2-ambient-orb-1" />
       <span className="v2-ambient-orb v2-ambient-orb-2" />
       <span className="v2-ambient-orb v2-ambient-orb-3" />
@@ -2238,11 +2186,11 @@ function ScrollAmbientCanvas() {
    Root export
 ───────────────────────────────────────────────── */
 export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
-  const rootRef = useRef<HTMLDivElement>(null);
+  const ambientRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
+    const canvas = ambientRef.current;
+    if (!canvas) return;
 
     const setVars = (p: number) => {
       const clamped = Math.max(0, Math.min(1, p));
@@ -2252,21 +2200,22 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
       const y2 = Math.sin(clamped * Math.PI * 2.0) * 11 + clamped * 8;
       const x3 = Math.sin(clamped * Math.PI * 2.6 + 1.1) * 12;
       const y3 = Math.cos(clamped * Math.PI * 2.1 + 0.6) * -9;
+      const wy = clamped * 32 - 16;
 
       const em = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 1.7 - 0.3));
       const tl = 0.52 + 0.48 * (0.5 + 0.5 * Math.cos(clamped * Math.PI * 2.4));
       const vl = 0.36 + 0.54 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 3.0 + 0.8));
 
-      root.style.setProperty("--amb-p", clamped.toFixed(4));
-      root.style.setProperty("--amb-x1", `${x1.toFixed(2)}vw`);
-      root.style.setProperty("--amb-y1", `${y1.toFixed(2)}vh`);
-      root.style.setProperty("--amb-x2", `${x2.toFixed(2)}vw`);
-      root.style.setProperty("--amb-y2", `${y2.toFixed(2)}vh`);
-      root.style.setProperty("--amb-x3", `${x3.toFixed(2)}vw`);
-      root.style.setProperty("--amb-y3", `${y3.toFixed(2)}vh`);
-      root.style.setProperty("--amb-em", em.toFixed(3));
-      root.style.setProperty("--amb-tl", tl.toFixed(3));
-      root.style.setProperty("--amb-vl", vl.toFixed(3));
+      canvas.style.setProperty("--amb-x1", `${x1.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y1", `${y1.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-x2", `${x2.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y2", `${y2.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-x3", `${x3.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y3", `${y3.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-wy", `${wy.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-em", em.toFixed(3));
+      canvas.style.setProperty("--amb-tl", tl.toFixed(3));
+      canvas.style.setProperty("--amb-vl", vl.toFixed(3));
     };
 
     if (prefersReduced()) {
@@ -2276,49 +2225,61 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
 
     let curP = 0;
     let targetP = 0;
+    let maxScroll = 1;
     let raf = 0;
 
-    const measureTarget = () => {
-      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const measureBounds = () => {
+      maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
       targetP = Math.max(0, Math.min(1, window.scrollY / maxScroll));
     };
 
     const tick = () => {
       raf = 0;
       const diff = targetP - curP;
-      if (Math.abs(diff) < 0.0004) {
+      if (Math.abs(diff) < 0.0005) {
         curP = targetP;
         setVars(curP);
         return;
       }
-      curP += diff * 0.085;
+      curP += diff * 0.1;
       setVars(curP);
       raf = requestAnimationFrame(tick);
     };
 
     const kick = () => {
-      measureTarget();
+      targetP = Math.max(0, Math.min(1, window.scrollY / maxScroll));
       if (!raf) raf = requestAnimationFrame(tick);
     };
 
-    measureTarget();
+    const onResize = () => {
+      measureBounds();
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+
+    measureBounds();
     curP = targetP;
     setVars(curP);
 
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(document.documentElement);
+    }
     window.addEventListener("scroll", kick, { passive: true });
-    window.addEventListener("resize", kick, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
+      if (ro) ro.disconnect();
       window.removeEventListener("scroll", kick);
-      window.removeEventListener("resize", kick);
+      window.removeEventListener("resize", onResize);
     };
   }, []);
 
   return (
-    <div className="yk-v2" ref={rootRef}>
+    <div className="yk-v2">
       {/* Shared scroll-reactive background canvas */}
-      <ScrollAmbientCanvas />
+      <ScrollAmbientCanvas canvasRef={ambientRef} />
 
       {/* Hero */}
       <HeroSection onStart={onStart} />

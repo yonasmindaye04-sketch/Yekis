@@ -60,9 +60,16 @@ export function ProximityPopTitle({
     }
 
     let centers: Array<{ x: number; y: number; cur: number; last: number }> = [];
+    let headPageLeft = 0;
+    let headPageTop = 0;
+    let headHeight = 0;
 
     function measure() {
       if (!head) return;
+      const r = head.getBoundingClientRect();
+      headPageLeft = r.left + window.scrollX;
+      headPageTop = r.top + window.scrollY;
+      headHeight = r.height;
       centers = chars.map((s) => {
         const pos = getOffsetRelativeTo(s, head);
         return {
@@ -174,9 +181,16 @@ export function ProximityPopTitle({
     }
 
     const onPointerMove = (e: PointerEvent) => {
-      const r = head.getBoundingClientRect();
-      px = e.clientX - r.left;
-      py = e.clientY - r.top;
+      if (e.pointerType === "touch") return;
+      if (window.scrollY > headPageTop + headHeight + 220) {
+        if (inside) {
+          inside = false;
+          startLoop();
+        }
+        return;
+      }
+      px = e.clientX + window.scrollX - headPageLeft;
+      py = e.clientY + window.scrollY - headPageTop;
       inside = true;
       startLoop();
     };

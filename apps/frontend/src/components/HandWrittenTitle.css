@@ -293,3 +293,7 @@
     opacity: 1 !important;
   }
 }
+
+.yk-v2 .v2-fees-section:not(.v2-inview) .yk-hw-circle path {
+  animation-play-state: paused;
+}
