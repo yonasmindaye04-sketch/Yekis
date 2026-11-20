@@ -1,5 +1,31 @@
 # Architecture And Product Decisions
 
+## 2026-11-20
+
+### Multi-Channel Authentication — Phase 0 Decision Lock
+The founder closed nine questions about the multi-channel authentication work (email OTP + Telegram OTP + optional Google on one Yekis account). The full audit, threat model and proposed design live in **`docs/auth/PHASE0_AUTH_AUDIT.md`**. **Code status for all nine: no implementation yet — the audit document is the review gate.**
+
+| # | Decision | Code status |
+|---|---|---|
+| 1 | Audit and threat model **first**, implementation only after the founder reviews it | Done — `docs/auth/PHASE0_AUTH_AUDIT.md`. No auth code has been changed |
+| 2 | Keep email/phone + password sign-in alongside the new channels | No code. Password stays the strong factor |
+| 3 | An email-OTP signup **may** create an account with no password and the reserved `+2510…` phone | No code. Will reuse the federated sentinel pattern in `modules/auth/identity.ts` |
+| 4 | Telegram: add the 6-digit **pushed** OTP, keep the existing 8-character code valid during the transition | No code. The legacy code is deprecated, not removed |
+| 5 | Identity storage stays on the existing `User` columns (`googleId`, `telegramUserId`, `email`, `phone`) | No code. **No `user_auth_identities` table** — the columns already enforce one identity per provider, and a second table would create two sources of truth |
+| 6 | Device/session management is **in scope**, implemented the secure way | No code. Will add an `AuthSession` registry keyed on the existing `sid` claim, with per-device revocation |
+| 7 | No paid email provider — use a free tier | No code. Recommendation: **Brevo free** (300 emails/day, single verified sender, no domain, $0); Elastic Email, Mailtrap and Gmail app-password documented as fallbacks |
+| 8 | Configure Google now | No code. The backend verification already exists; only the client id and the frontend build variable are missing |
+| 9 | **An email-OTP session must not be able to move money on its own** | No code. `email_otp` will be removed from `STRONG_AUTH_METHODS`; money movement keeps requiring a fresh password (and the withdrawal-scoped SMS OTP) |
+
+### Standing Constraints For The Authentication Work
+- **No automatic account merging.** A provider sign-in that matches an existing address must ask the member to link it from a signed-in session (`AccountLinkRequiredError`), exactly as `modules/auth/identity.ts` does today. An email-OTP-created account is explicitly *not* an auto-merge target — it will carry a `passwordlessEmailAt` marker so the existing `passwordSetAt` rule cannot swallow it.
+- **No weakening of escrow permissions.** `requireFreshAuth` keeps its 300-second freshness window; the withdrawal-scoped SMS OTP and the KYC gates are untouched.
+- **No parallel infrastructure.** One bot, one `User` table, one session system, one OTP primitive set — extended, not duplicated.
+- **No code in the repository.** Provider keys live in the host environment only; `scripts/scan-secrets.js` gates the commit.
+
+### The Live Host Was Leaking One-Time Codes (Phase 0 finding, not yet fixed)
+The audit's most urgent finding: `POST /api/v1/auth/email/code` on the public staging deployment returns the OTP **in the response body** (`"devCode":"097046"`, probed 2026-11-19), because the guard is `NODE_ENV !== "production"` and staging is a public host. The same host has no mail transport at all, so `/auth/verification/channels` advertises a channel that cannot deliver. Both are fixed in Phase 2 of the audit plan — **before** any new sign-in channel is switched on. Until then, email must not be advertised as a working sign-in method.
+
 ## 2026-11-12
 
 ### Phase 0 Decision Lock — Twelve Open Questions Answered

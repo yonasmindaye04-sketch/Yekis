@@ -16,6 +16,12 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 
 > **2026-11-13 legal-publication pass.** The public Privacy Policy and Terms of Service are now complete version 1.1 documents, with matching Markdown publications. They are aligned with the implemented seven-day release and cooling-off windows, 7%/0% fee model, consent-aware analytics, data-subject export/erasure, and ten-year retention for the identity, financial, transaction, consent, dispute, and audit records that law requires. This removes the placeholder-page and stale-retention defects; it does **not** close the external Ethiopian counsel-approval dependency.
 
+> **2026-11-20 authentication audit pass.** A read-only Phase 0 audit of the authentication module was completed and recorded in `docs/auth/PHASE0_AUTH_AUDIT.md`. Two **live defects on the public staging host** were measured on 2026-11-19 and are security-of-processing findings (PDPP Arts. 7 & 24 — the platform must not expose personal data or credentials it cannot protect):
+> - `POST /api/v1/auth/email/code` returns the one-time code **in the HTTP response** outside `NODE_ENV=development` (the guard is `!== "production"`, and staging is a public host). The code is therefore obtainable for any address by an anonymous caller. The same host also prints the code to stdout when no mail transport is configured.
+> - `GET /api/v1/auth/verification/channels` advertises email as `available: true` on a host with **no mail transport**, so the capability the platform publishes about itself is false, and password-reset mail is undeliverable there.
+>
+> Neither is a *blocker* in the sense of this document — both are engineering work with a scheduled plan (audit Phase 2, before any new sign-in channel is enabled). They are recorded here because they are live now, and because no transactional-email provider is configured on any host, which is itself an operational dependency: a **$0** provider (Brevo free is the recommendation) must be configured before email can be treated as a working channel.
+
 ## 1. Separate Bank/Telebirr Escrow Account
 **Domain**: Finance / Escrow
 **Master Design Document Section**: 4.1 Payment, Escrow, and Ledger Setup

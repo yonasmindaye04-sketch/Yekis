@@ -657,6 +657,7 @@ erDiagram
 
 * **Purpose:** Handles user registration, age gating (18+ requirement), credential authentication, JWT token issuance (access/refresh), password hashing (Argon2), consent capture, Telegram Mini App session verification, and the **onboarding OTP** that proves control of the signup address before the account exists.
 * **Owns Models:** `User`, `ConsentRecord`, `PhoneVerificationCode`, `EmailVerificationCode`.
+* **Phase 0 audit (2026-11-20):** `docs/auth/PHASE0_AUTH_AUDIT.md` holds the read-only audit and threat model for the *planned* multi-channel work (email OTP sign-in, Telegram push OTP, optional Google on one account). **None of that plan is implemented** — the module behaves exactly as the audit measured it, including two open defects on the live staging host: email one-time codes are returned in the API response outside `development`, and `/auth/verification/channels` advertises an email channel the host cannot deliver.
 
 #### State Machine
 Auth does not have a multi-step entity state machine, but enforces an active session gate:
