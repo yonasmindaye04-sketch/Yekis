@@ -366,11 +366,22 @@ chatRouter.post(
   requireAuth,
   async (req: AuthedRequest, res) => {
     try {
-      const suggestions = await generateSmartReplies({
+      const body = (req.body || {}) as {
+        tone?: "PROFESSIONAL" | "FRIENDLY" | "NEGOTIATION" | "CONCISE";
+        customPrompt?: string;
+        currentDraft?: string;
+      };
+      const result = await generateSmartReplies({
         conversationId: req.params.conversationId as string,
         userId: req.user!.id,
+        tone: body.tone,
+        customPrompt: body.customPrompt,
+        currentDraft: body.currentDraft,
       });
-      return res.json({ suggestions });
+      if (Array.isArray(result)) {
+        return res.json({ suggestions: result });
+      }
+      return res.json(result);
     } catch (err) {
       if (handleError(err, res)) return;
       logger.error({ err }, "Failed to generate smart replies");

@@ -33,7 +33,7 @@ import { HandWrittenTitle } from "./components/HandWrittenTitle";
 import { ProximityPopTitle } from "./components/ProximityPopTitle";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
-import { LanguageSelector } from "./components/LanguageSelector";
+import { FooterV2 } from "./MarketingFooter";
 import "./landing-v2.css";
 
 /* ─────────────────────────────────────────────────
@@ -201,6 +201,41 @@ const prefersReduced = () =>
   typeof window !== "undefined" &&
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
+function useSectionVisible(
+  ref: React.RefObject<HTMLElement | null>,
+  rootMargin = "160px 0px",
+  threshold = 0.01,
+  once = false
+) {
+  const [visible, setVisible] = useState(() => (typeof window === "undefined" ? true : prefersReduced()));
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (prefersReduced() || !("IntersectionObserver" in window)) {
+      setVisible(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const en of entries) {
+          if (en.isIntersecting) {
+            setVisible(true);
+            if (once) io.disconnect();
+          } else if (!once) {
+            setVisible(false);
+          }
+        }
+      },
+      { rootMargin, threshold }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, rootMargin, threshold, once]);
+
+  return visible;
+}
+
 /* ─────────────────────────────────────────────────
    Toast bus (isolated to V2)
 ───────────────────────────────────────────────── */
@@ -259,7 +294,7 @@ function Reveal({
   dir = "up",
   delay = 0,
   className,
-  amount = 0.08,
+  amount = 0.1,
   style,
 }: {
   children: React.ReactNode;
@@ -271,12 +306,12 @@ function Reveal({
 }) {
   const hidden =
     dir === "left"
-      ? { opacity: 0, x: -18 }
+      ? { opacity: 0, x: -28 }
       : dir === "right"
-        ? { opacity: 0, x: 18 }
+        ? { opacity: 0, x: 28 }
         : dir === "zoom"
-          ? { opacity: 0, scale: 0.97 }
-          : { opacity: 0, y: 16 };
+          ? { opacity: 0, y: 18, scale: 0.96 }
+          : { opacity: 0, y: 28 };
   return (
     <motion.div
       className={className}
@@ -284,7 +319,7 @@ function Reveal({
       initial={hidden}
       whileInView={{ opacity: 1, x: 0, y: 0, scale: 1 }}
       viewport={{ once: true, amount }}
-      transition={{ duration: 0.26, delay: Math.min(delay, 0.06), ease: EASE }}
+      transition={{ duration: 0.52, delay: Math.min(delay, 0.14), ease: EASE }}
     >
       {children}
     </motion.div>
@@ -422,6 +457,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
   const layerRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const [settled, setSettled] = useState(prefersReduced);
+  const heroInView = useSectionVisible(heroRef, "180px 0px");
 
   useEffect(() => {
     if (settled) return;
@@ -437,6 +473,7 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
     if (!layer || !inner) return;
     let raf = 0;
     const onMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
       if (window.scrollY > window.innerHeight) return;
       if (raf) return;
       raf = requestAnimationFrame(() => {
@@ -455,15 +492,17 @@ function HeroSection({ onStart }: { onStart?: (mode: "login" | "register") => vo
   }, []);
 
   return (
-    <section className="v2-hero" id="top" ref={heroRef}>
-      {/* ambient glow orbs */}
-      <div className="v2-fp-glow v2-fp-glow-one" />
-      <div className="v2-fp-glow v2-fp-glow-two" />
+    <section className={`v2-hero${heroInView ? " v2-inview" : ""}`} id="top" ref={heroRef}>
+      <div className="v2-hero-backdrop" aria-hidden="true">
+        {/* ambient glow orbs */}
+        <div className="v2-fp-glow v2-fp-glow-one" />
+        <div className="v2-fp-glow v2-fp-glow-two" />
 
-      {/* floating path field */}
-      <div className="v2-fp-layer" ref={layerRef}>
-        <FloatingPaths position={1} />
-        <FloatingPaths position={-1} />
+        {/* floating path field */}
+        <div className="v2-fp-layer" ref={layerRef}>
+          <FloatingPaths position={1} />
+          <FloatingPaths position={-1} />
+        </div>
       </div>
 
       {/* hero content */}
@@ -664,6 +703,7 @@ function EscrowSection() {
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const ghostRefs = useRef<(HTMLDivElement | null)[]>([]);
   const glowRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const stageInView = useSectionVisible(stageRef, "180px 0px");
 
   const isCard =
     typeof window !== "undefined" &&
@@ -700,9 +740,8 @@ function EscrowSection() {
       return;
     }
 
-    let raf = 0;
-
     if (isCard) {
+      let raf = 0;
       const LOOP_MS = 6000;
       const start = performance.now();
       const autoTick = (now: number) => {
@@ -715,19 +754,48 @@ function EscrowSection() {
       return () => cancelAnimationFrame(raf);
     }
 
-    const progress = () => {
-      const rect = stage.getBoundingClientRect();
-      const total = stage.offsetHeight - window.innerHeight;
-      const passed = Math.min(Math.max(-rect.top, 0), Math.max(total, 0));
-      return total > 0 ? passed / total : 0;
+    let stageTop = 0;
+    let totalScrollable = 1;
+    let raf = 0;
+
+    const measure = () => {
+      stageTop = stage.getBoundingClientRect().top + window.scrollY;
+      totalScrollable = Math.max(1, stage.offsetHeight - window.innerHeight);
     };
 
-    const tick = () => {
-      apply(Math.min(N - 1, Math.floor(progress() * N + 1e-4)));
-      raf = requestAnimationFrame(tick);
+    const updateFromScroll = () => {
+      raf = 0;
+      const passed = Math.min(Math.max(window.scrollY - stageTop, 0), totalScrollable);
+      const p = passed / totalScrollable;
+      apply(Math.min(N - 1, Math.floor(p * N + 1e-4)));
     };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+
+    const onScroll = () => {
+      if (!raf) raf = requestAnimationFrame(updateFromScroll);
+    };
+
+    const onResize = () => {
+      measure();
+      updateFromScroll();
+    };
+
+    measure();
+    updateFromScroll();
+
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(stage);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onResize);
+      if (ro) ro.disconnect();
+    };
   }, [isCard]);
 
   return (
@@ -735,15 +803,17 @@ function EscrowSection() {
       <EscrowSvgDefs />
       <section
         ref={stageRef}
-        className="stage"
+        className={`stage${stageInView ? " v2-inview" : ""}`}
         id="how-it-works"
         aria-label="How YEKIS works, step by step"
       >
         <div className="stage-pin" id="pin">
-          <div ref={(el) => { glowRefs.current[0] = el; }} className="glow g1 on" />
-          <div ref={(el) => { glowRefs.current[1] = el; }} className="glow g2" />
-          <div ref={(el) => { glowRefs.current[2] = el; }} className="glow g3" />
-          <div ref={(el) => { glowRefs.current[3] = el; }} className="glow g4" />
+          <div className="stage-glows" aria-hidden="true">
+            <div ref={(el) => { glowRefs.current[0] = el; }} className="glow g1 on" />
+            <div ref={(el) => { glowRefs.current[1] = el; }} className="glow g2" />
+            <div ref={(el) => { glowRefs.current[2] = el; }} className="glow g3" />
+            <div ref={(el) => { glowRefs.current[3] = el; }} className="glow g4" />
+          </div>
 
           <div className="cols">
             {/* LEFT : bold topic */}
@@ -829,253 +899,627 @@ function EscrowSection() {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
+  const feesRef = useRef<HTMLElement>(null);
+  const feesInView = useSectionVisible(feesRef, "180px 0px");
+
   return (
-    <section id="fees">
-      <HandWrittenTitle
-        eyebrow="Yekis Jobs"
-        title="Make ideas visible."
-        subtitle="Where verified Ethiopian talent and ambitious teams build together."
-      />
+    <section
+      id="fees"
+      ref={feesRef}
+      className={`v2-fees-section${feesInView ? " v2-inview" : ""}`}
+    >
+      <Reveal dir="zoom" amount={0.14}>
+        <HandWrittenTitle
+          eyebrow="Yekis Jobs"
+          title="Make ideas visible."
+          subtitle="Where verified Ethiopian talent and ambitious teams build together."
+        />
+      </Reveal>
     </section>
   );
 }
 
 /* ─────────────────────────────────────────────────
    Categories — pinned editorial card stack
-───────────────────────────────────────────────── */
-const STK_Y_OFFSET = 5; // % each waiting card sits below the one in front
-const STK_SCALE_STEP = 0.075; // each waiting card is this much smaller
-const STK_LOOP_MS = 7000;
+   ───────────────────────────────────────────────── */
+const STK_Y_OFFSET = 3.2;
+const STK_SCALE_STEP = 0.06;
+const STK_ENTER_Y = 62;
+const STK_ENTER_RX = -16;
+const STK_ENTER_SCALE = 0.88;
+const STK_CARD_MS = 950;
+const STK_STAGGER_MS = 110;
+const STK_TILT_X = 2.6;
+const STK_TILT_Y = 3.4;
+const STK_VEL_KICK = 240;
+const STK_VEL_MAX = 6;
+const STK_PARALLAX = 7;
+const STK_CARD_LOOP_MS = 7000;
+const STK_CARD_REVEAL_MS = 6000;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const clamp = (v: number, lo: number, hi: number) =>
   v < lo ? lo : v > hi ? hi : v;
+const easeOutExpo = (t: number) => {
+  const c = clamp(t, 0, 1);
+  return c >= 1 ? 1 : 1 - Math.pow(2, -10 * c);
+};
 
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
-  const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const rootRef = useRef<HTMLElement>(null);
+  const cardRefs = useRef<(HTMLElement | null)[]>([]);
+  const copyRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const mediaRefs = useRef<(HTMLDivElement | null)[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const outroRef = useRef<HTMLDivElement>(null);
+  const pinRef = useRef<HTMLElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const outroRef = useRef<HTMLElement>(null);
+  const catInView = useSectionVisible(rootRef, "240px 0px");
+
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [hudOn, setHudOn] = useState(false);
+  const [isReduced, setIsReduced] = useState(prefersReduced);
 
   const isCard =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("card");
 
-  const cards = [
-    {
-      kicker: t.marketing.categories.c1Class,
-      title: `${t.marketing.categories.c1Title1} ${t.marketing.categories.c1Title2}`,
-      icon: "/icons/web-development.webp",
-      bg: "#c75a35",
-    },
-    {
-      kicker: t.marketing.categories.c2Class,
-      title: `${t.marketing.categories.c2Title1} ${t.marketing.categories.c2Title2}`,
-      icon: "/icons/graphic-design.webp",
-      bg: "#1f4d4a",
-    },
-    {
-      kicker: t.marketing.categories.c3Class,
-      title: `${t.marketing.categories.c3Title1} ${t.marketing.categories.c3Title2}`,
-      icon: "/icons/digital-marketing.webp",
-      bg: "#2d2a66",
-    },
-    {
-      kicker: t.marketing.categories.c4Class,
-      title: `${t.marketing.categories.c4Title1} ${t.marketing.categories.c4Title2}`,
-      icon: "/icons/content-copywriting.webp",
-      bg: "#0e3f36",
-    },
-    {
-      kicker: t.marketing.categories.c5Class,
-      title: `${t.marketing.categories.c5Title1} ${t.marketing.categories.c5Title2}`,
-      icon: "/icons/translation.webp",
-      bg: "#4a224f",
-    },
-    {
-      kicker: t.marketing.categories.c6Class,
-      title: `${t.marketing.categories.c6Title1} ${t.marketing.categories.c6Title2}`,
-      icon: "/icons/data-processing.webp",
-      bg: "#1a1613",
-    },
-  ];
+  const cards = useMemo(
+    () => [
+      {
+        num: "01",
+        category: "Engineering",
+        kicker: t.marketing.categories.c1Class || "01 / Engineering",
+        title1: t.marketing.categories.c1Title1 || "Web & App",
+        title2: t.marketing.categories.c1Title2 || "Development",
+        roles: t.marketing.categories.c1Roles || "148 open roles",
+        tag: t.marketing.categories.c1Tag || "Full\u2011stack \u00b7 Mobile \u00b7 API",
+        bg: "#123f36",
+        ac: "#5eead4",
+        glow: "rgba(94,234,212,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+        ),
+      },
+      {
+        num: "02",
+        category: "Design",
+        kicker: t.marketing.categories.c2Class || "02 / Design",
+        title1: t.marketing.categories.c2Title1 || "Graphic Design",
+        title2: t.marketing.categories.c2Title2 || "& Branding",
+        roles: t.marketing.categories.c2Roles || "96 open roles",
+        tag: t.marketing.categories.c2Tag || "Identity \u00b7 Print \u00b7 UI",
+        bg: "#332a5e",
+        ac: "#b7a4fb",
+        glow: "rgba(183,164,251,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" />
+            <circle cx="17.5" cy="10.5" r=".5" />
+            <circle cx="8.5" cy="7.5" r=".5" />
+            <circle cx="6.5" cy="12.5" r=".5" />
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C19.965 6.012 15.463 2 12 2z" />
+          </svg>
+        ),
+      },
+      {
+        num: "03",
+        category: "Marketing",
+        kicker: t.marketing.categories.c3Class || "03 / Marketing",
+        title1: t.marketing.categories.c3Title1 || "Digital",
+        title2: t.marketing.categories.c3Title2 || "Marketing",
+        roles: t.marketing.categories.c3Roles || "74 open roles",
+        tag: t.marketing.categories.c3Tag || "SEO \u00b7 Social \u00b7 Paid",
+        bg: "#3c4510",
+        ac: "#d3f16a",
+        glow: "rgba(211,241,106,.18)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3 11 18-5v12L3 14v-3z" />
+            <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+          </svg>
+        ),
+      },
+      {
+        num: "04",
+        category: "Content",
+        kicker: t.marketing.categories.c4Class || "04 / Content",
+        title1: t.marketing.categories.c4Title1 || "Content &",
+        title2: t.marketing.categories.c4Title2 || "Copywriting",
+        roles: t.marketing.categories.c4Roles || "61 open roles",
+        tag: t.marketing.categories.c4Tag || "Editorial \u00b7 UX \u00b7 Scripts",
+        bg: "#0f3e3d",
+        ac: "#6ee7d8",
+        glow: "rgba(110,231,216,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m12 19 7-7 3 3-7 7-3-3z" />
+            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+            <path d="M2 2l7.586 7.586" />
+            <circle cx="11" cy="11" r="2" />
+          </svg>
+        ),
+      },
+      {
+        num: "05",
+        category: "Language",
+        kicker: t.marketing.categories.c5Class || "05 / Language",
+        title1: t.marketing.categories.c5Title1 || "Amharic / English",
+        title2: t.marketing.categories.c5Title2 || "Translation",
+        roles: t.marketing.categories.c5Roles || "53 open roles",
+        tag: t.marketing.categories.c5Tag || "Localisation \u00b7 Subtitling",
+        bg: "#401d52",
+        ac: "#e0aaff",
+        glow: "rgba(224,170,255,.20)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m5 8 6 6" />
+            <path d="m4 14 6-6 2-3" />
+            <path d="M2 5h12" />
+            <path d="M7 2h1" />
+            <path d="m22 22-5-10-5 10" />
+            <path d="M14 18h6" />
+          </svg>
+        ),
+      },
+      {
+        num: "06",
+        category: "Data",
+        kicker: t.marketing.categories.c6Class || "06 / Data",
+        title1: t.marketing.categories.c6Title1 || "Data",
+        title2: t.marketing.categories.c6Title2 || "Processing",
+        roles: t.marketing.categories.c6Roles || "88 open roles",
+        tag: t.marketing.categories.c6Tag || "Annotation \u00b7 ETL \u00b7 QA",
+        bg: "#423610",
+        ac: "#fde047",
+        glow: "rgba(253,224,71,.18)",
+        icon: (
+          <svg viewBox="0 0 24 24" fill="none" strokeLinecap="round" strokeLinejoin="round">
+            <ellipse cx="12" cy="5" rx="9" ry="3" />
+            <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+            <path d="M3 12a9 3 0 0 0 18 0V5" />
+          </svg>
+        ),
+      },
+    ],
+    [t]
+  );
+
+  const total = cards.length;
+  const segment = 1 / Math.max(1, total - 1);
+
+  const goToCard = (i: number) => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
+    const span = Math.max(1, wrap.offsetHeight - window.innerHeight);
+    const p = i >= total - 1 ? 1 : i === 0 ? 0 : Math.min(1, i * segment + 0.002);
+    window.scrollTo({
+      top: wrapTop + p * span,
+      behavior: prefersReduced() ? "auto" : "smooth",
+    });
+  };
 
   useEffect(() => {
-    const reduced = window.matchMedia(
-      "(prefers-reduced-motion: reduce)"
-    ).matches;
-    const cardEls = cardRefs.current.filter(Boolean) as HTMLDivElement[];
-    const total = cardEls.length;
-    if (total === 0) return;
-    const segment = 1 / total;
+    const reduced = prefersReduced();
+    setIsReduced(reduced);
+
+    const wrap = wrapRef.current;
+    const pin = pinRef.current;
+    const stage = stageRef.current;
     const outro = outroRef.current;
+    const cardEls = cardRefs.current.filter(Boolean) as HTMLElement[];
+    const copyEls = copyRefs.current.filter(Boolean) as HTMLElement[];
+    const mediaEls = mediaRefs.current.filter(Boolean) as HTMLElement[];
 
-    // Write the deck for a given normalised progress p∈[0,1].
-    const render = (p: number) => {
-      const active = Math.min(Math.floor(p / segment), total - 1);
-      const segP = (p - active * segment) / segment;
+    if (!wrap || !pin || !stage || cardEls.length === 0) return;
 
-      cardEls.forEach((card, i) => {
-        let y: number;
-        let rx: number;
-        let scale: number;
-        if (i < active) {
-          y = -250;
-          rx = 35;
-          scale = 1;
-        } else if (i === active) {
-          y = lerp(-50, -200, segP);
-          rx = lerp(0, 35, segP);
-          scale = 1;
-        } else {
-          const behind = i - active;
-          y = -50 + (behind - segP) * STK_Y_OFFSET;
-          rx = 0;
-          scale = 1 - (behind - segP) * STK_SCALE_STEP;
-        }
-        card.style.transform = `translate(-50%, ${y}%) rotateX(${rx.toFixed(
-          2
-        )}deg) scale(${scale.toFixed(3)})`;
-      });
+    const introTotal = (total - 1) * STK_STAGGER_MS + STK_CARD_MS;
+    let wrapTop = 0;
+    let span = 1;
+    let pinLeft = 0;
+    let pinTop = 0;
+    let pinWidth = 1;
+    let pinHeight = 1;
+
+    const measure = () => {
+      wrapTop = wrap.getBoundingClientRect().top + window.scrollY;
+      span = Math.max(1, wrap.offsetHeight - window.innerHeight);
+      const pr = pin.getBoundingClientRect();
+      pinLeft = pr.left + window.scrollX;
+      pinTop = pr.top + window.scrollY;
+      pinWidth = Math.max(1, pr.width);
+      pinHeight = Math.max(1, pr.height);
     };
+    measure();
+
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(measure);
+      ro.observe(wrap);
+    }
+    window.addEventListener("resize", measure, { passive: true });
+
+    const deckPose = (
+      i: number,
+      p: number,
+      out: { y: number; rx: number; sc: number; t: number }
+    ) => {
+      const active = Math.min(Math.floor(p / segment), total - 1);
+      const segP = clamp((p - active * segment) / segment, 0, 1);
+      if (i < active) {
+        out.y = -250;
+        out.rx = 35;
+        out.sc = 1;
+        out.t = 1;
+        return active;
+      }
+      if (i === active) {
+        out.y = lerp(-50, -200, segP);
+        out.rx = lerp(0, 35, segP);
+        out.sc = 1;
+        out.t = segP;
+        return active;
+      }
+      const behind = i - active;
+      out.y = -50 + (behind - segP) * STK_Y_OFFSET;
+      out.rx = 0;
+      out.sc = 1 - (behind - segP) * STK_SCALE_STEP;
+      out.t = 0;
+      return active;
+    };
+
+    const pose = { y: 0, rx: 0, sc: 1, t: 0 };
+    const render = (p: number, elapsed: number) => {
+      let active = 0;
+      cardEls.forEach((card, i) => {
+        active = deckPose(i, p, pose);
+        const e =
+          elapsed >= introTotal
+            ? 1
+            : easeOutExpo((elapsed - i * STK_STAGGER_MS) / STK_CARD_MS);
+        const y = lerp(STK_ENTER_Y, pose.y, e);
+        const rx = lerp(STK_ENTER_RX, pose.rx, e);
+        const sc = lerp(STK_ENTER_SCALE, pose.sc, e);
+        card.style.opacity = clamp(e * 1.6, 0, 1).toFixed(3);
+        card.style.transform = `translate3d(-50%, ${y.toFixed(2)}%, 0) rotateX(${rx.toFixed(
+          2
+        )}deg) scale(${sc.toFixed(3)})`;
+        const tVal = pose.t * e;
+        if (copyEls[i]) {
+          copyEls[i].style.transform = `translate3d(0,${(tVal * -STK_PARALLAX).toFixed(2)}%,0)`;
+        }
+        if (mediaEls[i]) {
+          mediaEls[i].style.transform = `translate3d(0,${(tVal * STK_PARALLAX).toFixed(
+            2
+          )}%,0) scale(${(1 - tVal * 0.05).toFixed(3)})`;
+        }
+      });
+      return active;
+    };
+
+    let lastActive = -1;
+    let didHudOn = false;
+
+    const syncHud = (active: number) => {
+      if (active !== lastActive) {
+        lastActive = active;
+        setActiveIndex(active);
+      }
+    };
+
+    const progressFromScroll = () => clamp((window.scrollY - wrapTop) / span, 0, 1);
+
+    let outroIO: IntersectionObserver | null = null;
+    if (outro) {
+      if (reduced || isCard) {
+        outro.classList.add("is-active");
+      } else if ("IntersectionObserver" in window) {
+        outroIO = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((en) => {
+              if (en.isIntersecting) {
+                outro.classList.add("is-active");
+              } else if (en.boundingClientRect.top > (window.innerHeight || 800)) {
+                outro.classList.remove("is-active");
+              }
+            });
+          },
+          { threshold: 0.15 }
+        );
+        outroIO.observe(outro);
+      } else {
+        outro.classList.add("is-active");
+      }
+    }
 
     if (reduced) {
-      render(0);
-      outro?.classList.add("is-active");
-      return;
+      const staticRender = () => {
+        const p = isCard ? 0 : progressFromScroll();
+        const active = render(p, Infinity);
+        syncHud(active);
+        if (!didHudOn) {
+          didHudOn = true;
+          setHudOn(true);
+        }
+      };
+      staticRender();
+      if (!isCard) window.addEventListener("scroll", staticRender, { passive: true });
+      return () => {
+        window.removeEventListener("resize", measure);
+        if (!isCard) window.removeEventListener("scroll", staticRender);
+        if (ro) ro.disconnect();
+        if (outroIO) outroIO.disconnect();
+      };
     }
 
+    cardEls.forEach((c) => {
+      c.style.opacity = "0";
+    });
+
+    let tx = 0;
+    let ty = 0;
+    let sx = 0;
+    let sy = 0;
+    let isNear = true;
     let raf = 0;
 
-    if (isCard) {
-      // No scroll inside the card — auto-play the timeline on a loop.
-      const start = performance.now();
-      const tick = (now: number) => {
-        const t = ((now - start) % STK_LOOP_MS) / STK_LOOP_MS;
-        // ease through the reveal (first ~0.86), then hold on the last frame
-        const revealEnd = 6000 / STK_LOOP_MS;
-        const p = t < revealEnd ? t / revealEnd : 1;
-        render(clamp(p, 0, 1));
-        if (p >= 0.96) {
-          outro?.classList.add("is-active");
-        } else {
-          outro?.classList.remove("is-active");
-        }
-        raf = requestAnimationFrame(tick);
-      };
-      raf = requestAnimationFrame(tick);
-      return () => cancelAnimationFrame(raf);
-    }
+    let introStarted = isCard || wrap.getBoundingClientRect().top <= window.innerHeight * 0.92;
+    let introStart = introStarted ? performance.now() : 0;
 
-    // IntersectionObserver triggers word loading animation as outro enters
-    let io: IntersectionObserver | null = null;
-    if (outro && "IntersectionObserver" in window) {
-      io = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              outro.classList.add("is-active");
-            } else if (entry.boundingClientRect.top > (window.innerHeight || 800)) {
-              outro.classList.remove("is-active");
-            }
-          });
-        },
-        { threshold: 0.15 }
-      );
-      io.observe(outro);
-    }
+    const cardStart = performance.now();
+    let lastP = progressFromScroll();
+    let lastRenderedP = -1;
+    let vel = 0;
 
-    // Standalone: drive by the pinned wrapper's scroll position.
-    let autoScrolled = false;
-    const wrap = wrapRef.current || document.getElementById("stk-wrap");
-    const tick = () => {
-      if (wrap) {
-        const top = wrap.getBoundingClientRect().top;
-        const span = wrap.offsetHeight - window.innerHeight;
-        const p = clamp(-top / span, 0, 1);
-        render(p);
+    const loop = (now: number) => {
+      raf = 0;
+      if (!isCard && !isNear) return;
 
-        // Bring the "Let's Build" section automatically with clean motion when the cards finish dealing
-        if (p >= 0.96 && !autoScrolled && outro) {
-          autoScrolled = true;
-          outro.scrollIntoView({ behavior: "smooth", block: "start" });
-        } else if (p < 0.82) {
-          autoScrolled = false;
-        }
+      if (!introStarted && window.scrollY + window.innerHeight * 0.95 >= wrapTop) {
+        introStarted = true;
+        introStart = now;
       }
-      raf = requestAnimationFrame(tick);
+
+      const elapsed = introStarted ? Math.max(0, now - introStart) : 0;
+      let p: number;
+      if (isCard) {
+        const loopT = ((now - cardStart) % STK_CARD_LOOP_MS) / STK_CARD_LOOP_MS;
+        const revealEnd = STK_CARD_REVEAL_MS / STK_CARD_LOOP_MS;
+        p = loopT < revealEnd ? loopT / revealEnd : 1;
+      } else {
+        p = progressFromScroll();
+      }
+
+      vel = lerp(vel, clamp((p - lastP) * STK_VEL_KICK, -STK_VEL_MAX, STK_VEL_MAX), 0.14);
+      lastP = p;
+      sx = lerp(sx, tx, 0.09);
+      sy = lerp(sy, ty, 0.09);
+
+      const tiltX = vel - sy * STK_TILT_X;
+      const tiltY = sx * STK_TILT_Y;
+      stage.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg)`;
+
+      const introRunning = introStarted && elapsed < introTotal;
+      if (introRunning || Math.abs(p - lastRenderedP) > 1e-5) {
+        lastRenderedP = p;
+        const active = render(p, elapsed);
+        syncHud(active);
+      }
+
+      if (elapsed >= introTotal && !didHudOn) {
+        didHudOn = true;
+        setHudOn(true);
+      }
+
+      const settled =
+        !isCard &&
+        (!introStarted || elapsed >= introTotal) &&
+        Math.abs(vel) < 0.015 &&
+        Math.abs(sx - tx) < 0.002 &&
+        Math.abs(sy - ty) < 0.002 &&
+        Math.abs(p - progressFromScroll()) < 1e-5;
+
+      if (!settled) {
+        raf = requestAnimationFrame(loop);
+      } else {
+        vel = 0;
+        sx = tx;
+        sy = ty;
+        stage.style.transform = `rotateX(${(-sy * STK_TILT_X).toFixed(2)}deg) rotateY(${(
+          sx * STK_TILT_Y
+        ).toFixed(2)}deg)`;
+      }
     };
-    raf = requestAnimationFrame(tick);
+
+    const ensureLoop = () => {
+      if (!raf && (isCard || isNear)) {
+        raf = requestAnimationFrame(loop);
+      }
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      if (e.pointerType === "touch") return;
+      const pinViewportTop = pinTop - window.scrollY;
+      tx = ((e.clientX + window.scrollX - pinLeft) / pinWidth - 0.5) * 2;
+      ty = ((e.clientY - pinViewportTop) / pinHeight - 0.5) * 2;
+      ensureLoop();
+    };
+    const onPointerLeave = () => {
+      tx = 0;
+      ty = 0;
+      ensureLoop();
+    };
+
+    let wrapIO: IntersectionObserver | null = null;
+    if (!isCard && "IntersectionObserver" in window) {
+      wrapIO = new IntersectionObserver(
+        (entries) => {
+          for (const en of entries) {
+            isNear = en.isIntersecting;
+            if (en.isIntersecting) {
+              if (!introStarted) {
+                introStarted = true;
+                introStart = performance.now();
+              }
+              ensureLoop();
+            }
+          }
+        },
+        { rootMargin: "250px 0px", threshold: 0.01 }
+      );
+      wrapIO.observe(wrap);
+    }
+
+    const onScroll = () => ensureLoop();
+
+    if (!isCard) {
+      window.addEventListener("scroll", onScroll, { passive: true });
+      pin.addEventListener("pointermove", onPointerMove, { passive: true });
+      pin.addEventListener("pointerleave", onPointerLeave, { passive: true });
+    }
+
+    // Initial render so cards are positioned properly at current scroll offset
+    const initActive = render(lastP, introStarted ? 0 : 0);
+    syncHud(initActive);
+    if (isNear || isCard) ensureLoop();
 
     return () => {
-      cancelAnimationFrame(raf);
-      if (io) io.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+      if (!isCard) {
+        window.removeEventListener("scroll", onScroll);
+        pin.removeEventListener("pointermove", onPointerMove);
+        pin.removeEventListener("pointerleave", onPointerLeave);
+      }
+      if (ro) ro.disconnect();
+      if (wrapIO) wrapIO.disconnect();
+      if (outroIO) outroIO.disconnect();
     };
-  }, [isCard, cards.length]);
+  }, [isCard, segment, total]);
 
-  const stage = (
-    <div className="stk-stage">
-      {cards.map((c, i) => (
-        <div
-          key={c.kicker}
-          ref={(el) => {
-            cardRefs.current[i] = el;
-          }}
-          className="stk-card"
-          style={{ background: c.bg, zIndex: cards.length - i, cursor: "pointer" }}
-          onClick={() => onStart("register")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onStart("register");
-            }
-          }}
-          aria-label={`Browse ${c.kicker}: ${c.title}`}
-        >
-          <div className="stk-col stk-copy">
-            <p>{c.kicker}</p>
-            <h2>{c.title}</h2>
-          </div>
-          <div className="stk-col stk-media">
-            {/* The category artwork is a 3D render (Fluent 3D, via Icons8):
-                a single object floating on the card's own colour, which
-                reads at a glance where the flat line-art scenes did not —
-                they all looked like the same picture. */}
-            <img
-              className="stk-3d-icon"
-              src={c.icon}
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-              decoding="async"
-            />
-          </div>
-        </div>
-      ))}
-    </div>
+  const outroWords = useMemo(
+    () => (t.marketing.categories.outroTitle || "Let's Build").split(" "),
+    [t.marketing.categories.outroTitle]
   );
 
   return (
-    <section className="v2-section stk-root" id="categories" style={{ paddingTop: 20, paddingBottom: 0 }}>
-      {/* section header */}
-      <div className="v2-container">
-        <Reveal delay={0.05}><h2 className="v2-sec-title">{t.marketing.categories.title}</h2></Reveal>
+    <section
+      ref={rootRef}
+      className={`v2-section stk-root${catInView ? " v2-inview" : ""}`}
+      id="categories"
+      aria-label="Explore expertise"
+    >
+      <div className="v2-container stk-section-head">
+        <Reveal delay={0.04}>
+          <h2 className="v2-sec-title">{t.marketing.categories.title}</h2>
+        </Reveal>
         <Reveal delay={0.1}>
-          <p className="v2-sec-sub" style={{ marginBottom: 38 }}>
-            {t.marketing.categories.subtitle}
-          </p>
+          <p className="v2-sec-sub">{t.marketing.categories.subtitle}</p>
         </Reveal>
       </div>
 
       <div id="stk-wrap" className="stk-wrap" ref={wrapRef}>
-        <section className="stk-pin">
-          <div className="stk-chrome">
-            <span className="stk-mark">Yekis®</span>
-            <span className="stk-tag">Stack · Scroll</span>
+        <section className="stk-pin" ref={pinRef} aria-label="Pinned category card stack">
+          <div className="stk-stage" ref={stageRef}>
+            {cards.map((c, i) => {
+              const isActive = isReduced || activeIndex === i;
+              return (
+                <article
+                  key={c.num}
+                  ref={(el) => {
+                    cardRefs.current[i] = el;
+                  }}
+                  className="stk-card"
+                  data-category={c.category}
+                  style={
+                    {
+                      background: c.bg,
+                      "--ac": c.ac,
+                      "--glow": c.glow,
+                      zIndex: total - i,
+                    } as React.CSSProperties
+                  }
+                  role="button"
+                  tabIndex={isActive ? 0 : -1}
+                  aria-hidden={isActive ? "false" : "true"}
+                  aria-label={`Browse ${c.category}: ${c.title1} ${c.title2}`}
+                  onClick={() => onStart("register")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onStart("register");
+                    }
+                  }}
+                >
+                  <div
+                    className="stk-col stk-copy"
+                    ref={(el) => {
+                      copyRefs.current[i] = el;
+                    }}
+                  >
+                    <div>
+                      <p className="k">{c.kicker}</p>
+                      <h2>
+                        {c.title1}
+                        <br />
+                        {c.title2}
+                      </h2>
+                    </div>
+                    <div className="row">
+                      <span className="roles">{c.roles}</span>
+                      <span className="chip" aria-hidden="true">
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M5 12h14" />
+                          <path d="m12 5 7 7-7 7" />
+                        </svg>
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    className="stk-col stk-media"
+                    ref={(el) => {
+                      mediaRefs.current[i] = el;
+                    }}
+                    aria-hidden="true"
+                  >
+                    <span className="tag">{c.tag}</span>
+                    <span className="ic">{c.icon}</span>
+                    <p className="num">{c.num}</p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
-          {stage}
+
+          <div className={`stk-hud-right${hudOn ? " on" : ""}`}>
+            <nav className="stk-dots" aria-label="Jump to category">
+              {cards.map((c, i) => (
+                <button
+                  key={c.num}
+                  type="button"
+                  className="stk-dot"
+                  title={c.category}
+                  aria-label={`Jump to ${c.category}`}
+                  aria-current={activeIndex === i ? "true" : undefined}
+                  onClick={() => goToCard(i)}
+                />
+              ))}
+            </nav>
+            <div className="stk-count" aria-live="polite">
+              <b>{String(activeIndex + 1).padStart(2, "0")}</b> / {String(total).padStart(2, "0")}
+            </div>
+          </div>
         </section>
       </div>
 
@@ -1092,15 +1536,15 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
           className="stk-outro-title"
           aria-label={t.marketing.categories.outroTitle || "Let's Build"}
         >
-          {(t.marketing.categories.outroTitle || "Let's Build").split(" ").map((word, wi, arr) => (
+          {outroWords.map((word, wi) => (
             <span key={`${word}-${wi}`} className="stk-word-wrap" aria-hidden="true">
               <span
                 className="stk-word"
-                style={{ "--wi": wi, "--total": arr.length } as React.CSSProperties}
+                style={{ "--wi": wi, "--total": outroWords.length } as React.CSSProperties}
               >
                 {word}
               </span>
-              {wi < arr.length - 1 && <span className="stk-word-space">&nbsp;</span>}
+              {wi < outroWords.length - 1 && <span className="stk-word-space">&nbsp;</span>}
             </span>
           ))}
         </h1>
@@ -1109,15 +1553,21 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
           <div className="stk-load-bar-fill" />
         </div>
 
-        <p className="stk-outro-sub">
-          {t.marketing.categories.outroSubtitle}
-        </p>
+        <p className="stk-outro-sub">{t.marketing.categories.outroSubtitle}</p>
 
         <div className="stk-cta-row">
-          <button className="stk-outro-btn" onClick={() => onStart("register")}>
+          <button
+            className="stk-outro-btn"
+            type="button"
+            onClick={() => onStart("register")}
+          >
             {t.nav.getStarted}
           </button>
-          <button className="stk-outro-ghost" onClick={() => onStart("login")}>
+          <button
+            className="stk-outro-ghost"
+            type="button"
+            onClick={() => onStart("login")}
+          >
             {t.nav.signIn}
           </button>
         </div>
@@ -1186,6 +1636,8 @@ function ReviewCard({ review }: { review: MemberReview }) {
 
 function TestimonialsSection() {
   const { t } = useI18n();
+  const sectionRef = useRef<HTMLElement>(null);
+  const inView = useSectionVisible(sectionRef, "180px 0px");
   const columns = useMemo(() => {
     const cols: MemberReview[][] = [[], [], []];
     REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
@@ -1193,46 +1645,54 @@ function TestimonialsSection() {
   }, []);
 
   return (
-    <section className="v2-section v2-testi" aria-labelledby="v2-testi-title">
+    <section
+      ref={sectionRef}
+      className={`v2-section v2-testi${inView ? " v2-inview" : ""}`}
+      aria-labelledby="v2-testi-title"
+    >
       <div className="v2-testi-aurora" aria-hidden="true" />
       <div className="v2-container">
         <div className="v2-center">
-          <Reveal delay={0.06}>
+          <Reveal delay={0.04}>
             <h2 className="v2-sec-title" id="v2-testi-title">
               {t.marketing.testimonials.title}
             </h2>
           </Reveal>
-          <Reveal delay={0.14}>
+          <Reveal delay={0.1}>
             <p className="v2-sec-sub v2-testi-sub">
               {t.marketing.testimonials.subtitle}
             </p>
           </Reveal>
         </div>
 
-        <div className="v2-testi-marquee">
-          {columns.map((col, i) => (
-            <div
-              className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
-              key={`col-${i}`}
-              style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
-            >
-              <div className="v2-testi-track">
-                <div className="v2-testi-copy">
-                  {col.map((r) => (
-                    <ReviewCard key={r.name} review={r} />
-                  ))}
-                </div>
-                <div className="v2-testi-copy" aria-hidden="true">
-                  {col.map((r) => (
-                    <ReviewCard key={`${r.name}-loop`} review={r} />
-                  ))}
+        <Reveal dir="up" amount={0.08} delay={0.08}>
+          <div className="v2-testi-marquee">
+            {columns.map((col, i) => (
+              <div
+                className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
+                key={`col-${i}`}
+                style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
+              >
+                <div className="v2-testi-track">
+                  <div className="v2-testi-copy">
+                    {col.map((r) => (
+                      <ReviewCard key={r.name} review={r} />
+                    ))}
+                  </div>
+                  <div className="v2-testi-copy" aria-hidden="true">
+                    {col.map((r) => (
+                      <ReviewCard key={`${r.name}-loop`} review={r} />
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </Reveal>
 
-        <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
+        <Reveal delay={0.06}>
+          <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
+        </Reveal>
       </div>
     </section>
   );
@@ -1250,7 +1710,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   ];
 
   return (
-    <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title" style={{ paddingTop: 10 }}>
+    <section className="v2-section v2-about" id="about" aria-labelledby="v2-about-title">
       <div className="v2-container">
         <Reveal amount={0.15}>
           <div className="v2-about-panel">
@@ -1329,6 +1789,8 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   const { t } = useI18n();
   const sectionRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const faqVisible = useSectionVisible(sectionRef, "0px 0px", 0.12, true);
+  const faqInView = useSectionVisible(sectionRef, "160px 0px");
 
   /* rows are flattened on the way in so one index drives the whole list —
      the open state, the --i stagger and the filter all key off it */
@@ -1420,7 +1882,12 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
   let i = 0;
 
   return (
-    <section className="v2-faq" id="faq" ref={sectionRef} aria-labelledby="v2-faq-title">
+    <section
+      className={`v2-faq${faqVisible ? " is-visible" : ""}${faqInView ? " v2-inview" : ""}`}
+      id="faq"
+      ref={sectionRef}
+      aria-labelledby="v2-faq-title"
+    >
       {/* ambient motion layer */}
       <div className="v2-faq-blobs" aria-hidden="true">
         <span className="v2-faq-blob b1" />
@@ -1579,30 +2046,43 @@ function FAQSection({ onNavigate }: { onNavigate: (p: string) => void }) {
 function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => void }) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLElement | null>(null);
+  const ctaVisible = useSectionVisible(panelRef, "0px 0px", 0.14, true);
+  const ctaInView = useSectionVisible(panelRef, "160px 0px");
 
   /* the spotlight gradient follows the pointer across the panel */
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
+    let raf = 0;
+    let lastX = 0;
+    let lastY = 0;
     const onMove = (e: PointerEvent) => {
-      const r = panel.getBoundingClientRect();
-      if (!r.width || !r.height) return;
-      panel.style.setProperty(
-        "--mouse-x",
-        `${((e.clientX - r.left) / r.width) * 100}%`,
-      );
-      panel.style.setProperty(
-        "--mouse-y",
-        `${((e.clientY - r.top) / r.height) * 100}%`,
-      );
+      if (e.pointerType === "touch") return;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const r = panel.getBoundingClientRect();
+        if (!r.width || !r.height) return;
+        panel.style.setProperty(
+          "--mouse-x",
+          `${((lastX - r.left) / r.width) * 100}%`,
+        );
+        panel.style.setProperty(
+          "--mouse-y",
+          `${((lastY - r.top) / r.height) * 100}%`,
+        );
+      });
     };
     const onLeave = () => {
       panel.style.setProperty("--mouse-x", "50%");
       panel.style.setProperty("--mouse-y", "0%");
     };
-    panel.addEventListener("pointermove", onMove);
-    panel.addEventListener("pointerleave", onLeave);
+    panel.addEventListener("pointermove", onMove, { passive: true });
+    panel.addEventListener("pointerleave", onLeave, { passive: true });
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       panel.removeEventListener("pointermove", onMove);
       panel.removeEventListener("pointerleave", onLeave);
     };
@@ -1610,7 +2090,7 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
 
   return (
     <section
-      className="v2-outro-cta"
+      className={`v2-outro-cta${ctaVisible ? " is-visible" : ""}${ctaInView ? " v2-inview" : ""}`}
       id="ready"
       ref={panelRef}
       aria-labelledby="ready-heading"
@@ -1685,229 +2165,20 @@ function BackToTop() {
 }
 
 /* ─────────────────────────────────────────────────
-   Footer — frosted card over a panel, giant word below
+   Shared scroll-reactive ambient background layer
 ───────────────────────────────────────────────── */
-function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
-  const { t } = useI18n();
-
-  const NAV_COLS = [
-    {
-      heading: t.marketing.footer.platform,
-      links: [
-        { label: t.marketing.footer.faq, page: "faq" },
-        { label: t.marketing.footer.fees, page: "fees" },
-        { label: t.marketing.footer.caseStudies, page: "case-studies" },
-      ],
-    },
-    {
-      heading: t.marketing.footer.company,
-      links: [
-        { label: t.marketing.footer.about, page: "about" },
-        { label: t.marketing.footer.contactSupport, href: "mailto:support@yekis.com" },
-      ],
-    },
-    {
-      heading: t.marketing.footer.legal,
-      links: [
-        { label: t.marketing.footer.privacy, page: "privacy" },
-        { label: t.marketing.footer.terms, page: "terms" },
-      ],
-    },
-  ];
-
-  const SOCIAL = [
-    {
-      label: "TikTok",
-      href: "#",
-      svg: '<path fill="currentColor" d="M16.6 5.82A4.28 4.28 0 0 1 15.54 3h-3.09v12.4a2.59 2.59 0 0 1-2.59 2.5 2.59 2.59 0 1 1 .77-5.06V9.7a5.68 5.68 0 0 0-.77-.05A5.68 5.68 0 1 0 15.54 15.3V9.01a7.35 7.35 0 0 0 4.3 1.38V7.3a4.29 4.29 0 0 1-3.24-1.48Z"/>',
-    },
-    {
-      label: "Telegram",
-      href: "https://t.me/yekis_channel",
-      svg: '<path fill="currentColor" d="M21.94 4.6 18.9 19.2c-.23 1.02-.84 1.27-1.7.79l-4.7-3.46-2.27 2.18c-.25.25-.46.46-.94.46l.33-4.79 8.72-7.88c.38-.34-.08-.53-.59-.19L6.06 13.1l-4.65-1.45c-1.01-.32-1.03-1.01.21-1.5l18.17-7c.84-.31 1.58.2 1.15 1.44Z"/>',
-    },
-    {
-      label: "Instagram",
-      href: "#",
-      svg: '<rect x="3" y="3" width="18" height="18" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="17.4" cy="6.7" r="1.1" fill="currentColor"/>',
-    },
-    {
-      label: "Facebook",
-      href: "#",
-      svg: '<path fill="currentColor" d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5.02 3.66 9.18 8.44 9.94v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.5-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.33V22c4.78-.76 8.44-4.92 8.44-9.94Z"/>',
-    },
-  ];
-
-  const year = new Date().getFullYear();
-
-  /* reveal the card + giant word the moment they scroll into view */
-  const areaRef = useRef<HTMLElement | null>(null);
-  useEffect(() => {
-    const area = areaRef.current;
-    const card = area?.querySelector<HTMLElement>(".v2-footer-card");
-    const word = area?.querySelector<HTMLElement>(".v2-footer-word");
-    if (!area || !card || !word) return;
-    if (prefersReduced() || !("IntersectionObserver" in window)) {
-      card.classList.add("is-visible");
-      area.classList.add("is-visible");
-      return;
-    }
-
-    /* the card fades up on its own threshold; the wordmark pops separately so
-       the animation is never missed above the fold */
-    const cardIO = new IntersectionObserver(
-      (entries) => {
-        for (const en of entries) {
-          if (!en.isIntersecting) continue;
-          en.target.classList.add("is-visible");
-          cardIO.disconnect();
-        }
-      },
-      { threshold: 0.12 },
-    );
-    cardIO.observe(card);
-
-    const wordIO = new IntersectionObserver(
-      (entries) => {
-        for (const en of entries) {
-          if (!en.isIntersecting) continue;
-          area.classList.add("is-visible");
-          wordIO.disconnect();
-        }
-      },
-      { threshold: 0.3 },
-    );
-    wordIO.observe(word);
-
-    return () => {
-      cardIO.disconnect();
-      wordIO.disconnect();
-    };
-  }, []);
-
+function ScrollAmbientCanvas({
+  canvasRef,
+}: {
+  canvasRef: React.RefObject<HTMLDivElement | null>;
+}) {
   return (
-    <footer className="v2-footer-area" id="yk-footer" ref={areaRef}>
-      <div className="v2-footer-divider" aria-hidden />
-
-      <span className="v2-footer-glow v2-footer-glow-l" aria-hidden />
-      <span className="v2-footer-glow v2-footer-glow-r" aria-hidden />
-
-      <div className="v2-footer-card">
-        <div className="v2-footer-top">
-          {/* Brand column */}
-          <div className="v2-footer-lead">
-            <button
-              className="v2-footer-logo"
-              onClick={() => onNavigate("home")}
-              aria-label="Go to homepage"
-            >
-              <span className="v2-footer-symbol" aria-hidden>
-                <svg viewBox="0 0 24 24">
-                  <path d="M5 4l7 9v7" />
-                  <path d="M19 4l-7 9" />
-                </svg>
-              </span>
-              <span>Yekis</span>
-            </button>
-            <p className="v2-footer-desc">
-              {t.marketing.footer.desc}
-            </p>
-            <nav className="v2-footer-social" aria-label="Social links">
-              {SOCIAL.map(({ label, href, svg }) => (
-                <a
-                  key={label}
-                  href={href}
-                  title={label}
-                  aria-label={label}
-                  target={href.startsWith("http") ? "_blank" : undefined}
-                  rel="noopener noreferrer"
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Nav columns */}
-          <div className="v2-footer-nav">
-            {NAV_COLS.map((col) => (
-              <nav key={col.heading} aria-label={col.heading}>
-                <h4>{col.heading}</h4>
-                <div className="v2-footer-nav-links">
-                  {col.links.map((lk) =>
-                    "href" in lk ? (
-                      <a key={lk.label} href={lk.href}>
-                        {lk.label}
-                      </a>
-                    ) : (
-                      <button key={lk.label} onClick={() => onNavigate(lk.page!)}>
-                        {lk.label}
-                      </button>
-                    ),
-                  )}
-                </div>
-              </nav>
-            ))}
-          </div>
-        </div>
-
-        <div className="v2-footer-rule" aria-hidden />
-
-        {/* Bottom bar */}
-        <div className="v2-footer-base">
-          <div className="v2-footer-meta">
-            <p>
-              &copy; {year} Yekis &mdash; Addis Ababa &middot; {t.marketing.footer.copyright}
-            </p>
-            <span className="v2-footer-escrow">
-              <ShieldCheck />
-              {t.marketing.footer.escrowNote}
-            </span>
-          </div>
-          <div className="v2-footer-legal">
-            <LanguageSelector variant="segmented" />
-            <button onClick={() => onNavigate("privacy")}>{t.marketing.footer.privacy}</button>
-            <button onClick={() => onNavigate("terms")}>{t.marketing.footer.terms}</button>
-            {/* The 3D icon set is Icons8's, and their free licence asks for
-                a credit wherever their work appears. */}
-            <a
-              href="https://icons8.com"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="v2-footer-icon-credit"
-            >
-              {t.marketing.footer.iconCredit}
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <div className="v2-footer-word" aria-hidden>
-        Yekis
-      </div>
-
-      {/* Structured data */}
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            name: "Yekis",
-            url: "https://yekis.com",
-            logo: "https://yekis.com/svgviewer-output.svg",
-            description:
-              "Ethiopia's freelance marketplace. Fund a milestone, review the work, release payment.",
-            sameAs: ["https://t.me/yekis_channel", "https://t.me/yekis_group"],
-            contactPoint: {
-              "@type": "ContactPoint",
-              contactType: "customer support",
-              availableLanguage: ["English", "Amharic"],
-            },
-          }),
-        }}
-      />
-    </footer>
+    <div className="v2-ambient-canvas" ref={canvasRef} aria-hidden="true">
+      <span className="v2-ambient-orb v2-ambient-orb-1" />
+      <span className="v2-ambient-orb v2-ambient-orb-2" />
+      <span className="v2-ambient-orb v2-ambient-orb-3" />
+      <span className="v2-ambient-wash" />
+    </div>
   );
 }
 
@@ -1915,8 +2186,101 @@ function FooterV2({ onNavigate }: { onNavigate: (page: string) => void }) {
    Root export
 ───────────────────────────────────────────────── */
 export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
+  const ambientRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const canvas = ambientRef.current;
+    if (!canvas) return;
+
+    const setVars = (p: number) => {
+      const clamped = Math.max(0, Math.min(1, p));
+      const x1 = Math.sin(clamped * Math.PI * 2.2) * 14;
+      const y1 = Math.cos(clamped * Math.PI * 1.6) * 10 - clamped * 10;
+      const x2 = Math.cos(clamped * Math.PI * 1.8) * -15;
+      const y2 = Math.sin(clamped * Math.PI * 2.0) * 11 + clamped * 8;
+      const x3 = Math.sin(clamped * Math.PI * 2.6 + 1.1) * 12;
+      const y3 = Math.cos(clamped * Math.PI * 2.1 + 0.6) * -9;
+      const wy = clamped * 32 - 16;
+
+      const em = 0.62 + 0.38 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 1.7 - 0.3));
+      const tl = 0.52 + 0.48 * (0.5 + 0.5 * Math.cos(clamped * Math.PI * 2.4));
+      const vl = 0.36 + 0.54 * (0.5 + 0.5 * Math.sin(clamped * Math.PI * 3.0 + 0.8));
+
+      canvas.style.setProperty("--amb-x1", `${x1.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y1", `${y1.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-x2", `${x2.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y2", `${y2.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-x3", `${x3.toFixed(2)}vw`);
+      canvas.style.setProperty("--amb-y3", `${y3.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-wy", `${wy.toFixed(2)}vh`);
+      canvas.style.setProperty("--amb-em", em.toFixed(3));
+      canvas.style.setProperty("--amb-tl", tl.toFixed(3));
+      canvas.style.setProperty("--amb-vl", vl.toFixed(3));
+    };
+
+    if (prefersReduced()) {
+      setVars(0.15);
+      return;
+    }
+
+    let curP = 0;
+    let targetP = 0;
+    let maxScroll = 1;
+    let raf = 0;
+
+    const measureBounds = () => {
+      maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      targetP = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+    };
+
+    const tick = () => {
+      raf = 0;
+      const diff = targetP - curP;
+      if (Math.abs(diff) < 0.0005) {
+        curP = targetP;
+        setVars(curP);
+        return;
+      }
+      curP += diff * 0.1;
+      setVars(curP);
+      raf = requestAnimationFrame(tick);
+    };
+
+    const kick = () => {
+      targetP = Math.max(0, Math.min(1, window.scrollY / maxScroll));
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+
+    const onResize = () => {
+      measureBounds();
+      if (!raf) raf = requestAnimationFrame(tick);
+    };
+
+    measureBounds();
+    curP = targetP;
+    setVars(curP);
+
+    let ro: ResizeObserver | null = null;
+    if ("ResizeObserver" in window) {
+      ro = new ResizeObserver(onResize);
+      ro.observe(document.documentElement);
+    }
+    window.addEventListener("scroll", kick, { passive: true });
+    window.addEventListener("resize", onResize, { passive: true });
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      if (ro) ro.disconnect();
+      window.removeEventListener("scroll", kick);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
+
   return (
     <div className="yk-v2">
+      {/* Shared scroll-reactive background canvas */}
+      <ScrollAmbientCanvas canvasRef={ambientRef} />
+
       {/* Hero */}
       <HeroSection onStart={onStart} />
 

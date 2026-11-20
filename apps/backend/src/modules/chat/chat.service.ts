@@ -639,8 +639,14 @@ export async function sendMessage(params: {
 export async function generateSmartReplies(params: {
   conversationId: string;
   userId: string;
+  tone?: "PROFESSIONAL" | "FRIENDLY" | "NEGOTIATION" | "CONCISE";
+  customPrompt?: string;
+  currentDraft?: string;
 }) {
   const { conversation, isStaff } = await getConversationAccess(params.conversationId, params.userId);
+  const tone = params.tone || "PROFESSIONAL";
+  const customPrompt = (params.customPrompt || "").trim();
+  const currentDraft = (params.currentDraft || "").trim();
 
   const user = await prisma.user.findUnique({
     where: { id: params.userId },
@@ -652,172 +658,306 @@ export async function generateSmartReplies(params: {
   const messages = await prisma.chatMessage.findMany({
     where: { conversationId: params.conversationId },
     orderBy: { createdAt: "desc" },
-    take: 5,
-    include: { sender: { select: { id: true, role: true } } },
+    take: 8,
+    include: { sender: { select: { id: true, role: true, displayName: true } } },
   });
 
-  // ── Support Conversation Replies ──
-  if (isSupport) {
-    if (isStaff) {
-      if (messages.length === 0) {
-        return [
-          "Hello! I'm reviewing your support request. How can I help you today?",
-          "Greetings! Please share the details of your inquiry or issue.",
-          "Welcome to Yekis Support! I'm here to assist you.",
-        ];
-      }
-      return [
-        "I'm looking into this for you right now. Please allow me a moment.",
-        "Could you please provide the transaction ID, job title, or contract reference?",
-        "This issue has been resolved. Please let me know if you need anything else!",
-      ];
-    }
+  const participantIds = Array.from(
+    new Set([conversation.createdById, params.userId, ...messages.map((m) => m.senderId)].filter(Boolean)),
+  );
 
-    // Client or Freelancer talking to Support
-    if (messages.length === 0) {
-      return [
-        "I have a question regarding my wallet deposit or payout.",
-        "Could you please assist me with a milestone contract issue?",
-        "I need help with my Fayda identity verification status.",
-      ];
-    }
-    const latest = messages[0];
-    if (latest?.senderId === params.userId) {
-      return [
-        "Thank you for looking into this!",
-        "Let me know if you need any additional screenshots or information.",
-        "I will wait for your update.",
-      ];
-    }
-    return [
-      "Thank you! That resolved my question.",
-      "Here is the additional information you requested.",
-      "Could you please clarify what steps I need to take next?",
-    ];
-  }
+  const relatedContracts = await prisma.contract.findMany({
+    where: {
+      OR: [
+        { clientId: { in: participantIds } },
+        { freelancerId: { in: participantIds } },
+      ],
+    },
+    include: {
+      job: { select: { id: true, title: true, status: true } },
+      milestones: {
+        orderBy: { sequenceNumber: "asc" },
+      },
+    },
+    take: 3,
+  });
 
-  // ── Direct Conversation Replies (Role-based: CLIENT vs FREELANCER) ──
-  if (messages.length === 0) {
-    if (userRole === "CLIENT") {
-      return [
-        "Hi! Are you available to discuss a new project?",
-        "Could you review the project scope and share your rate estimate?",
-        "Let's align on the milestone deliverables and timeline.",
-      ];
+  const relatedGigs = await prisma.gig.findMany({
+    where: {
+      freelancerId: { in: participantIds },
+      status: "PUBLISHED",
+    },
+    take: 3,
+  });
+
+  const activeContract = relatedContracts[0] || null;
+  const activeMilestone =
+    activeContract?.milestones.find((m) => m.escrowState === "DELIVERED" || m.escrowState === "FUNDED") ||
+    activeContract?.milestones[0] ||
+    null;
+  const activeGig = relatedGigs[0] || null;
+
+  const milestoneETB = activeMilestone
+    ? `${(Number(activeMilestone.amountMinor) / 100).toLocaleString()} ETB`
+    : null;
+
+  const styleTransform = (baseText: string): string => {
+    if (tone === "CONCISE") {
+      return baseText.split(".")[0].trim() + ".";
     }
-    // FREELANCER
-    return [
-      "Hello! I reviewed your project requirements and would love to help.",
-      "Hi! Could you share more details on the scope and timeline?",
-      "I'm available and ready to discuss milestones and deliverables.",
-    ];
-  }
+    if (tone === "FRIENDLY") {
+      return `Hi there! ${baseText} Let me know if that works for you!`;
+    }
+    if (tone === "NEGOTIATION") {
+      return `${baseText} Let's lock these terms in Yekis Escrow so both sides are protected.`;
+    }
+    return baseText;
+  };
 
   const latest = messages[0];
   const text = (latest?.body || "").toLowerCase();
 
-  // If latest message was sent by the requesting user themselves
-  if (latest?.senderId === params.userId) {
-    if (userRole === "CLIENT") {
-      return [
-        "Let me know your thoughts whenever you're ready!",
-        "Looking forward to hearing from you.",
-        "Feel free to ask if anything in the brief is unclear.",
-      ];
-    }
-    // FREELANCER
-    return [
-      "Let me know if you need any clarification on my proposal.",
-      "Looking forward to hearing your thoughts!",
-      "I'll keep you updated on progress.",
-    ];
-  }
+  let rawItems: Array<{
+    id: string;
+    label: string;
+    text: string;
+    rationale: string;
+    category: "APPROVAL" | "NEGOTIATION" | "DELIVERY" | "CLARIFICATION" | "FOLLOW_UP";
+  }> = [];
 
-  // Deliverable review / submission context
-  if (
+  if (customPrompt) {
+    rawItems = [
+      {
+        id: "custom-1",
+        label: "Custom Option 1",
+        text: styleTransform(
+          `${currentDraft ? `${currentDraft} — ` : ""}Regarding "${customPrompt}": let's align this with ${activeMilestone ? `milestone "${activeMilestone.title}" (${milestoneETB})` : "our Yekis escrow agreement"}.`,
+        ),
+        rationale: `Generated from your custom prompt ("${customPrompt}") in ${tone.toLowerCase()} tone.`,
+        category: "NEGOTIATION",
+      },
+      {
+        id: "custom-2",
+        label: "Structured Proposal",
+        text: styleTransform(
+          `Here is what I propose for ${customPrompt}: we can document the acceptance criteria on ${activeContract?.job?.title || "the contract"} and proceed once confirmed.`,
+        ),
+        rationale: "Pairs your custom instruction with contract milestone verification.",
+        category: "CLARIFICATION",
+      },
+      {
+        id: "custom-3",
+        label: "Actionable Next Step",
+        text: styleTransform(
+          `Could we confirm "${customPrompt}" today so we keep our delivery timeline on track?`,
+        ),
+        rationale: "Direct follow-up anchored to project schedule.",
+        category: "FOLLOW_UP",
+      },
+    ];
+  } else if (isSupport) {
+    rawItems = isStaff
+      ? [
+          {
+            id: "sup-staff-1",
+            label: "Investigating Issue",
+            text: styleTransform("I am reviewing your escrow ledger and transaction logs now. Please allow me a moment."),
+            rationale: "Reassures user while checking ledger records.",
+            category: "CLARIFICATION",
+          },
+          {
+            id: "sup-staff-2",
+            label: "Request Reference",
+            text: styleTransform("Could you share the Telebirr/CBE Birr transaction reference or contract ID so I can verify?"),
+            rationale: "Collects payment rail reference.",
+            category: "FOLLOW_UP",
+          },
+          {
+            id: "sup-staff-3",
+            label: "Confirm Resolution",
+            text: styleTransform("This ticket has been verified and resolved on your account. Let me know if you need anything else."),
+            rationale: "Closes loop clearly.",
+            category: "APPROVAL",
+          },
+        ]
+      : [
+          {
+            id: "sup-user-1",
+            label: "Escrow / Top-Up Check",
+            text: styleTransform("Could you check the status of my recent escrow milestone or wallet top-up receipt?"),
+            rationale: "Standard escrow support inquiry.",
+            category: "CLARIFICATION",
+          },
+          {
+            id: "sup-user-2",
+            label: "Share Reference ID",
+            text: styleTransform("Here is my contract and payment reference number for verification."),
+            rationale: "Provides actionable audit details.",
+            category: "DELIVERY",
+          },
+          {
+            id: "sup-user-3",
+            label: "Next Steps",
+            text: styleTransform("Thank you! Could you clarify what steps I should take next?"),
+            rationale: "Polite follow-up.",
+            category: "FOLLOW_UP",
+          },
+        ];
+  } else if (
     text.includes("deliver") ||
     text.includes("submit") ||
     text.includes("review") ||
-    text.includes("finished") ||
-    text.includes("check") ||
-    text.includes("done")
+    text.includes("done") ||
+    activeMilestone?.escrowState === "DELIVERED"
   ) {
-    if (userRole === "CLIENT") {
-      return [
-        "I will review the deliverables thoroughly and get back to you shortly.",
-        "Deliverables received! Everything looks great so far.",
-        "Could you please share the source files and assets as well?",
-      ];
-    }
-    return [
-      "I've updated the files based on your feedback. Please take a look!",
-      "Everything is ready for your review. Let me know if any revisions are needed.",
-      "Thank you for reviewing! I'm ready to proceed to the next milestone.",
-    ];
+    rawItems =
+      userRole === "CLIENT"
+        ? [
+            {
+              id: "del-c-1",
+              label: "Approve & Release",
+              text: styleTransform(
+                `I have reviewed the submission for ${activeMilestone ? `"${activeMilestone.title}"` : "this milestone"} and will release the ${milestoneETB || "escrow"} payout now.`,
+              ),
+              rationale: "Confirms QA sign-off and immediate milestone release.",
+              category: "APPROVAL",
+            },
+            {
+              id: "del-c-2",
+              label: "Confirm QA Check",
+              text: styleTransform(
+                `Deliverable received for ${activeContract?.job?.title || "the project"}. I am running final QA tests today and will update you shortly.`,
+              ),
+              rationale: "Sets clear expectation for review window.",
+              category: "CLARIFICATION",
+            },
+            {
+              id: "del-c-3",
+              label: "Request Minor Revision",
+              text: styleTransform(
+                `Thank you for the upload! Could we make one small adjustment before we close ${activeMilestone ? `"${activeMilestone.title}"` : "the milestone"}?`,
+              ),
+              rationale: "Constructive revision request tied to active milestone.",
+              category: "NEGOTIATION",
+            },
+          ]
+        : [
+            {
+              id: "del-f-1",
+              label: "Ready for Escrow Release",
+              text: styleTransform(
+                `All deliverables for ${activeMilestone ? `"${activeMilestone.title}" (${milestoneETB})` : "this phase"} are uploaded and verified. Please review and release the milestone when ready.`,
+              ),
+              rationale: "Prompts client to inspect and release funded escrow.",
+              category: "DELIVERY",
+            },
+            {
+              id: "del-f-2",
+              label: "Offer Walkthrough",
+              text: styleTransform(
+                `I have attached the build artifacts and test logs. Happy to walk you through any part of the implementation!`,
+              ),
+              rationale: "Speeds up client acceptance.",
+              category: "FOLLOW_UP",
+            },
+            {
+              id: "del-f-3",
+              label: "Plan Next Milestone",
+              text: styleTransform(
+                `Once you approve this deliverable, I am ready to kick off the next milestone right away.`,
+              ),
+              rationale: "Maintains momentum toward next contract phase.",
+              category: "NEGOTIATION",
+            },
+          ];
+  } else {
+    rawItems =
+      userRole === "CLIENT"
+        ? [
+            {
+              id: "gen-c-1",
+              label: "Align on Milestone",
+              text: styleTransform(
+                `The scope for ${activeContract?.job?.title || conversation.subject} looks solid. Let's proceed with ${activeMilestone ? `"${activeMilestone.title}" (${milestoneETB})` : "funding the escrow milestone"}.`,
+              ),
+              rationale: "Moves conversation toward escrow execution.",
+              category: "APPROVAL",
+            },
+            {
+              id: "gen-c-2",
+              label: "Split Into 2 Phases",
+              text: styleTransform(
+                `Can we structure this into two clear escrow milestones with defined QA acceptance criteria?`,
+              ),
+              rationale: "Reduces delivery risk using staged milestones.",
+              category: "NEGOTIATION",
+            },
+            {
+              id: "gen-c-3",
+              label: "Confirm Timeline",
+              text: styleTransform(
+                `Could you confirm your estimated delivery date and whether you need any additional assets from our side?`,
+              ),
+              rationale: "Clarifies schedule and dependencies.",
+              category: "CLARIFICATION",
+            },
+          ]
+        : [
+            {
+              id: "gen-f-1",
+              label: "Confirm Availability",
+              text: styleTransform(
+                `I can deliver ${activeContract?.job?.title || conversation.subject} within the target schedule. Ready to start as soon as ${activeMilestone ? `"${activeMilestone.title}" (${milestoneETB})` : "the milestone"} is funded.`,
+              ),
+              rationale: "Confirms readiness tied to escrow protection.",
+              category: "APPROVAL",
+            },
+            {
+              id: "gen-f-2",
+              label: "Propose Milestone Breakdown",
+              text: styleTransform(
+                `I suggest breaking this into Phase 1 (Core Architecture & Sandbox) and Phase 2 (Production QA & Handover) on Yekis Escrow.`,
+              ),
+              rationale: "Structured milestone counter-proposal.",
+              category: "NEGOTIATION",
+            },
+            {
+              id: "gen-f-3",
+              label: "Share Gig / Portfolio",
+              text: styleTransform(
+                `I have handled similar integrations${activeGig ? ` (see my gig "${activeGig.title}")` : ""} and can share sample verification logs right away.`,
+              ),
+              rationale: "References active freelancer gig for credibility.",
+              category: "DELIVERY",
+            },
+          ];
   }
 
-  // Budget / Milestone / Escrow context
-  if (
-    text.includes("budget") ||
-    text.includes("price") ||
-    text.includes("etb") ||
-    text.includes("birr") ||
-    text.includes("milestone") ||
-    text.includes("escrow") ||
-    text.includes("cost") ||
-    text.includes("pay")
-  ) {
-    if (userRole === "CLIENT") {
-      return [
-        "The proposed ETB budget works for me. Let's create the escrow milestone.",
-        "Could we structure this into milestone payments via Yekis escrow?",
-        "Could you provide a quick breakdown of deliverables for this budget?",
-      ];
-    }
-    return [
-      "The proposed ETB budget works well. I'm ready to begin once escrow is funded.",
-      "Could we structure this into two milestone payments via Yekis escrow?",
-      "That matches our agreed scope. Let's set up the milestone contract.",
-    ];
-  }
-
-  // Deadline / Timeline context
-  if (
-    text.includes("when") ||
-    text.includes("time") ||
-    text.includes("deadline") ||
-    text.includes("days") ||
-    text.includes("urgent") ||
-    text.includes("schedule") ||
-    text.includes("start")
-  ) {
-    if (userRole === "CLIENT") {
-      return [
-        "That timeline fits my schedule well. Let's proceed.",
-        "Could we aim to complete this a few days earlier if possible?",
-        "Sounds like a solid schedule. Let's get started!",
-      ];
-    }
-    return [
-      "I can comfortably deliver this within the requested timeline.",
-      "That timeline works perfectly. I can get started today.",
-      "To guarantee high quality, could we schedule 2 extra days for QA?",
-    ];
-  }
-
-  // General conversation replies
-  if (userRole === "CLIENT") {
-    return [
-      "Sounds great! Let's proceed with this plan.",
-      "Could you share a bit more detail on your approach?",
-      "Understood! Looking forward to the next steps.",
-    ];
-  }
-  return [
-    "Sounds great! Let's proceed with this plan.",
-    "Could you share a bit more detail on the specific requirements?",
-    "Understood! I'll prepare the next steps right away.",
-  ];
+  return {
+    suggestions: rawItems.map((i) => i.text),
+    items: rawItems,
+    context: {
+      stage: activeMilestone?.escrowState === "DELIVERED" ? "Deliverable Review" : activeContract ? "Active Escrow Contract" : "Deal Scoping",
+      contractId: activeContract?.id || null,
+      contractTitle: activeContract?.job?.title || null,
+      milestoneId: activeMilestone?.id || null,
+      milestoneTitle: activeMilestone?.title || null,
+      milestoneAmountETB: milestoneETB,
+      escrowState: activeMilestone?.escrowState || null,
+      gigTitle: activeGig?.title || null,
+    },
+    actionChips: [
+      { id: "act-deal", label: "Extract Deal Terms", actionType: "EXTRACT_DEAL" },
+      { id: "act-sum", label: "Summarize Thread", actionType: "SUMMARIZE" },
+      ...(activeContract
+        ? [{ id: "act-contract", label: "Open Contracts & Escrow", actionType: "OPEN_CONTRACTS" }]
+        : []),
+    ],
+    agentNote: activeMilestone
+      ? `Grounded in ${activeContract?.job?.title || "active contract"} · ${activeMilestone.title} (${milestoneETB}, ${activeMilestone.escrowState})`
+      : `Analyzed ${messages.length} recent message(s) in ${tone.toLowerCase()} tone`,
+    toneUsed: tone,
+  };
 }
 
 export async function summarizeConversation(params: {

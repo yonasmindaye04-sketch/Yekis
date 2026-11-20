@@ -74,7 +74,7 @@
   top: 0;
   left: 0;
   width: 100%;
-  z-index: 100;
+  z-index: 125;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1052,9 +1052,9 @@
   width: 100vw;
   height: 100vh;
   height: 100dvh;
-  background: rgba(6, 10, 14, 0.62);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background: rgba(8, 12, 16, 0.36);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 120;
 }
 
@@ -1065,27 +1065,28 @@
   bottom: 0;
   height: 100vh;
   height: 100dvh;
-  width: min(90vw, 290px);
+  width: min(88vw, 310px);
   background: var(--yekis-bg, #0b1116);
   border-left: 1px solid var(--yekis-border);
   z-index: 130;
   display: flex;
   flex-direction: column;
-  padding: max(20px, env(safe-area-inset-top)) 20px max(24px, env(safe-area-inset-bottom));
-  gap: 20px;
+  padding: max(22px, env(safe-area-inset-top)) 28px max(28px, env(safe-area-inset-bottom));
+  gap: 28px;
   transform: translateX(105%);
   visibility: hidden;
   pointer-events: none;
   transition:
     transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
     visibility 0.22s;
-  box-shadow: -16px 0 40px rgba(0, 0, 0, 0.45);
+  box-shadow: -12px 0 36px rgba(0, 0, 0, 0.22);
   overflow-y: auto;
   box-sizing: border-box;
 }
 
 :root[data-theme="light"] .marketing-mobile-drawer {
-  background: #ffffff;
+  background: #fdfcf8;
+  box-shadow: -12px 0 36px rgba(15, 23, 42, 0.14);
 }
 
 .marketing-mobile-drawer.open {
@@ -1097,111 +1098,84 @@
 .marketing-mobile-drawer-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--yekis-border);
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 2px 0 6px;
 }
 
-.marketing-mobile-drawer-title {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--yekis-muted);
-}
-
+.marketing-mobile-icon-btn,
 .marketing-mobile-close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  border: 1px solid var(--yekis-border);
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--yekis-copy);
   cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.marketing-mobile-icon-btn:hover,
+.marketing-mobile-close:hover {
+  background: var(--color-bg-subtle);
+}
+
+.marketing-mobile-icon-btn:focus-visible,
+.marketing-mobile-close:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
 }
 
 .marketing-mobile-links {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 
 .marketing-mobile-links button {
   display: flex;
   align-items: center;
   width: 100%;
-  min-height: 46px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid transparent;
+  min-height: 52px;
+  padding: 14px 2px;
+  border: 0;
+  border-bottom: 1px solid var(--yekis-border);
+  border-radius: 0;
   background: transparent;
   color: var(--yekis-copy);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.16s ease, color 0.16s ease;
+  transition: color 0.16s ease;
 }
 
 .marketing-mobile-links button:hover,
 .marketing-mobile-links button:focus-visible,
 .marketing-mobile-links button.is-active {
-  background: var(--color-bg-subtle);
+  background: transparent;
   color: var(--yekis-lime);
   outline: none;
 }
 
 .marketing-mobile-links button.is-active {
-  font-weight: 700;
-}
-
-.marketing-mobile-actions {
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-top: 16px;
-  border-top: 1px solid var(--yekis-border);
-}
-
-.marketing-mobile-actions > button {
-  width: 100%;
-  min-height: 46px;
-  justify-content: center;
-}
-
-.marketing-mobile-preferences {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 4px;
-  color: var(--yekis-muted);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: 600;
 }
 
 .marketing-drawer-language {
-  flex: 1;
+  display: inline-flex;
   justify-content: flex-end;
 }
 
-.marketing-drawer-language .yk-lang-trigger {
-  min-height: 44px;
-}
-
 .marketing-drawer-language .yk-lang-menu {
-  right: auto;
-  left: 0;
+  right: 0;
+  left: auto;
 }
 
-/* The header's language control is a bare label, not a boxed button.
+/* The header & drawer language controls are bare labels, not boxed buttons.
    The dark-theme rules in LanguageSelector.css are more specific than a
    plain `.marketing-header-language .yk-lang-trigger`, so they were
    winning: the box came back in dark mode and nowhere else, which is
@@ -1209,15 +1183,19 @@
    The border keeps its width and only loses its colour, so nothing
    moves. */
 .marketing-header-language .yk-lang-trigger,
-:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger {
-  min-height: 44px;
+.marketing-drawer-language .yk-lang-trigger,
+:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger,
+:root[data-theme="dark"] .marketing-drawer-language .yk-lang-trigger {
+  min-height: 38px;
   border-color: transparent;
   background: transparent;
   color: var(--color-text-secondary);
 }
 
 .marketing-header-language .yk-lang-trigger:hover,
-:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger:hover {
+.marketing-drawer-language .yk-lang-trigger:hover,
+:root[data-theme="dark"] .marketing-header-language .yk-lang-trigger:hover,
+:root[data-theme="dark"] .marketing-drawer-language .yk-lang-trigger:hover {
   border-color: transparent;
   background: var(--color-bg-subtle);
   color: var(--color-text);

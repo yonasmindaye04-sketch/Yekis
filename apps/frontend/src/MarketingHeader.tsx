@@ -84,7 +84,17 @@ export function MarketingHeader({
         aria-label="Mobile navigation menu"
       >
         <div className="marketing-mobile-drawer-head">
-          <span className="marketing-mobile-drawer-title">Navigation</span>
+          <LanguageSelector variant="dropdown" className="marketing-drawer-language" />
+          <button
+            type="button"
+            className="marketing-mobile-icon-btn"
+            onClick={toggleTheme}
+            aria-label={
+              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+            }
+          >
+            {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
+          </button>
           <button
             type="button"
             className="marketing-mobile-close"
@@ -106,27 +116,19 @@ export function MarketingHeader({
               {item.label}
             </button>
           ))}
-        </nav>
-        <div className="marketing-mobile-actions">
-          <div className="marketing-mobile-preferences">
-            <span>Language</span>
-            <LanguageSelector variant="dropdown" className="marketing-drawer-language" />
-          </div>
           <button
             type="button"
-            className="btn-ghost"
             onClick={() => handleMobileAuth("login")}
           >
             {t.nav.signIn}
           </button>
           <button
             type="button"
-            className="btn-primary"
             onClick={() => handleMobileAuth("register")}
           >
             {t.nav.getStarted}
           </button>
-        </div>
+        </nav>
       </div>
     </>
   );

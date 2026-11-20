@@ -2508,7 +2508,7 @@ const loadWorkspace = async () => {
                   <span className="sh-kbd">Escrow Protected</span>
                 </div>
                 <div className="form-grid">
-                  <label style={{ gridColumn: "span 2" }}>
+                  <label className="form-span-2">
                     Brief Title
                     <input
                       value={jobTitle}

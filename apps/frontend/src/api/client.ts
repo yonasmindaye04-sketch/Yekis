@@ -347,8 +347,74 @@ export interface ChatMessage {
   };
 }
 
+export type MiniMeTone = "PROFESSIONAL" | "FRIENDLY" | "NEGOTIATION" | "CONCISE";
+
+export interface SmartReplyItem {
+  id: string;
+  label: string;
+  text: string;
+  rationale?: string;
+  category?: "APPROVAL" | "NEGOTIATION" | "DELIVERY" | "CLARIFICATION" | "FOLLOW_UP";
+}
+
+export interface MiniMeActionChip {
+  id: string;
+  label: string;
+  actionType: "EXTRACT_DEAL" | "SUMMARIZE" | "OPEN_CONTRACTS" | "INSERT_MILESTONE_UPDATE";
+  payload?: string;
+}
+
+export interface MiniMeContextBadge {
+  stage: string;
+  contractId?: string | null;
+  contractTitle?: string | null;
+  milestoneId?: string | null;
+  milestoneTitle?: string | null;
+  milestoneAmountETB?: string | null;
+  escrowState?: string | null;
+  gigTitle?: string | null;
+}
+
+export interface SmartReplyOptions {
+  tone?: MiniMeTone;
+  customPrompt?: string;
+  currentDraft?: string;
+  activeRole?: string;
+  subject?: string;
+  messages?: Array<{
+    senderId: string;
+    senderName?: string;
+    senderRole?: string;
+    body: string;
+    createdAt?: string;
+  }>;
+  contracts?: Array<{
+    id: string;
+    title: string;
+    status: string;
+    milestones: Array<{
+      id: string;
+      title: string;
+      amountMinor: number;
+      escrowState: string;
+      dueDate: string;
+    }>;
+  }>;
+  gigs?: Array<{
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+  }>;
+}
+
 export interface SmartRepliesResponse {
   suggestions: string[];
+  items?: SmartReplyItem[];
+  context?: MiniMeContextBadge;
+  actionChips?: MiniMeActionChip[];
+  agentNote?: string;
+  toneUsed?: MiniMeTone;
 }
 
 export interface ConversationSummaryResponse {
@@ -1204,21 +1270,24 @@ class ApiClient {
     });
   }
 
-  async getSmartReplies(conversationId: string): Promise<SmartRepliesResponse> {
+  async getSmartReplies(conversationId: string, options?: SmartReplyOptions): Promise<SmartRepliesResponse> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/suggest-replies`, {
       method: "POST",
+      body: JSON.stringify(options ?? {}),
     });
   }
 
-  async summarizeChat(conversationId: string): Promise<ConversationSummaryResponse> {
+  async summarizeChat(conversationId: string, options?: SmartReplyOptions): Promise<ConversationSummaryResponse> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/summarize`, {
       method: "POST",
+      body: JSON.stringify(options ?? {}),
     });
   }
 
-  async extractDealTerms(conversationId: string): Promise<DealTermsResponse> {
+  async extractDealTerms(conversationId: string, options?: SmartReplyOptions): Promise<DealTermsResponse> {
     return this.request(`/api/v1/chat/conversations/${conversationId}/assistant/extract-deal`, {
       method: "POST",
+      body: JSON.stringify(options ?? {}),
     });
   }
 

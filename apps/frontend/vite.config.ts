@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type HttpServer, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -212,6 +213,132 @@ function productionCspPlugin(): Plugin {
  * spamming ECONNREFUSED when the backend is restarting.
  */
 function resilientApiProxyPlugin(): Plugin {
+  const handleGeminiAssistantRoute = async (
+    targetPath: string,
+    rawBody: string,
+  ): Promise<Record<string, unknown> | null> => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) return null;
+
+    let payload: Record<string, unknown> = {};
+    if (rawBody) {
+      try {
+        payload = JSON.parse(rawBody);
+      } catch {
+        payload = {};
+      }
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    if (targetPath.endsWith("/assistant/suggest-replies")) {
+      const tone = (payload.tone as string) || "PROFESSIONAL";
+      const customPrompt = (payload.customPrompt as string) || "";
+      const currentDraft = (payload.currentDraft as string) || "";
+      const activeRole = (payload.activeRole as string) || "CLIENT";
+      const subject = (payload.subject as string) || "Escrow Workspace Thread";
+      const messages = Array.isArray(payload.messages) ? payload.messages : [];
+      const contracts = Array.isArray(payload.contracts) ? payload.contracts : [];
+      const gigs = Array.isArray(payload.gigs) ? payload.gigs : [];
+
+      const promptText = `You are Mini-Me, an agentic escrow & freelance deal co-pilot on Yekis Jobs (Ethiopia's escrow-backed marketplace using ETB, Telebirr, CBE Birr, and M-Pesa).
+Generate 3 actionable, context-grounded reply suggestions that the current user (${activeRole}) can send in this conversation.
+
+Conversation Subject: ${subject}
+Selected Tone: ${tone}
+${customPrompt ? `User Custom Instruction: ${customPrompt}` : ""}
+${currentDraft ? `User Current Draft in Composer (refine or build upon if relevant): ${currentDraft}` : ""}
+
+Recent Conversation History:
+${messages.map((m: Record<string, unknown>) => `- [${m.senderRole || "USER"} ${m.senderName || ""}]: ${m.body}`).join("\n") || "No messages yet."}
+
+Active Platform Contracts & Milestones Context:
+${JSON.stringify(contracts, null, 2)}
+
+Active Gigs Context:
+${JSON.stringify(gigs, null, 2)}
+
+Return 3 distinct reply options tailored to the ${tone} tone, plus the detected context badge and 2-3 helpful action chips.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-4-hydrogen",
+        contents: promptText,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              agentNote: {
+                type: Type.STRING,
+                description: "Short 1-sentence insight explaining what Mini-Me detected in the thread and escrow state.",
+              },
+              context: {
+                type: Type.OBJECT,
+                properties: {
+                  stage: { type: Type.STRING },
+                  contractId: { type: Type.STRING },
+                  contractTitle: { type: Type.STRING },
+                  milestoneId: { type: Type.STRING },
+                  milestoneTitle: { type: Type.STRING },
+                  milestoneAmountETB: { type: Type.STRING },
+                  escrowState: { type: Type.STRING },
+                  gigTitle: { type: Type.STRING },
+                },
+                required: ["stage"],
+              },
+              items: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    label: { type: Type.STRING, description: "2-4 word intent badge, e.g. 'Release Milestone', 'Split Scope'" },
+                    text: { type: Type.STRING, description: "The full ready-to-send reply message." },
+                    rationale: { type: Type.STRING, description: "Short reason why this reply fits." },
+                    category: { type: Type.STRING },
+                  },
+                  required: ["id", "label", "text"],
+                },
+              },
+              actionChips: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    id: { type: Type.STRING },
+                    label: { type: Type.STRING },
+                    actionType: {
+                      type: Type.STRING,
+                      description: "One of: EXTRACT_DEAL, SUMMARIZE, OPEN_CONTRACTS, INSERT_MILESTONE_UPDATE",
+                    },
+                    payload: { type: Type.STRING },
+                  },
+                  required: ["id", "label", "actionType"],
+                },
+              },
+            },
+            required: ["agentNote", "context", "items", "actionChips"],
+          },
+        },
+      });
+
+      if (response.text) {
+        const parsed = JSON.parse(response.text);
+        const items = Array.isArray(parsed.items) ? parsed.items : [];
+        return {
+          suggestions: items.map((it: { text: string }) => it.text),
+          items,
+          context: parsed.context,
+          actionChips: parsed.actionChips,
+          agentNote: parsed.agentNote,
+          toneUsed: tone,
+        };
+      }
+    }
+
+    return null;
+  };
+
   const attachMiddleware = (
     middlewares: {
       use: (
@@ -223,6 +350,11 @@ function resilientApiProxyPlugin(): Plugin {
   ) => {
     middlewares.use("/api", (req, res) => {
       const targetPath = `/api${req.url || ""}`;
+      const bodyChunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => {
+        bodyChunks.push(Buffer.from(chunk));
+      });
+
       const proxyReq = http.request(
         {
           hostname: "127.0.0.1",
@@ -240,7 +372,7 @@ function resilientApiProxyPlugin(): Plugin {
         },
       );
 
-      proxyReq.on("error", () => {
+      proxyReq.on("error", async () => {
         if (res.headersSent) {
           res.end();
           return;
@@ -259,6 +391,25 @@ function resilientApiProxyPlugin(): Plugin {
           );
           return;
         }
+
+        if (
+          req.method === "POST" &&
+          targetPath.includes("/chat/conversations/") &&
+          targetPath.includes("/assistant/")
+        ) {
+          try {
+            const rawBody = Buffer.concat(bodyChunks).toString("utf8");
+            const geminiResult = await handleGeminiAssistantRoute(targetPath, rawBody);
+            if (geminiResult) {
+              res.statusCode = 200;
+              res.end(JSON.stringify(geminiResult));
+              return;
+            }
+          } catch {
+            // Fall through to resilient local agentic fallback
+          }
+        }
+
         res.statusCode = 200;
         res.setHeader("X-Yekis-Offline", "1");
         res.end(
