@@ -1039,6 +1039,62 @@ with no linked Telegram chat, because there is no SMS provider on the host
 either. That is the payout control working as intended, and it is the reason
 the two-provider setup is the next task rather than an optional extra.
 
+### The mail transport and Google sign-in — 2026-11-20
+
+The founder created the two provider accounts that only they could create and
+supplied the two credentials. This commit (`d6f2c30`) carries the Brevo
+transport and the deployment that puts it, and the Google client id, on the
+host.
+
+**What was set on the host** (55 environment variables — the previous 50, all
+preserved, plus five):
+
+```
+BREVO_API_KEY=<the founder's key>
+EMAIL_TRANSPORT=brevo
+EMAIL_FROM="Yekis <emushu70@gmail.com>"
+GOOGLE_CLIENT_ID=1040630878719-…apps.googleusercontent.com
+VITE_GOOGLE_CLIENT_ID=<the same id>     # build-time: the frontend bundle
+```
+
+**A note on the ordering, because it cost a build.** The push to the deployed
+branch starts a build on its own, and that build **restores the environment it
+had when it started**: the first attempt set the variables while the
+push-triggered build was already running, and the completed build overwrote
+them (the app came back with the original 50 variables and none of the five
+new ones). The variables were set again once the app was `LIVE` and idle, and
+the redeploy was triggered explicitly. **On this platform, set the
+environment first and deploy afterwards — never during a build.**
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-20T20:28:42Z`, serving
+  `/assets/index-DS674qxc.js`, with **55** environment variables.
+- `GET /api/v1/auth/verification/channels` answers
+  `{"email":{"available":true,"label":"Email"},"phone":{"available":true,"label":"Telegram"}}`
+  — the email channel is now genuinely deliverable, and it says so because a
+  transport is configured, not because the environment name says so.
+- `POST /api/v1/auth/email/code` answers **`200 {"sent":true,"expiresAt":…,
+  "retryAfterSec":60}`** — and **no `devCode`**. The message was accepted by
+  the Brevo API and is in the founder's inbox. The code was delivered by mail
+  and was not disclosed to the caller.
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- The served bundle **contains the client id**, so the "Continue with Google"
+  button is present — `VITE_GOOGLE_CLIENT_ID` is a build-time variable, and a
+  backend-only value would have left the button hidden.
+- `POST /api/v1/auth/phone/code` still answers **`503 SMS_UNAVAILABLE`** — no
+  SMS provider and no linked Telegram chat, so the code is neither delivered
+  nor disclosed. The payout control is unchanged by the mail work.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+
+**What this means for the instance:** the onboarding step now offers **email
+and** Telegram, and the email code arrives by mail. Password recovery is
+deliverable for the first time. The sender is still a personal address, so
+the next improvement is a `yekis.*` domain verified in Brevo for SPF/DKIM —
+a configuration change, not a code change.
+
 ### Teardown
 
 ```bash

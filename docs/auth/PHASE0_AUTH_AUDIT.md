@@ -897,7 +897,9 @@ F-01, F-02 and F-08. Rows E-10 to E-14 are the **post-fix** re-probes of
 2026-11-20, taken against the deployment of `57dc847` on
 `https://yekis.app.aletcloud.com` (`lastDeployedAt` `2026-11-20T13:15:51Z`;
 the host was rebuilt again at `2026-11-20T14:19:02Z` for a documentation-only
-commit, and the probes below were taken against that build).
+commit, and the probes below were taken against that build). Rows **E-15 to
+E-19** are the probes after the mail transport and Google sign-in were
+configured (deployment `d6f2c30`, `lastDeployedAt` `2026-11-20T20:28:42Z`).
 
 | # | Check | Result |
 |---|---|---|
@@ -915,6 +917,11 @@ commit, and the probes below were taken against that build).
 | **E-12** | `POST /api/v1/auth/phone/code` (test number), **after the fix** | **`503 {"error":"SMS_UNAVAILABLE",…}`** — no SMS provider and no linked Telegram chat, so the code is not delivered and not disclosed; the row is deleted. The second disclosure site is closed as well. |
 | **E-13** | `GET /api/v1/auth/oauth/providers`, **after the fix** | `{"google":false,"apple":false,"facebook":false,"telegram":true,"telegramBotUsername":"ye_kis_bot"}` — unchanged, and correct: Google is still not configured (F-08 stays open). |
 | **E-14** | `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` | **11/11 checks passed** — the SPA, the API, the security headers and the 404 behaviour are intact after the redeploy. |
+| **E-15** | `GET /api/v1/auth/verification/channels`, after the **Brevo** transport was configured | **`{"email":{"available":true,"label":"Email"},"phone":{"available":true,"label":"Telegram"}}`** — the email channel is now genuinely deliverable. The answer is still derived from the configuration, not from the environment name. |
+| **E-16** | `POST /api/v1/auth/email/code` (the founder's own address), after the transport was configured | **`200 {"sent":true,"expiresAt":…,"retryAfterSec":60}`** — the message was accepted by the Brevo API and is in the inbox, and **there is no `devCode` in the response**. The code is delivered by mail and is not disclosed to the caller. This is the behaviour the F-01 fix was supposed to make possible: the channel works *because* it can deliver, not because it published the code. |
+| **E-17** | `GET /api/v1/auth/oauth/providers`, after the Google client id was configured | **`{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`** — F-08 is closed. The served bundle also carries the client id, so the button is actually rendered (`VITE_GOOGLE_CLIENT_ID` is a build-time variable). |
+| **E-18** | `POST /api/v1/auth/phone/code` (test number), after the mail work | **`503 {"error":"SMS_UNAVAILABLE",…}`** — unchanged. The mail transport does not touch the payout controls: there is still no SMS provider on the host, so the withdrawal approval code is only deliverable to members with a linked Telegram chat. |
+| **E-19** | `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` | **11/11 checks passed** — after the transport and Google deployment. |
 
 ## Appendix B — file map
 
