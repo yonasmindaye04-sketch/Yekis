@@ -663,7 +663,7 @@ export async function generateSmartReplies(params: {
   });
 
   const participantIds = Array.from(
-    new Set([conversation.createdById, params.userId, ...messages.map((m) => m.senderId)].filter(Boolean)),
+    new Set([conversation.creatorId, params.userId, ...messages.map((m) => m.senderId)].filter(Boolean)),
   );
 
   const relatedContracts = await prisma.contract.findMany({
@@ -676,7 +676,9 @@ export async function generateSmartReplies(params: {
     include: {
       job: { select: { id: true, title: true, status: true } },
       milestones: {
-        orderBy: { sequenceNumber: "asc" },
+        // `Milestone` has no sequence column in the schema; the creation
+        // order is the milestone order.
+        orderBy: { createdAt: "asc" },
       },
     },
     take: 3,
@@ -685,14 +687,18 @@ export async function generateSmartReplies(params: {
   const relatedGigs = await prisma.gig.findMany({
     where: {
       freelancerId: { in: participantIds },
-      status: "PUBLISHED",
+      // `GigStatus` is DRAFT | ACTIVE | PAUSED | REJECTED | ARCHIVED. A gig
+      // that is live on the marketplace is ACTIVE.
+      status: "ACTIVE",
     },
     take: 3,
   });
 
   const activeContract = relatedContracts[0] || null;
   const activeMilestone =
-    activeContract?.milestones.find((m) => m.escrowState === "DELIVERED" || m.escrowState === "FUNDED") ||
+    activeContract?.milestones.find(
+      (m) => m.escrowState === "SUBMITTED_FOR_REVIEW" || m.escrowState === "ESCROW_HELD",
+    ) ||
     activeContract?.milestones[0] ||
     null;
   const activeGig = relatedGigs[0] || null;
@@ -703,7 +709,7 @@ export async function generateSmartReplies(params: {
 
   const styleTransform = (baseText: string): string => {
     if (tone === "CONCISE") {
-      return baseText.split(".")[0].trim() + ".";
+      return (baseText.split(".")[0] ?? "").trim() + ".";
     }
     if (tone === "FRIENDLY") {
       return `Hi there! ${baseText} Let me know if that works for you!`;
@@ -808,7 +814,7 @@ export async function generateSmartReplies(params: {
     text.includes("submit") ||
     text.includes("review") ||
     text.includes("done") ||
-    activeMilestone?.escrowState === "DELIVERED"
+    activeMilestone?.escrowState === "SUBMITTED_FOR_REVIEW"
   ) {
     rawItems =
       userRole === "CLIENT"
@@ -937,7 +943,7 @@ export async function generateSmartReplies(params: {
     suggestions: rawItems.map((i) => i.text),
     items: rawItems,
     context: {
-      stage: activeMilestone?.escrowState === "DELIVERED" ? "Deliverable Review" : activeContract ? "Active Escrow Contract" : "Deal Scoping",
+      stage: activeMilestone?.escrowState === "SUBMITTED_FOR_REVIEW" ? "Deliverable Review" : activeContract ? "Active Escrow Contract" : "Deal Scoping",
       contractId: activeContract?.id || null,
       contractTitle: activeContract?.job?.title || null,
       milestoneId: activeMilestone?.id || null,
