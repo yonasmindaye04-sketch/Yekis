@@ -962,6 +962,70 @@ not retain the start-up lines for this build, so the migration output is not
 quoted here; what the host proves is the mounted route and the inline SLA
 fields on the rows it returns.
 
+### The one-time code disclosure fix — 2026-11-20
+
+The staging deployment was handing out one-time codes. `POST
+/api/v1/auth/email/code` answered `{"sent":true,…,"devCode":"097046"}` (probed
+2026-11-19), because the guard was `NODE_ENV !== "production"` — and staging is
+a publicly reachable host. The same rule covered the **withdrawal approval
+code**, the second factor in front of a payout. It was fixed before any new
+sign-in channel was switched on.
+
+**What was deployed:** `57dc847` on `main`, fast-forwarded to
+`fix/code-only-compliance-gaps`; both branches point at the same commit. The
+commit range is `3c794d8..57dc847`:
+
+| Commit | What it carries |
+|---|---|
+| `66e4ea5` | The fix itself — `isDevCodeDisclosureAllowed()` (disclosure only on `development` and `test`), every disclosure site gated (email OTP service and route, phone OTP service and route, withdrawal OTP route), and a capability endpoint that answers from the transport configuration instead of the environment name. |
+| `5e2520b` | The merge of the four commits that landed on `main` after the last deployment (`aa2434b`, `0878c76`, `681ae5f`, `636151e`). |
+| `4d9a825` | The build fix — those four commits left `main` un-buildable (see below). |
+| `57dc847` | The founder's provider setup checklist (`docs/auth/PROVIDER_SETUP_CHECKLIST.md`). |
+
+**The build break that had to be fixed first.** `aa2434b` added
+`@google/genai` to the root `package.json` without regenerating
+`pnpm-lock.yaml`, and the image runs `pnpm install --frozen-lockfile` — so
+**every build from that commit failed before it started**. The same commit's
+Mini-Me co-pilot code referenced schema fields that do not exist
+(`Conversation.createdById`, `Milestone.sequenceNumber`, `GigStatus.PUBLISHED`,
+`EscrowState.DELIVERED`/`FUNDED`), which the backend `tsc` build in the image
+turned into thirteen type errors. Both are fixed in `4d9a825`. Without that
+commit, the deployed branch could not have been fast-forwarded to `main` at
+all, and a deploy of `main` would have failed in the image build.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-20T13:15:51Z` (previously
+  `2026-11-19T19:14:51Z`), serving `/assets/index-DJckh7C0.js` (previously
+  `/assets/index-DW4Isqrs.js`), with all **50** environment variables intact.
+- `POST /api/v1/auth/email/code` now answers **`503`
+  `{"error":"EMAIL_UNAVAILABLE","message":"Could not send an email to that
+  address. Check it and try again."}`** — **no code, no `devCode`**. The row is
+  deleted and the caller is told the message was not sent, because there is no
+  mail transport on this host.
+- `GET /api/v1/auth/verification/channels` now answers
+  `{"email":{"available":false,"label":"Email"},"phone":{"available":true,"label":"Telegram"}}`
+  — the capability endpoint is telling the truth: no mail transport, so no
+  email channel; the Telegram bot is configured, so the phone channel is real.
+- `POST /api/v1/auth/phone/code` answers **`503 SMS_UNAVAILABLE`** — no SMS
+  provider and no linked Telegram chat, so the code is neither delivered nor
+  disclosed.
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"google":false,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}` —
+  unchanged and correct; Google is still not configured.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+
+**What this means for the instance:** the onboarding step now steers to the
+**Telegram** channel instead of email, and it no longer "works" by publishing
+the code in the response. The email channel comes back as soon as a mail
+transport is configured — the steps are in `docs/auth/PROVIDER_SETUP_CHECKLIST.md`
+(Brevo free, or a Gmail app password as the same-day alternative). The
+**withdrawal approval code** is likewise unavailable on staging for members
+with no linked Telegram chat, because there is no SMS provider on the host
+either. That is the payout control working as intended, and it is the reason
+the two-provider setup is the next task rather than an optional extra.
+
 ### Teardown
 
 ```bash

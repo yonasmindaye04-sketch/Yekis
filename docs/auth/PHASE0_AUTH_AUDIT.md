@@ -880,7 +880,12 @@ signup flow end to end once the mail transport works.
 
 ---
 
-## Appendix A — evidence log (2026-11-19)
+## Appendix A — evidence log (2026-11-19, re-probed 2026-11-20)
+
+The first nine rows are the **pre-fix** probes of 2026-11-19 — the evidence for
+F-01, F-02 and F-08. Rows E-10 to E-13 are the **post-fix** re-probes of
+2026-11-20, taken against the deployment of `57dc847` on
+`https://yekis.app.aletcloud.com` (`lastDeployedAt` `2026-11-20T13:15:51Z`).
 
 | # | Check | Result |
 |---|---|---|
@@ -893,6 +898,11 @@ signup flow end to end once the mail transport works.
 | E-7 | Repository search for `purgeExpiredTelegramLoginCodes` | definition only, no scheduler → F-11 |
 | E-8 | Read of `email-verification.service.ts`, `email.service.ts`, `auth.service.ts`, `oauth.service.ts`, `identity.ts`, `middleware/auth.ts`, `auth-methods.ts`, bot handlers | the findings above |
 | E-9 | Provider pricing pages (Brevo, Elastic Email, Mailtrap, Resend) fetched 2026-11-19/20 | section 8 table |
+| **E-10** | `POST /api/v1/auth/email/code` (throwaway address), **after the fix** | **`503 {"error":"EMAIL_UNAVAILABLE","message":"Could not send an email to that address. Check it and try again."}`** — no code, no `devCode`. The row is deleted and the caller is told the message was not sent, because there is no mail transport on the host. **F-01 is closed.** |
+| **E-11** | `GET /api/v1/auth/verification/channels`, **after the fix** | **`{"email":{"available":false,"label":"Email"},"phone":{"available":true,"label":"Telegram"}}`** — the capability endpoint now answers from the configuration: no mail transport, so no email channel; the Telegram bot is configured, so the phone channel is real. **F-02 is closed.** |
+| **E-12** | `POST /api/v1/auth/phone/code` (test number), **after the fix** | **`503 {"error":"SMS_UNAVAILABLE",…}`** — no SMS provider and no linked Telegram chat, so the code is not delivered and not disclosed; the row is deleted. The second disclosure site is closed as well. |
+| **E-13** | `GET /api/v1/auth/oauth/providers`, **after the fix** | `{"google":false,"apple":false,"facebook":false,"telegram":true,"telegramBotUsername":"ye_kis_bot"}` — unchanged, and correct: Google is still not configured (F-08 stays open). |
+| **E-14** | `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` | **11/11 checks passed** — the SPA, the API, the security headers and the 404 behaviour are intact after the redeploy. |
 
 ## Appendix B — file map
 
