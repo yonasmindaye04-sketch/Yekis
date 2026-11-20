@@ -275,12 +275,26 @@ build to run again — which is what a redeploy does.
 
 **The onboarding OTP on a testing deployment.** The signup flow proves control
 of the signup address with a 6-digit code before the account is created. With
-no SMTP credentials the code is written to the container log instead and the
-API response carries it as `devCode` — so the flow completes on a testing
-deployment without a mail provider. Read the code from the platform's logs, or
-set the `SMTP_*` variables to have it delivered by mail. This fallback does
-**not** exist in production, where a missing SMTP configuration answers `503
-EMAIL_UNAVAILABLE` rather than pretending the message was sent.
+no SMTP credentials the code is **not delivered and not disclosed**: the
+request answers `503 EMAIL_UNAVAILABLE`, no code row is kept, and the signup
+step uses the Telegram channel instead (or the member links a Telegram chat
+first, which makes the phone channel deliverable through the bot).
+
+This used to be different, and it was a live exposure. Until 2026-11-20 the
+code was written to the container log **and** returned in the API response as
+`devCode` on any host that was not `production` — including this public
+staging deployment, where anyone could ask for a code for any address and read
+it out of the reply. The disclosure affordances now exist only on
+`NODE_ENV=development` (a laptop) and `NODE_ENV=test` (the automated suite);
+see `isDevCodeDisclosureAllowed()` in `apps/backend/src/config/env.ts`.
+
+**So a mail transport is required for the email channel on any reachable
+host.** A free provider is enough — Brevo's free plan (300 emails/day, a
+single verified sender, no domain, no card) is the current recommendation, and
+`docs/auth/PHASE0_AUTH_AUDIT.md` §8 has the exact setup steps. Gmail with an
+app password is the same-day stopgap if no account is available yet. Until one
+is configured, `GET /api/v1/auth/verification/channels` reports
+`email.available: false`, which is the truth: the platform cannot send mail.
 
 `GET /api/v1/auth/verification/channels` reports what the running host can
 actually deliver. Check it after deploying: if `email.available` is `false`

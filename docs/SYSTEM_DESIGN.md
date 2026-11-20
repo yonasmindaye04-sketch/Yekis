@@ -711,6 +711,10 @@ sequenceDiagram
 
 The proof is raised **before** the account exists, which is why both OTP routes are unauthenticated, and it is attached to the new row by `registerUser`. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. The SMS phone codes are deliberately left alone: `User.phone` is the payout destination and the withdrawal-approval code is money, so that flow is not weakened to make signup work.
 
+**A code is never disclosed to a reachable host.** The OTP services used to return the code itself in the API response whenever the environment was not `production` — and `staging` is a real, publicly reachable host. On 2026-11-19 the live staging deployment answered `POST /api/v1/auth/email/code` with the six-digit code in the body, so anyone on the internet could ask for a code for **any** address and read it out of the reply; the same rule covered the **withdrawal approval code**, the second factor in front of a payout. The disclosure affordances are now confined to the two environments that are not reachable by the public — `development` (a laptop) and `test` (the automated suite) — by `isDevCodeDisclosureAllowed()` in `config/env.ts`. On `staging` and `production` a code that cannot be delivered is not delivered: the row is deleted and the caller is told the message was not sent.
+
+**The capability endpoint reports the configuration, not the environment name.** `isEmailDeliveryConfigured()` used to answer `true` for anything that was not production, so the live staging host advertised email as available while it had no mail transport at all and the onboarding step dead-ended at the first request. It now answers from the transport configuration, and the phone channel is derived from the SMS key or the Telegram bot in the same way. A host with no provider is a host with no verification channel, and the platform says so rather than pretending.
+
 **The address is stored in one canonical form.** `registerUser` lower-cases and trims the address before it is written, and the duplicate check matches it case-insensitively. Every other path that touches `User.email` already uses that form — the login lookup lower-cases it, the OAuth path lower-cases it, and the OTP proof is issued and looked up against it — so storing the address as it was typed would put the row outside all of them. An account registered as `Alice@Example.com` could not sign in, because login searches for `alice@example.com`; and because the account existed by then, every retry hit the duplicate path and failed the same way. The canonical form also means one mailbox cannot end up with two accounts spelled differently. The password-reset lookup uses the same canonical form: a lookup by the raw string is case-sensitive on PostgreSQL and would miss the account entirely, and the person would be told a reset token was on its way when none had been created.
 
 **The two registration collisions are separate events.** An address that is already on file and a number that is already on file are different situations, and treating them as one is what made a registration disappear.
@@ -752,9 +756,9 @@ sequenceDiagram
 | Method | Path | Auth / Permission | Purpose |
 |---|---|---|---|
 | `POST` | `/api/v1/auth/register` | Public | Register account, validate age $\ge 18$, record consents, create wallet & KYC record |
-| `POST` | `/api/v1/auth/email/code` | Public | Issue the onboarding email OTP. Stores only the salted SHA-256 of the code |
+| `POST` | `/api/v1/auth/email/code` | Public | Issue the onboarding email OTP. Stores only the salted SHA-256 of the code. The code itself is returned only on a developer machine or in the test suite |
 | `POST` | `/api/v1/auth/email/verify` | Public | Check the onboarding email OTP |
-| `POST` | `/api/v1/auth/phone/code` | Public | Issue an SMS OTP (payout-number verification, withdrawal approval) |
+| `POST` | `/api/v1/auth/phone/code` | Public | Issue an SMS OTP (payout-number verification, withdrawal approval). The code itself is returned only on a developer machine or in the test suite |
 | `POST` | `/api/v1/auth/phone/verify` | Public | Check an SMS OTP |
 | `GET` | `/api/v1/auth/verification/channels` | Public | Which OTP channels can deliver on this host |
 | `POST` | `/api/v1/auth/login` | Public | Authenticate via email/password, return access & refresh JWTs |

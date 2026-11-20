@@ -4,7 +4,7 @@ import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";
 import type { AuthedRequest } from "../../middleware/auth.js";
 import { logger } from "../../lib/logger.js";
-import { env } from "../../config/env.js";
+import { isDevCodeDisclosureAllowed } from "../../config/env.js";
 import {
   requestPhoneCode,
   verifyPhoneCode,
@@ -103,14 +103,16 @@ export function registerPhoneVerificationRoutes(router: Router): void {
           phone: parsed.data.phone,
           userId: (req as AuthedRequest).user?.id ?? null,
         });
-        // devCode is stripped by the service in production, so this cannot leak
-        // a live code even if a caller ignores that.
+        // devCode is only ever present on a developer machine or in the test
+        // suite. It used to be present on any non-production host, which put
+        // the live code in the body of this response on the public staging
+        // deployment. See `isDevCodeDisclosureAllowed` in config/env.ts.
         return res.json({
           sent: true,
           expiresAt: challenge.expiresAt,
           retryAfterSec: challenge.retryAfterSec,
           ...(challenge.channel ? { channel: challenge.channel } : {}),
-          ...(challenge.devCode && env.NODE_ENV !== "production"
+          ...(challenge.devCode && isDevCodeDisclosureAllowed()
             ? { devCode: challenge.devCode }
             : {}),
         });

@@ -864,3 +864,38 @@ if (violations.length > 0) {
 }
 
 export const env: Env = resolved;
+
+/**
+ * Whether a one-time code (an email OTP, a phone OTP, a withdrawal approval
+ * code) may be handed back to the caller in an API response, or printed to
+ * the server log as a stand-in for a real delivery.
+ *
+ * WHY THIS IS AN ALLOWLIST AND NOT `!== "production"`
+ *
+ * The old rule was "anything that is not production". That reads as safe and
+ * is not: `staging` is a real, publicly reachable host, and on 2026-11-19 the
+ * live staging deployment answered `POST /api/v1/auth/email/code` with the
+ * six-digit code in the response body. Anyone on the internet could ask for a
+ * code for any address and read it out of the reply. The same rule also
+ * covered the **withdrawal approval code**, which is the second factor in
+ * front of a payout.
+ *
+ * So the disclosure affordances are now confined to the two environments that
+ * are not reachable by the public:
+ *
+ *   - `development` - a laptop. The developer needs to read the code out of
+ *     the response or the terminal to test the flow, and that code is theirs.
+ *   - `test` - the automated suite. `tests/email-verification.test.ts`,
+ *     `tests/phone-verification.test.ts` and `tests/withdrawal-2fa.test.ts`
+ *     assert on the code itself; without it those suites could not test the
+ *     flow at all.
+ *
+ * `staging` and `production` get nothing: a code that cannot be delivered is
+ * not delivered. The row is deleted and the caller is told the message was
+ * not sent, which is the truth. A host that has no mail or SMS provider is
+ * not a host with a working verification channel, and the capability
+ * endpoint now says so.
+ */
+export function isDevCodeDisclosureAllowed(): boolean {
+  return env.NODE_ENV === "development" || env.NODE_ENV === "test";
+}

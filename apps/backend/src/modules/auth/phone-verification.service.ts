@@ -2,7 +2,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
-import { env } from "../../config/env.js";
+import { isDevCodeDisclosureAllowed } from "../../config/env.js";
 import { sendSms } from "../notifications/sms.client.js";
 import { sendVerificationCodeViaTelegram } from "../notifications/telegram.client.js";
 
@@ -205,12 +205,16 @@ export async function requestPhoneCode(params: {
     }
 
     if (!deliveredChannel) {
-      // Neither SMS nor Telegram is available. In non-production the code is
-      // returned in the API response and printed to the server log — the same
-      // pattern that email-verification.service.ts uses in
-      // deliverVerificationCode(). Do not delete the row or throw: the devCode
-      // path in the response is the delivery mechanism.
-      if (env.NODE_ENV !== "production") {
+      // Neither SMS nor Telegram is available. On a developer machine or in
+      // the test suite the code is returned in the API response and printed to
+      // the server log — the same pattern that email-verification.service.ts
+      // uses in deliverVerificationCode(). Do not delete the row or throw: the
+      // devCode path in the response is the delivery mechanism.
+      //
+      // This used to cover every non-production environment, which meant a
+      // publicly reachable host could mint a phone code - including a
+      // withdrawal approval code - that nobody had to receive over SMS.
+      if (isDevCodeDisclosureAllowed()) {
         // eslint-disable-next-line no-console
         console.log(
           `\n================== [DEV - NOT SENT] PHONE OTP ==================\n` +
@@ -242,8 +246,10 @@ export async function requestPhoneCode(params: {
   logger.info({ phone, channel: deliveredChannel }, "Phone verification code issued");
 
   return {
-    // Never leak the code outside development.
-    ...(env.NODE_ENV !== "production" ? { devCode: code } : {}),
+    // Never leak the code outside development. The old rule was
+    // `!== "production"`, which included the publicly reachable staging host.
+    // See `isDevCodeDisclosureAllowed` in config/env.ts.
+    ...(isDevCodeDisclosureAllowed() ? { devCode: code } : {}),
     expiresAt,
     retryAfterSec: Math.ceil(RESEND_COOLDOWN_MS / 1000),
     channel: deliveredChannel,

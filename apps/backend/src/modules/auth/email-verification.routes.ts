@@ -4,7 +4,7 @@ import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";
 import type { AuthedRequest } from "../../middleware/auth.js";
 import { logger } from "../../lib/logger.js";
-import { env } from "../../config/env.js";
+import { env, isDevCodeDisclosureAllowed } from "../../config/env.js";
 import {
   requestEmailCode,
   verifyEmailCode,
@@ -113,14 +113,19 @@ export function registerEmailVerificationRoutes(router: Router): void {
         label: "Email",
       },
       phone: {
-        // Available when SMS is configured, OR in non-production (devCode
-        // path keeps the flow working), OR when the Telegram bot is
-        // configured (Telegram fallback delivery). This matches the same
-        // pattern that isEmailDeliveryConfigured() uses for email.
+        // Available when SMS is configured, OR when the Telegram bot is
+        // configured (Telegram fallback delivery), OR on a developer machine /
+        // in the test suite where the code is handed back to the caller that
+        // asked for it. This matches the same pattern that
+        // isEmailDeliveryConfigured() uses for email.
+        //
+        // It used to include every non-production environment, which made a
+        // publicly reachable staging host claim a phone channel it could not
+        // deliver to anyone without a linked Telegram chat.
         available:
           Boolean(env.SMS_ETHIOPIA_API_KEY) ||
-          env.NODE_ENV !== "production" ||
-          Boolean(env.TELEGRAM_BOT_TOKEN),
+          Boolean(env.TELEGRAM_BOT_TOKEN) ||
+          isDevCodeDisclosureAllowed(),
         label: env.SMS_ETHIOPIA_API_KEY
           ? "SMS"
           : env.TELEGRAM_BOT_TOKEN
@@ -146,13 +151,15 @@ export function registerEmailVerificationRoutes(router: Router): void {
           userId: (req as AuthedRequest).user?.id ?? null,
           purposeLabel: "Confirm your email address",
         });
-        // devCode is stripped by the service in production, so this cannot leak
-        // a live code even if a caller ignores that.
+        // devCode is only ever present on a developer machine or in the test
+        // suite. It used to be present on any non-production host, which put
+        // the live code in the body of this response on the public staging
+        // deployment. See `isDevCodeDisclosureAllowed` in config/env.ts.
         return res.json({
           sent: true,
           expiresAt: challenge.expiresAt,
           retryAfterSec: challenge.retryAfterSec,
-          ...(challenge.devCode && env.NODE_ENV !== "production"
+          ...(challenge.devCode && isDevCodeDisclosureAllowed()
             ? { devCode: challenge.devCode }
             : {}),
         });

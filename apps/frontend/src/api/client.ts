@@ -1371,8 +1371,9 @@ class ApiClient {
    * is registration, where the code is sent and checked before the account
    * exists. Neither reveals whether a number is already registered.
    *
-   * `devCode` is only ever present outside production, and is shown by the UI
-   * in that case so a developer can complete the flow without a handset.
+   * `devCode` is only ever present on a developer machine or in the test
+   * suite, and is shown by the UI in that case so a developer can complete the
+   * flow without a handset. It is never present on a reachable host.
    */
   async requestPhoneCode(phone: string): Promise<{
     sent: boolean;
@@ -1431,8 +1432,9 @@ class ApiClient {
    * account exists, and the response never says whether the address is already
    * registered.
    *
-   * `devCode` is only ever present outside production, and is shown by the UI
-   * in that case so a developer can complete the flow without a mailbox.
+   * `devCode` is only ever present on a developer machine or in the test
+   * suite, and is shown by the UI in that case so a developer can complete the
+   * flow without a mailbox. It is never present on a reachable host.
    */
   async requestEmailCode(email: string): Promise<{
     sent: boolean;

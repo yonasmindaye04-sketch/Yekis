@@ -2,7 +2,7 @@
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto";
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
-import { env } from "../../config/env.js";
+import { env, isDevCodeDisclosureAllowed } from "../../config/env.js";
 import { sendEmailVerificationCodeEmail } from "../../lib/email/email.service.js";
 
 // === TYPES ===
@@ -203,8 +203,11 @@ export async function requestEmailCode(params: {
   logger.info({ email, purpose }, "Email verification code issued");
 
   return {
-    // Never leak the code outside development.
-    ...(env.NODE_ENV !== "production" ? { devCode: code } : {}),
+    // Never leak the code outside development. The old rule was
+    // `!== "production"`, which included the publicly reachable staging host
+    // — where the code was returned in the response body. See
+    // `isDevCodeDisclosureAllowed` in config/env.ts.
+    ...(isDevCodeDisclosureAllowed() ? { devCode: code } : {}),
     expiresAt,
     retryAfterSec: Math.ceil(RESEND_COOLDOWN_MS / 1000),
   };
@@ -355,32 +358,39 @@ export function isSmtpConfigured(): boolean {
  * the same shape as `GET /auth/oauth/providers` and reveals nothing about any
  * account.
  *
- * Outside production the console fallback is available, so the channel IS
- * usable — the code lands in the server log instead of an inbox. On a hosted
- * testing environment that is the difference between a signup that works and
- * a signup that dead-ends at the first step.
+ * The answer is the CONFIGURATION, never the environment name. The old
+ * implementation returned true for anything that was not production, so the
+ * live staging host - which has no mail transport at all - advertised email
+ * as available and the onboarding step dead-ended at the first request.
+ * "Not production" is not a delivery capability.
+ *
+ * A host that has no SMTP credentials is only able to "deliver" a code in
+ * development or in the test suite, where the code is handed back to the
+ * caller that asked for it.
  */
 export function isEmailDeliveryConfigured(): boolean {
-  if (env.NODE_ENV !== "production") return true;
-  return isSmtpConfigured();
+  if (isSmtpConfigured()) return true;
+  return isDevCodeDisclosureAllowed();
 }
 
 /**
- * Delivers the code, with a console fallback for non-production hosts.
+ * Delivers the code.
  *
- * WHY THE FALLBACK EXISTS
- * The first onboarding step has to be deliverable on a host that has no SMTP
- * credentials — a testing deployment usually does not. `sendEmail` refuses to
- * pretend a message was delivered when SMTP is missing outside development,
- * which is correct for the password-reset token (a live bearer credential).
- * An onboarding code is a different thing: it authorises creating an account,
- * not entering one, and outside production it is already returned to the
- * caller in the API response. Writing it to the server log therefore adds no
- * exposure that does not already exist, and it turns a dead signup into a
- * working one.
+ * WHY THE FALLBACK EXISTS, AND WHERE IT STOPS
+ * A developer machine with no SMTP credentials still has to be able to test
+ * the onboarding flow, so the code is printed to the terminal there (and in
+ * the test suite). That affordance is deliberately confined to
+ * `development` and `test`.
  *
- * In production there is no fallback: a missing SMTP configuration is a
- * misconfiguration and the caller is told the message was not delivered.
+ * It used to cover every non-production environment, which meant the public
+ * staging host printed codes to its log and - because `sendEmail` also
+ * refused to pretend outside development - the code was handed to the caller
+ * in the response body as well. A host that is reachable by the public must
+ * not be able to produce a deliverable code without a mail transport, so
+ * here the row is deleted and the caller is told the message was not sent.
+ *
+ * In production there has never been a fallback: a missing SMTP configuration
+ * is a misconfiguration and the caller is told the message was not delivered.
  */
 async function deliverVerificationCode(params: {
   email: string;
@@ -398,10 +408,12 @@ async function deliverVerificationCode(params: {
   // it; do not paper over a broken mail server.
   if (isSmtpConfigured()) return { sent: false };
 
-  if (env.NODE_ENV === "production") return { sent: false };
+  // No transport, and this is not a developer machine or the test suite:
+  // there is no way to deliver the code, so the code is not delivered.
+  if (!isDevCodeDisclosureAllowed()) return { sent: false };
 
-  // No SMTP, not production: print the code to the server log so a testing
-  // host can complete the flow.
+  // No SMTP, development or test only: print the code to the server log so a
+  // developer can complete the flow.
   //
   // Deliberately NOT logged through `logger`: the logger redacts every key
   // named `code` (it is a one-time code, and redaction is the right default).

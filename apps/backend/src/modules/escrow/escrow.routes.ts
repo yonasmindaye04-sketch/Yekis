@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { Router } from "express";
-import { env } from "../../config/env.js";
+import { env, isDevCodeDisclosureAllowed } from "../../config/env.js";
 import { FundEscrowInput, PaymentProvider, WithdrawInput } from "../../schemas";
 import { z } from "zod";
 import { requireAuth, requireFreshAuth, type AuthedRequest } from "../../middleware/auth.js";
@@ -418,10 +418,14 @@ escrowRouter.post(
       return res.json({
         expiresAt: challenge.expiresAt,
         retryAfterSec: challenge.retryAfterSec,
-        // Never in production. The local dev client cannot read an SMS, and
-        // a development build that refuses to work is a development build
-        // nobody tests.
-        ...(challenge.devCode ? { devCode: challenge.devCode } : {}),
+        // Never on a reachable host. The local dev client cannot read an SMS,
+        // and a development build that refuses to work is a development build
+        // nobody tests - but that affordance must not exist on the public
+        // staging deployment, where this code approves a payout. See
+        // `isDevCodeDisclosureAllowed` in config/env.ts.
+        ...(challenge.devCode && isDevCodeDisclosureAllowed()
+          ? { devCode: challenge.devCode }
+          : {}),
       });
     } catch (err) {
       if (err instanceof WithdrawalPhoneMissingError) {

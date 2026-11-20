@@ -26,11 +26,13 @@
    *verification* step, Telegram (widget / Mini App / bot code), real Google-Apple-Facebook ID-token
    verification, JWT access+refresh with `amr`/`auth_time`/`session_version`, audit logging and rate
    limits all exist. The work is **extension, not replacement**.
-2. **The live host currently leaks one-time codes.** `POST /api/v1/auth/email/code` on the public
-   staging deployment answers `{"sent":true,…,"devCode":"097046"}` — the OTP is returned in the HTTP
-   response because the "development only" guard is `NODE_ENV !== "production"`, and staging is a
-   public host (**F-01**). This is the single most urgent item and it is fixed in Phase 2, before
-   any new channel is switched on.
+2. **The live host was returning one-time codes — closed on 2026-11-20.** `POST /api/v1/auth/email/code` on
+   the public staging deployment answered `{"sent":true,…,"devCode":"097046"}` — the OTP was returned in the
+   HTTP response because the "development only" guard was `NODE_ENV !== "production"`, and staging is a
+   public host (**F-01**). The same rule also covered the withdrawal approval code. This was fixed the day
+   the audit was delivered, on the same branch, before any new channel was switched on: code disclosure is
+   now confined to `development` and `test` by `isDevCodeDisclosureAllowed()`, and the capability endpoint
+   reports the configuration instead of the environment name. See F-01/F-02 and the changelog entry.
 3. **The live host cannot send email at all.** There are no `SMTP_*` variables, and `sendEmail`
    refuses to pretend outside `development`. Password-reset mail therefore never leaves the box
    (**F-03**). Section 8 solves this for **$0** with a free transactional provider and a truthful
@@ -137,6 +139,9 @@ seconds. Revocation is all-or-nothing: `revokeAllSessions()` increments `User.se
 
 ### 4.5 Live host facts (probed 2026-11-19)
 
+The probes below were taken **before** the F-01/F-02 fix of 2026-11-20 and are the evidence for those
+findings. The post-fix re-probe is recorded in Appendix A (E-10).
+
 | Probe | Result | Meaning |
 |---|---|---|
 | `GET /api/v1/auth/verification/channels` | `{"email":{"available":true,"label":"Email"},"phone":{"available":true,"label":"Telegram"}}` | The host claims it can send email. It cannot (F-02/F-03). |
@@ -172,6 +177,27 @@ closed *before* Phase 3, not after.
 and the route; gate the stdout fallback on the same condition; make the capability endpoint report
 the truth. Phase 2.
 
+**Resolution — closed 2026-11-20, in the same branch as this document.** The disclosure rule is now
+an allowlist in `apps/backend/src/config/env.ts`:
+
+```ts
+export function isDevCodeDisclosureAllowed(): boolean {
+  return env.NODE_ENV === "development" || env.NODE_ENV === "test";
+}
+```
+
+`test` is in the allowlist because the suites assert on the code itself
+(`tests/email-verification.test.ts`, `tests/phone-verification.test.ts`, `tests/withdrawal-2fa.test.ts`);
+neither environment is reachable by the public. Every disclosure site was closed, not only the measured
+one: the email OTP service and route, the phone OTP service and route, and the withdrawal OTP route
+(now gated independently of the service). The phone service's "no SMS provider, no Telegram chat, print
+the code" fallback was confined the same way. On `staging` and `production` a code that cannot be
+delivered is not delivered: the row is deleted and the caller is told the message was not sent.
+
+**Consequence to be aware of:** until a mail transport is configured on the staging host, the email
+verification step answers `503 EMAIL_UNAVAILABLE` and the signup flow uses Telegram. That is the honest
+state — before the fix it "worked" by publishing the code.
+
 ---
 
 ### F-02 — High — the capability endpoint reports a channel that cannot deliver
@@ -186,6 +212,12 @@ absent.
 
 **Fix.** Derive availability from the configured transport (SMTP credentials, or an API key for the
 selected provider), never from `NODE_ENV`. Phase 2.
+
+**Resolution — partially closed 2026-11-20.** `isEmailDeliveryConfigured()` now answers
+`isSmtpConfigured() || isDevCodeDisclosureAllowed()`, and the phone channel is derived from the SMS key
+or the Telegram bot in the same way, so the live host reports `email.available:false` instead of
+advertising a channel it cannot deliver. The remaining part of F-02 is the transport abstraction of
+section 7.3 (one transport behind several providers), which is Phase 1/2 work.
 
 ---
 
@@ -743,6 +775,7 @@ the previous phase's gate is met.
 | **0 — Audit** | This document | **Founder approval** | n/a (docs only) |
 | **1 — Prerequisites** | Email transport abstraction + `scripts/test-email.mjs`; Google client id obtained; local Postgres/Redis up | One real email delivered; `/oauth/providers` shows `google:true` | Feature flags stay off |
 | **2 — Foundations** | Close F-01, F-02, F-05, F-06, F-11: no codes outside development, truthful capabilities, peppered OTP hashes, cleanup job | S-1, S-2, S-5 tests green; the live probe that leaked `devCode` now returns no code | Revert the commit; the old behaviour is only "leaky", not broken |
+| **2a — Done 2026-11-20** | **F-01 and the disclosure half of F-02 are closed** (the allowlist, every disclosure site, the truthful capability endpoint). F-05, F-06 and F-11 remain: the pepper, the strong-factor policy and the cleanup job | The live re-probe (Appendix A, E-10) returns no code; the auth suites show no new failures | Revert the commit |
 | **3 — Email OTP** | `/email/login`, `/register/email`, `/email/password/set`; frontend email-code sign-in | E2E: sign in, register passwordless, set a password; enumeration and rate-limit tests green | `AUTH_EMAIL_LOGIN_ENABLED=false` |
 | **4 — Telegram** | Push OTP, link token + bot handler, `wl_` repair (F-04), legacy 8-char code kept | Bot + link tests green; no duplicate accounts created; the `wl_` flow completes end to end | `AUTH_TELEGRAM_PUSH_OTP_ENABLED=false`; the legacy path still works |
 | **5 — Identities & devices** | `/auth/identities`, Account security UI, `AuthSession` registry, per-device revocation, last-method guard | S-9, S-10, S-12 tests green; the device list renders and a revoked device stops working | `AUTH_DEVICE_SESSIONS_ENABLED=false`; logout falls back to today's behaviour |
