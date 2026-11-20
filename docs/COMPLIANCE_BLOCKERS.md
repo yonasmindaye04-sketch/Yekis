@@ -22,7 +22,11 @@ Once the business dependencies are resolved, engineering can replace the stubs w
 >
 > **The first defect was closed on 2026-11-20** (same branch as the audit): `isDevCodeDisclosureAllowed()` in `apps/backend/src/config/env.ts` confines code disclosure to `development` and `test`, the capability endpoint now answers from the transport configuration, and every disclosure site (email OTP, phone OTP, withdrawal OTP) was gated. On a reachable host a code that cannot be delivered is not delivered.
 >
-> **What remains** is an operational dependency rather than a code defect: **no transactional-email provider is configured on any host**, so the email verification step answers `503` and password recovery is undeliverable until one is. A **$0** provider (Brevo free is the recommendation — 300 emails/day, a single verified sender, no domain, no card; the setup steps are in `docs/auth/PHASE0_AUTH_AUDIT.md` §8) restores the channel. Until then, email must not be advertised as a working sign-in method, and the withdrawal approval code on staging is only deliverable to members with a linked Telegram chat — there is no SMS provider on the host either, which is the payout control working as intended.
+> **The second defect was closed on 2026-11-20 as well**, by configuring a **$0** transactional-mail provider: **Brevo free** (300 emails/day, one verified sender, no domain, no card), reached over its HTTPS API. The platform now carries a second transport behind the same `sendEmail` call, and the capability endpoint reports `email.available: true` because a transport is genuinely configured — not because the environment name says so.
+>
+> **What remains** is a smaller operational dependency rather than a code defect. The mail transport exists, but the **sender is still a personal address** (`emushu70@gmail.com`): a `yekis.*` domain should be bought and verified in Brevo so the platform sends SPF/DKIM-aligned mail from its own domain — that is a deliverability and reputational matter, not a data-protection one, and it changes no code. The **withdrawal approval code on staging** is still only deliverable to members with a linked Telegram chat, because there is no SMS provider on the host either; that is the payout control working as intended and it is unchanged by the mail work.
+>
+> The **email verification step is now deliverable on the live host** and no longer answers `503`.
 
 ## 1. Separate Bank/Telebirr Escrow Account
 **Domain**: Finance / Escrow

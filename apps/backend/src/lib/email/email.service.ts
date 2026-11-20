@@ -69,8 +69,13 @@ function escapeHtml(str: string): string {
  */
 let smtpTransport: nodemailer.Transporter | null = null;
 
+/** Whether the SMTP credentials are complete. Asked without side effects. */
+function hasSmtpCredentials(): boolean {
+  return Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+}
+
 function getTransport(): nodemailer.Transporter | null {
-  if (!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS)) return null;
+  if (!hasSmtpCredentials()) return null;
   if (!smtpTransport) {
     smtpTransport = nodemailer.createTransport({
       host: env.SMTP_HOST,
@@ -80,6 +85,138 @@ function getTransport(): nodemailer.Transporter | null {
     });
   }
   return smtpTransport;
+}
+
+/**
+ * Which transport carries the mail.
+ *
+ *   "smtp"  - the SMTP host, and nothing else
+ *   "brevo" - the Brevo HTTPS API, and nothing else
+ *   "auto"  - SMTP when it is configured, otherwise the Brevo API
+ *
+ * An explicit preference never silently falls back to the other transport. If
+ * the host says "brevo" and there is no API key, the answer is "no transport",
+ * so the caller learns that the message was not delivered instead of assuming
+ * that some other transport quietly carried it.
+ */
+export type EmailTransportKind = "smtp" | "brevo" | "none";
+
+export function resolveEmailTransport(): EmailTransportKind {
+  const preference = env.EMAIL_TRANSPORT;
+  if (preference === "smtp") return hasSmtpCredentials() ? "smtp" : "none";
+  if (preference === "brevo") return env.BREVO_API_KEY ? "brevo" : "none";
+  if (hasSmtpCredentials()) return "smtp";
+  if (env.BREVO_API_KEY) return "brevo";
+  return "none";
+}
+
+/**
+ * Whether the platform has a transport that can actually deliver a message.
+ *
+ * This is the question the capability endpoint asks, and the question the
+ * onboarding code path asks before it mints a code nobody can receive. The
+ * answer is the CONFIGURATION, never the environment name.
+ */
+export function isEmailTransportConfigured(): boolean {
+  return resolveEmailTransport() !== "none";
+}
+
+/**
+ * The Brevo HTTPS API endpoint.
+ *
+ * The API - not SMTP - because the hosted app already talks to the internet
+ * over HTTPS for everything else, and a container may not have an outbound
+ * SMTP port open at all. Brevo's free plan covers the whole platform today.
+ */
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
+
+/**
+ * Splits "Yekis <emushu70@gmail.com>" into the name and the address the
+ * Brevo API expects. A bare address is used as the address, with the default
+ * sender name.
+ */
+function parseSender(from: string): { name: string; email: string } {
+  const match = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(from);
+  if (match) {
+    // The regex guarantees both groups, but `noUncheckedIndexedAccess` makes
+    // the index access `string | undefined`, so the optionality is handled
+    // here rather than asserted away.
+    return {
+      name: match[1]?.trim() || "Yekis",
+      email: (match[2] ?? "").trim(),
+    };
+  }
+  return { name: "Yekis", email: from.trim() };
+}
+
+/**
+ * Sends one message through the Brevo HTTPS API.
+ *
+ * The field names are Brevo's, not a generic mail API's: `htmlContent` and
+ * `textContent`, not `html` and `text`. Sending `html`/`text` is accepted
+ * only in Brevo's older v2 endpoint and is rejected here with
+ * `missing_parameter` - which is why the shape is asserted in the test.
+ */
+async function sendViaBrevo(params: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  from: string;
+}): Promise<{ success: boolean; messageId?: string }> {
+  const apiKey = env.BREVO_API_KEY;
+  if (!apiKey) return { success: false };
+
+  try {
+    const response = await fetch(BREVO_API_URL, {
+      method: "POST",
+      headers: {
+        "api-key": apiKey,
+        "content-type": "application/json",
+        accept: "application/json",
+      },
+      body: JSON.stringify({
+        sender: parseSender(params.from),
+        to: [{ email: params.to }],
+        subject: params.subject,
+        htmlContent: params.html,
+        textContent: params.text,
+      }),
+    });
+
+    if (!response.ok) {
+      // The body carries the reason (an unverified sender, a breached quota, a
+      // malformed payload). It is truncated, and it never contains the API key.
+      const detail = await response.text().catch(() => "");
+      logger.error(
+        {
+          status: response.status,
+          to: params.to,
+          subject: params.subject,
+          detail: detail.slice(0, 300),
+        },
+        "Failed to send email via the Brevo API",
+      );
+      return { success: false };
+    }
+
+    const body = (await response.json().catch(() => ({}))) as {
+      messageId?: unknown;
+    };
+    const messageId =
+      typeof body.messageId === "string" ? body.messageId : undefined;
+    logger.info(
+      { to: params.to, subject: params.subject, messageId, transport: "brevo" },
+      "Email delivered via the Brevo API",
+    );
+    return { success: true, messageId };
+  } catch (err) {
+    logger.error(
+      { err, to: params.to, subject: params.subject },
+      "Failed to send email via the Brevo API",
+    );
+    return { success: false };
+  }
 }
 
 /**
@@ -102,10 +239,17 @@ export async function sendEmail(
 
   sentEmailsLog.push({ ...payload, from });
 
-  const transport = getTransport();
-  if (transport) {
+  const transport = resolveEmailTransport();
+
+  if (transport === "brevo") {
+    return sendViaBrevo({ to, subject, html: payload.html, text, from });
+  }
+
+  if (transport === "smtp") {
+    const smtp = getTransport();
+    if (!smtp) return { success: false };
     try {
-      const info = await transport.sendMail({
+      const info = await smtp.sendMail({
         from,
         to,
         subject,
@@ -146,7 +290,7 @@ export async function sendEmail(
   if (isDevelopment) {
     logger.warn(
       { to, subject },
-      "SMTP not configured - email NOT delivered, printed to console for local development only.",
+      "No mail transport configured - email NOT delivered, printed to console for local development only.",
     );
     // eslint-disable-next-line no-console
     console.log(
@@ -169,7 +313,7 @@ export async function sendEmail(
   // token instead of leaving a valid credential nobody can receive.
   logger.error(
     { to, subject },
-    "SMTP is not configured and this is not a development environment - email NOT delivered.",
+    "No mail transport is configured and this is not a development environment - email NOT delivered.",
   );
   return { success: false };
 }

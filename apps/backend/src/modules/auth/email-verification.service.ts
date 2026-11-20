@@ -3,7 +3,10 @@ import { createHash, randomBytes, randomInt, timingSafeEqual } from "node:crypto
 import { prisma } from "../../lib/prisma.js";
 import { logger } from "../../lib/logger.js";
 import { env, isDevCodeDisclosureAllowed } from "../../config/env.js";
-import { sendEmailVerificationCodeEmail } from "../../lib/email/email.service.js";
+import {
+  isEmailTransportConfigured,
+  sendEmailVerificationCodeEmail,
+} from "../../lib/email/email.service.js";
 
 // === TYPES ===
 export class EmailCodeNotFoundError extends Error {}
@@ -352,8 +355,8 @@ export function isSmtpConfigured(): boolean {
 /**
  * Whether the platform can actually deliver a code right now.
  *
- * Used by the onboarding UI's channel discovery: on a host with no SMTP
- * credentials the email step would 503, and on a host with no SMS key the
+ * Used by the onboarding UI's channel discovery: on a host with no mail
+ * transport the email step would 503, and on a host with no SMS key the
  * phone step would 503. Returning booleans derived from the configuration is
  * the same shape as `GET /auth/oauth/providers` and reveals nothing about any
  * account.
@@ -364,12 +367,15 @@ export function isSmtpConfigured(): boolean {
  * as available and the onboarding step dead-ended at the first request.
  * "Not production" is not a delivery capability.
  *
- * A host that has no SMTP credentials is only able to "deliver" a code in
+ * A host that has no mail transport is only able to "deliver" a code in
  * development or in the test suite, where the code is handed back to the
  * caller that asked for it.
  */
 export function isEmailDeliveryConfigured(): boolean {
-  if (isSmtpConfigured()) return true;
+  // Any transport that can carry the message: the SMTP host, or the Brevo
+  // HTTPS API. The question is "can this host send mail", not "is this host
+  // SMTP", because a host with only a Brevo key can deliver perfectly well.
+  if (isEmailTransportConfigured()) return true;
   return isDevCodeDisclosureAllowed();
 }
 
@@ -404,16 +410,17 @@ async function deliverVerificationCode(params: {
   });
   if (result.success) return { sent: true };
 
-  // SMTP is configured but the send failed: a real delivery failure. Report
-  // it; do not paper over a broken mail server.
-  if (isSmtpConfigured()) return { sent: false };
+  // A transport is configured but the send failed: a real delivery failure
+  // (an unverified sender, a breached quota, an unreachable mail server).
+  // Report it; do not paper over a broken transport.
+  if (isEmailTransportConfigured()) return { sent: false };
 
   // No transport, and this is not a developer machine or the test suite:
   // there is no way to deliver the code, so the code is not delivered.
   if (!isDevCodeDisclosureAllowed()) return { sent: false };
 
-  // No SMTP, development or test only: print the code to the server log so a
-  // developer can complete the flow.
+  // No transport, development or test only: print the code to the server log so
+  // a developer can complete the flow.
   //
   // Deliberately NOT logged through `logger`: the logger redacts every key
   // named `code` (it is a one-time code, and redaction is the right default).
@@ -423,7 +430,7 @@ async function deliverVerificationCode(params: {
     `\n================== [DEV - NOT SENT] EMAIL OTP ==================\n` +
       `To: ${params.email}\n` +
       `Code: ${params.code}\n` +
-      `SMTP is not configured on this host, so the code was not delivered by mail.\n` +
+      `No mail transport is configured on this host, so the code was not delivered by mail.\n` +
       `===============================================================\n`,
   );
   return { sent: true };

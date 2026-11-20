@@ -31,6 +31,14 @@ import { env } from "../src/config/env.js";
  */
 const sentMessages: { email: string; code: string }[] = [];
 let sendSucceeds = true;
+/**
+ * Whether a mail transport is configured, as the service sees it.
+ *
+ * The suite mocks the mail transport itself, so in the default state there is
+ * NO transport: the platform cannot really send anything, and the only reason
+ * a code is issued at all is the development/test disclosure allowance.
+ */
+let transportConfigured = false;
 
 vi.mock("../src/lib/email/email.service.js", () => ({
   sendEmailVerificationCodeEmail: async (params: {
@@ -41,6 +49,11 @@ vi.mock("../src/lib/email/email.service.js", () => ({
     sentMessages.push({ email: params.email, code: params.code });
     return { success: true };
   },
+  // The capability question is no longer "is SMTP configured" - it is "is ANY
+  // transport configured", because the platform can also carry mail over the
+  // Brevo HTTPS API. The mock mirrors the real module and reports the state
+  // the test sets.
+  isEmailTransportConfigured: () => transportConfigured,
 }));
 
 const {
@@ -183,12 +196,16 @@ describe("the stored challenge is not the code", () => {
     expect(row).toBeNull();
   });
 
-  it("still issues the code outside production when SMTP is missing", async () => {
-    // The hosted testing environment runs with NODE_ENV=staging and no SMTP
-    // credentials. The console fallback is what makes the onboarding work
-    // there instead of dead-ending on the first step, and outside production
-    // the code is already returned to the caller in the API response — so the
-    // server log adds no exposure that does not already exist.
+  it("still issues the code in the test suite when there is no transport at all", async () => {
+    // The suite runs with NODE_ENV=development (the .env sets it), and the
+    // disclosure allowance is what lets a developer read the code out of the
+    // response and complete the flow without a mailbox.
+    //
+    // NOTE: this is NOT the hosted testing environment. The old version of
+    // this test said "outside production", and meant staging - which is a
+    // publicly reachable host where the code used to be handed to any caller
+    // (F-01). The allowance is now confined to development and test, and
+    // staging gets nothing: a code that cannot be delivered is not delivered.
     expect(env.NODE_ENV).not.toBe("production");
     sendSucceeds = false;
 
@@ -199,6 +216,28 @@ describe("the stored challenge is not the code", () => {
       where: { email: A, verifiedAt: null },
     });
     expect(row.id).toBeTruthy();
+  });
+
+  it("does not issue a code when a configured transport fails, even in development", async () => {
+    // A transport that is present but broken (an unverified sender, a breached
+    // quota, an unreachable mail server) is a real delivery failure. The
+    // development fallback must not paper over it: the fallback exists for a
+    // host with NO transport, not for a host whose transport is misconfigured.
+    // A code that was never sent is a credential nobody received.
+    sendSucceeds = false;
+    transportConfigured = true;
+    try {
+      await expect(requestEmailCode({ email: A })).rejects.toThrow(
+        EmailCodeDeliveryFailedError,
+      );
+    } finally {
+      transportConfigured = false;
+    }
+
+    const row = await prisma.emailVerificationCode.findFirst({
+      where: { email: A, verifiedAt: null },
+    });
+    expect(row).toBeNull();
   });
 });
 

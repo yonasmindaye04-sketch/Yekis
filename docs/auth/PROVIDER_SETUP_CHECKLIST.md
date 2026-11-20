@@ -1,13 +1,28 @@
 # Provider Setup Checklist — Email And Google
 
+> **STATUS: DONE — 2026-11-20.** Both accounts were created and both keys are
+> configured on the live host. This document is kept as the runbook: it is
+> what to repeat (or to do for another domain, another sender, or another
+> client id), and it records why each step exists.
+>
+> | | State |
+> |---|---|
+> | **Brevo account** | Live. Free plan, 300 emails/day, account `emushu70@gmail.com`, company `yekis` |
+> | **Sender `emushu70@gmail.com`** | **Verified** — a test message was accepted by the API (`201`, message id `<202611201937…@smtp-relay.mailin.fr>`) |
+> | **Brevo transport in the backend** | Live. `EMAIL_TRANSPORT=brevo`, `BREVO_API_KEY=…`, `EMAIL_FROM="Yekis <emushu70@gmail.com>"` |
+> | **Google client id** | Live. `GOOGLE_CLIENT_ID` and the build-time `VITE_GOOGLE_CLIENT_ID` are both set to `1040630878719-…apps.googleusercontent.com` |
+>
+> **What the assistant did afterwards:** set the environment variables on the
+> app, redeploy, and verify live — `email.available: true` and `google: true`.
+>
+> **Never paste a key into the repository.** Each value below is given to the
+> assistant and goes straight into the AletCloud app's environment.
+> `scripts/scan-secrets.js` gates every commit.
+
 > **Who does what.** You create the two accounts (they need your e-mail, your
 > Google sign-in and, for Brevo, a sender address you own). I do everything
 > after that: the environment variables on the host, the redeploy, the live
 > verification, and the deployment record in `docs/ALETCLOUD_DEPLOYMENT.md`.
->
-> **Never paste a key into the repository.** Each value below is given to me
-> and goes straight into the AletCloud app's environment. `scripts/scan-secrets.js`
-> gates every commit.
 >
 > Context: `docs/auth/PHASE0_AUTH_AUDIT.md` §8 (mail) and §9 (Google).
 
@@ -145,6 +160,13 @@ member links Google from their signed-in session (never an automatic merge).
 |---|---|
 | Phase 0 audit and threat model | **Done** — `docs/auth/PHASE0_AUTH_AUDIT.md` |
 | The live code-disclosure leak (the staging host returned the OTP in the response) | **Fixed on 2026-11-20**, before any new channel was switched on |
-| E-mail transport configured | Waiting on Part A |
-| Google configured | Waiting on Part B |
+| E-mail transport configured | **Done 2026-11-20** — Brevo over the HTTPS API; the live host reports `email.available: true` and the onboarding code is delivered by mail |
+| Google configured | **Done 2026-11-20** — the client id is set in both the backend and the frontend build; the live host reports `google: true` |
 | Email OTP sign-in, Telegram push OTP, identities API, device sessions | **Not started** — they wait for your review of the audit document (the founder decision was: audit first, then implement) |
+
+### The one thing still worth doing later
+Buy a `yekis.*` domain and verify it in Brevo (SPF + DKIM), then switch
+`EMAIL_FROM` to it. The transport code does not change — only the
+configuration. Until then the platform sends from a personal address, which
+delivers but is less trustworthy to a receiving mailbox than a signed domain.
+

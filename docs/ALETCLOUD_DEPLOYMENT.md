@@ -269,13 +269,15 @@ build to run again — which is what a redeploy does.
 | `VITE_OBJECT_STORE_ORIGIN` | `https://s3.aletcloud.com` | Build-time; see §5.2 |
 | `VITE_GOOGLE_CLIENT_ID` | *optional* | Build-time; the sign-in button is hidden when it is absent |
 | `RUN_MIGRATIONS` | `true` | The container applies `prisma migrate deploy` before the API starts |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | *optional* | The transactional mail transport. It carries the onboarding OTP (the 6-digit code sent before an account is created) and the password-reset mail |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_SECURE` | *optional* | The SMTP transport. It carries the onboarding OTP (the 6-digit code sent before an account is created) and the password-reset mail |
+| `BREVO_API_KEY` | *optional* | The Brevo HTTPS API transport. The API key is the only credential; the sender address is configured through `EMAIL_FROM` and must be a **verified sender** in the Brevo account |
+| `EMAIL_TRANSPORT` | `auto` | Which transport carries the mail: `smtp`, `brevo`, or `auto` (SMTP when it is configured, otherwise the Brevo API). An explicit value never silently falls back to the other transport |
 | `EMAIL_FROM` | `Yekis Notifications <notifications@yekis.com>` | The sender of every platform mail |
 | `SMS_ETHIOPIA_API_KEY` | *optional* | The SMS provider. With it unset, the phone OTP channel reports itself as unavailable and the onboarding falls back to email |
 
 **The onboarding OTP on a testing deployment.** The signup flow proves control
 of the signup address with a 6-digit code before the account is created. With
-no SMTP credentials the code is **not delivered and not disclosed**: the
+no mail transport at all the code is **not delivered and not disclosed**: the
 request answers `503 EMAIL_UNAVAILABLE`, no code row is kept, and the signup
 step uses the Telegram channel instead (or the member links a Telegram chat
 first, which makes the phone channel deliverable through the bot).
@@ -295,6 +297,13 @@ single verified sender, no domain, no card) is the current recommendation, and
 app password is the same-day stopgap if no account is available yet. Until one
 is configured, `GET /api/v1/auth/verification/channels` reports
 `email.available: false`, which is the truth: the platform cannot send mail.
+
+**Why the Brevo API rather than Brevo's SMTP relay.** Both work, and the code
+carries both. The API needs nothing but outbound port 443, which the hosted
+app already uses for everything else; a raw SMTP connection needs port 587 or
+465 open, which a platform container may not have. If SMTP is what you have,
+set `SMTP_HOST=smtp-relay.brevo.com`, `SMTP_PORT=587`, and use the Brevo API
+key as both `SMTP_USER` and `SMTP_PASS`.
 
 `GET /api/v1/auth/verification/channels` reports what the running host can
 actually deliver. Check it after deploying: if `email.available` is `false`

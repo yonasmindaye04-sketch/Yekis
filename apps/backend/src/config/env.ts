@@ -299,6 +299,35 @@ const EnvSchema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_SECURE: z.coerce.boolean().default(false),
+
+  // The Brevo (formerly Sendinblue) HTTPS API transport.
+  //
+  // WHY A SECOND TRANSPORT, AND WHY THE API RATHER THAN SMTP
+  // The hosted app talks to the internet over HTTPS for everything else it
+  // does (the Telegram webhook, the object store), but a raw SMTP connection
+  // needs an outbound port (587 or 465) that a platform container may not
+  // have open. Brevo's HTTPS API needs nothing but port 443, and its free
+  // plan (300 messages a day, one verified sender, no domain, no card) is
+  // enough for the whole platform today.
+  //
+  // The API key is the only credential. The sender address is configured
+  // separately, in EMAIL_FROM, and must be a verified sender in the Brevo
+  // account - Brevo rejects the send otherwise.
+  BREVO_API_KEY: z.string().optional(),
+
+  // Which transport carries the mail.
+  //
+  //   "smtp"  - the SMTP host above, and nothing else
+  //   "brevo" - the Brevo HTTPS API, and nothing else
+  //   "auto"  - SMTP when it is configured, otherwise the Brevo API
+  //
+  // "auto" is the default so that a host with both configured uses SMTP (the
+  // transport most operators expect to see in the logs) and a host with only
+  // one configured still works. An explicit value never silently falls back
+  // to the other transport: if you say "brevo" and there is no key, the
+  // platform reports that it cannot deliver, rather than quietly using SMTP.
+  EMAIL_TRANSPORT: z.enum(["smtp", "brevo", "auto"]).default("auto"),
+
   EMAIL_FROM: z
     .string()
     .default("Yekis Notifications <notifications@yekis.com>"),

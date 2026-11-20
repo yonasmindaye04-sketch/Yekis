@@ -36,10 +36,11 @@
 3. **The live host cannot send email at all.** There are no `SMTP_*` variables, and `sendEmail`
    refuses to pretend outside `development`. Password-reset mail therefore never leaves the box
    (**F-03**). Section 8 solves this for **$0** with a free transactional provider and a truthful
-   capability endpoint.
+   capability endpoint. **Closed 2026-11-20:** the Brevo HTTPS API transport is live on the host.
 4. **Google is not configured anywhere** — not on the host, not in the frontend build
    (`/auth/oauth/providers` → `google:false`). Section 9 is the exact console runbook; the only
    thing needed from the founder is a Google account and a few minutes in the Google Cloud console.
+   **Closed 2026-11-20:** the founder supplied the client id and the host is configured.
 5. **One dead flow exists.** The Telegram PKCE web-login (`?start=wl_<sid>`) hands out a bot link on
    the live host, but the bot has no `wl_` handler and `approveWebLogin()` is imported and never
    called, so the flow stays `pending` forever (**F-04**).
@@ -234,6 +235,15 @@ undeliverable. This is not only an auth problem — money receipts are affected.
 
 **Fix.** Section 8: a provider abstraction with a **$0** provider, plus the `scripts/test-email.mjs`
 delivery check and a truthful capability endpoint. Phase 1/2.
+
+**Resolution — closed 2026-11-20.** The founder created the **Brevo** account (free plan, 300
+messages/day, the sender `emushu70@gmail.com` verified) and supplied the API key. The platform now
+carries a second transport — the Brevo HTTPS API — behind the same `sendEmail` call, so the host
+needs nothing but outbound port 443; a container may not have an outbound SMTP port open at all.
+`EMAIL_TRANSPORT` chooses between `smtp`, `brevo` and `auto`, and an explicit choice never silently
+falls back to the other transport. The live host reports `email.available: true` and the onboarding
+email code is delivered by mail. The sender is still a personal address: a `yekis.*` domain should be
+verified in Brevo later for SPF/DKIM and deliverability (section 8, step 6).
 
 ---
 

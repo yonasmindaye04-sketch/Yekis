@@ -13,8 +13,8 @@ The founder closed nine questions about the multi-channel authentication work (e
 | 4 | Telegram: add the 6-digit **pushed** OTP, keep the existing 8-character code valid during the transition | No code. The legacy code is deprecated, not removed |
 | 5 | Identity storage stays on the existing `User` columns (`googleId`, `telegramUserId`, `email`, `phone`) | No code. **No `user_auth_identities` table** — the columns already enforce one identity per provider, and a second table would create two sources of truth |
 | 6 | Device/session management is **in scope**, implemented the secure way | No code. Will add an `AuthSession` registry keyed on the existing `sid` claim, with per-device revocation |
-| 7 | No paid email provider — use a free tier | No code. Recommendation: **Brevo free** (300 emails/day, single verified sender, no domain, $0); Elastic Email, Mailtrap and Gmail app-password documented as fallbacks |
-| 8 | Configure Google now | No code. The backend verification already exists; only the client id and the frontend build variable are missing |
+| 7 | No paid email provider — use a free tier | **Done — 2026-11-20.** **Brevo free** (300 emails/day, single verified sender, no domain, $0) is live over its HTTPS API. `EMAIL_TRANSPORT` chooses between `smtp` and `brevo`; Elastic Email, Mailtrap and Gmail app-password remain documented as fallbacks |
+| 8 | Configure Google now | **Done — 2026-11-20.** The client id is set on the host (`GOOGLE_CLIENT_ID` and the build-time `VITE_GOOGLE_CLIENT_ID`); the backend verification already existed |
 | 9 | **An email-OTP session must not be able to move money on its own** | No code. `email_otp` will be removed from `STRONG_AUTH_METHODS`; money movement keeps requiring a fresh password (and the withdrawal-scoped SMS OTP) |
 
 ### Standing Constraints For The Authentication Work
@@ -23,8 +23,10 @@ The founder closed nine questions about the multi-channel authentication work (e
 - **No parallel infrastructure.** One bot, one `User` table, one session system, one OTP primitive set — extended, not duplicated.
 - **No code in the repository.** Provider keys live in the host environment only; `scripts/scan-secrets.js` gates the commit.
 
-### The Live Host Was Leaking One-Time Codes (Phase 0 finding, not yet fixed)
-The audit's most urgent finding: `POST /api/v1/auth/email/code` on the public staging deployment returns the OTP **in the response body** (`"devCode":"097046"`, probed 2026-11-19), because the guard is `NODE_ENV !== "production"` and staging is a public host. The same host has no mail transport at all, so `/auth/verification/channels` advertises a channel that cannot deliver. Both are fixed in Phase 2 of the audit plan — **before** any new sign-in channel is switched on. Until then, email must not be advertised as a working sign-in method.
+### The Live Host Was Leaking One-Time Codes (Phase 0 finding — closed 2026-11-20)
+The audit's most urgent finding: `POST /api/v1/auth/email/code` on the public staging deployment returned the OTP **in the response body** (`"devCode":"097046"`, probed 2026-11-19), because the guard was `NODE_ENV !== "production"` and staging is a public host. The same host had no mail transport at all, so `/auth/verification/channels` advertised a channel that could not deliver.
+
+**Both are closed.** Code disclosure is now confined to `development` and `test` by `isDevCodeDisclosureAllowed()`, every disclosure site is gated (email OTP, phone OTP, withdrawal OTP), and the capability endpoint answers from the transport configuration. A **$0** mail transport (Brevo free over the HTTPS API) is configured on the host, so the email channel is now genuinely deliverable rather than merely advertised. The live re-probe is in `docs/auth/PHASE0_AUTH_AUDIT.md` Appendix A (E-10 … E-14).
 
 ## 2026-11-12
 
