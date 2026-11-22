@@ -1,5 +1,28 @@
 # Architecture And Product Decisions
 
+## 2026-11-22
+
+### Google On An Existing Password Account — "Link From Settings"
+The founder asked why a member whose account already existed could not keep signing in with the Google button. The live host answered `409 ACCOUNT_LINK_REQUIRED` — *"An account already exists for you… Sign in with your password first, then link this provider from your account settings."* — **and the place that message pointed to did not exist**: there was no endpoint that could link Google, and no screen to link it from. So the answer was "you may not", for every password account, permanently.
+
+| Question | Decision |
+|---|---|
+| What may a Google sign-in do to an existing password account? | **Nothing on its own.** It stays a refusal (`409 ACCOUNT_LINK_REQUIRED`). The provider credential is added only from a signed-in session, by the account holder. |
+| How does the member add Google? | Sign in with the password, open **Settings → Security → Linked Accounts**, and press the Google button there. The account that is signed in is the account that gains the credential. |
+| May a provider sign-in be merged into an account that merely shares the address? | **No.** Unchanged — and now pinned by a test. |
+| May a *verified* address be merged? | **No.** A verified address says the inbox belongs to the account. It does not say the person holding it at Google is the person who owns the account, and an unproven address is registerable by anyone. |
+
+**What was wrong in the code, precisely.** `loginWithOAuthProfile()` looked the account up **by email only** and ran the password check before it ever looked at the provider id — so a Google credential that had been linked deliberately was never read back, and the link could not be made in the first place. The lookup is now: **provider id first** (that *is* the credential), then the address (that is only a label). Telegram already worked this way — `telegram.service.ts` finds the account by `telegramUserId` first and falls back to the synthetic address second — and the OAuth path now matches it.
+
+**Consequences that are deliberate.**
+- The **no-auto-merge rule is unchanged.** A Google sign-in that matches the address of a password account is still refused. What changed is that the refusal now has an exit: the member can prove they own the account and then attach the credential deliberately.
+- **Linking is a step-up operation.** The route requires a session that is fresh (≤300 s) and strong (`pwd`/`totp`/`email_otp`). A session opened with Google, Telegram or a stale password cannot change how the account gets in.
+- **Linking cannot smuggle in a second address.** The Google credential must present the *same* address as the account. A link adds a credential; it never attaches a second mailbox — and with it a second destination for transactional mail and a second KYC subject — to an account that already has one.
+- **Unlinking is guarded.** Google cannot be removed when it is the last way into the account (no password, no verified address), because the password-reset mail is the remaining way back.
+- **The provider id is the credential and stays on the server.** `GET /auth/identities` answers with booleans only; the ids themselves are never sent to the browser.
+
+**What this does not change.** An OAuth session is still not a strong factor (`oauth` is not in `STRONG_AUTH_METHODS`), so a Google session still cannot move money on its own. The email-OTP channel, the Telegram push OTP and the per-device session registry are still Phase 3, Phase 4 and the rest of Phase 5.
+
 ## 2026-11-20
 
 ### Multi-Channel Authentication — Phase 0 Decision Lock

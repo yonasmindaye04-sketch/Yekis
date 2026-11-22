@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyRound,
   ShieldCheck,
@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Edit,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import { TbAlertTriangle, TbAlertCircle } from "react-icons/tb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
@@ -21,6 +23,31 @@ import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { api, type MeResponse } from "./api/client";
 import { useI18n, type Language } from "./i18n";
 import { cn } from "@/lib/utils";
+import {
+  loadGoogleIdentity,
+  renderGoogleIdentityButton,
+  googleClientId,
+} from "@/lib/googleIdentity";
+
+/**
+ * Turns a failed link/unlink into something a person can act on.
+ *
+ * The API answers with a code and, where it has one, a sentence. The
+ * step-up middleware answers with a code only, so those two are translated
+ * here — "REAUTH_REQUIRED" is not an instruction anyone can follow.
+ */
+function describeCredentialError(err: unknown): string {
+  const raw =
+    err instanceof Error && err.message ? err.message : "Something went wrong.";
+  switch (raw) {
+    case "REAUTH_REQUIRED":
+      return "Your sign-in is too old to change how you sign in. Sign in again with your password, then try this.";
+    case "STEP_UP_REQUIRED":
+      return "Sign in with your password first, then link Google.";
+    default:
+      return raw;
+  }
+}
 
 export interface SettingsWorkspaceProps {
   user: MeResponse;
@@ -58,6 +85,27 @@ export function SettingsWorkspace({
   const [revokeLoading, setRevokeLoading] = useState(false);
   const [revokeMessage, setRevokeMessage] = useState<string | null>(null);
   const [revokeError, setRevokeError] = useState<string | null>(null);
+
+  // Linked credentials State
+  //
+  // A member's account can be reached by more than one method. This screen is
+  // where they see which ones, and where a provider credential is added to an
+  // account that already exists — the deliberate alternative to letting a
+  // matching address merge two accounts into one.
+  const [identities, setIdentities] = useState<{
+    email: string;
+    emailVerified: boolean;
+    passwordSet: boolean;
+    google: boolean;
+    apple: boolean;
+    facebook: boolean;
+    telegram: boolean;
+    phoneVerified: boolean;
+  } | null>(null);
+  const [credentialError, setCredentialError] = useState<string | null>(null);
+  const [credentialMessage, setCredentialMessage] = useState<string | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const googleLinkBtnRef = useRef<HTMLSpanElement>(null);
 
   // Preferences State
   const [selectedTimezone, setSelectedTimezone] = useState(
@@ -120,6 +168,94 @@ export function SettingsWorkspace({
     } finally {
       setPrefSaving(false);
       setTimeout(() => setPrefSuccess(null), 3500);
+    }
+  };
+
+  const loadIdentities = useCallback(async () => {
+    try {
+      setIdentities(await api.getAuthIdentities());
+    } catch {
+      setCredentialError("Could not load your linked accounts.");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "security") return;
+    void loadIdentities();
+  }, [activeTab, loadIdentities]);
+
+  /**
+   * A Google credential has arrived from the Google button. The server
+   * verifies it, checks that it belongs to this account's own address, and
+   * binds it. Nothing is merged: the account that is signed in is the account
+   * that gains the credential.
+   */
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setGoogleBusy(true);
+      setCredentialError(null);
+      setCredentialMessage(null);
+      try {
+        await api.linkGoogle(credential);
+        setCredentialMessage(
+          "Google is linked. You can now sign in with the Google button.",
+        );
+        await loadIdentities();
+      } catch (err) {
+        setCredentialError(describeCredentialError(err));
+      } finally {
+        setGoogleBusy(false);
+      }
+    },
+    [loadIdentities],
+  );
+
+  /**
+   * Renders Google's own button on top of ours, the way the sign-in card
+   * does: the official button is an iframe, so it is made invisible and laid
+   * over the styled button that people actually see.
+   */
+  useEffect(() => {
+    if (activeTab !== "security") return;
+    if (!identities || identities.google) return;
+    if (!googleClientId()) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        await loadGoogleIdentity();
+        if (cancelled || !googleLinkBtnRef.current) return;
+        renderGoogleIdentityButton(
+          googleLinkBtnRef.current,
+          (credential) => void handleGoogleCredential(credential),
+          { theme: "outline", type: "icon", shape: "circle", size: "large" },
+        );
+      } catch {
+        setCredentialError(
+          "Google sign-in could not be loaded. Check your connection and try again.",
+        );
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, identities, handleGoogleCredential]);
+
+  const handleUnlinkGoogle = async () => {
+    setGoogleBusy(true);
+    setCredentialError(null);
+    setCredentialMessage(null);
+    try {
+      await api.unlinkGoogle();
+      setCredentialMessage(
+        "Google is disconnected. Your password still signs you in.",
+      );
+      await loadIdentities();
+    } catch (err) {
+      setCredentialError(describeCredentialError(err));
+    } finally {
+      setGoogleBusy(false);
     }
   };
 
@@ -524,6 +660,330 @@ export function SettingsWorkspace({
                 </button>
               </div>
             </form>
+          </div>
+
+          {/* Linked Accounts */}
+          <div className="sh-card">
+            <div className="sh-card-header">
+              <div>
+                <h3 className="sh-card-title">Linked Accounts</h3>
+                <p className="sh-card-desc">
+                  Connect Google so you can sign in with it. Linking adds a way
+                  in — your password is never replaced, and no two accounts are
+                  ever merged into one.
+                </p>
+              </div>
+            </div>
+
+            {credentialMessage && (
+              <Alert variant="success" className="flex items-center gap-2.5 mb-3">
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback className="bg-emerald-600 dark:bg-emerald-600/80 rounded-[5px] text-white">
+                    <Check className="size-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <AlertTitle className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    Done
+                  </AlertTitle>
+                  <AlertDescription className="text-emerald-700/90 dark:text-emerald-400/90">
+                    {credentialMessage}
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
+
+            {credentialError && (
+              <Alert variant="destructive" className="flex items-center gap-2.5 mb-3">
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                    <TbAlertCircle className="size-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <AlertTitle className="font-semibold">Could not do that</AlertTitle>
+                  <AlertDescription>{credentialError}</AlertDescription>
+                </div>
+              </Alert>
+            )}
+
+            {!identities ? (
+              <p style={{ fontSize: "0.85rem", color: "var(--color-text-secondary)" }}>
+                Loading your linked accounts…
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 2 }}>
+                {/* Password */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 0",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text-secondary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <KeyRound size={16} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>Password</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      {identities.passwordSet
+                        ? "Set — your strongest way into this account."
+                        : "Not set — set one so this account is never held by a single provider."}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      border: "1px solid var(--color-border)",
+                      color: identities.passwordSet
+                        ? "var(--color-text-secondary)"
+                        : "var(--color-warning-text, #b45309)",
+                    }}
+                  >
+                    {identities.passwordSet ? "Active" : "Not set"}
+                  </span>
+                </div>
+
+                {/* Email */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 0",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text-secondary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Globe size={16} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>Email</div>
+                    <div
+                      style={{
+                        fontSize: "0.78rem",
+                        color: "var(--color-text-secondary)",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {identities.email}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {identities.emailVerified ? "Verified" : "Unverified"}
+                  </span>
+                </div>
+
+                {/* Google — the one that can be linked from here */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 0",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--color-bg)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.27v3.15C3.25 21.36 7.33 24 12 24z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.27C.46 8.2 0 10.04 0 12s.46 3.8 1.27 5.42l4.01-3.15z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.25 2.64 1.27 6.58l4.01 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                      />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>Google</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      {identities.google
+                        ? "Connected — the Google button signs you in."
+                        : "Not connected — sign in with your password first, then connect Google."}
+                    </div>
+                  </div>
+
+                  {identities.google ? (
+                    <button
+                      type="button"
+                      className="sh-btn"
+                      onClick={() => void handleUnlinkGoogle()}
+                      disabled={googleBusy}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
+                      <Unlink size={14} />
+                      {googleBusy ? "Working…" : "Disconnect"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => undefined}
+                      disabled={googleBusy}
+                      aria-label="Link Google account"
+                      title="Link Google"
+                      style={{
+                        position: "relative",
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        border: "1px solid var(--color-border)",
+                        background: "#ffffff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+                        padding: 0,
+                        cursor: googleBusy ? "not-allowed" : "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24">
+                        <path
+                          fill="#4285F4"
+                          d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.15z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.27v3.15C3.25 21.36 7.33 24 12 24z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.27C.46 8.2 0 10.04 0 12s.46 3.8 1.27 5.42l4.01-3.15z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.25 2.64 1.27 6.58l4.01 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                        />
+                      </svg>
+                      {/* Google's own button is an iframe, laid invisibly over ours. */}
+                      <span
+                        ref={googleLinkBtnRef}
+                        style={{
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                          width: "100%",
+                          height: "100%",
+                          display: "block",
+                          opacity: 0.001,
+                          overflow: "hidden",
+                          cursor: "pointer",
+                          zIndex: 2,
+                        }}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {/* Telegram — read-only until the bot link flow ships */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 0",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 9,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      background: "var(--color-bg)",
+                      color: "var(--color-text-secondary)",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <Link2 size={16} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>Telegram</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      {identities.telegram
+                        ? "Connected — your linked chat receives your codes."
+                        : "Not connected."}
+                    </div>
+                  </div>
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      padding: "3px 9px",
+                      borderRadius: 999,
+                      border: "1px solid var(--color-border)",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {identities.telegram ? "Connected" : "Not connected"}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active Sessions & Security Controls */}

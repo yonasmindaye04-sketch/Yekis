@@ -179,7 +179,10 @@ const PRODUCTION_CSP = [
   "font-src 'self' https://fonts.gstatic.com data:",
   `img-src ${IMG_SRC}`,
   "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://api.telegram.org https://*.google.com https://*.run.app",
-  "frame-src https://appleid.cdn-apple.com",
+  // Google's own sign-in button is an IFRAME (accounts.google.com/gsi/button),
+  // and so is the One Tap prompt. Without this entry the browser refuses the
+  // frame, the credential never arrives, and the button silently does nothing.
+  "frame-src https://appleid.cdn-apple.com https://accounts.google.com",
   "manifest-src 'self'",
   "worker-src 'self' blob:",
   "media-src 'self' blob:",

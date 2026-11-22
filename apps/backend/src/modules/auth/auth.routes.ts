@@ -44,8 +44,12 @@ import {
   verifyAppleIdToken,
   verifyFacebookAccessToken,
   loginWithOAuthProfile,
+  linkGoogleToUser,
+  unlinkGoogleFromUser,
   OAuthNotConfiguredError,
   OAuthVerificationError,
+  OAuthLinkConflictError,
+  OAuthEmailMismatchError,
   getOAuthProviderAvailability,
 } from "./oauth.service.js";
 import { z } from "zod";
@@ -490,6 +494,91 @@ authRouter.post("/oauth/google", oauthLimiter, async (req, res) => {
   }
 });
 
+/**
+ * Links a Google credential to the account of a member who is ALREADY signed
+ * in.
+ *
+ * This is the answer to `409 ACCOUNT_LINK_REQUIRED`. A member whose account
+ * owns a password is never merged into by a Google sign-in — the address is
+ * only a label, and matching it would be an account-takeover primitive — so
+ * they sign in with their password first and attach Google here, from the
+ * Account security screen.
+ *
+ * The session must be FRESH and STRONG (`requireFreshAuth`): linking changes
+ * how a member gets into their account, so it must not be reachable from a
+ * session opened with a weak factor or left open for hours. The Google
+ * credential is verified against Google's JWKS before anything is written, and
+ * the service refuses an address that is not the account's own.
+ */
+authRouter.post(
+  "/oauth/google/link",
+  requireAuth,
+  requireFreshAuth(300),
+  oauthLimiter,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({ idToken: z.string().min(20) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+
+    try {
+      const profile = await verifyGoogleIdToken(parsed.data.idToken);
+      return res.json(await linkGoogleToUser(req.user!.id, profile));
+    } catch (err) {
+      if (err instanceof OAuthNotConfiguredError) {
+        return res
+          .status(503)
+          .json({ error: "NOT_CONFIGURED", message: err.message });
+      }
+      if (err instanceof OAuthVerificationError) {
+        return res
+          .status(401)
+          .json({ error: "OAUTH_VERIFICATION_FAILED", message: err.message });
+      }
+      if (err instanceof OAuthEmailMismatchError) {
+        return res
+          .status(409)
+          .json({ error: "EMAIL_MISMATCH", message: err.message });
+      }
+      if (err instanceof OAuthLinkConflictError) {
+        return res
+          .status(409)
+          .json({ error: "PROVIDER_LINK_CONFLICT", message: err.message });
+      }
+      logger.error({ err }, "Unexpected error while linking Google account");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+/**
+ * Removes the Google credential from the signed-in member's account. The
+ * service refuses when Google would be the last way into the account (the
+ * last-method guard, F-10 / S-12).
+ */
+authRouter.delete(
+  "/oauth/google/link",
+  requireAuth,
+  requireFreshAuth(300),
+  async (req: AuthedRequest, res) => {
+    try {
+      return res.json(await unlinkGoogleFromUser(req.user!.id));
+    } catch (err) {
+      if (err instanceof OAuthLinkConflictError) {
+        return res
+          .status(409)
+          .json({ error: "LAST_CREDENTIAL", message: err.message });
+      }
+      logger.error({ err }, "Unexpected error while unlinking Google account");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 authRouter.post("/oauth/apple", oauthLimiter, async (req, res) => {
   const parsed = z
     .object({
@@ -671,6 +760,42 @@ authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   });
   if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
   return res.json(user);
+});
+
+/**
+ * What this account can sign in with — the first thing a support agent asks
+ * and the thing the Account security screen renders.
+ *
+ * BOOLEANS ONLY. The provider ids themselves are never sent to the browser:
+ * they are the handle a member is impersonated by at Google or Telegram, so a
+ * leaked response must not carry them. "Linked" is all the screen needs.
+ */
+authRouter.get("/identities", requireAuth, async (req: AuthedRequest, res) => {
+  const user = await prisma.user.findUnique({
+    where: { id: req.user!.id },
+    select: {
+      email: true,
+      emailVerified: true,
+      passwordSetAt: true,
+      googleId: true,
+      appleId: true,
+      facebookId: true,
+      telegramUserId: true,
+      phoneVerifiedAt: true,
+    },
+  });
+  if (!user) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+  return res.json({
+    email: user.email,
+    emailVerified: user.emailVerified,
+    passwordSet: user.passwordSetAt !== null,
+    google: user.googleId !== null,
+    apple: user.appleId !== null,
+    facebook: user.facebookId !== null,
+    telegram: user.telegramUserId !== null,
+    phoneVerified: user.phoneVerifiedAt !== null,
+  });
 });
 
 const changePasswordLimiter = rateLimit({

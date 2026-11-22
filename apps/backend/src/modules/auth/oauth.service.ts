@@ -12,6 +12,7 @@ import {
   isPasswordOwnedAccount,
   withPlaceholderPhone,
 } from "./identity.js";
+import { normalizeEmail } from "./email-verification.service.js";
 
 /**
  * OAuth social sign-in: Google, Apple, Facebook.
@@ -41,6 +42,17 @@ export interface OAuthProfile {
 
 export class OAuthNotConfiguredError extends Error {}
 export class OAuthVerificationError extends Error {}
+
+/**
+ * The provider credential is already bound to a different account, or the
+ * account cannot give it up without losing its last way in.
+ */
+export class OAuthLinkConflictError extends Error {}
+
+/**
+ * The provider's address is not the address of the account being linked.
+ */
+export class OAuthEmailMismatchError extends Error {}
 
 // ---- Google ----
 
@@ -200,14 +212,101 @@ export async function verifyFacebookAccessToken(
 
 // ---- Shared find-or-provision + token issuance ----
 
+/**
+ * The Prisma filter that selects the account a provider id is bound to.
+ *
+ * `googleId`, `appleId` and `facebookId` are unique columns, so this resolves
+ * to at most one row. The provider id is the CREDENTIAL itself — unlike the
+ * email address, which is only a label the provider happens to assert about a
+ * mailbox — so it is the one match that can be trusted to mean "the same
+ * member".
+ */
+function providerIdWhere(profile: OAuthProfile): {
+  googleId?: string;
+  appleId?: string;
+  facebookId?: string;
+} {
+  switch (profile.provider) {
+    case "GOOGLE":
+      return { googleId: profile.providerId };
+    case "APPLE":
+      return { appleId: profile.providerId };
+    case "FACEBOOK":
+      return { facebookId: profile.providerId };
+  }
+}
+
+/**
+ * Mints the session for a member who signed in with a provider credential.
+ *
+ * `oauth` is deliberately NOT a strong factor: a federated provider session
+ * says nothing about who is sitting at the browser right now, so it can never
+ * authorise a withdrawal or an account change on its own.
+ */
+async function issueOAuthSession(
+  user: {
+    id: string;
+    role: string;
+    ucid: string | null;
+    staffRole?: string | null;
+    sessionVersion?: number;
+  },
+  profile: OAuthProfile,
+) {
+  const { createAuthTokens } = await import("./auth.service.js");
+  const result = await createAuthTokens(user, ["oauth"]);
+
+  await recordAuditEvent({
+    userId: user.id,
+    eventType: `USER_LOGGED_IN_OAUTH_${profile.provider}`,
+    entityType: "User",
+    entityId: user.id,
+  });
+
+  return result;
+}
+
 export async function loginWithOAuthProfile(
   profile: OAuthProfile,
   requestedRole?: "CLIENT" | "FREELANCER",
 ) {
   const providerField = `${profile.provider.toLowerCase()}Id`;
 
-  // 1. Existing link?
+  /**
+   * 1. Existing link?
+   *
+   * The provider id IS the credential, so it is the one match that means "the
+   * same member". It is looked up FIRST.
+   *
+   * The lookup used to be by email alone, which meant the link this service
+   * writes — and that `POST /auth/oauth/google/link` writes — was never read
+   * back: a member who linked Google from Settings was still refused with
+   * ACCOUNT_LINK_REQUIRED, because their account owns a password and the
+   * password check ran before anything looked at the provider id. The email
+   * match below is a MERGE candidate; this one is not.
+   */
   let user = await prisma.user.findFirst({
+    where: providerIdWhere(profile),
+  });
+
+  if (user) {
+    // The link was made deliberately — by the member, from a signed-in
+    // session — so this is a sign-in, not a merge. The provider's address is
+    // NOT copied onto the account: the Yekis email is the login identifier
+    // and the destination of every transactional mail, and it only changes
+    // when the member changes it themselves.
+    if (normalizeEmail(user.email) !== profile.email) {
+      logger.warn(
+        { userId: user.id, provider: profile.provider },
+        "OAuth provider address no longer matches the account address",
+      );
+    }
+    return await issueOAuthSession(user, profile);
+  }
+
+  // 2. No provider link. The address the provider proved is all that is left,
+  //    and this is the path where a merge could happen.
+  user = await prisma.user.findFirst({
     where: { email: profile.email },
   });
 
@@ -303,10 +402,29 @@ export async function loginWithOAuthProfile(
     });
   }
 
-  // 2. Ensure the provider id is linked for future direct lookup.
+  // 3. Ensure the provider id is linked for future direct lookup.
   const linkData = { [providerField]: profile.providerId };
-  const needsLink =
-    (user as Record<string, unknown>)[providerField] !== profile.providerId;
+  const boundProviderId = (user as Record<string, unknown>)[providerField];
+  const needsLink = boundProviderId !== profile.providerId;
+
+  /**
+   * The account is already bound to a DIFFERENT credential from this same
+   * provider. Overwriting it would hand the account to whoever holds that
+   * other credential — and the address is exactly what makes that possible:
+   * a provider account can change its address, and the old address can then
+   * be registered by somebody else. The account belongs to the credential it
+   * was linked to, not to whoever shows up with the same address later.
+   */
+  if (needsLink && boundProviderId) {
+    logger.warn(
+      { userId: user.id, provider: profile.provider },
+      "Refusing to overwrite an existing provider binding",
+    );
+    throw new OAuthVerificationError(
+      "This Yekis account is already linked to a different account at this provider. Sign in with the one you linked.",
+    );
+  }
+
   if (needsLink) {
     try {
       await prisma.user.update({ where: { id: user.id }, data: linkData });
@@ -320,19 +438,121 @@ export async function loginWithOAuthProfile(
     }
   }
 
-  const { createAuthTokens } = await import("./auth.service.js");
-  // A federated provider session is not a strong factor: it cannot authorise a
-  // withdrawal or an account change on its own.
-  const result = await createAuthTokens(user, ["oauth"]);
+  return await issueOAuthSession(user, profile);
+}
 
-  await recordAuditEvent({
-    userId: user.id,
-    eventType: `USER_LOGGED_IN_OAUTH_${profile.provider}`,
-    entityType: "User",
-    entityId: user.id,
+// ---- Linking a provider to an account the member already owns ----
+
+/**
+ * Binds a Google credential to the account of a member who is ALREADY signed
+ * in.
+ *
+ * This is the only way a provider credential reaches a password account, and
+ * it is deliberately the slow way: the caller has proved a strong credential
+ * (the route requires a fresh session), so the link is an act of the account
+ * holder rather than a consequence of matching an address.
+ *
+ * Three things are refused:
+ *   1. a Google address that is not the account's own address — linking adds a
+ *      credential, it must never attach a second mailbox (and with it a second
+ *      destination for transactional mail and a second KYC subject) to an
+ *      account that already has one;
+ *   2. a Google credential that already belongs to another account — that is
+ *      the merge the whole no-auto-merge rule exists to prevent;
+ *   3. nothing at all is written when the credential is already this
+ *      account's, so the call is idempotent.
+ */
+export async function linkGoogleToUser(userId: string, profile: OAuthProfile) {
+  if (profile.provider !== "GOOGLE") {
+    throw new OAuthVerificationError(
+      "Only Google can be linked through this endpoint.",
+    );
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, googleId: true },
+  });
+  if (!user) throw new OAuthLinkConflictError("Account not found.");
+
+  if (normalizeEmail(profile.email) !== normalizeEmail(user.email)) {
+    throw new OAuthEmailMismatchError(
+      "Use the Google account that matches the email address on your Yekis account.",
+    );
+  }
+
+  const owner = await prisma.user.findFirst({
+    where: { googleId: profile.providerId },
+    select: { id: true },
+  });
+  if (owner && owner.id !== userId) {
+    throw new OAuthLinkConflictError(
+      "This Google account is already linked to a different Yekis account.",
+    );
+  }
+
+  if (user.googleId === profile.providerId) {
+    return { linked: true, alreadyLinked: true };
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { googleId: profile.providerId },
   });
 
-  return result;
+  await recordAuditEvent({
+    userId,
+    eventType: "USER_LINKED_GOOGLE",
+    entityType: "User",
+    entityId: userId,
+    metadata: { provider: "GOOGLE", providerId: profile.providerId },
+  });
+
+  return { linked: true, alreadyLinked: false };
+}
+
+/**
+ * Removes the Google credential from the signed-in member's account.
+ *
+ * The last-method guard (F-10 / S-12): an account must always keep one way
+ * in. A platform password, or a verified address that can receive a
+ * password-reset mail, is what remains once Google is removed — and a member
+ * with neither is refused, because unlinking would be the last thing standing
+ * between them and their own account.
+ */
+export async function unlinkGoogleFromUser(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      passwordSetAt: true,
+      emailVerified: true,
+      googleId: true,
+    },
+  });
+  if (!user) throw new OAuthLinkConflictError("Account not found.");
+  if (!user.googleId) return { unlinked: false };
+
+  const hasOtherCredential = !!user.passwordSetAt || !!user.emailVerified;
+  if (!hasOtherCredential) {
+    throw new OAuthLinkConflictError(
+      "Set a password or verify your email before unlinking Google.",
+    );
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { googleId: null },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "USER_UNLINKED_GOOGLE",
+    entityType: "User",
+    entityId: userId,
+  });
+
+  return { unlinked: true };
 }
 
 // ---- Provider availability (drives frontend button rendering) ----

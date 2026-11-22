@@ -152,6 +152,24 @@ from `emushu70@gmail.com` → the account is created or, if the address already
 has a password account, the API answers `409 ACCOUNT_LINK_REQUIRED` and the
 member links Google from their signed-in session (never an automatic merge).
 
+**How that link is done (since 2026-11-22).** Sign in with the **password**,
+then open **Settings → Security → Linked Accounts** and press the Google
+button there. The Google credential is verified by the server against Google's
+JWKS, must present the **same address** as the account, and is refused if it
+already belongs to another account. After that, the "Continue with Google"
+button on the sign-in card signs the member in — the credential is found by
+its provider id, not by the address.
+
+Two things are worth knowing before testing:
+
+- The session must be **fresh** (within 5 minutes of the password sign-in)
+  and **strong** (a password, not a Google or Telegram session). If the
+  screen says the sign-in is too old, sign in again with the password and
+  press the Google button straight away.
+- The Google account used to link must be **the same address** as the Yekis
+  account. A different Google address is refused with `EMAIL_MISMATCH` — the
+  link adds a credential, it never attaches a second mailbox to an account.
+
 ---
 
 ## Part C — What happens next, and what is already done
@@ -162,7 +180,7 @@ member links Google from their signed-in session (never an automatic merge).
 | The live code-disclosure leak (the staging host returned the OTP in the response) | **Fixed on 2026-11-20**, before any new channel was switched on |
 | E-mail transport configured | **Done 2026-11-20** — Brevo over the HTTPS API; the live host reports `email.available: true` and the onboarding code is delivered by mail |
 | Google configured | **Done 2026-11-20** — the client id is set in both the backend and the frontend build; the live host reports `google: true` |
-| Email OTP sign-in, Telegram push OTP, identities API, device sessions | **Not started** — they wait for your review of the audit document (the founder decision was: audit first, then implement) |
+| Email OTP sign-in, Telegram push OTP, identities API, device sessions | **Partly done** — the Google slice of the identities work shipped on 2026-11-22 (`GET /auth/identities`, the Google link endpoint and the Account security screen). The email OTP sign-in, the Telegram push OTP and the per-device session registry still wait for your review of the audit document (the founder decision was: audit first, then implement) |
 
 ### The one thing still worth doing later
 Buy a `yekis.*` domain and verify it in Brevo (SPF + DKIM), then switch

@@ -652,6 +652,7 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `POST` | `/api/v1/auth/refresh` | Public (valid refresh token) | Exchange refresh token for new access+refresh pair. Suspended accounts refused. |
 | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidates the current session |
 | `GET` | `/api/v1/auth/me` | Authenticated | Returns current user profile |
+| `GET` | `/api/v1/auth/identities` | Authenticated | What this account can sign in with — `email`, `emailVerified`, `passwordSet`, `google`, `apple`, `facebook`, `telegram`, `phoneVerified`. **Booleans only**: the provider ids are never sent to the browser, because they are the handle a member is impersonated by at the provider |
 | `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert. `503 TELEGRAM_NOT_CONFIGURED` when the host has no bot token — the signature cannot be checked without it |
 | `POST` | `/api/v1/auth/telegram/miniapp` | Public | Alias for Mini App login |
 | `POST` | `/api/v1/auth/telegram/miniapp/register` | Public | Register a new account via Telegram Mini App |
@@ -663,7 +664,9 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `GET` | `/api/v1/auth/telegram/web-login/:sid/status` | Public | Poll for session completion |
 | `POST` | `/api/v1/auth/telegram/web-login/redeem` | Public | Redeem a completed Telegram web-login session for JWTs |
 | `GET` | `/api/v1/auth/oauth/providers` | Public | Returns available OAuth provider list |
-| `POST` | `/api/v1/auth/oauth/google` | Public | Google OAuth sign-in / register |
+| `POST` | `/api/v1/auth/oauth/google` | Public | Google OAuth sign-in / register. The account is found by the **provider id first** — that is the credential — and only then by the address, which is only a label. A Google sign-in whose provider id is bound to an account signs in; one that merely *matches the address* of a password account is refused with `409 ACCOUNT_LINK_REQUIRED` and is never merged |
+| `POST` | `/api/v1/auth/oauth/google/link` | Authenticated + fresh session | Bind a Google credential to the account that is already signed in. The credential is verified against Google's JWKS, the address must be the account's own address, and a credential that already belongs to another account is refused. `401 OAUTH_VERIFICATION_FAILED`, `409 EMAIL_MISMATCH`, `409 PROVIDER_LINK_CONFLICT`, `403 STEP_UP_REQUIRED` when the session is not strong |
+| `DELETE` | `/api/v1/auth/oauth/google/link` | Authenticated + fresh session | Remove the Google credential. `409 LAST_CREDENTIAL` when Google is the last way into the account (no password, no verified address) |
 | `POST` | `/api/v1/auth/oauth/apple` | Public | Apple OAuth sign-in / register |
 | `POST` | `/api/v1/auth/oauth/facebook` | Public | Facebook OAuth sign-in / register |
 | `POST` | `/api/v1/auth/reset-password-request` | Public | Send password reset email |

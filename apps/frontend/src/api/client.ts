@@ -1092,6 +1092,53 @@ class ApiClient {
     });
   }
 
+  // ---------- Linked credentials (the signed-in account) ----------
+
+  /**
+   * What this account can sign in with. Booleans only — the provider ids
+   * themselves are never sent to the browser.
+   */
+  async getAuthIdentities(): Promise<{
+    email: string;
+    emailVerified: boolean;
+    passwordSet: boolean;
+    google: boolean;
+    apple: boolean;
+    facebook: boolean;
+    telegram: boolean;
+    phoneVerified: boolean;
+  }> {
+    return this.request("/api/v1/auth/identities", { method: "GET" });
+  }
+
+  /**
+   * Binds a Google credential to the account that is already signed in.
+   *
+   * This is the answer to `409 ACCOUNT_LINK_REQUIRED`: the member signs in
+   * with their password first, then attaches Google here. The server verifies
+   * the credential against Google's JWKS, refuses an address that is not the
+   * account's own, and refuses a credential that already belongs to another
+   * account.
+   */
+  async linkGoogle(idToken: string): Promise<{ linked: boolean; alreadyLinked: boolean }> {
+    return this.request(
+      "/api/v1/auth/oauth/google/link",
+      {
+        method: "POST",
+        body: JSON.stringify({ idToken }),
+      },
+      { strictHttpErrors: true },
+    );
+  }
+
+  async unlinkGoogle(): Promise<{ unlinked: boolean }> {
+    return this.request(
+      "/api/v1/auth/oauth/google/link",
+      { method: "DELETE" },
+      { strictHttpErrors: true },
+    );
+  }
+
   async requestPasswordReset(email: string): Promise<{ success: boolean }> {
     return this.request("/api/v1/auth/reset-password-request", {
       method: "POST",

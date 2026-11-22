@@ -351,6 +351,20 @@ is the first question a support agent asks.
 **Fix.** `GET /auth/identities` + a last-method guard on every unlink + the Account security UI.
 Phase 5.
 
+**Status — partly closed 2026-11-22.** `GET /auth/identities` exists (booleans only — the provider
+ids never leave the server), the Account security screen exists, and the last-method guard is
+enforced on the Google unlink. The **Telegram** unlink still has no guard, and the device registry
+and per-device revocation are still Phase 5.
+
+**Companion finding — the Google sign-in path could never honour a link (2026-11-22).** Found while
+answering the founder's question about the `409 ACCOUNT_LINK_REQUIRED` response. `loginWithOAuthProfile()`
+looked the account up **by email only** and ran the password check before it ever consulted the
+provider id, so (a) a Google credential that had been linked deliberately was never read back, and
+(b) the link could not be made in the first place — the error message pointed at an account settings
+screen that did not exist. The lookup is now **provider id first, address second**; the no-auto-merge
+rule is unchanged and is now pinned by tests. See `docs/DECISIONS.md` (2026-11-22) and
+`apps/backend/tests/oauth-account-link.test.ts`.
+
 ---
 
 ### F-11 — Low — OTP rows are never purged
@@ -786,6 +800,7 @@ the previous phase's gate is met.
 | **1 — Prerequisites** | Email transport abstraction + `scripts/test-email.mjs`; Google client id obtained; local Postgres/Redis up | One real email delivered; `/oauth/providers` shows `google:true` | Feature flags stay off |
 | **2 — Foundations** | Close F-01, F-02, F-05, F-06, F-11: no codes outside development, truthful capabilities, peppered OTP hashes, cleanup job | S-1, S-2, S-5 tests green; the live probe that leaked `devCode` now returns no code | Revert the commit; the old behaviour is only "leaky", not broken |
 | **2a — Done 2026-11-20** | **F-01 and the disclosure half of F-02 are closed** (the allowlist, every disclosure site, the truthful capability endpoint). F-05, F-06 and F-11 remain: the pepper, the strong-factor policy and the cleanup job | The live re-probe (Appendix A, E-10) returns no code; the auth suites show no new failures | Revert the commit |
+| **5a/6a — Done 2026-11-22** | **The Google link slice of Phases 5 and 6**: `GET /auth/identities`, `POST`/`DELETE /auth/oauth/google/link`, the Account security screen's **Linked Accounts** card, the last-method guard on the Google unlink, and the provider-id-first lookup that makes a deliberate link work. The `AuthSession` registry, per-device revocation and the Telegram link flow are still Phase 5 and Phase 4 | 16 new tests (`oauth-account-link.test.ts`); the auth, email, Telegram, session, privacy and route suites show no new failures (206 pass, 2 pre-existing failures); the route baseline regenerated (197 → 200 routes) | Unset `GOOGLE_CLIENT_ID` → the button hides again; `DELETE /auth/oauth/google/link` removes the credential |
 | **3 — Email OTP** | `/email/login`, `/register/email`, `/email/password/set`; frontend email-code sign-in | E2E: sign in, register passwordless, set a password; enumeration and rate-limit tests green | `AUTH_EMAIL_LOGIN_ENABLED=false` |
 | **4 — Telegram** | Push OTP, link token + bot handler, `wl_` repair (F-04), legacy 8-char code kept | Bot + link tests green; no duplicate accounts created; the `wl_` flow completes end to end | `AUTH_TELEGRAM_PUSH_OTP_ENABLED=false`; the legacy path still works |
 | **5 — Identities & devices** | `/auth/identities`, Account security UI, `AuthSession` registry, per-device revocation, last-method guard | S-9, S-10, S-12 tests green; the device list renders and a revoked device stops working | `AUTH_DEVICE_SESSIONS_ENABLED=false`; logout falls back to today's behaviour |
@@ -900,6 +915,8 @@ the host was rebuilt again at `2026-11-20T14:19:02Z` for a documentation-only
 commit, and the probes below were taken against that build). Rows **E-15 to
 E-19** are the probes after the mail transport and Google sign-in were
 configured (deployment `d6f2c30`, `lastDeployedAt` `2026-11-20T20:28:42Z`).
+Rows **E-20 and E-21** are the evidence behind the Google link work of
+2026-11-22 (the live 409 and the code read that explained it).
 
 | # | Check | Result |
 |---|---|---|
@@ -922,6 +939,8 @@ configured (deployment `d6f2c30`, `lastDeployedAt` `2026-11-20T20:28:42Z`).
 | **E-17** | `GET /api/v1/auth/oauth/providers`, after the Google client id was configured | **`{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`** — F-08 is closed. The served bundle also carries the client id, so the button is actually rendered (`VITE_GOOGLE_CLIENT_ID` is a build-time variable). |
 | **E-18** | `POST /api/v1/auth/phone/code` (test number), after the mail work | **`503 {"error":"SMS_UNAVAILABLE",…}`** — unchanged. The mail transport does not touch the payout controls: there is still no SMS provider on the host, so the withdrawal approval code is only deliverable to members with a linked Telegram chat. |
 | **E-19** | `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` | **11/11 checks passed** — after the transport and Google deployment. |
+| **E-20** | `POST /api/v1/auth/oauth/google` for the founder's **password** account, before the link work | **`409 {"error":"ACCOUNT_LINK_REQUIRED","message":"An account already exists for … Sign in with your password first, then link this provider from your account settings."}`** — the refusal itself was correct (the no-auto-merge rule), but the screen it pointed at did not exist: no link endpoint, no Account security view. The address match is a label, not a credential. |
+| **E-21** | Read of `oauth.service.ts:209-212` and `telegram.service.ts:127` (2026-11-22) | The OAuth path looked the account up **by email only** and ran the password check before the provider id was ever consulted, so a deliberately linked credential was never read back; the Telegram path already looked up by `telegramUserId` first. The lookup order is now the same on both paths, and the new suite pins both halves: a linked credential signs in, a matching address never does. |
 
 ## Appendix B — file map
 

@@ -2,6 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { events } from "../analytics";
 import { Send, X, ExternalLink } from "lucide-react";
+import {
+  loadGoogleIdentity,
+  renderGoogleIdentityButton,
+  googleClientId,
+} from "../lib/googleIdentity";
 
 /**
  * Social sign-in and registration buttons for Google / Telegram / Apple.
@@ -15,28 +20,6 @@ import { Send, X, ExternalLink } from "lucide-react";
 
 declare global {
   interface Window {
-    google?: {
-      accounts: {
-        id: {
-          initialize: (config: {
-            client_id: string;
-            callback: (response: { credential: string }) => void;
-          }) => void;
-          renderButton: (
-            el: HTMLElement,
-            options: Record<string, unknown>,
-          ) => void;
-          prompt: (
-            momentListener?: (notification: {
-              isNotDisplayed: () => boolean;
-              isSkippedMoment: () => boolean;
-              getNotDisplayedReason: () => string;
-              getSkippedReason: () => string;
-            }) => void,
-          ) => void;
-        };
-      };
-    };
     AppleID?: {
       auth: {
         init: (config: {
@@ -182,31 +165,19 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
 
     (async () => {
       try {
-        await loadScript(
-          "https://accounts.google.com/gsi/client",
-          "google-gsi-client",
-        );
+        await loadGoogleIdentity();
         if (cancelled || !window.google) return;
-
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as
-          string | undefined;
-        if (!clientId) return;
-
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response) =>
-            void handle("GOOGLE", async () => {
-              return api.loginWithGoogleOAuth(response.credential, role);
-            }),
-        });
+        if (!googleClientId()) return;
 
         if (googleBtnRef.current) {
-          window.google.accounts.id.renderButton(googleBtnRef.current, {
-            theme: "outline",
-            type: "icon",
-            shape: "circle",
-            size: "large",
-          });
+          renderGoogleIdentityButton(
+            googleBtnRef.current,
+            (credential) =>
+              void handle("GOOGLE", async () => {
+                return api.loginWithGoogleOAuth(credential, role);
+              }),
+            { theme: "outline", type: "icon", shape: "circle", size: "large" },
+          );
         }
       } catch {
         /* button fallback SVG remains visible */
