@@ -1,6 +1,9 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Archive, Pause, Plus, Star, Trash2 } from "lucide-react";
+import { Activity, Archive, Pause, Plus, Star, Trash2, Wallet } from "lucide-react";
+import { GlassCard } from "./components/ui-v2/GlassCard";
+import { StatCard } from "./components/ui-v2/StatCard";
+import { ShinyBadge } from "./components/ui-v2/ShinyBadge";
 import {
   api,
   type CreateGigPayload,
@@ -12,7 +15,6 @@ import {
   EscrowFeeBreakdown,
   formatEtbMajor,
   formatStatusLabel,
-  statusTone,
 } from "./pages/ops/components/ui";
 
 // === HELPERS ===
@@ -153,6 +155,16 @@ const STATUS_COPY: Record<string, { label: string; tone: string; hint: string }>
     hint: "No longer listed.",
   },
 };
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = s.toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 // === MAIN COMPONENT ===
 export function GigSellerDashboard() {
@@ -352,7 +364,7 @@ export function GigSellerDashboard() {
 
         {error ? <div className="form-error">{error}</div> : null}
 
-        <div className="panel" style={{ padding: 20, marginTop: 16 }}>
+        <GlassCard style={{ padding: 20, marginTop: 16 }}>
           <label className="gig-field">
             <span>Title</span>
             <input
@@ -405,7 +417,7 @@ export function GigSellerDashboard() {
               onChange={(e) => set("maxRevisions", e.target.value)}
             />
           </label>
-        </div>
+        </GlassCard>
 
         <div className="content-toolbar" style={{ marginTop: 24 }}>
           <div>
@@ -428,7 +440,7 @@ export function GigSellerDashboard() {
         </div>
 
         {draft.packages.map((p, i) => (
-          <div className="panel" key={p.tier} style={{ padding: 20, marginTop: 12 }}>
+          <GlassCard key={p.tier} style={{ padding: 20, marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="badge">{p.tier}</span>
               {!readOnlyPackages && draft.packages.length > 1 ? (
@@ -511,7 +523,7 @@ export function GigSellerDashboard() {
                 />
               </div>
             )}
-          </div>
+          </GlassCard>
         ))}
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -537,6 +549,43 @@ export function GigSellerDashboard() {
   // ── the list ──
   return (
     <section className="platform-content">
+      {/* Welcome banner */}
+      <div className="gig-welcome-banner">
+        <div>
+          <h2 className="gig-welcome-banner__title">Welcome back 👋</h2>
+          <p className="gig-welcome-banner__sub">Here's your seller overview for today.</p>
+        </div>
+        <div className="gig-welcome-banner__shine" aria-hidden />
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
+        <StatCard
+          label="Live Gigs"
+          value={gigs?.filter(g => g.status === "ACTIVE").length ?? 0}
+          accent="green"
+          icon={Star}
+        />
+        <StatCard
+          label="Active Orders"
+          value={"—"}
+          accent="blue"
+          icon={Activity}
+        />
+        <StatCard
+          label="Total Earnings"
+          value={"ETB —"}
+          accent="teal"
+          icon={Wallet}
+        />
+        <StatCard
+          label="Total Gigs"
+          value={gigs?.length ?? 0}
+          accent="amber"
+          icon={Archive}
+        />
+      </div>
+
       <div className="content-toolbar">
         <div>
           <h2>{gf.myGigsTitle}</h2>
@@ -554,11 +603,11 @@ export function GigSellerDashboard() {
       {loading ? (
         <div style={{ display: "grid", gap: 12 }}>
           {[1, 2].map((idx) => (
-            <div className="panel" key={idx} style={{ padding: 18 }}>
+            <GlassCard key={idx} style={{ padding: 18 }}>
               <div className="sh-skeleton" style={{ height: 20, width: "45%", marginBottom: 10 }} />
               <div className="sh-skeleton" style={{ height: 14, width: "65%", marginBottom: 14 }} />
               <div className="sh-skeleton" style={{ height: 34, width: "100%" }} />
-            </div>
+            </GlassCard>
           ))}
         </div>
       ) : gigs.length === 0 ? (
@@ -588,7 +637,7 @@ export function GigSellerDashboard() {
                 null as number | null,
               );
               return (
-                <div className="panel" key={g.id} style={{ padding: 18 }}>
+                <GlassCard key={g.id} style={{ padding: 18 }}>
                   <div
                     style={{
                       display: "flex",
@@ -615,9 +664,9 @@ export function GigSellerDashboard() {
                       </div>
                     </div>
 
-                    <span className={`status-pill ${statusTone(g.status)}`}>
+                    <ShinyBadge variant={statusToVariant(g.status)}>
                       {formatStatusLabel(g.status, t.workspace.statuses)}
-                    </span>
+                    </ShinyBadge>
                   </div>
 
                   {copy.hint ? (
@@ -659,7 +708,7 @@ export function GigSellerDashboard() {
                       </button>
                       {g.status === "ACTIVE" ? (
                         <button
-                          className="btn-secondary"
+                           className="btn-secondary"
                           onClick={() => void changeStatus(g, "PAUSED")}
                         >
                           <Pause size={14} /> {gf.pauseBtn}
@@ -675,7 +724,7 @@ export function GigSellerDashboard() {
                       ) : null}
                     </span>
                   </div>
-                </div>
+                </GlassCard>
               );
             })}
           </div>

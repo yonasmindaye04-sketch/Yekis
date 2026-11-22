@@ -1,6 +1,7 @@
 import { useMemo, useState, useId } from "react";
 import type { Milestone, TopUpRequest } from "../../api/client";
 import type { TimeRangeKey, TimeSeriesPoint } from "./dashboardData";
+import { GlassCard } from "../ui-v2/GlassCard";
 
 const DAY_MS = 86_400_000;
 
@@ -214,7 +215,7 @@ export function InteractiveCashflowAreaChart({
   const activePoint = hoverIdx !== null ? points[hoverIdx] : points[points.length - 1];
 
   return (
-    <div className="sh-card">
+    <GlassCard className="sh-card">
       <div className="sh-card-header">
         <div>
           <h3 className="sh-card-title">Escrow Inflow & Released Payouts</h3>
@@ -307,8 +308,9 @@ export function InteractiveCashflowAreaChart({
                   x2={width - padR}
                   y1={y}
                   y2={y}
-                  stroke="var(--color-border)"
-                  strokeDasharray={step === 0 ? undefined : "3 3"}
+                  stroke="var(--ops-border, var(--color-border))"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.5}
                   strokeWidth="1"
                 />
                 <text
@@ -415,7 +417,7 @@ export function InteractiveCashflowAreaChart({
           })}
         </svg>
       </div>
-    </div>
+    </GlassCard>
   );
 }
 
@@ -456,7 +458,7 @@ export function InteractiveRailVelocityBarChart({
   const active = hoverIdx !== null ? points[hoverIdx] : points[points.length - 1];
 
   return (
-    <div className="sh-card">
+    <GlassCard className="sh-card">
       <div className="sh-card-header">
         <div>
           <h3 className="sh-card-title">Payment Rail Settlement Mix</h3>
@@ -502,8 +504,9 @@ export function InteractiveRailVelocityBarChart({
                   x2={width - padR}
                   y1={y}
                   y2={y}
-                  stroke="var(--color-border)"
-                  strokeDasharray={step === 0 ? undefined : "3 3"}
+                  stroke="var(--ops-border, var(--color-border))"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.5}
                 />
                 <text
                   x={padL - 6}
@@ -573,6 +576,6 @@ export function InteractiveRailVelocityBarChart({
           })}
         </svg>
       </div>
-    </div>
+    </GlassCard>
   );
 }

@@ -33,10 +33,22 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   useToast,
   Button,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("BALANCED") || u.includes("CONFIRM")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("MISMATCH")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
 
@@ -201,14 +213,14 @@ export default function Ledger() {
         <>
           <div className="grid g6" style={{ marginBottom: 16 }}>
             {bundle.accounts.slice(0, 12).map((a) => (
-              <div className="card acct-card" key={a.code}>
+              <GlassCard className="acct-card" key={a.code}>
                 <div className="acct-type" style={{ color: a.c }}>
                   {a.type}
                 </div>
                 <div className="acct-name">{a.name}</div>
                 <div className="acct-bal">{fmt(a.bal)}</div>
                 <div className="acct-code mono">{a.code}</div>
-              </div>
+              </GlassCard>
             ))}
           </div>
           {bundle.integrity.bal ? (
@@ -239,7 +251,7 @@ export default function Ledger() {
         <LoadingBox />
       )}
 
-      <div className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -258,12 +270,12 @@ export default function Ledger() {
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </div>
+      </GlassCard>
 
       {rows.length === 0 ? (
-        <div className="card">
+        <GlassCard>
           <Empty icon={BookOpen}>No journal entries match.</Empty>
-        </div>
+        </GlassCard>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -282,7 +294,7 @@ export default function Ledger() {
                         {j.id} {j.refId ? `· Entity: ${j.refId}` : ""}
                       </div>
                     </div>
-                    <Pill s={j.ref} />
+                    <ShinyBadge variant={statusToVariant(j.ref)}>{formatStatusLabel(j.ref)}</ShinyBadge>
                   </div>
                   <div className="qi-foot">
                     <span className="mono" style={{ fontWeight: 700 }}>
@@ -298,7 +310,7 @@ export default function Ledger() {
           </div>
 
           {sel ? (
-            <div className="queue-detail card">
+            <GlassCard className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -310,10 +322,10 @@ export default function Ledger() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <Pill s={sel.ref} />
-                    <span className="pill p-green">Balanced (DR = CR)</span>
+                    <ShinyBadge variant={statusToVariant(sel.ref)}>{formatStatusLabel(sel.ref)}</ShinyBadge>
+                    <ShinyBadge variant="success">Balanced (DR = CR)</ShinyBadge>
                     {verifiedMap[sel.id] ? (
-                      <span className="pill p-blue">Signed Off by Admin</span>
+                      <ShinyBadge variant="info">Signed Off by Admin</ShinyBadge>
                     ) : null}
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
@@ -418,7 +430,7 @@ export default function Ledger() {
                           </td>
                           <td className="cell-main">{leg.name}</td>
                           <td>
-                            <Pill s={leg.type} />
+                            <ShinyBadge variant={statusToVariant(leg.type)}>{formatStatusLabel(leg.type)}</ShinyBadge>
                           </td>
                           <td className="amount">{leg.dr > 0 ? fmt(leg.dr) : "—"}</td>
                           <td className="amount">{leg.cr > 0 ? fmt(leg.cr) : "—"}</td>
@@ -502,7 +514,7 @@ export default function Ledger() {
                   </button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           ) : null}
         </div>
       )}

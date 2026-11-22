@@ -14,6 +14,8 @@ import {
   Sun,
   Moon,
   Edit,
+  ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { TbAlertTriangle, TbAlertCircle } from "react-icons/tb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
@@ -21,6 +23,8 @@ import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { api, type MeResponse } from "./api/client";
 import { useI18n, type Language } from "./i18n";
 import { cn } from "@/lib/utils";
+import { GlassCard } from "./components/ui-v2/GlassCard";
+import "./SettingsWorkspace.css";
 
 export interface SettingsWorkspaceProps {
   user: MeResponse;
@@ -32,6 +36,14 @@ export interface SettingsWorkspaceProps {
 
 type SettingsTab = "security" | "general" | "notifications" | "privacy" | "data";
 
+const SETTINGS_TABS: { id: SettingsTab; label: string; Icon: LucideIcon }[] = [
+  { id: "security", label: "Security & Password", Icon: KeyRound },
+  { id: "general", label: "Preferences & Localization", Icon: Globe },
+  { id: "notifications", label: "Notifications", Icon: Bell },
+  { id: "privacy", label: "Privacy & Visibility", Icon: ShieldCheck },
+  { id: "data", label: "Data & Account", Icon: Download },
+];
+
 export function SettingsWorkspace({
   user,
   onUserUpdated,
@@ -41,6 +53,32 @@ export function SettingsWorkspace({
 }: SettingsWorkspaceProps) {
   const { language, setLanguage } = useI18n();
   const [activeTab, setActiveTab] = useState<SettingsTab>("security");
+  const activeTabMeta =
+    SETTINGS_TABS.find((tab) => tab.id === activeTab) ?? SETTINGS_TABS[0];
+
+  const handleTabKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    const lastIndex = SETTINGS_TABS.length - 1;
+    let nextIndex: number | null = null;
+
+    if (event.key === "ArrowRight") {
+      nextIndex = index === lastIndex ? 0 : index + 1;
+    } else if (event.key === "ArrowLeft") {
+      nextIndex = index === 0 ? lastIndex : index - 1;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = lastIndex;
+    }
+
+    if (nextIndex === null) return;
+    event.preventDefault();
+    const nextTab = SETTINGS_TABS[nextIndex];
+    setActiveTab(nextTab.id);
+    document.getElementById(`settings-tab-${nextTab.id}`)?.focus();
+  };
 
   // Change Password State
   const [currentPassword, setCurrentPassword] = useState("");
@@ -256,62 +294,51 @@ export function SettingsWorkspace({
 
   return (
     <div className="settings-workspace-root">
-      {/* Navigation Filter Tabs */}
-      <div className="sh-card sh-filter-card" style={{ marginBottom: 16 }}>
-        <div className="sh-segmented" role="tablist" aria-label="Settings navigation">
-          <button
-            type="button"
-            className={activeTab === "security" ? "active" : ""}
-            onClick={() => setActiveTab("security")}
-            role="tab"
-            aria-selected={activeTab === "security"}
-          >
-            <KeyRound size={14} /> Security & Password
-          </button>
-          <button
-            type="button"
-            className={activeTab === "general" ? "active" : ""}
-            onClick={() => setActiveTab("general")}
-            role="tab"
-            aria-selected={activeTab === "general"}
-          >
-            <Globe size={14} /> Preferences & Localization
-          </button>
-          <button
-            type="button"
-            className={activeTab === "notifications" ? "active" : ""}
-            onClick={() => setActiveTab("notifications")}
-            role="tab"
-            aria-selected={activeTab === "notifications"}
-          >
-            <Bell size={14} /> Notifications
-          </button>
-          <button
-            type="button"
-            className={activeTab === "privacy" ? "active" : ""}
-            onClick={() => setActiveTab("privacy")}
-            role="tab"
-            aria-selected={activeTab === "privacy"}
-          >
-            <ShieldCheck size={14} /> Privacy & Visibility
-          </button>
-          <button
-            type="button"
-            className={activeTab === "data" ? "active" : ""}
-            onClick={() => setActiveTab("data")}
-            role="tab"
-            aria-selected={activeTab === "data"}
-          >
-            <Download size={14} /> Data & Account
-          </button>
+      {/* Section trail — the topbar breadcrumb names the workspace; this names
+          the settings section currently open. */}
+      <nav className="settings-crumbs" aria-label="Breadcrumb">
+        <span>Settings</span>
+        <ChevronRight size={12} aria-hidden="true" />
+        <strong className="settings-crumbs-current" aria-current="page">
+          {activeTabMeta.label}
+        </strong>
+      </nav>
+
+      {/* Section navigation — landing-page header indicator treatment. */}
+      <GlassCard className="settings-nav-card" noPadding>
+        <div className="settings-tabbar" role="tablist" aria-label="Settings sections">
+          {SETTINGS_TABS.map(({ id, label, Icon }, index) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                id={`settings-tab-${id}`}
+                type="button"
+                className={cn("settings-tab", isActive && "is-active")}
+                onClick={() => setActiveTab(id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`settings-panel-${id}`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </GlassCard>
 
       {/* TAB 1: SECURITY & CREDENTIALS */}
       {activeTab === "security" && (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div
+          role="tabpanel"
+          id="settings-panel-security"
+          aria-labelledby="settings-tab-security"
+          style={{ display: "grid", gap: 16 }}
+        >
           {/* Change Password Card */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Change Password</h3>
@@ -524,10 +551,10 @@ export function SettingsWorkspace({
                 </button>
               </div>
             </form>
-          </div>
+          </GlassCard>
 
           {/* Active Sessions & Security Controls */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Active Sessions & Device Management</h3>
@@ -618,10 +645,10 @@ export function SettingsWorkspace({
                 </button>
               </div>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Identity Verification Summary */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Identity & Multi-Factor Status</h3>
@@ -676,13 +703,18 @@ export function SettingsWorkspace({
                 </button>
               </div>
             )}
-          </div>
+          </GlassCard>
         </div>
       )}
 
       {/* TAB 2: PREFERENCES & LOCALIZATION */}
       {activeTab === "general" && (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div
+          role="tabpanel"
+          id="settings-panel-general"
+          aria-labelledby="settings-tab-general"
+          style={{ display: "grid", gap: 16 }}
+        >
           {prefSuccess && (
             <Alert variant="success" className="flex items-center gap-2.5">
               <Avatar className="size-6 rounded-[5px] shrink-0">
@@ -697,7 +729,7 @@ export function SettingsWorkspace({
           )}
 
           {/* Language Selection */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Platform Language</h3>
@@ -747,10 +779,10 @@ export function SettingsWorkspace({
                 </button>
               ))}
             </div>
-          </div>
+          </GlassCard>
 
           {/* Timezone Selection */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Timezone & Regional Clock</h3>
@@ -775,10 +807,10 @@ export function SettingsWorkspace({
                 <option value="Asia/Dubai">Asia/Dubai (Gulf Standard Time, UTC+4)</option>
               </select>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Theme Mode Toggle */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Display Appearance</h3>
@@ -804,13 +836,18 @@ export function SettingsWorkspace({
                 <Sun size={14} /> Light Theme
               </button>
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
 
       {/* TAB 3: NOTIFICATIONS */}
       {activeTab === "notifications" && (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div
+          role="tabpanel"
+          id="settings-panel-notifications"
+          aria-labelledby="settings-tab-notifications"
+          style={{ display: "grid", gap: 16 }}
+        >
           {notifSaved && (
             <Alert variant="success" className="flex items-center gap-2.5">
               <Avatar className="size-6 rounded-[5px] shrink-0">
@@ -824,7 +861,7 @@ export function SettingsWorkspace({
             </Alert>
           )}
 
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Escrow & Financial Notifications</h3>
@@ -907,13 +944,18 @@ export function SettingsWorkspace({
                 </div>
               </label>
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
 
       {/* TAB 4: PRIVACY & VISIBILITY */}
       {activeTab === "privacy" && (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div
+          role="tabpanel"
+          id="settings-panel-privacy"
+          aria-labelledby="settings-tab-privacy"
+          style={{ display: "grid", gap: 16 }}
+        >
           {privacySuccess && (
             <Alert variant="success" className="flex items-center gap-2.5">
               <Avatar className="size-6 rounded-[5px] shrink-0">
@@ -928,7 +970,7 @@ export function SettingsWorkspace({
           )}
 
           {/* Work Availability */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Marketplace Availability</h3>
@@ -954,10 +996,10 @@ export function SettingsWorkspace({
                 </p>
               </div>
             </label>
-          </div>
+          </GlassCard>
 
           {/* Directory Visibility */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Profile Directory Visibility</h3>
@@ -1021,13 +1063,18 @@ export function SettingsWorkspace({
                 </div>
               ))}
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
 
       {/* TAB 5: DATA MANAGEMENT & DANGER ZONE */}
       {activeTab === "data" && (
-        <div style={{ display: "grid", gap: 16 }}>
+        <div
+          role="tabpanel"
+          id="settings-panel-data"
+          aria-labelledby="settings-tab-data"
+          style={{ display: "grid", gap: 16 }}
+        >
           {exportSuccess && (
             <Alert variant="success" className="flex items-center gap-2.5">
               <Avatar className="size-6 rounded-[5px] shrink-0">
@@ -1042,7 +1089,7 @@ export function SettingsWorkspace({
           )}
 
           {/* Export Account Data */}
-          <div className="sh-card">
+          <GlassCard>
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title">Export Account Data (PDPP / GDPR Archive)</h3>
@@ -1073,10 +1120,10 @@ export function SettingsWorkspace({
                 )}
               </button>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Account Termination & Statutory Retention Notice */}
-          <div className="sh-card" style={{ borderColor: "rgba(220, 38, 38, 0.3)" }}>
+          <GlassCard accent="red">
             <div className="sh-card-header">
               <div>
                 <h3 className="sh-card-title" style={{ color: "var(--color-error-text, #dc2626)" }}>
@@ -1124,7 +1171,7 @@ export function SettingsWorkspace({
                 </button>
               )}
             </div>
-          </div>
+          </GlassCard>
         </div>
       )}
     </div>

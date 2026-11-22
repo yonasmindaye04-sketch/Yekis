@@ -32,13 +32,24 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("RESOLV") || u.includes("LOW")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("BAN") || u.includes("CRITICAL") || u.includes("HIGH") || u.includes("FRAUD") || u.includes("IMPERSONAT") || u.includes("ABUSIVE")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS") || u.includes("MEDIUM") || u.includes("SPAM")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("DISMISS") || u.includes("NO_ACTION")) return "neutral";
+  return "info";
+}
 import { useOpsUi } from "../opsUiContext";
 
 const ENFORCEMENT_TEMPLATES = [
@@ -228,15 +239,14 @@ export default function ReportsQueue() {
         sub="User-to-user abuse reports, off-platform circumvention, impersonation & fraud moderation"
         right={
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="pill p-amber" style={{ fontSize: 13 }}>
-              <span className="pdot" />
+            <ShinyBadge variant="warning">
               {total.toLocaleString()}{" "}
               {status === "OPEN"
                 ? "pending moderation"
                 : status === "ALL"
                   ? "total reports"
                   : status.toLowerCase().replace(/_/g, " ")}
-            </span>
+            </ShinyBadge>
             <Button variant="outline" size="sm" onClick={() => void refreshFeatured()} disabled={busyFeatured}>
               <RefreshCw size={14} /> Refresh Featured Carousel
             </Button>
@@ -287,7 +297,7 @@ export default function ReportsQueue() {
         />
       </div>
 
-      <Card className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -343,12 +353,12 @@ export default function ReportsQueue() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={ShieldCheck}>
                 No profile reports match this filter.{" "}
                 {status !== "ALL" ? (
@@ -361,7 +371,7 @@ export default function ReportsQueue() {
                   </button>
                 ) : null}
               </Empty>
-            </Card>
+            </GlassCard>
           ) : (
             rows.map((r) => (
               <button
@@ -376,8 +386,8 @@ export default function ReportsQueue() {
                 <div className="q-sub" style={{ marginTop: 4 }}>
                   <span className="subject">{r.reason.replace(/_/g, " ")}</span>
                   <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                    <Pill s={r.severity} />
-                    <Pill s={r.status} />
+                    <ShinyBadge variant={statusToVariant(r.severity)}>{formatStatusLabel(r.severity)}</ShinyBadge>
+                    <ShinyBadge variant={statusToVariant(r.status)}>{formatStatusLabel(r.status)}</ShinyBadge>
                   </div>
                 </div>
                 <div
@@ -424,7 +434,7 @@ export default function ReportsQueue() {
         </div>
 
         {sel ? (
-          <Card className="queue-detail card">
+          <GlassCard className="queue-detail">
             <div className="qd-head">
               <div
                 style={{
@@ -437,11 +447,11 @@ export default function ReportsQueue() {
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <h3>Profile Abuse & Trust Review</h3>
-                  <Pill s={sel.reason} />
+                  <ShinyBadge variant={statusToVariant(sel.reason)}>{formatStatusLabel(sel.reason)}</ShinyBadge>
                 </div>
                 <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <Pill s={sel.severity} />
-                  <Pill s={sel.status} />
+                  <ShinyBadge variant={statusToVariant(sel.severity)}>{formatStatusLabel(sel.severity)}</ShinyBadge>
+                  <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
                 </div>
               </div>
               <div
@@ -696,9 +706,9 @@ export default function ReportsQueue() {
                 <span className="kbd">D</span> dismiss · <span className="kbd">R</span> focus note
               </div>
             </div>
-          </Card>
+          </GlassCard>
         ) : (
-          <Card className="queue-detail card">
+          <GlassCard className="queue-detail">
             <div className="empty-detail">
               <UserCheck size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a profile report to inspect details and take enforcement action.</p>
@@ -707,7 +717,7 @@ export default function ReportsQueue() {
                 navigate the queue
               </span>
             </div>
-          </Card>
+          </GlassCard>
         )}
       </div>
     </div>

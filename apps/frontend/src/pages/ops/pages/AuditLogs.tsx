@@ -9,6 +9,8 @@ import { FileText, RefreshCw, Search } from "lucide-react";
 import { dts, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { RawAuditLog } from "../opsBackend";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 import {
   Empty,
   ErrorBox,
@@ -17,10 +19,18 @@ import {
   OpsTable,
   PageHead,
   Pager,
-  Pill,
   Button,
-  Card,
 } from "../components/ui";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 export default function AuditLogs() {
   const list = useListPage<RawAuditLog>(opsListApi.auditLogs);
@@ -46,7 +56,7 @@ export default function AuditLogs() {
         <Kv k="With an amount" v={String(rows.filter((r) => r.amountMinor != null).length)} />
         <Kv k="Staff actors" v={String(rows.filter((r) => r.actorRole).length)} />
       </div>
-      <Card className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -58,7 +68,7 @@ export default function AuditLogs() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
       <OpsTable
         heads={["Event", "Entity", "Action", "Actor", "Amount", "IP", "When"]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="entries" />}
@@ -76,7 +86,7 @@ export default function AuditLogs() {
                 <div>{r.entityType}</div>
                 <div className="cell-sub mono">{r.entityId}</div>
               </td>
-              <td>{r.action ? <Pill s={r.action} /> : <span style={{ color: "var(--ops-text-3)" }}>—</span>}</td>
+              <td>{r.action ? <ShinyBadge variant={statusToVariant(r.action)}>{r.action.replace(/_/g, " ")}</ShinyBadge> : <span style={{ color: "var(--ops-text-3)" }}>—</span>}</td>
               <td style={{ fontSize: 12.5 }}>{r.actorRole ?? "—"}</td>
               <td className="amount">{r.amountMinor != null ? (r.amountMinor / 100).toLocaleString() : "—"}</td>
               <td className="mono" style={{ fontSize: 12 }}>{r.ipAddress ?? "—"}</td>

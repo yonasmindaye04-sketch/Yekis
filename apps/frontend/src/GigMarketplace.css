@@ -1455,3 +1455,32 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── GigSeller glass shell ──────────────────────────────── */
+.gig-welcome-banner {
+  background: var(--gradient-brand, linear-gradient(135deg, #16a34a 0%, #0d9488 100%));
+  border-radius: 14px;
+  padding: 20px 24px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.gig-welcome-banner__title {
+  font-family: var(--font-heading, "Hanken Grotesk", sans-serif);
+  font-size: 18px;
+  font-weight: 800;
+  margin: 0 0 2px;
+}
+.gig-welcome-banner__sub {
+  font-size: 13px;
+  opacity: 0.85;
+  margin: 0;
+}
+.gig-welcome-banner__shine {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.14) 60%, transparent 72%);
+}
+

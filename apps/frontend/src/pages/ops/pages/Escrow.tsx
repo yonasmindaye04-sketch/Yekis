@@ -34,13 +34,24 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("HOLD")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("REFUND")) return "neutral";
+  return "info";
+}
 import { useListPage } from "../opsList";
 import { ESCROW_STATES, HELD_STATES } from "../opsConst";
 import type { Escrow } from "../opsTypes";
@@ -290,7 +301,7 @@ export default function EscrowPage() {
         />
       ) : null}
 
-      <Card className="card filters" style={{ marginTop: 16 }}>
+      <GlassCard className="filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -309,12 +320,12 @@ export default function EscrowPage() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
 
       {rows.length === 0 ? (
-        <div className="card">
+        <GlassCard>
           <Empty icon={DollarSign}>No milestone escrows match.</Empty>
-        </div>
+        </GlassCard>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -333,7 +344,7 @@ export default function EscrowPage() {
                         {e.job} · {e.fl}
                       </div>
                     </div>
-                    <Pill s={e.held ? "ADMIN_HOLD" : e.state} />
+                    <ShinyBadge variant={statusToVariant(e.held ? "ADMIN_HOLD" : e.state)}>{formatStatusLabel(e.held ? "ADMIN_HOLD" : e.state)}</ShinyBadge>
                   </div>
                   <div className="qi-foot">
                     <span className="mono">{e.id}</span>
@@ -351,7 +362,7 @@ export default function EscrowPage() {
           </div>
 
           {sel ? (
-            <div className="queue-detail card">
+            <GlassCard className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -363,8 +374,8 @@ export default function EscrowPage() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <Pill s={sel.held ? "ADMIN_HOLD" : sel.state} />
-                    <span className="pill p-sky">{sel.rail}</span>
+                    <ShinyBadge variant={statusToVariant(sel.held ? "ADMIN_HOLD" : sel.state)}>{formatStatusLabel(sel.held ? "ADMIN_HOLD" : sel.state)}</ShinyBadge>
+                    <ShinyBadge variant="info">{sel.rail}</ShinyBadge>
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -589,7 +600,7 @@ export default function EscrowPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           ) : null}
         </div>
       )}

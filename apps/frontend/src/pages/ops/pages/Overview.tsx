@@ -21,10 +21,6 @@ import {
   Wallet,
   XCircle,
   ChevronRight,
-  Table2,
-  Kanban,
-  Calendar,
-  TrendingUp,
 } from "lucide-react";
 import { dts, fmt, opsApi, useApi } from "../opsApi";
 import type { OverviewBundle } from "../opsTypes";
@@ -33,6 +29,8 @@ import { Empty, ErrorBox, LoadingBox } from "../components/ui";
 import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
 import { useOpsUi } from "../opsUiContext";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { StatCard } from "../../../components/ui-v2/StatCard";
 import type { OpsPageId } from "../opsNav";
 import type {
   KanbanColumnId,
@@ -569,52 +567,38 @@ export default function Overview() {
       {/* Sub-navigation bar with Dual-Dashboard Mode Switcher */}
       <div className="sh-subnav-bar" style={{ marginBottom: 18 }}>
         <div className="sh-subnav-left">
-          <div className="sh-segmented" role="tablist" aria-label="Ops Dashboard Mode">
+          <div className="ops-seg" role="tablist">
             <button
-              type="button"
+              className={`ops-seg-btn${opsDashMode === "dashboard-1" ? " active" : ""}`}
+              onClick={() => setOpsDashMode("dashboard-1")}
               role="tab"
               aria-selected={opsDashMode === "dashboard-1"}
-              className={`sh-seg-btn ${opsDashMode === "dashboard-1" ? "active" : ""}`}
-              onClick={() => setOpsDashMode("dashboard-1")}
             >
-              <BarChart3 size={14} />
-              <span>Dashboard 1: Command & Analytics</span>
+              Executive
             </button>
             <button
-              type="button"
+              className={`ops-seg-btn${opsDashMode === "dashboard-2" ? " active" : ""}`}
+              onClick={() => setOpsDashMode("dashboard-2")}
               role="tab"
               aria-selected={opsDashMode === "dashboard-2"}
-              className={`sh-seg-btn ${opsDashMode === "dashboard-2" ? "active" : ""}`}
-              onClick={() => setOpsDashMode("dashboard-2")}
             >
-              <Table2 size={14} />
-              <span>Dashboard 2: Ledger Grid, Kanban & SLA Calendar</span>
+              Operations Ledger
             </button>
           </div>
 
           {opsDashMode === "dashboard-2" && (
-            <div className="sh-segmented" role="tablist" aria-label="Operations tool">
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("table")}
-              >
-                <Table2 size={13} /> Escrow Grid ({ledgerRecords.length})
-              </button>
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("kanban")}
-              >
-                <Kanban size={13} /> Case & Milestone Kanban ({kanbanTasks.length})
-              </button>
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("calendar")}
-              >
-                <Calendar size={13} /> SLA Schedule ({scheduleEvents.length})
-              </button>
+            <div className="ops-seg" role="tablist">
+              {(["table", "kanban", "calendar"] as const).map((t) => (
+                <button
+                  key={t}
+                  className={`ops-seg-btn${opsSubTab === t ? " active" : ""}`}
+                  onClick={() => setOpsSubTab(t)}
+                  role="tab"
+                  aria-selected={opsSubTab === t}
+                >
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -630,91 +614,68 @@ export default function Overview() {
       </div>
 
       {/* 4-Column Primary KPI Stat Cards */}
-      <div className="sh-kpi-grid" style={{ marginBottom: 16 }}>
-        <article
-          className="sh-kpi-card"
+      <div className="grid g4" style={{ gap: 16, marginBottom: 16 }}>
+        <div
           onClick={() => ui.navigate("users")}
           role="button"
           tabIndex={0}
           onKeyDown={onKpiKey}
+          style={{ cursor: "pointer" }}
         >
-          <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Registered Platform Users</span>
-            <Users size={15} className="sh-text-muted" />
-          </div>
-          <div className="sh-kpi-value sh-mono">{m.totalUsers.toLocaleString()}</div>
-          <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <TrendingUp size={12} /> +14.2%
-            </span>
-            <span className="sh-cell-meta">
-              {m.pendingIdentity} pending Fayda KYC
-            </span>
-          </div>
-        </article>
+          <StatCard
+            label="Registered Platform Users"
+            value={m.totalUsers.toLocaleString()}
+            accent="blue"
+            icon={Users}
+            delta={{ pct: 14.2, label: "vs last month" }}
+          />
+        </div>
 
-        <article
-          className="sh-kpi-card"
+        <div
           onClick={() => ui.navigate("escrow")}
           role="button"
           tabIndex={0}
           onKeyDown={onKpiKey}
+          style={{ cursor: "pointer" }}
         >
-          <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Custodial Funds in Escrow</span>
-            <DollarSign size={15} className="sh-text-muted" />
-          </div>
-          <div className="sh-kpi-value sh-mono">{fmt(m.fundsInEscrowMinor)}</div>
-          <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <TrendingUp size={12} /> +21.8%
-            </span>
-            <span className="sh-cell-meta">
-              Across {m.activeContracts} active contracts
-            </span>
-          </div>
-        </article>
+          <StatCard
+            label="Custodial Funds in Escrow"
+            value={fmt(m.fundsInEscrowMinor)}
+            accent="green"
+            icon={DollarSign}
+            delta={{ pct: 21.8, label: "vs last month" }}
+          />
+        </div>
 
-        <article
-          className="sh-kpi-card"
+        <div
           onClick={() => ui.navigate("payouts")}
           role="button"
           tabIndex={0}
           onKeyDown={onKpiKey}
+          style={{ cursor: "pointer" }}
         >
-          <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Pending Disbursement Queue</span>
-            <Wallet size={15} className="sh-text-muted" />
-          </div>
-          <div className="sh-kpi-value sh-mono">{m.pendingPayouts}</div>
-          <div className="sh-kpi-foot">
-            <span className="sh-cell-meta">
-              {m.pendingPayments} pending payments · {m.pendingTopUps} top-ups
-            </span>
-          </div>
-        </article>
+          <StatCard
+            label="Pending Disbursement Queue"
+            value={m.pendingPayouts}
+            accent="amber"
+            icon={Wallet}
+          />
+        </div>
 
-        <article
-          className="sh-kpi-card"
+        <div
           onClick={() => ui.navigate("dispute-queue")}
           role="button"
           tabIndex={0}
           onKeyDown={onKpiKey}
+          style={{ cursor: "pointer" }}
         >
-          <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Open Mediation & KYC Triage</span>
-            <Scale size={15} className="sh-text-muted" />
-          </div>
-          <div className="sh-kpi-value sh-mono">
-            {m.openDisputes + m.pendingIdentity}
-          </div>
-          <div className="sh-kpi-foot">
-            <span className="sh-cell-meta">
-              {m.openDisputes} disputes · {m.pendingIdentity} KYC ·{" "}
-              {m.openSupportTickets} tickets
-            </span>
-          </div>
-        </article>
+          <StatCard
+            label="Open Mediation & KYC Triage"
+            value={m.openDisputes + m.pendingIdentity}
+            accent="red"
+            icon={TriangleAlert}
+          />
+        </div>
       </div>
 
       {opsDashMode === "dashboard-1" ? (
@@ -740,79 +701,88 @@ export default function Overview() {
           </div>
 
           <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
-            <div className="card card-pad">
-              <div className="sec-title">
-                <BarChart3 size={16} /> {settlementTitle}{" "}
-                <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
-                  {settlementUnit}
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <BarChart3 size={16} /> {settlementTitle}{" "}
+                  <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
+                    {settlementUnit}
+                  </span>
                 </span>
               </div>
-              <AreaChart
-                labels={settlementLabels}
-                values={settlementValues}
-                color="#16a34a"
-              />
-            </div>
-            <div className="card card-pad">
-              <div className="sec-title">
-                <DollarSign size={16} /> Escrow by State ({timeRange.toUpperCase()})
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
+                <AreaChart
+                  labels={settlementLabels}
+                  values={settlementValues}
+                  color="#16a34a"
+                />
               </div>
-              {escSegs.length ? (
-                <Donut segs={escSegs} centerSub="in escrow" />
-              ) : (
-                <Empty icon={DollarSign}>No escrow rows.</Empty>
-              )}
-            </div>
+            </GlassCard>
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <DollarSign size={16} /> Escrow by State ({timeRange.toUpperCase()})
+                </span>
+              </div>
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
+                {escSegs.length ? (
+                  <Donut segs={escSegs} centerSub="in escrow" />
+                ) : (
+                  <Empty icon={DollarSign}>No escrow rows.</Empty>
+                )}
+              </div>
+            </GlassCard>
           </div>
 
           <div className="grid gc-1-1" style={{ marginBottom: 16 }}>
-            <div className="card card-pad">
-              <div className="sec-title">
-                <Wallet size={16} /> {payoutTitle}
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Wallet size={16} /> {payoutTitle}
+                </span>
               </div>
-              <BarChart
-                labels={payoutLabels}
-                series={[
-                  {
-                    name: "Payouts",
-                    color: "#16a34a",
-                    values: payoutValues,
-                  },
-                  {
-                    name: "Refunds",
-                    color: "#dc2626",
-                    values: refundValues,
-                  },
-                ]}
-              />
-              <ChartLegend
-                series={[
-                  { name: "Payouts", color: "#16a34a" },
-                  { name: "Refunds", color: "#dc2626" },
-                ]}
-              />
-            </div>
-            <div className="card card-pad">
-              <div className="sec-title">
-                <Activity size={16} /> Review Workload — Open Items per Queue
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
+                <BarChart
+                  labels={payoutLabels}
+                  series={[
+                    {
+                      name: "Payouts",
+                      color: "#16a34a",
+                      values: payoutValues,
+                    },
+                    {
+                      name: "Refunds",
+                      color: "#dc2626",
+                      values: refundValues,
+                    },
+                  ]}
+                />
+                <ChartLegend
+                  series={[
+                    { name: "Payouts", color: "#16a34a" },
+                    { name: "Refunds", color: "#dc2626" },
+                  ]}
+                />
               </div>
-              <HBars rows={wl} />
-            </div>
+            </GlassCard>
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <Activity size={16} /> Review Workload — Open Items per Queue
+                </span>
+              </div>
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
+                <HBars rows={wl} />
+              </div>
+            </GlassCard>
           </div>
 
           <div className="grid gc-2-1">
-            <div className="card card-pad">
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 14,
-                }}
-              >
-                <div className="sec-title" style={{ marginBottom: 0 }}>
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title">
                   Recent Platform Audit Stream
-                </div>
+                </span>
                 <button
                   className="btn btn-ghost btn-sm"
                   onClick={() => ui.navigate("audit")}
@@ -820,29 +790,33 @@ export default function Overview() {
                   View all
                 </button>
               </div>
-              {data.activity.map((a, i) => {
-                const [fg, Icon] = actTone(a.a);
-                return (
-                  <div className="act-row" key={`${a.a}-${i}`}>
-                    <div className="act-ic" style={{ color: fg }}>
-                      <Icon size={17} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div className="act-t">{a.a.replace(/_/g, " ")}</div>
-                      <div className="act-s">
-                        {a.e} · {dts(a.t)}
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
+                {data.activity.map((a, i) => {
+                  const [fg, Icon] = actTone(a.a);
+                  return (
+                    <div className="act-row" key={`${a.a}-${i}`}>
+                      <div className="act-ic" style={{ color: fg }}>
+                        <Icon size={17} />
                       </div>
+                      <div style={{ flex: 1 }}>
+                        <div className="act-t">{a.a.replace(/_/g, " ")}</div>
+                        <div className="act-s">
+                          {a.e} · {dts(a.t)}
+                        </div>
+                      </div>
+                      <span style={{ color: "var(--ops-text-3)" }}>
+                        <ChevronRight size={15} />
+                      </span>
                     </div>
-                    <span style={{ color: "var(--ops-text-3)" }}>
-                      <ChevronRight size={15} />
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="card card-pad">
-              <div className="sec-title">Priority Staff Queues</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  );
+                })}
+              </div>
+            </GlassCard>
+            <GlassCard noPadding className="ops-chart-panel">
+              <div className="ops-chart-panel__head">
+                <span className="ops-chart-panel__title">Priority Staff Queues</span>
+              </div>
+              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
                 {qa.map(([pg, l, n, Icon, c]) => (
                   <button
                     className="qa-btn"
@@ -861,7 +835,7 @@ export default function Overview() {
                   </button>
                 ))}
               </div>
-            </div>
+            </GlassCard>
           </div>
         </>
       ) : (

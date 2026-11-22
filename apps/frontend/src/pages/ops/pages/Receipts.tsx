@@ -31,10 +31,22 @@ import {
   OpsTable,
   PageHead,
   Pager,
-  Pill,
   Rail,
+  formatStatusLabel,
   useToast,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 export default function Receipts() {
   const toast = useToast();
@@ -140,7 +152,7 @@ export default function Receipts() {
         />
       </div>
 
-      <div className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -159,7 +171,7 @@ export default function Receipts() {
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </div>
+      </GlassCard>
 
       <OpsTable
         heads={["User", "Amount", "Rail", "Reference", "History", "Submitted", "Status", ""]}
@@ -183,7 +195,7 @@ export default function Receipts() {
                   {r.userHistory.rejectedCount ? ` · ${r.userHistory.rejectedCount} rejected` : ""}
                 </td>
                 <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>{dt(r.createdAt)}</td>
-                <td><Pill s={r.status} /></td>
+                <td><ShinyBadge variant={statusToVariant(r.status)}>{formatStatusLabel(r.status)}</ShinyBadge></td>
                 <td>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     {r.receiptImagePath ? (

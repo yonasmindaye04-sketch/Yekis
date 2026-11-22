@@ -19,9 +19,11 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { dt, fmt, opsApi } from "../opsApi";
-import { Empty, Kv, LoadingBox, PageHead, Pill, useToast, Button } from "../components/ui";
+import { Empty, Kv, LoadingBox, PageHead, useToast, Button } from "../components/ui";
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 
 type Report = {
   id: string;
@@ -263,9 +265,9 @@ export default function WithholdingReports() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="card">
+        <GlassCard>
           <Empty icon={FileText}>No withholding tax periods found.</Empty>
-        </div>
+        </GlassCard>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -282,7 +284,7 @@ export default function WithholdingReports() {
                       <div className="qi-name">Period {r.periodMonth}</div>
                       <div className="qi-sub">{r.transactionCount} freelancer disbursements</div>
                     </div>
-                    <Pill s={r.filedAt ? "CONFIRMED" : "PENDING"} />
+                    <ShinyBadge variant={r.filedAt ? "success" : "warning"}>{r.filedAt ? "Confirmed" : "Pending"}</ShinyBadge>
                   </div>
                   <div className="qi-foot">
                     <span className="mono" style={{ fontWeight: 700 }}>
@@ -297,7 +299,7 @@ export default function WithholdingReports() {
           </div>
 
           {sel ? (
-            <div className="queue-detail card">
+            <GlassCard className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -309,10 +311,10 @@ export default function WithholdingReports() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span className="pill p-blue">ERCA Form WHT-03</span>
-                    <Pill s={sel.filedAt ? "CONFIRMED" : "PENDING"} />
+                    <ShinyBadge variant="info">ERCA Form WHT-03</ShinyBadge>
+                    <ShinyBadge variant={sel.filedAt ? "success" : "warning"}>{sel.filedAt ? "Confirmed" : "Pending"}</ShinyBadge>
                     {certsIssued[sel.id] || sel.filedAt ? (
-                      <span className="pill p-green">Certificates Issued</span>
+                      <ShinyBadge variant="success">Certificates Issued</ShinyBadge>
                     ) : null}
                   </div>
                   <h3
@@ -413,7 +415,7 @@ export default function WithholdingReports() {
                           </td>
                           <td className="mono">{item.tin}</td>
                           <td>
-                            <span className="pill p-green">{item.rate}</span>
+                            <ShinyBadge variant="success">{item.rate}</ShinyBadge>
                           </td>
                           <td className="amount">{fmt(item.grossMinor)}</td>
                           <td className="amount">{fmt(item.whtMinor)}</td>
@@ -515,7 +517,7 @@ export default function WithholdingReports() {
                   </button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           ) : null}
         </div>
       )}

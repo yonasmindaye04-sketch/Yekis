@@ -34,9 +34,21 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   useToast,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 /**
  * SLA is computed server-side (see modules/sla/sla.service.ts) and attached to
@@ -259,7 +271,7 @@ export default function SupportDesk() {
         />
       </div>
 
-      <div className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -292,14 +304,14 @@ export default function SupportDesk() {
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </div>
+      </GlassCard>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <div className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={MessageSquare}>No conversations in this queue.</Empty>
-            </div>
+            </GlassCard>
           ) : (
             rows.map((c) => {
               const last = c.messages[0];
@@ -311,7 +323,7 @@ export default function SupportDesk() {
                 >
                   <div className="q-head">
                     <strong>{c.subject}</strong>
-                    <Pill s={c.status} />
+                    <ShinyBadge variant={statusToVariant(c.status)}>{formatStatusLabel(c.status)}</ShinyBadge>
                   </div>
                   <div className="q-sub">
                     <span className="subject">{c.creator.email}</span>
@@ -346,7 +358,7 @@ export default function SupportDesk() {
         </div>
 
         {active ? (
-          <div className="queue-detail card chat-panel">
+          <GlassCard className="queue-detail chat-panel">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                 <div>
@@ -472,13 +484,13 @@ export default function SupportDesk() {
                 ) : null}
               </div>
             </div>
-          </div>
+          </GlassCard>
         ) : (
-          <div className="queue-detail card chat-panel">
+          <GlassCard className="queue-detail chat-panel">
             <div className="empty-detail">
               <Empty icon={MessageSquare}>Select a conversation to read and reply.</Empty>
             </div>
-          </div>
+          </GlassCard>
         )}
       </div>
     </div>

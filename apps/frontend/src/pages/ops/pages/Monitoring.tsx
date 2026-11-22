@@ -7,6 +7,8 @@ import { Activity, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { dts, fmt, opsApi, useApi } from "../opsApi";
 import type { HealthState } from "../opsTypes";
 import { Banner, ErrorBox, LoadingBox, PageHead } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 
 export default function Monitoring() {
   const { data, error, loading, reload } = useApi<HealthState>(opsApi.health);
@@ -23,13 +25,21 @@ export default function Monitoring() {
       />
       <div className="grid g5" style={{ marginBottom: 16 }}>
         {Object.entries(data.checks).map(([n, c]) => (
-          <div className={`card health-card ${c.ok ? "h-ok" : "h-bad"}`} key={n}>
+          <GlassCard className={`health-card ${c.ok ? "h-ok" : "h-bad"}`} key={n}>
             <div className="h-name">{n.replace(/_/g, " ")}</div>
             <div className="h-state">
-              {c.ok ? <CheckCircle2 size={16} /> : <XCircle size={16} />} {c.ok ? "Healthy" : "Degraded"}
+              {c.ok ? (
+                <ShinyBadge variant="success">
+                  <CheckCircle2 size={13} style={{ display: "inline", verticalAlign: -1, marginRight: 4 }} /> Healthy
+                </ShinyBadge>
+              ) : (
+                <ShinyBadge variant="error">
+                  <XCircle size={13} style={{ display: "inline", verticalAlign: -1, marginRight: 4 }} /> Degraded
+                </ShinyBadge>
+              )}
             </div>
             <div className="h-detail">{c.d || ""}</div>
-          </div>
+          </GlassCard>
         ))}
       </div>
       {data.ledger.bal ? (
