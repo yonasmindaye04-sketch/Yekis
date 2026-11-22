@@ -1095,6 +1095,58 @@ deliverable for the first time. The sender is still a personal address, so
 the next improvement is a `yekis.*` domain verified in Brevo for SPF/DKIM —
 a configuration change, not a code change.
 
+### The Google link flow — 2026-11-22
+
+The founder asked why a member whose account already existed could not keep
+signing in with the Google button. The live instance answered
+`409 ACCOUNT_LINK_REQUIRED` — *"Sign in with your password first, then link
+this provider from your account settings"* — **and the place that message
+pointed to did not exist**: no endpoint could link Google, and no screen could
+link it from. The refusal itself was correct; the exit it offered was missing.
+
+The work is in `5bc6bf6` (the link flow) and `2cfe5f0` (a one-line fix so a
+Google button that cannot load says so instead of doing nothing). **No
+environment variable changed**: the host still carries **55** variables, and
+the Google client id and the Brevo key are the ones set on 2026-11-20.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-22T17:43:44Z`, serving
+  `/assets/index-CEmbHoGT.js`, with **55** environment variables. The final
+  build (`2cfe5f0`, the one-line fallback fix) came back **LIVE** at
+  `2026-11-22T18:18:18Z`, serving `/assets/index-BcSyJWS5.js`, again with
+  **55** environment variables.
+- `GET /api/v1/auth/identities` answers **`401`** without a session and
+  **`200`** with one. Before the deploy it was a **`404`** — the route did not
+  exist, which is the same fact the 409 message was hiding.
+- `POST /api/v1/auth/oauth/google/link` answers **`401`** without a session
+  and **`403 {"error":"STEP_UP_REQUIRED"}`** for a session opened with a
+  provider credential. Linking changes how a member gets in, so it needs a
+  fresh **strong** session.
+- The served bundle carries the new screen: it contains **"Linked Accounts"**,
+  **"Google is linked"** and both new endpoint paths
+  (`/api/v1/auth/identities`, `/api/v1/auth/oauth/google/link`).
+- The production CSP now reads
+  `frame-src https://appleid.cdn-apple.com https://accounts.google.com`.
+  Google's own button is an **iframe**, and the old policy named only Apple's
+  CDN — so the browser refused the frame and the button silently did nothing.
+  `script-src` and `connect-src` already allowed `*.google.com`; only the
+  frame directive was missing.
+- `GET /api/v1/auth/oauth/providers` still answers
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+
+**What this means for the instance:** a member whose account owns a password
+can now use the Google button — sign in with the password, open **Settings →
+Security → Linked Accounts**, press the Google button there, and the Google
+button on the sign-in card works from then on. The provider credential must be
+the one whose address matches the account, the session must be fresh, and the
+**no-auto-merge rule is unchanged**: a Google sign-in that merely matches the
+address of a password account is still refused. The decisions are in
+`docs/DECISIONS.md` (2026-11-22) and the evidence is in
+`docs/auth/PHASE0_AUTH_AUDIT.md` Appendix A (E-20, E-21).
+
 ### Teardown
 
 ```bash
