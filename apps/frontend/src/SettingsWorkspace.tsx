@@ -879,7 +879,14 @@ export function SettingsWorkspace({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => undefined}
+                      onClick={() =>
+                        // A click reaches this button only when Google's own
+                        // button (an iframe) is absent or was refused by the
+                        // browser. Say so, rather than doing nothing at all.
+                        setCredentialError(
+                          "Google sign-in could not load in this browser. Check that accounts.google.com is reachable, then try again.",
+                        )
+                      }
                       disabled={googleBusy}
                       aria-label="Link Google account"
                       title="Link Google"
