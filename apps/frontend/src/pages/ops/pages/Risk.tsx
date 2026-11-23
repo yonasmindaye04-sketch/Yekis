@@ -28,9 +28,21 @@ import {
   OpsTable,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   useToast,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("LOW")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("CRITICAL") || u.includes("HIGH") || u.includes("FRAUD")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("DISMISSED")) return "neutral";
+  return "info";
+}
 
 export default function Risk() {
   const toast = useToast();
@@ -161,7 +173,7 @@ export default function Risk() {
         />
       ) : null}
 
-      <div className="card filters" style={{ marginTop: 16 }}>
+      <GlassCard className="filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -175,7 +187,7 @@ export default function Risk() {
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </div>
+      </GlassCard>
 
       <OpsTable
         heads={["Rule", "Risk", "Status", "User", "KYC", "Wallet", "Detected", ""]}
@@ -193,8 +205,8 @@ export default function Risk() {
                     <div className="cell-main">{f.type.replace(/_/g, " ")}</div>
                     <div className="cell-sub mono">{f.id}</div>
                   </td>
-                  <td><Pill s={lv} /></td>
-                  <td><Pill s={f.status} /></td>
+                  <td><ShinyBadge variant={statusToVariant(lv)}>{lv}</ShinyBadge></td>
+                  <td><ShinyBadge variant={statusToVariant(f.status)}>{formatStatusLabel(f.status)}</ShinyBadge></td>
                   <td>
                     <div className="cell-main" style={{ fontWeight: 600 }}>{f.user.email}</div>
                     <div className="cell-sub mono">{f.user.ucid}</div>
@@ -217,7 +229,7 @@ export default function Risk() {
                 {openId === f.id ? (
                   <tr className="expand-row">
                     <td colSpan={8}>
-                      <div className="card card-pad" style={{ margin: 0 }}>
+                      <GlassCard className="card-pad" style={{ margin: 0 }}>
                         <div className="sec-title">Rule detail</div>
                         <div className="kv" style={{ marginTop: 10 }}>
                           <div className="kv-k">Trigger payload</div>
@@ -242,7 +254,7 @@ export default function Risk() {
                             <Unlock size={13} /> Lift hold
                           </button>
                         </div>
-                      </div>
+                      </GlassCard>
                     </td>
                   </tr>
                 ) : null}

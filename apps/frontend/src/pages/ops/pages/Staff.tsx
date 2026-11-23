@@ -10,7 +10,19 @@ import { Check, RefreshCw, Shield, UserX, UserCheck } from "lucide-react";
 import { opsApi, opsListApi, useApi } from "../opsApi";
 import type { StaffMember, StaffRole } from "../opsTypes";
 import { useListPage } from "../opsList";
-import { ErrorBox, LoadingBox, OpsTable, PageHead, Pager, Pill, useToast } from "../components/ui";
+import { ErrorBox, LoadingBox, OpsTable, PageHead, Pager, useToast } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 const ROLE_LABELS: Record<StaffRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -81,7 +93,7 @@ export default function StaffPage() {
           <tr key={s.id}>
             <td className="cell-main" style={{ fontWeight: 600 }}>{s.email}</td>
             <td className="mono" style={{ fontSize: 12, color: "var(--ops-text-2)" }}>{s.ucid}</td>
-            <td><Pill s={s.userRole} /></td>
+            <td><ShinyBadge variant={statusToVariant(s.userRole)}>{s.userRole.replace(/_/g, " ")}</ShinyBadge></td>
             <td>
               {editId === s.id ? (
                 <select
@@ -96,12 +108,12 @@ export default function StaffPage() {
                   ))}
                 </select>
               ) : s.staffRole ? (
-                <Pill s={s.staffRole} />
+                <ShinyBadge variant={statusToVariant(s.staffRole)}>{ROLE_LABELS[s.staffRole] ?? s.staffRole.replace(/_/g, " ")}</ShinyBadge>
               ) : (
                 <span style={{ color: "var(--ops-text-3)" }}>—</span>
               )}
             </td>
-            <td>{s.suspended ? <Pill s="SUSPENDED" /> : <Pill s="ACTIVE" />}</td>
+            <td>{s.suspended ? <ShinyBadge variant="error">Suspended</ShinyBadge> : <ShinyBadge variant="success">Active</ShinyBadge>}</td>
             <td>
               {editId === s.id ? (
                 <span style={{ display: "flex", gap: 6 }}>
@@ -119,7 +131,7 @@ export default function StaffPage() {
         ))}
       </OpsTable>
 
-      <div className="card card-pad" style={{ marginTop: 24 }}>
+      <GlassCard className="card-pad" style={{ marginTop: 24 }}>
         <div className="sec-title"><Shield size={17} /> Permission Matrix</div>
         {!matrix.data ? (
           <div className="empty">
@@ -157,7 +169,7 @@ export default function StaffPage() {
             </div>
           </>
         )}
-      </div>
+      </GlassCard>
     </div>
   );
 }

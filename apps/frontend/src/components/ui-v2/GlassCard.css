@@ -1,0 +1,51 @@
+/* GlassCard — floating elevated surface, no hard border boxing */
+.gc {
+  position: relative;
+  background: var(--color-bg-elevated);
+  /* Nearly-invisible edge definition — not a box, just a boundary */
+  border: 1px solid var(--border-glass-light, rgba(0,0,0,0.07));
+  border-radius: 14px;
+  /* Shadow provides depth — no border needed for separation */
+  box-shadow: var(--shadow-card-light);
+  overflow: hidden;
+  padding: 20px;
+  transition: box-shadow 180ms ease, transform 180ms ease;
+}
+/* Specular top-bevel: the "shiny" signature from Watermelon UI */
+.gc::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0) 32%);
+  pointer-events: none;
+  z-index: 0;
+}
+.gc > * { position: relative; z-index: 1; }
+.gc:hover { transform: translateY(-1px); }
+.gc--no-pad { padding: 0; }
+
+/* Accent top-bar variants */
+.gc::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: 14px 14px 0 0;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+.gc--accent-green::after  { background: var(--gradient-accent-green);  opacity: 1; }
+.gc--accent-blue::after   { background: var(--gradient-accent-blue);   opacity: 1; }
+.gc--accent-amber::after  { background: var(--gradient-accent-amber);  opacity: 1; }
+.gc--accent-red::after    { background: var(--gradient-accent-red);    opacity: 1; }
+.gc--accent-teal::after   { background: var(--gradient-accent-teal);   opacity: 1; }
+
+/* Dark theme */
+:root[data-theme="dark"] .gc {
+  border-color: var(--border-glass-dark, rgba(255,255,255,0.08));
+  box-shadow: var(--shadow-card-dark);
+}
+:root[data-theme="dark"] .gc::before {
+  background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 32%);
+}

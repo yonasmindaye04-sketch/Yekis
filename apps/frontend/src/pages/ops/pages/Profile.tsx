@@ -24,6 +24,8 @@ import { api } from "../../../api/client";
 import type { SelfProfile, UpdateProfilePayload } from "../../../api/client";
 import { useOpsUi } from "../opsUiContext";
 import { Banner, ErrorBox, Kv, LoadingBox, PageHead, SecTitle } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 
@@ -200,7 +202,7 @@ export default function ProfilePage() {
 
       <div className="grid g2" style={{ alignItems: "start" }}>
         {/* ── identity summary ── */}
-        <div className="card card-pad">
+        <GlassCard className="card-pad">
           <SecTitle icon={UserRound}>Account</SecTitle>
           <div className="prof-id">
             <div className="avatar-lg" aria-hidden>
@@ -214,10 +216,9 @@ export default function ProfilePage() {
               </div>
               <div className="prof-mail">{account?.email}</div>
               <div style={{ marginTop: 6 }}>
-                <span className="pill p-violet">
-                  <span className="pdot" />
+                <ShinyBadge variant="info">
                   {account?.roleLabel ?? "Staff"}
-                </span>
+                </ShinyBadge>
               </div>
             </div>
           </div>
@@ -235,10 +236,10 @@ export default function ProfilePage() {
               ? "Your profile is complete."
               : "Add a name and bio to reach 100% — clients filter on this."}
           </p>
-        </div>
+        </GlassCard>
 
         {/* ── the form ── */}
-        <div className="card card-pad">
+        <GlassCard className="card-pad">
           <SecTitle icon={BadgeCheck}>Public details</SecTitle>
 
           {fieldError ? (
@@ -357,7 +358,7 @@ export default function ProfilePage() {
               <Save size={14} /> {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
-        </div>
+        </GlassCard>
       </div>
     </div>
   );

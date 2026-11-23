@@ -30,14 +30,25 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
   SlaBadge,
+  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("RESOLV")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("ARBITRAT")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS") || u.includes("MEDIAT") || u.includes("NEGOTIAT")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 import { TbFileAlert } from "react-icons/tb";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
@@ -171,10 +182,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         title="Dispute Mediation Queue"
         sub="Stage 3 mediation — review scope, evidence and settle escrow outcomes"
         right={
-          <span className="pill p-violet" style={{ fontSize: 13 }}>
-            <span className="pdot" />
+          <ShinyBadge variant="warning">
             {rows.filter((d) => d.stage === "STAGE_3_MEDIATION").length} awaiting mediation
-          </span>
+          </ShinyBadge>
         }
       />
       <div className="grid g4" style={{ marginBottom: 12 }}>
@@ -225,7 +235,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         <Banner tone="b-red" icon={Clock} strong="SLA breach detected." rest="At least one dispute exceeded its mediation deadline — resolve it first." />
       ) : null}
 
-      <Card className="card filters" style={{ marginBottom: 14 }}>
+      <GlassCard className="filters" style={{ marginBottom: 14 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -245,14 +255,14 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
           label="Dispute stage"
         />
         <Button variant="outline" onClick={reload}>Refresh</Button>
-      </Card>
+      </GlassCard>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {visibleRows.length === 0 ? (
-            <Card className="card" style={{ padding: "36px 16px", textAlign: "center" }}>
+            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={Scale}>No active disputes in this view.</Empty>
-            </Card>
+            </GlassCard>
           ) : (
             visibleRows.map((d) => (
               <button
@@ -266,7 +276,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 </div>
                 <div className="q-sub">
                   <span className="subject">{d.job}</span>
-                  <Pill s={d.stage} />
+                  <ShinyBadge variant={statusToVariant(d.stage)}>{formatStatusLabel(d.stage)}</ShinyBadge>
                 </div>
                 <div style={{ marginTop: 7 }}>
                   <SlaBadge h={d.slaH} sla={d.sla} />
@@ -278,7 +288,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         </div>
 
         {sel ? (
-          <div className="queue-detail card">
+          <GlassCard className="queue-detail">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>{sel.job}</h3>
@@ -286,7 +296,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
               </div>
               <div className="qd-meta">
                 Dispute category: <b style={{ color: "var(--ops-text)" }}>{sel.cat.replace(/_/g, " ")}</b> ·{" "}
-                <Pill s={sel.stage} /> · opened {dt(sel.created)}
+                <ShinyBadge variant={statusToVariant(sel.stage)}>{formatStatusLabel(sel.stage)}</ShinyBadge> · opened {dt(sel.created)}
               </div>
             </div>
             <div className="qd-body">
@@ -468,9 +478,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 </button>
               </div>
             </div>
-          </div>
+          </GlassCard>
         ) : (
-          <div className="queue-detail card">
+          <GlassCard className="queue-detail">
             <div className="empty-detail">
               <Scale size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a dispute to mediate.</p>
@@ -478,7 +488,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate
               </span>
             </div>
-          </div>
+          </GlassCard>
         )}
       </div>
     </div>

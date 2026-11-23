@@ -9,6 +9,7 @@
 import {
   useState,
   useEffect,
+  useLayoutEffect,
   useRef,
   useMemo,
 } from "react";
@@ -602,8 +603,8 @@ const ESCROW_STEPS = [
         d: ".5s",
       },
       {
-        bold: "Deposit · Visa •• 4021",
-        small: "$2,400.00 reserved for milestone 2 of 4",
+        bold: "Deposit · Telebirr 0911 ••• 421",
+        small: "ETB 96,000 reserved for milestone 2 of 4",
         d: ".6s",
       },
       {
@@ -625,7 +626,7 @@ const ESCROW_STEPS = [
     rows: [
       {
         bold: "3 deliverables uploaded",
-        small: "homepage-v2.fig · copy-deck.pdf · launch-notes.md",
+        small: "addis-cafe-menu.fig · launch-poster.pdf · amharic-copy.docx",
         d: ".5s",
       },
       {
@@ -651,13 +652,13 @@ const ESCROW_STEPS = [
     i3: "#128a4d",
     rows: [
       {
-        bold: "$2,400.00 released to @dana",
-        small: "One tap — funds leave escrow instantly",
+        bold: "ETB 96,000 released to Selam T.",
+        small: "One tap — paid straight to her Telebirr wallet",
         d: ".5s",
       },
       {
         bold: "Receipt issued automatically",
-        small: "Payout record saved to both sides",
+        small: "Telebirr receipt saved for both sides",
         d: ".6s",
       },
       {
@@ -678,7 +679,7 @@ const ESCROW_STEPS = [
     i3: "#b4690e",
     rows: [
       {
-        bold: "Support mediates with evidence",
+        bold: "Yekis mediates with evidence",
         small: "Brief, versions and messages auto-collected",
         d: ".5s",
       },
@@ -699,6 +700,7 @@ const ESCROW_STEPS = [
 function EscrowSection() {
   const { t } = useI18n();
   const stageRef = useRef<HTMLElement>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
   const wordRefs = useRef<(HTMLElement | null)[]>([]);
   const panelRefs = useRef<(HTMLElement | null)[]>([]);
   const ghostRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -708,6 +710,40 @@ function EscrowSection() {
   const isCard =
     typeof window !== "undefined" &&
     new URLSearchParams(window.location.search).has("card");
+
+  /* Shrink each step word just enough to fit the column, so "Approve",
+     "Protected" and their translations are never clipped by .mask. */
+  useLayoutEffect(() => {
+    const left = leftRef.current;
+    if (!left) return;
+
+    let alive = true;
+
+    const fitWords = () => {
+      if (!alive) return;
+      left.querySelectorAll<HTMLElement>(".word").forEach((word) => {
+        const mask = word.querySelector<HTMLElement>(".mask");
+        const inner = word.querySelector<HTMLElement>(".mask-in");
+        if (!mask || !inner) return;
+        word.style.setProperty("--word-fit", "1");
+        const available = mask.clientWidth;
+        const natural = inner.scrollWidth;
+        if (!available || !natural) return;
+        const fit = natural > available ? (available / natural) * 0.98 : 1;
+        word.style.setProperty("--word-fit", fit.toFixed(4));
+      });
+    };
+
+    fitWords();
+    const observer = new ResizeObserver(fitWords);
+    observer.observe(left);
+    document.fonts?.ready.then(fitWords).catch(() => {});
+
+    return () => {
+      alive = false;
+      observer.disconnect();
+    };
+  }, [t]);
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -817,7 +853,7 @@ function EscrowSection() {
 
           <div className="cols">
             {/* LEFT : bold topic */}
-            <div className="col-left">
+            <div className="col-left" ref={leftRef}>
               {ESCROW_STEPS.map((s, i) => (
                 <div
                   key={`ghost-${s.n}`}

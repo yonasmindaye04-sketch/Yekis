@@ -1,0 +1,163 @@
+/* ==========================================================================
+   SettingsWorkspace.css — section navigation
+   The section switcher borrows the landing-page header treatment: quiet
+   labels that grow a short accent underline when hovered, focused or active.
+   ========================================================================== */
+
+.settings-workspace-root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* ── Section breadcrumb ─────────────────────────────────────────────────── */
+.settings-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 -4px;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.settings-crumbs svg {
+  flex-shrink: 0;
+  opacity: 0.55;
+}
+
+.settings-crumbs-current {
+  overflow: hidden;
+  color: var(--color-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Section tab bar ────────────────────────────────────────────────────── */
+.gc.settings-nav-card {
+  padding: 0;
+}
+
+.settings-tabbar {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 2px;
+  padding: 6px 10px 0;
+}
+
+.settings-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 10px 13px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.settings-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-tab svg {
+  flex-shrink: 0;
+}
+
+/* The indicator itself: a short underline centred under the label, exactly
+   like the marketing header links, so the two surfaces read as one system. */
+.settings-tab::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 220ms ease;
+}
+
+.settings-tab:hover {
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+
+.settings-tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  color: var(--color-text);
+}
+
+.settings-tab.is-active {
+  color: var(--color-text);
+}
+
+.settings-tab.is-active svg {
+  color: var(--color-primary);
+}
+
+.settings-tab:hover::after,
+.settings-tab:focus-visible::after,
+.settings-tab.is-active::after {
+  transform: scaleX(1);
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  .settings-tabbar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-tabbar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-tab {
+    min-height: 42px;
+    padding: 9px 8px 12px;
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-tabbar {
+    grid-template-columns: 1fr;
+    padding: 4px 6px 0;
+  }
+
+  .settings-tab {
+    justify-content: flex-start;
+    padding-left: 12px;
+    border-radius: 8px;
+  }
+
+  .settings-tab::after {
+    left: 12px;
+    right: auto;
+    width: 44px;
+    transform-origin: left;
+  }
+}

@@ -25,6 +25,9 @@
   --ops-radius:10px;
   --ops-sidebar-w:248px; --ops-header-h:64px;
   --ops-spring:cubic-bezier(.34,1.56,.64,1);
+  --ops-shadow-card: 0 1px 3px rgba(15,23,42,0.06),0 4px 16px rgba(15,23,42,0.05),inset 0 1px 0 rgba(255,255,255,0.90);
+  --ops-border-row: rgba(0,0,0,0.05);
+  --ops-border-glass: rgba(0,0,0,0.07);
 
   font-family:'Inter',system-ui,-apple-system,sans-serif;
   background:var(--ops-bg);color:var(--ops-text);
@@ -38,22 +41,27 @@
   --ops-blue:#60a5fa; --ops-violet:#a78bfa; --ops-sky:#38bdf8;
   --ops-head-bg:#0f1013; --ops-row-hover:#18181b; --ops-input:#151518; --ops-kv:#151518;
   --ops-shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
+  --ops-shadow-card: 0 1px 2px rgba(0,0,0,0.40),0 4px 20px rgba(0,0,0,0.35),inset 0 1px 0 rgba(255,255,255,0.07);
+  --ops-border-row: rgba(255,255,255,0.05);
+  --ops-border-glass: rgba(255,255,255,0.08);
 }
 .ops-root *,.ops-root *::before,.ops-root *::after{box-sizing:border-box}
+.ops-root{background-image:var(--mesh-green),var(--mesh-teal)}
 .ops-root .mono{font-family:'JetBrains Mono',monospace}
 .ops-root button{font-family:inherit;cursor:pointer}
 .ops-root input,.ops-root select,.ops-root textarea{font-family:inherit;font-size:13px;color:var(--ops-text)}
 
 /* ── shell layout ── */
 .ops-root .app{display:flex;min-height:100vh}
-.ops-root .sidebar{width:var(--ops-sidebar-w);background:var(--ops-panel);border-right:1px solid var(--ops-border);position:fixed;top:0;bottom:0;left:0;display:flex;flex-direction:column;z-index:60;transition:transform .25s ease}
+.ops-root .sidebar{width:var(--ops-sidebar-w);background:color-mix(in srgb,var(--ops-panel) 85%,transparent);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);border-right:none;box-shadow:1px 0 0 var(--ops-border-glass),inset 0 1px 0 rgba(255,255,255,0.08);position:fixed;top:0;bottom:0;left:0;display:flex;flex-direction:column;z-index:60;transition:transform .25s ease}
 .ops-root .main{flex:1;margin-left:var(--ops-sidebar-w);display:flex;flex-direction:column;min-width:0}
-.ops-root .header{height:var(--ops-header-h);background:color-mix(in srgb,var(--ops-panel) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--ops-border);display:flex;align-items:center;gap:12px;padding:0 24px;position:sticky;top:0;z-index:50}
+.ops-root .header{height:56px;background:color-mix(in srgb,var(--ops-panel) 85%,transparent);backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);border-bottom:none;box-shadow:0 1px 0 var(--ops-border-glass);display:flex;align-items:center;gap:12px;padding:0 24px;position:sticky;top:0;z-index:50}
 .ops-root .content{padding:28px;max-width:1440px;width:100%}
 
 /* Local shadcn-style primitives. They are intentionally framework-agnostic so
    existing admin pages can adopt them incrementally without a route rewrite. */
-.ops-root .ui-card{background:var(--ops-panel);border:1px solid var(--ops-border);border-radius:var(--ops-radius);box-shadow:var(--ops-shadow)}
+.ops-root .ui-card{position:relative;background:var(--ops-panel);border:1px solid var(--ops-border-glass);border-radius:12px;box-shadow:var(--ops-shadow-card);overflow:hidden}
+.ops-root .ui-card::before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,0.12) 0%,rgba(255,255,255,0) 30%);pointer-events:none}
 .ops-root .ui-card-header{display:flex;flex-direction:column;gap:6px;padding:20px 20px 0}
 .ops-root .ui-card-title{margin:0;font-size:15px;font-weight:700;letter-spacing:-.01em}
 .ops-root .ui-card-content{padding:20px}
@@ -71,7 +79,7 @@
 .ops-root .ui-button:focus-visible{outline:2px solid var(--ops-primary);outline-offset:2px}
 .ops-root .ui-button:disabled{opacity:.5;cursor:not-allowed}
 
-.ops-root .brand{display:flex;align-items:center;gap:10px;padding:0 20px;height:var(--ops-header-h);border-bottom:1px solid var(--ops-border);flex-shrink:0}
+.ops-root .brand{display:flex;align-items:center;gap:10px;padding:0 20px;height:56px;border-bottom:1px solid var(--ops-border-glass);flex-shrink:0}
 /* The Yekis Jobs mark ships as an opaque near-white 800×800 tile, so it is
    framed with the surface border to read as a logo tile in both themes
    rather than a white blob on the dark panel. */
@@ -87,10 +95,11 @@
 .ops-root .nav-item{display:flex;align-items:center;gap:10px;width:100%;padding:9px 10px;border:none;background:transparent;border-radius:9px;color:var(--ops-text-2);font-size:13px;font-weight:500;text-align:left;transition:all .15s}
 .ops-root .nav-item svg{flex-shrink:0;opacity:.75}
 .ops-root .nav-item:hover{background:var(--ops-row-hover);color:var(--ops-text)}
-.ops-root .nav-item.active{background:var(--ops-primary-soft);color:var(--ops-primary);font-weight:700}
+.ops-root .nav-item.active{background:rgba(22,163,74,0.08);color:var(--ops-primary);font-weight:700;box-shadow:inset 3px 0 0 var(--ops-primary);border-radius:0 8px 8px 0}
+:root[data-theme="dark"] .ops-root .nav-item.active{background:rgba(34,197,94,0.10)}
 .ops-root .nav-item.active svg{opacity:1}
 .ops-root .nav-badge{margin-left:auto;font-size:12px;font-weight:800;color:var(--ops-amber)}
-.ops-root .sidebar-foot{border-top:1px solid var(--ops-border);padding:10px 12px;overflow:hidden}
+.ops-root .sidebar-foot{border-top:1px solid var(--ops-border-glass);padding:10px 12px;overflow:hidden}
 .ops-root .user-chip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;border-radius:10px;transition:background .15s;width:100%;max-width:100%;overflow:hidden}
 .ops-root .user-chip:hover{background:var(--ops-row-hover)}
 /* The chip is now a container for two controls, so the hover/focus affordance
@@ -146,7 +155,8 @@
 .ops-root .action-bar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:12px}
 .ops-root .action-bar .btn{height:38px;padding:0 15px;font-size:13px;font-weight:700;border-radius:9px}
 
-.ops-root .card{--card-spacing:0px;background:var(--ops-panel);border:1px solid var(--ops-border);border-radius:var(--ops-radius);box-shadow:var(--ops-shadow)}
+.ops-root .card{--card-spacing:0px;position:relative;background:var(--ops-panel);border:1px solid var(--ops-border-glass);border-radius:12px;box-shadow:var(--ops-shadow-card);overflow:hidden}
+.ops-root .card::before{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(255,255,255,0.12) 0%,rgba(255,255,255,0) 30%);pointer-events:none;z-index:0}
 .ops-root .grid{display:grid;gap:10px}
 .ops-root .g4{grid-template-columns:repeat(4,minmax(0,1fr))}.ops-root .g3{grid-template-columns:repeat(3,minmax(0,1fr))}
 .ops-root .g2,.ops-root .g21{grid-template-columns:repeat(2,minmax(0,1fr))}.ops-root .g6{grid-template-columns:repeat(6,minmax(0,1fr))}
@@ -578,6 +588,13 @@
 .ops-root .ops-view-btn{display:inline-flex;align-items:center;gap:5px;min-height:36px;padding:5px 10px;border:none;border-radius:6px;background:transparent;color:var(--ops-text-2);font-size:12px;font-weight:700;cursor:pointer}
 .ops-root .ops-view-btn.active{background:var(--ops-primary-soft);color:var(--ops-primary)}
 
+/* ── Segmented control (tab switcher replacement) ── */
+.ops-seg{display:inline-flex;border:1px solid var(--ops-border-glass);border-radius:10px;padding:3px;gap:2px;background:var(--ops-bg)}
+.ops-seg-btn{flex:1;min-width:0;height:30px;padding:0 14px;border-radius:8px;border:none;background:transparent;font-size:12.5px;font-weight:600;color:var(--ops-text-2);cursor:pointer;transition:background .15s,color .15s,box-shadow .15s;white-space:nowrap}
+.ops-seg-btn.active{background:var(--ops-panel);color:var(--ops-text);box-shadow:0 1px 4px rgba(0,0,0,0.12)}
+:root[data-theme="dark"] .ops-seg-btn.active{box-shadow:0 1px 4px rgba(0,0,0,0.5)}
+.ops-seg-btn:not(.active):hover{background:var(--ops-row-hover);color:var(--ops-text)}
+
 /* ── responsive ── */
 @media(min-width:1441px){
   .ops-root .content{max-width:1600px;margin:0 auto;width:100%}
@@ -633,4 +650,10 @@
 @media(prefers-reduced-motion:reduce){
   .ops-root .draw,.ops-root .fadeA,.ops-root .bar,.ops-root .donut,.ops-root .hb-fill,.ops-root .fade,.ops-root .pal-overlay,.ops-root .toast{animation:none!important;opacity:1;stroke-dashoffset:0;transform:none}
 }
+
+/* ── Chart Panels ── */
+.ops-chart-panel__head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;gap:12px}
+.ops-chart-panel__title{font-size:13px;font-weight:700;color:var(--ops-text)}
+.ops-chart-panel__body{padding:8px 0 4px}
+
 

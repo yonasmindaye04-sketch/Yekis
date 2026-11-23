@@ -29,14 +29,22 @@ import {
   OpsTable,
   PageHead,
   Pager,
-  Pill,
+  formatStatusLabel,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 
-const roleColor = (r: string) =>
-  r === "CLIENT" ? "#15803d" : r === "FREELANCER" ? "#2563eb" : "#7c3aed";
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 
 export default function UsersPage() {
   const toast = useToast();
@@ -161,7 +169,7 @@ export default function UsersPage() {
         <button className="back-link" onClick={closeDetail}>
           <ChevronLeft size={15} /> Back to users
         </button>
-        <Card className="card card-pad">
+        <GlassCard className="card-pad">
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
             <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
               <div className="avatar" style={{ width: 52, height: 52, fontSize: 16 }}>
@@ -174,14 +182,14 @@ export default function UsersPage() {
               </div>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <span className="pill" style={{ color: roleColor(detail.role), fontSize: 13 }}><span className="pdot" />{detail.role}</span>
-              {detail.suspended ? <Pill s="SUSPENDED" /> : null}
+              <ShinyBadge variant="info">{detail.role}</ShinyBadge>
+              {detail.suspended ? <ShinyBadge variant="error">Suspended</ShinyBadge> : null}
             </div>
           </div>
 
           <div className="grid g4" style={{ marginTop: 20 }}>
             <div className="kv"><div className="kv-k">Wallet Balance</div><div className="kv-v">{fmt(detail.wallet)}</div></div>
-            <div className="kv"><div className="kv-k">KYC Status</div><div className="kv-v" style={{ fontSize: 14, paddingTop: 4 }}><Pill s={detail.kyc} /></div></div>
+            <div className="kv"><div className="kv-k">KYC Status</div><div className="kv-v" style={{ fontSize: 14, paddingTop: 4 }}><ShinyBadge variant={statusToVariant(detail.kyc)}>{formatStatusLabel(detail.kyc)}</ShinyBadge></div></div>
             <div className="kv"><div className="kv-k">Profile Completeness</div><div className="kv-v">{detail.completeness}%</div></div>
             <div className="kv"><div className="kv-k">Joined</div><div className="kv-v">{dt(detail.created)}</div></div>
           </div>
@@ -240,7 +248,7 @@ export default function UsersPage() {
             Suspension requires <span className="mono">users.suspend</span>; forcing re-review requires{" "}
             <span className="mono">kyc.review</span>. Both are enforced server-side and audited.
           </div>
-        </Card>
+        </GlassCard>
       </div>
     );
   }
@@ -254,7 +262,7 @@ export default function UsersPage() {
         <Kv k="Suspended" v={String(rows.filter((u) => u.suspended).length)} warn />
         <Kv k="KYC verified" v={String(rows.filter((u) => u.kyc === "VERIFIED").length)} />
       </div>
-      <Card className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -267,7 +275,7 @@ export default function UsersPage() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
       <OpsTable
         heads={["User", "Contact", "Role", "KYC", "Status", "Joined", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="accounts" />}
@@ -279,9 +287,9 @@ export default function UsersPage() {
             <tr key={u.id} className="clickable" onClick={() => void openDetail(u.id)}>
               <td><div className="cell-main">{u.name ?? u.email}</div><div className="cell-sub mono">{u.ucid}</div></td>
               <td><div style={{ fontSize: 12.5 }}>{u.email}</div><div className="cell-sub">{u.phone}</div></td>
-              <td><span className="pill" style={{ color: roleColor(u.role) }}><span className="pdot" />{u.role}</span></td>
-              <td><Pill s={u.kyc} /></td>
-              <td>{u.suspended ? <Pill s="SUSPENDED" /> : <span className="pill p-gray"><span className="pdot" />Active</span>}</td>
+              <td><ShinyBadge variant="info">{u.role}</ShinyBadge></td>
+              <td><ShinyBadge variant={statusToVariant(u.kyc)}>{formatStatusLabel(u.kyc)}</ShinyBadge></td>
+              <td>{u.suspended ? <ShinyBadge variant="error">Suspended</ShinyBadge> : <ShinyBadge variant="success">Active</ShinyBadge>}</td>
               <td style={{ color: "var(--ops-text-2)" }}>{dt(u.created)}</td>
               <td style={{ color: "var(--ops-text-3)" }}><ChevronRight size={15} /></td>
             </tr>

@@ -1,6 +1,42 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-18
+Last validated: 2026-11-22
+
+> **Minimalist & Shiny Dashboard Redesign — Zero-Box & Glass Surface Architecture (2026-11-20):**
+> - **The Goal**: Address the cluttered visual layout characterised by nested boxes, heavy solid borders, and dated card dividers across the platform's command centers and workspaces. Inspired by `ui.watermelon.sh/dashboards`, transition the visual language into a sleek, minimalist, elevation-first aesthetic with specular top-edge highlights and subtle ambient gradients.
+> - **Shared Component Layer (`apps/frontend/src/components/ui-v2/`)**:
+>   - **`GlassCard`**: Floating elevated surface container with specular top-bevel inset highlight (`var(--shadow-inset-shine)`), faint boundary edge (`var(--border-glass)`), and accent color top-edge strips. Replaced heavy solid borders with soft optical elevation shadows.
+>   - **`StatCard`**: High-impact KPI tile component with accent indicator, categorical icon badge, large tabular metrics, and inline delta direction indicators (`TrendingUp` / `TrendingDown`).
+>   - **`ShinyBadge`**: Semantic, high-contrast status badge with solid 1.5px border and legible typography replacing old low-opacity pill backgrounds, fully respecting repository zero-pill guidelines.
+>   - **`PageShell`**: Top-level page container with dual subtle mesh radial gradients (`--mesh-green`, `--mesh-teal`) that eliminates redundant outer border framing.
+>   - **`GlassChartTooltip`**: Translucent floating chart tooltip with backdrop blur and high-contrast metric rows.
+> - **Ops Console Shell & Overview (`OpsConsole.tsx`, `Overview.tsx`, `ops-console.css`)**:
+>   - 220px translucent glass sidebar with `backdrop-filter: blur(20px)` and accent-bar active nav state.
+>   - 56px glass header bar with micro-shadow edge.
+>   - Upgraded Executive Command Center with 4-column `StatCard` KPI row, segmented control tab switchers (`.ops-seg`), and `GlassCard` chart wrappers with minimal dashed horizontal gridlines.
+>   - Upgraded all 22 operations console inner pages (`AuditLogs`, `Contracts`, `DisputeQueue`, `Escrow`, `GigModeration`, `KycQueue`, `Ledger`, `Payments`, `Payouts`, `ReportsQueue`, `SupportDesk`, etc.) with `GlassCard` and `ShinyBadge`.
+> - **Gig Seller Dashboard & Client Workspaces (`GigSellerDashboard.tsx`, `ChatWorkspace.css`, `SettingsWorkspace.tsx`)**:
+>   - Added shiny gradient welcome banner with dynamic seller greeting and specular highlight sweep.
+>   - Integrated 4-metric seller KPI row (`StatCard`) and `GlassCard` gig inventory items.
+>   - Applied translucent glass styling to `ChatWorkspace` sidebars and headers, and converted `SettingsWorkspace` section cards to `GlassCard`.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with 0 errors (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with 0 errors.
+>   - `node scripts/scan-secrets.js` clean (812 files checked, 0 findings).
+>   - `pnpm --filter backend type-check` and `route-audit:check` clean.
+
+
+> **Landing escrow steps fit the column and use Ethiopian demo data (2026-11-22):**
+> - "Approve" and "Protected" overflowed the 5/12 left column in the "Pay for results, not promises" section and were clipped by `.mask` (607px and 707px of text in a 529px column). `LandingPageV2.tsx` now measures each localized step word after layout, on resize and on language change, and sets a per-word `--word-fit` scale in `landing-v2.css`, so all four words — English, Amharic, Oromo and Tigrinya — stay fully visible.
+> - The demo rows now reflect the Ethiopian market: Telebirr deposit/payout, ETB 96,000, payee Selam T., and an Addis café deliverable set, replacing the Visa/$2,400/@dana placeholders.
+> - **Verified:** `pnpm --filter frontend build` passes; `node scripts/check-doc-parity.mjs` and `node scripts/scan-secrets.js` are clean. Checked at 1536px and 420px, and in Amharic, with no clipping.
+
+
+> **Settings section navigation aligned with the landing-page indicator style (2026-11-22):**
+> - The five settings choices were unstyled buttons inside `.sh-segmented` (no `.sh-seg-btn`), so their labels collided. `SettingsWorkspace.tsx` now uses a dedicated `.settings-tabbar` with the marketing-header underline indicator on hover, focus and the active section, plus a `Settings / <section>` breadcrumb.
+> - The bar is a responsive 5/3/2/1-column grid, and the tabs are a full ARIA tablist (`role="tab"`/`tabpanel`, `aria-selected`, Left/Right/Home/End keys). Styling lives in the new `apps/frontend/src/SettingsWorkspace.css`.
+> - **Verified:** `pnpm --filter frontend build` passes with 0 errors (`tsc -b && vite build`).
+
 
 > **A profile photo saves, and Settings stops returning 500 (2026-11-18):**
 > - **The bug.** Choosing a photo compressed it into a JPEG data URL and sent it as `avatarUrl`. Zod allowed 1.5 MB; the column is `VARCHAR(500)`; Postgres refused the write and the API answered `500 INTERNAL_ERROR`. The photo was never the problem — the **save** was, and it failed for every member who had picked one.

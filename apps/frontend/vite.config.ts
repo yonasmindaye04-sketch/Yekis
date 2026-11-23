@@ -122,6 +122,10 @@ const SECURITY_HEADERS = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Cross-Origin-Resource-Policy": "cross-origin",
+  // The Google sign-in button opens a POPUP to accounts.google.com and reads
+  // the credential back through it, so the opener must survive. Mirrors the
+  // header the deployed server sends (apps/backend/src/lib/staticSite.ts).
+  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 } as const;
@@ -184,7 +188,12 @@ const PRODUCTION_CSP = [
   // frame, the credential never arrives, and the button silently does nothing.
   "frame-src https://appleid.cdn-apple.com https://accounts.google.com",
   "manifest-src 'self'",
-  "worker-src 'self' blob:",
+  // Google's Identity Services runs part of itself in a Web Worker served from
+  // accounts.google.com. Without this entry the browser refuses to construct
+  // it ("Failed to construct 'Worker': Script at
+  // 'https://accounts.google.com/gsi/client' cannot be accessed from origin"),
+  // and the button never produces a credential.
+  "worker-src 'self' blob: https://accounts.google.com",
   "media-src 'self' blob:",
 ].join("; ");
 

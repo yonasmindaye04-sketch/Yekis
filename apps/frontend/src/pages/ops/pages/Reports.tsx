@@ -28,7 +28,19 @@ import { fmt, opsApi, useApi } from "../opsApi";
 import type { OpsPageId } from "../opsPerms";
 import type { ReportsBundle } from "../opsTypes";
 import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
-import { ErrorBox, Kv, LoadingBox, PageHead, Pill, SecTitle, useToast, Button, Card } from "../components/ui";
+import { ErrorBox, Kv, LoadingBox, PageHead, formatStatusLabel, SecTitle, useToast, Button } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("CONFIRM")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, etb } from "../opsExport";
 import type { TimeRangeKey } from "../../../components/dashboard/dashboardData";
@@ -534,7 +546,7 @@ export default function Reports() {
       </div>
 
       <div className="grid g2" style={{ marginBottom: 22 }}>
-        <Card className="card card-pad">
+        <GlassCard className="card-pad">
           <div className="ch-head">
             <div>
               <div className="ch-title">{reportView.volTitle}</div>
@@ -547,8 +559,8 @@ export default function Reports() {
             color="#2563eb"
             unit="ETB"
           />
-        </Card>
-        <Card className="card card-pad">
+        </GlassCard>
+        <GlassCard className="card-pad">
           <div className="ch-head">
             <div>
               <div className="ch-title">{reportView.railTitle}</div>
@@ -568,7 +580,7 @@ export default function Reports() {
               { name: "CBE Birr", values: reportView.cbe, color: "#7c3aed" },
             ]}
           />
-        </Card>
+        </GlassCard>
       </div>
 
       <SecTitle icon={BarChart3}>Actionable Financial Cohorts & Batch Execution Workbench</SecTitle>
@@ -587,7 +599,9 @@ export default function Reports() {
                     <div className="qi-name">{c.title}</div>
                     <div className="qi-sub">{c.sub}</div>
                   </div>
-                  <Pill s={completedBatches[c.id] ? "CONFIRMED" : c.badgeStatus} />
+                  <ShinyBadge variant={statusToVariant(completedBatches[c.id] ? "CONFIRMED" : c.badgeStatus)}>
+                    {formatStatusLabel(completedBatches[c.id] ? "CONFIRMED" : c.badgeStatus)}
+                  </ShinyBadge>
                 </div>
                 <div className="qi-foot">
                   <span className="mono" style={{ fontWeight: 700 }}>
@@ -603,7 +617,7 @@ export default function Reports() {
           })}
         </div>
 
-        <div className="queue-detail card">
+        <GlassCard className="queue-detail">
           <div
             style={{
               display: "flex",
@@ -615,8 +629,10 @@ export default function Reports() {
           >
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <Pill s={completedBatches[selCohort.id] ? "CONFIRMED" : selCohort.badgeStatus} />
-                <span className="pill p-blue">{selCohort.ownerRole}</span>
+                <ShinyBadge variant={statusToVariant(completedBatches[selCohort.id] ? "CONFIRMED" : selCohort.badgeStatus)}>
+                  {formatStatusLabel(completedBatches[selCohort.id] ? "CONFIRMED" : selCohort.badgeStatus)}
+                </ShinyBadge>
+                <ShinyBadge variant="info">{selCohort.ownerRole}</ShinyBadge>
                 <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                   SLA: {selCohort.slaWindow}
                 </span>
@@ -707,7 +723,9 @@ export default function Reports() {
                       <td>{item.rail}</td>
                       <td className="amount">{fmt(item.amountMinor)}</td>
                       <td>
-                        <Pill s={completedBatches[selCohort.id] ? "CONFIRMED" : item.state} />
+                        <ShinyBadge variant={statusToVariant(completedBatches[selCohort.id] ? "CONFIRMED" : item.state)}>
+                          {formatStatusLabel(completedBatches[selCohort.id] ? "CONFIRMED" : item.state)}
+                        </ShinyBadge>
                       </td>
                     </tr>
                   ))}
@@ -768,12 +786,12 @@ export default function Reports() {
               </button>
             </div>
           </div>
-        </div>
+        </GlassCard>
       </div>
 
       <SecTitle icon={Briefcase}>Marketplace Breakdown ({timeRange.toUpperCase()})</SecTitle>
       <div className="grid g3" style={{ marginBottom: 16 }}>
-        <Card className="card card-pad">
+        <GlassCard className="card-pad">
           <div className="ch-head">
             <div>
               <div className="ch-title">Users by Role</div>
@@ -788,8 +806,8 @@ export default function Reports() {
               { label: "Freelancers", value: mk.freelancers, color: "#059669" },
             ]}
           />
-        </Card>
-        <Card className="card card-pad">
+        </GlassCard>
+        <GlassCard className="card-pad">
           <div className="ch-head">
             <div>
               <div className="ch-title">Contracts by Status</div>
@@ -798,8 +816,8 @@ export default function Reports() {
             <Briefcase size={15} style={{ color: "var(--ops-text-3)" }} />
           </div>
           <Donut centerSub="Contracts" segs={statusSegs} />
-        </Card>
-        <Card className="card card-pad">
+        </GlassCard>
+        <GlassCard className="card-pad">
           <div className="ch-head">
             <div>
               <div className="ch-title">Completed by Category</div>
@@ -812,7 +830,7 @@ export default function Reports() {
           ) : (
             <div className="empty">No completed contracts in the current window.</div>
           )}
-        </Card>
+        </GlassCard>
       </div>
     </div>
   );

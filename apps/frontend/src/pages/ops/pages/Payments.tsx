@@ -32,14 +32,25 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
   Rail,
+  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("SUCCESS")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("REFUND")) return "neutral";
+  return "info";
+}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
@@ -245,7 +256,7 @@ export default function Payments() {
         />
       </div>
 
-      <Card className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -272,12 +283,12 @@ export default function Payments() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
 
       {rows.length === 0 ? (
-        <div className="card">
+        <GlassCard>
           <Empty icon={CreditCard}>No inbound payments match this filter.</Empty>
-        </div>
+        </GlassCard>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -296,7 +307,7 @@ export default function Payments() {
                         {p.client} · {p.job}
                       </div>
                     </div>
-                    <Pill s={p.status} />
+                    <ShinyBadge variant={statusToVariant(p.status)}>{formatStatusLabel(p.status)}</ShinyBadge>
                   </div>
                   <div className="qi-foot">
                     <Rail p={p.provider} />
@@ -314,7 +325,7 @@ export default function Payments() {
           </div>
 
           {sel ? (
-            <div className="queue-detail card">
+            <GlassCard className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -327,7 +338,7 @@ export default function Payments() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Rail p={sel.provider} />
-                    <Pill s={sel.status} />
+                    <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       Internal ID: {sel.id}
                     </span>
@@ -522,7 +533,7 @@ export default function Payments() {
                   </button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           ) : null}
         </div>
       )}

@@ -33,14 +33,25 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  Pill,
   Rail,
+  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
-  Card,
 } from "../components/ui";
+import { GlassCard } from "../../../components/ui-v2/GlassCard";
+import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+
+function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
+  const u = (s ?? "").toUpperCase();
+  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
+  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
+  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("TERMINAT")) return "error";
+  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
+  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
+  return "info";
+}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
@@ -335,7 +346,7 @@ export default function Contracts() {
         />
       </div>
 
-      <Card className="card filters">
+      <GlassCard className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -354,12 +365,12 @@ export default function Contracts() {
         <Button variant="outline" onClick={list.reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </Card>
+      </GlassCard>
 
       {rows.length === 0 ? (
-        <div className="card">
+        <GlassCard>
           <Empty icon={FileText}>No contracts match the current filters.</Empty>
-        </div>
+        </GlassCard>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -378,7 +389,7 @@ export default function Contracts() {
                         {c.client} → {c.fl}
                       </div>
                     </div>
-                    <Pill s={c.status} />
+                    <ShinyBadge variant={statusToVariant(c.status)}>{formatStatusLabel(c.status)}</ShinyBadge>
                   </div>
                   <div className="qi-foot">
                     <span className="mono">{c.id}</span>
@@ -394,7 +405,7 @@ export default function Contracts() {
           </div>
 
           {sel ? (
-            <div className="queue-detail card">
+            <GlassCard className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -406,12 +417,11 @@ export default function Contracts() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span className="pill p-blue">{sel.cat.replace(/_/g, " ")}</span>
-                    <Pill s={sel.status} />
-                    <span className="pill p-sky">
-                      <span className="pdot" />
+                    <ShinyBadge variant="info">{sel.cat.replace(/_/g, " ")}</ShinyBadge>
+                    <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
+                    <ShinyBadge variant="success">
                       Escrow Held: {fmt(sel.escrowHeld)}
-                    </span>
+                    </ShinyBadge>
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -545,7 +555,7 @@ export default function Contracts() {
                               ) : null}
                             </td>
                             <td>
-                              <Pill s={ms.s} />
+                              <ShinyBadge variant={statusToVariant(ms.s)}>{formatStatusLabel(ms.s)}</ShinyBadge>
                             </td>
                             <td className="amount">{fmt(ms.a)}</td>
                             <td className="amount" style={{ color: "var(--ops-text-2)" }}>
@@ -588,7 +598,7 @@ export default function Contracts() {
                               <Rail p={p.p} />
                             </td>
                             <td>
-                              <Pill s={p.s} />
+                              <ShinyBadge variant={statusToVariant(p.s)}>{formatStatusLabel(p.s)}</ShinyBadge>
                             </td>
                             <td className="amount">{fmt(p.a)}</td>
                             <td style={{ color: "var(--ops-text-2)", fontSize: 12 }}>{dt(p.c)}</td>
@@ -704,7 +714,7 @@ export default function Contracts() {
                   </button>
                 </div>
               </div>
-            </div>
+            </GlassCard>
           ) : null}
         </div>
       )}

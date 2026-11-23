@@ -866,10 +866,13 @@
   display: flex;
   align-items: baseline;
   gap: 0.12em;
-  font-size: clamp(64px, 9.6vw, 150px);
+  /* --word-fit is measured per step so long words (Approve, Protected,
+     and their Amharic/Oromo/Tigrinya translations) never clip. */
+  font-size: calc(clamp(64px, 9.6vw, 150px) * var(--word-fit, 1));
   font-weight: 800;
   letter-spacing: -0.04em;
   line-height: 1.05;
+  white-space: nowrap;
   transform: translateY(112%);
   transition: transform 0.95s cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;

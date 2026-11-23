@@ -1147,6 +1147,60 @@ address of a password account is still refused. The decisions are in
 `docs/DECISIONS.md` (2026-11-22) and the evidence is in
 `docs/auth/PHASE0_AUTH_AUDIT.md` Appendix A (E-20, E-21).
 
+### The merged full version and the two remaining Google-button policies — 2026-11-23
+
+The work that had been sitting on `feat/multi-channel-auth` (`6b44f04`) is now
+merged into `main`, and `fix/code-only-compliance-gaps` — the branch the host
+builds from — is fast-forwarded to the same commit. **The host now serves the
+full, final version**: the glass dashboard redesign and the ops console rebuilt
+on it, beside the Google link flow, the Brevo mail transport and the
+one-time-code fixes that were already on `main`.
+
+**What the merge changed on the host:**
+
+- **The glass UI kit and the ops console.** `apps/frontend/src/components/ui-v2/`
+  (`GlassCard`, `GlassChartTooltip`, `PageShell`, `ShinyBadge`, `StatCard`) and
+  the **23** ops-console pages rebuilt on it, with
+  `apps/frontend/src/styles/ops-console.css`.
+- **The landing escrow steps** now fit their words (the Amharic, Oromo and
+  Tigrinya labels no longer clipped), and **the Settings section switcher** is
+  a real ARIA tablist with a `settings-tabbar`.
+- **Nothing on the backend.** `git diff d438c8a...6b44f04 -- apps/backend` is
+  **empty**: no route, no guard, no schema, no money path. The 200-route
+  baseline is unchanged and the route audit passes.
+
+**Two policies that still stopped the Google button** — the founder's browser
+console named both:
+
+- **The worker.** Google Identity Services runs part of itself in a **Web
+  Worker served from `accounts.google.com`**. The production CSP's `worker-src`
+  was `'self' blob:` — no Google — so the browser refused to construct it:
+  *"Failed to construct 'Worker': Script at
+  'https://accounts.google.com/gsi/client' cannot be accessed from origin …"*.
+  `worker-src` now names `https://accounts.google.com` as well (one hostname,
+  not a wildcard).
+- **The opener.** The API sent helmet's default
+  `Cross-Origin-Opener-Policy: same-origin`, which severs the OAuth popup from
+  the page that opened it: *"Cross-Origin-Opener-Policy policy would block the
+  window.open call"*. The SPA's responses now send
+  `Cross-Origin-Opener-Policy: same-origin-allow-popups` explicitly — the
+  value Chrome already assumes when the header is absent, made explicit so a
+  platform proxy cannot sever the popup — and the dev server sends the same
+  header, so local behaviour matches the deployed host. The API's stricter
+  `same-origin` is left alone: it serves JSON, never a document that opens a
+  popup.
+
+**One blocker remains, and it is the founder's to clear:** the Google Cloud
+OAuth client must list `https://yekis.app.aletcloud.com` under **Authorized
+JavaScript origins**, or Google answers *"The Google origin is not allowed for
+the client ID"* and refuses to issue a credential. The runbook is
+`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3. The *"The request has been
+aborted"* and *"fedcm get() aborted without reason"* lines were the FedCM flow
+being cut off by the two blocks above, not a third defect.
+
+**No environment variable changed.** The host still carries the **55** variables
+set on 2026-11-20, including the Google client id and the Brevo key.
+
 ### Teardown
 
 ```bash

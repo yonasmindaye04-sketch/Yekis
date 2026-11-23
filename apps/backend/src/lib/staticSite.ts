@@ -70,6 +70,14 @@ const SITE_SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
   "Cross-Origin-Resource-Policy": "same-origin",
+  // The Google sign-in button opens a POPUP to accounts.google.com and reads
+  // the credential back through it. `same-origin` would sever that popup
+  // from its opener and the credential would never arrive ("Cross-Origin-
+  // Opener-Policy policy would block the window.open call").
+  // `same-origin-allow-popups` keeps the opener isolated from other
+  // cross-origin windows while still allowing the OAuth popup the app itself
+  // opens — the documented setting for an app that initiates OAuth.
+  "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
   "Permissions-Policy":
     "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
 };
