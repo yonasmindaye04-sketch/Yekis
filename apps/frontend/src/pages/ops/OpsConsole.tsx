@@ -330,9 +330,54 @@ const toast = useCallback((msg: string) => {
                       <PanelLeftClose size={17} />
                     )}
                   </button>
-                  <div className="crumb">
-                    Ops / <b>{current?.name ?? ""}</b>
-                  </div>
+                  <nav className="crumb" aria-label="Operations Console breadcrumb">
+                    <button
+                      type="button"
+                      className="crumb-link"
+                      onClick={() => navigate("overview")}
+                    >
+                      Ops Console
+                    </button>
+                    {(() => {
+                      const activeGroup = groups.find((g) =>
+                        g.items.some((i) => i.id === activePage)
+                      );
+                      if (!activeGroup || activePage === "overview") return null;
+                      const firstGroupItem = activeGroup.items[0];
+                      return (
+                        <>
+                          <span className="crumb-sep">/</span>
+                          <button
+                            type="button"
+                            className="crumb-link"
+                            onClick={() =>
+                              firstGroupItem && navigate(firstGroupItem.id)
+                            }
+                          >
+                            {activeGroup.label}
+                          </button>
+                        </>
+                      );
+                    })()}
+                    <span className="crumb-sep">/</span>
+                    <b className="crumb-current" aria-current="page">
+                      {current?.name ?? ""}
+                    </b>
+                    {focusId && (
+                      <>
+                        <span className="crumb-sep">/</span>
+                        <button
+                          type="button"
+                          className="crumb-focus-pill"
+                          onClick={() => setFocusId(undefined)}
+                          title="Clear focused record filter"
+                        >
+                          <span>#{focusId}</span>
+                          <span aria-hidden="true">×</span>
+                        </button>
+                      </>
+                    )}
+                  </nav>
                   <div className="search-wrap" style={{ margin: "0 auto" }}>
                     <Search size={15} />
                     <input

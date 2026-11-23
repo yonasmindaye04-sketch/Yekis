@@ -6211,17 +6211,18 @@
 
 /* Animated Count-Up KPI Strip (Replaces dense manifesto sub-paragraphs) */
 .yk-cs-studio .cs-scroll-kpi-strip {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 24px 48px;
   margin-top: 28px;
 }
 
 .yk-cs-studio .cs-scroll-kpi-pill {
-  background: #f5f7f4;
-  border: 1px solid rgba(11, 15, 12, 0.1);
-  border-radius: 18px;
-  padding: 18px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -6445,14 +6446,126 @@
     display: none;
   }
   .yk-cs-studio .cs-scroll-kpi-strip {
-    grid-template-columns: 1fr;
+    gap: 20px 32px;
   }
   .yk-cs-studio .cs-service-item {
     white-space: normal;
   }
 }
 
+/* ── Studio Breadcrumb (Clean Inline Subpage Trail) ── */
+.yk-cs-studio .cs-studio-breadcrumb {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin-bottom: 20px;
+  background: transparent;
+  border: none;
+}
 
+.yk-cs-studio .cs-studio-breadcrumb-list {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
 
+.yk-cs-studio .cs-studio-breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+}
 
+.yk-cs-studio .cs-studio-breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  padding: 2px 4px;
+  color: rgba(244, 247, 244, 0.65);
+  font-family: var(--v2-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.18s ease;
+}
 
+.yk-cs-studio .cs-studio-breadcrumb-link:hover {
+  color: #9be564;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-brace {
+  color: #78c841;
+  font-weight: 800;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-sep {
+  color: rgba(255, 255, 255, 0.28);
+  font-weight: 600;
+  user-select: none;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  color: #f4f7f4;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #9be564;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-code {
+  color: #78c841;
+  font-weight: 800;
+}
+
+.yk-cs-studio .cs-studio-breadcrumb-meta,
+.yk-cs-studio .cs-studio-band-pills {
+  display: none;
+}
+
+/* ── IntersectionObserver 6-Band Dynamic Reveal Animations ── */
+.yk-cs-studio [data-studio-band]:not(.cs-services-band) > .cs-band-inner,
+.yk-cs-studio .cs-services-band[data-studio-band] .cs-services-grid {
+  opacity: 0;
+  transform: translate3d(0, 36px, 0) scale(0.975);
+  transition:
+    opacity 780ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 780ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+
+.yk-cs-studio [data-studio-band].is-band-visible:not(.cs-services-band) > .cs-band-inner,
+.yk-cs-studio .cs-services-band[data-studio-band].is-band-visible .cs-services-grid {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-cs-studio [data-studio-band]:not(.cs-services-band) > .cs-band-inner,
+  .yk-cs-studio .cs-services-band[data-studio-band] .cs-services-grid {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}

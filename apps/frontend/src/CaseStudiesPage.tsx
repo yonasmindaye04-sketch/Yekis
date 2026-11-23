@@ -19,6 +19,7 @@ import {
   AnimatedCountUpStrip,
   ScrollIlluminatedHeadline,
   StickyScrollServicesStage,
+  StudioBreadcrumb,
 } from "./components/StudioScrollMotion";
 import "./landing-v2.css";
 
@@ -705,7 +706,8 @@ const sectionRevealVariants = {
 };
 
 export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const isAm = language === "am";
   const [activeCategory, setActiveCategory] = useState<CaseCategory>("ALL");
   const [activeDiscipline, setActiveDiscipline] = useState<Exclude<CaseCategory, "ALL">>("ENGINEERING");
   const [activeTestimonialIdx, setActiveTestimonialIdx] = useState(0);
@@ -1775,6 +1777,51 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
       {/* ── SECTION 1: Dark Studio Hero (Pure Visual Attraction & Motion) ── */}
       <section className="cs-hero-band" aria-label="Case Studies Studio Hero">
         <div className="cs-band-inner">
+          <StudioBreadcrumb
+            items={[
+              {
+                label: isAm ? "መነሻ" : "Home",
+                onClick: () => onNavigate("home"),
+              },
+              {
+                label: isAm ? "የተሳኩ ፕሮጀክቶች" : "Case Studies",
+                onClick:
+                  activeCategory !== "ALL"
+                    ? () => setActiveCategory("ALL")
+                    : undefined,
+                active: activeCategory === "ALL",
+              },
+              ...(activeCategory !== "ALL"
+                ? [
+                    {
+                      code: activeCategory,
+                      label: `Filter · ${activeCategory}`,
+                      active: true,
+                    },
+                  ]
+                : []),
+            ]}
+            rightMeta={
+              <div className="cs-studio-band-pills">
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate("fees")}
+                >
+                  <span>FEES</span>
+                  <span>{isAm ? "ክፍያዎች" : "Fee Schedule"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate("about")}
+                >
+                  <span>STUDIO</span>
+                  <span>{isAm ? "ስለ እኛ" : "About"}</span>
+                </button>
+              </div>
+            }
+          />
           <motion.div
             className="cs-hero-top"
             initial={{ opacity: 0, y: 28 }}

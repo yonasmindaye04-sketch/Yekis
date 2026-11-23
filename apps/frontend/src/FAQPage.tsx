@@ -8,11 +8,12 @@ import {
   ScrollIlluminatedHeadline,
   ScrollParallaxDiptych,
   StickyScrollServicesStage,
+  StudioBreadcrumb,
   type StickyStackItem,
 } from "./components/StudioScrollMotion";
 
 interface FAQPageProps {
-  onNavigate?: (view: "landing" | "about" | "faq" | "fees" | "casestudies") => void;
+  onNavigate?: (view: string) => void;
   onStart?: (mode: "login" | "register") => void;
 }
 
@@ -538,6 +539,46 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           ================================================================ */}
       <section className="cs-hero-band">
         <div className="cs-band-inner">
+          <StudioBreadcrumb
+            items={[
+              {
+                label: lang === "am" ? "መነሻ" : "Home",
+                onClick: () => onNavigate?.("home"),
+              },
+              {
+                label: lang === "am" ? "የእገዛ ማዕከል" : "Help & Governance",
+                onClick: () => questionsSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
+              },
+              {
+                code: activeCategory.toUpperCase(),
+                label:
+                  lang === "am"
+                    ? `ምድብ · ${activeCategory.toUpperCase()}`
+                    : `Topic · ${activeCategory.toUpperCase()}`,
+                active: true,
+              },
+            ]}
+            rightMeta={
+              <div className="cs-studio-band-pills">
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("fees")}
+                >
+                  <span>FEES</span>
+                  <span>{lang === "am" ? "የክፍያ ማስያ" : "Fee Schedule"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("terms")}
+                >
+                  <span>LEGAL</span>
+                  <span>{lang === "am" ? "የአገልግሎት ውል" : "Terms"}</span>
+                </button>
+              </div>
+            }
+          />
           <motion.div
             className="cs-hero-top"
             initial={{ opacity: 0, y: 28 }}

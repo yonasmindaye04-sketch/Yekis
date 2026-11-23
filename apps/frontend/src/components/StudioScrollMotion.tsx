@@ -318,3 +318,75 @@ export function StickyScrollServicesStage({
     </div>
   );
 }
+
+export interface StudioBreadcrumbItem {
+  label: string;
+  onClick?: () => void;
+  active?: boolean;
+  code?: string;
+}
+
+export function StudioBreadcrumb({
+  items,
+  rightMeta,
+  variant = "dark",
+}: {
+  items: StudioBreadcrumbItem[];
+  rightMeta?: React.ReactNode;
+  variant?: "dark" | "light";
+}) {
+  return (
+    <nav
+      className={`cs-studio-breadcrumb cs-studio-breadcrumb--${variant}`}
+      aria-label="Breadcrumb"
+    >
+      <ol className="cs-studio-breadcrumb-list">
+        {items.map((item, idx) => {
+          const isLast = idx === items.length - 1;
+          const isCurrent = item.active ?? isLast;
+          return (
+            <li key={`${item.label}-${idx}`} className="cs-studio-breadcrumb-item">
+              {item.onClick && !isCurrent ? (
+                <button
+                  type="button"
+                  className="cs-studio-breadcrumb-link"
+                  onClick={item.onClick}
+                >
+                  {idx === 0 && (
+                    <span className="cs-studio-breadcrumb-brace" aria-hidden="true">
+                      {"{"}
+                    </span>
+                  )}
+                  <span>{item.label}</span>
+                  {idx === 0 && (
+                    <span className="cs-studio-breadcrumb-brace" aria-hidden="true">
+                      {"}"}
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <span
+                  className={`cs-studio-breadcrumb-current ${isCurrent ? "is-active" : ""}`}
+                  aria-current={isCurrent ? "page" : undefined}
+                >
+                  <span className="cs-studio-breadcrumb-dot" aria-hidden="true" />
+                  {item.code && (
+                    <span className="cs-studio-breadcrumb-code">{item.code}</span>
+                  )}
+                  <span>{item.label}</span>
+                </span>
+              )}
+              {!isLast && (
+                <span className="cs-studio-breadcrumb-sep" aria-hidden="true">
+                  /
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {rightMeta && <div className="cs-studio-breadcrumb-meta">{rightMeta}</div>}
+    </nav>
+  );
+}
+
