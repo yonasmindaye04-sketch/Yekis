@@ -1239,6 +1239,16 @@ card open):
   Content Security Policy directive"* — the button rendered unstyled.
   `style-src` now names `https://accounts.google.com`, and that is fixed in
   the commit after this one.
+- **After the `style-src` fix** (`1de9070`, the app back **LIVE** at
+  `2026-11-23T20:48:08Z`, 55 environment variables, the same bundle — the
+  policy lives in `index.html`, so the JavaScript and CSS hashes did not
+  change), the browser was driven through the sign-in card again and
+  **every CSP violation is gone**: the console carries no worker error, no
+  opener-policy error and no blocked-stylesheet error. Google's own
+  stylesheet is now in the document's stylesheet list, the button renders
+  with its own styling next to the Telegram button, and the only lines left
+  are the known cosmetic `frame-ancestors`-in-a-`<meta>` notice and the two
+  Telegram version notices.
 - **One blocker remains, and it is the founder's to clear.** The console's
   **"[GSI_LOGGER]: The given origin is not allowed for the given client ID"**
   and the **400** on `accounts.google.com/gsi/button` are the **same single
