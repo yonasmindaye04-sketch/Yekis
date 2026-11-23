@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { defineConfig, type HttpServer, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import { GoogleGenAI, Type } from "@google/genai";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -232,6 +231,7 @@ function resilientApiProxyPlugin(): Plugin {
       }
     }
 
+    const { GoogleGenAI, Type } = await import("@google/genai");
     const ai = new GoogleGenAI({ apiKey });
 
     if (targetPath.endsWith("/assistant/suggest-replies")) {
@@ -530,6 +530,8 @@ export default defineConfig({
       "@base-ui/react/tooltip",
       "@base-ui/react/popover",
       "@base-ui/react/tabs",
+      "react-icons/tb",
+      "react-icons/fa",
     ],
   },
   preview: {

@@ -8,11 +8,12 @@ import {
   ScrollIlluminatedHeadline,
   ScrollParallaxDiptych,
   StickyScrollServicesStage,
+  StudioBreadcrumb,
   type StickyStackItem,
 } from "./components/StudioScrollMotion";
 
 interface FeesPageProps {
-  onNavigate?: (view: "landing" | "about" | "faq" | "fees" | "casestudies") => void;
+  onNavigate?: (view: string) => void;
   onStart?: (mode: "login" | "register") => void;
 }
 
@@ -292,6 +293,39 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           ================================================================ */}
       <section className="cs-hero-band">
         <div className="cs-band-inner">
+          <StudioBreadcrumb
+            items={[
+              {
+                label: lang === "am" ? "መነሻ" : "Home",
+                onClick: () => onNavigate?.("home"),
+              },
+              {
+                code: "0% CLIENT FEE",
+                label: lang === "am" ? "ክፍያዎች እና ኢስክሮ" : "Pricing & Fee Schedule",
+                active: true,
+              },
+            ]}
+            rightMeta={
+              <div className="cs-studio-band-pills">
+                <button
+                  type="button"
+                  className="cs-studio-band-pill is-active"
+                  onClick={() => calculatorRef.current?.scrollIntoView({ behavior: "smooth" })}
+                >
+                  <span>ETB</span>
+                  <span>{lang === "am" ? "የክፍያ ማስያ" : "Fee Calculator ↓"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("faq")}
+                >
+                  <span>SLA</span>
+                  <span>{lang === "am" ? "ደንቦች" : "Escrow FAQ"}</span>
+                </button>
+              </div>
+            }
+          />
           <motion.div
             className="cs-hero-top"
             initial={{ opacity: 0, y: 28 }}

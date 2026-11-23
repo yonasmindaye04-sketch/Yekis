@@ -7,11 +7,12 @@ import {
   ScrollIlluminatedHeadline,
   ScrollParallaxDiptych,
   StickyScrollServicesStage,
+  StudioBreadcrumb,
   type StickyStackItem,
 } from "./components/StudioScrollMotion";
 
 interface AboutPageProps {
-  onNavigate?: (view: "landing" | "about" | "faq" | "fees" | "casestudies") => void;
+  onNavigate?: (view: string) => void;
   onStart?: (mode: "login" | "register") => void;
 }
 
@@ -327,6 +328,47 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           ================================================================ */}
       <section className="cs-hero-band">
         <div className="cs-band-inner">
+          <StudioBreadcrumb
+            items={[
+              {
+                label: lang === "am" ? "መነሻ" : "Home",
+                onClick: () => onNavigate?.("home"),
+              },
+              {
+                code: "STUDIO",
+                label: lang === "am" ? "ስለ እኛ እና መዋቅር" : "About & Architecture",
+                active: true,
+              },
+            ]}
+            rightMeta={
+              <div className="cs-studio-band-pills">
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("fees")}
+                >
+                  <span>01</span>
+                  <span>{lang === "am" ? "ክፍያዎች" : "Fees"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("case-studies")}
+                >
+                  <span>02</span>
+                  <span>{lang === "am" ? "ፕሮጀክቶች" : "Cases"}</span>
+                </button>
+                <button
+                  type="button"
+                  className="cs-studio-band-pill"
+                  onClick={() => onNavigate?.("faq")}
+                >
+                  <span>03</span>
+                  <span>{lang === "am" ? "ጥያቄዎች" : "FAQ"}</span>
+                </button>
+              </div>
+            }
+          />
           <motion.div
             className="cs-hero-top"
             initial={{ opacity: 0, y: 28 }}

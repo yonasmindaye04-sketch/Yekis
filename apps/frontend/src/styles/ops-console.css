@@ -122,8 +122,12 @@
 .ops-root .icon-btn{position:relative;width:34px;height:34px;border-radius:8px;border:1px solid var(--ops-border);background:var(--ops-panel);color:var(--ops-text-2);display:flex;align-items:center;justify-content:center;transition:all .15s}
 .ops-root .icon-btn:hover{color:var(--ops-primary);border-color:var(--ops-primary)}
 .ops-root .dot{position:absolute;top:7px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--ops-red);border:2px solid var(--ops-panel)}
-.ops-root .crumb{font-size:12px;color:var(--ops-text-3);font-weight:500}
-.ops-root .crumb b{color:var(--ops-text);font-weight:700}
+.ops-root .crumb{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ops-text-3);font-weight:500;flex-wrap:wrap}
+.ops-root .crumb-link{background:none;border:none;padding:3px 6px;border-radius:6px;color:var(--ops-text-2);font-size:12px;font-weight:600;cursor:pointer;transition:background .15s,color .15s}
+.ops-root .crumb-link:hover{background:var(--ops-row-hover);color:var(--ops-primary)}
+.ops-root .crumb-sep{color:var(--ops-text-3);opacity:.6;user-select:none}
+.ops-root .crumb b,.ops-root .crumb-current{color:var(--ops-text);font-weight:700;padding:3px 8px;border-radius:6px;background:color-mix(in srgb,var(--ops-primary) 10%,transparent)}
+.ops-root .crumb-focus-pill{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;border:1px solid var(--ops-primary);background:var(--ops-primary-soft);color:var(--ops-primary-dark);font-family:var(--ops-mono);font-size:11px;font-weight:700;cursor:pointer}
 
 /* ── page furniture ── */
 .ops-root .page-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
