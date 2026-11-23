@@ -1201,6 +1201,53 @@ being cut off by the two blocks above, not a third defect.
 **No environment variable changed.** The host still carries the **55** variables
 set on 2026-11-20, including the Google client id and the Brevo key.
 
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-23T19:46:01Z`, serving
+  `/assets/index-BNkU2lOs.js` and `/assets/index-DR9okXdP.css`, with **55**
+  environment variables. The CSS hash is **identical** to the local production
+  build of the merged tree, which is what proves the host is serving the
+  merged source and not the previous build.
+- The merged work is in the served assets: the CSS carries the glass UI kit
+  (31 `glass` rules), the ops console's **7** `.ops-root .crumb` rules, the
+  Settings tab bar (`settings-tabbar`) and the landing escrow's `word-fit`;
+  the bundle carries **"Linked Accounts"**, **"Google is linked"** and both
+  new endpoint paths.
+- `GET /api/v1/auth/identities` answers **401** without a session, and
+  `POST /api/v1/auth/oauth/google/link` answers **401** without a session.
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The start-up log reports **"No pending migrations to apply."** — the merge
+  carried no schema change, as the empty backend diff predicted.
+- `/` now sends **`Cross-Origin-Opener-Policy: same-origin-allow-popups`**,
+  and the served HTML's policy now reads
+  `worker-src 'self' blob: https://accounts.google.com`.
+
+**What a real browser on the live host now shows** (Chromium, the sign-in
+card open):
+
+- The Google Identity Services script **loads**
+  (`https://accounts.google.com/gsi/client`), the button's **iframe is live**
+  (`https://accounts.google.com/gsi/button?...client_id=1040630878719-…`) and
+  it carries the Amharic label *"በGoogle አዝራር ይግቡ"*. There is **no** worker
+  error and **no** opener-policy error any more — the two console lines the
+  founder's screenshot carried are gone.
+- One policy still blocked part of it: the console carried *"Loading the
+  stylesheet 'https://accounts.google.com/gsi/style' violates the following
+  Content Security Policy directive"* — the button rendered unstyled.
+  `style-src` now names `https://accounts.google.com`, and that is fixed in
+  the commit after this one.
+- **One blocker remains, and it is the founder's to clear.** The console's
+  **"[GSI_LOGGER]: The given origin is not allowed for the given client ID"**
+  and the **400** on `accounts.google.com/gsi/button` are the **same single
+  cause**: the Google Cloud OAuth client refuses the origin, because
+  `https://yekis.app.aletcloud.com` is not in its **Authorized JavaScript
+  origins**. Nothing on the platform can change that — it is a setting in the
+  founder's Google Cloud project. The runbook is
+  `docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3.
+
 ### Teardown
 
 ```bash
