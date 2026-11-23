@@ -423,7 +423,7 @@ Two GitHub Actions workflows exist at `.github/workflows/`:
 
 | Workflow | What it actually does |
 |---|---|
-| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, a frontend job that runs the production build, and a `container` job that builds the deployment image and checks the entrypoint. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
+| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), lockfile-parity check (`node scripts/check-lockfile-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, a frontend job that runs the production build, and a `container` job that builds the deployment image and checks the entrypoint. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
 | `deploy.yml` | **Placeholder only.** The workflow file exists but its deployment steps are a comment ("Deploy steps would go here"). No image is built, pushed, or deployed |
 
 > The `deploy.yml` placeholder is the reason the roadmap's Phase 0 DoD "auto-run tests on every PR" is now satisfied for **tests** but the release pipeline is still unbuilt. Documented in `docs/ROADMAP_ALIGNMENT.md`.

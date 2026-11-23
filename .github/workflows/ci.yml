@@ -68,6 +68,16 @@ jobs:
         working-directory: .
         run: node scripts/check-doc-parity.mjs
 
+      # `pnpm install --frozen-lockfile` (the install step above, and the
+      # Dockerfile's) refuses to install when a workspace manifest declares a
+      # dependency the lockfile's importer for that workspace does not record.
+      # The build then fails before it starts, and the failure reads like a
+      # platform problem rather than a manifest problem. This check says which
+      # workspace and which dependency drifted.
+      - name: Lockfile parity check
+        working-directory: .
+        run: node scripts/check-lockfile-parity.mjs
+
       # The scanner's own patterns are exercised first. It has twice reported
       # "clean" while being unable to match a shape GitGuardian matched, so a
       # green scan is only meaningful if the scanner can still fail.
