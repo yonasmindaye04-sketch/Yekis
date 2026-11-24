@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { CheckCircle2, Fingerprint, ShieldCheck } from "lucide-react";
+import { CheckCircle2, FileCheck, Fingerprint, HelpCircle, Lock, ShieldCheck } from "lucide-react";
 import { api, type KycStatusResponse } from "./api/client";
 import { useI18n } from "./i18n";
 import { formatStatusLabel, statusTone } from "./pages/ops/components/ui";
@@ -342,8 +342,9 @@ export function BrowserVerification() {
         </div>
       </section>
 
-      {/* ── Fayda Identity Review Redesigned Card ──────────────────── */}
-      <section className="idv-card" aria-labelledby="idv-title">
+      {/* ── Fayda Identity Layout: Form + Guidance Sidebar ────────── */}
+      <div className="idv-layout">
+        <section className="idv-card" aria-labelledby="idv-title">
         <div className="idv-inner">
 
           {/* Header */}
@@ -731,6 +732,114 @@ export function BrowserVerification() {
           </span>
         </footer>
       </section>
+
+      {/* Guidance Sidebar (utilizing desktop right space) */}
+      <aside className="idv-sidebar" aria-label={k.guidanceTitle || "Tier 1 Verification Guide"}>
+        {/* Tier 1 Privileges */}
+        <div className="idv-sidebar-card">
+          <div className="idv-sidebar-header">
+            <div className="idv-sidebar-icon" aria-hidden="true">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <h2 className="idv-sidebar-title">{k.privilegesTitle || "Tier 1 Privileges"}</h2>
+              <p className="idv-sidebar-sub">{k.guidanceSub || "Requirements and unlocked privileges"}</p>
+            </div>
+          </div>
+          <ul className="idv-perks-list">
+            <li className="idv-perk-item">
+              <CheckCircle2 size={15} className="idv-perk-icon" aria-hidden="true" />
+              <div>
+                <strong>{k.privilegeBidding || "Bid on Marketplace Jobs"}</strong>
+                <p>{k.privilegeBiddingDesc || "Submit proposals on client briefs and public project requests immediately."}</p>
+              </div>
+            </li>
+            <li className="idv-perk-item">
+              <CheckCircle2 size={15} className="idv-perk-icon" aria-hidden="true" />
+              <div>
+                <strong>{k.privilegeContracts || "Sign Bilateral Contracts"}</strong>
+                <p>{k.privilegeContractsDesc || "Execute legally binding contracts protected by escrow milestone rules."}</p>
+              </div>
+            </li>
+            <li className="idv-perk-item">
+              <CheckCircle2 size={15} className="idv-perk-icon" aria-hidden="true" />
+              <div>
+                <strong>{k.privilegePayouts || "Fast Wallet Withdrawals"}</strong>
+                <p>{k.privilegePayoutsDesc || "Withdraw cleared earnings to Telebirr, CBE Birr, and Ethiopian banks."}</p>
+              </div>
+            </li>
+            <li className="idv-perk-item">
+              <CheckCircle2 size={15} className="idv-perk-icon" aria-hidden="true" />
+              <div>
+                <strong>{k.privilegeBadge || "Verified Trust Badge"}</strong>
+                <p>{k.privilegeBadgeDesc || "Showcase a verified badge on your profile to win client trust."}</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        {/* Document Checklist */}
+        <div className="idv-sidebar-card">
+          <div className="idv-sidebar-header">
+            <div className="idv-sidebar-icon" aria-hidden="true">
+              <FileCheck size={20} />
+            </div>
+            <div>
+              <h2 className="idv-sidebar-title">{k.checklistTitle || "Photo Guidelines"}</h2>
+              <p className="idv-sidebar-sub">Tips for instant, automatic approval</p>
+            </div>
+          </div>
+          <ul className="idv-checklist">
+            <li className="idv-check-item">
+              <span className="idv-check-bullet" aria-hidden="true" />
+              <div>
+                <strong>{k.checkAccepted || "Accepted Documents"}</strong>
+                <p>{k.checkAcceptedDesc || "Physical Fayda Smart Card, printed eID slip, or official digital eSignet credential."}</p>
+              </div>
+            </li>
+            <li className="idv-check-item">
+              <span className="idv-check-bullet" aria-hidden="true" />
+              <div>
+                <strong>{k.checkCorners || "All 4 Corners Visible"}</strong>
+                <p>{k.checkCornersDesc || "Frame the entire ID card without clipping edges, barcodes, or QR codes."}</p>
+              </div>
+            </li>
+            <li className="idv-check-item">
+              <span className="idv-check-bullet" aria-hidden="true" />
+              <div>
+                <strong>{k.checkLighting || "Clear & Legible"}</strong>
+                <p>{k.checkLightingDesc || "Capture under even lighting without glare covering your 12-digit FIN."}</p>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        {/* Security & Regulatory Compliance */}
+        <div className="idv-sidebar-card">
+          <div className="idv-sidebar-header">
+            <div className="idv-sidebar-icon" aria-hidden="true">
+              <Lock size={20} />
+            </div>
+            <div>
+              <h2 className="idv-sidebar-title">{k.securityTitle || "Compliance & Privacy"}</h2>
+              <p className="idv-sidebar-sub">National Bank of Ethiopia (NBE) &amp; PDPP compliant</p>
+            </div>
+          </div>
+          <p className="idv-security-text">
+            {k.securityDesc || "Identity verification is conducted directly through Ethiopia's National ID Program (NID) via Fayda eSignet. Your document is encrypted in transit using 256-bit TLS and never shared with unauthorized third parties."}
+          </p>
+          <div className="idv-help-row">
+            <HelpCircle size={15} aria-hidden="true" />
+            <span>
+              {k.faydaEnrollHelp || "Don't have a Fayda ID?"}{" "}
+              <a href="https://fayda.et" target="_blank" rel="noopener noreferrer">
+                {k.faydaEnrollLink || "Visit fayda.et to enroll"}
+              </a>
+            </span>
+          </div>
+        </div>
+      </aside>
+    </div>
 
       {/* Tier 2 Section */}
       {showTier2 && (

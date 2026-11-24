@@ -66,6 +66,20 @@ Last validated: 2026-11-22
 > - **Old local photos are dropped.** A data URL left in `localStorage` by an older build is cleared on load instead of being sent back and rejected.
 > - **Verified:** `tests/avatar-profile.test.ts` (11 tests: storage, replacement, ownership, over-long/data-URL rejection, public serving) and the PDPP erasure suite pass; `pnpm --filter frontend build`, `pnpm --filter backend type-check`, `route-audit:check` and `node scripts/check-doc-parity.mjs` pass. The deployed instance applied migration `20261118190000_user_avatar` (38 in total) and a throwaway account uploaded, served and cleared a real JPEG there: the public URL answered `200 image/jpeg` with an immutable cache, the 600-character URL and the data URL answered `400` instead of the old `500`, another member's id was refused, and erasure reported `avatarsDeleted: 1` and left the URL `404`. See `docs/ALETCLOUD_DEPLOYMENT.md` §11.
 
+> **Fayda Identity Review Responsive Guidance Layout (2026-11-24):**
+> - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
+>   - **Responsive Two-Column Layout (`.idv-layout`)**: Refactored the KYC screen to resolve awkward desktop whitespace on wide viewports (`min-width: 1024px`) by pairing the primary Fayda verification card (`.idv-card`) with a dedicated three-section guidance sidebar (`.idv-sidebar`, 360px width) in a clean grid (`minmax(0, 1fr) 360px`, `gap: 22px`). Stacks seamlessly into a single column on tablet/mobile screens (`max-width: 1023px`).
+>   - **Tier 1 Privileges Card (`.idv-sidebar-card`)**: Outlines key unlocked platform capabilities upon completing Tier 1 verification: bidding on marketplace jobs, signing bilateral digital contracts, unlocking instant escrow payouts (Telebirr/CBE/Bank), and earning the official verified profile badge.
+>   - **Photo Guidelines & Document Checklist**: Actionable tips for fast automated verification (accepted document formats including physical smart cards, printed eID slips, digital eSignet credentials; framing all 4 corners; avoiding flash glare over the 12-digit FIN).
+>   - **Compliance, Privacy & NID Integration**: Reassures users with details on direct National ID Program (eSignet) biometric verification, 256-bit TLS encryption, NBE escrow compliance, and PDPP privacy guarantees, plus a direct link to `fayda.et` for un-enrolled users.
+>   - **Theme Parity & Multi-Locale Sync**: Layout geometry is 100% theme-invariant between light and dark modes with bare colored glyphs (zero icon background tiles) and zero emojis. Full translation parity across `en`, `am`, `om`, and `ti` in `i18n.ts`.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+>   - `node scripts/scan-secrets.js` passes with exit code 0.
+>   - `pnpm --filter backend route-audit:check` passes with exit code 0.
+>   - `pnpm --filter backend type-check` passes with exit code 0.
+
 > **Fayda Identity Review Redesign — Calm Enterprise & Trust Direction (2026-11-18):**
 > - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
 >   - **Card Shell Architecture (`.idv-card`)**: Redesigned the Fayda / Tier 1 KYC verification component into a high-trust, calm enterprise card shell featuring a custom biometric fingerprint emblem, overline (`Fayda Identity Review`), primary heading, descriptive subtext, live tier status indicator (`Tier 1 · Awaiting documents` / `Tier 1 · In review` / `Tier 1 · Verified`), and a verified trust badge (`Secured by Fayda eSignet`).

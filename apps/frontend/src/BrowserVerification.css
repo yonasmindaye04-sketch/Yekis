@@ -1,6 +1,8 @@
 /* ── Fayda Identity Review Redesign Styles ───────────────────────────── */
 
-.idv-card {
+.idv-layout,
+.idv-card,
+.idv-sidebar-card {
   color-scheme: dark;
   --bg: #0c1117;
   --bg-glow: rgba(43, 160, 110, 0.05);
@@ -25,22 +27,14 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 12px 40px -12px rgba(0, 0, 0, 0.55);
   --radius: 14px;
   --radius-sm: 10px;
-
-  width: 100%;
-  max-width: 880px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
-  font-family: inherit;
-  color: var(--text);
-  box-sizing: border-box;
 }
 
+:root[data-theme="light"] .idv-layout,
 :root[data-theme="light"] .idv-card,
-[data-theme="light"] .idv-card {
+:root[data-theme="light"] .idv-sidebar-card,
+[data-theme="light"] .idv-layout,
+[data-theme="light"] .idv-card,
+[data-theme="light"] .idv-sidebar-card {
   color-scheme: light;
   --bg: #eef1f4;
   --bg-glow: rgba(12, 122, 82, 0.05);
@@ -63,6 +57,28 @@
   --danger: #c2413b;
   --danger-soft: rgba(194, 65, 59, 0.09);
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 16px 40px -16px rgba(16, 24, 40, 0.18);
+}
+
+/* ── Responsive Two-Column Layout ────────────────────────────── */
+.idv-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 22px;
+  align-items: start;
+  width: 100%;
+}
+
+.idv-card {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  font-family: inherit;
+  color: var(--text);
+  box-sizing: border-box;
 }
 
 .idv-card *,
@@ -755,7 +771,184 @@
   display: block;
 }
 
+/* ── Guidance Sidebar Styles ─────────────────────────────────── */
+.idv-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.idv-sidebar-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 20px;
+  box-sizing: border-box;
+  color: var(--text);
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  overflow: hidden;
+}
+
+.idv-sidebar-card *,
+.idv-sidebar-card *::before,
+.idv-sidebar-card *::after {
+  box-sizing: border-box;
+}
+
+.idv-sidebar-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.idv-sidebar-icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+  margin-top: 2px;
+}
+
+.idv-sidebar-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  margin: 0 0 3px;
+  color: var(--text);
+}
+
+.idv-sidebar-sub {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.idv-perks-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.idv-perk-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.idv-perk-icon {
+  flex: none;
+  color: var(--accent-text);
+  margin-top: 2px;
+}
+
+.idv-perk-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.35;
+  margin-bottom: 2px;
+}
+
+.idv-perk-item p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.idv-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.idv-check-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.idv-check-bullet {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-text);
+  margin-top: 6px;
+}
+
+.idv-check-item strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.35;
+  margin-bottom: 2px;
+}
+
+.idv-check-item p {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.idv-security-text {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.idv-help-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.idv-help-row svg {
+  flex: none;
+  color: var(--text-faint);
+}
+
+.idv-help-row a {
+  color: var(--accent-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+
+.idv-help-row a:hover {
+  opacity: 0.85;
+}
+
 /* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  .idv-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
 @media (max-width: 720px) {
   .idv-inner {
     padding: 24px 20px 22px;
@@ -790,7 +983,10 @@
 @media (prefers-reduced-motion: reduce) {
   .idv-card *,
   .idv-card *::before,
-  .idv-card *::after {
+  .idv-card *::after,
+  .idv-sidebar-card *,
+  .idv-sidebar-card *::before,
+  .idv-sidebar-card *::after {
     animation: none !important;
     transition: none !important;
   }
