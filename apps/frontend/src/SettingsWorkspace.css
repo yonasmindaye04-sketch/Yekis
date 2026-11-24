@@ -286,6 +286,16 @@ dialog.sh-deactivate-dialog::backdrop {
   .sh-deactivate-grid {
     grid-template-columns: 1fr;
   }
+  .sh-deactivate-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  .sh-deactivate-footer button {
+    width: 100%;
+    min-height: 44px;
+  }
 }
 
 .sh-deactivate-col {

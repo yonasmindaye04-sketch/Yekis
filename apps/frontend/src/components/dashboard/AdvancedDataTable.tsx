@@ -428,6 +428,9 @@ export function AdvancedDataTable({
       {/* Data Grid */}
       <div
         className={`sh-table-scroll ${mobileViewMode === "cards" ? "sh-hide-on-mobile-cards" : ""}`}
+        tabIndex={0}
+        role="region"
+        aria-label="Escrow contracts and milestone ledger"
       >
         <table className={`sh-data-table ${density === "compact" ? "compact" : "comfortable"}`}>
           <thead>

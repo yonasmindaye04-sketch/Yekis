@@ -1283,7 +1283,12 @@ export function FiscalDocumentSheet({
         </section>
 
         {/* 7-Column Metadata Band */}
-        <section className="excel-band-wrap">
+        <section
+          className="excel-band-wrap"
+          tabIndex={0}
+          role="region"
+          aria-label="Fiscal metadata band"
+        >
           <table className="excel-band-table">
             <thead>
               <tr>
@@ -1319,7 +1324,12 @@ export function FiscalDocumentSheet({
         </section>
 
         {/* Line Items Table */}
-        <section className="excel-table-wrap">
+        <section
+          className="excel-table-wrap"
+          tabIndex={0}
+          role="region"
+          aria-label="Fiscal line items table"
+        >
           <table className="excel-table">
             <thead>
               <tr>

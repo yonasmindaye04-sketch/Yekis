@@ -69,6 +69,14 @@ Last validated: 2026-11-22
 > - Integrated Ethiopian Fiscal Year logic (EFY, Hamle 1 → Sene 30) with quarterly tabs (Q1–Q4) and dual bilingual labels (Amharic & English).
 > - Included contextual calculation hints inside the milestone creation dialog showing corresponding EFY dates and quarters.
 > - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
+>
+> **Platform-wide professional responsiveness overhaul (`RULE.md` §4 & Modern Web Guidance) (2026-11-24):**
+> - Unified drawer collapse threshold to `< 1024px` across user workspace (`FullPlatformApp.tsx`) and Ops Console (`OpsConsole.tsx`), giving tablets comfortable touch drawer overlays.
+> - Enforced 2-across KPI cards (`repeat(2, minmax(0, 1fr))`) down to 320px small phones, eliminating single-column card stretching.
+> - Allowed mobile action buttons to share rows (`flex: 1 1 calc(50% - 4px)`) rather than stacking full-height blocks.
+> - Enhanced horizontal scroll wrappers (`.sh-table-scroll`, `.tbl-wrap`, `.excel-table-wrap`) with `tabIndex={0}`, `role="region"`, and accessible labels for keyboard scrollability per modern web guidance.
+> - Enforced 44px touch targets on mobile interactive controls and 16px input font sizes to avoid iOS auto-zoom.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
 
 
 > **A profile photo saves, and Settings stops returning 500 (2026-11-18):**

@@ -555,12 +555,12 @@ function FullPlatformAppInner() {
   const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= 768,
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
   );
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth <= 768;
+      const mobile = window.innerWidth < 1024;
       setIsMobileViewport(mobile);
       if (!mobile) setMobileDrawerOpen(false);
     };

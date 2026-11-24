@@ -3697,7 +3697,7 @@
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .platform-shell.sh-shell,
   .platform-shell.sh-shell.sh-collapsed,
   .platform-shell.sh-shell.sh-variant-inset,
@@ -3795,11 +3795,21 @@
   .sh-icon-only-btn,
   .sh-icon-btn,
   .sh-btn,
-  .sh-seg-btn {
+  .sh-seg-btn,
+  .sh-topbar-back-btn,
+  .sh-topbar-menu-btn,
+  .platform-topbar .theme-toggle,
+  .platform-topbar .notification-trigger,
+  .platform-topbar .user-menu {
     min-height: 44px;
   }
 
-  .sh-icon-only-btn {
+  .sh-icon-only-btn,
+  .sh-topbar-back-btn,
+  .sh-topbar-menu-btn,
+  .platform-topbar .theme-toggle,
+  .platform-topbar .notification-trigger,
+  .platform-topbar .user-menu {
     min-width: 44px;
   }
 
@@ -4073,7 +4083,16 @@
 
 @media (max-width: 480px) {
   .sh-kpi-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px;
+  }
+
+  .sh-kpi-card {
+    padding: 10px 12px;
+  }
+
+  .sh-kpi-value {
+    font-size: 1.15rem;
   }
 
   /* Ethiopian Fiscal Calendar */
@@ -4095,8 +4114,8 @@
   }
 
   .workflow-actions .sh-btn {
-    flex: 1 1 100% !important;
-    width: 100%;
+    flex: 1 1 calc(50% - 4px);
+    min-width: 120px;
   }
 
   .signature-grid > span {

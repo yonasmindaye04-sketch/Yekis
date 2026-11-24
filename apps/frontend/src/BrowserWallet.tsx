@@ -735,7 +735,7 @@ export function BrowserWallet({
                   M-Pesa are handled manually and open the transfer instructions.
                 </p>
 
-                <div className="payment-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div className="payment-grid payment-grid-3">
                   <button
                     type="button"
                     className={
@@ -895,7 +895,7 @@ export function BrowserWallet({
                 <p className="wallet-help">
                   Send money to the platform account below, then upload the receipt for staff verification:
                 </p>
-                <div className="payment-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+                <div className="payment-grid payment-grid-3">
                   <button
                     type="button"
                     className={

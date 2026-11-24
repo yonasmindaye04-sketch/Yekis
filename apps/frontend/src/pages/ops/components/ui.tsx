@@ -495,7 +495,12 @@ export function OpsTable({
           </button>
         </div>
       </div>
-      <div className={`tbl-wrap ${mobileViewMode === "cards" ? "ops-tbl-cards-mode" : "ops-tbl-scroll-mode"}`}>
+      <div
+        className={`tbl-wrap ${mobileViewMode === "cards" ? "ops-tbl-cards-mode" : "ops-tbl-scroll-mode"}`}
+        tabIndex={0}
+        role="region"
+        aria-label="Operations data table"
+      >
         <table ref={tableRef} className="tbl">
           <thead>
             <tr>

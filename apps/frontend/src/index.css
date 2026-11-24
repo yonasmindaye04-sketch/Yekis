@@ -3312,6 +3312,19 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
   }
+  .ft-modal-actions {
+    width: 100%;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .ft-modal-actions button,
+  .ft-modal-actions .btn-primary,
+  .ft-modal-actions .btn-secondary {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
 }
 
 /* === Proposal Attachments & Job Detail UI === */
@@ -3442,10 +3455,13 @@ img, video, iframe, canvas {
 
   /* Gig Marketplace & Seller Dashboard Responsive Adaptation */
   .gig-grid,
-  .gigs-grid,
+  .gigs-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   .seller-stats-grid,
   .profile-stats-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   .kyc-queue-container,
@@ -3640,7 +3656,13 @@ img, video, iframe, canvas {
 @media (max-width: 768px) {
   .refresh-button,
   .chat-attach-btn,
-  .attachment-chip button {
+  .attachment-chip button,
+  .sh-icon-only-btn,
+  .sh-topbar-menu-btn,
+  .sh-topbar-back-btn,
+  .sidebar-brand-toggle,
+  .marketing-mobile-toggle,
+  .marketing-mobile-close {
     min-width: 44px !important;
     min-height: 44px !important;
   }
@@ -4223,6 +4245,15 @@ img, video, iframe, canvas {
   .excel-sheet-card {
     padding: 20px 16px;
     gap: 16px;
+  }
+  .excel-actions-bar {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .excel-actions-bar button {
+    width: 100%;
+    min-height: 44px;
   }
   .excel-meta-grid {
     grid-template-columns: 1fr;
@@ -4834,7 +4865,11 @@ img, video, iframe, canvas {
 
 @media (max-width: 500px) {
   .tx-kpi-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .tx-kpi-card {
+    padding: 10px 12px;
   }
 }
 
