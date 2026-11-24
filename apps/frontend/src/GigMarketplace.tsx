@@ -508,11 +508,6 @@ export function GigMarketplace() {
     <section className="afro-gigs-section">
       {/* Afro-Tech Command Hero Banner */}
       <div className="afro-hero-card">
-        <div className="afro-eyebrow-row">
-          <span className="afro-pulse-dot" />
-          <p className="afro-eyebrow">Ethiopian Digital Services Escrow</p>
-        </div>
-
         <h1 className="afro-headline">Predefined Gigs, Protected by Escrow</h1>
 
         <p className="afro-subtitle">

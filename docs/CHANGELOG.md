@@ -5,6 +5,10 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Added
+- **Wallet Top-Up Default Flow & Account Update (2026-11-24)** — Updated the wallet top-up section across `apps/frontend/src/BrowserWallet.tsx`, `App.tsx`, and `FiscalDocumentModal.tsx`:
+  - **Manual Transfer & CBE Bank Defaults**: Switched the default top-up method from `"INSTANT"` to `"MANUAL"` (Manual Transfer) and the default payment rail to `"CBE_BIRR"` (CBE Bank), immediately surfacing the transfer account card and verification receipt upload form.
+  - **Updated Platform Account Numbers**: Updated Commercial Bank of Ethiopia (CBE) collection account to `1000300802428` and Safaricom M-Pesa collection phone to `0716 356 515` (Till: `882199`), synchronizing clipboard copy actions, in-sheet receipt previews, and guidance documentation.
+  - **Accessible Underline Tab Bar Styling**: Restyled the unstyled top-up mode switcher using `.tx-tab-group` and `.tx-tab-btn` with semantic `role="tablist"` / `role="tab"`, `aria-selected`, and signature underline indicators matching platform-wide styling standards.
 - **Ethiopian Fiscal Calendar (E.C. / EFY) support for Schedule & Milestone Calendar (2026-11-24)** — Enhanced the workspace schedule calendar in `apps/frontend/src/components/dashboard/CalendarScheduleView.tsx` with native Ethiopian calendar support using `kenat`:
   - **Dual Calendar Modes**: Added an interactive segmented mode switcher allowing clients and freelancers to toggle seamlessly between the Gregorian Calendar and the Ethiopian Fiscal Calendar (E.C. / EFY).
   - **Fiscal Year & Quarter Navigation**: Implemented Ethiopian fiscal-year arithmetic (Hamle 1 → Sene 30, EFY 2019) with dedicated quarterly navigation tabs (Q1 Hamle–Meskerem, Q2 Tikimt–Tahsas, Q3 Tir–Megabit, Q4 Miyazya–Sene) and dual Gregorian range indicators.
@@ -49,6 +53,7 @@ All notable implementation and documentation changes are recorded here.
   - **Operational note worth keeping:** a push to the deployed branch starts a build on its own, and that build **restores the environment it had when it started**. Setting the variables during a running build means the completed build overwrites them. Set the environment first, then deploy.
 
 ### Changed
+- **Gigs marketplace header banner cleanup (2026-11-24)** — Removed the redundant `"Ethiopian Digital Services Escrow"` eyebrow badge and pulse dot from the Afro-Tech command hero banner in `GigMarketplace.tsx`, keeping the header clean and directly anchored on the primary headline.
 - **Featured Talent Compact Cards Redesign & Direct Workflow Integration (2026-11-24)** — Overhauled the Featured Talent section (`FeaturedCarousel.tsx`, `index.css`, `mockData.ts`) to match the compact card prototype and resolve workflow navigation issues:
   - **Compact Minimalist Card Grid**: Replaced bulky scrollable carousel cards with a responsive auto-fit grid (`.ft-grid`, `.ft-card`) featuring 40px initials avatars with verified checkmark badges, 26px circular share/bookmark mini-buttons, bold name headers with theme-invariant compact status badges (`New` and `Top rated`), single-line dot-separated skill lists (`·`), and a streamlined footer with availability/jobs-delivered dots and `View profile` links. Removed all hourly rates, redundant ratings, and live socket connection text from card faces.
   - **Direct Chat Workflow Wiring**: Wired both "Hire" and "Message" modal action buttons to invoke `onOpenChat(talent.id, talent.displayName)`, dynamically provisioning a direct conversation with the specific selected talent (e.g. Selam, Dawit, Hanna, Yonas) rather than falling back to the admin support channel.

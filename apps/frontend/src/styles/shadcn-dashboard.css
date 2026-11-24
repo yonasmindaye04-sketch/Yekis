@@ -3685,6 +3685,16 @@
     min-width: 36px;
     min-height: 36px;
   }
+
+  /* Ethiopian Fiscal Calendar */
+  .sh-fiscal-bar {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .sh-fiscal-quarters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {
@@ -4064,6 +4074,15 @@
 @media (max-width: 480px) {
   .sh-kpi-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Ethiopian Fiscal Calendar */
+  .sh-fiscal-quarters {
+    grid-template-columns: 1fr;
+  }
+
+  .sh-cal-month-label {
+    min-width: 132px;
   }
 
   .sh-filter-card-actions {

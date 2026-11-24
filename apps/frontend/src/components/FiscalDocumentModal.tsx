@@ -105,7 +105,7 @@ const RAIL_META: Record<FiscalRail, RailMetaConfig> = {
   CBE_BIRR: {
     logo: "/payment/cbe payment.jpg",
     defaultRef: "FT26295XK9104",
-    settlementAccount: "1000 223 344 (Yekis Custodial Trust)",
+    settlementAccount: "1000300802428 (Yekis Custodial Trust)",
     locales: {
       en: {
         name: "CBE Birr / Commercial Bank of Ethiopia",
@@ -128,7 +128,7 @@ const RAIL_META: Record<FiscalRail, RailMetaConfig> = {
   M_PESA: {
     logo: "/payment/mpesa.svg",
     defaultRef: "RJK91M28LP04",
-    settlementAccount: "Till 882199 · +251 777 011 818",
+    settlementAccount: "Till 882199 · +251 716 356 515",
     locales: {
       en: {
         name: "Safaricom M-Pesa",

@@ -66,7 +66,7 @@ const paymentAccounts = {
   CBE_BIRR: {
     label: "CBE Bank",
     accountName: "Yekis Jobs",
-    accountNumber: "1000 223 344",
+    accountNumber: "1000300802428",
     image: "/payment/cbe payment.jpg",
     imgStyle: {
       width: "70px",
@@ -79,7 +79,7 @@ const paymentAccounts = {
   M_PESA: {
     label: "Safaricom M-Pesa",
     accountName: "Yekis Jobs",
-    accountNumber: "0777 011 818 (Till: 882199)",
+    accountNumber: "0716 356 515 (Till: 882199)",
     image: "/payment/mpesa.svg",
     imgStyle: {
       width: "70px",
@@ -218,9 +218,9 @@ export function App() {
   const [faydaIdNumber, setFaydaIdNumber] = useState("");
   const [faydaIdPhoto, setFaydaIdPhoto] = useState<File | null>(null);
   const [selfieWithIdPhoto, setSelfieWithIdPhoto] = useState<File | null>(null);
-  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
+  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("MANUAL");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
+  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("CBE_BIRR");
   const [checkoutRail, setCheckoutRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
   const [checkoutFallback, setCheckoutFallback] = useState<{
     amount: string;
@@ -2768,15 +2768,23 @@ export function App() {
                       <div className="panel-heading">
                         <h2>Add Funds</h2>
                       </div>
-                      <div className="tabs" style={{ marginBottom: 16 }}>
+                      <div className="tabs tx-tab-group" role="tablist" aria-label="Top-up method" style={{ marginBottom: 16 }}>
                         <button
-                          className={topUpMethod === "INSTANT" ? "active" : ""}
+                          type="button"
+                          role="tab"
+                          id="app-topup-tab-instant"
+                          aria-selected={topUpMethod === "INSTANT"}
+                          className={`tx-tab-btn ${topUpMethod === "INSTANT" ? "active" : ""}`}
                           onClick={() => setTopUpMethod("INSTANT")}
                         >
                           Instant Checkout
                         </button>
                         <button
-                          className={topUpMethod === "MANUAL" ? "active" : ""}
+                          type="button"
+                          role="tab"
+                          id="app-topup-tab-manual"
+                          aria-selected={topUpMethod === "MANUAL"}
+                          className={`tx-tab-btn ${topUpMethod === "MANUAL" ? "active" : ""}`}
                           onClick={() => setTopUpMethod("MANUAL")}
                         >
                           Manual Transfer

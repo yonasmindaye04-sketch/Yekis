@@ -447,7 +447,7 @@ Last updated: 2026-10-03
 > 3. Zero-Dead-End Manual Verification Fallback: Eliminated user dead-ends when automated gateway APIs are unreachable or experience latency:
 >    - *Checkout Initiation Fallback:* If automated checkout fails, clients receive an actionable fallback card offering a 1-click transition to Manual Transfer with amount and provider pre-filled.
 >    - *Receipt Attachment on Stalled Requests:* Implemented `POST /api/v1/wallet/topups/:topUpId/attach-receipt` allowing users to upload bank/mobile money receipts to existing `CHECKOUT_PENDING` requests, automatically promoting them to `PENDING` manual review.
-> 4. Operations Queue Enhancements: Updated `TopUpQueue.tsx` with color-coded provider badges (Telebirr blue, CBE purple, M-Pesa emerald) and destination account indicators (`0910 011 818`, `1000 223 344`, `0777 011 818 / Till 882199`) for fast staff verification.
+> 4. Operations Queue Enhancements: Updated `TopUpQueue.tsx` with color-coded provider badges (Telebirr blue, CBE purple, M-Pesa emerald) and destination account indicators (`0910 011 818`, `1000300802428`, `0716 356 515 / Till 882199`) for fast staff verification.
 > 5. Unified Frontend & Mobile Experience: Updated both `BrowserWallet.tsx` (Desktop Web) and `App.tsx` (Mobile & Telegram Mini App) with 3-way provider selectors, 1-click account copying, and inline receipt attachment modals.
 >
 > **Update 2026-09-05 (Afternoon - Chat Attachment Persistence & Support Desk Visibility Fix):**
