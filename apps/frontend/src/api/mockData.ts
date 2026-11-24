@@ -2548,40 +2548,60 @@ class MockStore {
     if (cleanPath === "/featured") {
       return [
         {
-          id: "usr-free-01",
-          userId: "usr-free-01",
-          displayName: "Hanna Tadesse",
+          id: "demo-selam",
+          userId: "demo-selam",
+          displayName: "Selam Tadesse",
+          roleTitle: "Content & Translation Specialist",
           avatarUrl: null,
-          primarySkill: { id: "sk-1", nameEn: "Full-Stack & FinTech Engineering" },
-          ratingAverage: 4.95,
-          totalJobsCompleted: 38,
-          completedContracts: 38,
+          primarySkill: { id: "sk-writing", nameEn: "Content Writing" },
+          skills: ["Content Writing", "Translation", "Virtual Assistance"],
+          ratingAverage: null,
+          totalJobsCompleted: 0,
+          completedContracts: 0,
           kycBadge: "shield",
-          bio: "Specialist in Telebirr, CBE Birr, and enterprise React/Node architectures.",
+          bio: "Detail-oriented freelancer focused on clear communication and on-time delivery. I help clients with content creation, English-Amharic translation, and day-to-day business administration.",
         },
         {
-          id: "usr-both-01",
-          userId: "usr-both-01",
-          displayName: "Dawit Mekonnen",
+          id: "demo-dawit",
+          userId: "demo-dawit",
+          displayName: "Dawit Tesfaye",
+          roleTitle: "Full-stack Web Developer",
           avatarUrl: null,
-          primarySkill: { id: "sk-3", nameEn: "Product UI/UX & Design Systems" },
-          ratingAverage: 4.92,
-          totalJobsCompleted: 29,
-          completedContracts: 29,
+          primarySkill: { id: "sk-react", nameEn: "React & Node.js" },
+          skills: ["React", "Node.js", "REST APIs"],
+          ratingAverage: null,
+          totalJobsCompleted: 0,
+          completedContracts: 0,
           kycBadge: "shield",
-          bio: "Designing accessible financial & logistics products for East Africa.",
+          bio: "Web developer helping small businesses and startups build fast, modern websites and dashboards. Comfortable across the entire stack — from front-ends to APIs and databases.",
         },
         {
-          id: "usr-free-03",
-          userId: "usr-free-03",
-          displayName: "Meron Alemu",
+          id: "demo-hanna",
+          userId: "demo-hanna",
+          displayName: "Hanna Bekele",
+          roleTitle: "Senior UI/UX Designer",
           avatarUrl: null,
-          primarySkill: { id: "sk-4", nameEn: "Amharic & Afaan Oromo Localization" },
-          ratingAverage: 5.0,
-          totalJobsCompleted: 51,
-          completedContracts: 51,
+          primarySkill: { id: "sk-design", nameEn: "UI/UX Design" },
+          skills: ["Figma", "Design Systems", "Prototyping"],
+          ratingAverage: 4.9,
+          totalJobsCompleted: 34,
+          completedContracts: 34,
           kycBadge: "shield",
-          bio: "Certified fintech, legal, and medical translator for Ethiopian languages.",
+          bio: "Product designer with 6+ years of experience shipping fintech and marketplace products. Specializing in design systems and end-to-end user flows.",
+        },
+        {
+          id: "demo-yonas",
+          userId: "demo-yonas",
+          displayName: "Yonas Alemu",
+          roleTitle: "Full-stack Cloud Engineer",
+          avatarUrl: null,
+          primarySkill: { id: "sk-cloud", nameEn: "Cloud & Backend" },
+          skills: ["TypeScript", "Next.js", "PostgreSQL"],
+          ratingAverage: 4.8,
+          totalJobsCompleted: 27,
+          completedContracts: 27,
+          kycBadge: "shield",
+          bio: "Full-stack engineer building reliable web applications for startups and enterprise teams. Experienced in clean architecture, automated testing, and cloud infrastructure.",
         },
       ];
     }
@@ -2621,6 +2641,125 @@ class MockStore {
         return { deleted: true };
       }
       return this.portfolioItems;
+    }
+    if (cleanPath.startsWith("/profiles/")) {
+      const targetId = cleanPath.replace("/profiles/", "").trim();
+      const u = this.getCurrentUser();
+      if (targetId && targetId !== "me" && targetId !== u.id) {
+        const demoProfiles: Record<string, any> = {
+          "demo-selam": {
+            id: "demo-selam",
+            displayName: "Selam Tadesse",
+            firstName: "Selam",
+            lastName: "Tadesse",
+            bio: "Detail-oriented freelancer focused on clear communication and on-time delivery. I help clients with content creation, English-Amharic translation, and day-to-day business administration. Ready for my first contracts on Yekis.",
+            avatarUrl: null,
+            profileCompleteness: 100,
+            isAvailableForWork: true,
+            profileVisibility: "PUBLIC",
+            primarySkillId: "sk-writing",
+            skills: [
+              { id: "sk-writing", nameEn: "Content Writing" },
+              { id: "sk-trans", nameEn: "Translation" },
+              { id: "sk-va", nameEn: "Virtual Assistance" },
+            ],
+            portfolio: [],
+            kyc: { tier: "TIER_1", status: "VERIFIED", badgeType: "FAYDA_VERIFIED" },
+            stats: {
+              jobsCompleted: 0,
+              rating: { average: null, count: 0 },
+              earnedRange: "New",
+              memberSince: "2026-11-01T00:00:00.000Z",
+            },
+            isOwnProfile: false,
+            canViewFullProfile: true,
+          },
+          "demo-dawit": {
+            id: "demo-dawit",
+            displayName: "Dawit Tesfaye",
+            firstName: "Dawit",
+            lastName: "Tesfaye",
+            bio: "Web developer helping small businesses and startups build fast, modern websites and dashboards. Comfortable across the entire stack — from responsive front-ends to APIs, database design, and cloud deployment.",
+            avatarUrl: null,
+            profileCompleteness: 100,
+            isAvailableForWork: true,
+            profileVisibility: "PUBLIC",
+            primarySkillId: "sk-react",
+            skills: [
+              { id: "sk-react", nameEn: "React & Node.js" },
+              { id: "sk-api", nameEn: "REST APIs" },
+              { id: "sk-css", nameEn: "Tailwind CSS" },
+            ],
+            portfolio: [],
+            kyc: { tier: "TIER_1", status: "VERIFIED", badgeType: "FAYDA_VERIFIED" },
+            stats: {
+              jobsCompleted: 0,
+              rating: { average: null, count: 0 },
+              earnedRange: "New",
+              memberSince: "2026-11-01T00:00:00.000Z",
+            },
+            isOwnProfile: false,
+            canViewFullProfile: true,
+          },
+          "demo-hanna": {
+            id: "demo-hanna",
+            displayName: "Hanna Bekele",
+            firstName: "Hanna",
+            lastName: "Bekele",
+            bio: "Product designer with 6+ years of experience shipping fintech and marketplace products. I specialise in design systems and end-to-end user flows — from discovery research to polished, developer-ready Figma handoff.",
+            avatarUrl: null,
+            profileCompleteness: 100,
+            isAvailableForWork: true,
+            profileVisibility: "PUBLIC",
+            primarySkillId: "sk-design",
+            skills: [
+              { id: "sk-design", nameEn: "UI/UX Design" },
+              { id: "sk-figma", nameEn: "Figma" },
+              { id: "sk-ds", nameEn: "Design Systems" },
+            ],
+            portfolio: [],
+            kyc: { tier: "TIER_2", status: "VERIFIED", badgeType: "FAYDA_VERIFIED" },
+            stats: {
+              jobsCompleted: 34,
+              rating: { average: 4.9, count: 31 },
+              earnedRange: "ETB 250,000+",
+              memberSince: "2025-03-01T00:00:00.000Z",
+            },
+            isOwnProfile: false,
+            canViewFullProfile: true,
+          },
+          "demo-yonas": {
+            id: "demo-yonas",
+            displayName: "Yonas Alemu",
+            firstName: "Yonas",
+            lastName: "Alemu",
+            bio: "Full-stack engineer building reliable web applications for startups and enterprise teams. I value clean architecture, automated testing, and transparent delivery milestones.",
+            avatarUrl: null,
+            profileCompleteness: 100,
+            isAvailableForWork: true,
+            profileVisibility: "PUBLIC",
+            primarySkillId: "sk-cloud",
+            skills: [
+              { id: "sk-cloud", nameEn: "Cloud & Backend" },
+              { id: "sk-ts", nameEn: "TypeScript" },
+              { id: "sk-pg", nameEn: "PostgreSQL" },
+            ],
+            portfolio: [],
+            kyc: { tier: "TIER_2", status: "VERIFIED", badgeType: "FAYDA_VERIFIED" },
+            stats: {
+              jobsCompleted: 27,
+              rating: { average: 4.8, count: 24 },
+              earnedRange: "ETB 310,000+",
+              memberSince: "2025-06-01T00:00:00.000Z",
+            },
+            isOwnProfile: false,
+            canViewFullProfile: true,
+          },
+        };
+        if (demoProfiles[targetId]) {
+          return demoProfiles[targetId];
+        }
+      }
     }
     if (cleanPath.includes("/profile")) {
       if (method === "PATCH" && parsedBody) {
@@ -2812,24 +2951,55 @@ class MockStore {
       method === "POST"
     ) {
       const isSupport = cleanPath.includes("support") || cleanPath.includes("guest");
+      const recipientId = String(parsedBody?.recipientId || "");
+      const demoNames: Record<string, string> = {
+        "demo-selam": "Selam Tadesse",
+        "demo-dawit": "Dawit Tesfaye",
+        "demo-hanna": "Hanna Bekele",
+        "demo-yonas": "Yonas Alemu",
+        "demo-meron": "Meron Haile",
+        "demo-abel": "Abel Girma",
+        "usr-free-01": "Hanna Tadesse",
+        "usr-both-01": "Dawit Mekonnen",
+      };
+      const recipientName =
+        String(parsedBody?.recipientName || "") ||
+        demoNames[recipientId] ||
+        (recipientId.startsWith("demo-")
+          ? recipientId.replace("demo-", "").charAt(0).toUpperCase() + recipientId.replace("demo-", "").slice(1)
+          : isSupport ? "Yekis Support Desk" : "Verified Freelancer");
+
+      if (!isSupport && recipientId) {
+        const existingConv = this.conversations.find(
+          (c) => !c.isSupport && c.otherParticipant?.id === recipientId
+        );
+        if (existingConv) {
+          return { ...existingConv, accessToken: "mock-guest-token" };
+        }
+      }
+
+      const targetId = isSupport ? "usr-admin-01" : (recipientId || "usr-free-01");
+      const targetEmail = isSupport ? "support@yekis.et" : `${recipientId || "freelancer"}@yekis.et`;
+      const targetRole = isSupport ? "ADMIN" : "FREELANCER";
+
       const newConv: ChatConversation = {
-        id: `conv-${Date.now()}`,
-        subject: String(parsedBody?.subject || (isSupport ? "Support Request" : "Direct Project Discussion")),
+        id: isSupport ? `conv-support-${Date.now()}` : `conv-direct-${recipientId || Date.now()}`,
+        subject: String(parsedBody?.subject || (isSupport ? "Support Request" : `Direct discussion with ${recipientName}`)),
         status: "OPEN",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        latestMessage: parsedBody?.body
-          ? {
-              body: String(parsedBody.body),
-              createdAt: new Date().toISOString(),
-              senderId: this.getCurrentUser().id,
-            }
-          : null,
+        latestMessage: {
+          body: isSupport
+            ? "Selam! Welcome to Yekis Support. How can our escrow or verification team help you today?"
+            : `Selam! Thanks for reaching out. I'm available to collaborate on your project deliverables and milestones.`,
+          createdAt: new Date().toISOString(),
+          senderId: targetId,
+        },
         otherParticipant: {
-          id: isSupport ? "usr-admin-01" : "usr-free-01",
-          email: isSupport ? "support@yekis.et" : "hanna.tadesse@addisdev.et",
-          role: isSupport ? "ADMIN" : "FREELANCER",
-          displayName: isSupport ? "Yekis Support Desk" : "Hanna Tadesse",
+          id: targetId,
+          email: targetEmail,
+          role: targetRole,
+          displayName: recipientName,
         },
         isSupport,
         unread: false,
@@ -2840,17 +3010,17 @@ class MockStore {
         {
           id: `msg-${Date.now()}`,
           conversationId: newConv.id,
-          senderId: "usr-admin-01",
+          senderId: targetId,
           body: isSupport
             ? "Selam! Welcome to Yekis Support. How can our escrow or verification team help you today?"
-            : "Selam! Let's discuss the project milestones and deliverables here.",
+            : `Selam! Thanks for reaching out. I'm available to collaborate on your project deliverables and milestones.`,
           createdAt: new Date().toISOString(),
           sender: {
-            id: "usr-admin-01",
-            email: "support@yekis.et",
-            role: "ADMIN",
-            staffRole: "SUPER_ADMIN",
-            displayName: isSupport ? "Yekis Support Desk" : "Hanna Tadesse",
+            id: targetId,
+            email: targetEmail,
+            role: (isSupport ? "ADMIN" : "FREELANCER") as any,
+            staffRole: (isSupport ? "SUPER_ADMIN" : null) as any,
+            displayName: recipientName,
           },
         },
       ];

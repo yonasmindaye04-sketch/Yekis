@@ -56,6 +56,19 @@ Last validated: 2026-11-22
 > - The five settings choices were unstyled buttons inside `.sh-segmented` (no `.sh-seg-btn`), so their labels collided. `SettingsWorkspace.tsx` now uses a dedicated `.settings-tabbar` with the marketing-header underline indicator on hover, focus and the active section, plus a `Settings / <section>` breadcrumb.
 > - The bar is a responsive 5/3/2/1-column grid, and the tabs are a full ARIA tablist (`role="tab"`/`tabpanel`, `aria-selected`, Left/Right/Home/End keys). Styling lives in the new `apps/frontend/src/SettingsWorkspace.css`.
 > - **Verified:** `pnpm --filter frontend build` passes with 0 errors (`tsc -b && vite build`).
+>
+> **Tab bar styling unified across views to match the Settings underline design (2026-11-24):**
+> - The disparate tab treatments across core views (`GigMarketplace` outline buttons, `WorkflowWorkspace` segmented control pill containers, and `BrowserWallet` filled green pill buttons) were updated to match the `SettingsWorkspace` tab bar pattern (`settings-tabbar` / `settings-tab`).
+> - Replaced container pill backgrounds, green outline borders, and filled pills with a clean transparent surface and a centered 2px bottom accent underline (`::after`) that scales in on hover, focus-visible, and active states.
+> - Active tabs feature bold text and primary-colored SVG glyphs (`var(--color-primary)`), while inactive tabs use quiet secondary text (`var(--color-text-secondary)`).
+> - Validated full responsive horizontal scrolling (`overflow-x: auto`), touch gesture handling, ARIA `role="tablist"`/`role="tab"`/`aria-selected` compliance, and theme-invariant geometry.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
+>
+> **Ethiopian Fiscal Calendar (E.C. / EFY) support in workspace schedule (2026-11-24):**
+> - Enhanced `CalendarScheduleView.tsx` with a dual-mode calendar toggle (Gregorian and Ethiopian Fiscal Calendar) using `kenat` for precision date conversions.
+> - Integrated Ethiopian Fiscal Year logic (EFY, Hamle 1 → Sene 30) with quarterly tabs (Q1–Q4) and dual bilingual labels (Amharic & English).
+> - Included contextual calculation hints inside the milestone creation dialog showing corresponding EFY dates and quarters.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
 
 
 > **A profile photo saves, and Settings stops returning 500 (2026-11-18):**

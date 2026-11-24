@@ -1338,9 +1338,11 @@ export function BrowserWallet({
             </div>
           </div>
 
-          <div className="tx-tab-group">
+          <div className="tx-tab-group" role="tablist" aria-label="Filter transactions by category">
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "ALL"}
               className={`tx-tab-btn ${movementCategoryFilter === "ALL" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("ALL")}
             >
@@ -1348,20 +1350,26 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "IN"}
               className={`tx-tab-btn ${movementCategoryFilter === "IN" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("IN")}
             >
-              <ArrowDownLeft size={13} /> Money In (+{movements.filter((m) => m.direction === "IN").length})
+              <ArrowDownLeft size={13} aria-hidden="true" /> Money In (+{movements.filter((m) => m.direction === "IN").length})
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "OUT"}
               className={`tx-tab-btn ${movementCategoryFilter === "OUT" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("OUT")}
             >
-              <ArrowUpRight size={13} /> Money Out (-{movements.filter((m) => m.direction === "OUT").length})
+              <ArrowUpRight size={13} aria-hidden="true" /> Money Out (-{movements.filter((m) => m.direction === "OUT").length})
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "PAYOUT"}
               className={`tx-tab-btn ${movementCategoryFilter === "PAYOUT" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("PAYOUT")}
             >
@@ -1369,6 +1377,8 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "TOP_UP"}
               className={`tx-tab-btn ${movementCategoryFilter === "TOP_UP" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("TOP_UP")}
             >
@@ -1376,6 +1386,8 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "ESCROW_LOCK"}
               className={`tx-tab-btn ${movementCategoryFilter === "ESCROW_LOCK" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("ESCROW_LOCK")}
             >

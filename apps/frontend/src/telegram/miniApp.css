@@ -128,10 +128,15 @@
   color: #f7faf9 !important;
 }
 
-:root[data-theme="dark"] .mini-app-shell .bottom-nav button.active,
-:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button.active {
+:root[data-theme="dark"] .mini-app-shell .bottom-nav button.active {
   background: #22c55e !important;
   color: #09090b !important;
+}
+
+:root[data-theme="dark"] .mini-platform-shell .platform-mobile-nav button.active {
+  background: transparent !important;
+  color: #22c55e !important;
+  border-top-color: #22c55e !important;
 }
 
 :root[data-theme="dark"] .welcome-screen .btn-primary,
@@ -288,10 +293,15 @@
   color: #0f172a !important;
 }
 
-:root[data-theme="light"] .mini-app-shell .bottom-nav button.active,
-:root[data-theme="light"] .mini-platform-shell .platform-mobile-nav button.active {
+:root[data-theme="light"] .mini-app-shell .bottom-nav button.active {
   background: #16a34a !important;
   color: #ffffff !important;
+}
+
+:root[data-theme="light"] .mini-platform-shell .platform-mobile-nav button.active {
+  background: transparent !important;
+  color: #16a34a !important;
+  border-top-color: #16a34a !important;
 }
 
 :root[data-theme="light"] .welcome-screen .btn-primary,
@@ -387,6 +397,57 @@
   width: 100%;
   padding-top: 6px;
   padding-bottom: 24px;
+}
+
+/* Telegram Mini App Space Ergonomics & Layout Optimization */
+.mini-platform-shell .platform-topbar {
+  padding: 12px 14px 10px;
+}
+.mini-platform-shell .platform-content {
+  padding: 12px 12px 84px;
+}
+.mini-platform-shell .overview-hero {
+  padding: 16px 14px;
+  gap: 12px;
+  border-radius: 12px;
+}
+.mini-platform-shell .overview-hero h2 {
+  font-size: 1.35rem;
+  line-height: 1.15;
+  margin: 4px 0 6px;
+}
+.mini-platform-shell .overview-hero p:not(.eyebrow) {
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+.mini-platform-shell .platform-metrics {
+  grid-template-columns: repeat(2, 1fr) !important;
+  gap: 8px !important;
+  margin: 10px 0 !important;
+}
+.mini-platform-shell .platform-metrics .metric-card {
+  padding: 12px 10px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 82px;
+  box-sizing: border-box;
+}
+.mini-platform-shell .platform-metrics .metric-card strong {
+  font-size: 1.15rem;
+  margin: 2px 0;
+}
+.mini-platform-shell .platform-metrics .metric-card small {
+  font-size: 0.72rem;
+}
+.mini-platform-shell .platform-metrics .metric-card span {
+  font-size: 0.7rem;
+}
+.mini-platform-shell .panel {
+  padding: 14px 12px;
+  border-radius: 12px;
+  margin-bottom: 12px;
 }
 
 

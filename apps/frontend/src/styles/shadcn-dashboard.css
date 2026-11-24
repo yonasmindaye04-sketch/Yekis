@@ -2110,15 +2110,18 @@
 
 .sh-filter-card .sh-segmented {
   display: flex;
-  align-items: center;
-  gap: 3px;
-  padding: 3px;
+  align-items: stretch;
+  gap: 4px;
+  padding: 4px 6px 0;
   flex-shrink: 0;
   max-width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   overscroll-behavior-x: contain;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .sh-filter-card .sh-segmented::-webkit-scrollbar {
@@ -2126,8 +2129,74 @@
 }
 
 .sh-filter-card .sh-seg-btn {
-  flex-shrink: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 6px 12px 10px;
+  border: 0;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.sh-filter-card .sh-seg-btn svg {
+  flex-shrink: 0;
+}
+
+/* Accent underline centered under tab, matching Settings tabbar */
+.sh-filter-card .sh-seg-btn::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 220ms ease;
+}
+
+.sh-filter-card .sh-seg-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+
+.sh-filter-card .sh-seg-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+  color: var(--color-text);
+}
+
+.sh-filter-card .sh-seg-btn.active,
+.sh-filter-card .sh-seg-btn[aria-selected="true"] {
+  background: transparent;
+  color: var(--color-text);
+  box-shadow: none;
+}
+
+.sh-filter-card .sh-seg-btn.active svg,
+.sh-filter-card .sh-seg-btn[aria-selected="true"] svg {
+  color: var(--color-primary);
+}
+
+.sh-filter-card .sh-seg-btn:hover::after,
+.sh-filter-card .sh-seg-btn:focus-visible::after,
+.sh-filter-card .sh-seg-btn.active::after,
+.sh-filter-card .sh-seg-btn[aria-selected="true"]::after {
+  transform: scaleX(1);
 }
 
 .sh-filter-card-actions {
@@ -2621,11 +2690,35 @@
   gap: 6px;
 }
 
+.sh-cal-month-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-width: 168px;
+  text-align: center;
+}
+
 .sh-cal-month-title {
   font-size: 0.92rem;
   font-weight: 700;
-  min-width: 130px;
+  min-width: 0;
+  white-space: nowrap;
   text-align: center;
+}
+
+.sh-cal-month-sub {
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--color-neutral-text, #64748b);
+  white-space: nowrap;
+}
+
+.sh-cal-mode-toggle .sh-seg-btn {
+  min-width: 0;
+  padding: 0 12px;
 }
 
 .sh-cal-split {
@@ -2826,6 +2919,197 @@
 
 .sh-upcoming-row:hover {
   border-color: var(--color-primary);
+}
+
+.sh-cal-upcoming-empty {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-neutral-text, #64748b);
+}
+
+/* ── Ethiopian Fiscal Calendar ───────────────────────────────────────────── */
+.sh-fiscal-bar {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.85fr) minmax(0, 2fr);
+  gap: 14px;
+  align-items: stretch;
+  padding: 12px 14px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--sh-radius);
+}
+
+.sh-fiscal-summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  min-width: 0;
+}
+
+.sh-fiscal-eyebrow {
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-fiscal-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sh-fiscal-title-row strong {
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.sh-fiscal-year-greg {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.sh-fiscal-range {
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-fiscal-range-sep {
+  color: var(--color-border-strong, #d9e1e5);
+}
+
+.sh-fiscal-quarters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sh-fiscal-quarter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 58px;
+  padding: 8px 10px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--sh-radius) - 2px);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.sh-fiscal-quarter:hover {
+  border-color: var(--color-primary);
+}
+
+.sh-fiscal-quarter.active {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.sh-fiscal-quarter-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.sh-fiscal-quarter-months {
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-fiscal-quarter-meta {
+  margin-top: auto;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.sh-cal-day-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+}
+
+.sh-cal-alt-date {
+  font-size: 0.6rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-cal-dual-date {
+  margin: 3px 0 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sh-cal-amharic-date {
+  margin: 1px 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-cal-fiscal-context {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: calc(var(--sh-radius) - 2px);
+}
+
+.sh-cal-fiscal-context-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-cal-fiscal-context strong {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.sh-cal-fiscal-context-months {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-cal-fiscal-context-range {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-form-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-neutral-text, #64748b);
 }
 
 /* ── Slide-Over Sheet (Layout Customizer & Row Inspector) ───────────────── */
@@ -3371,7 +3655,7 @@
 
   .sh-filter-card .sh-seg-btn {
     min-height: 38px;
-    padding: 0 12px;
+    padding: 6px 12px 10px;
     font-size: 0.8rem;
   }
 

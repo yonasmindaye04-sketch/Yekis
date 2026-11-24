@@ -1,14 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
-  Star,
-  Shield,
-  ChevronLeft,
-  ChevronRight,
-  Sparkles,
   Bookmark,
   Share2,
   ArrowRight,
-  CheckCircle,
+  ChevronLeft,
   X,
   MapPin,
   Globe,
@@ -16,8 +11,9 @@ import {
   Briefcase,
   MessageSquare,
   ExternalLink,
+  Star,
+  CheckCircle,
 } from "lucide-react";
-import { YekisAvatar } from "./components/YekisAvatar";
 import { api } from "./api/client";
 
 export interface TalentReview {
@@ -77,8 +73,8 @@ function persistSavedTalentIds(ids: Set<string>): void {
   }
 }
 
-// Built-in verified talent profiles (Ethiopian talent showcase)
-const DEMO_TALENTS: TalentItem[] = [
+// Built-in verified talent profiles (Ethiopian talent showcase matching prototype)
+export const DEMO_TALENTS: TalentItem[] = [
   {
     id: "demo-selam",
     displayName: "Selam Tadesse",
@@ -113,7 +109,7 @@ const DEMO_TALENTS: TalentItem[] = [
     hue: 210,
     avatarUrl: null,
     primarySkill: { id: "sk-react", nameEn: "React & Node.js" },
-    skills: ["React", "Node.js", "REST APIs", "Tailwind CSS"],
+    skills: ["React", "Node.js", "REST APIs"],
     portfolioUrl: "dawit.dev",
     isNew: true,
     kycBadge: "shield",
@@ -140,7 +136,7 @@ const DEMO_TALENTS: TalentItem[] = [
     hue: 265,
     avatarUrl: null,
     primarySkill: { id: "sk-design", nameEn: "UI/UX Design" },
-    skills: ["Figma", "Design Systems", "Prototyping", "User Research"],
+    skills: ["Figma", "Design Systems", "Prototyping"],
     portfolioUrl: "hannabekele.design",
     isNew: false,
     kycBadge: "shield",
@@ -180,7 +176,7 @@ const DEMO_TALENTS: TalentItem[] = [
     hue: 25,
     avatarUrl: null,
     primarySkill: { id: "sk-cloud", nameEn: "Cloud & Backend" },
-    skills: ["TypeScript", "Next.js", "PostgreSQL", "Docker", "AWS"],
+    skills: ["TypeScript", "Next.js", "PostgreSQL"],
     portfolioUrl: "yonasalemu.dev",
     isNew: false,
     kycBadge: "shield",
@@ -213,6 +209,9 @@ const DEMO_TALENTS: TalentItem[] = [
       },
     ],
   },
+];
+
+const EXTRA_DEMO_TALENTS: TalentItem[] = [
   {
     id: "demo-meron",
     displayName: "Meron Haile",
@@ -220,7 +219,7 @@ const DEMO_TALENTS: TalentItem[] = [
     hue: 330,
     avatarUrl: null,
     primarySkill: { id: "sk-video", nameEn: "Video Production" },
-    skills: ["Premiere Pro", "After Effects", "Motion Graphics", "Color Grading"],
+    skills: ["Premiere Pro", "After Effects", "Motion Graphics"],
     portfolioUrl: "meronhaile.studio",
     isNew: false,
     kycBadge: "shield",
@@ -238,20 +237,7 @@ const DEMO_TALENTS: TalentItem[] = [
     verifiedOn: "Jan 8, 2026",
     about:
       "Video editor for commercial brands, event producers, and creators. Short-form reels, product teasers, and high-production company overviews with crisp pacing, clear audio, and cinematic color grading.",
-    reviews: [
-      {
-        name: "Sara M.",
-        stars: 5,
-        date: "Nov 2026",
-        text: "Turned 4 hours of event footage into a 3-minute highlight reel that our whole team loved. Two rounds of revisions, zero friction.",
-      },
-      {
-        name: "Nahom B.",
-        stars: 4,
-        date: "Sep 2026",
-        text: "Great eye for pacing and music selection. Delivered ahead of schedule and handled feedback quickly.",
-      },
-    ],
+    reviews: [],
   },
   {
     id: "demo-abel",
@@ -260,7 +246,7 @@ const DEMO_TALENTS: TalentItem[] = [
     hue: 190,
     avatarUrl: null,
     primarySkill: { id: "sk-data", nameEn: "Data Analytics" },
-    skills: ["Python", "SQL", "Power BI", "Excel Models", "Dashboards"],
+    skills: ["Python", "SQL", "Power BI"],
     portfolioUrl: "abelgirma.data",
     isNew: false,
     kycBadge: "shield",
@@ -278,22 +264,31 @@ const DEMO_TALENTS: TalentItem[] = [
     verifiedOn: "Feb 20, 2025",
     about:
       "I turn complex spreadsheets and operational databases into clear visual decisions. Custom dashboards, automated reporting pipelines, and KPI tracking that non-technical leadership teams can easily act upon.",
-    reviews: [
-      {
-        name: "Helen W.",
-        stars: 5,
-        date: "Nov 2026",
-        text: "Abel built a sales dashboard that replaced three manual weekly spreadsheets. Paid for itself in the very first month.",
-      },
-      {
-        name: "Yared S.",
-        stars: 5,
-        date: "Oct 2026",
-        text: "Rare mix of technical depth and clear business explanations. He walked our managers through every metric so we can maintain it ourselves.",
-      },
-    ],
+    reviews: [],
   },
 ];
+
+export function getDemoTalentById(id: string): TalentItem | undefined {
+  return DEMO_TALENTS.find((t) => t.id === id) || EXTRA_DEMO_TALENTS.find((t) => t.id === id);
+}
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 0) return "ST";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function getAvatarColor(talent: TalentItem): string {
+  if (talent.id === "demo-selam" || talent.displayName.includes("Selam")) return "#6366f1";
+  if (talent.id === "demo-dawit" || talent.displayName.includes("Dawit")) return "#84cc16";
+  if (talent.id === "demo-hanna" || talent.displayName.includes("Hanna")) return "#8b5cf6";
+  if (talent.id === "demo-yonas" || talent.displayName.includes("Yonas")) return "#65a30d";
+  if (talent.id === "demo-meron" || talent.displayName.includes("Meron")) return "#ec4899";
+  if (talent.id === "demo-abel" || talent.displayName.includes("Abel")) return "#06b6d4";
+  if (talent.hue) return `hsl(${talent.hue}, 65%, 45%)`;
+  return "#6366f1";
+}
 
 // Clean Ethiopian Flag Icon (SVG clip path, no emoji)
 export const EthiopianFlagIcon = () => (
@@ -318,19 +313,17 @@ export const EthiopianFlagIcon = () => (
 
 export const FeaturedCarousel = ({
   onProfileClick,
+  onOpenChat,
 }: {
   onProfileClick?: (id: string) => void;
+  onOpenChat?: (userId: string, userName?: string) => void;
 }) => {
   const [talents, setTalents] = useState<TalentItem[]>(DEMO_TALENTS);
   const [activeFilter, setActiveFilter] = useState<"all" | "saved">("all");
   const [savedIds, setSavedIds] = useState<Set<string>>(() => getSavedTalentIds());
   const [selectedTalent, setSelectedTalent] = useState<TalentItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [currentTime, setCurrentTime] = useState<string>("Live");
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = (msg: string) => {
@@ -355,12 +348,13 @@ export const FeaturedCarousel = ({
             const hue = hues[idx % hues.length];
             const isNew = !t.ratingAverage || t.totalJobsCompleted === 0;
             const primarySkillName =
+              t.roleTitle ||
               t.primarySkill?.nameEn ||
               t.primarySkill?.nameAm ||
               "Professional Freelancer";
 
             return {
-              id: t.id,
+              id: t.id || t.userId || `featured-${idx}`,
               displayName: t.displayName || "Verified Freelancer",
               avatarUrl: t.avatarUrl || null,
               primarySkill: t.primarySkill || { id: "primary", nameEn: primarySkillName },
@@ -373,21 +367,22 @@ export const FeaturedCarousel = ({
               ratingCount: t.ratingCount || 0,
               totalJobsCompleted: t.totalJobsCompleted || 0,
               onTimePercent: t.totalJobsCompleted > 0 ? "98%" : null,
-              hourlyRateETB: 950 + (idx % 5) * 250,
-              location: "Addis Ababa",
-              languages: "Amharic, English",
-              memberSince: "2025",
-              verifiedOn: "Verified",
+              hourlyRateETB: t.hourlyRateETB || 950 + (idx % 5) * 250,
+              location: t.location || "Addis Ababa",
+              languages: t.languages || "Amharic, English",
+              memberSince: t.memberSince || "2025",
+              verifiedOn: t.verifiedOn || "Verified",
               kycBadge: t.kycBadge || "shield",
               kycTier: t.kycTier || 1,
               isAvailableForWork: t.isAvailableForWork !== false,
-              responseTime: "~1 hr",
-              portfolioUrl: null,
+              responseTime: t.responseTime || "~1 hr",
+              portfolioUrl: t.portfolioUrl || null,
               about:
                 t.bio ||
+                t.about ||
                 "Verified Ethiopian professional with proven domain expertise. Dedicated to reliable delivery and transparent communication on Yekis.",
-              reviews: [],
-              hue,
+              reviews: t.reviews || [],
+              hue: t.hue || hue,
               isNew,
             };
           });
@@ -402,47 +397,6 @@ export const FeaturedCarousel = ({
       cancelled = true;
     };
   }, []);
-
-  // Live timestamp clock update
-  useEffect(() => {
-    const updateTime = () => {
-      setCurrentTime(
-        new Date().toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        }),
-      );
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Update carousel scroll navigation buttons
-  const checkScroll = () => {
-    if (!scrollRef.current) return;
-    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-    setCanScrollLeft(scrollLeft > 4);
-    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 6);
-  };
-
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener("resize", checkScroll);
-    return () => window.removeEventListener("resize", checkScroll);
-  }, [talents]);
-
-  const handleScroll = (direction: "left" | "right") => {
-    if (scrollRef.current) {
-      const card = scrollRef.current.querySelector(".carousel-card");
-      const step = card ? (card.getBoundingClientRect().width + 18) * 1.5 : 420;
-      scrollRef.current.scrollBy({
-        left: direction === "left" ? -step : step,
-        behavior: "smooth",
-      });
-      setTimeout(checkScroll, 350);
-    }
-  };
 
   // Toggle Shortlist Bookmark
   const toggleSaveTalent = (e: React.MouseEvent, talent: TalentItem) => {
@@ -496,118 +450,83 @@ export const FeaturedCarousel = ({
   };
 
   return (
-    <section className="carousel-section" aria-label="Featured Talent">
+    <section className="ft-wrap" aria-label="Featured Talent">
       {/* Toast Notification */}
-      {toastMessage && <div className="ft-toast">{toastMessage}</div>}
+      {toastMessage && (
+        <div className="ft-toast show" role="status">
+          {toastMessage}
+        </div>
+      )}
 
       {/* Header */}
-      <div className="carousel-header">
-        <div className="carousel-title-group">
-          <h2>Featured Talent</h2>
-          <span className="carousel-subtitle">
-            Top verified Ethiopian professionals available for hire
-          </span>
+      <div className="ft-head">
+        <div>
+          <h2 className="ft-title">Featured Talent</h2>
+          <p className="ft-sub">Verified Ethiopian professionals available for hire</p>
         </div>
 
-        <div className="carousel-header-actions">
-          {/* All vs Saved filter pills */}
-          <div className="carousel-filter-pills" role="tablist" aria-label="Talent filter">
+        <div className="ft-controls">
+          <div className="ft-tabs" role="tablist" aria-label="Talent filter">
             <button
               type="button"
-              className={`carousel-filter-btn ${activeFilter === "all" ? "active" : ""}`}
+              className={`ft-tab ${activeFilter === "all" ? "active" : ""}`}
+              role="tab"
+              aria-selected={activeFilter === "all"}
               onClick={() => setActiveFilter("all")}
             >
-              All ({talents.length})
+              All <span>({talents.length})</span>
             </button>
             <button
               type="button"
-              className={`carousel-filter-btn ${activeFilter === "saved" ? "active" : ""}`}
+              className={`ft-tab ${activeFilter === "saved" ? "active" : ""}`}
+              role="tab"
+              aria-selected={activeFilter === "saved"}
               onClick={() => setActiveFilter("saved")}
             >
-              <Bookmark size={13} />
-              Saved ({savedIds.size})
-            </button>
-          </div>
-
-          {/* Navigation Controls */}
-          <div className="carousel-controls">
-            <button
-              type="button"
-              onClick={() => handleScroll("left")}
-              className="carousel-btn"
-              disabled={!canScrollLeft}
-              aria-label="Scroll left"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleScroll("right")}
-              className="carousel-btn"
-              disabled={!canScrollRight}
-              aria-label="Scroll right"
-            >
-              <ChevronRight size={18} />
+              <Bookmark size={12} strokeWidth={2} />
+              Saved <span>({savedIds.size})</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Carousel Track */}
+      {/* Grid */}
       {displayedTalents.length === 0 ? (
-        <div
-          style={{
-            padding: "36px 20px",
-            textAlign: "center",
-            background: "var(--color-bg-elevated)",
-            borderRadius: "16px",
-            border: "1px dashed var(--color-border)",
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          <Bookmark size={24} style={{ margin: "0 auto 8px", opacity: 0.5 }} />
-          <p style={{ margin: 0, fontWeight: 600 }}>No saved freelancers yet</p>
-          <p style={{ margin: "4px 0 12px", fontSize: "0.82rem" }}>
-            Click the bookmark icon on any talent card to add them to your shortlist.
-          </p>
-          <button
-            type="button"
-            className="carousel-filter-btn active"
-            onClick={() => setActiveFilter("all")}
-          >
-            Browse all talents
-          </button>
+        <div className="ft-empty">
+          No saved professionals yet. Use the bookmark icon to save a profile.
         </div>
       ) : (
-        <div
-          ref={scrollRef}
-          onScroll={checkScroll}
-          className="carousel-list"
-          role="region"
-          aria-label="Talent list"
-        >
+        <section className="ft-grid" aria-label="Featured professionals">
           {displayedTalents.map((talent) => {
             const name = talent.displayName?.trim() || "Verified Freelancer";
-            const skillName =
+            const role =
               talent.roleTitle ||
               talent.primarySkill?.nameEn ||
               "Professional Freelancer";
             const isSaved = savedIds.has(talent.id);
-            const hue = talent.hue || 160;
-
-            const hasRating =
-              talent.ratingAverage !== null &&
-              talent.ratingAverage !== undefined &&
-              talent.ratingAverage > 0;
+            const initials = getInitials(name);
+            const avatarBg = getAvatarColor(talent);
+            const skills = (
+              talent.skills && talent.skills.length > 0
+                ? talent.skills
+                : [role]
+            ).slice(0, 3);
+            const isNew = talent.isNew || talent.totalJobsCompleted === 0;
+            const isTopRated = !isNew && (talent.ratingAverage ?? 0) >= 4.8;
+            const statusText =
+              talent.totalJobsCompleted > 0
+                ? `${talent.totalJobsCompleted} jobs delivered`
+                : "Available";
+            const isAvailable = statusText === "Available";
 
             return (
               <article
                 key={talent.id}
+                className="ft-card"
+                data-id={talent.id}
                 onClick={() => handleCardClick(talent)}
-                className="carousel-card"
-                style={{ "--h": hue } as React.CSSProperties}
-                role="button"
                 tabIndex={0}
+                role="button"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
@@ -615,146 +534,87 @@ export const FeaturedCarousel = ({
                   }
                 }}
               >
-                {/* Card Top: Avatar + Action icons */}
-                <div className="carousel-card-top">
-                  <span className="carousel-avatar-wrap">
-                    <YekisAvatar
-                      userId={talent.id.startsWith("demo-") ? null : talent.id}
-                      displayName={name}
-                      avatarUrl={talent.avatarUrl}
-                      size={58}
-                      animate="hover"
-                    />
-                    <span
-                      className="carousel-badge-shield"
-                      title="Fayda National ID Verified"
-                      aria-label="Fayda Verified"
-                    >
-                      <Shield size={11} strokeWidth={2.6} />
+                <div className="ft-card-top">
+                  <div className="ft-avatar" style={{ backgroundColor: avatarBg }}>
+                    {initials}
+                    <span className="check" title="Verified">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <path d="M5 12l5 5L20 7" />
+                      </svg>
                     </span>
-                  </span>
-
-                  <div className="carousel-top-actions">
+                  </div>
+                  <div className="ft-actions">
                     <button
                       type="button"
-                      className="carousel-circle-btn"
+                      className="ft-mini"
                       onClick={(e) => handleShare(e, talent)}
-                      title="Share profile link"
-                      aria-label="Share profile"
+                      aria-label={`Share ${name}`}
                     >
-                      <Share2 size={14} />
+                      <Share2 size={13} strokeWidth={2} />
                     </button>
                     <button
                       type="button"
-                      className={`carousel-circle-btn ${isSaved ? "saved" : ""}`}
+                      className="ft-mini"
                       onClick={(e) => toggleSaveTalent(e, talent)}
-                      title={isSaved ? "Remove from shortlist" : "Save to shortlist"}
-                      aria-label="Bookmark"
+                      aria-pressed={isSaved}
+                      aria-label={`Save ${name}`}
                     >
-                      <Bookmark size={14} fill={isSaved ? "currentColor" : "none"} />
+                      <Bookmark
+                        size={13}
+                        strokeWidth={2}
+                        fill={isSaved ? "currentColor" : "none"}
+                      />
                     </button>
                   </div>
                 </div>
 
-                {/* Name & Status */}
-                <div className="carousel-name-row">
-                  <h3 className="carousel-name" title={name}>
-                    {name}
-                  </h3>
-                  {talent.isNew ? (
-                    <span className="carousel-bold-status new">
-                      <Sparkles size={12} /> New
-                    </span>
-                  ) : hasRating && talent.ratingAverage! >= 4.8 ? (
-                    <span className="carousel-bold-status top">
-                      <Star size={11} fill="currentColor" /> Top rated
-                    </span>
+                <h3 className="ft-card-name">
+                  {name}{" "}
+                  {isNew ? (
+                    <span className="ft-badge new">New</span>
+                  ) : isTopRated ? (
+                    <span className="ft-badge top">Top rated</span>
                   ) : null}
-                </div>
+                </h3>
 
-                {/* Role Headline */}
-                <p className="carousel-role" title={skillName}>
-                  {skillName}
+                <p className="ft-role">{role}</p>
+
+                <p className="ft-skills">
+                  {skills.map((skill, idx) => (
+                    <React.Fragment key={skill}>
+                      {idx > 0 && <span className="dot">·</span>}
+                      {skill}
+                    </React.Fragment>
+                  ))}
                 </p>
 
-                {/* Skill Tags */}
-                <div className="carousel-tags">
-                  {(talent.skills && talent.skills.length > 0
-                    ? talent.skills
-                    : [skillName]
-                  )
-                    .slice(0, 3)
-                    .map((s, idx) => (
-                      <span key={idx} className="carousel-tag">
-                        {s}
-                      </span>
-                    ))}
-                </div>
-
-                {/* 3-Column Stats Grid */}
-                <div className="carousel-stats-grid">
-                  <div className="carousel-stat-col">
-                    <span className="carousel-stat-val">
-                      {hasRating ? (
-                        <>
-                          <Star size={13} fill="var(--color-warning)" color="var(--color-warning)" />
-                          {Number(talent.ratingAverage).toFixed(1)}
-                        </>
-                      ) : (
-                        <span style={{ color: "var(--color-primary)" }}>New</span>
-                      )}
-                    </span>
-                    <span className="carousel-stat-lbl">Rating</span>
-                  </div>
-
-                  <div className="carousel-stat-col">
-                    <span className="carousel-stat-val">
-                      {talent.totalJobsCompleted > 0
-                        ? `${talent.totalJobsCompleted} jobs`
-                        : talent.hourlyRateETB
-                          ? `ETB ${talent.hourlyRateETB}`
-                          : "Verified"}
-                    </span>
-                    <span className="carousel-stat-lbl">
-                      {talent.totalJobsCompleted > 0 ? "Delivered" : "Rate / hr"}
-                    </span>
-                  </div>
-
-                  <div className="carousel-stat-col">
-                    <span className="carousel-stat-val">
-                      <EthiopianFlagIcon />
-                    </span>
-                    <span className="carousel-stat-lbl">Ethiopia</span>
-                  </div>
-                </div>
-
-                {/* Card CTA */}
-                <div className="carousel-card-actions">
+                <div className="ft-foot">
+                  <span className={`ft-status ${isAvailable ? "" : "neutral"}`}>
+                    <span className="dot" />
+                    {statusText}
+                  </span>
                   <button
                     type="button"
-                    className="carousel-action-view"
+                    className="ft-view"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCardClick(talent);
                     }}
                   >
-                    View Profile <ArrowRight size={14} />
+                    View profile <ArrowRight size={13} strokeWidth={2} />
                   </button>
                 </div>
               </article>
             );
           })}
-        </div>
+        </section>
       )}
 
-      {/* Footer / Live Activity Row */}
-      <div className="carousel-live-row">
-        <span>{displayedTalents.length} verified professionals available</span>
-        <span className="carousel-live-indicator">
-          <span className="carousel-live-dot" aria-hidden="true" />
-          <b>Live</b> · Updated <time>{currentTime}</time>
-        </span>
-      </div>
+      {/* Count footer */}
+      <p className="ft-count">
+        {displayedTalents.length} {activeFilter === "saved" ? "saved" : "featured"}{" "}
+        professional{displayedTalents.length === 1 ? "" : "s"}
+      </p>
 
       {/* Quick-View Profile Modal (Functional inspection) */}
       {selectedTalent && (
@@ -791,20 +651,26 @@ export const FeaturedCarousel = ({
             {/* Modal Hero Banner */}
             <div className="ft-modal-hero">
               <span className="ft-modal-avatar-wrap">
-                <YekisAvatar
-                  userId={selectedTalent.id.startsWith("demo-") ? null : selectedTalent.id}
-                  displayName={selectedTalent.displayName}
-                  avatarUrl={selectedTalent.avatarUrl}
-                  size={88}
-                  animate="hover"
-                />
-                <span
-                  className="ft-modal-badge"
-                  title="Fayda Tier Verified"
-                  aria-label="Fayda Verified"
+                <div
+                  className="ft-avatar"
+                  style={{
+                    width: 72,
+                    height: 72,
+                    fontSize: 24,
+                    backgroundColor: getAvatarColor(selectedTalent),
+                  }}
                 >
-                  <Shield size={13} strokeWidth={2.6} />
-                </span>
+                  {getInitials(selectedTalent.displayName)}
+                  <span
+                    className="check"
+                    title="Verified"
+                    style={{ width: 22, height: 22, right: -3, bottom: -3 }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ width: 12, height: 12 }}>
+                      <path d="M5 12l5 5L20 7" />
+                    </svg>
+                  </span>
+                </div>
               </span>
 
               <h2 className="ft-modal-name">{selectedTalent.displayName}</h2>
@@ -826,23 +692,6 @@ export const FeaturedCarousel = ({
                 </span>
               </div>
 
-              <div className="ft-modal-chips">
-                <span className="ft-chip-verified">
-                  <Shield size={13} strokeWidth={2.5} />
-                  Fayda Tier {selectedTalent.kycTier || 1} Verified
-                </span>
-                {selectedTalent.isNew && (
-                  <span className="carousel-bold-status new" style={{ fontSize: "0.85rem" }}>
-                    <Sparkles size={13} /> New Talent
-                  </span>
-                )}
-                {selectedTalent.ratingAverage && selectedTalent.ratingAverage >= 4.8 && (
-                  <span className="carousel-bold-status top" style={{ fontSize: "0.85rem" }}>
-                    <Star size={13} fill="currentColor" /> Top Rated
-                  </span>
-                )}
-              </div>
-
               {/* Action Buttons */}
               <div className="ft-modal-actions">
                 <button
@@ -851,7 +700,14 @@ export const FeaturedCarousel = ({
                   onClick={() => {
                     const fn = selectedTalent.displayName.split(" ")[0];
                     showToast(`Starting project proposal with ${fn}...`);
-                    handleOpenFullProfile(selectedTalent.id);
+                    const id = selectedTalent.id;
+                    const name = selectedTalent.displayName;
+                    setSelectedTalent(null);
+                    if (onOpenChat) {
+                      onOpenChat(id, name);
+                    } else {
+                      handleOpenFullProfile(id);
+                    }
                   }}
                 >
                   <Briefcase size={16} /> Hire {selectedTalent.displayName.split(" ")[0]}
@@ -862,7 +718,14 @@ export const FeaturedCarousel = ({
                   onClick={() => {
                     const fn = selectedTalent.displayName.split(" ")[0];
                     showToast(`Opening direct conversation with ${fn}...`);
-                    handleOpenFullProfile(selectedTalent.id);
+                    const id = selectedTalent.id;
+                    const name = selectedTalent.displayName;
+                    setSelectedTalent(null);
+                    if (onOpenChat) {
+                      onOpenChat(id, name);
+                    } else {
+                      handleOpenFullProfile(id);
+                    }
                   }}
                 >
                   <MessageSquare size={16} /> Message
@@ -1028,7 +891,14 @@ export const FeaturedCarousel = ({
                     onClick={() => {
                       const fn = selectedTalent.displayName.split(" ")[0];
                       showToast(`Starting proposal for ${fn}...`);
-                      handleOpenFullProfile(selectedTalent.id);
+                      const id = selectedTalent.id;
+                      const name = selectedTalent.displayName;
+                      setSelectedTalent(null);
+                      if (onOpenChat) {
+                        onOpenChat(id, name);
+                      } else {
+                        handleOpenFullProfile(id);
+                      }
                     }}
                   >
                     Hire {selectedTalent.displayName.split(" ")[0]}
@@ -1041,7 +911,7 @@ export const FeaturedCarousel = ({
                 <section className="ft-card-box">
                   <h3 className="ft-box-label">
                     Identity Verification
-                    <span className="ft-chip-verified" style={{ marginLeft: "auto", fontSize: "0.72rem", padding: "2px 8px" }}>
+                    <span className="ft-bold-verified" style={{ marginLeft: "auto", fontSize: "0.76rem" }}>
                       Tier {selectedTalent.kycTier || 1}
                     </span>
                   </h3>
@@ -1084,3 +954,4 @@ export const FeaturedCarousel = ({
     </section>
   );
 };
+

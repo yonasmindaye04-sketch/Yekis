@@ -805,6 +805,7 @@ class ApiClient {
       thrown.code = error.error;
       if (error.nextAction) thrown.nextAction = error.nextAction;
       if ((error as any).blockers) thrown.blockers = (error as any).blockers;
+      if ((error as any).details) (thrown as any).details = (error as any).details;
       throw thrown;
     }
 
@@ -1266,14 +1267,72 @@ class ApiClient {
   }
 
   async createDirectConversation(recipientId: string, subject: string): Promise<ChatConversation> {
-    return this.request("/api/v1/chat/direct", {
-      method: "POST",
-      body: JSON.stringify({ recipientId, subject }),
-    });
+    try {
+      return await this.request("/api/v1/chat/direct", {
+        method: "POST",
+        body: JSON.stringify({ recipientId, subject }),
+      });
+    } catch (err) {
+      if (recipientId.startsWith("demo-")) {
+        const demoNames: Record<string, string> = {
+          "demo-selam": "Selam Tadesse",
+          "demo-dawit": "Dawit Tesfaye",
+          "demo-hanna": "Hanna Bekele",
+          "demo-yonas": "Yonas Alemu",
+          "demo-meron": "Meron Haile",
+          "demo-abel": "Abel Girma",
+        };
+        const recipientName = demoNames[recipientId] || "Verified Freelancer";
+        return {
+          id: `conv-direct-${recipientId}`,
+          subject,
+          status: "OPEN",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          latestMessage: {
+            body: "Selam! Thanks for reaching out. I'm available to collaborate on your project deliverables and milestones.",
+            createdAt: new Date().toISOString(),
+            senderId: recipientId,
+          },
+          otherParticipant: {
+            id: recipientId,
+            email: `${recipientId}@yekis.et`,
+            role: "FREELANCER",
+            displayName: recipientName,
+          },
+          isSupport: false,
+          unread: false,
+        };
+      }
+      throw err;
+    }
   }
 
   async getChatMessages(conversationId: string): Promise<ChatMessage[]> {
-    return this.request(`/api/v1/chat/conversations/${conversationId}/messages`);
+    try {
+      return await this.request(`/api/v1/chat/conversations/${conversationId}/messages`);
+    } catch (err) {
+      if (conversationId.startsWith("conv-direct-demo-")) {
+        const talentId = conversationId.replace("conv-direct-", "");
+        return [
+          {
+            id: `msg-${Date.now()}`,
+            conversationId,
+            senderId: talentId,
+            body: "Selam! Thanks for reaching out. I'm available to collaborate on your project deliverables and milestones.",
+            createdAt: new Date().toISOString(),
+            sender: {
+              id: talentId,
+              email: `${talentId}@yekis.et`,
+              role: "FREELANCER",
+              staffRole: null,
+              displayName: "Verified Freelancer",
+            },
+          },
+        ];
+      }
+      throw err;
+    }
   }
 
   async sendChatMessage(conversationId: string, body: string, attachmentUrl?: string, internal = false): Promise<ChatMessage> {
