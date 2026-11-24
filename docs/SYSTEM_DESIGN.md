@@ -1700,7 +1700,7 @@ The second audit surface is `GET /api/v1/admin/incidents/breaches`, which reads 
 
 * **Purpose:** PDPP No. 1321/2024 access, portability and erasure. One module so the export and the erasure agree on what "personal data" means — if they drifted apart, the export would quietly under-report what the platform keeps.
 * **Files:** `privacy.service.ts` (the implementation). The routes live in `profiles.routes.ts` so the existing documented export route keeps working.
-* **Routes:** `GET /api/v1/users/me/export`, `POST /api/v1/users/me/erasure`.
+* **Routes:** `GET /api/v1/users/me/export`, `GET /api/v1/users/me/erasure/blockers`, `POST /api/v1/users/me/erasure`.
 
 #### Access and Portability
 

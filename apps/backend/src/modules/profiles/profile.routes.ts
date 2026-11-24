@@ -247,6 +247,29 @@ profileRouter.get(
   },
 );
 
+// GET /me/erasure/blockers
+//
+// Checks for outstanding obligations (wallet balance, active contracts, open
+// disputes, pending payouts/topups) that block account deactivation/erasure.
+profileRouter.get(
+  "/me/erasure/blockers",
+  requireAuth,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const userId = req.user!.id;
+      const blockers = await findErasureBlockers(userId);
+      return res.json({
+        eligible: blockers.length === 0,
+        blockers,
+      });
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error checking erasure blockers");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 // POST /me/erasure
 //
 // PDPP Art. 15 — the data subject's right to erasure.

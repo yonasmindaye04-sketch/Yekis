@@ -44,38 +44,42 @@
 }
 
 .settings-tabbar {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   align-items: stretch;
   gap: 2px;
-  padding: 6px 10px 0;
+  padding: 8px 10px 0;
 }
 
 .settings-tab {
   position: relative;
   display: inline-flex;
+  flex: 1 1 auto;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-width: 0;
-  min-height: 46px;
-  padding: 10px 10px 13px;
+  gap: 7px;
+  min-width: 140px;
+  min-height: 52px;
+  padding: 10px 16px 14px;
   border: 0;
   border-radius: 8px 8px 0 0;
   background: transparent;
   color: var(--color-text-secondary);
   font-family: inherit;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  line-height: 1.2;
+  line-height: 1.25;
   cursor: pointer;
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  word-break: break-word;
   transition: color 160ms ease, background-color 160ms ease;
 }
 
 .settings-tab span {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-tab svg {
@@ -125,39 +129,198 @@
 
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 1180px) {
-  .settings-tabbar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .settings-tab {
+    min-width: 120px;
+    padding: 10px 12px 14px;
   }
 }
 
 @media (max-width: 760px) {
   .settings-tabbar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 2px;
+    padding: 6px 8px 0;
   }
 
   .settings-tab {
-    min-height: 42px;
-    padding: 9px 8px 12px;
-    font-size: 0.78rem;
+    min-width: 100px;
+    min-height: 46px;
+    padding: 9px 10px 12px;
+    font-size: 0.75rem;
   }
 }
 
 @media (max-width: 520px) {
   .settings-tabbar {
-    grid-template-columns: 1fr;
+    flex-direction: column;
     padding: 4px 6px 0;
+    gap: 1px;
   }
 
   .settings-tab {
+    flex: unset;
+    width: 100%;
+    min-width: unset;
     justify-content: flex-start;
-    padding-left: 12px;
+    padding: 10px 14px 12px;
     border-radius: 8px;
+    white-space: nowrap;
   }
 
   .settings-tab::after {
-    left: 12px;
+    left: 14px;
     right: auto;
     width: 44px;
     transform-origin: left;
   }
+}
+
+/* ── Danger Button ──────────────────────────────────────────────────────── */
+.sh-btn-danger {
+  background: var(--color-error-bg, #dc2626);
+  color: #ffffff;
+  border: 1px solid var(--color-error-border, #dc2626);
+  font-weight: 600;
+}
+
+.sh-btn-danger:hover:not(:disabled) {
+  background: var(--color-error-text, #b91c1c);
+  border-color: var(--color-error-text, #b91c1c);
+  color: #ffffff;
+}
+
+.sh-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Account Deactivation Native Dialog ─────────────────────────────────── */
+/* MANDATORY: overscroll-behavior: contain prevents scroll chaining behind modal */
+dialog.sh-deactivate-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  padding: 0;
+  width: min(94vw, 580px);
+  max-height: min(90vh, 720px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+  z-index: 200;
+}
+
+dialog.sh-deactivate-dialog::backdrop {
+  background: rgba(9, 13, 18, 0.65);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.sh-deactivate-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.sh-deactivate-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-error-text, #dc2626);
+}
+
+.sh-deactivate-close-btn {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.sh-deactivate-close-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+}
+
+.sh-deactivate-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  max-height: calc(90vh - 140px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sh-deactivate-notice-box {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--color-bg-subtle);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.sh-deactivate-notice-box strong {
+  display: block;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.sh-deactivate-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 600px) {
+  .sh-deactivate-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sh-deactivate-col {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--color-bg);
+}
+
+.sh-deactivate-col h4 {
+  margin: 0 0 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sh-deactivate-col ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.sh-deactivate-col ul li {
+  margin-bottom: 4px;
+}
+
+.sh-deactivate-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-subtle);
 }

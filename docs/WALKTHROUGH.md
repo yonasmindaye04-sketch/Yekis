@@ -32,6 +32,26 @@ Last validated: 2026-11-22
 > - **Verified:** `pnpm --filter frontend build` passes; `node scripts/check-doc-parity.mjs` and `node scripts/scan-secrets.js` are clean. Checked at 1536px and 420px, and in Amharic, with no clipping.
 
 
+> **Production-Ready Account Deactivation & Statutory PDPP Erasure (2026-11-23):**
+> - **The capability**: The Account Deactivation card under `Settings → Data & Account` was previously a static informational notice without an actionable deactivation workflow. It is now fully functional, production-ready, and backed by Ethiopian Personal Data Protection Proclamation No. 1321/2024 (Art. 15) and National Bank of Ethiopia (NBE) 10-year statutory retention mandates.
+> - **Pre-flight obligation audit (`GET /api/v1/users/me/erasure/blockers`)**:
+>   - Automatically inspects the account for active blockers: remaining non-zero wallet balances, processing top-ups, pending payout transactions, active contracts, and open dispute mediations.
+>   - Renders structured blocker alerts with actionable resolution guidance (e.g. withdraw remaining funds, settle milestones).
+> - **Step-up verification & permanent execution (`POST /api/v1/users/me/erasure`)**:
+>   - Enforces step-up authentication (`requireFreshAuth(300)` via password re-authentication), confirmation phrase validation (`DEACTIVATE`), and explicit statutory retention acknowledgment.
+>   - Destroys personal profile data, direct messages, support chat history, uploaded chat attachments (including object store bytes), portfolio items, and skills; pseudonymises email to `erased-<ucid>@erased.invalid`; invalidates credentials and terminates all active sessions.
+>   - Retains immutable financial ledger logs, tax records, and KYC AML identity join keys (UCID, phone, Fayda hash) for 10 years per NBE directives.
+> - **Accessible UI Dialog (`SettingsWorkspace.tsx` & `SettingsWorkspace.css`)**:
+>   - Native `<dialog>` modal element implementing `overscroll-behavior: contain` to prevent backdrop scroll chaining, `aria-labelledby`, safe-action `autofocus` on Cancel, light dismiss, and zero emojis.
+>   - Shows an itemized post-erasure summary and automated session cleanup.
+> - **Verification**:
+>   - `pnpm --filter backend vitest run tests/privacy-data-rights.test.ts` (6 tests pass).
+>   - `pnpm --filter backend route-audit:check` (201 routes clean).
+>   - `pnpm --filter backend type-check` (tsc clean).
+>   - `pnpm --filter frontend build` (tsc -b && vite build clean).
+>   - `node scripts/check-doc-parity.mjs` (complete alignment).
+>   - `node scripts/scan-secrets.js` (clean).
+
 > **Settings section navigation aligned with the landing-page indicator style (2026-11-22):**
 > - The five settings choices were unstyled buttons inside `.sh-segmented` (no `.sh-seg-btn`), so their labels collided. `SettingsWorkspace.tsx` now uses a dedicated `.settings-tabbar` with the marketing-header underline indicator on hover, focus and the active section, plus a `Settings / <section>` breadcrumb.
 > - The bar is a responsive 5/3/2/1-column grid, and the tabs are a full ARIA tablist (`role="tab"`/`tabpanel`, `aria-selected`, Left/Right/Home/End keys). Styling lives in the new `apps/frontend/src/SettingsWorkspace.css`.

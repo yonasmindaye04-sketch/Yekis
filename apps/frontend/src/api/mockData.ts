@@ -2452,6 +2452,94 @@ class MockStore {
       const u = this.getCurrentUser();
       return { profileCompleteness: u.profileCompleteness ?? 75 };
     }
+    if (cleanPath === "/users/me/export") {
+      const u = this.getCurrentUser();
+      return {
+        platform: "Yekis Jobs",
+        schemaVersion: 2,
+        exportedAt: new Date().toISOString(),
+        notice: "This archive contains every category of personal data Yekis holds about you.",
+        account: {
+          id: u.id,
+          ucid: u.ucid,
+          email: u.email,
+          phone: u.phone,
+          role: u.role,
+        },
+        profile: {
+          displayName: u.displayName,
+          bio: "Building resilient escrow-backed software, Telebirr integrations, and digital products across Ethiopia.",
+        },
+        verification: { kycTier: "TIER_2", kycStatus: "VERIFIED" },
+        financials: { currency: "ETB", balanceMinor: 0 },
+        marketplaceActivity: { jobsPosted: [], proposals: [], contracts: [] },
+      };
+    }
+    if (cleanPath === "/users/me/erasure/blockers") {
+      const u = this.getCurrentUser();
+      const blockers: { code: string; message: string }[] = [];
+      const balance = u.wallet?.balanceMinor ?? 0;
+      if (balance > 0) {
+        blockers.push({
+          code: "WALLET_BALANCE",
+          message: "Your wallet still holds funds. Withdraw the balance before requesting erasure.",
+        });
+      }
+      return {
+        eligible: blockers.length === 0,
+        blockers,
+      };
+    }
+    if (cleanPath === "/users/me/erasure") {
+      const u = this.getCurrentUser();
+      const balance = u.wallet?.balanceMinor ?? 0;
+      if (balance > 0) {
+        const error = new Error("Erasure cannot proceed until outstanding items are resolved.") as Error & {
+          code: string;
+          blockers: { code: string; message: string }[];
+        };
+        error.code = "ERASURE_BLOCKED";
+        error.blockers = [
+          {
+            code: "WALLET_BALANCE",
+            message: "Your wallet still holds funds. Withdraw the balance before requesting erasure.",
+          },
+        ];
+        throw error;
+      }
+      const storeWithSusp = this as unknown as { suspendedUsers?: Record<string, boolean> };
+      if (!storeWithSusp.suspendedUsers) {
+        storeWithSusp.suspendedUsers = {};
+      }
+      storeWithSusp.suspendedUsers[u.id] = true;
+      return {
+        performedAt: new Date().toISOString(),
+        erased: {
+          profileFields: 12,
+          supportChatMessages: 4,
+          directMessages: 3,
+          chatAttachmentsDeleted: 1,
+          proposalsScrubbed: 2,
+          jobsScrubbed: 1,
+          gigsScrubbed: 1,
+          reviewsScrubbed: 0,
+          portfolioItemsDeleted: 2,
+          skillsDeleted: 4,
+          notificationsDeleted: 6,
+          profileViewsDeleted: 14,
+          featuredLogsDeleted: 0,
+          authArtefactsDeleted: 1,
+          avatarsDeleted: 1,
+        },
+        retained: [
+          "Identity join keys (UCID, phone, Fayda biometric hash) for AML compliance",
+          "Immutable financial ledger, escrow movement logs, and tax vouchers (10-year NBE/ERCA retention)",
+          "Audit trail records and consent history (statutory compliance)",
+          "Bilateral contract terms and completed milestone settlement records",
+        ],
+        accountClosed: true,
+      };
+    }
 
     // Skills, Featured, Portfolio, Reviews, Profile
     if (cleanPath === "/skills") {

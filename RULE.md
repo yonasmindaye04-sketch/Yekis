@@ -60,7 +60,7 @@ These rules define the non-negotiable engineering, design, accessibility, and op
 
 ## 4. Strict Responsiveness & Mobile Compaction Standards
 
-- **Rule First Workflow**: Read and check `rule.md` before designing or writing any code. Every implementation must conform to responsive standards.
+- **Rule First Workflow**: Read and check `rule.md` before designing or writing any code. Every implementation must conform to responsive standards. For any HTML/CSS/client-side JS task, also run the `modern-web-guidance` skill first (per `AGENTS.md`) before writing ad-hoc solutions.
 - **Fluid Breakpoints**: Every screen, component, modal, and widget must adapt seamlessly across all standard breakpoints:
   - Mobile Phones: `320px` – `640px` (`sm`)
   - Tablets: `641px` – `1023px` (`md` / `lg`)

@@ -365,4 +365,28 @@ describe("erasure destroys the personal content", () => {
     });
     expect(audit).toBeTruthy();
   });
+
+  it("reports deactivation blockers via GET /me/erasure/blockers", async () => {
+    const user = await makeUserWithContent();
+    // Zero balance -> eligible
+    const resEligible = await request(app)
+      .get("/api/v1/users/me/erasure/blockers")
+      .set("Authorization", await authHeader(user.id));
+    expect(resEligible.status).toBe(200);
+    expect(resEligible.body.eligible).toBe(true);
+    expect(resEligible.body.blockers.length).toBe(0);
+
+    // Give wallet balance -> blocked with WALLET_BALANCE
+    await prisma.wallet.update({
+      where: { userId: user.id },
+      data: { balanceMinor: 50_000 },
+    });
+
+    const resBlocked = await request(app)
+      .get("/api/v1/users/me/erasure/blockers")
+      .set("Authorization", await authHeader(user.id));
+    expect(resBlocked.status).toBe(200);
+    expect(resBlocked.body.eligible).toBe(false);
+    expect(resBlocked.body.blockers.map((b: { code: string }) => b.code)).toContain("WALLET_BALANCE");
+  });
 });

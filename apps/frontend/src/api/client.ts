@@ -800,9 +800,11 @@ class ApiClient {
       ) as Error & {
         code?: string;
         nextAction?: { type: string; path: string };
+        blockers?: { code: string; message: string }[];
       };
       thrown.code = error.error;
       if (error.nextAction) thrown.nextAction = error.nextAction;
+      if ((error as any).blockers) thrown.blockers = (error as any).blockers;
       throw thrown;
     }
 
@@ -1910,9 +1912,30 @@ class ApiClient {
     return this.request("/api/v1/users/me/export");
   }
 
+  /** Checks whether the account has outstanding blockers preventing deactivation (PDPP Art. 15). */
+  async getErasureBlockers(): Promise<{ eligible: boolean; blockers: { code: string; message: string }[] }> {
+    return this.request("/api/v1/users/me/erasure/blockers");
+  }
+
   /** Erases personal data, retaining the AML records the law requires. */
   async eraseMyData(): Promise<{ performedAt: string; erased: Record<string, number>; retained: string[]; accountClosed: boolean }> {
     return this.request("/api/v1/users/me/erasure", { method: "POST" });
+  }
+
+  /**
+   * Deactivates the account with step-up verification and PDPP statutory erasure.
+   * If a password is provided alongside the user's email, re-authenticates first to satisfy requireFreshAuth(300).
+   */
+  async deactivateAccount(input?: { password?: string; email?: string }): Promise<{
+    performedAt: string;
+    erased: Record<string, number>;
+    retained: string[];
+    accountClosed: boolean;
+  }> {
+    if (input?.password && input?.email) {
+      await this.login(input.email, input.password);
+    }
+    return this.eraseMyData();
   }
 
   async getDisputes(): Promise<Dispute[]> { return this.request("/api/v1/disputes"); }
