@@ -1274,6 +1274,9 @@ git push origin main:fix/code-only-compliance-gaps    # c4c3fe5..b4634b5
 Both refs are at `b4634b5`, and the app is **LIVE** at
 `2026-11-25T07:17:46Z` (previous `2026-11-23T20:48:08Z`), still with **55**
 environment variables and still deploying `fix/code-only-compliance-gaps`.
+The docs commit that records this deployment triggers one more build of the
+same tree; the served assets stay identical, so `lastDeployedAt` moves a few
+minutes past the timestamp above without the code changing.
 
 **The lockfile was the one dangerous part, and it was repaired deliberately.**
 Their branch's `pnpm-lock.yaml` recorded `react-icons` in the **root** importer,
