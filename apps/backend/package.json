@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "infra:up": "docker compose -f ../../docker-compose.yml up -d",
     "prebuild": "pnpm prisma:generate",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-locales.mjs",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "type-check": "tsc -p tsconfig.json --noEmit",
