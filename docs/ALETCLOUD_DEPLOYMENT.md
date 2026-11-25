@@ -1341,6 +1341,88 @@ still has to be added to the OAuth client's **Authorized JavaScript origins**
 (`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). The CSP, worker and opener fixes
 from 2026-11-23 are all still in the deployed tree.
 
+### The bot answers again - 2026-11-25
+
+The founder reported that the bot "is not responding at all": a message sent to
+`@ye_kis_bot` produced nothing at all, and the web sign-in that depends on the
+bot was stuck with it. The host was healthy and the bot was "degraded", not
+down:
+
+```
+GET /api/v1/telegram/health →
+{"status":"degraded","transport":"webhook",
+ "webhook":{"pendingUpdateCount":6,
+            "lastErrorMessage":"Wrong response from the webhook: 500 Internal Server Error"}}
+```
+
+Telegram's own complaint was the whole diagnosis. Telegram had the webhook, it
+delivered the updates, and every delivery came back **500** - so Telegram
+retried the same update forever and the member never saw a reply. The runtime
+log showed why:
+
+```
+Incoming update  command=help
+GrammyError: Call to 'sendMessage' failed!
+  (400: Bad Request: can't parse entities:
+   Can't find end of the entity starting at byte offset 4)
+  payload: {"chat_id":5114851772,"text":"help_commands","parse_mode":"Markdown"}
+```
+
+**Three defects, in a row.** The text the bot tried to send was the
+translation KEY - `help_commands` - not a sentence. The dictionaries are
+runtime data, so `tsc` never emitted them, and the Docker image copies
+`apps/backend/dist` and nothing else: the loader resolved the dictionaries
+relative to the working directory, found none, and `ctx.t()` returned the key.
+An underscore is an italic delimiter in Markdown, so Telegram refused the
+message; grammY turned the refused send into an error; and because grammY's
+`bot.catch` guards the long-polling batch API only - the webhook adapter
+calls `handleUpdate()` directly - the error escaped the adapter and the route
+answered **500**. Telegram kept redelivering, and the bot looked dead.
+
+**What was changed** (`361b46b`, on `fix/code-only-compliance-gaps`):
+
+- `apps/backend/scripts/copy-locales.mjs` copies the dictionaries into
+  `dist/modules/bot/locales` as part of the build, and the loader finds them
+  next to its own compiled file (`__dirname`), so it no longer depends on the
+  working directory or on the source tree.
+- `middleware/errorBoundary.middleware.ts` is the outermost middleware: it
+  catches what escapes a handler, logs it, and answers the member in plain
+  text, so the delivery is acknowledged and the retry loop stops.
+- `markdownFallbackTransformer` sends a message Telegram refuses to FORMAT
+  again without `parse_mode`. Any other refusal still fails.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-25T15:46:25Z` on `361b46b`, with the
+  **55** environment variables intact.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"`,
+  `"pendingUpdateCount":0` and **no** `lastErrorMessage` (it was
+  `"degraded"` with six pending updates before).
+- Telegram's own `getWebhookInfo` answers `"pending_update_count":0` and
+  **no** `last_error_message`.
+- A `/help` update delivered to the webhook is **"Incoming update"** →
+  **"Update processed"** (262 ms) → **HTTP 200**, with no
+  "Webhook processing failed" and no `GrammyError` in the log, and the member
+  receives the English help text in Telegram.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+
+**One environment variable changed:** `TELEGRAM_WEBHOOK_SECRET` now holds the
+secret the founder generated (`I7n0bm12...`), so the live host and the local
+`.env` agree. Every other variable is byte-for-byte what it was - the map was
+read with `getAppEnv` and written back with `setAppEnv`, all **55** of them.
+The platform applies an environment change to a NEW container only, so the
+secret took effect with the redeploy, and the bot re-registered the webhook
+with it at start-up (`Bot webhook set` in the log).
+
+**The local `.env` files no longer carry the live credentials.** The bot is
+owned by the deployment; a local process that registered the production
+webhook URL would delete it at start-up, and two pollers make Telegram refuse
+one of them. `apps/backend/.env` and `.env` now run in `TELEGRAM_ENV=dev` with
+polling and with an **empty** token, webhook URL and secret. To drive the real
+bot from a laptop, use a tunnel
+(`docs/CLOUDFLARE_TUNNEL_PLAYBOOK.md`) and a bot token of your own.
+
 ### Teardown
 
 ```bash
