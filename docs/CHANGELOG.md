@@ -4,6 +4,9 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Changed
+- **The platform-wide responsiveness work is deployed (2026-11-25)** — `feat/multi-channel-auth` (`7b82df6`) is merged into `main` as **`b4634b5`**, and both `main` and the deployed branch `fix/code-only-compliance-gaps` point at it. The app came back **LIVE** at `2026-11-25T07:17:46Z` with **55** environment variables, serving the merged build; `check-deployment.mjs` passes **11/11**, the route audit passes at **201** routes, and the auth/erasure probes answer as expected (**401** without a session; `google:true` on the providers endpoint). The escrow-receipt compliance copy that their corporate-email commit had reverted is restored inside the new shell. The full record — including the lockfile repair and the stale-Redis test note — is `docs/ALETCLOUD_DEPLOYMENT.md` §11, *"The platform-wide responsiveness work goes live"*.
+
 ### Added
 - **Wallet Top-Up Default Flow & Account Update (2026-11-24)** — Updated the wallet top-up section across `apps/frontend/src/BrowserWallet.tsx`, `App.tsx`, and `FiscalDocumentModal.tsx`:
   - **Manual Transfer & CBE Bank Defaults**: Switched the default top-up method from `"INSTANT"` to `"MANUAL"` (Manual Transfer) and the default payment rail to `"CBE_BIRR"` (CBE Bank), immediately surfacing the transfer account card and verification receipt upload form.

@@ -1258,6 +1258,86 @@ card open):
   founder's Google Cloud project. The runbook is
   `docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3.
 
+### The platform-wide responsiveness work goes live - 2026-11-25
+
+**The third merge, and the first deployment of the responsiveness work.** Five
+commits landed on `feat/multi-channel-auth` after the 2026-11-23 deployment
+(`58b76d3`, `1940cd2`, `529edfe`, `37fcab1`, `7b82df6`). They are merged into
+`main` as **`b4634b5`** (a real merge, parents `c4c3fe5` and `7b82df6`) and the
+deployed branch is fast-forwarded to the same commit:
+
+```bash
+git push origin main                                  # c4c3fe5..b4634b5
+git push origin main:fix/code-only-compliance-gaps    # c4c3fe5..b4634b5
+```
+
+Both refs are at `b4634b5`, and the app is **LIVE** at
+`2026-11-25T07:17:46Z` (previous `2026-11-23T20:48:08Z`), still with **55**
+environment variables and still deploying `fix/code-only-compliance-gaps`.
+
+**The lockfile was the one dangerous part, and it was repaired deliberately.**
+Their branch's `pnpm-lock.yaml` recorded `react-icons` in the **root** importer,
+while `main` had removed the root declaration in `f2149c0`. That mismatch is
+exactly what makes `pnpm install --frozen-lockfile` fail with
+`ERR_PNPM_OUTDATED_LOCKFILE`, before the image build starts — it was reproduced
+on the merged tree, then the lockfile was regenerated with the repository's
+pinned pnpm **9.0.0** (the version the image installs). The regeneration removed
+**exactly three lines** — the orphan root entry — and nothing else. The merged
+tree now installs cleanly, `kenat@4.0.2` is present, and
+`scripts/check-lockfile-parity.mjs` was extended to compare **both** directions
+so this class of merge damage cannot pass a gate again.
+
+**One compliance fix was restored by hand.** Their corporate-email commit put
+back the *"Escrow Protection Policy"* wording that `main` had deliberately
+replaced, claiming the platform holds funds *"securely"* in escrow — a promise
+the segregated NBE account cannot back yet. The receipt now carries `main`'s
+compliant copy (**"How this payment is held"**, the auto-release window and the
+dispute outcome) inside their HTML shell, the total row reads **"Total held"**,
+and the shell footer no longer says *"Secure Ethiopian Escrow"*. Their own test
+still asserted the compliant wording, so the merge would otherwise have shipped
+a regression.
+
+**What was verified before the push:**
+
+- Frontend type-check and production build clean, with `kenat` installed.
+- Backend type-check clean.
+- `privacy-data-rights` + `oauth-account-link` + `google-auth-and-email`
+  **26/26 pass**. (The privacy suite needs a working Redis: the local `.env`
+  password was stale and every session call waited out the 30 s timeout; a
+  throwaway Redis on `127.0.0.1:6380` proved the suite itself is green.)
+- Route audit **passed** against the **201**-route baseline.
+- Doc parity **complete alignment**; secret scan **0 findings** across 1040
+  tracked files; lockfile parity **clean** in both directions.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-25T07:17:46Z`, serving
+  `/assets/index-CMm-YkrB.js` and `/assets/index-5W81mL1d.css`.
+- The CSS hash is **identical** to the local production build. The JavaScript
+  hash is not, and that is expected: the host bakes its `VITE_*` values in at
+  build time (`VITE_GOOGLE_CLIENT_ID`, `VITE_OBJECT_STORE_ORIGIN`,
+  `VITE_TELEGRAM_BOT_USERNAME`), so the bundle content — and therefore its
+  hash — differs from a local build made without them. The CSS has no `VITE_*`
+  input, so it is the reliable fingerprint.
+- The served bundle carries the new work: `erasure/blockers` (**2**),
+  `Deactivate Account` (**3**) and `settings-tabbar` (**1**).
+- `GET /api/v1/auth/identities` → **401**;
+  `POST /api/v1/auth/oauth/google/link` → **401**;
+  `GET /api/v1/users/me/erasure/blockers` → **401**;
+  `GET /api/v1/auth/oauth/providers` →
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The start-up log reports the bundled Redis up, **40 migrations found**,
+  **"No pending migrations to apply."**, the API listening on 8080 and the bot
+  started. `GET /api/v1/telegram/health` answers **200** with
+  `"pendingUpdateCount":0`.
+
+**The Google origin blocker is unchanged.** `https://yekis.app.aletcloud.com`
+still has to be added to the OAuth client's **Authorized JavaScript origins**
+(`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). The CSP, worker and opener fixes
+from 2026-11-23 are all still in the deployed tree.
+
 ### Teardown
 
 ```bash
