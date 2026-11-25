@@ -60,32 +60,39 @@ function readManifest(dir) {
  * parser (the repository has no YAML dependency at the root, and adding one
  * for a check would be worse than the check).
  *
+ * The sections are kept apart, because pnpm compares them separately: a
+ * dependency listed under `dependencies` in the manifest and under
+ * `devDependencies` in the lockfile is a drift, not a match.
+ *
  * @param {string[]} lines the lockfile's lines
- * @param {number} start the first line of the importer block
- * @returns {Record<string, string>} dependency name -> specifier
+ * @param {number} start the index of the importer key
+ * @returns {{ dependencies: Record<string, string>, devDependencies: Record<string, string> }}
  */
 function parseImporter(lines, start) {
-  /** @type {Record<string, string>} */
-  const specifiers = {};
+  /** @type {{ dependencies: Record<string, string>, devDependencies: Record<string, string> }} */
+  const sections = { dependencies: {}, devDependencies: {} };
   /** @type {string | null} */
   let current = null;
-  let inBlock = false;
+  /** @type {"dependencies" | "devDependencies" | null} */
+  let section = null;
 
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
     // A new importer, the `packages:` section or `snapshots:` ends the block.
     if (/^  \S/.test(line) || /^(packages|snapshots):/.test(line)) break;
 
-    const section = line.match(/^    (dependencies|devDependencies):\s*$/);
-    if (section) {
-      inBlock = true;
+    const header = line.match(/^    (dependencies|devDependencies):\s*$/);
+    if (header) {
+      section = header[1];
+      current = null;
       continue;
     }
     if (/^    \S/.test(line)) {
-      inBlock = false;
+      section = null;
+      current = null;
       continue;
     }
-    if (!inBlock) continue;
+    if (!section) continue;
 
     const name = line.match(/^      '?([^':]+)'?:\s*$/);
     if (name) {
@@ -94,11 +101,11 @@ function parseImporter(lines, start) {
     }
     const specifier = line.match(/^        specifier:\s*(.+?)\s*$/);
     if (specifier && current) {
-      specifiers[current] = specifier[1].replace(/^['"]|['"]$/g, "");
+      sections[section][current] = specifier[1].replace(/^['"]|['"]$/g, "");
       current = null;
     }
   }
-  return specifiers;
+  return sections;
 }
 
 /**
@@ -131,9 +138,14 @@ for (const workspace of WORKSPACES) {
     continue;
   }
   const locked = parseImporter(lines, importerLine);
-  for (const [field, declared] of Object.entries(manifest)) {
+
+  // Forward: every dependency the manifest declares must be in the lockfile
+  // importer for the same workspace, under the same section, with the same
+  // specifier.
+  for (const field of ["dependencies", "devDependencies"]) {
+    const declared = manifest[field];
     for (const [name, specifier] of Object.entries(declared)) {
-      const lockedSpecifier = locked[name];
+      const lockedSpecifier = locked[field][name];
       if (lockedSpecifier === undefined) {
         console.error(
           `❌ ${workspace}: ${field}.${name} (${specifier}) is not in the lockfile importer`,
@@ -142,6 +154,24 @@ for (const workspace of WORKSPACES) {
       } else if (lockedSpecifier !== specifier) {
         console.error(
           `❌ ${workspace}: ${field}.${name} manifest says ${specifier}, lockfile says ${lockedSpecifier}`,
+        );
+        drift += 1;
+      }
+    }
+  }
+
+  // Reverse: the lockfile importer must not list a dependency the manifest
+  // does not. pnpm compares the two specifier SETS, so an orphan entry in the
+  // lockfile fails `--frozen-lockfile` just as surely as a missing one —
+  // `ERR_PNPM_OUTDATED_LOCKFILE`, before the image build starts. This is the
+  // direction a one-sided check misses, and it is how a merge can leave a
+  // lockfile that records a dependency a manifest no longer declares.
+  for (const field of ["dependencies", "devDependencies"]) {
+    for (const [name, specifier] of Object.entries(locked[field])) {
+      if (!(name in manifest[field])) {
+        console.error(
+          `❌ ${workspace}: the lockfile importer lists ${field}.${name} ` +
+            `(${specifier}) but the manifest does not declare it`,
         );
         drift += 1;
       }

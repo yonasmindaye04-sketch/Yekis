@@ -365,6 +365,7 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
 | `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
 | `GET` | `/api/v1/users/me/export` | Authenticated | Export the complete PDPP data-subject archive as JSON — account, profile, verification, financials, marketplace activity, communications (consents, notifications, chat, DMs) and the compliance records the platform holds |
+| `GET` | `/api/v1/users/me/erasure/blockers` | Authenticated | Check whether the account has any outstanding obligations (open disputes, active contracts, wallet balance, pending payouts/topups) that block deactivation/erasure under statutory retention rules |
 | `POST` | `/api/v1/users/me/erasure` | Authenticated + fresh auth (5 min) | Erase personal data under PDPP Art. 15. Destroys profile, chat, DMs, portfolio, marketing and analytics data and the credentials; retains the identity, financial and AML records the law requires; closes the account. Returns `409 ERASURE_BLOCKED` with the outstanding items when money is still in flight |
 | `GET` | `/api/v1/skills` | Public | List available skills |
 | `POST` | `/api/v1/contracts/:id/review` | Contract party | Submit double-blind review for contract |

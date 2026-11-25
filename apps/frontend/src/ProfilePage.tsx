@@ -7,11 +7,13 @@ import {
   Flag,
   Calendar,
   X,
+  MessageSquare,
 } from "lucide-react";
 import { api } from "./api/client";
 import { YekisAvatar } from "./components/YekisAvatar";
 import { useI18n } from "./i18n";
 import { loadLocalPortfolio } from "./ProfileEditPage";
+import { getDemoTalentById, type TalentItem } from "./FeaturedCarousel";
 import "./ProfilePage.css";
 
 // Shape mirrors backend profile.service.ts getPublicProfile()
@@ -56,9 +58,53 @@ interface PublicProfileData {
   canViewFullProfile: boolean;
 }
 
+function convertTalentToPublicProfile(talent: TalentItem): PublicProfileData {
+  return {
+    id: talent.id,
+    displayName: talent.displayName,
+    bio: talent.about || null,
+    avatarUrl: talent.avatarUrl || null,
+    isAvailableForWork: talent.isAvailableForWork !== false,
+    primarySkillId: talent.primarySkill?.id || null,
+    skills: (talent.skills || []).map((s, idx) => ({
+      id: `sk-demo-${idx}`,
+      nameEn: s,
+      nameAm: s,
+      name: s,
+    })),
+    portfolio: talent.portfolioUrl
+      ? [
+          {
+            id: `pf-${talent.id}`,
+            title: `${talent.displayName} Case Study`,
+            description: `Published portfolio project at ${talent.portfolioUrl}`,
+            thumbnailUrl: "/marketing/yekis-collaboration-banner.png",
+          },
+        ]
+      : [],
+    kyc: {
+      tier: `TIER_${talent.kycTier || 1}`,
+      status: "VERIFIED",
+      badgeType: "FAYDA_VERIFIED",
+    },
+    stats: {
+      jobsCompleted: talent.totalJobsCompleted || 0,
+      rating: {
+        average: talent.ratingAverage ?? null,
+        count: talent.ratingCount || 0,
+      },
+      earnedRange: talent.totalJobsCompleted > 0 ? "ETB 150,000+" : "New",
+      memberSince: talent.memberSince ? `2026-01-01T00:00:00.000Z` : "2026-01-01T00:00:00.000Z",
+    },
+    isOwnProfile: false,
+    canViewFullProfile: true,
+  };
+}
+
 export const ProfilePage = ({
   userId = "me",
   onProfileLoaded,
+  onOpenChat,
 }: {
   userId?: string;
   /**
@@ -69,6 +115,7 @@ export const ProfilePage = ({
    * passes down, because only the profile knows the name it fetched.
    */
   onProfileLoaded?: (profile: { id: string; displayName: string }) => void;
+  onOpenChat?: (userId: string, userName?: string) => void;
 }) => {
   const { t, language: lang } = useI18n();
   const pr = t.workspace.profile;
@@ -96,6 +143,34 @@ export const ProfilePage = ({
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
+
+    // If viewing a demo talent (e.g. from Featured Talent showcase), resolve directly
+    if (userId.startsWith("demo-")) {
+      const demo = getDemoTalentById(userId);
+      if (demo) {
+        const loaded = convertTalentToPublicProfile(demo);
+        setProfile(loaded);
+        onProfileLoadedRef.current?.({
+          id: loaded.id,
+          displayName: loaded.displayName,
+        });
+        if (demo.reviews && demo.reviews.length > 0) {
+          setReviews(
+            demo.reviews.map((r, idx) => ({
+              id: `rev-demo-${idx}`,
+              rating: r.stars,
+              comment: r.text,
+              createdAt: r.date,
+            }))
+          );
+        } else {
+          setReviews([]);
+        }
+        setLoading(false);
+        return;
+      }
+    }
+
     Promise.all([
       api.getPublicProfile(userId),
       api.getReviews(userId).catch(() => []),
@@ -222,7 +297,15 @@ export const ProfilePage = ({
                 </div>
               </div>
               {!profile.isOwnProfile && (
-                <div className="hero-actions">
+                <div className="hero-actions" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenChat?.(profile.id, profile.displayName)}
+                    className="sh-btn sh-btn-primary"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 38, padding: "0 16px" }}
+                  >
+                    <MessageSquare size={16} /> Message
+                  </button>
                   <button
                     onClick={() => {
                       setReportModalOpen(true);

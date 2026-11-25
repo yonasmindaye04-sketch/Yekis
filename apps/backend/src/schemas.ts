@@ -144,7 +144,7 @@ export const RegisterInput = z.object({
     )
     .optional(),
   password: z.string().min(10),
-  languagePreference: z.enum(["am", "en"]),
+  languagePreference: z.enum(["am", "en", "om", "ti"]),
   role: UserRole,
   dateOfBirth: z.string().date(), // ISO date ΓÇö checked server-side against capacity gate
   consents: z.object({

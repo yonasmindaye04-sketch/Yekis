@@ -53,7 +53,7 @@ export function BrowserWallet({
   role: "CLIENT" | "FREELANCER" | "BOTH";
 }) {
   const [checkoutRail, setCheckoutRail] = useState<PaymentRail>("TELEBIRR");
-  const [topUpRail, setTopUpRail] = useState<PaymentRail>("TELEBIRR");
+  const [topUpRail, setTopUpRail] = useState<PaymentRail>("CBE_BIRR");
   const [withdrawRail, setWithdrawRail] = useState<PaymentRail>("TELEBIRR");
   const [amount, setAmount] = useState("");
   const [reference, setReference] = useState("");
@@ -74,7 +74,7 @@ export function BrowserWallet({
   // now includes dual-role accounts. Defaulting this off for BOTH left them
   // unable to add funds without first opening the panel.
   const [showTopUp, setShowTopUp] = useState(role !== "FREELANCER");
-  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
+  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("MANUAL");
 
   // Manual verification fallback when API call fails
   const [checkoutFallback, setCheckoutFallback] = useState<{
@@ -705,15 +705,23 @@ export function BrowserWallet({
         </div>
         {showTopUp && (
           <>
-            <div className="tabs" style={{ marginBottom: 16 }}>
+            <div className="tabs tx-tab-group" role="tablist" aria-label="Top-up method" style={{ marginBottom: 16 }}>
               <button
-                className={topUpMethod === "INSTANT" ? "active" : ""}
+                type="button"
+                role="tab"
+                id="topup-tab-instant"
+                aria-selected={topUpMethod === "INSTANT"}
+                className={`tx-tab-btn ${topUpMethod === "INSTANT" ? "active" : ""}`}
                 onClick={() => setTopUpMethod("INSTANT")}
               >
                 Instant Checkout
               </button>
               <button
-                className={topUpMethod === "MANUAL" ? "active" : ""}
+                type="button"
+                role="tab"
+                id="topup-tab-manual"
+                aria-selected={topUpMethod === "MANUAL"}
+                className={`tx-tab-btn ${topUpMethod === "MANUAL" ? "active" : ""}`}
                 onClick={() => setTopUpMethod("MANUAL")}
               >
                 Manual Transfer
@@ -727,7 +735,7 @@ export function BrowserWallet({
                   M-Pesa are handled manually and open the transfer instructions.
                 </p>
 
-                <div className="payment-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 10 }}>
+                <div className="payment-grid payment-grid-3">
                   <button
                     type="button"
                     className={
@@ -887,7 +895,7 @@ export function BrowserWallet({
                 <p className="wallet-help">
                   Send money to the platform account below, then upload the receipt for staff verification:
                 </p>
-                <div className="payment-grid" style={{ gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+                <div className="payment-grid payment-grid-3">
                   <button
                     type="button"
                     className={
@@ -938,7 +946,7 @@ export function BrowserWallet({
                     <div className="payment-account-text">
                       <strong>CBE Bank</strong>
                       <span>Commercial Bank of Ethiopia</span>
-                      <code>1000 223 344</code>
+                      <code>1000300802428</code>
                     </div>
                   </button>
 
@@ -965,7 +973,7 @@ export function BrowserWallet({
                     <div className="payment-account-text">
                       <strong>Safaricom M-Pesa</strong>
                       <span>Till 882199 / Phone</span>
-                      <code>0777 011 818</code>
+                      <code>0716 356 515</code>
                     </div>
                   </button>
                 </div>
@@ -982,7 +990,7 @@ export function BrowserWallet({
                   }}
                 >
                   <span>
-                    Selected: <strong>{topUpRail === "TELEBIRR" ? "Telebirr (0910 011 818)" : topUpRail === "CBE_BIRR" ? "CBE Bank (1000 223 344)" : "M-Pesa (0777 011 818 - Till 882199)"}</strong>
+                    Selected: <strong>{topUpRail === "TELEBIRR" ? "Telebirr (0910 011 818)" : topUpRail === "CBE_BIRR" ? "CBE Bank (1000300802428)" : "M-Pesa (0716 356 515 - Till 882199)"}</strong>
                   </span>
                   <button
                     type="button"
@@ -990,7 +998,7 @@ export function BrowserWallet({
                     style={{ fontSize: "0.76rem", padding: "4px 8px", display: "flex", alignItems: "center", gap: 4 }}
                     onClick={() =>
                       copyAccountToClipboard(
-                        topUpRail === "TELEBIRR" ? "0910011818" : topUpRail === "CBE_BIRR" ? "1000223344" : "0777011818",
+                        topUpRail === "TELEBIRR" ? "0910011818" : topUpRail === "CBE_BIRR" ? "1000300802428" : "0716356515",
                         topUpRail,
                       )
                     }
@@ -1338,9 +1346,11 @@ export function BrowserWallet({
             </div>
           </div>
 
-          <div className="tx-tab-group">
+          <div className="tx-tab-group" role="tablist" aria-label="Filter transactions by category">
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "ALL"}
               className={`tx-tab-btn ${movementCategoryFilter === "ALL" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("ALL")}
             >
@@ -1348,20 +1358,26 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "IN"}
               className={`tx-tab-btn ${movementCategoryFilter === "IN" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("IN")}
             >
-              <ArrowDownLeft size={13} /> Money In (+{movements.filter((m) => m.direction === "IN").length})
+              <ArrowDownLeft size={13} aria-hidden="true" /> Money In (+{movements.filter((m) => m.direction === "IN").length})
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "OUT"}
               className={`tx-tab-btn ${movementCategoryFilter === "OUT" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("OUT")}
             >
-              <ArrowUpRight size={13} /> Money Out (-{movements.filter((m) => m.direction === "OUT").length})
+              <ArrowUpRight size={13} aria-hidden="true" /> Money Out (-{movements.filter((m) => m.direction === "OUT").length})
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "PAYOUT"}
               className={`tx-tab-btn ${movementCategoryFilter === "PAYOUT" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("PAYOUT")}
             >
@@ -1369,6 +1385,8 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "TOP_UP"}
               className={`tx-tab-btn ${movementCategoryFilter === "TOP_UP" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("TOP_UP")}
             >
@@ -1376,6 +1394,8 @@ export function BrowserWallet({
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={movementCategoryFilter === "ESCROW_LOCK"}
               className={`tx-tab-btn ${movementCategoryFilter === "ESCROW_LOCK" ? "active" : ""}`}
               onClick={() => setMovementCategoryFilter("ESCROW_LOCK")}
             >

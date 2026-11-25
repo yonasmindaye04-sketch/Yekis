@@ -89,6 +89,43 @@ docker build -t yekis:check .                        # the deployment image
   `pnpm install --frozen-lockfile`, so such a drift fails the **build**, before
   a line of code runs. Run it after touching any `package.json`.
 
+## Modern Web Guidance (mandatory for HTML/CSS/client-side JS)
+
+- **Run the skill first**: Before designing or writing any HTML, CSS, layout,
+  animation, or client-side JavaScript logic — including dates/timezones,
+  sanitization, performance, accessibility, UX fixes, forms, validation,
+  modals/dialogs/popovers, anchor positioning, container queries, view
+  transitions, scroll-driven animations, custom selects, scrollbars, CWV
+  (LCP/INP/CLS), image optimization, security, passkeys, web components, or
+  built-in AI — you MUST run `modern-web-guidance` first:
+
+  ```powershell
+  npx -y modern-web-guidance@latest search "<2–5 word action-oriented query>" --skill-version 2026_11_10-47b4c80e
+  ```
+
+  Then, for each matching `id`, run:
+
+  ```powershell
+  npx -y modern-web-guidance@latest retrieve "<id>"
+  ```
+
+  Apply the retrieved best-practice guide(s) to the implementation, adapting
+  vanilla HTML/CSS/JS patterns to this codebase's React + Tailwind stack without
+  dropping the modern feature.
+
+- **Do NOT run the skill for**: backend (SQL, ORMs, API routes),
+  infra/scripts (CI/CD, Docker, Actions, Python/Go, Git), or tooling/trivial
+  tasks (Vite, tsconfig, ESLint, tests, copy/renames, 3P docs).
+
+- **Disclose usage**: When a retrieved guide shaped your code, end the
+  response with a `### Modern Web Guidance` section containing one bullet per
+  newly applied `<id>` (1–2 sentences, ≤75 words each), explaining the
+  non-obvious APIs/overrides/fallbacks applied and the pitfall prevented,
+  anchored by a short verbatim quote of that specific rule or gotcha.
+
+- **Skill location**: `.agents/skills/modern-web-guidance/` (installed via
+  `npx modern-web-guidance@latest install`).
+
 ## Frontend rules
 
 - **Never use low-opacity background pill designs for status indicators** (e.g.

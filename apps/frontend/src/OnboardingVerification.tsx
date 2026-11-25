@@ -191,6 +191,16 @@ export function OnboardingVerification({
               ? ob.emailConfirmedDesc.replace("{target}", masked)
               : ob.phoneConfirmedDesc.replace("{target}", masked)}
           </p>
+          {onBack && (
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ marginTop: "16px", width: "100%" }}
+              onClick={onBack}
+            >
+              Back
+            </button>
+          )}
         </div>
       </div>
     );

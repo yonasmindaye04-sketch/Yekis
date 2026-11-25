@@ -52,6 +52,7 @@ interface MarketplaceShadcnDashboardProps {
   onRefresh: () => void;
   onNavigateView: (view: string) => void;
   onSelectProfile?: (userId: string) => void;
+  onOpenChat?: (userId: string, userName?: string) => void;
 }
 
 function toKanbanCol(state: string): KanbanColumnId {
@@ -90,6 +91,7 @@ export function MarketplaceShadcnDashboard({
   onRefresh,
   onNavigateView,
   onSelectProfile,
+  onOpenChat,
 }: MarketplaceShadcnDashboardProps) {
   const {
     dashboardVariant,
@@ -806,9 +808,12 @@ export function MarketplaceShadcnDashboard({
             </div>
           </div>
 
-          {!canWork && onSelectProfile && (
+          {(canHire || !canWork) && onSelectProfile && (
             <div style={{ marginTop: 16 }}>
-              <FeaturedCarousel onProfileClick={onSelectProfile} />
+              <FeaturedCarousel
+                onProfileClick={onSelectProfile}
+                onOpenChat={onOpenChat}
+              />
             </div>
           )}
         </>

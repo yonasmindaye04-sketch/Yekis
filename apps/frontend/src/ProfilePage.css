@@ -910,6 +910,20 @@
   .stat-item {
     gap: 8px;
   }
+
+  .modal-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .modal-actions button,
+  .modal-actions .btn-secondary,
+  .modal-actions .btn-danger {
+    width: 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
 }
 
 /* Real-API additions */

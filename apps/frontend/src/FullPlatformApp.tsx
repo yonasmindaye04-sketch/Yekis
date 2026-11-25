@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import {
   api,
@@ -446,6 +446,93 @@ function FullPlatformAppInner() {
   const [viewedProfileName, setViewedProfileName] = useState<string | null>(
     null,
   );
+
+  // Navigation history tracking for the universal back button
+  interface ViewHistoryEntry {
+    view: View;
+    viewUserId: string | null;
+  }
+  const [viewHistory, setViewHistory] = useState<ViewHistoryEntry[]>([]);
+  const isBackNavRef = useRef(false);
+  const prevViewRef = useRef<ViewHistoryEntry>({ view: "overview", viewUserId: null });
+
+  useEffect(() => {
+    if (isBackNavRef.current) {
+      isBackNavRef.current = false;
+      prevViewRef.current = { view, viewUserId };
+      return;
+    }
+    const prev = prevViewRef.current;
+    if (prev.view !== view || prev.viewUserId !== viewUserId) {
+      setViewHistory((h) => [...h, prev]);
+      prevViewRef.current = { view, viewUserId };
+      if (typeof window !== "undefined") {
+        try {
+          window.history.pushState(
+            { yekisView: view, viewUserId },
+            "",
+            window.location.pathname,
+          );
+        } catch {
+          // ignore history push errors
+        }
+      }
+    }
+  }, [view, viewUserId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state && e.state.yekisView) {
+        isBackNavRef.current = true;
+        setView(e.state.yekisView as View);
+        setViewUserId(e.state.viewUserId ?? null);
+        setViewHistory((h) => (h.length > 0 ? h.slice(0, -1) : []));
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const handleUniversalBack = useCallback(() => {
+    if (viewHistory.length > 0) {
+      const previous = viewHistory[viewHistory.length - 1];
+      setViewHistory((h) => h.slice(0, -1));
+      isBackNavRef.current = true;
+      prevViewRef.current = previous;
+      setViewUserId(previous.viewUserId);
+      setView(previous.view);
+      if (typeof window !== "undefined") {
+        try {
+          window.history.replaceState(
+            { yekisView: previous.view, viewUserId: previous.viewUserId },
+            "",
+            window.location.pathname,
+          );
+        } catch {
+          // ignore
+        }
+      }
+    } else if (view !== "overview") {
+      isBackNavRef.current = true;
+      prevViewRef.current = { view: "overview", viewUserId: null };
+      setViewUserId(null);
+      setView("overview");
+      if (typeof window !== "undefined") {
+        try {
+          window.history.replaceState(
+            { yekisView: "overview", viewUserId: null },
+            "",
+            window.location.pathname,
+          );
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      window.history.back();
+    }
+  }, [viewHistory, view]);
   const [focusContractId, setFocusContractId] = useState<string | null>(null);
   const [focusChatConversationId, setFocusChatConversationId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
@@ -461,19 +548,19 @@ function FullPlatformAppInner() {
   const [jobBudgetMax, setJobBudgetMax] = useState("");
   const [jobDeadline, setJobDeadline] = useState("");
   /* Overview interactivity state */
-  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [, setLastUpdatedAt] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [realtimeLive, setRealtimeLive] = useState(false);
+  const [, setRealtimeLive] = useState(false);
   /* Dual-role ("BOTH") accounts can toggle between combined, client, or freelancer workspace views */
   const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= 768,
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
   );
 
   useEffect(() => {
     const onResize = () => {
-      const mobile = window.innerWidth <= 768;
+      const mobile = window.innerWidth < 1024;
       setIsMobileViewport(mobile);
       if (!mobile) setMobileDrawerOpen(false);
     };
@@ -524,6 +611,25 @@ function FullPlatformAppInner() {
     setViewUserId(userId);
     setViewedProfileName(null);
     setView("profile");
+  };
+
+  /**
+   * Opens or creates a direct chat conversation with a specific user and navigates to the chat workspace.
+   */
+  const openChatWithUser = async (recipientId: string, recipientName?: string) => {
+    try {
+      const directConv = await api.createDirectConversation(
+        recipientId,
+        recipientName ? `Direct discussion with ${recipientName}` : "Direct Project Discussion",
+      );
+      if (directConv?.id) {
+        setFocusChatConversationId(directConv.id);
+      }
+      setView("chat");
+    } catch {
+      // If direct conversation creation fails, navigate to chat
+      setView("chat");
+    }
   };
 
   /**
@@ -2265,7 +2371,7 @@ const loadWorkspace = async () => {
             <button
               type="button"
               className="sh-icon-only-btn sh-topbar-back-btn"
-              onClick={() => window.history.back()}
+              onClick={handleUniversalBack}
               title="Go back"
               aria-label="Go back"
             >
@@ -2454,23 +2560,8 @@ const loadWorkspace = async () => {
               onRefresh={() => void refreshDashboard()}
               onNavigateView={(v) => navigateToView(v as View)}
               onSelectProfile={(id) => openProfileOf(id)}
+              onOpenChat={(id, name) => void openChatWithUser(id, name)}
             />
-
-            <div className="overview-meta" style={{ padding: "0 24px 28px", maxWidth: 1440, margin: "0 auto" }}>
-              <span
-                className={realtimeLive ? "live-dot on" : "live-dot"}
-                aria-hidden="true"
-              />
-              <span className="overview-meta-text sh-mono">
-                {realtimeLive ? "Realtime socket connected" : "Auto-sync every 60s"} · Updated{" "}
-                {lastUpdatedAt
-                  ? lastUpdatedAt.toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })
-                  : "…"}
-              </span>
-            </div>
           </div>
         )}
 
@@ -2815,6 +2906,7 @@ const loadWorkspace = async () => {
                 // in until the person has a name.
                 setViewedProfileName(loaded.displayName || null)
               }
+              onOpenChat={(id, name) => void openChatWithUser(id, name)}
             />
           </section>
         )}

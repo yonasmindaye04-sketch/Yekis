@@ -17,6 +17,8 @@ import {
   Link2,
   Unlink,
   ChevronRight,
+  UserX,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { TbAlertTriangle, TbAlertCircle } from "react-icons/tb";
@@ -168,6 +170,23 @@ export function SettingsWorkspace({
   // Export Data State
   const [exportLoading, setExportLoading] = useState(false);
   const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+
+  // Account Deactivation Modal State
+  const deactivateDialogRef = useRef<HTMLDialogElement>(null);
+  const [checkingBlockers, setCheckingBlockers] = useState(false);
+  const [deactivateBlockers, setDeactivateBlockers] = useState<{ code: string; message: string }[]>([]);
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [showDeactivatePassword, setShowDeactivatePassword] = useState(false);
+  const [deactivatePhrase, setDeactivatePhrase] = useState("");
+  const [acknowledgeRetention, setAcknowledgeRetention] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [deactivateResult, setDeactivateResult] = useState<{
+    performedAt: string;
+    erased: Record<string, number>;
+    retained: string[];
+    accountClosed: boolean;
+  } | null>(null);
 
   // Theme State
   const isDark = document.documentElement.getAttribute("data-theme") !== "light";
@@ -418,6 +437,90 @@ export function SettingsWorkspace({
     }
   };
 
+  const handleOpenDeactivateModal = async () => {
+    setDeactivateError(null);
+    setDeactivateResult(null);
+    setDeactivatePassword("");
+    setShowDeactivatePassword(false);
+    setDeactivatePhrase("");
+    setAcknowledgeRetention(false);
+    setCheckingBlockers(true);
+    deactivateDialogRef.current?.showModal();
+
+    try {
+      const res = await api.getErasureBlockers();
+      setDeactivateBlockers(res.blockers || []);
+    } catch (err: any) {
+      if (err.blockers) {
+        setDeactivateBlockers(err.blockers);
+      } else {
+        setDeactivateBlockers([]);
+      }
+    } finally {
+      setCheckingBlockers(false);
+    }
+  };
+
+  const handleCloseDeactivateModal = () => {
+    deactivateDialogRef.current?.close();
+  };
+
+  const handleDialogClick = (e: React.MouseEvent<HTMLDialogElement>) => {
+    const dialog = deactivateDialogRef.current;
+    if (!dialog) return;
+    const r = dialog.getBoundingClientRect();
+    if (
+      e.clientX < r.left ||
+      e.clientX > r.right ||
+      e.clientY < r.top ||
+      e.clientY > r.bottom
+    ) {
+      handleCloseDeactivateModal();
+    }
+  };
+
+  const handleConfirmDeactivate = async () => {
+    if (deactivatePhrase.trim().toUpperCase() !== "DEACTIVATE") {
+      setDeactivateError("Please type DEACTIVATE in capital letters to confirm.");
+      return;
+    }
+    if (!acknowledgeRetention) {
+      setDeactivateError("You must acknowledge the statutory retention notice.");
+      return;
+    }
+    if (identities?.passwordSet && !deactivatePassword.trim()) {
+      setDeactivateError("Please enter your account password for step-up verification.");
+      return;
+    }
+
+    setDeactivating(true);
+    setDeactivateError(null);
+
+    try {
+      const result = await api.deactivateAccount({
+        password: deactivatePassword.trim() || undefined,
+        email: user.email,
+      });
+      setDeactivateResult(result);
+      if (onUserUpdated) await onUserUpdated();
+    } catch (err: any) {
+      if (err.blockers && err.blockers.length > 0) {
+        setDeactivateBlockers(err.blockers);
+        setDeactivateError("Account deactivation is blocked by active obligations.");
+      } else if (err.code === "PASSWORD_MISMATCH" || err.message?.toLowerCase().includes("invalid")) {
+        setDeactivateError("Incorrect password. Please verify your password and try again.");
+      } else if (err.code === "REAUTH_REQUIRED" || err.message === "REAUTH_REQUIRED") {
+        setDeactivateError("Your session is not fresh. Please enter your password to re-authenticate.");
+      } else if (err.code === "STEP_UP_REQUIRED" || err.message === "STEP_UP_REQUIRED") {
+        setDeactivateError("Step-up authentication requires your account password.");
+      } else {
+        setDeactivateError(err.message || "Failed to deactivate account. Please try again or contact support.");
+      }
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
   const handleToggleNotif = () => {
     setNotifSaved(true);
     setTimeout(() => setNotifSaved(false), 3000);
@@ -457,7 +560,7 @@ export function SettingsWorkspace({
                 aria-selected={isActive}
                 aria-controls={`settings-panel-${id}`}
               >
-                <Icon size={14} aria-hidden="true" />
+                <Icon size={15} aria-hidden="true" />
                 <span>{label}</span>
               </button>
             );
@@ -1619,6 +1722,13 @@ export function SettingsWorkspace({
             </Alert>
 
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", paddingTop: 8 }}>
+              <button
+                type="button"
+                className="sh-btn sh-btn-danger"
+                onClick={handleOpenDeactivateModal}
+              >
+                <UserX size={14} aria-hidden="true" /> Deactivate Account...
+              </button>
               {onLogout && (
                 <button
                   type="button"
@@ -1641,6 +1751,327 @@ export function SettingsWorkspace({
           </GlassCard>
         </div>
       )}
+
+      {/* Account Deactivation Modal (Native <dialog> conforming to modern-web-guidance) */}
+      <dialog
+        ref={deactivateDialogRef}
+        className="sh-deactivate-dialog"
+        aria-labelledby="deactivate-dialog-title"
+        onClick={handleDialogClick}
+        onCancel={handleCloseDeactivateModal}
+      >
+        <div className="sh-deactivate-header">
+          <h3 id="deactivate-dialog-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <UserX size={18} aria-hidden="true" />
+            {deactivateResult ? "Account Deactivated" : "Deactivate Account & Statutory Erasure"}
+          </h3>
+          <button
+            type="button"
+            className="sh-deactivate-close-btn"
+            onClick={handleCloseDeactivateModal}
+            aria-label="Close dialog"
+            disabled={deactivating}
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="sh-deactivate-body">
+          {checkingBlockers ? (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "36px 0", gap: 12 }}>
+              <RefreshCw size={24} className="animate-spin text-dim" />
+              <p style={{ fontSize: "0.85rem", color: "var(--color-text-secondary)" }}>
+                Auditing active escrow balances, open contracts, and disputes...
+              </p>
+            </div>
+          ) : deactivateResult ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <Alert variant="default" className="border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300">
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback className="bg-emerald-600 rounded-[5px] text-white">
+                    <Check size={14} />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <AlertTitle className="font-semibold text-emerald-800 dark:text-emerald-300">
+                    Account Successfully Deactivated & Pseudonymised
+                  </AlertTitle>
+                  <AlertDescription className="text-emerald-700/90 dark:text-emerald-400/90 text-xs">
+                    Your personal profile has been permanently scrubbed and all active browser/Telegram sessions have been terminated.
+                  </AlertDescription>
+                </div>
+              </Alert>
+
+              <div className="sh-deactivate-grid">
+                <div className="sh-deactivate-col">
+                  <h4 style={{ color: "var(--color-error-text, #dc2626)" }}>Personal Data Destroyed (PDPP Art. 15)</h4>
+                  <ul>
+                    <li>{deactivateResult.erased.profileFields} profile identity fields erased</li>
+                    <li>{deactivateResult.erased.supportChatMessages + deactivateResult.erased.directMessages} chat and direct messages scrubbed</li>
+                    <li>{deactivateResult.erased.portfolioItemsDeleted} portfolio items removed</li>
+                    <li>{deactivateResult.erased.proposalsScrubbed + deactivateResult.erased.jobsScrubbed} proposals and job postings archived</li>
+                    <li>Email pseudonymised to RFC-2606 invalid domain</li>
+                  </ul>
+                </div>
+                <div className="sh-deactivate-col">
+                  <h4 style={{ color: "var(--color-primary)" }}>Statutory Retention (10-Year Mandate)</h4>
+                  <ul>
+                    {deactivateResult.retained.map((item, idx) => (
+                      <li key={idx}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              <div className="sh-deactivate-notice-box">
+                <strong>National Bank of Ethiopia (NBE) & ERCA Compliance Notice</strong>
+                <p style={{ margin: 0, color: "var(--color-text-secondary)" }}>
+                  As required by Ethiopian financial regulations, your transaction ledger vouchers and KYC join keys are archived in an immutable cold ledger for 10 years.
+                </p>
+              </div>
+            </div>
+          ) : deactivateBlockers.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Alert variant="warning" className="flex items-start gap-2.5">
+                <Avatar className="size-6 rounded-[5px] shrink-0">
+                  <AvatarFallback className="bg-amber-600 dark:bg-amber-600/80 rounded-[5px] text-white">
+                    <TbAlertTriangle className="size-3.5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <AlertTitle className="font-semibold text-amber-800 dark:text-amber-300">
+                    Deactivation Currently Blocked ({deactivateBlockers.length} outstanding item{deactivateBlockers.length > 1 ? "s" : ""})
+                  </AlertTitle>
+                  <AlertDescription className="text-amber-700/90 dark:text-amber-400/90 text-xs">
+                    Under financial escrow regulations, accounts with pending funds, active contracts, or unresolved disputes cannot be terminated.
+                  </AlertDescription>
+                </div>
+              </Alert>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {deactivateBlockers.map((b, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      border: "1px solid var(--color-border)",
+                      background: "var(--color-bg)",
+                      fontSize: "0.82rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    <span style={{ fontWeight: 800, color: "var(--color-error-text, #dc2626)", fontSize: "0.75rem", fontFamily: "var(--font-mono)" }}>
+                      [{b.code}]
+                    </span>
+                    <span style={{ color: "var(--color-text)", flex: 1 }}>{b.message}</span>
+                  </div>
+                ))}
+              </div>
+
+              <p style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)", margin: 0 }}>
+                Please resolve the items above (e.g., withdraw remaining wallet funds, settle active milestones, or conclude ongoing disputes) before requesting deactivation.
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div className="sh-deactivate-notice-box">
+                <strong style={{ color: "var(--color-error-text, #dc2626)" }}>Irrevocable Account Deactivation & Statutory Archival</strong>
+                <p style={{ margin: "4px 0 0", color: "var(--color-text-secondary)" }}>
+                  In accordance with the Ethiopian Personal Data Protection Proclamation No. 1321/2024 (Art. 15) and National Bank of Ethiopia (NBE) regulatory frameworks:
+                </p>
+              </div>
+
+              <div className="sh-deactivate-grid">
+                <div className="sh-deactivate-col">
+                  <h4 style={{ color: "var(--color-error-text, #dc2626)" }}>Permanently Erased</h4>
+                  <ul>
+                    <li>Profile name, bio, display name, and avatar images</li>
+                    <li>Portfolio items, claimed skills, and public gigs</li>
+                    <li>Direct messages, chat history, and uploaded files</li>
+                    <li>Active sessions terminated on web and Telegram</li>
+                  </ul>
+                </div>
+                <div className="sh-deactivate-col">
+                  <h4 style={{ color: "var(--color-primary)" }}>10-Year Statutory Retention</h4>
+                  <ul>
+                    <li>Immutable financial escrow ledger & vouchers</li>
+                    <li>Tax reporting records under ERCA mandates</li>
+                    <li>AML identity keys (UCID, phone, Fayda hash)</li>
+                    <li>Executed contract agreements & dispute logs</li>
+                  </ul>
+                </div>
+              </div>
+
+              {identities?.passwordSet && (
+                <div>
+                  <label
+                    htmlFor="deactivate-password"
+                    style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: 6 }}
+                  >
+                    Current Password (Step-Up Verification)
+                  </label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      id="deactivate-password"
+                      type={showDeactivatePassword ? "text" : "password"}
+                      className="input-field"
+                      placeholder="Enter your account password"
+                      value={deactivatePassword}
+                      onChange={(e) => setDeactivatePassword(e.target.value)}
+                      style={{ width: "100%", paddingRight: 40 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowDeactivatePassword(!showDeactivatePassword)}
+                      aria-label={showDeactivatePassword ? "Hide password" : "Show password"}
+                      style={{
+                        position: "absolute",
+                        right: 10,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: 0,
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer",
+                      }}
+                    >
+                      {showDeactivatePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label
+                  htmlFor="deactivate-phrase"
+                  style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, marginBottom: 6 }}
+                >
+                  Type <span style={{ fontFamily: "var(--font-mono)", fontWeight: 800, color: "var(--color-error-text, #dc2626)" }}>DEACTIVATE</span> to confirm:
+                </label>
+                <input
+                  id="deactivate-phrase"
+                  type="text"
+                  className="input-field"
+                  placeholder="DEACTIVATE"
+                  value={deactivatePhrase}
+                  onChange={(e) => setDeactivatePhrase(e.target.value)}
+                  style={{ width: "100%", fontFamily: "var(--font-mono)" }}
+                />
+              </div>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 10,
+                  fontSize: "0.8rem",
+                  color: "var(--color-text)",
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={acknowledgeRetention}
+                  onChange={(e) => setAcknowledgeRetention(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  I understand that this action is permanent. My profile and activity will be erased, and financial records will be retained for 10 years per Ethiopian statutory requirements.
+                </span>
+              </label>
+
+              {deactivateError && (
+                <Alert variant="destructive" className="flex items-start gap-2.5">
+                  <Avatar className="size-6 rounded-[5px] shrink-0">
+                    <AvatarFallback className="bg-red-600 rounded-[5px] text-white">
+                      <TbAlertCircle className="size-3.5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <AlertTitle className="font-semibold text-red-800 dark:text-red-300">
+                      Deactivation Failed
+                    </AlertTitle>
+                    <AlertDescription className="text-red-700/90 dark:text-red-400/90 text-xs">
+                      {deactivateError}
+                    </AlertDescription>
+                  </div>
+                </Alert>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="sh-deactivate-footer">
+          {deactivateResult ? (
+            <button
+              type="button"
+              className="sh-btn sh-btn-primary"
+              onClick={() => {
+                handleCloseDeactivateModal();
+                if (onLogout) onLogout();
+                else window.location.href = "/login";
+              }}
+            >
+              <LogOut size={14} aria-hidden="true" /> Sign Out & Complete
+            </button>
+          ) : deactivateBlockers.length > 0 ? (
+            <>
+              <button
+                type="button"
+                autoFocus
+                className="sh-btn sh-btn-secondary"
+                onClick={handleCloseDeactivateModal}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-primary"
+                onClick={handleOpenDeactivateModal}
+              >
+                <RefreshCw size={14} aria-hidden="true" /> Re-Check Obligations
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                autoFocus
+                className="sh-btn sh-btn-secondary"
+                onClick={handleCloseDeactivateModal}
+                disabled={deactivating}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-danger"
+                disabled={
+                  deactivating ||
+                  deactivatePhrase.trim().toUpperCase() !== "DEACTIVATE" ||
+                  !acknowledgeRetention ||
+                  Boolean(identities?.passwordSet && !deactivatePassword.trim())
+                }
+                onClick={handleConfirmDeactivate}
+              >
+                {deactivating ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" aria-hidden="true" /> Deactivating Account...
+                  </>
+                ) : (
+                  <>
+                    <UserX size={14} aria-hidden="true" /> Permanently Deactivate Account
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </dialog>
     </div>
   );
 }

@@ -129,13 +129,13 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
 
   const badges = useApi<OpsBadges>(opsApi.badges);
 
-  /* Below 860px the sidebar is an overlay drawer; above it, a collapsible
+  /* Below 1024px the sidebar is an overlay drawer; above it, a collapsible
      column. One 3-bar button drives whichever applies. */
   const [isNarrow, setIsNarrow] = useState(
-    () => typeof window !== "undefined" && window.innerWidth <= 860,
+    () => typeof window !== "undefined" && window.innerWidth < 1024,
   );
   useEffect(() => {
-    const onResize = () => setIsNarrow(window.innerWidth <= 860);
+    const onResize = () => setIsNarrow(window.innerWidth < 1024);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);

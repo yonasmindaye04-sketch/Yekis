@@ -508,11 +508,6 @@ export function GigMarketplace() {
     <section className="afro-gigs-section">
       {/* Afro-Tech Command Hero Banner */}
       <div className="afro-hero-card">
-        <div className="afro-eyebrow-row">
-          <span className="afro-pulse-dot" />
-          <p className="afro-eyebrow">Ethiopian Digital Services Escrow</p>
-        </div>
-
         <h1 className="afro-headline">Predefined Gigs, Protected by Escrow</h1>
 
         <p className="afro-subtitle">
@@ -678,7 +673,7 @@ export function GigMarketplace() {
           </div>
         </div>
 
-        {/* Tier 2: Watermelon UI / shadcn Horizontal Tab Rail */}
+        {/* Tier 2: Category Navigation Rail — unified with Settings tab styling */}
         <div
           className="afro-cat-header-tabs-wrap"
           role="tablist"
@@ -694,7 +689,7 @@ export function GigMarketplace() {
             )}
             onClick={() => setCategory("")}
           >
-            <Layers size={14} />
+            <Layers size={14} aria-hidden="true" />
             <span>All Services</span>
           </button>
           {categories.map((c) => {

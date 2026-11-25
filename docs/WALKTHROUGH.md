@@ -32,10 +32,51 @@ Last validated: 2026-11-22
 > - **Verified:** `pnpm --filter frontend build` passes; `node scripts/check-doc-parity.mjs` and `node scripts/scan-secrets.js` are clean. Checked at 1536px and 420px, and in Amharic, with no clipping.
 
 
+> **Production-Ready Account Deactivation & Statutory PDPP Erasure (2026-11-23):**
+> - **The capability**: The Account Deactivation card under `Settings → Data & Account` was previously a static informational notice without an actionable deactivation workflow. It is now fully functional, production-ready, and backed by Ethiopian Personal Data Protection Proclamation No. 1321/2024 (Art. 15) and National Bank of Ethiopia (NBE) 10-year statutory retention mandates.
+> - **Pre-flight obligation audit (`GET /api/v1/users/me/erasure/blockers`)**:
+>   - Automatically inspects the account for active blockers: remaining non-zero wallet balances, processing top-ups, pending payout transactions, active contracts, and open dispute mediations.
+>   - Renders structured blocker alerts with actionable resolution guidance (e.g. withdraw remaining funds, settle milestones).
+> - **Step-up verification & permanent execution (`POST /api/v1/users/me/erasure`)**:
+>   - Enforces step-up authentication (`requireFreshAuth(300)` via password re-authentication), confirmation phrase validation (`DEACTIVATE`), and explicit statutory retention acknowledgment.
+>   - Destroys personal profile data, direct messages, support chat history, uploaded chat attachments (including object store bytes), portfolio items, and skills; pseudonymises email to `erased-<ucid>@erased.invalid`; invalidates credentials and terminates all active sessions.
+>   - Retains immutable financial ledger logs, tax records, and KYC AML identity join keys (UCID, phone, Fayda hash) for 10 years per NBE directives.
+> - **Accessible UI Dialog (`SettingsWorkspace.tsx` & `SettingsWorkspace.css`)**:
+>   - Native `<dialog>` modal element implementing `overscroll-behavior: contain` to prevent backdrop scroll chaining, `aria-labelledby`, safe-action `autofocus` on Cancel, light dismiss, and zero emojis.
+>   - Shows an itemized post-erasure summary and automated session cleanup.
+> - **Verification**:
+>   - `pnpm --filter backend vitest run tests/privacy-data-rights.test.ts` (6 tests pass).
+>   - `pnpm --filter backend route-audit:check` (201 routes clean).
+>   - `pnpm --filter backend type-check` (tsc clean).
+>   - `pnpm --filter frontend build` (tsc -b && vite build clean).
+>   - `node scripts/check-doc-parity.mjs` (complete alignment).
+>   - `node scripts/scan-secrets.js` (clean).
+
 > **Settings section navigation aligned with the landing-page indicator style (2026-11-22):**
 > - The five settings choices were unstyled buttons inside `.sh-segmented` (no `.sh-seg-btn`), so their labels collided. `SettingsWorkspace.tsx` now uses a dedicated `.settings-tabbar` with the marketing-header underline indicator on hover, focus and the active section, plus a `Settings / <section>` breadcrumb.
 > - The bar is a responsive 5/3/2/1-column grid, and the tabs are a full ARIA tablist (`role="tab"`/`tabpanel`, `aria-selected`, Left/Right/Home/End keys). Styling lives in the new `apps/frontend/src/SettingsWorkspace.css`.
 > - **Verified:** `pnpm --filter frontend build` passes with 0 errors (`tsc -b && vite build`).
+>
+> **Tab bar styling unified across views to match the Settings underline design (2026-11-24):**
+> - The disparate tab treatments across core views (`GigMarketplace` outline buttons, `WorkflowWorkspace` segmented control pill containers, and `BrowserWallet` filled green pill buttons) were updated to match the `SettingsWorkspace` tab bar pattern (`settings-tabbar` / `settings-tab`).
+> - Replaced container pill backgrounds, green outline borders, and filled pills with a clean transparent surface and a centered 2px bottom accent underline (`::after`) that scales in on hover, focus-visible, and active states.
+> - Active tabs feature bold text and primary-colored SVG glyphs (`var(--color-primary)`), while inactive tabs use quiet secondary text (`var(--color-text-secondary)`).
+> - Validated full responsive horizontal scrolling (`overflow-x: auto`), touch gesture handling, ARIA `role="tablist"`/`role="tab"`/`aria-selected` compliance, and theme-invariant geometry.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
+>
+> **Ethiopian Fiscal Calendar (E.C. / EFY) support in workspace schedule (2026-11-24):**
+> - Enhanced `CalendarScheduleView.tsx` with a dual-mode calendar toggle (Gregorian and Ethiopian Fiscal Calendar) using `kenat` for precision date conversions.
+> - Integrated Ethiopian Fiscal Year logic (EFY, Hamle 1 → Sene 30) with quarterly tabs (Q1–Q4) and dual bilingual labels (Amharic & English).
+> - Included contextual calculation hints inside the milestone creation dialog showing corresponding EFY dates and quarters.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
+>
+> **Platform-wide professional responsiveness overhaul (`RULE.md` §4 & Modern Web Guidance) (2026-11-24):**
+> - Unified drawer collapse threshold to `< 1024px` across user workspace (`FullPlatformApp.tsx`) and Ops Console (`OpsConsole.tsx`), giving tablets comfortable touch drawer overlays.
+> - Enforced 2-across KPI cards (`repeat(2, minmax(0, 1fr))`) down to 320px small phones, eliminating single-column card stretching.
+> - Allowed mobile action buttons to share rows (`flex: 1 1 calc(50% - 4px)`) rather than stacking full-height blocks.
+> - Enhanced horizontal scroll wrappers (`.sh-table-scroll`, `.tbl-wrap`, `.excel-table-wrap`) with `tabIndex={0}`, `role="region"`, and accessible labels for keyboard scrollability per modern web guidance.
+> - Enforced 44px touch targets on mobile interactive controls and 16px input font sizes to avoid iOS auto-zoom.
+> - **Verified:** `pnpm --filter frontend build` clean, `node scripts/check-doc-parity.mjs` clean, `node scripts/scan-secrets.js` clean.
 
 
 > **A profile photo saves, and Settings stops returning 500 (2026-11-18):**
@@ -45,6 +86,20 @@ Last validated: 2026-11-22
 > - **Public but not enumerable.** `GET /avatars/:id` needs no session because signed-out visitors see public profiles and an `<img>` cannot send a token. The id is random, and replacing a photo creates a new id, so the response is cached as immutable; the old id stops working. Unknown ids are `404`.
 > - **Old local photos are dropped.** A data URL left in `localStorage` by an older build is cleared on load instead of being sent back and rejected.
 > - **Verified:** `tests/avatar-profile.test.ts` (11 tests: storage, replacement, ownership, over-long/data-URL rejection, public serving) and the PDPP erasure suite pass; `pnpm --filter frontend build`, `pnpm --filter backend type-check`, `route-audit:check` and `node scripts/check-doc-parity.mjs` pass. The deployed instance applied migration `20261118190000_user_avatar` (38 in total) and a throwaway account uploaded, served and cleared a real JPEG there: the public URL answered `200 image/jpeg` with an immutable cache, the 600-character URL and the data URL answered `400` instead of the old `500`, another member's id was refused, and erasure reported `avatarsDeleted: 1` and left the URL `404`. See `docs/ALETCLOUD_DEPLOYMENT.md` §11.
+
+> **Fayda Identity Review Responsive Guidance Layout (2026-11-24):**
+> - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
+>   - **Responsive Two-Column Layout (`.idv-layout`)**: Refactored the KYC screen to resolve awkward desktop whitespace on wide viewports (`min-width: 1024px`) by pairing the primary Fayda verification card (`.idv-card`) with a dedicated three-section guidance sidebar (`.idv-sidebar`, 360px width) in a clean grid (`minmax(0, 1fr) 360px`, `gap: 22px`). Stacks seamlessly into a single column on tablet/mobile screens (`max-width: 1023px`).
+>   - **Tier 1 Privileges Card (`.idv-sidebar-card`)**: Outlines key unlocked platform capabilities upon completing Tier 1 verification: bidding on marketplace jobs, signing bilateral digital contracts, unlocking instant escrow payouts (Telebirr/CBE/Bank), and earning the official verified profile badge.
+>   - **Photo Guidelines & Document Checklist**: Actionable tips for fast automated verification (accepted document formats including physical smart cards, printed eID slips, digital eSignet credentials; framing all 4 corners; avoiding flash glare over the 12-digit FIN).
+>   - **Compliance, Privacy & NID Integration**: Reassures users with details on direct National ID Program (eSignet) biometric verification, 256-bit TLS encryption, NBE escrow compliance, and PDPP privacy guarantees, plus a direct link to `fayda.et` for un-enrolled users.
+>   - **Theme Parity & Multi-Locale Sync**: Layout geometry is 100% theme-invariant between light and dark modes with bare colored glyphs (zero icon background tiles) and zero emojis. Full translation parity across `en`, `am`, `om`, and `ti` in `i18n.ts`.
+> - **Verification**:
+>   - `pnpm --filter frontend build` passes with exit code 0 (`tsc -b && vite build`).
+>   - `node scripts/check-doc-parity.mjs` passes with exit code 0.
+>   - `node scripts/scan-secrets.js` passes with exit code 0.
+>   - `pnpm --filter backend route-audit:check` passes with exit code 0.
+>   - `pnpm --filter backend type-check` passes with exit code 0.
 
 > **Fayda Identity Review Redesign — Calm Enterprise & Trust Direction (2026-11-18):**
 > - **`BrowserVerification.tsx` & `BrowserVerification.css`**:
@@ -739,7 +794,7 @@ otificationQueue.
 > - **Zero Dead-End Manual Verification Fallback**:
 >   - When automated gateway APIs fail, time out, or experience downtime, clients are never stranded. The frontend renders an inline fallback card with a 1-click **"Switch to Manual Verification"** button that pre-fills the amount and payment rail for seamless direct transfer.
 >   - For delayed or unconfirmed checkout requests (`CHECKOUT_PENDING`), clients can click **"Attach receipt for verification"** to submit their payment reference number and receipt image directly to the existing transaction via `POST /api/v1/wallet/topups/:topUpId/attach-receipt`. The server updates the top-up to `PENDING` manual review and notifies operations staff.
-> - **Operations Staff Top-Up Queue (`TopUpQueue.tsx`)**: Upgraded the receipt review desk with color-coded provider badges (`Telebirr` in brand blue, `CBE Bank` in purple, `Safaricom M-Pesa` in emerald green) and destination account indicators (`0910 011 818`, `1000 223 344`, `0777 011 818 / Till 882199`) so staff can verify receipts quickly.
+> - **Operations Staff Top-Up Queue (`TopUpQueue.tsx`)**: Upgraded the receipt review desk with color-coded provider badges (`Telebirr` in brand blue, `CBE Bank` in purple, `Safaricom M-Pesa` in emerald green) and destination account indicators (`0910 011 818`, `1000300802428`, `0716 356 515 / Till 882199`) so staff can verify receipts quickly.
 > - **Telegram Mini App & Browser Wallet Parity**: Unified the 3-way payment rail selection, 1-click account copy, fallback handling, and receipt upload modals across both `BrowserWallet.tsx` (Desktop Web) and `App.tsx` (Mobile / Telegram Mini App).
 >
 > **Chat Attachment Upload, Persistent Storage & Support Desk Rendering (2026-09-05):**

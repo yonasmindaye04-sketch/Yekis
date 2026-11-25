@@ -1700,7 +1700,7 @@ The second audit surface is `GET /api/v1/admin/incidents/breaches`, which reads 
 
 * **Purpose:** PDPP No. 1321/2024 access, portability and erasure. One module so the export and the erasure agree on what "personal data" means — if they drifted apart, the export would quietly under-report what the platform keeps.
 * **Files:** `privacy.service.ts` (the implementation). The routes live in `profiles.routes.ts` so the existing documented export route keeps working.
-* **Routes:** `GET /api/v1/users/me/export`, `POST /api/v1/users/me/erasure`.
+* **Routes:** `GET /api/v1/users/me/export`, `GET /api/v1/users/me/erasure/blockers`, `POST /api/v1/users/me/erasure`.
 
 #### Access and Portability
 
@@ -2672,7 +2672,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 #### Known gaps
 
 - **Hardcoded copy is still widespread.** 25 of 131 `.tsx` files import the i18n module; the other **106** never touch it. An exact AST count (TypeScript's own parser) finds **1,974 hardcoded JSX text nodes**, of which **1,296** are in files that never import the i18n module — concentrated in the ops console (which is English-only by design). There is **no lint rule** forbidding raw literals, and no test that checks locale parity. Reproduce the figure with `node scripts/measure-frontend-i18n.mjs`.
-- **Registration only accepts two languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en"])`, so registering with Oromiffa or Tigrigna selected returns `400 VALIDATION_ERROR`.
+- **Registration accepts all four platform languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en", "om", "ti"])`, allowing users who select Oromiffa or Tigrigna to register without validation rejection.
 - **The bot's auth middleware collapses the session language to am/en**, so a bot user who picks `om` or `ti` is silently switched back to English on the next inbound message. The same collapse applies to Telegram sign-ups.
 - **No RTL support.** The platform is left-to-right only: `document.documentElement.dir` is never set, there is no RTL locale, no `[dir="rtl"]` rule and no logical-property migration. Ethiopic text renders in the same Latin-first font stack.
 - `LandingPage.tsx` (977 lines) is **dead code** — the app imports `LandingPageV2`.
@@ -3187,7 +3187,7 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 **Where it falls short today:**
 - Roughly **1,974 hardcoded JSX text literals** remain across the frontend — **1,296** of them in the 106 files that never import the i18n module, concentrated in the ops console, which is English-only by design. There is no lint rule and no parity test preventing more. `node scripts/measure-frontend-i18n.mjs` prints the current figure.
-- **Registration accepts only `en` and `am`.** Choosing Oromiffa or Tigrigna and registering returns `400 VALIDATION_ERROR`.
+- **Registration accepts all four platform languages.** `RegisterInput.languagePreference` is `z.enum(["am", "en", "om", "ti"])`, accepting `en`, `am`, `om`, and `ti` without validation failure.
 - **The bot's language collapses to am/en** after every inbound message, so a bot user who selects `om` or `ti` is silently switched back to English.
 - **No RTL support** — the platform is left-to-right only, and `dir` is never set.
 

@@ -324,24 +324,16 @@
   white-space: nowrap;
 }
 
-/* Tier 2: Category Tabs Horizontal Rail (Watermelon UI / shadcn style) */
+/* Tier 2: Category Tabs Horizontal Rail (aligned with Settings tab design) */
 .afro-cat-header-tabs-wrap {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 12px 0;
   overflow-x: auto;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  background: var(--color-bg-subtle);
-}
-
-:root[data-theme="dark"] .afro-cat-header-tabs-wrap {
-  background: rgba(15, 23, 30, 0.6);
-}
-
-:root[data-theme="light"] .afro-cat-header-tabs-wrap {
-  background: #f8fafc;
+  background: transparent;
 }
 
 .afro-cat-header-tabs-wrap::-webkit-scrollbar {
@@ -349,51 +341,76 @@
 }
 
 .afro-cat-tab-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 38px;
-  padding: 0 14px;
-  border-radius: 8px;
+  justify-content: center;
+  gap: 7px;
+  min-height: 44px;
+  padding: 8px 14px 12px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 600;
+  line-height: 1.25;
   cursor: pointer;
-  transition: all 0.15s ease;
   white-space: nowrap;
   flex-shrink: 0;
-  border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-secondary);
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.afro-cat-tab-btn svg {
+  flex-shrink: 0;
+}
+
+/* Accent underline centered under tab, exactly like Settings tabbar */
+.afro-cat-tab-btn::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 220ms ease;
 }
 
 .afro-cat-tab-btn:hover {
   color: var(--color-text);
-  background: var(--color-surface);
-  border-color: var(--color-border);
+  background: var(--color-bg-subtle);
+  border-color: transparent;
 }
 
-.afro-cat-tab-btn.active {
-  background: var(--color-surface);
+.afro-cat-tab-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
   color: var(--color-text);
-  border-color: var(--color-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  font-weight: 700;
 }
 
-:root[data-theme="dark"] .afro-cat-tab-btn.active {
-  background: #1a2632;
-  border-color: var(--color-primary);
-  color: #ffffff;
+.afro-cat-tab-btn.active,
+.afro-cat-tab-btn[aria-selected="true"] {
+  background: transparent;
+  color: var(--color-text);
+  border-color: transparent;
+  box-shadow: none;
 }
 
-:root[data-theme="light"] .afro-cat-tab-btn.active {
-  background: #ffffff;
-  border-color: var(--color-primary);
-  color: #0f172a;
-}
-
-.afro-cat-tab-btn.active svg {
+.afro-cat-tab-btn.active svg,
+.afro-cat-tab-btn[aria-selected="true"] svg {
   color: var(--color-primary);
+}
+
+.afro-cat-tab-btn:hover::after,
+.afro-cat-tab-btn:focus-visible::after,
+.afro-cat-tab-btn.active::after,
+.afro-cat-tab-btn[aria-selected="true"]::after {
+  transform: scaleX(1);
 }
 
 .afro-cat-dropdown-menu {
@@ -1415,8 +1432,8 @@
   }
 
   .afro-trust-strip {
-    grid-template-columns: 1fr;
-    gap: 12px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .afro-hero-card {
@@ -1456,31 +1473,4 @@
   }
 }
 
-/* ── GigSeller glass shell ──────────────────────────────── */
-.gig-welcome-banner {
-  background: var(--gradient-brand, linear-gradient(135deg, #16a34a 0%, #0d9488 100%));
-  border-radius: 14px;
-  padding: 20px 24px;
-  color: #fff;
-  position: relative;
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-.gig-welcome-banner__title {
-  font-family: var(--font-heading, "Hanken Grotesk", sans-serif);
-  font-size: 18px;
-  font-weight: 800;
-  margin: 0 0 2px;
-}
-.gig-welcome-banner__sub {
-  font-size: 13px;
-  opacity: 0.85;
-  margin: 0;
-}
-.gig-welcome-banner__shine {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(120deg, transparent 40%, rgba(255, 255, 255, 0.14) 60%, transparent 72%);
-}
 

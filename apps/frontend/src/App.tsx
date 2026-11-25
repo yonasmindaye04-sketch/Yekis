@@ -31,6 +31,8 @@ import {
   ShieldAlert,
   RefreshCw,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { PaymentReturn } from "./PaymentReturn";
 import { OnboardingVerification } from "./OnboardingVerification";
@@ -64,7 +66,7 @@ const paymentAccounts = {
   CBE_BIRR: {
     label: "CBE Bank",
     accountName: "Yekis Jobs",
-    accountNumber: "1000 223 344",
+    accountNumber: "1000300802428",
     image: "/payment/cbe payment.jpg",
     imgStyle: {
       width: "70px",
@@ -77,7 +79,7 @@ const paymentAccounts = {
   M_PESA: {
     label: "Safaricom M-Pesa",
     accountName: "Yekis Jobs",
-    accountNumber: "0777 011 818 (Till: 882199)",
+    accountNumber: "0716 356 515 (Till: 882199)",
     image: "/payment/mpesa.svg",
     imgStyle: {
       width: "70px",
@@ -199,6 +201,7 @@ export function App() {
   );
   const [mobilePhone, setMobilePhone] = useState("");
   const [mobilePassword, setMobilePassword] = useState("");
+  const [showMobilePassword, setShowMobilePassword] = useState(false);
   const [mobileRole, setMobileRole] = useState<"CLIENT" | "FREELANCER" | "BOTH">(
     "FREELANCER",
   );
@@ -215,9 +218,9 @@ export function App() {
   const [faydaIdNumber, setFaydaIdNumber] = useState("");
   const [faydaIdPhoto, setFaydaIdPhoto] = useState<File | null>(null);
   const [selfieWithIdPhoto, setSelfieWithIdPhoto] = useState<File | null>(null);
-  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("INSTANT");
+  const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("MANUAL");
   const [topUpAmount, setTopUpAmount] = useState("");
-  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
+  const [topUpRail, setTopUpRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("CBE_BIRR");
   const [checkoutRail, setCheckoutRail] = useState<"TELEBIRR" | "CBE_BIRR" | "M_PESA">("TELEBIRR");
   const [checkoutFallback, setCheckoutFallback] = useState<{
     amount: string;
@@ -582,7 +585,11 @@ export function App() {
 
   const handleMobileAuth = async () => {
     if (!mobilePhone.trim() || !mobilePassword.trim()) {
-      alert("Please enter both your phone number or email and your password.");
+      setTelegramAuthError("Please enter both your phone number or email and your password.");
+      return;
+    }
+    if (mobileAuthMode === "signup" && mobilePassword.length < 10) {
+      setTelegramAuthError("Password must be at least 10 characters long.");
       return;
     }
     const normalizedPhone = normalizeEthiopianPhone(mobilePhone);
@@ -741,6 +748,7 @@ export function App() {
       setTelegramAuthStatus("error");
       const raw = err instanceof Error ? err.message : "Sign-up failed";
       const code = (err as { code?: string })?.code ?? "";
+      const details = (err as { details?: { fieldErrors?: Record<string, string[]> } })?.details;
       if (raw.includes("INVALID_CREDENTIALS") || raw.includes("401")) {
         setTelegramAuthError(
           "We could not create the account. If that email address is already registered, sign in with it instead.",
@@ -748,6 +756,18 @@ export function App() {
       } else if (code === "PHONE_IN_USE" || raw.includes("PHONE_IN_USE")) {
         setTelegramAuthError(
           "An account with this phone number already exists. Please switch to Sign In.",
+        );
+      } else if (code === "VALIDATION_ERROR" || raw.includes("VALIDATION_ERROR")) {
+        let fieldMsg = "";
+        if (details?.fieldErrors) {
+          const parts = Object.entries(details.fieldErrors).map(([field, msgs]) => {
+            const label = field === "password" ? "Password" : field === "email" ? "Email" : field;
+            return `${label}: ${msgs.join(", ")}`;
+          });
+          if (parts.length > 0) fieldMsg = parts.join(". ");
+        }
+        setTelegramAuthError(
+          fieldMsg || "Password must be at least 10 characters long. Please click Back to update your password.",
         );
       } else {
         setTelegramAuthError(raw);
@@ -1527,20 +1547,72 @@ export function App() {
                     color: "var(--color-text-secondary)",
                   }}
                 >
-                  Password / PIN
-                  <input
-                    type="password"
-                    value={mobilePassword}
-                    onChange={(e) => setMobilePassword(e.target.value)}
-                    placeholder="Enter password"
-                    style={{
-                      padding: "10px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--color-border)",
-                      background: "var(--color-bg)",
-                      color: "var(--color-text)",
-                    }}
-                  />
+                  {mobileAuthMode === "signup"
+                    ? "Password (min. 10 characters)"
+                    : "Password"}
+                  <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <input
+                      type={showMobilePassword ? "text" : "password"}
+                      value={mobilePassword}
+                      onChange={(e) => setMobilePassword(e.target.value)}
+                      placeholder={
+                        mobileAuthMode === "signup"
+                          ? "Create secure password"
+                          : "Enter password"
+                      }
+                      autoComplete={
+                        mobileAuthMode === "signup"
+                          ? "new-password"
+                          : "current-password"
+                      }
+                      spellCheck={false}
+                      autoCapitalize="none"
+                      style={{
+                        padding: "10px 42px 10px 10px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-bg)",
+                        color: "var(--color-text)",
+                        width: "100%",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <button
+                      type="button"
+                      aria-label={showMobilePassword ? "Hide password" : "Show password"}
+                      onClick={() => setShowMobilePassword((prev) => !prev)}
+                      style={{
+                        position: "absolute",
+                        right: "10px",
+                        background: "none",
+                        border: "none",
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "4px",
+                      }}
+                    >
+                      {showMobilePassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                  {mobileAuthMode === "signup" && (
+                    <div style={{ fontSize: "0.76rem", marginTop: "2px" }}>
+                      {mobilePassword.length === 0 ? (
+                        <span style={{ color: "var(--color-text-secondary)" }}>
+                          Minimum 10 characters required
+                        </span>
+                      ) : mobilePassword.length < 10 ? (
+                        <span style={{ color: "var(--color-error, #ef4444)", fontWeight: 600 }}>
+                          Requires {10 - mobilePassword.length} more character{10 - mobilePassword.length === 1 ? "" : "s"} ({mobilePassword.length}/10)
+                        </span>
+                      ) : (
+                        <span style={{ color: "var(--color-primary, #22c55e)", fontWeight: 700 }}>
+                          Password length requirement met
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </label>
 
                 {mobileAuthMode === "signup" && (
@@ -2337,15 +2409,30 @@ export function App() {
                   </div>
 
                   <div className="platform-metrics">
-                    <article className="metric-card">
-                      <small>Wallet balance</small>
+                    <article
+                      className="metric-card"
+                      onClick={() => setActiveTab("wallet")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <small>Wallet balance</small>
+                        <Wallet size={14} style={{ color: "var(--color-primary)" }} />
+                      </div>
                       <strong>ETB {walletBalance.toLocaleString()}</strong>
-                      <span>Approved funds</span>
+                      <span>Approved &bull; Tap to open</span>
                     </article>
-                    <article className="metric-card">
-                      <small>
-                        {role === "ADMIN" ? "Needs review" : "Active work"}
-                      </small>
+
+                    <article
+                      className="metric-card"
+                      onClick={() => setActiveTab("escrow")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <small>
+                          {role === "ADMIN" ? "Needs review" : "Active work"}
+                        </small>
+                        <Briefcase size={14} style={{ color: "var(--color-primary)" }} />
+                      </div>
                       <strong>
                         {role === "ADMIN"
                           ? topUpRequests.filter(
@@ -2359,26 +2446,53 @@ export function App() {
                         {role === "ADMIN" ? "Receipts in queue" : "Milestones"}
                       </span>
                     </article>
-                    <article className="metric-card">
-                      <small>Open jobs</small>
+
+                    <article
+                      className="metric-card"
+                      onClick={() => setActiveTab("jobs")}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <small>Open jobs</small>
+                        <Search size={14} style={{ color: "var(--color-primary)" }} />
+                      </div>
                       <strong>{jobs.length}</strong>
                       <span>Opportunities</span>
                     </article>
-                  </div>
 
-                  <section className="panel profile-wallet-card">
-                    <div>
-                      <p className="eyebrow">Wallet</p>
-                      <h2>ETB {walletBalance.toLocaleString()}</h2>
-                      <p>Secure Ethiopian escrow and instant wallet ledger.</p>
-                    </div>
-                    <button
-                      className="btn-primary"
-                      onClick={() => setActiveTab("wallet")}
+                    <article
+                      className="metric-card"
+                      onClick={() =>
+                        setActiveTab(role === "ADMIN" ? "disputes" : "kyc")
+                      }
+                      style={{ cursor: "pointer" }}
                     >
-                      Open wallet <Wallet size={16} />
-                    </button>
-                  </section>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <small>
+                          {role === "ADMIN"
+                            ? "Disputes"
+                            : "Identity"}
+                        </small>
+                        <UserCircle size={14} style={{ color: "var(--color-primary)" }} />
+                      </div>
+                      <strong>
+                        {role === "ADMIN"
+                          ? milestones.filter((m) => m.escrowState === "DISPUTED").length
+                          : kycStatus === "APPROVED"
+                            ? "Verified"
+                            : kycStatus === "UNDER_REVIEW"
+                              ? "In Review"
+                              : "Required"}
+                      </strong>
+                      <span>
+                        {role === "ADMIN"
+                          ? "Disputed milestones"
+                          : kycStatus === "APPROVED"
+                            ? "Payouts active"
+                            : "Fayda ID verification"}
+                      </span>
+                    </article>
+                  </div>
 
                   <div className="platform-grid">
                     {role === "CLIENT" && (
@@ -2654,15 +2768,23 @@ export function App() {
                       <div className="panel-heading">
                         <h2>Add Funds</h2>
                       </div>
-                      <div className="tabs" style={{ marginBottom: 16 }}>
+                      <div className="tabs tx-tab-group" role="tablist" aria-label="Top-up method" style={{ marginBottom: 16 }}>
                         <button
-                          className={topUpMethod === "INSTANT" ? "active" : ""}
+                          type="button"
+                          role="tab"
+                          id="app-topup-tab-instant"
+                          aria-selected={topUpMethod === "INSTANT"}
+                          className={`tx-tab-btn ${topUpMethod === "INSTANT" ? "active" : ""}`}
                           onClick={() => setTopUpMethod("INSTANT")}
                         >
                           Instant Checkout
                         </button>
                         <button
-                          className={topUpMethod === "MANUAL" ? "active" : ""}
+                          type="button"
+                          role="tab"
+                          id="app-topup-tab-manual"
+                          aria-selected={topUpMethod === "MANUAL"}
+                          className={`tx-tab-btn ${topUpMethod === "MANUAL" ? "active" : ""}`}
                           onClick={() => setTopUpMethod("MANUAL")}
                         >
                           Manual Transfer
@@ -3041,45 +3163,47 @@ export function App() {
                           placeholder="Enter your Fayda ID number"
                         />
                       </label>
-                      <div className="flex flex-col gap-1.5">
-                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
-                          Fayda ID photo
-                        </span>
-                        <FileUploader
-                          compact
-                          showCard={false}
-                          showHeader={false}
-                          maxFiles={1}
-                          accept="image/*"
-                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
-                          maxSizeMB={10}
-                          value={faydaIdPhoto}
-                          onFileSelect={(file) => setFaydaIdPhoto(file)}
-                          showFooter={false}
-                          showEncryptionBadge={true}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1.5" style={{ marginTop: 8 }}>
-                        <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
-                          Selfie holding Fayda ID
-                        </span>
-                        <FileUploader
-                          compact
-                          showCard={false}
-                          showHeader={false}
-                          maxFiles={1}
-                          accept="image/*"
-                          acceptedLabel="JPG, PNG, WebP · up to 10 MB"
-                          maxSizeMB={10}
-                          value={selfieWithIdPhoto}
-                          onFileSelect={(file) => setSelfieWithIdPhoto(file)}
-                          showFooter={false}
-                          showEncryptionBadge={true}
-                        />
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
+                        <div className="flex flex-col gap-1.5">
+                          <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+                            Fayda ID photo
+                          </span>
+                          <FileUploader
+                            compact
+                            showCard={false}
+                            showHeader={false}
+                            maxFiles={1}
+                            accept="image/*"
+                            acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                            maxSizeMB={10}
+                            value={faydaIdPhoto}
+                            onFileSelect={(file) => setFaydaIdPhoto(file)}
+                            showFooter={false}
+                            showEncryptionBadge={false}
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>
+                            Selfie holding ID
+                          </span>
+                          <FileUploader
+                            compact
+                            showCard={false}
+                            showHeader={false}
+                            maxFiles={1}
+                            accept="image/*"
+                            acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                            maxSizeMB={10}
+                            value={selfieWithIdPhoto}
+                            onFileSelect={(file) => setSelfieWithIdPhoto(file)}
+                            showFooter={false}
+                            showEncryptionBadge={false}
+                          />
+                        </div>
                       </div>
                       <button
                         className="btn-primary"
-                        style={{ marginTop: 16 }}
+                        style={{ marginTop: 14 }}
                         onClick={submitKyc}
                         disabled={isLoading}
                       >
@@ -3093,15 +3217,22 @@ export function App() {
                         <strong>{kycStatus.replace("_", " ")}</strong>
                       </div>
                       <span
-                        className="status-pill"
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 4,
+                          fontWeight: 700,
+                          fontSize: "0.85rem",
+                          color:
+                            kycStatus === "APPROVED"
+                              ? "var(--color-primary, #22c55e)"
+                              : kycStatus === "UNDER_REVIEW"
+                                ? "#f59e0b"
+                                : "var(--color-text-secondary)",
                         }}
                       >
                         {kycStatus === "APPROVED" && <CheckCircle2 size={14} />}{" "}
-                        {kycStatus}
+                        {kycStatus.replace("_", " ")}
                       </span>
                     </section>
                   </div>

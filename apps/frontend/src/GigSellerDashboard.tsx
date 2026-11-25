@@ -1,9 +1,6 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Archive, Pause, Plus, Star, Trash2, Wallet } from "lucide-react";
-import { GlassCard } from "./components/ui-v2/GlassCard";
-import { StatCard } from "./components/ui-v2/StatCard";
-import { ShinyBadge } from "./components/ui-v2/ShinyBadge";
 import {
   api,
   type CreateGigPayload,
@@ -15,6 +12,7 @@ import {
   EscrowFeeBreakdown,
   formatEtbMajor,
   formatStatusLabel,
+  statusTone,
 } from "./pages/ops/components/ui";
 
 // === HELPERS ===
@@ -155,16 +153,6 @@ const STATUS_COPY: Record<string, { label: string; tone: string; hint: string }>
     hint: "No longer listed.",
   },
 };
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = s.toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 
 // === MAIN COMPONENT ===
 export function GigSellerDashboard() {
@@ -364,7 +352,7 @@ export function GigSellerDashboard() {
 
         {error ? <div className="form-error">{error}</div> : null}
 
-        <GlassCard style={{ padding: 20, marginTop: 16 }}>
+        <div className="sh-card" style={{ padding: 20, marginTop: 16 }}>
           <label className="gig-field">
             <span>Title</span>
             <input
@@ -417,7 +405,7 @@ export function GigSellerDashboard() {
               onChange={(e) => set("maxRevisions", e.target.value)}
             />
           </label>
-        </GlassCard>
+        </div>
 
         <div className="content-toolbar" style={{ marginTop: 24 }}>
           <div>
@@ -440,7 +428,7 @@ export function GigSellerDashboard() {
         </div>
 
         {draft.packages.map((p, i) => (
-          <GlassCard key={p.tier} style={{ padding: 20, marginTop: 12 }}>
+          <div className="sh-card" key={p.tier} style={{ padding: 20, marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className="badge">{p.tier}</span>
               {!readOnlyPackages && draft.packages.length > 1 ? (
@@ -523,7 +511,7 @@ export function GigSellerDashboard() {
                 />
               </div>
             )}
-          </GlassCard>
+          </div>
         ))}
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
@@ -549,51 +537,60 @@ export function GigSellerDashboard() {
   // ── the list ──
   return (
     <section className="platform-content">
-      {/* Welcome banner */}
-      <div className="gig-welcome-banner">
+      {/* Section Header */}
+      <div className="sh-card-header" style={{ marginBottom: 16 }}>
         <div>
-          <h2 className="gig-welcome-banner__title">Welcome back 👋</h2>
-          <p className="gig-welcome-banner__sub">Here's your seller overview for today.</p>
+          <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+            {gf.myGigsTitle}
+          </h2>
+          <p className="sh-card-desc">
+            {gf.myGigsDesc}
+          </p>
         </div>
-        <div className="gig-welcome-banner__shine" aria-hidden />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <span className="sh-kbd">
+            {totals.live} Live · {gigs.length} Total
+          </span>
+          <button className="sh-btn sh-btn-primary" onClick={startCreate}>
+            <Plus size={15} /> {gf.createGigBtn}
+          </button>
+        </div>
       </div>
 
-      {/* KPI row */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14, marginBottom: 24 }}>
-        <StatCard
-          label="Live Gigs"
-          value={gigs?.filter(g => g.status === "ACTIVE").length ?? 0}
-          accent="green"
-          icon={Star}
-        />
-        <StatCard
-          label="Active Orders"
-          value={"—"}
-          accent="blue"
-          icon={Activity}
-        />
-        <StatCard
-          label="Total Earnings"
-          value={"ETB —"}
-          accent="teal"
-          icon={Wallet}
-        />
-        <StatCard
-          label="Total Gigs"
-          value={gigs?.length ?? 0}
-          accent="amber"
-          icon={Archive}
-        />
-      </div>
-
-      <div className="content-toolbar">
-        <div>
-          <h2>{gf.myGigsTitle}</h2>
-          <p>{gf.myGigsDesc}</p>
+      {/* KPI Stat Strip */}
+      <div className="sh-kpi-grid" style={{ marginBottom: 20 }}>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Live Gigs</span>
+            <Star size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{totals.live}</div>
+          <div className="sh-kpi-sub">Active in marketplace</div>
         </div>
-        <button className="btn-primary" onClick={startCreate}>
-          <Plus size={16} /> {gf.createGigBtn}
-        </button>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Active Orders</span>
+            <Activity size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">—</div>
+          <div className="sh-kpi-sub">In progress deliverables</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Total Earnings</span>
+            <Wallet size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">ETB —</div>
+          <div className="sh-kpi-sub">Net revenue settled</div>
+        </div>
+        <div className="sh-card sh-kpi-card">
+          <div className="sh-kpi-top">
+            <span className="sh-kpi-label">Total Gigs</span>
+            <Archive size={15} className="sh-text-muted" />
+          </div>
+          <div className="sh-kpi-value sh-mono">{gigs.length}</div>
+          <div className="sh-kpi-sub">Created gig packages</div>
+        </div>
       </div>
 
       {notice ? <p style={{ color: "var(--color-success-text)" }}>{notice}</p> : null}
@@ -603,11 +600,11 @@ export function GigSellerDashboard() {
       {loading ? (
         <div style={{ display: "grid", gap: 12 }}>
           {[1, 2].map((idx) => (
-            <GlassCard key={idx} style={{ padding: 18 }}>
+            <div className="sh-card" key={idx} style={{ padding: 18 }}>
               <div className="sh-skeleton" style={{ height: 20, width: "45%", marginBottom: 10 }} />
               <div className="sh-skeleton" style={{ height: 14, width: "65%", marginBottom: 14 }} />
               <div className="sh-skeleton" style={{ height: 34, width: "100%" }} />
-            </GlassCard>
+            </div>
           ))}
         </div>
       ) : gigs.length === 0 ? (
@@ -637,7 +634,7 @@ export function GigSellerDashboard() {
                 null as number | null,
               );
               return (
-                <GlassCard key={g.id} style={{ padding: 18 }}>
+                <div className="sh-card" key={g.id} style={{ padding: 18 }}>
                   <div
                     style={{
                       display: "flex",
@@ -664,9 +661,9 @@ export function GigSellerDashboard() {
                       </div>
                     </div>
 
-                    <ShinyBadge variant={statusToVariant(g.status)}>
+                    <span className={`status-pill ${statusTone(g.status)}`}>
                       {formatStatusLabel(g.status, t.workspace.statuses)}
-                    </ShinyBadge>
+                    </span>
                   </div>
 
                   {copy.hint ? (
@@ -724,7 +721,7 @@ export function GigSellerDashboard() {
                       ) : null}
                     </span>
                   </div>
-                </GlassCard>
+                </div>
               );
             })}
           </div>

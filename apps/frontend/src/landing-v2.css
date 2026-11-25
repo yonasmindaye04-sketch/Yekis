@@ -3247,11 +3247,19 @@
   top: 1rem;
   left: 1rem;
   z-index: 1;
+  /* Self-contained pill: ProfilePage.css also defines a global `.tag`, and
+     without these resets its padding/background leak into the deck. */
+  padding: 0.4rem 0.75rem;
+  border: 1px solid rgba(23, 19, 31, 0.08);
+  border-radius: 999px;
+  --stk-tag-bg: #f4f2f7;
+  background: var(--stk-tag-bg);
   font-family: var(--stk-mono);
   font-size: 0.66rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.66);
+  color: #211b30;
+  color: contrast-color(var(--stk-tag-bg));
 }
 
 /* ── deck HUD (dots + counter) ── */
