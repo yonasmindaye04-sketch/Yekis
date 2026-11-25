@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTelegramMiniApp } from "./telegram/useTelegramMiniApp";
-import { getTelegramWebApp, reloadTelegramMiniApp } from "./telegram/webApp";
+import { getTelegramWebApp, isTelegramMiniApp, reloadTelegramMiniApp } from "./telegram/webApp";
 import { initAnalytics, events } from "./analytics";
 import { CookieBanner } from "./CookieBanner";
 import {
@@ -824,10 +824,10 @@ export function App() {
 
       if (redirectUrl) {
         const tg = window.Telegram?.WebApp;
-        if (tg && typeof tg.openLink === "function") {
+        if (isTelegramMiniApp() && tg && typeof tg.openLink === "function") {
           tg.openLink(redirectUrl);
         } else {
-          window.open(redirectUrl, "_blank", "noopener");
+          window.open(redirectUrl, "_blank", "noopener,noreferrer");
         }
       }
     } catch (err) {
@@ -1955,14 +1955,29 @@ export function App() {
                     border: "1px solid var(--color-border)",
                   }}
                 >
-                  <p style={{ margin: "0 0 8px 0" }}>
-                    {telebirrModal.provider === "TELEBIRR"
-                      ? "Telebirr"
-                      : telebirrModal.provider === "CBE_BIRR"
-                        ? "CBE Birr"
-                        : "Safaricom M-Pesa"}{" "}
-                    payment gateway was launched in your browser. Complete the payment there, or use sandbox simulation below:
-                  </p>
+                  {telebirrModal.redirectUrl ? (
+                    <p style={{ margin: "0 0 8px 0" }}>
+                      {telebirrModal.provider === "TELEBIRR"
+                        ? "Telebirr"
+                        : telebirrModal.provider === "CBE_BIRR"
+                          ? "CBE Birr"
+                          : "Safaricom M-Pesa"}{" "}
+                      payment gateway was launched in your browser. Complete the payment there, or use sandbox simulation below:
+                    </p>
+                  ) : import.meta.env.DEV ? (
+                    <p style={{ margin: "0 0 8px 0" }}>
+                      {telebirrModal.provider === "TELEBIRR"
+                        ? "Telebirr"
+                        : telebirrModal.provider === "CBE_BIRR"
+                          ? "CBE Birr"
+                          : "Safaricom M-Pesa"}{" "}
+                      live gateway credentials are not configured in this local environment, so a sandbox session was created. Click <strong>Simulate Instant Payment</strong> below or attach a manual receipt.
+                    </p>
+                  ) : (
+                    <p style={{ margin: "0 0 8px 0" }}>
+                      The payment gateway did not return a hosted checkout link for this session. Transfer via Manual Transfer or attach your receipt in Recent top-ups.
+                    </p>
+                  )}
                   {import.meta.env.DEV && (
                     <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--color-text-tertiary)" }}>
                       <strong>Note for Dev/Testing:</strong> In sandbox environments, entering real customer numbers may fail. Click <strong>Simulate Instant Payment</strong> below to approve without sandbox phone numbers.
@@ -1978,10 +1993,10 @@ export function App() {
                       style={{ width: "100%", justifyContent: "center" }}
                       onClick={() => {
                         const tg = window.Telegram?.WebApp;
-                        if (tg && typeof tg.openLink === "function") {
+                        if (isTelegramMiniApp() && tg && typeof tg.openLink === "function") {
                           tg.openLink(telebirrModal.redirectUrl!);
                         } else {
-                          window.open(telebirrModal.redirectUrl!, "_blank", "noopener");
+                          window.open(telebirrModal.redirectUrl!, "_blank", "noopener,noreferrer");
                         }
                       }}
                     >
@@ -2085,16 +2100,15 @@ export function App() {
                 </label>
 
                 <div className="flex flex-col gap-1.5">
-                  <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
-                    Receipt File (Image or PDF)
-                  </span>
                   <FileUploader
                     compact
                     showCard={false}
                     showHeader={false}
                     maxFiles={1}
                     accept="image/*,.pdf"
+                    label="Receipt File (Image or PDF)"
                     acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                    dropSubtitle="Upload a clear photo or PDF of your payment receipt"
                     maxSizeMB={10}
                     value={attachReceiptFile}
                     onFileSelect={(file) => setAttachReceiptFile(file)}
@@ -2220,16 +2234,15 @@ export function App() {
               </div>
 
               <div className="proposal-attachments form-wide" style={{ marginTop: 8 }}>
-                <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
-                  Attach Files
-                </span>
                 <FileUploader
                   compact
                   showCard={false}
                   showHeader={false}
                   maxFiles={6}
                   accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                  label="Attach Files"
                   acceptedLabel="PDF, DOCX, PNG, JPG · up to 25 MB each"
+                  dropSubtitle="Attach supporting documents or images"
                   maxSizeMB={25}
                   value={proposalModal.attachments}
                   onFilesChange={(files) =>
@@ -2964,16 +2977,15 @@ export function App() {
                             />
                           </label>
                           <div className="flex flex-col gap-1.5">
-                            <span style={{ fontSize: "0.85rem", fontWeight: 500 }}>
-                              Receipt image
-                            </span>
                             <FileUploader
                               compact
                               showCard={false}
                               showHeader={false}
                               maxFiles={1}
                               accept="image/*,.pdf"
+                              label="Receipt image"
                               acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                              dropSubtitle="Upload a clear photo or PDF of your transfer receipt"
                               maxSizeMB={10}
                               value={topUpReceipt}
                               onFileSelect={(file) => setTopUpReceipt(file)}
@@ -3165,16 +3177,15 @@ export function App() {
                       </label>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "8px" }}>
                         <div className="flex flex-col gap-1.5">
-                          <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>
-                            Fayda ID photo
-                          </span>
                           <FileUploader
                             compact
                             showCard={false}
                             showHeader={false}
                             maxFiles={1}
                             accept="image/*"
+                            label="Fayda ID photo"
                             acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                            dropSubtitle="Make sure all four corners of the ID are visible"
                             maxSizeMB={10}
                             value={faydaIdPhoto}
                             onFileSelect={(file) => setFaydaIdPhoto(file)}
@@ -3183,16 +3194,15 @@ export function App() {
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <span style={{ fontSize: "0.82rem", fontWeight: 600 }}>
-                            Selfie holding ID
-                          </span>
                           <FileUploader
                             compact
                             showCard={false}
                             showHeader={false}
                             maxFiles={1}
                             accept="image/*"
+                            label="Selfie holding ID"
                             acceptedLabel="JPG, PNG, WebP · up to 10 MB"
+                            dropSubtitle="Hold your Fayda ID clearly next to your face"
                             maxSizeMB={10}
                             value={selfieWithIdPhoto}
                             onFileSelect={(file) => setSelfieWithIdPhoto(file)}

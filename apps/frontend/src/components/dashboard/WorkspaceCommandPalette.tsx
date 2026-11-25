@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
 import { useTheme } from "../../theme/ThemeContext";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
 
 export interface CommandPaletteAction {
   id: string;
@@ -52,6 +54,8 @@ export function WorkspaceCommandPalette({
     setSidebarCollapsed,
   } = useShadcnLayout();
   const { theme, toggleTheme } = useTheme();
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).palette;
 
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -82,9 +86,9 @@ export function WorkspaceCommandPalette({
     const list: CommandPaletteAction[] = [
       {
         id: "mode-d1",
-        group: "Shadcn Dashboard Modes",
-        label: "Switch to Dashboard 1: Executive Analytics & KPIs",
-        hint: "Area charts, rail mix & KPI deltas",
+        group: copy.groups.modes,
+        label: copy.actions.d1Label,
+        hint: copy.actions.d1Hint,
         icon: <LayoutDashboard size={15} />,
         run: () => {
           onNavigateView("overview");
@@ -93,9 +97,9 @@ export function WorkspaceCommandPalette({
       },
       {
         id: "mode-d2-table",
-        group: "Shadcn Dashboard Modes",
-        label: "Switch to Dashboard 2: Advanced Ledger & Data Grid",
-        hint: "Multi-filter table, sorting & CSV export",
+        group: copy.groups.modes,
+        label: copy.actions.d2TableLabel,
+        hint: copy.actions.d2TableHint,
         icon: <Table2 size={15} />,
         run: () => {
           onNavigateView("overview");
@@ -105,9 +109,9 @@ export function WorkspaceCommandPalette({
       },
       {
         id: "mode-d2-kanban",
-        group: "Shadcn Dashboard Modes",
-        label: "Open Milestone & Deliverable Kanban Board",
-        hint: "5-stage drag-and-drop escrow workflow",
+        group: copy.groups.modes,
+        label: copy.actions.d2KanbanLabel,
+        hint: copy.actions.d2KanbanHint,
         icon: <Kanban size={15} />,
         run: () => {
           onNavigateView("overview");
@@ -117,9 +121,9 @@ export function WorkspaceCommandPalette({
       },
       {
         id: "mode-d2-calendar",
-        group: "Shadcn Dashboard Modes",
-        label: "Open Contract & Payout Schedule Calendar",
-        hint: "Monthly deadline grid & day agenda",
+        group: copy.groups.modes,
+        label: copy.actions.d2CalendarLabel,
+        hint: copy.actions.d2CalendarHint,
         icon: <Calendar size={15} />,
         run: () => {
           onNavigateView("overview");
@@ -129,81 +133,81 @@ export function WorkspaceCommandPalette({
       },
       {
         id: "nav-jobs",
-        group: "Workspace Navigation",
-        label: "Jobs & Briefs Marketplace",
-        hint: "Post a brief or submit proposals",
+        group: copy.groups.navigation,
+        label: copy.actions.jobsLabel,
+        hint: copy.actions.jobsHint,
         icon: <Briefcase size={15} />,
         run: () => onNavigateView("jobs"),
       },
       {
         id: "nav-gigs",
-        group: "Workspace Navigation",
-        label: "Fixed-Scope Gigs Catalog",
-        hint: "Browse packaged Ethiopian talent services",
+        group: copy.groups.navigation,
+        label: copy.actions.gigsLabel,
+        hint: copy.actions.gigsHint,
         icon: <Package size={15} />,
         run: () => onNavigateView("gigs"),
       },
       {
         id: "nav-contracts",
-        group: "Workspace Navigation",
-        label: "Contracts & Service Agreements",
-        hint: "Review and sign AACCSA agreements & download contract PDFs",
+        group: copy.groups.navigation,
+        label: copy.actions.contractsLabel,
+        hint: copy.actions.contractsHint,
         icon: <FileText size={15} />,
         run: () => onNavigateView("contracts"),
       },
       {
         id: "nav-escrow",
-        group: "Workspace Navigation",
-        label: "Escrow Center & Milestones",
-        hint: "Fund milestone vaults, submit deliverables & release payouts",
+        group: copy.groups.navigation,
+        label: copy.actions.escrowLabel,
+        hint: copy.actions.escrowHint,
         icon: <ShieldCheck size={15} />,
         run: () => onNavigateView("escrow"),
       },
       {
         id: "nav-wallet",
-        group: "Workspace Navigation",
-        label: "Wallet & Telebirr / CBE Top-Ups",
-        hint: "Manage ETB balance & upload payment receipts",
+        group: copy.groups.navigation,
+        label: copy.actions.walletLabel,
+        hint: copy.actions.walletHint,
         icon: <Wallet size={15} />,
         run: () => onNavigateView("wallet"),
       },
       {
         id: "nav-chat",
-        group: "Workspace Navigation",
-        label: "Messages & Contract Chat",
-        hint: "Real-time client, freelancer & staff messaging",
+        group: copy.groups.navigation,
+        label: copy.actions.chatLabel,
+        hint: copy.actions.chatHint,
         icon: <MessageCircle size={15} />,
         run: () => onNavigateView("chat"),
       },
       {
         id: "nav-verification",
-        group: "Workspace Navigation",
-        label: "Fayda National ID & KYC Verification",
-        hint: "Verify identity to unlock withdrawals",
+        group: copy.groups.navigation,
+        label: copy.actions.verificationLabel,
+        hint: copy.actions.verificationHint,
         icon: <ShieldCheck size={15} />,
         run: () => onNavigateView("verification"),
       },
       {
         id: "nav-cases",
-        group: "Workspace Navigation",
-        label: "Disputes & Mediation Center",
-        hint: "Submit evidence and track AACCSA arbitration",
+        group: copy.groups.navigation,
+        label: copy.actions.casesLabel,
+        hint: copy.actions.casesHint,
         icon: <Scale size={15} />,
         run: () => onNavigateView("cases"),
       },
       {
         id: "nav-profile",
-        group: "Workspace Navigation",
-        label: "Public Portfolio & Profile",
-        hint: "Inspect skills, verified badges & reviews",
+        group: copy.groups.navigation,
+        label: copy.actions.profileLabel,
+        hint: copy.actions.profileHint,
         icon: <UserIcon size={15} />,
         run: () => onNavigateView("profile"),
       },
       {
         id: "nav-settings",
-        group: "Workspace Navigation",
-        label: "Account Settings",
-        hint: "Preferences & support",
+        group: copy.groups.navigation,
+        label: copy.actions.settingsLabel,
+        hint: copy.actions.settingsHint,
         icon: <Settings size={15} />,
         run: () => onNavigateView("settings"),
       },
@@ -213,57 +217,53 @@ export function WorkspaceCommandPalette({
       list.push(
         {
           id: "role-client",
-          group: "Workspace Mode (Dual-Role)",
-          label: "Switch to Client Mode (Hiring & Escrow)",
-          hint: currentRole === "CLIENT" ? "Active mode" : "Switch to Client view",
+          group: copy.groups.roleMode,
+          label: copy.actions.roleClientLabel,
+          hint: copy.actions.roleClientHint(currentRole === "CLIENT"),
           icon: <Briefcase size={15} />,
           run: () => onSwitchRoleMode("CLIENT"),
         },
         {
           id: "role-freelancer",
-          group: "Workspace Mode (Dual-Role)",
-          label: "Switch to Freelancer Mode (Talent & Payouts)",
-          hint:
-            currentRole === "FREELANCER"
-              ? "Active mode"
-              : "Switch to Freelancer view",
+          group: copy.groups.roleMode,
+          label: copy.actions.roleFreelancerLabel,
+          hint: copy.actions.roleFreelancerHint(currentRole === "FREELANCER"),
           icon: <UserIcon size={15} />,
           run: () => onSwitchRoleMode("FREELANCER"),
         },
         {
           id: "role-both",
-          group: "Workspace Mode (Dual-Role)",
-          label: "Switch to Combined Mode (Client + Freelancer)",
-          hint: currentRole === "BOTH" ? "Active mode" : "Hire and deliver work",
+          group: copy.groups.roleMode,
+          label: copy.actions.roleBothLabel,
+          hint: copy.actions.roleBothHint(currentRole === "BOTH"),
           icon: <LayoutDashboard size={15} />,
           run: () => onSwitchRoleMode("BOTH"),
         },
       );
     }
 
-
     list.push(
       {
         id: "ui-customizer",
-        group: "Appearance & Shell",
-        label: "Open Workspace Layout Customizer",
-        hint: "Sidebar variant, density & corner radius",
+        group: copy.groups.appearance,
+        label: copy.actions.customizerLabel,
+        hint: copy.actions.customizerHint,
         icon: <SlidersHorizontal size={15} />,
         run: () => setCustomizerOpen(true),
       },
       {
         id: "ui-sidebar-toggle",
-        group: "Appearance & Shell",
-        label: "Toggle Sidebar Collapse (Icon Rail / Expanded)",
-        hint: "Maximize horizontal table canvas",
+        group: copy.groups.appearance,
+        label: copy.actions.sidebarToggleLabel,
+        hint: copy.actions.sidebarToggleHint,
         icon: <PanelLeft size={15} />,
         run: () => setSidebarCollapsed((c) => !c),
       },
       {
         id: "ui-theme",
-        group: "Appearance & Shell",
-        label: `Switch to ${theme === "light" ? "Dark" : "Light"} Theme`,
-        hint: "Yekis Emerald color system",
+        group: copy.groups.appearance,
+        label: copy.actions.themeLabel(theme === "light"),
+        hint: copy.actions.themeHint,
         icon: theme === "light" ? <Moon size={15} /> : <Sun size={15} />,
         run: () => toggleTheme(),
       },
@@ -271,7 +271,10 @@ export function WorkspaceCommandPalette({
 
     return list;
   }, [
+    copy,
+    currentRole,
     onNavigateView,
+    onSwitchRoleMode,
     setDashboardVariant,
     setOpsSubTab,
     setCustomizerOpen,
@@ -326,7 +329,7 @@ export function WorkspaceCommandPalette({
       onClick={() => setCommandPaletteOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="Global Command Palette"
+      aria-label={copy.dialogAria}
     >
       <div className="sh-cmd-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="sh-cmd-input-row">
@@ -340,17 +343,15 @@ export function WorkspaceCommandPalette({
               setSelectedIndex(0);
             }}
             onKeyDown={onInputKeyDown}
-            placeholder="Type a command, jump to a dashboard, or switch workspace role..."
-            aria-label="Command search"
+            placeholder={copy.placeholder}
+            aria-label={copy.searchAria}
           />
           <kbd className="sh-kbd">ESC</kbd>
         </div>
 
         <div className="sh-cmd-list">
           {filtered.length === 0 ? (
-            <div className="sh-table-empty">
-              No matching commands or views for "{query}".
-            </div>
+            <div className="sh-table-empty">{copy.empty(query)}</div>
           ) : (
             [...grouped.entries()].map(([groupName, groupItems]) => (
               <div key={groupName} className="sh-cmd-group">
@@ -386,13 +387,13 @@ export function WorkspaceCommandPalette({
 
         <div className="sh-cmd-footer">
           <span>
-            <kbd className="sh-kbd">↑</kbd> <kbd className="sh-kbd">↓</kbd> Navigate
+            <kbd className="sh-kbd">↑</kbd> <kbd className="sh-kbd">↓</kbd> {copy.navNavigate}
           </span>
           <span>
-            <kbd className="sh-kbd">↵</kbd> Execute
+            <kbd className="sh-kbd">↵</kbd> {copy.navExecute}
           </span>
           <span>
-            <kbd className="sh-kbd">⌘K</kbd> Toggle anywhere
+            <kbd className="sh-kbd">⌘K</kbd> {copy.navToggle}
           </span>
         </div>
       </div>

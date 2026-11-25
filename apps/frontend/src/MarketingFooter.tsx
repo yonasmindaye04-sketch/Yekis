@@ -3,9 +3,16 @@ import { ArrowUp, ShieldCheck } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { openSupportChat } from "./components/supportChatEvents";
 import { LandingSupportChat } from "./components/LandingSupportChat";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./landing-v2.css";
+
+const FOOTER_ARIA: Record<Language, { goHome: string; backToTop: string }> = {
+  en: { goHome: "Go to homepage", backToTop: "Back to top" },
+  am: { goHome: "ወደ መነሻ ገጽ ሂድ", backToTop: "ወደ ላይ ተመለስ" },
+  om: { goHome: "Gara fuula jalqabaa deemi", backToTop: "Gara oliitti deebi'i" },
+  ti: { goHome: "ናብ መበገሲ ገጽ ኪድ", backToTop: "ናብ ላዕሊ ተመለስ" },
+};
 
 type MarketingFooterProps = {
   onNavigate: (page: string) => void;
@@ -16,7 +23,8 @@ const prefersReduced = () =>
   window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
 export function FooterV2({ onNavigate }: MarketingFooterProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const aria = FOOTER_ARIA[language] ?? FOOTER_ARIA.en;
 
   const NAV_COLS = [
     {
@@ -131,7 +139,7 @@ export function FooterV2({ onNavigate }: MarketingFooterProps) {
             <button
               className="v2-footer-logo"
               onClick={() => onNavigate("home")}
-              aria-label="Go to homepage"
+              aria-label={aria.goHome}
             >
               <span className="v2-footer-symbol" aria-hidden>
                 <svg viewBox="0 0 24 24">
@@ -265,6 +273,8 @@ export function FooterV2({ onNavigate }: MarketingFooterProps) {
 }
 
 export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
+  const { language } = useI18n();
+  const aria = FOOTER_ARIA[language] ?? FOOTER_ARIA.en;
   const [showTop, setShowTop] = useState(false);
 
   useEffect(() => {
@@ -292,7 +302,7 @@ export function MarketingFooter({ onNavigate }: MarketingFooterProps) {
                 behavior: prefersReduced() ? "auto" : "smooth",
               })
             }
-            aria-label="Back to top"
+            aria-label={aria.backToTop}
           >
             <ArrowUp size={20} />
           </motion.button>

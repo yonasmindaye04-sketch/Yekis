@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { events } from "../analytics";
+import { type Language, useI18n } from "../i18n";
 
 /**
  * Standalone Telegram sign-in landing page.
@@ -18,11 +19,136 @@ export interface TelegramAuthPageProps {
   botUsername?: string | null;
 }
 
+const TELEGRAM_AUTH_COPY: Record<
+  Language,
+  {
+    enterCodePrompt: string;
+    redeemFailed: string;
+    invalidCode: string;
+    tooManyAttempts: string;
+    suspended: string;
+    title: string;
+    subtitleBefore: string;
+    subtitleAfter: string;
+    signedIn: string;
+    placeholder: string;
+    inputAria: string;
+    verifying: string;
+    signIn: string;
+    openBot: string;
+    expiryNote: string;
+  }
+> = {
+  en: {
+    enterCodePrompt: "Please enter the code from the Yekis bot.",
+    redeemFailed: "Code redemption failed.",
+    invalidCode:
+      "That code is invalid or has expired. Open the Yekis bot and send /login to get a fresh code.",
+    tooManyAttempts: "Too many attempts. Please wait a few minutes and try again.",
+    suspended: "This account is suspended. Please contact support.",
+    title: "Sign in with Telegram",
+    subtitleBefore: "Open the Yekis bot, send ",
+    subtitleAfter: ", then enter your code below.",
+    signedIn: "Signed in! Redirecting…",
+    placeholder: "Enter code (e.g. AB3D9F2K)",
+    inputAria: "Telegram sign-in code",
+    verifying: "Verifying…",
+    signIn: "Sign in",
+    openBot: "Open Yekis Bot",
+    expiryNote: "Your code expires in 10 minutes and works once only.",
+  },
+  am: {
+    enterCodePrompt: "እባክዎ ከYeKis ቦት የተሰጠዎትን ኮድ ያስገቡ።",
+    redeemFailed: "ኮዱን ማረጋገጥ አልተቻለም።",
+    invalidCode:
+      "ይህ ኮድ ልክ ያልሆነ ወይም ጊዜው ያለፈበት ነው። የYeKis ቦትን ከፍተው /login በመላክ አዲስ ኮድ ያግኙ።",
+    tooManyAttempts: "ብዙ ተደጋጋሚ ሙከራዎች ተደርገዋል። እባክዎ ጥቂት ደቂቃዎች ጠብቀው ይሞክሩ።",
+    suspended: "ይህ መለያ ታግዷል። እባክዎ የድጋፍ ክፍሉን ያነጋግሩ።",
+    title: "በቴሌግራም ይግቡ",
+    subtitleBefore: "የYeKis ቦትን ይክፈቱ፣ ",
+    subtitleAfter: " ይላኩ፣ ከዚያ ኮድዎን ከዚህ በታች ያስገቡ።",
+    signedIn: "ገብተዋል! በማሸጋገር ላይ…",
+    placeholder: "ኮድ ያስገቡ (ለምሳሌ AB3D9F2K)",
+    inputAria: "የቴሌግራም መግቢያ ኮድ",
+    verifying: "በማረጋገጥ ላይ…",
+    signIn: "ግባ",
+    openBot: "የYeKis ቦትን ክፈት",
+    expiryNote: "ኮድዎ በ10 ደቂቃ ውስጥ ጊዜው ያልፋል እና ለአንድ ጊዜ ብቻ ይሠራል።",
+  },
+  om: {
+    enterCodePrompt: "Maaloo koodii bootii Yekis irraa argattan galchaa.",
+    redeemFailed: "Koodii mirkaneessuun hin milkoofne.",
+    invalidCode:
+      "Koodiin kun dogoggora ykn yeroon isaa darbeera. Bootii Yekis banaatii koodii haaraa argachuuf /login ergaa.",
+    tooManyAttempts: "Yaalii baay'ee ta'eera. Maaloo daqiiqaa muraasa eegaatii yaalaa.",
+    suspended: "Herregni kun dhorkameera. Maaloo deeggarsa quunnamaa.",
+    title: "Telegramiin seeni",
+    subtitleBefore: "Bootii Yekis banaa, ",
+    subtitleAfter: " ergaatii koodii keessan armaan gaditti galchaa.",
+    signedIn: "Seentaniittu! Gara fuula biraatti ce'aa jira…",
+    placeholder: "Koodii galchi (fkn AB3D9F2K)",
+    inputAria: "Koodii seenumsa Telegram",
+    verifying: "Mirkaneessaa jira…",
+    signIn: "Seeni",
+    openBot: "Bootii Yekis Bani",
+    expiryNote: "Koodiin keessan daqiiqaa 10 keessatti darba, si'a tokko qofa hojjeta.",
+  },
+  ti: {
+    enterCodePrompt: "በጃኹም ካብ ቦት YeKis ዝተዋህበኩም ኮድ የእትዉ።",
+    redeemFailed: "ምርግጋጽ ኮድ ኣይተሳኸዐን።",
+    invalidCode:
+      "እዚ ኮድ ግጉይ ወይ ግዜኡ ዝሓለፈ እዩ። ቦት YeKis ከፊትኩም ሓድሽ ኮድ ንምርካብ /login ስደዱ።",
+    tooManyAttempts: "ብዙሕ ፈተነታት ተገይሩ። ሒደት ደቓይቕ ጸኒሕኩም እንደገና ፈትኑ።",
+    suspended: "እዚ ኣካውንት ተኣጊዱ ኣሎ። በጃኹም ደገፍ ተወከሱ።",
+    title: "ብቴሌግራም እቶ",
+    subtitleBefore: "ቦት YeKis ክፈቱ፣ ",
+    subtitleAfter: " ስደዱ፣ ድሕሪኡ ኮድኩም ኣብ ታሕቲ የእትዉ።",
+    signedIn: "ኣቲኹም ኣለኹም! ይሰጋገር ኣሎ…",
+    placeholder: "ኮድ የእትዉ (ንኣብነት AB3D9F2K)",
+    inputAria: "ኮድ መእተዊ ቴሌግራም",
+    verifying: "የረጋግጽ ኣሎ…",
+    signIn: "እቶ",
+    openBot: "ቦት YeKis ክፈት",
+    expiryNote: "ኮድኩም ኣብ ውሽጢ 10 ደቒቕ የብቅዕ፣ ንሓደ ግዜ ጥራይ ድማ ይሰርሕ።",
+  },
+};
+
 export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProps) {
+  const { language } = useI18n();
+  const copy = TELEGRAM_AUTH_COPY[language] ?? TELEGRAM_AUTH_COPY.en;
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const redeemCode = useCallback(async (rawCode: string) => {
+    const trimmed = rawCode.trim();
+    if (!trimmed) {
+      setError(copy.enterCodePrompt);
+      return;
+    }
+    setStatus("loading");
+    setError(null);
+    try {
+      const session = await api.loginWithTelegramCode(trimmed);
+      api.setSession(session);
+      events.login("telegram");
+      setStatus("success");
+      setTimeout(onAuthed, 400);
+    } catch (err) {
+      setStatus("error");
+      const msg = err instanceof Error ? err.message : copy.redeemFailed;
+      if (msg.includes("INVALID_CODE") || msg.includes("invalid or has expired")) {
+        setError(copy.invalidCode);
+      } else if (msg.includes("TOO_MANY_ATTEMPTS")) {
+        setError(copy.tooManyAttempts);
+      } else if (msg.includes("suspended")) {
+        setError(copy.suspended);
+      } else {
+        setError(msg);
+      }
+    }
+  }, [copy, onAuthed]);
 
   // Auto-redeem a code that arrived in the URL (?tg_code=XXXX)
   useEffect(() => {
@@ -42,37 +168,6 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
     void redeemCode(urlCode);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const redeemCode = useCallback(async (rawCode: string) => {
-    const trimmed = rawCode.trim();
-    if (!trimmed) {
-      setError("Please enter the code from the Yekis bot.");
-      return;
-    }
-    setStatus("loading");
-    setError(null);
-    try {
-      const session = await api.loginWithTelegramCode(trimmed);
-      api.setSession(session);
-      events.login("telegram");
-      setStatus("success");
-      setTimeout(onAuthed, 400);
-    } catch (err) {
-      setStatus("error");
-      const msg = err instanceof Error ? err.message : "Code redemption failed.";
-      if (msg.includes("INVALID_CODE") || msg.includes("invalid or has expired")) {
-        setError(
-          "That code is invalid or has expired. Open the Yekis bot and send /login to get a fresh code.",
-        );
-      } else if (msg.includes("TOO_MANY_ATTEMPTS")) {
-        setError("Too many attempts. Please wait a few minutes and try again.");
-      } else if (msg.includes("suspended")) {
-        setError("This account is suspended. Please contact support.");
-      } else {
-        setError(msg);
-      }
-    }
-  }, [onAuthed]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,10 +230,12 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
               color: "var(--color-text)",
             }}
           >
-            Sign in with Telegram
+            {copy.title}
           </h1>
           <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: "0.9rem" }}>
-            Open the Yekis bot, send <code>/login</code>, then enter your code below.
+            {copy.subtitleBefore}
+            <code>/login</code>
+            {copy.subtitleAfter}
           </p>
         </div>
 
@@ -157,7 +254,7 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <polyline points="20 6 9 17 4 12" />
             </svg>
-            Signed in! Redirecting…
+            {copy.signedIn}
           </div>
         )}
 
@@ -187,8 +284,8 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
               ref={inputRef}
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="Enter code (e.g. AB3D9F2K)"
-              aria-label="Telegram sign-in code"
+              placeholder={copy.placeholder}
+              aria-label={copy.inputAria}
               autoComplete="one-time-code"
               spellCheck={false}
               maxLength={16}
@@ -226,7 +323,7 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
                 transition: "background 0.15s",
               }}
             >
-              {status === "loading" ? "Verifying…" : "Sign in"}
+              {status === "loading" ? copy.verifying : copy.signIn}
             </button>
           </form>
         )}
@@ -252,12 +349,12 @@ export function TelegramAuthPage({ onAuthed, botUsername }: TelegramAuthPageProp
               <polyline points="15 3 21 3 21 9" />
               <line x1="10" y1="14" x2="21" y2="3" />
             </svg>
-            Open Yekis Bot
+            {copy.openBot}
           </a>
         )}
 
         <p style={{ margin: 0, color: "var(--color-text-tertiary)", fontSize: "0.78rem" }}>
-          Your code expires in 10 minutes and works once only.
+          {copy.expiryNote}
         </p>
       </div>
     </div>

@@ -1,5 +1,5 @@
 // === IMPORTS ===
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -7,6 +7,7 @@ import {
   Check,
   Clock,
   Copy,
+  ExternalLink,
   FileText,
   Info,
   Printer,
@@ -25,6 +26,7 @@ import {
 } from "./api/client";
 import { events } from "./analytics";
 import { stashPendingTopUp } from "./PaymentReturn";
+import { isTelegramMiniApp } from "./telegram/webApp";
 import {
   FiscalDocumentSheet,
   type FiscalDocumentData,
@@ -36,6 +38,29 @@ import { cn } from "@/lib/utils";
 import { FileUploader } from "@/components/ui/file-upload-1";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+
+interface ActiveCheckoutSession {
+  topUpId: string;
+  provider: PaymentRail;
+  amountEtb: number;
+  redirectUrl: string | null;
+  providerTransactionId: string | null;
+  status: "CHECKOUT_PENDING" | "PENDING" | "APPROVED" | "REJECTED" | "FLAGGED";
+  isSimulating: boolean;
+  actionError: string;
+}
+
+const PROVIDER_LABELS: Record<PaymentRail, string> = {
+  TELEBIRR: "Telebirr",
+  CBE_BIRR: "CBE Birr",
+  M_PESA: "Safaricom M-Pesa",
+};
+
+const PROVIDER_LOGOS: Record<PaymentRail, string> = {
+  TELEBIRR: "/payment/Telebirr.png",
+  CBE_BIRR: "/payment/cbe payment.jpg",
+  M_PESA: "/payment/mpesa.svg",
+};
 
 // === MAIN COMPONENT ===
 export function BrowserWallet({
@@ -59,8 +84,10 @@ export function BrowserWallet({
   const [reference, setReference] = useState("");
   const [receipt, setReceipt] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
-  const [messageIsError, setMessageIsError] = useState(false);
+  const [topUpMessage, setTopUpMessage] = useState("");
+  const [topUpMessageIsError, setTopUpMessageIsError] = useState(false);
+  const [withdrawMessage, setWithdrawMessage] = useState("");
+  const [withdrawMessageIsError, setWithdrawMessageIsError] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [payoutIdentifier, setPayoutIdentifier] = useState("");
   // Two-factor approval for the payout. The code is requested only once the
@@ -75,6 +102,15 @@ export function BrowserWallet({
   // unable to add funds without first opening the panel.
   const [showTopUp, setShowTopUp] = useState(role !== "FREELANCER");
   const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("MANUAL");
+
+  // Active checkout session modal & live status polling
+  const [activeCheckout, setActiveCheckout] = useState<ActiveCheckoutSession | null>(null);
+  const [isCheckoutDialogOpen, setIsCheckoutDialogOpen] = useState(false);
+  const [isCheckingCheckoutStatus, setIsCheckingCheckoutStatus] = useState(false);
+  const checkoutDialogRef = useRef<HTMLDialogElement | null>(null);
+  const checkoutDialogTitleId = useId();
+  const pointerDownOutsideRef = useRef(false);
+  const recentTopUpRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   // Manual verification fallback when API call fails
   const [checkoutFallback, setCheckoutFallback] = useState<{
@@ -118,13 +154,237 @@ export function BrowserWallet({
     void loadMovements();
   }, [loadMovements]);
 
-  const setSuccess = (msg: string) => {
-    setMessage(msg);
-    setMessageIsError(false);
+  const setTopUpSuccess = (msg: string) => {
+    setTopUpMessage(msg);
+    setTopUpMessageIsError(false);
   };
-  const setError = (msg: string) => {
-    setMessage(msg);
-    setMessageIsError(true);
+  const setTopUpError = (msg: string) => {
+    setTopUpMessage(msg);
+    setTopUpMessageIsError(true);
+  };
+  const setWithdrawSuccess = (msg: string) => {
+    setWithdrawMessage(msg);
+    setWithdrawMessageIsError(false);
+  };
+  const setWithdrawError = (msg: string) => {
+    setWithdrawMessage(msg);
+    setWithdrawMessageIsError(true);
+  };
+
+  const openCheckoutLink = (url: string) => {
+    const tg = window.Telegram?.WebApp;
+    if (isTelegramMiniApp() && tg && typeof tg.openLink === "function") {
+      tg.openLink(url);
+      return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const syncCheckoutStatus = useCallback(
+    async (topUpId: string) => {
+      setIsCheckingCheckoutStatus(true);
+      try {
+        const res = await api.getTopUpStatus(topUpId);
+        const resolvedStatus = res.credited ? "APPROVED" : res.status;
+        setActiveCheckout((prev) =>
+          prev && prev.topUpId === topUpId
+            ? {
+                ...prev,
+                status: resolvedStatus,
+                providerTransactionId: res.providerTransactionId ?? prev.providerTransactionId,
+                actionError: "",
+              }
+            : prev,
+        );
+        if (resolvedStatus === "APPROVED") {
+          setTopUpSuccess(
+            `ETB ${(res.amountMinor / 100).toLocaleString()} credited to your wallet.`,
+          );
+          setAmount("");
+          await Promise.all([onChanged(), loadMovements()]);
+        } else if (resolvedStatus === "REJECTED") {
+          setTopUpError(
+            "This payment was declined or expired. Check Recent top-ups or try again.",
+          );
+          await Promise.all([onChanged(), loadMovements()]);
+        } else if (resolvedStatus === "PENDING" || resolvedStatus === "FLAGGED") {
+          await Promise.all([onChanged(), loadMovements()]);
+        }
+        return resolvedStatus;
+      } catch (err) {
+        setActiveCheckout((prev) =>
+          prev && prev.topUpId === topUpId
+            ? {
+                ...prev,
+                actionError:
+                  err instanceof Error
+                    ? err.message
+                    : "Could not refresh payment status.",
+              }
+            : prev,
+        );
+        return null;
+      } finally {
+        setIsCheckingCheckoutStatus(false);
+      }
+    },
+    [loadMovements, onChanged],
+  );
+
+  // Open or close the native <dialog> via showModal() / close() so top-layer,
+  // Esc handling, inert background, and focus return are managed by the browser.
+  useEffect(() => {
+    const dialog = checkoutDialogRef.current;
+    if (!dialog) return;
+    if (isCheckoutDialogOpen && activeCheckout) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [isCheckoutDialogOpen, activeCheckout]);
+
+  // Poll pending checkout status briefly so mock auto-approval or returning
+  // webhook settlement updates the UI automatically without getting stuck.
+  const activeCheckoutTopUpId = activeCheckout?.topUpId ?? null;
+  const activeCheckoutStatus = activeCheckout?.status ?? null;
+  useEffect(() => {
+    if (!activeCheckoutTopUpId || activeCheckoutStatus !== "CHECKOUT_PENDING") return;
+    let cancelled = false;
+    let attempts = 0;
+
+    const timer = window.setInterval(() => {
+      if (cancelled) return;
+      attempts += 1;
+      void syncCheckoutStatus(activeCheckoutTopUpId).then((nextStatus) => {
+        if (nextStatus && nextStatus !== "CHECKOUT_PENDING") {
+          window.clearInterval(timer);
+        }
+      });
+      if (attempts >= 20) {
+        window.clearInterval(timer);
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activeCheckoutTopUpId, activeCheckoutStatus, syncCheckoutStatus]);
+
+  const closeCheckoutDialog = () => {
+    checkoutDialogRef.current?.close();
+    setIsCheckoutDialogOpen(false);
+  };
+
+  const handleCheckoutDialogClose = () => {
+    setIsCheckoutDialogOpen(false);
+    if (activeCheckout?.status === "CHECKOUT_PENDING") {
+      setTopUpSuccess(
+        "Checkout session is awaiting completion. Open instructions below or attach your receipt in Recent top-ups.",
+      );
+    }
+  };
+
+  const isPointOutsideDialog = (
+    e: React.PointerEvent<HTMLDialogElement>,
+    dialog: HTMLDialogElement,
+  ) => {
+    const r = dialog.getBoundingClientRect();
+    return (
+      e.clientX < r.left ||
+      e.clientX > r.right ||
+      e.clientY < r.top ||
+      e.clientY > r.bottom
+    );
+  };
+
+  const handleCheckoutDialogPointerDown = (
+    e: React.PointerEvent<HTMLDialogElement>,
+  ) => {
+    if ("closedBy" in HTMLDialogElement.prototype) return;
+    const dialog = checkoutDialogRef.current;
+    if (!dialog) return;
+    pointerDownOutsideRef.current = isPointOutsideDialog(e, dialog);
+  };
+
+  const handleCheckoutDialogPointerUp = (
+    e: React.PointerEvent<HTMLDialogElement>,
+  ) => {
+    if ("closedBy" in HTMLDialogElement.prototype) return;
+    const dialog = checkoutDialogRef.current;
+    const wasOutside = pointerDownOutsideRef.current;
+    pointerDownOutsideRef.current = false;
+    if (wasOutside && dialog && isPointOutsideDialog(e, dialog)) {
+      closeCheckoutDialog();
+    }
+  };
+
+  const openCheckoutInstructionsForRow = (item: TopUpRequest) => {
+    const rail: PaymentRail =
+      item.provider === "CBE_BIRR"
+        ? "CBE_BIRR"
+        : item.provider === "M_PESA"
+          ? "M_PESA"
+          : "TELEBIRR";
+    setActiveCheckout({
+      topUpId: item.id,
+      provider: rail,
+      amountEtb: item.amountMinor / 100,
+      redirectUrl: null,
+      providerTransactionId: item.providerTransactionId ?? null,
+      status: "CHECKOUT_PENDING",
+      isSimulating: false,
+      actionError: "",
+    });
+    setIsCheckoutDialogOpen(true);
+  };
+
+  const handleSimulateCheckoutSuccess = async () => {
+    if (!activeCheckout) return;
+    const targetId = activeCheckout.topUpId;
+    setActiveCheckout((prev) =>
+      prev && prev.topUpId === targetId
+        ? { ...prev, isSimulating: true, actionError: "" }
+        : prev,
+    );
+    try {
+      await api.simulateTopUpSuccess(targetId);
+      setActiveCheckout((prev) =>
+        prev && prev.topUpId === targetId
+          ? { ...prev, status: "APPROVED", isSimulating: false, actionError: "" }
+          : prev,
+      );
+      setTopUpSuccess(
+        `ETB ${activeCheckout.amountEtb.toLocaleString()} credited to your wallet.`,
+      );
+      setAmount("");
+      await Promise.all([onChanged(), loadMovements()]);
+    } catch (err) {
+      setActiveCheckout((prev) =>
+        prev && prev.topUpId === targetId
+          ? {
+              ...prev,
+              isSimulating: false,
+              actionError:
+                err instanceof Error
+                  ? err.message
+                  : "Sandbox simulation failed.",
+            }
+          : prev,
+      );
+    }
+  };
+
+  const switchCheckoutToAttachReceipt = (topUpId: string) => {
+    closeCheckoutDialog();
+    setAttachingTopUpId(topUpId);
+    setTopUpMessage("");
+    window.requestAnimationFrame(() => {
+      recentTopUpRowRefs.current[topUpId]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
   };
 
   const copyAccountToClipboard = (acc: string, label: string) => {
@@ -144,7 +404,7 @@ export function BrowserWallet({
     setTopUpRail(p);
     if (amt) setAmount(amt);
     setCheckoutFallback(null);
-    setMessage("");
+    setTopUpMessage("");
   };
 
   /**
@@ -173,42 +433,59 @@ export function BrowserWallet({
   const submitCheckoutTopUp = async () => {
     const amountNum = Number(amount);
     if (!amountNum || amountNum <= 0) {
-      setError("Please enter a valid amount.");
+      setTopUpError("Please enter a valid amount.");
       return;
     }
     setIsSubmitting(true);
-    setMessage("");
+    setTopUpMessage("");
     setCheckoutFallback(null);
 
     const amountMinor = Math.round(amountNum * 100);
 
     try {
-      const { redirectUrl, topUpId } = await api.initiateCheckoutTopUp(
-        amountMinor,
-        checkoutRail,
-      );
+      const { redirectUrl, topUpId, providerTransactionId } =
+        await api.initiateCheckoutTopUp(amountMinor, checkoutRail);
 
       if (topUpId) stashPendingTopUp(topUpId);
 
+      setActiveCheckout({
+        topUpId,
+        provider: checkoutRail,
+        amountEtb: amountNum,
+        redirectUrl: redirectUrl || null,
+        providerTransactionId: providerTransactionId || null,
+        status: "CHECKOUT_PENDING",
+        isSimulating: false,
+        actionError: "",
+      });
+      setIsCheckoutDialogOpen(true);
+
       if (redirectUrl) {
-        const tg = (window as unknown as { Telegram?: { WebApp?: { openLink?: (url: string) => void } } })?.Telegram?.WebApp;
-        if (tg && typeof tg.openLink === "function") {
-          tg.openLink(redirectUrl);
-        } else {
-          window.location.href = redirectUrl;
-        }
+        openCheckoutLink(redirectUrl);
+      }
+
+      await Promise.all([onChanged(), loadMovements()]);
+    } catch (err) {
+      const apiErr = err as Error & { status?: number; code?: string };
+      const msg = apiErr instanceof Error ? apiErr.message : "Checkout initiation failed.";
+      const isAuthFailure =
+        apiErr?.status === 401 ||
+        /missing or malformed authorization|invalid or expired token|session_revoked/i.test(msg);
+
+      if (isAuthFailure) {
+        setTopUpError("Your session expired. Please sign in again to continue.");
         return;
       }
 
-      setSuccess("Checkout session created. Follow the instructions to complete.");
-      await Promise.all([onChanged(), loadMovements()]);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Checkout initiation failed.";
-      setError(msg);
-      setCheckoutFallback({
-        amount,
-        provider: checkoutRail,
-      });
+      setTopUpError(msg);
+      const isClientPolicyError =
+        apiErr?.code === "VALIDATION_ERROR" || apiErr?.code === "UNSUPPORTED_PROVIDER";
+      if (!isClientPolicyError) {
+        setCheckoutFallback({
+          amount,
+          provider: checkoutRail,
+        });
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -217,29 +494,31 @@ export function BrowserWallet({
   const submitTopUp = async () => {
     const amountNum = Number(amount);
     if (!amountNum || amountNum <= 0) {
-      setError("Please enter a valid amount.");
+      setTopUpError("Please enter a valid amount.");
       return;
     }
     if (!reference.trim()) {
-      setError("Please enter the transaction or reference number.");
+      setTopUpError("Please enter the transaction or reference number.");
+      return;
+    }
+    if (!receipt) {
+      setTopUpError("Please upload your transfer receipt image or PDF.");
       return;
     }
 
     setIsSubmitting(true);
-    setMessage("");
+    setTopUpMessage("");
 
     try {
       const formData = new FormData();
       formData.append("amountMinor", String(Math.round(amountNum * 100)));
       formData.append("provider", topUpRail);
       formData.append("referenceNumber", reference.trim());
-      if (receipt) {
-        formData.append("receipt", receipt);
-      }
+      formData.append("receipt", receipt);
 
       await api.createTopUpRequest(formData);
 
-      setSuccess(
+      setTopUpSuccess(
         "Top-up submitted. Once staff verify the transfer, funds will appear in your balance.",
       );
       setAmount("");
@@ -247,7 +526,7 @@ export function BrowserWallet({
       setReceipt(null);
       await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Submission failed.");
+      setTopUpError(err instanceof Error ? err.message : "Submission failed.");
     } finally {
       setIsSubmitting(false);
     }
@@ -255,16 +534,16 @@ export function BrowserWallet({
 
   const handleAttachReceipt = async (topUpId: string) => {
     if (!attachRef.trim()) {
-      setError("Enter the transaction or reference code.");
+      setTopUpError("Enter the transaction or reference code.");
       return;
     }
     if (!attachFile) {
-      setError("Please select a receipt file.");
+      setTopUpError("Please select a receipt file.");
       return;
     }
 
     setIsAttachingSubmitting(true);
-    setMessage("");
+    setTopUpMessage("");
 
     try {
       const formData = new FormData();
@@ -273,13 +552,13 @@ export function BrowserWallet({
 
       await api.attachTopUpReceipt(topUpId, formData);
 
-      setSuccess("Receipt submitted for staff verification. Status updated to Pending.");
+      setTopUpSuccess("Receipt submitted for staff verification. Status updated to Pending.");
       setAttachingTopUpId(null);
       setAttachRef("");
       setAttachFile(null);
       await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to attach receipt.");
+      setTopUpError(err instanceof Error ? err.message : "Failed to attach receipt.");
     } finally {
       setIsAttachingSubmitting(false);
     }
@@ -294,17 +573,16 @@ export function BrowserWallet({
    */
   const sendWithdrawalOtp = async () => {
     setIsSendingOtp(true);
-    setError("");
-    setMessage("");
+    setWithdrawMessage("");
     try {
       const challenge = await api.requestWithdrawalOtp();
       setOtpRequested(true);
       setDevOtpCode(challenge.devCode ?? null);
-      setMessage(
+      setWithdrawSuccess(
         "We sent a 6-digit approval code to the phone number on your account.",
       );
     } catch (err) {
-      setError(
+      setWithdrawError(
         err instanceof Error
           ? err.message
           : "Could not send the approval code. Try again in a moment.",
@@ -323,24 +601,24 @@ export function BrowserWallet({
       amountMinor <= 0 ||
       !payoutIdentifier.trim()
     ) {
-      setError(
+      setWithdrawError(
         "Enter a withdrawal amount and your payout phone or account number.",
       );
       return;
     }
 
     if (amountMinor > wallet.balanceMinor) {
-      setError("Withdrawal amount exceeds your available balance.");
+      setWithdrawError("Withdrawal amount exceeds your available balance.");
       return;
     }
 
     if (!/^\d{6}$/.test(withdrawOtp.trim())) {
-      setError("Enter the 6-digit approval code we sent you.");
+      setWithdrawError("Enter the 6-digit approval code we sent you.");
       return;
     }
 
     setIsSubmitting(true);
-    setMessage("");
+    setWithdrawMessage("");
 
     try {
       const result = await api.withdrawWallet({
@@ -351,11 +629,11 @@ export function BrowserWallet({
       });
 
       if (result.error === "HELD_FOR_REVIEW") {
-        setError(
+        setWithdrawError(
           "Withdrawal held for compliance review. Your balance was not debited.",
         );
       } else if (result.error === "ACTIVE_CONTRACT_BLOCKS_WITHDRAWAL") {
-        setError(
+        setWithdrawError(
           result.message ??
             "You cannot withdraw while you have active contracts or open disputes. Wait for them to complete first.",
         );
@@ -366,14 +644,14 @@ export function BrowserWallet({
         setOtpRequested(false);
         setDevOtpCode(null);
         events.payoutRequested();
-        setSuccess(
+        setWithdrawSuccess(
           `Withdrawal request recorded for ETB ${amountNum.toLocaleString()}. Funds will be sent to your account upon staff settlement.`,
         );
       }
       await Promise.all([onChanged(), loadMovements()]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Withdrawal failed.";
-      setError(msg);
+      setWithdrawError(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -650,26 +928,26 @@ export function BrowserWallet({
             </div>
           </div>
 
-          {message && (
-            <Alert variant={messageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
+          {withdrawMessage && (
+            <Alert variant={withdrawMessageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
             >
               <Avatar className="size-6 rounded-[5px] shrink-0">
                 <AvatarFallback
                   className={cn(
                     "rounded-[5px] text-white",
-                    messageIsError
+                    withdrawMessageIsError
                       ? "bg-destructive dark:bg-destructive/60"
                       : "bg-emerald-600 dark:bg-emerald-600/80"
                   )}
                 >
-                  {messageIsError ? (
+                  {withdrawMessageIsError ? (
                     <TbAlertCircle className="size-3.5" />
                   ) : (
                     <Check className="size-3.5" />
                   )}
                 </AvatarFallback>
               </Avatar>
-              <AlertTitle>{message}</AlertTitle>
+              <AlertTitle className="text-sm font-medium">{withdrawMessage}</AlertTitle>
             </Alert>
           )}
 
@@ -729,8 +1007,8 @@ export function BrowserWallet({
             </div>
 
             {topUpMethod === "INSTANT" ? (
-              <div style={{ maxWidth: 540, display: "grid", gap: 14 }}>
-                <p style={{ margin: 0, color: "var(--color-text-secondary)", fontSize: "0.86rem" }}>
+              <div className="bw-instant-checkout">
+                <p className="wallet-help" style={{ margin: 0 }}>
                   Select a payment gateway. Telebirr checks out automatically; CBE Birr and
                   M-Pesa are handled manually and open the transfer instructions.
                 </p>
@@ -747,21 +1025,22 @@ export function BrowserWallet({
                       setCheckoutRail("TELEBIRR");
                       setCheckoutFallback(null);
                     }}
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
                   >
                     <img
                       src="/payment/Telebirr.png"
                       alt="Telebirr"
                       style={{
-                        width: "44px",
-                        height: "44px",
+                        width: "60px",
+                        height: "60px",
                         objectFit: "contain",
-                        borderRadius: "6px",
+                        borderRadius: "8px",
+                        flexShrink: 0,
                       }}
                     />
-                    <div className="payment-account-text" style={{ textAlign: "center" }}>
+                    <div className="payment-account-text">
                       <strong>Telebirr</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Instant C2B</span>
+                      <span>Instant C2B</span>
+                      <code>Auto checkout</code>
                     </div>
                   </button>
                   <button
@@ -769,21 +1048,22 @@ export function BrowserWallet({
                     onClick={() => chooseCheckoutRail("CBE_BIRR")}
                     title="CBE Birr has no automated checkout yet, so it is handled manually: transfer to the account below and upload your receipt."
                     className="payment-account"
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
                   >
                     <img
                       src="/payment/cbe payment.jpg"
                       alt="CBE Birr"
                       style={{
-                        width: "44px",
-                        height: "44px",
+                        width: "60px",
+                        height: "60px",
                         objectFit: "cover",
-                        borderRadius: "6px",
+                        borderRadius: "8px",
+                        flexShrink: 0,
                       }}
                     />
-                    <div className="payment-account-text" style={{ textAlign: "center" }}>
+                    <div className="payment-account-text">
                       <strong>CBE Birr</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Manual transfer</span>
+                      <span>Commercial Bank of Ethiopia</span>
+                      <code>Manual transfer</code>
                     </div>
                   </button>
                   <button
@@ -791,56 +1071,65 @@ export function BrowserWallet({
                     onClick={() => chooseCheckoutRail("M_PESA")}
                     title="M-Pesa has no automated checkout yet, so it is handled manually: transfer to the account below and upload your receipt."
                     className="payment-account"
-                    style={{ padding: "10px 8px", flexDirection: "column", textAlign: "center", gap: 6 }}
                   >
                     <img
                       src="/payment/mpesa.svg"
-                      alt="M-Pesa"
+                      alt="Safaricom M-Pesa"
                       style={{
-                        width: "44px",
-                        height: "44px",
+                        width: "60px",
+                        height: "60px",
                         objectFit: "contain",
-                        borderRadius: "6px",
+                        borderRadius: "8px",
+                        flexShrink: 0,
                       }}
                     />
-                    <div className="payment-account-text" style={{ textAlign: "center" }}>
-                      <strong>M-Pesa</strong>
-                      <span style={{ fontSize: "0.72rem" }}>Manual transfer</span>
+                    <div className="payment-account-text">
+                      <strong>Safaricom M-Pesa</strong>
+                      <span>Mobile money rail</span>
+                      <code>Manual transfer</code>
                     </div>
                   </button>
                 </div>
 
-                <label style={{ margin: 0 }}>
-                  Amount to add (ETB)
-                  <input
-                    type="number"
-                    min="1"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    placeholder="e.g. 1000"
-                  />
-                </label>
+                <div className="browser-topup-fields">
+                  <label style={{ margin: 0 }}>
+                    Amount to add (ETB)
+                    <input
+                      type="number"
+                      min="1"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="e.g. 1000"
+                    />
+                  </label>
+                  <div className="bw-instant-info-card">
+                    <strong>Telebirr Instant C2B Checkout</strong>
+                    <span>
+                      Creates an automated payment session in ETB and credits your wallet as soon as Telebirr confirms payment.
+                    </span>
+                  </div>
+                </div>
 
                 {checkoutFallback && (
-                  <Alert variant="destructive" className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 my-2">
-                    <Avatar className="size-6 rounded-[5px] shrink-0 self-start sm:self-center">
-                      <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
-                        <TbFileAlert className="size-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <AlertTitle className="font-semibold text-destructive">
+                  <Alert variant="destructive" className="bw-gateway-alert flex flex-col items-stretch gap-3 p-4 my-1">
+                    <div className="flex items-center gap-2.5">
+                      <Avatar className="size-6 rounded-[5px] shrink-0">
+                        <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                          <TbFileAlert className="size-4" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <AlertTitle className="text-sm font-semibold text-destructive leading-snug">
                         Automated Gateway Issue — Manual Verification Available
                       </AlertTitle>
-                      <AlertDescription className="mt-1">
-                        Automatic {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} checkout could not be completed. Check Recent top-ups before retrying so you don’t accidentally pay twice. You can also use manual verification and submit your receipt.
-                      </AlertDescription>
                     </div>
-                    <div className="flex gap-2 shrink-0 pt-2 sm:pt-0">
+                    <AlertDescription className="text-sm leading-relaxed text-foreground/90">
+                      Automatic {checkoutFallback.provider === "TELEBIRR" ? "Telebirr" : checkoutFallback.provider === "CBE_BIRR" ? "CBE Birr" : "Safaricom M-Pesa"} checkout could not be completed. Check Recent top-ups before retrying so you don’t accidentally pay twice. You can also use manual verification and submit your receipt.
+                    </AlertDescription>
+                    <div className="flex flex-wrap items-center gap-2.5 pt-1">
                       <button
                         type="button"
                         className="btn-primary"
-                        style={{ fontSize: "0.82rem", padding: "6px 14px", display: "flex", alignItems: "center", gap: 6 }}
+                        style={{ fontSize: "0.84rem", padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 6 }}
                         onClick={() => switchToManualFallback(checkoutFallback.provider, checkoutFallback.amount)}
                       >
                         Switch to Manual Verification <ArrowRight size={14} />
@@ -848,7 +1137,7 @@ export function BrowserWallet({
                       <button
                         type="button"
                         className="btn-secondary"
-                        style={{ fontSize: "0.82rem", padding: "6px 12px" }}
+                        style={{ fontSize: "0.84rem", padding: "8px 14px" }}
                         onClick={() => setCheckoutFallback(null)}
                       >
                         Dismiss
@@ -857,38 +1146,40 @@ export function BrowserWallet({
                   </Alert>
                 )}
 
-                <button
-                  className="btn-primary"
-                  style={{ justifyContent: "center", marginTop: 4, width: "fit-content" }}
-                  disabled={isSubmitting}
-                  onClick={() => void submitCheckoutTopUp()}
-                >
-                  <img
-                    src={
-                      checkoutRail === "TELEBIRR"
-                        ? "/payment/Telebirr.png"
-                        : checkoutRail === "CBE_BIRR"
-                        ? "/payment/cbe payment.jpg"
-                        : "/payment/mpesa.svg"
-                    }
-                    alt=""
-                    style={{
-                      width: 20,
-                      height: 20,
-                      objectFit: "contain",
-                      marginRight: 6,
-                      background: "#fff",
-                      borderRadius: 4,
-                    }}
-                  />
-                  {isSubmitting
-                    ? "Starting checkout..."
-                    : checkoutRail === "TELEBIRR"
-                    ? "Pay with Telebirr"
-                    : checkoutRail === "CBE_BIRR"
-                    ? "Pay with CBE Birr"
-                    : "Pay with M-Pesa"}
-                </button>
+                <div className="bw-instant-actions">
+                  <button
+                    className="btn-primary"
+                    style={{ justifyContent: "center" }}
+                    disabled={isSubmitting}
+                    onClick={() => void submitCheckoutTopUp()}
+                  >
+                    <img
+                      src={
+                        checkoutRail === "TELEBIRR"
+                          ? "/payment/Telebirr.png"
+                          : checkoutRail === "CBE_BIRR"
+                          ? "/payment/cbe payment.jpg"
+                          : "/payment/mpesa.svg"
+                      }
+                      alt=""
+                      style={{
+                        width: 20,
+                        height: 20,
+                        objectFit: "contain",
+                        marginRight: 6,
+                        background: "#fff",
+                        borderRadius: 4,
+                      }}
+                    />
+                    {isSubmitting
+                      ? "Starting checkout..."
+                      : checkoutRail === "TELEBIRR"
+                      ? "Pay with Telebirr"
+                      : checkoutRail === "CBE_BIRR"
+                      ? "Pay with CBE Birr"
+                      : "Pay with M-Pesa"}
+                  </button>
+                </div>
               </div>
             ) : (
               <>
@@ -1034,17 +1325,17 @@ export function BrowserWallet({
                     />
                   </label>
                   <div style={{ gridColumn: "1 / -1" }}>
-                    <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
-                      Receipt image or document (PDF/Photo)
-                    </span>
                     <FileUploader
                       compact
                       showCard={false}
                       showHeader={false}
                       maxFiles={1}
                       accept="image/*,.pdf"
+                      label="Receipt image or document (PDF/Photo)"
                       acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                      dropSubtitle="Upload a clear photo or PDF of your transfer receipt"
                       maxSizeMB={10}
+                      value={receipt}
                       onFileSelect={(file) => setReceipt(file)}
                       showFooter={false}
                       showEncryptionBadge={true}
@@ -1062,26 +1353,36 @@ export function BrowserWallet({
               </>
             )}
 
-            {message && (
-              <Alert variant={messageIsError ? "destructive" : "success"} className="flex items-center gap-2.5 my-2.5"
+            {topUpMessage && (
+              <Alert variant={topUpMessageIsError ? "destructive" : "success"} className="flex flex-wrap items-center gap-2.5 my-2.5"
               >
                 <Avatar className="size-6 rounded-[5px] shrink-0">
                   <AvatarFallback
                     className={cn(
                       "rounded-[5px] text-white",
-                      messageIsError
+                      topUpMessageIsError
                         ? "bg-destructive dark:bg-destructive/60"
                         : "bg-emerald-600 dark:bg-emerald-600/80"
                     )}
                   >
-                    {messageIsError ? (
+                    {topUpMessageIsError ? (
                       <TbAlertCircle className="size-3.5" />
                     ) : (
                       <Check className="size-3.5" />
                     )}
                   </AvatarFallback>
                 </Avatar>
-                <AlertTitle>{message}</AlertTitle>
+                <AlertTitle className="flex-1 min-w-0 text-sm font-medium">{topUpMessage}</AlertTitle>
+                {activeCheckout && activeCheckout.status === "CHECKOUT_PENDING" && !isCheckoutDialogOpen && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ fontSize: "0.78rem", padding: "5px 10px" }}
+                    onClick={() => setIsCheckoutDialogOpen(true)}
+                  >
+                    View instructions
+                  </button>
+                )}
               </Alert>
             )}
           </>
@@ -1107,6 +1408,9 @@ export function BrowserWallet({
             return (
               <div
                 key={item.id}
+                ref={(el) => {
+                  recentTopUpRowRefs.current[item.id] = el;
+                }}
                 style={{
                   display: "grid",
                   gap: 8,
@@ -1136,14 +1440,24 @@ export function BrowserWallet({
                       {item.status.replace("_", " ")}
                     </span>
                     {isPendingCheckout && (
-                      <button
-                        type="button"
-                        className="btn-secondary"
-                        style={{ fontSize: "0.78rem", padding: "4px 8px" }}
-                        onClick={() => setAttachingTopUpId(isAttaching ? null : item.id)}
-                      >
-                        {isAttaching ? "Cancel" : "Attach receipt"}
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: "0.78rem", padding: "4px 8px" }}
+                          onClick={() => openCheckoutInstructionsForRow(item)}
+                        >
+                          Complete checkout
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          style={{ fontSize: "0.78rem", padding: "4px 8px" }}
+                          onClick={() => setAttachingTopUpId(isAttaching ? null : item.id)}
+                        >
+                          {isAttaching ? "Cancel" : "Attach receipt"}
+                        </button>
+                      </>
                     )}
                     <button
                       type="button"
@@ -1222,8 +1536,11 @@ export function BrowserWallet({
                       showHeader={false}
                       maxFiles={1}
                       accept="image/*,.pdf"
+                      label="Receipt image or document (PDF/Photo)"
                       acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                      dropSubtitle="Upload a clear photo or PDF of your provider receipt"
                       maxSizeMB={10}
+                      value={attachFile}
                       onFileSelect={(file) => setAttachFile(file)}
                       showFooter={false}
                       showEncryptionBadge={true}
@@ -1604,8 +1921,11 @@ export function BrowserWallet({
                         showHeader={false}
                         maxFiles={1}
                         accept="image/*,.pdf"
+                        label="Receipt image or document (PDF/Photo)"
                         acceptedLabel="JPG, PNG, WebP or PDF · up to 10 MB"
+                        dropSubtitle="Upload a clear photo or PDF of your provider receipt"
                         maxSizeMB={10}
+                        value={attachFile}
                         onFileSelect={(file) => setAttachFile(file)}
                         showFooter={false}
                         showEncryptionBadge={true}
@@ -1959,6 +2279,244 @@ export function BrowserWallet({
           onClose={() => setActiveFiscalDoc(null)}
         />
       )}
+
+      {/* Checkout Instructions Modal (native <dialog> with showModal(), light dismiss, and scroll containment) */}
+      <dialog
+        ref={checkoutDialogRef}
+        className="bw-checkout-dialog"
+        aria-labelledby={checkoutDialogTitleId}
+        {...({ closedby: "any" } as Record<string, string>)}
+        onClose={handleCheckoutDialogClose}
+        onPointerDown={handleCheckoutDialogPointerDown}
+        onPointerUp={handleCheckoutDialogPointerUp}
+      >
+        {activeCheckout && (
+          <div className="bw-checkout-shell">
+            <div className="bw-checkout-header">
+              <div className="bw-checkout-title-group">
+                <img
+                  src={PROVIDER_LOGOS[activeCheckout.provider]}
+                  alt={PROVIDER_LABELS[activeCheckout.provider]}
+                  className="bw-checkout-logo"
+                />
+                <h1 id={checkoutDialogTitleId}>
+                  {PROVIDER_LABELS[activeCheckout.provider]} Checkout
+                </h1>
+              </div>
+              <button
+                type="button"
+                className="bw-checkout-close-btn"
+                aria-label="Close checkout instructions"
+                onClick={closeCheckoutDialog}
+              >
+                <X size={18} aria-hidden="true" />
+              </button>
+            </div>
+
+            <div className="bw-checkout-body">
+              <div className="bw-checkout-summary">
+                <div>
+                  <span className="bw-checkout-label">Top-up amount</span>
+                  <strong className="bw-checkout-amount">
+                    ETB {activeCheckout.amountEtb.toLocaleString()}
+                  </strong>
+                </div>
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className={cn(
+                    "bw-checkout-status",
+                    activeCheckout.status === "APPROVED"
+                      ? "is-approved"
+                      : activeCheckout.status === "REJECTED"
+                        ? "is-rejected"
+                        : activeCheckout.status === "PENDING"
+                          ? "is-pending"
+                          : "is-awaiting",
+                  )}
+                >
+                  {activeCheckout.status === "APPROVED"
+                    ? "Credited to wallet"
+                    : activeCheckout.status === "REJECTED"
+                      ? "Declined"
+                      : activeCheckout.status === "PENDING"
+                        ? "Pending staff review"
+                        : "Awaiting confirmation"}
+                </span>
+              </div>
+
+              {activeCheckout.providerTransactionId && (
+                <div className="bw-checkout-ref-row">
+                  <span>Session reference</span>
+                  <code className="sh-mono">{activeCheckout.providerTransactionId}</code>
+                </div>
+              )}
+
+              {activeCheckout.status === "APPROVED" ? (
+                <div className="bw-checkout-note">
+                  <p>
+                    <strong>Payment confirmed.</strong> ETB {activeCheckout.amountEtb.toLocaleString()} has been added to your available wallet balance and is ready to fund escrow milestones.
+                  </p>
+                </div>
+              ) : activeCheckout.status === "REJECTED" ? (
+                <div className="bw-checkout-note">
+                  <p>
+                    This payment session did not complete and no funds were added to your wallet. You can start a new checkout or transfer manually and submit your receipt.
+                  </p>
+                </div>
+              ) : activeCheckout.status === "PENDING" ? (
+                <div className="bw-checkout-note">
+                  <p>
+                    Your transfer receipt was received and is waiting in the staff verification queue.
+                  </p>
+                </div>
+              ) : activeCheckout.redirectUrl ? (
+                <div className="bw-checkout-note">
+                  <p>Complete your payment using the instructions below:</p>
+                  <ol className="bw-checkout-steps">
+                    <li>
+                      Use <strong>Open {PROVIDER_LABELS[activeCheckout.provider]} Paygate</strong> below if the gateway window did not open automatically.
+                    </li>
+                    <li>
+                      Authorize the transfer on the paygate screen. This window checks for confirmation automatically.
+                    </li>
+                    <li>
+                      If the gateway times out or you already transferred directly, attach your transfer receipt below.
+                    </li>
+                  </ol>
+                </div>
+              ) : import.meta.env.DEV ? (
+                <div className="bw-checkout-note">
+                  <p>
+                    Telebirr live gateway credentials are not configured in this local environment, so a sandbox checkout session was created without a redirect URL.
+                  </p>
+                  <ol className="bw-checkout-steps">
+                    <li>
+                      Click <strong>Simulate Instant Payment (Sandbox)</strong> below to settle this test top-up and credit your wallet immediately.
+                    </li>
+                    <li>
+                      Or click <strong>Attach Transfer Receipt</strong> to upload a receipt and test the manual staff review queue.
+                    </li>
+                  </ol>
+                </div>
+              ) : (
+                <div className="bw-checkout-note">
+                  <p>
+                    The payment gateway did not return a hosted checkout link for this session. Complete your top-up manually:
+                  </p>
+                  <ol className="bw-checkout-steps">
+                    <li>
+                      Transfer <strong>ETB {activeCheckout.amountEtb.toLocaleString()}</strong> to Yekis Telebirr account <strong>0910 011 818</strong> (or switch to Manual Transfer for CBE Bank / M-Pesa).
+                    </li>
+                    <li>
+                      Click <strong>Attach Transfer Receipt</strong> below to submit your transaction reference and receipt photo for staff approval.
+                    </li>
+                  </ol>
+                </div>
+              )}
+
+              {activeCheckout.actionError && (
+                <Alert variant="destructive" className="flex items-center gap-2.5">
+                  <Avatar className="size-6 rounded-[5px] shrink-0">
+                    <AvatarFallback className="bg-destructive dark:bg-destructive/60 rounded-[5px] text-white">
+                      <TbAlertCircle className="size-3.5" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <AlertTitle>{activeCheckout.actionError}</AlertTitle>
+                </Alert>
+              )}
+            </div>
+
+            <div className="bw-checkout-footer">
+              {activeCheckout.status === "APPROVED" || activeCheckout.status === "PENDING" ? (
+                <button
+                  type="button"
+                  autoFocus
+                  className="btn-primary"
+                  onClick={closeCheckoutDialog}
+                >
+                  Done
+                </button>
+              ) : activeCheckout.status === "REJECTED" ? (
+                <>
+                  <button
+                    type="button"
+                    autoFocus
+                    className="btn-secondary"
+                    onClick={closeCheckoutDialog}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => {
+                      const amt = String(activeCheckout.amountEtb);
+                      const prov = activeCheckout.provider;
+                      closeCheckoutDialog();
+                      switchToManualFallback(prov, amt);
+                    }}
+                  >
+                    Use Manual Transfer
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    autoFocus={!import.meta.env.DEV && !activeCheckout.redirectUrl}
+                    className="btn-secondary"
+                    onClick={closeCheckoutDialog}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={isCheckingCheckoutStatus || activeCheckout.isSimulating}
+                    onClick={() => void syncCheckoutStatus(activeCheckout.topUpId)}
+                  >
+                    {isCheckingCheckoutStatus ? "Checking..." : "Check Status"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={activeCheckout.isSimulating}
+                    onClick={() => switchCheckoutToAttachReceipt(activeCheckout.topUpId)}
+                  >
+                    Attach Transfer Receipt
+                  </button>
+                  {activeCheckout.redirectUrl && (
+                    <a
+                      href={activeCheckout.redirectUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary"
+                      style={{ textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6 }}
+                    >
+                      <span>Open {PROVIDER_LABELS[activeCheckout.provider]} Paygate</span>
+                      <ExternalLink size={14} aria-hidden="true" />
+                    </a>
+                  )}
+                  {import.meta.env.DEV && (
+                    <button
+                      type="button"
+                      autoFocus={!activeCheckout.redirectUrl}
+                      className="btn-primary"
+                      disabled={activeCheckout.isSimulating}
+                      onClick={() => void handleSimulateCheckoutSuccess()}
+                    >
+                      {activeCheckout.isSimulating
+                        ? "Processing..."
+                        : "Simulate Instant Payment (Sandbox)"}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </dialog>
     </div>
   );
 }

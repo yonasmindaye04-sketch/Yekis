@@ -14,6 +14,8 @@ import {
   Columns3,
 } from "lucide-react";
 import { useTheme } from "../../theme/ThemeContext";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
 
 export type SidebarVariant = "sidebar" | "inset" | "floating";
 export type DashboardVariant = "dashboard-1" | "dashboard-2";
@@ -150,16 +152,18 @@ export function useShadcnLayout() {
 
 export function LayoutCustomizerTrigger() {
   const { setCustomizerOpen } = useShadcnLayout();
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).customizer;
   return (
     <button
       type="button"
       className="sh-icon-btn"
       onClick={() => setCustomizerOpen(true)}
-      title="Customize workspace layout & appearance"
-      aria-label="Customize workspace layout"
+      title={copy.triggerTitle}
+      aria-label={copy.triggerAria}
     >
       <SlidersHorizontal size={15} />
-      <span className="sh-hide-mobile">Customize</span>
+      <span className="sh-hide-mobile">{copy.triggerText}</span>
     </button>
   );
 }
@@ -181,6 +185,8 @@ function LayoutCustomizerDrawer() {
     setCustomizerOpen,
   } = useShadcnLayout();
   const { theme, toggleTheme } = useTheme();
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).customizer;
 
   if (!customizerOpen) return null;
 
@@ -190,7 +196,7 @@ function LayoutCustomizerDrawer() {
       onClick={() => setCustomizerOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="Workspace Layout Customizer"
+      aria-label={copy.dialogAria}
     >
       <aside
         className="sh-sheet-panel"
@@ -198,16 +204,14 @@ function LayoutCustomizerDrawer() {
       >
         <div className="sh-sheet-header">
           <div>
-            <h3 className="sh-sheet-title">Workspace Customizer</h3>
-            <p className="sh-sheet-subtitle">
-              Configure sidebar framing, dashboard template mode, and table density.
-            </p>
+            <h3 className="sh-sheet-title">{copy.title}</h3>
+            <p className="sh-sheet-subtitle">{copy.subtitle}</p>
           </div>
           <button
             type="button"
             className="sh-icon-only-btn"
             onClick={() => setCustomizerOpen(false)}
-            aria-label="Close customizer"
+            aria-label={copy.closeAria}
           >
             <X size={16} />
           </button>
@@ -217,7 +221,7 @@ function LayoutCustomizerDrawer() {
           {/* Section 1: Dashboard Template Variant */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <Sparkles size={13} /> Dashboard Template Mode
+              <Sparkles size={13} /> {copy.templateModeLabel}
             </label>
             <div className="sh-customizer-grid-2">
               <button
@@ -226,10 +230,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setDashboardVariant("dashboard-1")}
               >
                 <span className="sh-choice-head">
-                  <span>Dashboard 1</span>
+                  <span>{copy.d1Title}</span>
                   {dashboardVariant === "dashboard-1" && <Check size={13} />}
                 </span>
-                <small>Executive KPIs & Cashflow Charts</small>
+                <small>{copy.d1Desc}</small>
               </button>
               <button
                 type="button"
@@ -237,10 +241,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setDashboardVariant("dashboard-2")}
               >
                 <span className="sh-choice-head">
-                  <span>Dashboard 2</span>
+                  <span>{copy.d2Title}</span>
                   {dashboardVariant === "dashboard-2" && <Check size={13} />}
                 </span>
-                <small>Data Grid, Kanban & Schedule</small>
+                <small>{copy.d2Desc}</small>
               </button>
             </div>
           </div>
@@ -248,14 +252,14 @@ function LayoutCustomizerDrawer() {
           {/* Section 2: Sidebar Shell Variant */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <Layout size={13} /> Sidebar Architecture
+              <Layout size={13} /> {copy.sidebarArchLabel}
             </label>
             <div className="sh-customizer-grid-3">
               {(
                 [
-                  { id: "sidebar", label: "Standard", desc: "Flush edge" },
-                  { id: "inset", label: "Inset", desc: "Framed canvas" },
-                  { id: "floating", label: "Floating", desc: "Detached rail" },
+                  { id: "sidebar", label: copy.sidebarStandard, desc: copy.sidebarStandardDesc },
+                  { id: "inset", label: copy.sidebarInset, desc: copy.sidebarInsetDesc },
+                  { id: "floating", label: copy.sidebarFloating, desc: copy.sidebarFloatingDesc },
                 ] as const
               ).map((item) => (
                 <button
@@ -277,7 +281,7 @@ function LayoutCustomizerDrawer() {
           {/* Section 3: Sidebar Collapse State */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <PanelLeft size={13} /> Navigation Rail Width
+              <PanelLeft size={13} /> {copy.railWidthLabel}
             </label>
             <div className="sh-customizer-grid-2">
               <button
@@ -286,10 +290,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setSidebarCollapsed(false)}
               >
                 <span className="sh-choice-head">
-                  <span>Expanded (256px)</span>
+                  <span>{copy.railExpanded}</span>
                   {!sidebarCollapsed && <Check size={13} />}
                 </span>
-                <small>Full labels & role card</small>
+                <small>{copy.railExpandedDesc}</small>
               </button>
               <button
                 type="button"
@@ -297,10 +301,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setSidebarCollapsed(true)}
               >
                 <span className="sh-choice-head">
-                  <span>Compact Icon Rail</span>
+                  <span>{copy.railCompact}</span>
                   {sidebarCollapsed && <Check size={13} />}
                 </span>
-                <small>Maximizes table width</small>
+                <small>{copy.railCompactDesc}</small>
               </button>
             </div>
           </div>
@@ -308,7 +312,7 @@ function LayoutCustomizerDrawer() {
           {/* Section 4: Data Grid & Row Density */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <Rows3 size={13} /> Data Table & List Density
+              <Rows3 size={13} /> {copy.densityLabel}
             </label>
             <div className="sh-customizer-grid-2">
               <button
@@ -317,10 +321,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setDensity("compact")}
               >
                 <span className="sh-choice-head">
-                  <span>Compact (38px)</span>
+                  <span>{copy.densityCompact}</span>
                   {density === "compact" && <Check size={13} />}
                 </span>
-                <small>High-density financial rows</small>
+                <small>{copy.densityCompactDesc}</small>
               </button>
               <button
                 type="button"
@@ -328,10 +332,10 @@ function LayoutCustomizerDrawer() {
                 onClick={() => setDensity("comfortable")}
               >
                 <span className="sh-choice-head">
-                  <span>Comfortable (46px)</span>
+                  <span>{copy.densityComfortable}</span>
                   {density === "comfortable" && <Check size={13} />}
                 </span>
-                <small>Relaxed spacing</small>
+                <small>{copy.densityComfortableDesc}</small>
               </button>
             </div>
           </div>
@@ -339,14 +343,14 @@ function LayoutCustomizerDrawer() {
           {/* Section 5: Corner Radius */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <Maximize2 size={13} /> Surface Radius Scale
+              <Maximize2 size={13} /> {copy.radiusLabel}
             </label>
             <div className="sh-customizer-grid-3">
               {(
                 [
-                  { id: "0.375rem", label: "Crisp (6px)" },
-                  { id: "0.5rem", label: "Default (8px)" },
-                  { id: "0.75rem", label: "Soft (12px)" },
+                  { id: "0.375rem", label: copy.radiusCrisp },
+                  { id: "0.5rem", label: copy.radiusDefault },
+                  { id: "0.75rem", label: copy.radiusSoft },
                 ] as const
               ).map((r) => (
                 <button
@@ -367,7 +371,7 @@ function LayoutCustomizerDrawer() {
           {/* Section 6: Color Mode */}
           <div className="sh-customizer-group">
             <label className="sh-customizer-label">
-              <Columns3 size={13} /> Color Theme (Yekis Emerald)
+              <Columns3 size={13} /> {copy.colorThemeLabel}
             </label>
             <div className="sh-customizer-grid-2">
               <button
@@ -379,11 +383,11 @@ function LayoutCustomizerDrawer() {
               >
                 <span className="sh-choice-head">
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <Sun size={13} /> Alabaster Light
+                    <Sun size={13} /> {copy.lightLabel}
                   </span>
                   {theme === "light" && <Check size={13} />}
                 </span>
-                <small>#F8FAFC canvas · #16A34A accent</small>
+                <small>{copy.lightDesc}</small>
               </button>
               <button
                 type="button"
@@ -394,11 +398,11 @@ function LayoutCustomizerDrawer() {
               >
                 <span className="sh-choice-head">
                   <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                    <Moon size={13} /> Carbon Dark
+                    <Moon size={13} /> {copy.darkLabel}
                   </span>
                   {theme === "dark" && <Check size={13} />}
                 </span>
-                <small>#090D12 canvas · #22C55E accent</small>
+                <small>{copy.darkDesc}</small>
               </button>
             </div>
           </div>
@@ -411,7 +415,7 @@ function LayoutCustomizerDrawer() {
             onClick={resetLayout}
             style={{ width: "100%", justifyContent: "center" }}
           >
-            <RotateCcw size={14} /> Reset to Default Layout
+            <RotateCcw size={14} /> {copy.resetBtn}
           </button>
         </div>
       </aside>

@@ -7,6 +7,7 @@ import {
   type Gig,
 } from "./api/client";
 import { useI18n } from "./i18n";
+import { GIG_SELLER_DASHBOARD_COPY } from "./gigSellerDashboardCopy";
 import {
   ConfirmActionModal,
   EscrowFeeBreakdown,
@@ -76,32 +77,32 @@ const formatBirr = (minor: number) => formatEtbMajor(minor / 100, true);
 
 /** Mirrors CreateGigInput in packages/schemas so errors surface here rather
  *  than as an opaque validation failure. */
-function validate(d: Draft): string | null {
-  if (d.title.trim().length < 5) return "Title must be at least 5 characters.";
-  if (d.title.trim().length > 120) return "Title cannot exceed 120 characters.";
-  if (d.description.trim().length < 20)
-    return "Description must be at least 20 characters — buyers need to know what they get.";
-  if (d.description.trim().length > 5000)
-    return "Description cannot exceed 5000 characters.";
+function validate(
+  d: Draft,
+  copy = GIG_SELLER_DASHBOARD_COPY.en,
+): string | null {
+  const v = copy.validation;
+  if (d.title.trim().length < 5) return v.titleMin;
+  if (d.title.trim().length > 120) return v.titleMax;
+  if (d.description.trim().length < 20) return v.descMin;
+  if (d.description.trim().length > 5000) return v.descMax;
 
   const tags = d.tags.split(",").map((t) => t.trim()).filter(Boolean);
-  if (tags.length > 20) return "At most 20 tags.";
+  if (tags.length > 20) return v.tagsMax;
 
   const used = new Set<Tier>();
   for (const p of d.packages) {
-    if (used.has(p.tier)) return "Each package tier can only be used once.";
+    if (used.has(p.tier)) return v.duplicateTier;
     used.add(p.tier);
-    if (p.title.trim().length < 2) return "Every package needs a title.";
-    if (p.description.trim().length < 5)
-      return "Every package needs a description of at least 5 characters.";
+    if (p.title.trim().length < 2) return v.pkgTitleMin;
+    if (p.description.trim().length < 5) return v.pkgDescMin;
     const days = Number(p.deliveryDays);
     if (!Number.isInteger(days) || days < 1 || days > 365)
-      return "Delivery days must be between 1 and 365.";
+      return v.deliveryRange;
     const rev = Number(p.revisionsIncluded);
     if (!Number.isInteger(rev) || rev < 0 || rev > 20)
-      return "Included revisions must be between 0 and 20.";
-    if (toMinor(p.price) === null)
-      return "Every package needs a price greater than zero, in ETB.";
+      return v.revisionsRange;
+    if (toMinor(p.price) === null) return v.pricePositive;
   }
   return null;
 }
@@ -156,7 +157,9 @@ const STATUS_COPY: Record<string, { label: string; tone: string; hint: string }>
 
 // === MAIN COMPONENT ===
 export function GigSellerDashboard() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const copy =
+    GIG_SELLER_DASHBOARD_COPY[language] ?? GIG_SELLER_DASHBOARD_COPY.en;
   const gf = t.workspace.gigsFlow;
   const fb = t.workspace.feeBreakdown;
   const [gigs, setGigs] = useState<Gig[]>([]);
@@ -278,7 +281,7 @@ export function GigSellerDashboard() {
 
   const save = async () => {
     if (!draft) return;
-    const invalid = validate(draft);
+    const invalid = validate(draft, copy);
     if (invalid) {
       setError(invalid);
       return;
@@ -294,18 +297,16 @@ export function GigSellerDashboard() {
           tags: draft.tags.split(",").map((t) => t.trim()).filter(Boolean),
           maxRevisions: Math.min(20, Math.max(0, Number(draft.maxRevisions) || 0)),
         });
-        setNotice("Gig updated.");
+        setNotice(copy.gigUpdated);
       } else {
         await api.createGig(toPayload(draft));
-        setNotice(
-          "Gig submitted for review. It appears in the marketplace once our team approves it.",
-        );
+        setNotice(copy.gigSubmittedReview);
       }
       setDraft(null);
       setEditing(null);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not save your gig.");
+      setError(e instanceof Error ? e.message : copy.saveErrorFallback);
     } finally {
       setSaving(false);
     }
@@ -316,10 +317,10 @@ export function GigSellerDashboard() {
     setNotice("");
     try {
       await api.setGigStatus(g.id, status);
-      setNotice(status === "PAUSED" ? "Gig paused." : "Gig archived.");
+      setNotice(status === "PAUSED" ? copy.gigPaused : copy.gigArchived);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not change the gig status.");
+      setError(e instanceof Error ? e.message : copy.statusErrorFallback);
     }
   };
 
@@ -339,11 +340,7 @@ export function GigSellerDashboard() {
         <div className="content-toolbar">
           <div>
             <h2>{editing ? gf.editGigTitle : gf.createGigBtn}</h2>
-            <p>
-              {editing
-                ? "Update the details buyers see."
-                : "Package a service you can deliver. Our team reviews it before it goes live."}
-            </p>
+            <p>{editing ? copy.editSubtitle : copy.createSubtitle}</p>
           </div>
           <button className="btn-secondary" onClick={() => { setDraft(null); setEditing(null); }}>
             {gf.cancelBtn}
@@ -354,49 +351,51 @@ export function GigSellerDashboard() {
 
         <div className="sh-card" style={{ padding: 20, marginTop: 16 }}>
           <label className="gig-field">
-            <span>Title</span>
+            <span>{copy.titleLabel}</span>
             <input
               value={draft.title}
               maxLength={120}
               onChange={(e) => set("title", e.target.value)}
-              placeholder="I will design a modern logo for your brand"
+              placeholder={copy.titlePlaceholder}
             />
             <em>{draft.title.trim().length}/120</em>
           </label>
 
           <label className="gig-field">
-            <span>Category</span>
+            <span>{copy.categoryLabel}</span>
             <select value={draft.category} onChange={(e) => set("category", e.target.value)}>
               {CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value}>
+                  {copy.categories[c.value] ?? c.label}
+                </option>
               ))}
             </select>
           </label>
 
           <label className="gig-field">
-            <span>Description</span>
+            <span>{copy.descriptionLabel}</span>
             <textarea
               value={draft.description}
               maxLength={5000}
               rows={6}
               onChange={(e) => set("description", e.target.value)}
-              placeholder="What the buyer receives, how you work, and what you need from them."
+              placeholder={copy.descriptionPlaceholder}
             />
-            <em>{draft.description.trim().length}/5000 · minimum 20</em>
+            <em>{copy.descriptionCounter(draft.description.trim().length)}</em>
           </label>
 
           <label className="gig-field">
-            <span>Tags</span>
+            <span>{copy.tagsLabel}</span>
             <input
               value={draft.tags}
               onChange={(e) => set("tags", e.target.value)}
-              placeholder="logo, branding, illustrator"
+              placeholder={copy.tagsPlaceholder}
             />
-            <em>Comma separated, up to 20</em>
+            <em>{copy.tagsHint}</em>
           </label>
 
           <label className="gig-field">
-            <span>Maximum revisions per order</span>
+            <span>{copy.maxRevisionsLabel}</span>
             <input
               type="number"
               min={0}
@@ -412,8 +411,8 @@ export function GigSellerDashboard() {
             <h3>{gf.packagesTitle}</h3>
             <p>
               {readOnlyPackages
-                ? "Package tiers are fixed once a gig is created."
-                : "Offer up to three tiers. Buyers pick one when ordering."}
+                ? copy.packagesFixedHint
+                : copy.packagesFlexibleHint}
             </p>
           </div>
           {!readOnlyPackages ? (
@@ -430,13 +429,13 @@ export function GigSellerDashboard() {
         {draft.packages.map((p, i) => (
           <div className="sh-card" key={p.tier} style={{ padding: 20, marginTop: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span className="badge">{p.tier}</span>
+              <span className="badge">{copy.tiers[p.tier] ?? p.tier}</span>
               {!readOnlyPackages && draft.packages.length > 1 ? (
                 <button
                   className="btn-secondary"
                   style={{ marginLeft: "auto" }}
                   onClick={() => removePackage(i)}
-                  aria-label={`Remove ${p.tier} package`}
+                  aria-label={copy.removePackageAria(copy.tiers[p.tier] ?? p.tier)}
                 >
                   <Trash2 size={15} />
                 </button>
@@ -449,7 +448,7 @@ export function GigSellerDashboard() {
                 value={p.title}
                 disabled={readOnlyPackages}
                 onChange={(e) => setPkg(i, "title", e.target.value)}
-                placeholder="Standard logo package"
+                placeholder={copy.packageTitlePlaceholder}
               />
             </label>
 
@@ -493,7 +492,7 @@ export function GigSellerDashboard() {
                   value={p.price}
                   disabled={readOnlyPackages}
                   onChange={(e) => setPkg(i, "price", e.target.value)}
-                  placeholder="1500"
+                  placeholder={copy.pricePlaceholder}
                 />
               </label>
             </div>
@@ -506,7 +505,7 @@ export function GigSellerDashboard() {
                   compact
                   labels={{
                     ...fb,
-                    title: `${p.tier} · ${fb.title}`,
+                    title: `${copy.tiers[p.tier] ?? p.tier} · ${fb.title}`,
                   }}
                 />
               </div>
@@ -517,7 +516,7 @@ export function GigSellerDashboard() {
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
           <button className="btn-primary" onClick={() => void save()} disabled={saving}>
             {saving
-              ? "Saving…"
+              ? copy.savingBtn
               : editing
                 ? gf.saveChangesBtn
                 : gf.submitReviewBtn}
@@ -549,7 +548,7 @@ export function GigSellerDashboard() {
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span className="sh-kbd">
-            {totals.live} Live · {gigs.length} Total
+            {copy.liveTotalBadge(totals.live, gigs.length)}
           </span>
           <button className="sh-btn sh-btn-primary" onClick={startCreate}>
             <Plus size={15} /> {gf.createGigBtn}
@@ -561,35 +560,35 @@ export function GigSellerDashboard() {
       <div className="sh-kpi-grid" style={{ marginBottom: 20 }}>
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Live Gigs</span>
+            <span className="sh-kpi-label">{copy.kpiLiveGigs}</span>
             <Star size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">{totals.live}</div>
-          <div className="sh-kpi-sub">Active in marketplace</div>
+          <div className="sh-kpi-sub">{copy.kpiLiveGigsSub}</div>
         </div>
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Active Orders</span>
+            <span className="sh-kpi-label">{copy.kpiActiveOrders}</span>
             <Activity size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">—</div>
-          <div className="sh-kpi-sub">In progress deliverables</div>
+          <div className="sh-kpi-sub">{copy.kpiActiveOrdersSub}</div>
         </div>
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Total Earnings</span>
+            <span className="sh-kpi-label">{copy.kpiTotalEarnings}</span>
             <Wallet size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">ETB —</div>
-          <div className="sh-kpi-sub">Net revenue settled</div>
+          <div className="sh-kpi-sub">{copy.kpiTotalEarningsSub}</div>
         </div>
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">Total Gigs</span>
+            <span className="sh-kpi-label">{copy.kpiTotalGigs}</span>
             <Archive size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">{gigs.length}</div>
-          <div className="sh-kpi-sub">Created gig packages</div>
+          <div className="sh-kpi-sub">{copy.kpiTotalGigsSub}</div>
         </div>
       </div>
 
@@ -618,17 +617,12 @@ export function GigSellerDashboard() {
       ) : (
         <>
           <p className="sh-mono" style={{ color: "var(--color-text-secondary)" }}>
-            {gigs.length} gig{gigs.length === 1 ? "" : "s"} · {totals.live} live ·{" "}
-            {totals.pending} awaiting review
+            {copy.summaryLine(gigs.length, totals.live, totals.pending)}
           </p>
 
           <div style={{ display: "grid", gap: 12 }}>
             {gigs.map((g) => {
-              const copy = STATUS_COPY[g.status] ?? {
-                label: g.status,
-                tone: "muted",
-                hint: "",
-              };
+              const statusHint = copy.statusHints[g.status] ?? STATUS_COPY[g.status]?.hint ?? "";
               const cheapest = (g.packages ?? []).reduce(
                 (min, p) => (min === null || p.priceMinor < min ? p.priceMinor : min),
                 null as number | null,
@@ -652,9 +646,11 @@ export function GigSellerDashboard() {
                           marginTop: 2,
                         }}
                       >
-                        {CATEGORIES.find((c) => c.value === g.category)?.label ?? g.category}
+                        {copy.categories[g.category] ??
+                          CATEGORIES.find((c) => c.value === g.category)?.label ??
+                          g.category}
                         {cheapest !== null ? (
-                          <span className="sh-mono"> · from {formatBirr(cheapest)}</span>
+                          <span className="sh-mono"> · {copy.fromPrice(formatBirr(cheapest))}</span>
                         ) : (
                           ""
                         )}
@@ -666,7 +662,7 @@ export function GigSellerDashboard() {
                     </span>
                   </div>
 
-                  {copy.hint ? (
+                  {statusHint ? (
                     <p
                       style={{
                         color: "var(--color-text-secondary)",
@@ -674,7 +670,7 @@ export function GigSellerDashboard() {
                         marginTop: 8,
                       }}
                     >
-                      {copy.hint}
+                      {statusHint}
                     </p>
                   ) : null}
 
@@ -690,13 +686,11 @@ export function GigSellerDashboard() {
                     }}
                   >
                     <span className="sh-mono">
-                      <Star size={13} /> {g.ratingCount || 0} rating
-                      {g.ratingCount === 1 ? "" : "s"}
+                      <Star size={13} /> {copy.ratingsCount(g.ratingCount || 0)}
                     </span>
-                    <span className="sh-mono">· {g.viewCount || 0} views</span>
+                    <span className="sh-mono">· {copy.viewsCount(g.viewCount || 0)}</span>
                     <span className="sh-mono">
-                      · {(g.packages ?? []).length} package
-                      {(g.packages ?? []).length === 1 ? "" : "s"}
+                      · {copy.packagesCount((g.packages ?? []).length)}
                     </span>
 
                     <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
@@ -736,9 +730,9 @@ export function GigSellerDashboard() {
         summaryRows={
           archiveTarget
             ? [
-                { label: "Gig", value: archiveTarget.title },
+                { label: copy.archiveSummaryGig, value: archiveTarget.title },
                 {
-                  label: "Status",
+                  label: copy.archiveSummaryStatus,
                   value: formatStatusLabel(
                     archiveTarget.status,
                     t.workspace.statuses,

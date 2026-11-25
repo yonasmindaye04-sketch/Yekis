@@ -239,6 +239,17 @@ function formatReceiptDate(iso: string | undefined, lang: ReceiptLanguage): stri
 
 interface ReceiptDictionary {
   langLabel: string;
+  defaultTag: string;
+  switchLangTitle: (nameEn: string, nativeLabel: string) => string;
+  closePreviewLabel: string;
+  docPerspectiveLabel: string;
+  toggleVatTitle: string;
+  toggleWhtTitle: string;
+  toggleTinTitle: string;
+  tinInputAriaLabel: string;
+  bandAriaLabel: string;
+  tableAriaLabel: string;
+  modalAriaLabel: string;
   badgeInvoice: string;
   badgeVoucher: string;
   copyRef: string;
@@ -324,6 +335,18 @@ interface ReceiptDictionary {
 const RECEIPT_I18N: Record<ReceiptLanguage, ReceiptDictionary> = {
   en: {
     langLabel: "Receipt Language:",
+    defaultTag: "Default",
+    switchLangTitle: (nameEn, nativeLabel) =>
+      `Switch receipt language to ${nameEn} (${nativeLabel})`,
+    closePreviewLabel: "Close document preview",
+    docPerspectiveLabel: "Document recipient perspective",
+    toggleVatTitle: "Toggle 15% Ethiopian Value Added Tax",
+    toggleWhtTitle: "Toggle ERCA Withholding Tax",
+    toggleTinTitle: "Switch between verified TIN and unverified TIN rate",
+    tinInputAriaLabel: "TIN number",
+    bandAriaLabel: "Fiscal metadata band",
+    tableAriaLabel: "Fiscal line items table",
+    modalAriaLabel: "Printable Invoice and Receipt Preview",
     badgeInvoice: "Escrow Receipt",
     badgeVoucher: "Payout Voucher",
     copyRef: "Copy Ref",
@@ -444,6 +467,18 @@ const RECEIPT_I18N: Record<ReceiptLanguage, ReceiptDictionary> = {
   },
   am: {
     langLabel: "የደረሰኝ ቋንቋ፦",
+    defaultTag: "መደበኛ",
+    switchLangTitle: (nameEn, nativeLabel) =>
+      `የደረሰኝ ቋንቋን ወደ ${nativeLabel} (${nameEn}) ቀይር`,
+    closePreviewLabel: "የሰነድ ቅድመ እይታን ዝጋ",
+    docPerspectiveLabel: "የሰነዱን ተቀባይ እይታ ይምረጡ",
+    toggleVatTitle: "የ15% የኢትዮጵያ ተጨማሪ እሴት ታክስን አብራ/አጥፋ",
+    toggleWhtTitle: "የገቢዎች ሚኒስቴር ዊዝሆልዲንግ ታክስን አብራ/አጥፋ",
+    toggleTinTitle: "በተረጋገጠ እና ባልተረጋገጠ TIN መካከል ቀይር",
+    tinInputAriaLabel: "የTIN ቁጥር",
+    bandAriaLabel: "የፋይናንስ መረጃ ሰንጠረዥ",
+    tableAriaLabel: "የክፍያ ዝርዝር ሰንጠረዥ",
+    modalAriaLabel: "የሚታተም ደረሰኝ ቅድመ እይታ",
     badgeInvoice: "የኢስክሮ ደረሰኝ",
     badgeVoucher: "የክፍያ ማረጋገጫ",
     copyRef: "መለያ ቅዳ",
@@ -564,6 +599,18 @@ const RECEIPT_I18N: Record<ReceiptLanguage, ReceiptDictionary> = {
   },
   om: {
     langLabel: "Afaan Nagahee:",
+    defaultTag: "Durtii",
+    switchLangTitle: (nameEn, nativeLabel) =>
+      `Afaan nagahee gara ${nativeLabel} (${nameEn}) tti jijjiiri`,
+    closePreviewLabel: "Ilaalcha duraa sanadaa cufi",
+    docPerspectiveLabel: "Ilaalcha fudhatamaa sanadaa",
+    toggleVatTitle: "Taaksii Dabalata Qabeenyaa 15% bani/cufi",
+    toggleWhtTitle: "Taaksii As-Irraa Hir'ifamu (WHT) bani/cufi",
+    toggleTinTitle: "TIN mirkanaa'ee fi hin mirkanoofne gidduutti jijjiiri",
+    tinInputAriaLabel: "Lakkoofsa TIN",
+    bandAriaLabel: "Odeeffannoo maallaqaa",
+    tableAriaLabel: "Gabatee tarree kaffaltii",
+    modalAriaLabel: "Ilaalcha duraa nagahee maxxanfamuu",
     badgeInvoice: "Nagahee Eeskiroo",
     badgeVoucher: "Waraqaa Kafaltii",
     copyRef: "Wabii Garagilchi",
@@ -684,6 +731,18 @@ const RECEIPT_I18N: Record<ReceiptLanguage, ReceiptDictionary> = {
   },
   ti: {
     langLabel: "ቋንቋ ደረሰኝ፦",
+    defaultTag: "ንቡር",
+    switchLangTitle: (nameEn, nativeLabel) =>
+      `ቋንቋ ደረሰኝ ናብ ${nativeLabel} (${nameEn}) ቀይር`,
+    closePreviewLabel: "ቅድመ ትርኢት ሰነድ ዕጾ",
+    docPerspectiveLabel: "መረጺ ተቐባሊ ሰነድ",
+    toggleVatTitle: "15% ተወሳኺ እሴት ታክስ (VAT) ወልዕ/ኣጥፍእ",
+    toggleWhtTitle: "ናይ ዊዝሆልዲንግ ታክስ ወልዕ/ኣጥፍእ",
+    toggleTinTitle: "ኣብ መንጎ ዝተረጋገጸን ዘይተረጋገጸን TIN ቀይር",
+    tinInputAriaLabel: "ቁጽሪ TIN",
+    bandAriaLabel: "ሰሌዳ ፋይናንሳዊ ሓበሬታ",
+    tableAriaLabel: "ሰሌዳ ዝርዝር ክፍሊት",
+    modalAriaLabel: "ዝሕተም ደረሰኝ ቅድመ ትርኢት",
     badgeInvoice: "ናይ ኤስክሮው ደረሰኝ",
     badgeVoucher: "ናይ ክፍሊት ምስክር ወረቐት",
     copyRef: "መወከሲ ቅዳሕ",
@@ -792,7 +851,7 @@ const RECEIPT_I18N: Record<ReceiptLanguage, ReceiptDictionary> = {
     providerRefLabel: "ናይ ክፍሊት መወከሲ ቁጽሪ፦",
     settlementAccountLabel: "ናይ ክፍሊት ሕሳብ፦",
     clearingSlaLabel: "ናይ ምጽራይ ግዜ፦",
-    instantClearingValue: "ብኡ sis ኡ ዝተረጋገጸ ክፍሊት",
+    instantClearingValue: "ብኡንብኡ ዝተረጋገጸ ክፍሊት",
     clientComplianceTitle: "ናይ ኤስክሮው ውሕስነትን ናይ ታክስ ሕጋውነትን",
     freelancerComplianceTitle: "ናይ ዊዝሆልዲንግ ታክስ ምስክር ወረቐት",
     clientComplianceBody: (principal) =>
@@ -1053,11 +1112,11 @@ export function FiscalDocumentSheet({
                     className={`excel-lang-pill-btn ${isActive ? "is-active" : ""}`}
                     onClick={() => handleSelectLang(item.code)}
                     aria-pressed={isActive}
-                    title={`Switch receipt language to ${item.nameEn} (${item.label})`}
+                    title={t.switchLangTitle(item.nameEn, item.label)}
                   >
                     <span>{item.label}</span>
                     {item.isDefault && (
-                      <span className="excel-lang-default-tag">Default</span>
+                      <span className="excel-lang-default-tag">{t.defaultTag}</span>
                     )}
                   </button>
                 );
@@ -1095,7 +1154,7 @@ export function FiscalDocumentSheet({
                 type="button"
                 className="excel-btn-close"
                 onClick={onClose}
-                aria-label="Close document preview"
+                aria-label={t.closePreviewLabel}
               >
                 <X size={18} />
               </button>
@@ -1109,7 +1168,7 @@ export function FiscalDocumentSheet({
             <div
               className="excel-toolbar-left"
               role="tablist"
-              aria-label="Document recipient perspective"
+              aria-label={t.docPerspectiveLabel}
             >
               <button
                 type="button"
@@ -1144,7 +1203,7 @@ export function FiscalDocumentSheet({
                 type="button"
                 className={`excel-chip-toggle ${isVatEnabled ? "is-on" : ""}`}
                 onClick={toggleVat}
-                title="Toggle 15% Ethiopian Value Added Tax"
+                title={t.toggleVatTitle}
               >
                 <span>{t.vatChipLabel(isVatEnabled)}</span>
               </button>
@@ -1153,7 +1212,7 @@ export function FiscalDocumentSheet({
                 type="button"
                 className={`excel-chip-toggle ${isWhtEnabled ? "is-on" : ""}`}
                 onClick={toggleWht}
-                title="Toggle ERCA Withholding Tax"
+                title={t.toggleWhtTitle}
               >
                 <span>{t.whtChipLabel(isWhtEnabled)}</span>
               </button>
@@ -1163,7 +1222,7 @@ export function FiscalDocumentSheet({
                   type="button"
                   className={`excel-chip-toggle ${isTinVerified ? "is-on" : ""}`}
                   onClick={toggleTinStatus}
-                  title="Switch between verified TIN and unverified TIN rate"
+                  title={t.toggleTinTitle}
                 >
                   <span>{t.tinChipLabel(isTinVerified)}</span>
                 </button>
@@ -1234,7 +1293,7 @@ export function FiscalDocumentSheet({
                     ? setClientTinInput(e.target.value)
                     : setFreelancerTinInput(e.target.value)
                 }
-                aria-label="TIN number"
+                aria-label={t.tinInputAriaLabel}
               />
             </div>
           </div>
@@ -1287,7 +1346,7 @@ export function FiscalDocumentSheet({
           className="excel-band-wrap"
           tabIndex={0}
           role="region"
-          aria-label="Fiscal metadata band"
+          aria-label={t.bandAriaLabel}
         >
           <table className="excel-band-table">
             <thead>
@@ -1328,7 +1387,7 @@ export function FiscalDocumentSheet({
           className="excel-table-wrap"
           tabIndex={0}
           role="region"
-          aria-label="Fiscal line items table"
+          aria-label={t.tableAriaLabel}
         >
           <table className="excel-table">
             <thead>
@@ -1759,7 +1818,7 @@ export function FiscalDocumentSheet({
         className="yk-fiscal-modal-backdrop"
         role="dialog"
         aria-modal="true"
-        aria-label="Printable Invoice and Receipt Preview"
+        aria-label={t.modalAriaLabel}
         onClick={onClose}
       >
         <div

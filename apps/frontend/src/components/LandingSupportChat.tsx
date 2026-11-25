@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageCircle, Paperclip, Send } from "lucide-react";
 import { api, type ChatMessage } from "../api/client";
 import { RealtimeSocketManager } from "../api/socket";
+import { type Language, useI18n } from "../i18n";
 import { OPEN_SUPPORT_CHAT_EVENT } from "./supportChatEvents";
 import { SecureAttachment } from "./SecureAttachment";
 import { getAttachmentLabel, isImageAttachment } from "./attachmentMeta";
@@ -38,10 +39,130 @@ type Bubble = {
 
 type ChatStep = "initial" | "submitted";
 
-const GREETING: Bubble = {
-  id: "greeting",
-  text: "Hi there! How can we help you today?",
-  sender: "agent",
+const SUPPORT_CHAT_COPY: Record<
+  Language,
+  {
+    greeting: string;
+    attachedFilePrefix: string;
+    attachmentFailed: string;
+    syncFailed: string;
+    ticketErrorFallback: string;
+    sendErrorPrefix: string;
+    sendErrorFallback: string;
+    sendAnother: string;
+    typeMessage: string;
+    talkingToPrefix: string;
+    connectedStatus: string;
+    checkingStatus: string;
+    defaultSubtitle: string;
+    popoverAria: string;
+    title: string;
+    closeAria: string;
+    inputAria: string;
+    attachAria: string;
+    sendAria: string;
+    openAria: string;
+    fabLabel: string;
+  }
+> = {
+  en: {
+    greeting: "Hi there! How can we help you today?",
+    attachedFilePrefix: "Attached file:",
+    attachmentFailed:
+      "Your support request was sent, but the attachment could not be uploaded. Please try attaching it again.",
+    syncFailed: "We couldn't load the conversation yet — refreshing shortly.",
+    ticketErrorFallback:
+      "Sorry, there was an error sending your message. Please try again.",
+    sendErrorPrefix: "Could not send that:",
+    sendErrorFallback: "Could not send that message. Please try again.",
+    sendAnother: "Send another message...",
+    typeMessage: "Type your message...",
+    talkingToPrefix: "You're talking to",
+    connectedStatus: "Connected — replies appear here",
+    checkingStatus: "Checking for replies...",
+    defaultSubtitle: "Typically replies in a few minutes",
+    popoverAria: "Yekis support chat",
+    title: "Yekis Support",
+    closeAria: "Close support chat",
+    inputAria: "Support message",
+    attachAria: "Attach file",
+    sendAria: "Send message",
+    openAria: "Open Yekis support chat",
+    fabLabel: "Need help?",
+  },
+  am: {
+    greeting: "ሰላም! ዛሬ እንዴት ልንረዳዎ እንችላለን?",
+    attachedFilePrefix: "የተያያዘ ፋይል:",
+    attachmentFailed:
+      "የድጋፍ ጥያቄዎ ተልኳል፣ ነገር ግን አባሪው ፋይል ሊጫን አልቻለም። እባክዎ ደግመው ይሞክሩ።",
+    syncFailed: "ውይይቱን ገና መጫን አልቻልንም — በጥቂት ጊዜ ውስጥ ይታደሳል።",
+    ticketErrorFallback: "ይቅርታ፣ መልዕክትዎን በመላክ ላይ ስህተት ተፈጥሯል። እባክዎ ደግመው ይሞክሩ።",
+    sendErrorPrefix: "መላክ አልተቻለም:",
+    sendErrorFallback: "መልዕክቱን መላክ አልተቻለም። እባክዎ ደግመው ይሞክሩ።",
+    sendAnother: "ሌላ መልዕክት ይላኩ...",
+    typeMessage: "መልዕክትዎን ይጻፉ...",
+    talkingToPrefix: "እያወሩ ያሉት ከ",
+    connectedStatus: "ተገናኝቷል — ምላሾች እዚህ ይታያሉ",
+    checkingStatus: "ምላሾችን በመፈተሽ ላይ...",
+    defaultSubtitle: "ብዙውን ጊዜ በጥቂት ደቂቃዎች ውስጥ ይመልሳል",
+    popoverAria: "የYeKis የድጋፍ ውይይት",
+    title: "የYeKis ድጋፍ",
+    closeAria: "የድጋፍ ውይይቱን ዝጋ",
+    inputAria: "የድጋፍ መልዕክት",
+    attachAria: "ፋይል አያይዝ",
+    sendAria: "መልዕክት ላክ",
+    openAria: "የYeKis የድጋፍ ውይይት ክፈት",
+    fabLabel: "እገዛ ይፈልጋሉ?",
+  },
+  om: {
+    greeting: "Akkam jirtu! Har'a akkamitti isin gargaaruu dandeenya?",
+    attachedFilePrefix: "Faayila maxxanfame:",
+    attachmentFailed:
+      "Gaaffiin deeggarsaa keessan ergameera, garuu faayilli maxxanfame fe'amuu hin dandeenye. Maaloo irra deebi'aa yaalaa.",
+    syncFailed: "Haasawa kana fe'uu hin dandeenye — yeroo dhiyootti haarawooma.",
+    ticketErrorFallback:
+      "Dhiifama, ergaa keessan erguu irratti dogoggorri uumameera. Maaloo irra deebi'aa yaalaa.",
+    sendErrorPrefix: "Erguun hin danda'amne:",
+    sendErrorFallback: "Ergaa kana erguun hin danda'amne. Irra deebi'aa yaalaa.",
+    sendAnother: "Ergaa biraa ergi...",
+    typeMessage: "Ergaa keessan barreessaa...",
+    talkingToPrefix: "Kan haasofsiisaa jirtan:",
+    connectedStatus: "Walqunnameera — deebiin asitti mul'ata",
+    checkingStatus: "Deebii sakatta'aa jira...",
+    defaultSubtitle: "Yeroo baay'ee daqiiqaa muraasa keessatti deebisa",
+    popoverAria: "Haasawa deeggarsaa Yekis",
+    title: "Deeggarsa Yekis",
+    closeAria: "Haasawa deeggarsaa cufi",
+    inputAria: "Ergaa deeggarsaa",
+    attachAria: "Faayila maxxansi",
+    sendAria: "Ergaa ergi",
+    openAria: "Haasawa deeggarsaa Yekis bani",
+    fabLabel: "Gargaarsa barbaadduu?",
+  },
+  ti: {
+    greeting: "ሰላም! ሎሚ ብኸመይ ክንሕግዘኩም ንኽእል?",
+    attachedFilePrefix: "ዝተተሓሓዘ ፋይል:",
+    attachmentFailed:
+      "ሕቶ ደገፍኩም ተላኢኹ ኣሎ፣ እቲ ዝተተሓሓዘ ፋይል ግን ክጽዓን ኣይከኣለን። በጃኹም እንደገና ፈትኑ።",
+    syncFailed: "ነቲ ዝርርብ ገና ክንጽዕኖ ኣይከኣልናን — ድሕሪ ቁሩብ ግዜ ክሕደስ እዩ።",
+    ticketErrorFallback: "ይቕረታ፣ መልእኽትኹም ኣብ ምልኣኽ ጌጋ ኣጋጢሙ። እንደገና ፈትኑ።",
+    sendErrorPrefix: "ምልኣኽ ኣይተኻእለን:",
+    sendErrorFallback: "ነቲ መልእኽቲ ምልኣኽ ኣይተኻእለን። እንደገና ፈትኑ።",
+    sendAnother: "ካልእ መልእኽቲ ስደድ...",
+    typeMessage: "መልእኽትኹም ጸሓፉ...",
+    talkingToPrefix: "ተዛራቢኹም:",
+    connectedStatus: "ተራኺቡ ኣሎ — መልስታት ኣብዚ ይረኣዩ",
+    checkingStatus: "መልስታት ይምርምር ኣሎ...",
+    defaultSubtitle: "ብልምዲ ኣብ ውሽጢ ሒደት ደቓይቕ ይምልስ",
+    popoverAria: "ዝርርብ ደገፍ YeKis",
+    title: "ደገፍ YeKis",
+    closeAria: "ዝርርብ ደገፍ ዕጾ",
+    inputAria: "መልእኽቲ ደገፍ",
+    attachAria: "ፋይል ኣተሓሕዝ",
+    sendAria: "መልእኽቲ ስደድ",
+    openAria: "ዝርርብ ደገፍ YeKis ክፈት",
+    fabLabel: "ሓገዝ የድልየኩም ድዩ?",
+  },
 };
 
 /** Fallback poll interval when the socket is unavailable. */
@@ -74,8 +195,15 @@ function readTokenSubject(token: string): string | null {
 }
 
 export function LandingSupportChat() {
+  const { language } = useI18n();
+  const copy = SUPPORT_CHAT_COPY[language] ?? SUPPORT_CHAT_COPY.en;
+  const greetingBubble: Bubble = {
+    id: "greeting",
+    text: copy.greeting,
+    sender: "agent",
+  };
   const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState<Bubble[]>([GREETING]);
+  const [messages, setMessages] = useState<Bubble[]>([greetingBubble]);
   const [inputText, setInputText] = useState("");
   const [chatStep, setChatStep] = useState<ChatStep>("initial");
   const [guestConversationId, setGuestConversationId] = useState<string | null>(null);
@@ -90,6 +218,13 @@ export function LandingSupportChat() {
   const socketRef = useRef<RealtimeSocketManager | null>(null);
   /** Guest user id, read from the scoped token so "mine" vs "agent" is exact. */
   const guestUserIdRef = useRef<string | null>(null);
+
+  // Keep greeting text synced with the active UI language.
+  useEffect(() => {
+    setMessages((prev) =>
+      prev.map((m) => (m.id === "greeting" ? { ...m, text: copy.greeting } : m)),
+    );
+  }, [copy.greeting]);
 
   // Keep the newest bubble in view whenever the thread grows or the panel opens.
   useEffect(() => {
@@ -107,9 +242,9 @@ export function LandingSupportChat() {
 
   // Let the footer / nav open this widget without mounting a second copy.
   useEffect(() => {
-    const open = () => setOpen(true);
-    window.addEventListener(OPEN_SUPPORT_CHAT_EVENT, open);
-    return () => window.removeEventListener(OPEN_SUPPORT_CHAT_EVENT, open);
+    const openChat = () => setOpen(true);
+    window.addEventListener(OPEN_SUPPORT_CHAT_EVENT, openChat);
+    return () => window.removeEventListener(OPEN_SUPPORT_CHAT_EVENT, openChat);
   }, []);
 
   /**
@@ -118,21 +253,24 @@ export function LandingSupportChat() {
    * The server is the source of truth: it knows the real senders and ids, which
    * is how a staff reply is distinguished from the visitor's own message.
    */
-  const syncThread = useCallback(async (conversationId: string, token: string) => {
-    const serverMessages: ChatMessage[] = await api.getGuestChatMessages(conversationId, token);
+  const syncThread = useCallback(
+    async (conversationId: string, token: string) => {
+      const serverMessages: ChatMessage[] = await api.getGuestChatMessages(conversationId, token);
 
-    setMessages(() => {
-      const real: Bubble[] = serverMessages.map((m) => ({
-        id: m.id,
-        text: m.body,
-        // The visitor owns the thread's guest account, so anything they did not
-        // send came from staff.
-        sender: m.senderId === guestUserIdRef.current ? "user" : "agent",
-        ...(m.attachmentUrl ? { attachmentUrl: m.attachmentUrl } : {}),
-      }));
-      return [GREETING, ...real];
-    });
-  }, []);
+      setMessages(() => {
+        const real: Bubble[] = serverMessages.map((m) => ({
+          id: m.id,
+          text: m.body,
+          // The visitor owns the thread's guest account, so anything they did not
+          // send came from staff.
+          sender: m.senderId === guestUserIdRef.current ? "user" : "agent",
+          ...(m.attachmentUrl ? { attachmentUrl: m.attachmentUrl } : {}),
+        }));
+        return [{ id: "greeting", text: copy.greeting, sender: "agent" }, ...real];
+      });
+    },
+    [copy.greeting],
+  );
 
   const startLiveUpdates = useCallback(
     (conversationId: string, token: string) => {
@@ -204,7 +342,7 @@ export function LandingSupportChat() {
   const handleSendMessage = async () => {
     if (!inputText.trim() && !attachedFile) return;
 
-    const text = inputText.trim() || (attachedFile ? `📎 ${attachedFile.name}` : "");
+    const text = inputText.trim() || (attachedFile ? attachedFile.name : "");
     // Captured before the composer resets: the upload happens later in the await
     // chain, by which point `attachedFile` state is already null. This is the
     // reason guest attachments were silently dropped.
@@ -249,7 +387,7 @@ export function LandingSupportChat() {
               await api.sendGuestChatMessage(
                 result.id,
                 result.accessToken,
-                `Attached file: ${pendingFile.name}`,
+                `${copy.attachedFilePrefix} ${pendingFile.name}`,
                 upload.url,
               );
             } catch {
@@ -257,7 +395,7 @@ export function LandingSupportChat() {
                 ...prev,
                 {
                   id: "attachment-error",
-                  text: "Your support request was sent, but the attachment could not be uploaded. Please try attaching it again.",
+                  text: copy.attachmentFailed,
                   sender: "agent",
                 },
               ]);
@@ -271,7 +409,7 @@ export function LandingSupportChat() {
               ...prev,
               {
                 id: "sync-failed",
-                text: "We couldn't load the conversation yet — refreshing shortly.",
+                text: copy.syncFailed,
                 sender: "agent",
               },
             ]);
@@ -286,7 +424,7 @@ export function LandingSupportChat() {
             text:
               err instanceof Error && err.message
                 ? err.message
-                : "Sorry, there was an error sending your message. Please try again.",
+                : copy.ticketErrorFallback,
             sender: "agent",
           },
         ]);
@@ -324,8 +462,8 @@ export function LandingSupportChat() {
             id: `err-${Date.now()}`,
             text:
               err instanceof Error && err.message
-                ? `Could not send that: ${err.message}`
-                : "Could not send that message. Please try again.",
+                ? `${copy.sendErrorPrefix} ${err.message}`
+                : copy.sendErrorFallback,
             sender: "agent",
           },
         ]);
@@ -347,37 +485,37 @@ export function LandingSupportChat() {
   }, [chatStep, guestConversationId, guestToken, live, syncThread]);
 
   const placeholder = chatStep === "submitted"
-    ? "Send another message..."
+    ? copy.sendAnother
     : attachedFile
-      ? `📎 ${attachedFile.name}`
-      : "Type your message...";
+      ? attachedFile.name
+      : copy.typeMessage;
 
   const headerSubtitle = assignedStaff
-    ? `You're talking to ${assignedStaff.name}`
+    ? `${copy.talkingToPrefix} ${assignedStaff.name}`
     : chatStep === "submitted"
       ? live
-        ? "Connected — replies appear here"
-        : "Checking for replies…"
-      : "Typically replies in a few minutes";
+        ? copy.connectedStatus
+        : copy.checkingStatus
+      : copy.defaultSubtitle;
 
   return (
     <>
       {open && (
         <aside
           className="landing-support-popover chat-variant"
-          aria-label="Yekis support chat"
+          aria-label={copy.popoverAria}
         >
           <div className="landing-support-head chat-head">
             <div className="chat-head-info">
               <div className="chat-agent-avatar">Y</div>
               <div>
-                <h3>Yekis Support</h3>
+                <h3>{copy.title}</h3>
                 <p>{headerSubtitle}</p>
               </div>
             </div>
             <button
               onClick={() => setOpen(false)}
-              aria-label="Close support chat"
+              aria-label={copy.closeAria}
             >
               ×
             </button>
@@ -424,12 +562,12 @@ export function LandingSupportChat() {
               }}
               placeholder={placeholder}
               disabled={sending}
-              aria-label="Support message"
+              aria-label={copy.inputAria}
             />
             <button
               className="chat-attach-btn"
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Attach file"
+              aria-label={copy.attachAria}
               type="button"
             >
               <Paperclip size={20} strokeWidth={2.5} />
@@ -437,7 +575,7 @@ export function LandingSupportChat() {
             <button
               onClick={() => void handleSendMessage()}
               disabled={sending || (!inputText.trim() && !attachedFile)}
-              aria-label="Send message"
+              aria-label={copy.sendAria}
               type="button"
             >
               <Send size={18} />
@@ -449,11 +587,11 @@ export function LandingSupportChat() {
       <button
         className="landing-chat-fab"
         onClick={() => setOpen((current) => !current)}
-        aria-label="Open Yekis support chat"
+        aria-label={copy.openAria}
         aria-expanded={open}
       >
         <MessageCircle size={22} color="currentColor" strokeWidth={2.5} />
-        <span>Need help?</span>
+        <span>{copy.fabLabel}</span>
       </button>
     </>
   );

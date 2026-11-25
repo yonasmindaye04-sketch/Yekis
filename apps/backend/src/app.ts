@@ -113,7 +113,11 @@ export function buildApp() {
   // and silently break verification.
   app.use("/api/v1/webhooks", webhooksRouter);
 
-  // Telegram bot webhook also needs raw body for secret token verification
+  // The Telegram router is mounted here too, but Telegram authenticates its
+  // deliveries with a secret-token HEADER rather than a signature over the
+  // body. Its webhook route therefore parses JSON locally before handing the
+  // update to grammY; the route-local parser is required because the global
+  // express.json() middleware has not run yet.
   app.use("/api/v1/telegram", botRouter);
 
   app.use(express.json({ limit: "1mb" }));

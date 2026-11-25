@@ -111,9 +111,9 @@ The Fabric token is cached in Redis (`telebirr.token.ts`).
 As of August 2026, the Telebirr Web Checkout integration is actively used for **Automatic Wallet Top-Ups**.
 
 When a user clicks "Pay with Telebirr" on the Wallet page:
-1. `initiateCheckoutTopUp` is called, creating a `WalletTopUp` record in the database with status `CHECKOUT_PENDING` and returning the checkout URL.
-2. The user pays on Telebirr.
-3. Telebirr sends a webhook to `POST /api/v1/webhooks/telebirr`.
+1. `initiateCheckoutTopUp` is called, creating a `WalletTopUp` record in the database with status `CHECKOUT_PENDING` and returning `{ topUpId, redirectUrl, providerTransactionId }` (`redirectUrl` is `null` when Telebirr credentials are not configured in local development).
+2. In the browser (`BrowserWallet.tsx`) and Mini App (`App.tsx`), a checkout instructions dialog opens and polls `GET /api/v1/wallet/topups/:topUpId` for status changes. When a `redirectUrl` is present, Telegram Mini App sessions call `Telegram.WebApp.openLink` while browser sessions open the paygate in a new tab with an explicit fallback link. When `redirectUrl` is `null` in local development (`import.meta.env.DEV`), the modal explains sandbox/manual options and exposes `Simulate Instant Payment (Sandbox)` (`POST /api/v1/wallet/topups/checkout/:topUpId/simulate-success`, disabled with `404` in production) or direct receipt attachment (`POST /api/v1/wallet/topups/:topUpId/attach-receipt`).
+3. On live paygate payments, Telebirr sends a webhook to `POST /api/v1/webhooks/telebirr`.
 4. The webhook handler (`handleTelebirrWebhook`) detects that the `merch_order_id` belongs to a `WalletTopUp` record instead of an escrow `PaymentTransaction`.
 5. It routes to `handleTopUpWebhook`, which atomically approves the top-up and credits the user's wallet balance.
 

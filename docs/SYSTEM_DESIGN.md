@@ -48,6 +48,7 @@
    - 8.8 [The Operations Console](#88-the-operations-console-appsfrontendsrcpagesops)
    - 8.9 [Multilingual Translation Framework](#89-multilingual-translation-framework)
    - 8.10 [Real-Time WebSocket Infrastructure](#810-real-time-websocket-infrastructure)
+   - 8.11 [The Workspace Schedule Calendar (Gregorian & Ethiopian Fiscal)](#811-the-workspace-schedule-calendar-gregorian--ethiopian-fiscal)
 9. [Platform Section-by-Section Functional Reference](#9-platform-section-by-section-functional-reference)
    - 9.15 [Gig Marketplace](#915-gig-marketplace)
    - 9.16 [Operations Console](#916-operations-console)
@@ -1381,6 +1382,7 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 
 * **Purpose:** Implements the official Yekis Telegram Bot via the Grammy framework. Handles `/start` deep linking, user account linking, interactive scene wizards (browse jobs, proposal bidding, wallet balance check, KYC guide), and bot webhooks.
 * **Owns:** Grammy bot instance, conversation scenes (`apps/backend/src/modules/bot/scenes/index.ts`).
+* **Webhook ingestion:** `POST /api/v1/telegram/webhook` authenticates Telegram's `X-Telegram-Bot-Api-Secret-Token` header with a constant-time comparison and fails closed when the secret is unset. Telegram authenticates the **header**, not the body, so the route parses JSON locally before handing the update to grammY's Express adapter. This route-local parser is required because the Telegram router is mounted before the application's global `express.json()` middleware; without it, `req.body` was `undefined`, every delivery failed with HTTP 500, and Telegram retried the update indefinitely while the bot remained silent.
 
 ---
 
@@ -1633,7 +1635,7 @@ Both reject an invalid signature with a logged warning before any state change.
 
 Two further guards apply to the Telebirr handler: the webhook is **idempotent** (a replayed callback does not double-apply the state transition), and the callback is **bound to the transaction** it created, so a forged payload cannot credit a milestone that was never paid for.
 
-> **Mounting order matters.** The webhook routers are mounted **before** `express.json()` in `app.ts` (lines 101 and 106), because they must parse the raw body themselves to verify a signature over the exact bytes the provider sent. Re-serialising the JSON to verify a signature can differ byte-for-byte from what was signed, and silently break verification.
+> **Mounting order matters.** The payment webhook routers are mounted **before** `express.json()` in `app.ts`, because they must parse the raw body themselves to verify a signature over the exact bytes the provider sent. Re-serialising the JSON to verify a signature can differ byte-for-byte from what was signed, and silently break verification. The Telegram router is mounted there as well, but it does not need raw bytes: Telegram's secret token is carried in a header, and the webhook route installs its own JSON parser before passing the parsed update to grammY.
 
 ---
 
@@ -2510,7 +2512,7 @@ All HTTP calls are centralized in a single `api` object exported from `client.ts
 
 It is **not** a stand-in for a server that answered with an error. A server that answered has answered, and its answer must reach the caller. So by default a 404/502/503/504 falls back to the mock, and a call can opt out with `strictHttpErrors: true`, which makes it throw the real status **and** refuses to fabricate a response on any path — a status code, an unreadable body, a non-JSON content type, or a parse failure.
 
-**Every authentication call opts out.** `loginWithTelegram`, `loginWithTelegramCode`, `linkTelegram`, `unlinkTelegram`, `login`, `loginWithMobile` and `register` are all strict. The reason is concrete: a host with no bot token answers `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for it and hand back `accessToken: "mock-jwt-access-token"` — a token no server issued. The Mini App looked signed in, every request that followed was refused with a 401, and the real reason never reached the person. A fabricated session is worse than a failed one, because it is a failure the person cannot see.
+**Every authentication call opts out.** `loginWithTelegram`, `loginWithTelegramCode`, `linkTelegram`, `unlinkTelegram`, `login`, `loginWithMobile` and `register` are all strict. The reason is concrete: a host with no bot token answers `503 TELEGRAM_NOT_CONFIGURED`, and the mock would otherwise stand in for it and hand back `accessToken: "mock-jwt-access-token"` — a token no server issued. The Mini App looked signed in, every request that followed was refused with a 401, and the real reason never reached the person. A fabricated session is worse than a failed one, because it is a failure the person cannot see. Once an intentional offline/mock session token (`"mock-jwt-access-token"` or `"demo-..."`) is active, `ApiClient` (`isMockSessionToken()`) short-circuits non-strict workspace requests directly to `mockStore` (and `socket.ts` skips `/api/v1/ws` connections) so editing profile or browsing never sends a mock token with a malformed `Bearer` header to a live backend.
 
 #### Key API Methods
 
@@ -2742,6 +2744,96 @@ The consequence is that the push is **asynchronous and delayed by queue latency*
 
 ---
 
+### 8.11 The Workspace Schedule Calendar (Gregorian & Ethiopian Fiscal)
+
+`apps/frontend/src/components/dashboard/CalendarScheduleView.tsx` renders the
+**Milestone, Payout & SLA Schedule** card on the client workspace dashboard
+(Dashboard 2 → Calendar tab) and in the operations console overview. It is the
+only place in the platform where a *date* is a first-class business object: it
+tracks contract deadlines, escrow release windows, proposal cut-offs and
+compliance SLA checkpoints, and it lets a user schedule a new one.
+
+#### Two calendar systems, one event store
+
+The calendar ships in **two modes over the same event data**:
+
+| Mode | Grid | What the user sees |
+|---|---|---|
+| **Gregorian** | The familiar month grid | The Gregorian day number, the month title, and — under it — the fiscal context (`EFY 2019 E.C. · Q2`) |
+| **Ethiopian Fiscal** | The Ethiopian (E.C.) month grid — 13 months, Pagume included | The E.C. day number, the Gregorian date under it, the E.C. month title (`Tikimt 2019 E.C.`), and its Gregorian span (`Oct 11 – Nov 9, 2026`) |
+
+Switching modes **keeps the selected date** — the E.C. month containing the
+selected Gregorian date is opened — so no context is lost. Events are always
+stored as Gregorian `YYYY-MM-DD` strings, so both modes index the same
+`Map<date, ScheduleEvent[]>`.
+
+#### The Ethiopian fiscal year
+
+The Ethiopian fiscal year runs **Hamle 1 → Sene 30** (about 8 July → 7 July)
+and is **labelled by the E.C. year in which it ends**: EFY 2019 is Hamle 1,
+2018 E.C. (8 July 2026) through Sene 30, 2019 E.C. (7 July 2027), which is why
+the bar also shows the Gregorian label `2026/27`.
+
+Fiscal quarters group the twelve regular months three at a time, with the
+epagomenal days of Pagume falling inside Q1:
+
+| Quarter | E.C. months | EFY 2019 (Gregorian) |
+|---|---|---|
+| Q1 | Hamle – Meskerem | 8 Jul 2026 – 10 Oct 2026 |
+| Q2 | Tikimt – Tahsas | 11 Oct 2026 – 8 Jan 2027 |
+| Q3 | Tir – Megabit | 9 Jan 2027 – 8 Apr 2027 |
+| Q4 | Miyazya – Sene | 9 Apr 2027 – 7 Jul 2027 |
+
+The fiscal bar shows the four quarters with the number of matching items and
+their ETB total; clicking a quarter jumps the grid to that quarter's first
+month and selects its first scheduled item.
+
+#### The conversion engine — `kenat`
+
+`apps/frontend/src/lib/ethiopianCalendar.ts` is the only place that converts
+between calendars. The arithmetic is **kenat** (`kenat@4`, MIT, zero runtime
+dependencies): `toEC` / `toGC` own the Ethiopic ↔ Gregorian conversion, the
+13-month year and the Pagume leap rule (`year % 4 === 3`), and kenat's Amharic
+month names are reused for the Ge'ez labels. Fiscal arithmetic — the
+Hamle–Sene year, its quarters and the Gregorian range labels — is Yekis code
+on top of it, because a fiscal year is a business concept rather than a
+calendar one.
+
+Two properties are deliberate:
+
+- **Calendar dates are not instants.** Every conversion is date-only; Gregorian
+  display strings are formatted with `Intl.DateTimeFormat` pinned to `UTC`, so
+  a date never drifts with the viewer's timezone.
+- **The fiscal-year label is derived, never stored.** There is no second date
+  field on a schedule event, and no way for the two calendars to disagree.
+
+#### What the user sees on a selected day
+
+The agenda inspector shows the selected date in three forms — Gregorian
+(`October 21, 2026`), E.C. (`Tikimt 11, 2019 E.C.`) and Ge'ez (`ጥቅምት 11,
+2019 ዓ.ም.`) — plus the fiscal period it belongs to (`EFY 2019 E.C. · Q2`,
+`Tikimt–Tahsas`, and the quarter's Gregorian range). The scheduling sheet
+previews the same three values for the date being entered, so the E.C. date is
+known *before* the deadline is committed.
+
+#### Known gaps
+
+- **The fiscal quarter definition is a Yekis convention**, not a statutory
+  filing rule. Ethiopia's fiscal year (Hamle 1 – Sene 30) and the era are
+  settled; the quarterly grouping used here is the twelve regular months
+  taken three at a time, with Pagume absorbed into Q1. Anything that must
+  reconcile with a Ministry of Finance or ERA filing needs the accountant's
+  own quarter boundaries.
+- **The calendar is client-state only.** `ScheduleEvent` rows are derived in
+  the browser from milestones, jobs, escrows and KYC queues; scheduling a
+  deadline updates the in-memory list, and there is no API that persists a
+  calendar item.
+- **No holiday awareness.** The grid marks nothing for public or religious
+  holidays. kenat ships a Bahire Hasab holiday engine that this view does not
+  yet use.
+
+---
+
 ## 9. Platform Section-by-Section Functional Reference
 
 This section provides a plain-English description of every user-facing section of the Yekis platform — what it does, how it works technically, and which parts of the codebase power it.
@@ -2931,11 +3023,15 @@ If client takes no action in 7 days, `autoRelease.worker.ts` calls `releaseMiles
 
 **How it works:**
 
+*Instant Checkout & Manual Verification Fallback (Client):*
+1. On the Instant Checkout tab (`BrowserWallet.tsx` / `App.tsx`), selecting Telebirr calls `POST /api/v1/wallet/topups/checkout`, which creates a `WalletTopUp { status: "CHECKOUT_PENDING" }` record and returns `{ topUpId, redirectUrl, providerTransactionId }` (`redirectUrl` is `null` in uncredentialed local development). CBE Birr and M-Pesa route straight to Manual Transfer because their merchant APIs are disabled (`PROVIDER_NOT_AVAILABLE`).
+2. `BrowserWallet.tsx` opens an accessible native `<dialog>` checkout instructions modal (`showModal()`) that polls `GET /api/v1/wallet/topups/:topUpId` for settlement, opens `redirectUrl` when present (using `Telegram.WebApp.openLink` only inside Telegram), surfaces `Simulate Instant Payment (Sandbox)` (`POST /api/v1/wallet/topups/checkout/:topUpId/simulate-success`, disabled with `404` in production) in `import.meta.env.DEV`, and links directly to `POST /api/v1/wallet/topups/:topUpId/attach-receipt` so stalled or unconfirmed checkouts can convert to manual receipt review.
+
 *Top-Up Submission (Client):*
-1. Client sends money to Yekis Telebirr or CBE bank account.
-2. In-app: selects provider, enters `amountEtb`, `transactionReference`, uploads receipt image.
-3. `api.createTopUpRequest(formData)` → `POST /api/v1/wallet/topups` (multipart).
-4. Backend stores receipt in object store, creates `WalletTopUp { status: "PENDING_REVIEW" }`.
+1. Client sends money to Yekis Telebirr, CBE Bank, or Safaricom M-Pesa account.
+2. In-app: selects provider, enters `amountEtb`, `transactionReference`, uploads receipt image or PDF.
+3. `api.createTopUpRequest(formData)` → `POST /api/v1/wallet/topups` (multipart `FormData`, with offline-only `mockStore` fallback when the backend is unreachable).
+4. Backend stores receipt in object store, creates `WalletTopUp { status: "PENDING" }`.
 5. Notification sent to staff.
 
 *Staff Review:*
@@ -3069,9 +3165,9 @@ flowchart LR
 **How it works:**
 
 *Profile:*
-- `ProfilePage.tsx` renders public profile: avatar, bio, skills, portfolio items, completed jobs count, Bayesian rating.
+- `ProfilePage.tsx` renders the public profile directly on the workspace background board (`--color-bg`) without outer card boxes or a hero banner slab: a full-width two-row CSS Grid `.pv-masthead` (avatar via `YekisAvatar`, balanced `<h1>` display name, inline verification tier text, primary skill, and bold text-only `Available for Work` status per `RULE.md` §2 aligned beside `.pv-actions` — `Edit Profile` when `isOwnProfile && onEditProfile`, or `Message` + `Report Profile` for visitors — above a 4-cell `.pv-kpi-strip` ledger showing Bayesian rating, completed jobs, `earnedRange`, and `memberSince`) above a two-column `.pv-board` (`324px` sticky-friendly left `.pv-rail` for skills and overview metadata, fluid right `.pv-canvas` for bio, 2-column borderless portfolio gallery using `<PortfolioThumbnail>` fallback and optional `projectUrl` links, reviews with optional owner reply, or restricted notice when `!profile.canViewFullProfile`). Profile reports open in a native `<dialog>` (`showModal()`, `closedby="any"` + pointer-bounds light-dismiss fallback) and submit `reportProfileSchema` enum codes (`FAKE_IDENTITY`, `MISLEADING_SKILLS`, `OFF_PLATFORM_CONTACT`, `OFFENSIVE_CONTENT`, `SPAM`, `OTHER`) to `POST /api/v1/users/:userId/report`.
 - Visibility controlled by `User.profileVisibility` (`PUBLIC`, `PROPOSERS`, `PRIVATE`).
-- `ProfileEditPage.tsx` → `PATCH /api/v1/users/me/profile` — updates name, bio, skills, availability and visibility. A chosen photo is compressed to a 320px JPEG in `apps/frontend/src/lib/avatarImage.ts` and uploaded to `POST /api/v1/users/me/avatar`; the returned `/api/v1/users/avatars/<id>` URL is what the PATCH stores in `avatarUrl`. The photo is applied immediately, while the rest of the form waits for **Save Changes**.
+- `ProfileEditPage.tsx` → `PATCH /api/v1/users/me/profile` + `/api/v1/portfolio/me*` — renders directly on the workspace background board (two-column sticky identity/readiness rail on the left, full-width hairline-separated editorial sections on the right) and updates name, bio, primary/additional skills (auto-syncing `primarySkillId` into `skillIds`), portfolio items (synced to `POST`/`PATCH`/`DELETE /api/v1/portfolio/me` alongside local draft storage), availability, and `profileVisibility`. A chosen photo is compressed to a 320px JPEG in `apps/frontend/src/lib/avatarImage.ts` and uploaded to `POST /api/v1/users/me/avatar`; the returned `/api/v1/users/avatars/<id>` URL is what the PATCH stores in `avatarUrl`. The photo is applied immediately, while the rest of the form waits for **Save Changes**.
 - `GET /api/v1/users/avatars/:avatarId` serves the stored image publicly with `Cache-Control: immutable`. A replacement upload creates a new id and deletes the old row, so a cached URL can never show somebody else's newer photo; clearing the avatar (`avatarUrl: null`) deletes the bytes.
 - `ProfileView` records are written each time a profile is viewed (analytics).
 

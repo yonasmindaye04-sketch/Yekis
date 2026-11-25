@@ -75,12 +75,12 @@ export function installFakeTelegramApi(
     if (pending && pending.length > 0) {
       const next = pending.shift() as unknown;
       if (next instanceof Error) throw next;
-      return next;
+      return { ok: true, result: next } as never;
     }
 
     switch (method) {
       case "getMe":
-        return me as never;
+        return { ok: true, result: me } as never;
       // A webhook this bot never registered: makes the code take the polling
       // branch, which is what a test asserting "no webhook call" wants.
       case "getWebhookInfo":
@@ -92,10 +92,13 @@ export function installFakeTelegramApi(
         } as never;
       case "sendMessage":
         return {
-          message_id: calls.length,
-          date: Math.floor(Date.now() / 1000),
-          chat: { id: (payload as { chat_id?: number }).chat_id ?? 0, type: "private" },
-          text: (payload as { text?: string }).text ?? "",
+          ok: true,
+          result: {
+            message_id: calls.length,
+            date: Math.floor(Date.now() / 1000),
+            chat: { id: (payload as { chat_id?: number }).chat_id ?? 0, type: "private" },
+            text: (payload as { text?: string }).text ?? "",
+          },
         } as never;
       case "editMessageText":
       case "editMessageReplyMarkup":
@@ -109,7 +112,7 @@ export function installFakeTelegramApi(
       case "deleteWebhook":
       case "sendPhoto":
       case "sendDocument":
-        return true as never;
+        return { ok: true, result: true } as never;
       default:
         // Anything unexpected still records, and returns a benign shape so the
         // caller does not crash on a missing field.

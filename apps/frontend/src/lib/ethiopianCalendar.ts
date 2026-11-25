@@ -67,8 +67,30 @@ export interface EthiopianCalendarCell {
   day: number;
 }
 
+/**
+ * Canonical English month names. kenat ships "Miazia" for month 8; the
+ * transliteration used across Yekis documentation and Ethiopian business
+ * documents is "Miyazya", so the display name is pinned here while the
+ * conversion engine, the leap rule and the Amharic names stay with kenat.
+ */
+const ETHIOPIAN_MONTH_NAMES_EN = [
+  "Meskerem",
+  "Tikimt",
+  "Hidar",
+  "Tahsas",
+  "Tir",
+  "Yekatit",
+  "Megabit",
+  "Miyazya",
+  "Ginbot",
+  "Sene",
+  "Hamle",
+  "Nehase",
+  "Pagume",
+] as const;
+
 export const ETHIOPIAN_MONTHS: readonly EthiopianMonthDefinition[] =
-  monthNames.english.map((name, index) => ({
+  ETHIOPIAN_MONTH_NAMES_EN.map((name, index) => ({
     number: index + 1,
     name,
     amharic: monthNames.amharic[index] ?? name,
@@ -106,7 +128,7 @@ const FISCAL_QUARTER_DEFINITIONS: Record<
     endYearOffset: 0,
   },
   4: {
-    monthLabel: "Miazia–Sene",
+    monthLabel: "Miyazya–Sene",
     startMonth: 8,
     endMonth: 10,
     startYearOffset: 0,

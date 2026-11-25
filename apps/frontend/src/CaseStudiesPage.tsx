@@ -16,6 +16,13 @@ import {
 } from "lucide-react";
 import { useI18n } from "./i18n";
 import {
+  CASE_STUDIES_COPY,
+  DISCIPLINES_BY_LANG,
+  getCaseStudies,
+  type CaseCategory,
+  type CaseStudyItem,
+} from "./caseStudiesData";
+import {
   AnimatedCountUpStrip,
   ScrollIlluminatedHeadline,
   StickyScrollServicesStage,
@@ -27,468 +34,6 @@ type CaseStudiesPageProps = {
   onNavigate: (page: string) => void;
   onStart?: (mode: "login" | "register") => void;
 };
-
-type CaseCategory = "ALL" | "ENGINEERING" | "DESIGN" | "MARKETING" | "LOCALIZATION" | "DATA";
-
-type ProblemPillar = {
-  label: string;
-  detail: string;
-};
-
-type CaseStudyItem = {
-  id: string;
-  index: string;
-  category: Exclude<CaseCategory, "ALL">;
-  categoryLabel: string;
-  title: string;
-  editorialHeadline: string;
-  client: string;
-  clientShort: string;
-  city: string;
-  summary: string;
-  executiveSummary: string;
-  historicalContext: string;
-  industryOverview: string;
-  problemPillars: [ProblemPillar, ProblemPillar, ProblemPillar];
-  methodologyNote: string;
-  findingsHeadline: string;
-  findingsSub: string;
-  budgetEtb: string;
-  timeline: string;
-  milestoneCount: number;
-  rail: string;
-  quote: string;
-  quoteAuthor: string;
-  quoteRole: string;
-  outcomeMetric: string;
-  chartBefore: number[];
-  chartAfter: number[];
-  finalThought: string;
-  futureImplication: string;
-  artVariant: "monolith" | "botanical" | "acoustic" | "prism" | "lattice" | "vault";
-  milestones: { title: string; amount: string; duration: string }[];
-};
-
-const CASE_STUDIES: CaseStudyItem[] = [
-  {
-    id: "cs-abyssinia-fleet",
-    index: "01",
-    category: "ENGINEERING",
-    categoryLabel: "Web & Mobile Engineering",
-    title: "Abyssinia Logistics Dispatch & Telebirr Driver Settlement Portal",
-    editorialHeadline:
-      "From manual spreadsheet dispatch to automated Telebirr driver settlements across 140+ cold-chain trucks",
-    client: "Abyssinia Freight & Cold-Chain PLC",
-    clientShort: "Abyssinia Freight",
-    city: "Addis Ababa",
-    summary:
-      "Built a real-time fleet tracking web application and mobile driver check-in portal with automated Telebirr trip allowances, replacing manual spreadsheet reconciliation across 140+ trucks.",
-    executiveSummary:
-      "Abyssinia Freight structured an 85,000 ETB engineering contract into four milestone tranches on Yekis. Each sprint was reviewed in staging before releasing funds, cutting dispatch reconciliation time by 68% within 21 days.",
-    historicalContext:
-      "Prior to milestone-backed remote hiring, fleet dispatchers reconciled fuel and trip allowances across five regional depots using manual spreadsheets and phone transfers, resulting in 4-day settlement delays.",
-    industryOverview:
-      "Ethiopian cold-chain and freight operators increasingly require real-time GPS check-ins paired with instant mobile money disbursements to keep long-haul drivers moving on schedule.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "140+ active trucks waited up to 96 hours for manual trip allowance verification and bank sign-off.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Five corridor checkpoints lacked unified digital proof of delivery or automated Telebirr payout hooks.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "Finance staff spent 28 hours every week auditing paper receipts and resolving duplicate claims.",
-      },
-    ],
-    methodologyNote:
-      "Work was divided into four escrowed sprints: architecture schema, live dispatcher map, mobile driver check-in with Telebirr webhook, and load testing across 140 concurrent driver sessions.",
-    findingsHeadline: "-68%",
-    findingsSub: "Reduction in weekly dispatch & driver allowance reconciliation time",
-    budgetEtb: "85,000 ETB",
-    timeline: "3 Weeks",
-    milestoneCount: 4,
-    rail: "Telebirr & CBE Birr",
-    quote:
-      "Approving each milestone released payment immediately. Our lead developer in Bahir Dar delivered every sprint ahead of schedule with zero payment friction.",
-    quoteAuthor: "Yared K.",
-    quoteRole: "Operations Director · Abyssinia Freight, Addis Ababa",
-    outcomeMetric: "-68% dispatch reconciliation time",
-    chartBefore: [28, 34, 31, 39, 42, 45],
-    chartAfter: [40, 58, 72, 84, 91, 96],
-    finalThought:
-      "Milestone escrow allowed an Addis logistics operator to hire senior engineering talent in Bahir Dar with complete technical and financial accountability.",
-    futureImplication:
-      "Phase 2 expands automated customs clearance alerts along the Addis–Djibouti corridor using the same 4-tranche milestone structure.",
-    artVariant: "monolith",
-    milestones: [
-      { title: "01 · System Architecture & API Schema", amount: "15,000 ETB", duration: "4 days" },
-      { title: "02 · Dispatcher Web Dashboard & Live Map", amount: "30,000 ETB", duration: "7 days" },
-      { title: "03 · Driver Mobile Check-In & Telebirr Webhook", amount: "25,000 ETB", duration: "6 days" },
-      { title: "04 · Load Testing, QA & Production Handover", amount: "15,000 ETB", duration: "4 days" },
-    ],
-  },
-  {
-    id: "cs-kaffa-coffee",
-    index: "02",
-    category: "DESIGN",
-    categoryLabel: "Design & Creative",
-    title: "Kaffa Origin Specialty Coffee Export Identity & Packaging System",
-    editorialHeadline:
-      "Building an export-grade specialty coffee identity from regional cooperative to three international buyer contracts",
-    client: "Kaffa Highland Exporters Union",
-    clientShort: "Kaffa Exporters",
-    city: "Hawassa",
-    summary:
-      "Complete brand identity, bilingual export packaging dielines, and a wholesale buyer lookbook for specialty washed Arabica lots shipping to European and Middle Eastern roasters.",
-    executiveSummary:
-      "By locking 45,000 ETB across three deliverable stages, Kaffa Highland Exporters collaborated remotely with an Addis brand studio—approving typography, print-ready bag dielines, and wholesale buyer decks with zero revision disputes.",
-    historicalContext:
-      "Specialty coffee unions in southern Ethiopia historically exported unbranded green lots at commodity discounts because local cooperatives lacked direct access to export-packaging designers.",
-    industryOverview:
-      "Direct-trade roasters in Europe and the Gulf demand traceable lot storytelling, moisture-barrier bag dielines, and bilingual cupping specification sheets before signing seasonal contracts.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "High-scoring single-origin Arabica lots were presented to international buyers with generic unbranded spec sheets.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Required 250g and 1kg valve-bag print dielines plus a 24-page wholesale lookbook in under 14 days.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "Previous informal design agreements stalled over unverified print color profiles and upfront deposit risk.",
-      },
-    ],
-    methodologyNote:
-      "Three milestone releases tied to tangible design artifacts: vector brand system, press-ready CMYK+Pantone packaging dielines, and bilingual buyer lookbook.",
-    findingsHeadline: "3x",
-    findingsSub: "International specialty roaster contracts signed at specialty trade show",
-    budgetEtb: "45,000 ETB",
-    timeline: "2 Weeks",
-    milestoneCount: 3,
-    rail: "CBE Birr",
-    quote:
-      "Escrow gave our union board confidence to hire a top Addis studio remotely. We reviewed print-ready proofs inside Yekis before releasing each tranche.",
-    quoteAuthor: "Meron G.",
-    quoteRole: "Export Marketing Lead · Kaffa Union, Hawassa",
-    outcomeMetric: "3 international buyer contracts signed",
-    chartBefore: [20, 24, 22, 26, 29, 30],
-    chartAfter: [35, 52, 68, 79, 88, 95],
-    finalThought:
-      "Structured proof reviews eliminated cross-city trust barriers between a Hawassa agricultural union and a specialized Addis packaging studio.",
-    futureImplication:
-      "The union now commissions seasonal harvest lookbooks every quarter through recurring Yekis milestone templates.",
-    artVariant: "botanical",
-    milestones: [
-      { title: "01 · Brand Strategy, Wordmark & Color System", amount: "15,000 ETB", duration: "5 days" },
-      { title: "02 · 250g & 1kg Export Bag Print Dielines", amount: "18,000 ETB", duration: "5 days" },
-      { title: "03 · Digital Buyer Deck & Brand Guidelines", amount: "12,000 ETB", duration: "4 days" },
-    ],
-  },
-  {
-    id: "cs-zemen-localization",
-    index: "03",
-    category: "LOCALIZATION",
-    categoryLabel: "Translation & Localization",
-    title: "Multilingual Maternal Health App Localization (Amharic, Afaan Oromoo & Tigrinya)",
-    editorialHeadline:
-      "Clinical-grade localization of 180+ maternal nutrition modules across three Ethiopian languages in 10 days",
-    client: "Biruh Health Initiative NGO",
-    clientShort: "Biruh Health NGO",
-    city: "Bahir Dar",
-    summary:
-      "Medical-grade translation, voiceover recording, and cultural QA of 180+ maternal nutrition modules across Amharic, Afaan Oromoo, and Tigrinya for rural health extension workers.",
-    executiveSummary:
-      "Biruh Health Initiative coordinated three certified medical linguists under a 38,000 ETB escrowed workflow, achieving 100% clinical QA sign-off and audit-ready Telebirr disbursement records.",
-    historicalContext:
-      "Public health NGOs operating in rural woredas struggled to localize digital field-worker apps quickly while maintaining strict donor-compliant financial audit trails.",
-    industryOverview:
-      "Field health extension tools require synchronized terminology glossaries, native voice prompts for low-literacy mothers, and verifiable clinician sign-off.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "180 clinical nutrition lessons needed simultaneous translation and audio recording across three languages.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Inconsistent medical terminology across regional contractors previously caused field-testing delays.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "Grant auditors required itemized milestone receipts matched to verified deliverable files.",
-      },
-    ],
-    methodologyNote:
-      "Milestone 1 locked the trilingual medical glossary before Milestone 2 script translation and Milestone 3 studio voiceover QA.",
-    findingsHeadline: "180+",
-    findingsSub: "Clinical modules localized & audio-verified with 100% QA pass rate",
-    budgetEtb: "38,000 ETB",
-    timeline: "10 Days",
-    milestoneCount: 3,
-    rail: "Telebirr",
-    quote:
-      "Hiring three certified linguists through Yekis with TIN-compliant receipts saved our finance team weeks of grant auditing paperwork.",
-    quoteAuthor: "Dr. Sara M.",
-    quoteRole: "Program Coordinator · Biruh Health, Bahir Dar",
-    outcomeMetric: "180 modules localized with 100% clinical QA",
-    chartBefore: [18, 22, 25, 29, 31, 35],
-    chartAfter: [42, 60, 74, 86, 94, 100],
-    finalThought:
-      "Locking the clinical glossary as Milestone 01 prevented downstream rework and guaranteed uniform terminology across all 180 lessons.",
-    futureImplication:
-      "Expanded to Somali and Sidama language packs using the same three-stage clinical verification protocol.",
-    artVariant: "acoustic",
-    milestones: [
-      { title: "01 · Medical Glossary & Terminology Alignment", amount: "8,000 ETB", duration: "2 days" },
-      { title: "02 · UI Strings & Lesson Script Translation", amount: "18,000 ETB", duration: "5 days" },
-      { title: "03 · Native Audio Prompts & In-App Linguistic QA", amount: "12,000 ETB", duration: "3 days" },
-    ],
-  },
-  {
-    id: "cs-sheger-growth",
-    index: "04",
-    category: "MARKETING",
-    categoryLabel: "Digital Marketing",
-    title: "Sheger Home & Electronics Telegram + TikTok Performance Launch",
-    editorialHeadline:
-      "Turning 12 short-form Amharic video reels and an automated Telegram catalog bot into a 3.4x return on spend",
-    client: "Sheger Retail Group",
-    clientShort: "Sheger Retail",
-    city: "Addis Ababa",
-    summary:
-      "Produced 12 short-form Amharic product reels, automated a Telegram catalog bot funnel, and managed targeted holiday conversion campaigns with clear ROAS milestones.",
-    executiveSummary:
-      "Sheger Retail Group replaced open-ended agency retainers with a 52,000 ETB milestone contract tied directly to studio video reels, Telegram bot attribution, and conversion optimization.",
-    historicalContext:
-      "Retailers in Addis Ababa frequently paid upfront monthly social-media retainers without clear deliverable schedules or attributable Telegram order tracking.",
-    industryOverview:
-      "High-intent consumer commerce in Ethiopia runs on short-form TikTok/Reels discovery paired with instant Telegram catalog checkout.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "Holiday campaign required 12 studio-shot Amharic product reels and a live Telegram order bot in 4 weeks.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Previous marketing spend lacked deep-link attribution between video views and Telegram sales inquiries.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "Sales reps were overwhelmed by unstructured DMs instead of pre-qualified product cart inquiries.",
-      },
-    ],
-    methodologyNote:
-      "Split into three performance tranches: Batch 1 studio reels, Telegram catalog funnel with tracking links, and Batch 2 conversion-optimized cuts.",
-    findingsHeadline: "3.4x",
-    findingsSub: "Verified return on holiday campaign spend with 3x Telegram order volume",
-    budgetEtb: "52,000 ETB",
-    timeline: "4 Weeks",
-    milestoneCount: 3,
-    rail: "Telebirr",
-    quote:
-      "We tied every milestone to verified creative deliverables and campaign setup. Sales inquiries on our Telegram channel tripled in the first two weeks.",
-    quoteAuthor: "Hanna G.",
-    quoteRole: "Founder · Sheger Retail Group, Addis Ababa",
-    outcomeMetric: "3.4x return on campaign spend",
-    chartBefore: [22, 26, 24, 28, 30, 32],
-    chartAfter: [38, 54, 71, 83, 90, 97],
-    finalThought:
-      "Deliverable-linked escrow aligned creative production speed with measurable Telegram funnel conversion.",
-    futureImplication:
-      "Sheger Retail now runs every seasonal product drop through 3-tranche creative + bot performance contracts.",
-    artVariant: "prism",
-    milestones: [
-      { title: "01 · Creative Scripting & 6 Studio Video Reels", amount: "20,000 ETB", duration: "10 days" },
-      { title: "02 · Telegram Catalog Funnel & Pixel Tracking", amount: "14,000 ETB", duration: "7 days" },
-      { title: "03 · Second Batch Reels & Conversion Optimization", amount: "18,000 ETB", duration: "11 days" },
-    ],
-  },
-  {
-    id: "cs-tigray-agri-data",
-    index: "05",
-    category: "DATA",
-    categoryLabel: "Data & Back-Office",
-    title: "Regional Grain Market Price & Cooperative Inventory Analytics Suite",
-    editorialHeadline:
-      "Structuring 42,000+ historical commodity records into a 15-minute weekly cooperative intelligence brief",
-    client: "Northern Highlands Cooperative Network",
-    clientShort: "Highlands Co-op",
-    city: "Mekelle",
-    summary:
-      "Cleaned 4 years of historical commodity records, automated weekly woreda price ingestion forms, and delivered an interactive Power BI & Python reporting dashboard.",
-    executiveSummary:
-      "A 64,000 ETB data engineering engagement across four escrowed milestones transformed fragmented Excel sheets into an automated Python + Power BI cooperative inventory suite.",
-    historicalContext:
-      "Four years of regional grain price and warehouse stock records were scattered across inconsistent spreadsheets with duplicate woreda codes and missing timestamps.",
-    industryOverview:
-      "Agricultural cooperative networks rely on timely weekly price dispersion data to allocate transport and stabilize member farmer payouts.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "42,000+ historical rows required deduplication, schema normalization, and outlier validation.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Weekly market brief compilation took analysts 3 full days of manual copy-pasting every week.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "Delayed inventory visibility led to stock imbalances across cooperative storage hubs.",
-      },
-    ],
-    methodologyNote:
-      "Four sequential data milestones: historical dataset deduplication, mobile ingestion schema, executive BI dashboard, and analyst handover training.",
-    findingsHeadline: "42K+",
-    findingsSub: "Historical commodity records structured; weekly reporting cut from 3 days to 15 min",
-    budgetEtb: "64,000 ETB",
-    timeline: "3 Weeks",
-    milestoneCount: 4,
-    rail: "CBE Birr",
-    quote:
-      "Every dataset delivery was verified in the milestone workspace before release. Our analysts now publish weekly market briefs in 15 minutes instead of 3 days.",
-    quoteAuthor: "Betty A.",
-    quoteRole: "Operations Lead · Highlands Co-op, Mekelle",
-    outcomeMetric: "42,000+ historical records structured",
-    chartBefore: [15, 19, 21, 20, 24, 26],
-    chartAfter: [36, 55, 69, 82, 91, 96],
-    finalThought:
-      "Verifying data quality at each milestone stage ensured the final BI dashboard launched on clean, trusted historical series.",
-    futureImplication:
-      "Automated SMS price feeds from 18 additional woreda markets are now ingested directly into the schema.",
-    artVariant: "lattice",
-    milestones: [
-      { title: "01 · Historical CSV/Excel Cleaning & Deduplication", amount: "16,000 ETB", duration: "5 days" },
-      { title: "02 · Automated Mobile Data Collection Schema", amount: "16,000 ETB", duration: "5 days" },
-      { title: "03 · Executive Price & Inventory Dashboard", amount: "20,000 ETB", duration: "6 days" },
-      { title: "04 · Staff Training & Documentation Handover", amount: "12,000 ETB", duration: "5 days" },
-    ],
-  },
-  {
-    id: "cs-diredawa-portal",
-    index: "06",
-    category: "ENGINEERING",
-    categoryLabel: "Web & Mobile Engineering",
-    title: "Dire Dawa Textile Supplier B2B Ordering & Customs Document Tracker",
-    editorialHeadline:
-      "Digitizing 100% of pro-forma invoice and customs sign-offs for an export manufacturing corridor",
-    client: "East Rift Manufacturing PLC",
-    clientShort: "East Rift Mfg",
-    city: "Dire Dawa",
-    summary:
-      "Engineered a secure supplier portal with role-based document sign-off, pro-forma invoice generation in ETB/USD, and automated SMS/Telegram status alerts.",
-    executiveSummary:
-      "East Rift Manufacturing executed a 110,000 ETB full-stack portal build across four verified milestones—moving 100% of supplier pro-forma approvals and customs waybill tracking online in 5 weeks.",
-    historicalContext:
-      "Cross-corridor textile procurement relied on emailed PDFs and physical stamp chains, creating bottlenecks between factory floor procurement and clearing agents.",
-    industryOverview:
-      "Industrial parks and export manufacturers in Dire Dawa require multi-role audit trails, dual-currency pro-forma templates, and instant status notifications.",
-    problemPillars: [
-      {
-        label: "defining the challenge",
-        detail: "Manual pro-forma invoice revisions and customs waybill sign-offs delayed raw material dispatch.",
-      },
-      {
-        label: "scope of the problem",
-        detail: "Required role-based access for procurement officers, suppliers, and clearing agents with full audit logs.",
-      },
-      {
-        label: "impact of the problem",
-        detail: "High-value B2B software builds demanded strict milestone escrow to protect both factory and engineering squad.",
-      },
-    ],
-    methodologyNote:
-      "Delivered in four audited tranches: RBAC auth & onboarding, pro-forma & customs document engine, Telegram/SMS notifications, and production cloud deployment.",
-    findingsHeadline: "100%",
-    findingsSub: "Digital pro-forma & customs document workflow with zero audit discrepancies",
-    budgetEtb: "110,000 ETB",
-    timeline: "5 Weeks",
-    milestoneCount: 4,
-    rail: "CBE Birr & M-Pesa",
-    quote:
-      "Splitting a 110,000 ETB build into four clear milestones kept both our procurement team and the freelance engineering squad 100% aligned.",
-    quoteAuthor: "Nardos A.",
-    quoteRole: "Technical Lead · East Rift Manufacturing, Dire Dawa",
-    outcomeMetric: "100% digital pro-forma workflow",
-    chartBefore: [24, 28, 27, 31, 33, 36],
-    chartAfter: [45, 62, 76, 87, 94, 100],
-    finalThought:
-      "Four-tranche milestone escrow made a 110,000 ETB enterprise build predictable, transparent, and risk-free for both sides.",
-    futureImplication:
-      "Now onboarding 60+ regional raw-material suppliers onto the automated pro-forma portal.",
-    artVariant: "vault",
-    milestones: [
-      { title: "01 · Role-Based Auth & Supplier Onboarding Flow", amount: "25,000 ETB", duration: "8 days" },
-      { title: "02 · Pro-Forma Invoice & Customs Document Engine", amount: "35,000 ETB", duration: "10 days" },
-      { title: "03 · Automated Telegram & SMS Alert Integration", amount: "28,000 ETB", duration: "9 days" },
-      { title: "04 · Security Audit & Cloud Deployment", amount: "22,000 ETB", duration: "8 days" },
-    ],
-  },
-];
-
-const DISCIPLINES: {
-  id: Exclude<CaseCategory, "ALL">;
-  title: string;
-  escrowRange: string;
-  avgTranches: string;
-  description: string;
-  rails: string;
-  featuredStudyId: string;
-}[] = [
-  {
-    id: "ENGINEERING",
-    title: "Engineering",
-    escrowRange: "45,000 – 120,000 ETB",
-    avgTranches: "4 Milestone Tranches",
-    rails: "Telebirr · CBE Birr · M-Pesa",
-    description:
-      "Full-stack web portals, Telebirr webhook integrations, fleet dispatch systems, and B2B enterprise workflows verified sprint-by-sprint.",
-    featuredStudyId: "cs-abyssinia-fleet",
-  },
-  {
-    id: "DESIGN",
-    title: "Branding",
-    escrowRange: "25,000 – 65,000 ETB",
-    avgTranches: "3 Milestone Tranches",
-    rails: "CBE Birr · Telebirr",
-    description:
-      "Export-ready packaging systems, brand identity guidelines, UI/UX design systems, and wholesale buyer lookbooks with staged proof sign-offs.",
-    featuredStudyId: "cs-kaffa-coffee",
-  },
-  {
-    id: "MARKETING",
-    title: "Growth & Reels",
-    escrowRange: "30,000 – 75,000 ETB",
-    avgTranches: "3 Milestone Tranches",
-    rails: "Telebirr",
-    description:
-      "Studio Amharic video reels, automated Telegram catalog bots, and conversion-tracked performance launches tied to clear ROAS deliverables.",
-    featuredStudyId: "cs-sheger-growth",
-  },
-  {
-    id: "LOCALIZATION",
-    title: "Localization",
-    escrowRange: "20,000 – 55,000 ETB",
-    avgTranches: "3 Milestone Tranches",
-    rails: "Telebirr · CBE Birr",
-    description:
-      "Clinical, technical, and NGO localization across Amharic, Afaan Oromoo, and Tigrinya with glossary lock and native audio QA.",
-    featuredStudyId: "cs-zemen-localization",
-  },
-  {
-    id: "DATA",
-    title: "Data & BI Suites",
-    escrowRange: "35,000 – 85,000 ETB",
-    avgTranches: "4 Milestone Tranches",
-    rails: "CBE Birr",
-    description:
-      "Historical dataset deduplication, automated woreda field ingestion schemas, and executive Python / Power BI analytics dashboards.",
-    featuredStudyId: "cs-tigray-agri-data",
-  },
-];
 
 /* Interactive 3D Pointer-Tracked Tilt & Magnetic Cursor Pill Surface */
 function TiltVisualSurface({
@@ -707,12 +252,22 @@ const sectionRevealVariants = {
 
 export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   const { t, language } = useI18n();
-  const isAm = language === "am";
+  const copy = CASE_STUDIES_COPY[language] ?? CASE_STUDIES_COPY.en;
+  const CASE_STUDIES = useMemo(() => getCaseStudies(language), [language]);
+  const DISCIPLINES = useMemo(
+    () => DISCIPLINES_BY_LANG[language] ?? DISCIPLINES_BY_LANG.en,
+    [language],
+  );
   const [activeCategory, setActiveCategory] = useState<CaseCategory>("ALL");
   const [activeDiscipline, setActiveDiscipline] = useState<Exclude<CaseCategory, "ALL">>("ENGINEERING");
   const [activeTestimonialIdx, setActiveTestimonialIdx] = useState(0);
-  const [selectedStudy, setSelectedStudy] = useState<CaseStudyItem | null>(null);
+  const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
   const [activeSpread, setActiveSpread] = useState<"all" | "1" | "2" | "3" | "4">("all");
+
+  const selectedStudy = useMemo(
+    () => (selectedStudyId ? CASE_STUDIES.find((s) => s.id === selectedStudyId) ?? null : null),
+    [selectedStudyId, CASE_STUDIES],
+  );
 
   const worksSectionRef = useRef<HTMLElement | null>(null);
   const spread1Ref = useRef<HTMLDivElement | null>(null);
@@ -720,19 +275,12 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   const spread3Ref = useRef<HTMLDivElement | null>(null);
   const spread4Ref = useRef<HTMLDivElement | null>(null);
 
-  const categories: { id: CaseCategory; label: string }[] = [
-    { id: "ALL", label: "All Stories" },
-    { id: "ENGINEERING", label: "Engineering" },
-    { id: "DESIGN", label: "Design & Brand" },
-    { id: "MARKETING", label: "Growth & Reels" },
-    { id: "LOCALIZATION", label: "Localization" },
-    { id: "DATA", label: "Data & BI" },
-  ];
+  const categories = copy.categories;
 
   const filteredStudies = useMemo(() => {
     if (activeCategory === "ALL") return CASE_STUDIES;
     return CASE_STUDIES.filter((item) => item.category === activeCategory);
-  }, [activeCategory]);
+  }, [activeCategory, CASE_STUDIES]);
 
   const activeTestimonial = CASE_STUDIES[activeTestimonialIdx] ?? CASE_STUDIES[0];
 
@@ -744,7 +292,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setSelectedStudy(null);
+        setSelectedStudyId(null);
       }
     };
     window.addEventListener("keydown", onKeyDown);
@@ -756,7 +304,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
   const openStudyDossier = (study: CaseStudyItem) => {
     setActiveSpread("all");
-    setSelectedStudy(study);
+    setSelectedStudyId(study.id);
   };
 
   const cycleStudyDossier = (dir: -1 | 1) => {
@@ -764,7 +312,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
     const idx = CASE_STUDIES.findIndex((s) => s.id === selectedStudy.id);
     const nextIdx = (idx + dir + CASE_STUDIES.length) % CASE_STUDIES.length;
     setActiveSpread("all");
-    setSelectedStudy(CASE_STUDIES[nextIdx]);
+    setSelectedStudyId(CASE_STUDIES[nextIdx].id);
   };
 
   const jumpToSpread = (spread: "1" | "2" | "3" | "4") => {
@@ -783,7 +331,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   };
 
   const handleStartProject = () => {
-    setSelectedStudy(null);
+    setSelectedStudyId(null);
     if (onStart) {
       onStart("register");
     } else {
@@ -873,7 +421,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="cs-dossier-modal-title"
-          onClick={() => setSelectedStudy(null)}
+          onClick={() => setSelectedStudyId(null)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -900,7 +448,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   letterSpacing: "0.1em",
                 }}
               >
-                DOSSIER #{selectedStudy.index}
+                {copy.modal.dossierPrefix}{selectedStudy.index}
               </span>
               <strong id="cs-dossier-modal-title" style={{ fontSize: 14.5, color: "#ffffff" }}>
                 {selectedStudy.clientShort} &middot; {selectedStudy.city}
@@ -910,8 +458,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   type="button"
                   className="cs-dossier-spread-tab"
                   onClick={() => cycleStudyDossier(-1)}
-                  aria-label="Previous case study dossier"
-                  title="Previous dossier"
+                  aria-label={copy.modal.prevAria}
+                  title={copy.modal.prevAria}
                 >
                   <ArrowLeft size={13} />
                 </button>
@@ -919,8 +467,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   type="button"
                   className="cs-dossier-spread-tab"
                   onClick={() => cycleStudyDossier(1)}
-                  aria-label="Next case study dossier"
-                  title="Next dossier"
+                  aria-label={copy.modal.nextAria}
+                  title={copy.modal.nextAria}
                 >
                   <ArrowRight size={13} />
                 </button>
@@ -928,16 +476,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             </div>
 
             {/* Spread Switcher Tabs */}
-            <div className="cs-dossier-spread-tabs" role="tablist" aria-label="Dossier spread selector">
-              {(
-                [
-                  { id: "all", label: "All 4 Spreads" },
-                  { id: "1", label: "01 · Executive Summary" },
-                  { id: "2", label: "02 · Problem Statement" },
-                  { id: "3", label: "03 · Methodology & Findings" },
-                  { id: "4", label: "04 · Solutions & Ledger" },
-                ] as const
-              ).map((tab) => (
+            <div className="cs-dossier-spread-tabs" role="tablist" aria-label={copy.modal.spreadTabsAria}>
+              {copy.modal.tabs.map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
@@ -953,8 +493,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
             <button
               type="button"
-              onClick={() => setSelectedStudy(null)}
-              aria-label="Close case study dossier"
+              onClick={() => setSelectedStudyId(null)}
+              aria-label={copy.modal.closeAria}
               style={{
                 background: "rgba(255,255,255,0.08)",
                 border: "1px solid rgba(255,255,255,0.18)",
@@ -980,7 +520,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   key={`${selectedStudy.id}-spread-1`}
                   className="cs-book-spread"
                   ref={spread1Ref}
-                  aria-label="Spread 1: Client Mandate and Executive Summary"
+                  aria-label={copy.modal.spread1Aria}
                   initial={{ opacity: 0, y: 36, rotateX: -6, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -24, scale: 0.97 }}
@@ -990,7 +530,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page cs-book-page--left">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Client Mandate</h3>
+                        <h3 className="cs-page-title">{copy.modal.clientMandateTitle}</h3>
                         <span className="cs-page-num">p. 02</span>
                       </div>
 
@@ -1066,7 +606,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                           </p>
                           <div>
                             <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 6 }}>
-                              Contract Scope &amp; Escrow Structure
+                              {copy.modal.contractScopeTitle}
                             </div>
                             <p style={{ fontSize: 12.5, lineHeight: 1.6, color: "#3d423f", margin: 0 }}>
                               {selectedStudy.summary}
@@ -1089,8 +629,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>ESCROW RAIL: {selectedStudy.rail.toUpperCase()}</span>
-                      <span>CITY: {selectedStudy.city.toUpperCase()}</span>
+                      <span>{copy.modal.escrowRailPrefix} {selectedStudy.rail.toUpperCase()}</span>
+                      <span>{copy.modal.cityPrefix} {selectedStudy.city.toUpperCase()}</span>
                     </div>
                   </div>
 
@@ -1098,22 +638,13 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Table of Contents &amp; Summary</h3>
+                        <h3 className="cs-page-title">{copy.modal.tocSummaryTitle}</h3>
                         <span className="cs-page-num">p. 03</span>
                       </div>
 
                       {/* Clickable Numbered TOC matching Image 1 */}
                       <div className="cs-toc-grid" style={{ marginTop: 16, marginBottom: 20 }}>
-                        {[
-                          { num: "02", label: "Client Mandate", spread: "1" as const },
-                          { num: "06", label: "Methodology", spread: "3" as const },
-                          { num: "03", label: "Executive Summary", spread: "1" as const },
-                          { num: "07", label: "Quantified Findings", spread: "3" as const },
-                          { num: "04", label: "Background Info", spread: "2" as const },
-                          { num: "08", label: "Milestone Ledger", spread: "4" as const },
-                          { num: "05", label: "Problem Statement", spread: "2" as const },
-                          { num: "09", label: "Conclusion & Next", spread: "4" as const },
-                        ].map((item) => (
+                        {copy.modal.tocRows.map((item) => (
                           <button
                             key={item.num}
                             type="button"
@@ -1137,7 +668,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             marginBottom: 8,
                           }}
                         >
-                          Executive Summary
+                          {copy.modal.execSummaryTitle}
                         </div>
                         <p style={{ fontSize: 12.5, lineHeight: 1.6, margin: 0 }}>
                           {selectedStudy.executiveSummary}
@@ -1146,14 +677,20 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
                       <div>
                         <div style={{ fontWeight: 800, fontSize: 13, marginBottom: 8 }}>
-                          Contract Conclusions
+                          {copy.modal.contractConclusionsTitle}
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, fontSize: 12, lineHeight: 1.55, color: "#3d423f" }}>
                           <p style={{ margin: 0 }}>
-                            <strong>100% Tranche Verification:</strong> Every birr of the {selectedStudy.budgetEtb} budget was locked prior to kickoff and released strictly upon verified deliverable approval.
+                            <strong>{copy.modal.conclusion1Title}</strong>{" "}
+                            {copy.modal.conclusion1Body(selectedStudy.budgetEtb)}
                           </p>
                           <p style={{ margin: 0 }}>
-                            <strong>Measurable Outcome:</strong> Achieved {selectedStudy.outcomeMetric} within {selectedStudy.timeline} across {selectedStudy.milestoneCount} structured milestones.
+                            <strong>{copy.modal.conclusion2Title}</strong>{" "}
+                            {copy.modal.conclusion2Body(
+                              selectedStudy.outcomeMetric,
+                              selectedStudy.timeline,
+                              selectedStudy.milestoneCount,
+                            )}
                           </p>
                         </div>
                       </div>
@@ -1170,8 +707,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>CATEGORY: {selectedStudy.categoryLabel.toUpperCase()}</span>
-                      <span>TOTAL: {selectedStudy.budgetEtb}</span>
+                      <span>{copy.modal.categoryPrefix} {selectedStudy.categoryLabel.toUpperCase()}</span>
+                      <span>{copy.modal.totalPrefix} {selectedStudy.budgetEtb}</span>
                     </div>
                   </div>
                 </motion.article>
@@ -1183,7 +720,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   key={`${selectedStudy.id}-spread-2`}
                   className="cs-book-spread"
                   ref={spread2Ref}
-                  aria-label="Spread 2: Background Information and Problem Statement"
+                  aria-label={copy.modal.spread2Aria}
                   initial={{ opacity: 0, y: 36, rotateX: -6, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -24, scale: 0.97 }}
@@ -1193,7 +730,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page cs-book-page--left">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Background Information</h3>
+                        <h3 className="cs-page-title">{copy.modal.bgInfoTitle}</h3>
                         <span className="cs-page-num">p. 04</span>
                       </div>
 
@@ -1208,10 +745,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                       >
                         <div>
                           <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, color: "#6e736f", textTransform: "uppercase" }}>
-                            Operational Baseline
+                            {copy.modal.opBaselineLabel}
                           </div>
                           <div style={{ fontWeight: 800, fontSize: 13.5, margin: "4px 0 6px" }}>
-                            Historical Context
+                            {copy.modal.histContextTitle}
                           </div>
                           <p style={{ fontSize: 12, lineHeight: 1.6, color: "#3d423f", margin: 0 }}>
                             {selectedStudy.historicalContext}
@@ -1219,10 +756,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         </div>
                         <div>
                           <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, color: "#6e736f", textTransform: "uppercase" }}>
-                            Market Landscape
+                            {copy.modal.marketLandscapeLabel}
                           </div>
                           <div style={{ fontWeight: 800, fontSize: 13.5, margin: "4px 0 6px" }}>
-                            Industry Overview
+                            {copy.modal.industryOverviewTitle}
                           </div>
                           <p style={{ fontSize: 12, lineHeight: 1.6, color: "#3d423f", margin: 0 }}>
                             {selectedStudy.industryOverview}
@@ -1249,20 +786,20 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             fontWeight: 800,
                           }}
                         >
-                          <span>Delivery Velocity &amp; Verification Index (Sprint 1 → Final)</span>
+                          <span>{copy.modal.chartTitle}</span>
                           <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, color: "#555a56" }}>
-                            INDEX (0–100)
+                            {copy.modal.chartIndexLabel}
                           </span>
                         </div>
                         {renderTrendChart(selectedStudy)}
                         <div style={{ display: "flex", gap: 18, marginTop: 8, fontSize: 11, fontFamily: "var(--v2-font-mono)" }}>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                             <i style={{ width: 8, height: 8, background: "#f5c518", border: "1px solid #141715", display: "inline-block" }} />
-                            Yekis Milestone Trajectory
+                            {copy.modal.chartLegendAfter}
                           </span>
                           <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#6e736f" }}>
                             <i style={{ width: 8, height: 8, background: "#9ca39e", display: "inline-block" }} />
-                            Pre-Escrow Baseline
+                            {copy.modal.chartLegendBefore}
                           </span>
                         </div>
                       </div>
@@ -1279,8 +816,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>BASELINE AUDIT</span>
-                      <span>VERIFIED BY YEKIS</span>
+                      <span>{copy.modal.baselineAuditFoot}</span>
+                      <span>{copy.modal.verifiedFoot}</span>
                     </div>
                   </div>
 
@@ -1288,7 +825,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Problem Statement</h3>
+                        <h3 className="cs-page-title">{copy.modal.problemStatementTitle}</h3>
                         <span className="cs-page-num">p. 05</span>
                       </div>
 
@@ -1326,7 +863,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                           }}
                         >
                           <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, color: "#f5c518", letterSpacing: "0.1em" }}>
-                            KEY BOTTLENECK
+                            {copy.modal.keyBottleneck}
                           </div>
                           <div style={{ fontWeight: 800, fontSize: 14, marginTop: 6, lineHeight: 1.35 }}>
                             {selectedStudy.editorialHeadline}
@@ -1334,10 +871,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         </div>
                         <div>
                           <p style={{ fontSize: 12.5, lineHeight: 1.6, color: "#292e2b", margin: "0 0 10px" }}>
-                            Without milestone-locked escrow, both client procurement teams and remote specialists faced asymmetric delivery and payment risk.
+                            {copy.modal.problemRiskParagraph}
                           </p>
                           <span className="cs-gold-strip" style={{ fontSize: 12 }}>
-                            &ldquo;Clear milestone definitions turned risk into predictable execution.&rdquo;
+                            {copy.modal.problemRiskQuote}
                           </span>
                         </div>
                       </div>
@@ -1354,8 +891,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>DIAGNOSTIC REVIEW</span>
-                      <span>{selectedStudy.milestoneCount} TRANCHES DEFINED</span>
+                      <span>{copy.modal.diagnosticFoot}</span>
+                      <span>{selectedStudy.milestoneCount} {copy.modal.tranchesDefinedSuffix}</span>
                     </div>
                   </div>
                 </motion.article>
@@ -1367,7 +904,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   key={`${selectedStudy.id}-spread-3`}
                   className="cs-book-spread"
                   ref={spread3Ref}
-                  aria-label="Spread 3: Methodology and Quantified Findings"
+                  aria-label={copy.modal.spread3Aria}
                   initial={{ opacity: 0, y: 36, rotateX: -6, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -24, scale: 0.97 }}
@@ -1377,13 +914,13 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page cs-book-page--left">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Methodology</h3>
+                        <h3 className="cs-page-title">{copy.modal.methodologyTitle}</h3>
                         <span className="cs-page-num">p. 06</span>
                       </div>
 
                       <div className="cs-gold-box" style={{ marginTop: 18, marginBottom: 20 }}>
                         <div style={{ fontWeight: 800, fontSize: 13.5, marginBottom: 6 }}>
-                          Escrow &amp; Sprint Verification Protocol
+                          {copy.modal.protocolTitle}
                         </div>
                         <p style={{ fontSize: 12.5, lineHeight: 1.6, margin: 0 }}>
                           {selectedStudy.methodologyNote}
@@ -1394,18 +931,18 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                       <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: 16, alignItems: "center" }}>
                         <div style={{ border: "1px solid #141715", padding: 12 }}>
                           <div style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10.5, fontWeight: 800, marginBottom: 8 }}>
-                            VERIFICATION METRICS
+                            {copy.modal.verificationMetricsTitle}
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #dfdfd9", fontSize: 12 }}>
-                            <span>Escrow Locked Upfront</span>
+                            <span>{copy.modal.metricLocked}</span>
                             <strong>100% ({selectedStudy.budgetEtb})</strong>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #dfdfd9", fontSize: 12 }}>
-                            <span>First-Pass Milestone QA</span>
-                            <strong>100% Approved</strong>
+                            <span>{copy.modal.metricFirstPass}</span>
+                            <strong>{copy.modal.metricApproved}</strong>
                           </div>
                           <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", fontSize: 12 }}>
-                            <span>Wallet Settlement Rail</span>
+                            <span>{copy.modal.metricRail}</span>
                             <strong>{selectedStudy.rail}</strong>
                           </div>
                         </div>
@@ -1423,10 +960,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             {selectedStudy.timeline}
                           </div>
                           <div style={{ fontWeight: 800, fontSize: 12.5, marginTop: 6 }}>
-                            Analytical &amp; QA Approach
+                            {copy.modal.qaApproachTitle}
                           </div>
                           <p style={{ fontSize: 11.5, lineHeight: 1.55, color: "#3d423f", margin: "4px 0 0" }}>
-                            Each deliverable tranche was inspected against pre-agreed acceptance criteria before instant payout release.
+                            {copy.modal.qaApproachBody}
                           </p>
                         </div>
                       </div>
@@ -1443,8 +980,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>PROTOCOL: MILESTONE ESCROW</span>
-                      <span>ZERO DISPUTES</span>
+                      <span>{copy.modal.protocolFoot}</span>
+                      <span>{copy.modal.zeroDisputesFoot}</span>
                     </div>
                   </div>
 
@@ -1452,7 +989,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Findings</h3>
+                        <h3 className="cs-page-title">{copy.modal.findingsTitle}</h3>
                         <span className="cs-page-num">p. 07</span>
                       </div>
 
@@ -1476,12 +1013,12 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
                       {/* 3 Gold Data Analysis KPI Cards matching Image 1 Spread 4 Right */}
                       <div style={{ fontWeight: 800, fontSize: 12.5, marginBottom: 8 }}>
-                        Data Analysis &amp; Settlement Breakdown
+                        {copy.modal.breakdownTitle}
                       </div>
                       <div className="cs-findings-kpi-grid" style={{ marginBottom: 18 }}>
                         <div className="cs-findings-kpi">
                           <span style={{ fontSize: 10.5, fontFamily: "var(--v2-font-mono)", textTransform: "uppercase" }}>
-                            Total Escrowed
+                            {copy.modal.kpiEscrowed}
                           </span>
                           <strong style={{ fontSize: 16, fontFamily: "var(--v2-font-head)", fontWeight: 900 }}>
                             {selectedStudy.budgetEtb}
@@ -1489,7 +1026,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         </div>
                         <div className="cs-findings-kpi">
                           <span style={{ fontSize: 10.5, fontFamily: "var(--v2-font-mono)", textTransform: "uppercase" }}>
-                            Tranches Released
+                            {copy.modal.kpiReleased}
                           </span>
                           <strong style={{ fontSize: 16, fontFamily: "var(--v2-font-head)", fontWeight: 900 }}>
                             {selectedStudy.milestoneCount} / {selectedStudy.milestoneCount}
@@ -1497,10 +1034,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         </div>
                         <div className="cs-findings-kpi">
                           <span style={{ fontSize: 10.5, fontFamily: "var(--v2-font-mono)", textTransform: "uppercase" }}>
-                            Payout Speed
+                            {copy.modal.kpiPayoutSpeed}
                           </span>
                           <strong style={{ fontSize: 16, fontFamily: "var(--v2-font-head)", fontWeight: 900 }}>
-                            &lt; 15 min
+                            {copy.modal.kpiPayoutVal}
                           </strong>
                         </div>
                       </div>
@@ -1508,16 +1045,16 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                       <div style={{ display: "grid", gridTemplateColumns: "0.38fr 0.62fr", gap: 14 }}>
                         <div className="cs-gold-box" style={{ padding: 14 }}>
                           <div style={{ fontWeight: 800, fontSize: 12, marginBottom: 4 }}>
-                            Results &amp; Observations
+                            {copy.modal.resultsObsTitle}
                           </div>
                           <p style={{ fontSize: 11.5, lineHeight: 1.5, margin: 0 }}>
-                            {selectedStudy.outcomeMetric} verified upon final milestone sign-off.
+                            {selectedStudy.outcomeMetric} {copy.modal.resultsObsSuffix}
                           </p>
                         </div>
                         <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.65, color: "#292e2b" }}>
-                          <li>100% of milestone funds were deposited in ETB prior to sprint commencement.</li>
-                          <li>Automated receipts generated for both client accounting and freelancer wallet ledger.</li>
-                          <li>Zero scope creep or delayed bank reconciliation across all {selectedStudy.milestoneCount} tranches.</li>
+                          {copy.modal.findingsBullets(selectedStudy.milestoneCount).map((bullet, idx) => (
+                            <li key={idx}>{bullet}</li>
+                          ))}
                         </ul>
                       </div>
                     </div>
@@ -1533,8 +1070,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>OUTCOME: {selectedStudy.outcomeMetric.toUpperCase()}</span>
-                      <span>100% VERIFIED</span>
+                      <span>{copy.modal.outcomeFootPrefix} {selectedStudy.outcomeMetric.toUpperCase()}</span>
+                      <span>{copy.modal.verified100Foot}</span>
                     </div>
                   </div>
                 </motion.article>
@@ -1546,7 +1083,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   key={`${selectedStudy.id}-spread-4`}
                   className="cs-book-spread"
                   ref={spread4Ref}
-                  aria-label="Spread 4: Solutions, Milestone Ledger and Conclusion"
+                  aria-label={copy.modal.spread4Aria}
                   initial={{ opacity: 0, y: 36, rotateX: -6, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, rotateX: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -24, scale: 0.97 }}
@@ -1556,15 +1093,15 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page cs-book-page--left">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Solutions &amp; Milestone Ledger</h3>
+                        <h3 className="cs-page-title">{copy.modal.solutionsTitle}</h3>
                         <span className="cs-page-num">p. 08</span>
                       </div>
 
                       {/* Animated Radial Progress Rings matching Image 1 Spread 5 Left */}
                       <div style={{ display: "flex", alignItems: "center", gap: 24, marginTop: 16, marginBottom: 18, flexWrap: "wrap" }}>
                         {[
-                          { pct: "100%", label: "Milestones Approved", dash: 113 },
-                          { pct: "95%", label: "Net Talent Payout", dash: 107 },
+                          { pct: "100%", label: copy.modal.ringApproved, dash: 113 },
+                          { pct: "95%", label: copy.modal.ringNetPayout, dash: 107 },
                         ].map((ring) => (
                           <div key={ring.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
                             <svg width="46" height="46" viewBox="0 0 46 46">
@@ -1603,9 +1140,9 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                       <table className="cs-ledger-table">
                         <thead>
                           <tr>
-                            <th>Milestone Deliverable</th>
-                            <th>Window</th>
-                            <th>Escrow Tranche</th>
+                            <th>{copy.modal.thDeliverable}</th>
+                            <th>{copy.modal.thWindow}</th>
+                            <th>{copy.modal.thTranche}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1631,8 +1168,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>ALL {selectedStudy.milestoneCount} TRANCHES RELEASED</span>
-                      <span>TOTAL: {selectedStudy.budgetEtb}</span>
+                      <span>{copy.modal.allTranchesFoot(selectedStudy.milestoneCount)}</span>
+                      <span>{copy.modal.totalPrefix} {selectedStudy.budgetEtb}</span>
                     </div>
                   </div>
 
@@ -1640,7 +1177,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   <div className="cs-book-page">
                     <div>
                       <div className="cs-page-head">
-                        <h3 className="cs-page-title">Conclusion</h3>
+                        <h3 className="cs-page-title">{copy.modal.conclusionTitle}</h3>
                         <span className="cs-page-num">p. 09</span>
                       </div>
 
@@ -1673,7 +1210,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             <Award size={14} />
                           </span>
                           <div>
-                            <div style={{ fontWeight: 800, fontSize: 13 }}>Final Thoughts</div>
+                            <div style={{ fontWeight: 800, fontSize: 13 }}>{copy.modal.finalThoughtsTitle}</div>
                             <p style={{ fontSize: 12, lineHeight: 1.55, color: "#3d423f", margin: "2px 0 0" }}>
                               {selectedStudy.finalThought}
                             </p>
@@ -1695,7 +1232,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             <Sparkles size={14} />
                           </span>
                           <div>
-                            <div style={{ fontWeight: 800, fontSize: 13 }}>Implications For Future</div>
+                            <div style={{ fontWeight: 800, fontSize: 13 }}>{copy.modal.futureTitle}</div>
                             <p style={{ fontSize: 12, lineHeight: 1.55, color: "#3d423f", margin: "2px 0 0" }}>
                               {selectedStudy.futureImplication}
                             </p>
@@ -1722,13 +1259,13 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             gap: 8,
                           }}
                         >
-                          <span>Post a Similar Project</span>
+                          <span>{copy.modal.postSimilar}</span>
                           <ArrowUpRight size={15} />
                         </button>
                         <button
                           type="button"
                           onClick={() => {
-                            setSelectedStudy(null);
+                            setSelectedStudyId(null);
                             onNavigate("fees");
                           }}
                           style={{
@@ -1743,7 +1280,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             cursor: "pointer",
                           }}
                         >
-                          Calculate Escrow Fees
+                          {copy.calculateFees}
                         </button>
                       </div>
                     </div>
@@ -1759,8 +1296,8 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         color: "#555a56",
                       }}
                     >
-                      <span>YEKIS CASE STUDY DOSSIER</span>
-                      <span>END OF REPORT</span>
+                      <span>{copy.modal.dossierFoot}</span>
+                      <span>{copy.modal.endReportFoot}</span>
                     </div>
                   </div>
                 </motion.article>
@@ -1775,16 +1312,16 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   return (
     <div className="yk-v2 yk-v2-subpage yk-cs-studio">
       {/* ── SECTION 1: Dark Studio Hero (Pure Visual Attraction & Motion) ── */}
-      <section className="cs-hero-band" aria-label="Case Studies Studio Hero">
+      <section className="cs-hero-band" aria-label={copy.heroSectionAria}>
         <div className="cs-band-inner">
           <StudioBreadcrumb
             items={[
               {
-                label: isAm ? "መነሻ" : "Home",
+                label: copy.breadcrumbHome,
                 onClick: () => onNavigate("home"),
               },
               {
-                label: isAm ? "የተሳኩ ፕሮጀክቶች" : "Case Studies",
+                label: copy.breadcrumbCases,
                 onClick:
                   activeCategory !== "ALL"
                     ? () => setActiveCategory("ALL")
@@ -1795,7 +1332,9 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                 ? [
                     {
                       code: activeCategory,
-                      label: `Filter · ${activeCategory}`,
+                      label: `${copy.filterPrefix} ${
+                        categories.find((c) => c.id === activeCategory)?.label ?? activeCategory
+                      }`,
                       active: true,
                     },
                   ]
@@ -1808,16 +1347,16 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   className="cs-studio-band-pill"
                   onClick={() => onNavigate("fees")}
                 >
-                  <span>FEES</span>
-                  <span>{isAm ? "ክፍያዎች" : "Fee Schedule"}</span>
+                  <span>{copy.feesTag}</span>
+                  <span>{copy.feesLabel}</span>
                 </button>
                 <button
                   type="button"
                   className="cs-studio-band-pill"
                   onClick={() => onNavigate("about")}
                 >
-                  <span>STUDIO</span>
-                  <span>{isAm ? "ስለ እኛ" : "About"}</span>
+                  <span>{copy.studioTag}</span>
+                  <span>{copy.aboutLabel}</span>
                 </button>
               </div>
             }
@@ -1829,7 +1368,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             transition={{ duration: 0.72, ease: [0.22, 1, 0.36, 1] }}
           >
             <h1 className="cs-hero-display">
-              we prove{" "}
+              {copy.heroPrefix}{" "}
               <motion.span
                 className="cs-hero-brace"
                 initial={{ scale: 0.7, opacity: 0 }}
@@ -1838,7 +1377,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
               >
                 &#123;
               </motion.span>
-              escrow
+              {copy.heroBraceWord}
               <motion.span
                 className="cs-hero-brace"
                 initial={{ scale: 0.7, opacity: 0 }}
@@ -1856,7 +1395,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
               >
                 &rarr;
               </motion.span>
-              results in practice
+              {copy.heroSuffix}
             </h1>
           </motion.div>
 
@@ -1870,7 +1409,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             <TiltVisualSurface
               className="cs-hero-art-frame"
               onClick={() => openStudyDossier(CASE_STUDIES[0])}
-              ariaLabel="Inspect Abyssinia Logistics case study dossier"
+              ariaLabel={copy.hoverAria01}
             >
               <svg className="cs-hero-art-svg" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid slice">
                 <defs>
@@ -1911,7 +1450,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                 <circle className="cs-svg-float" cx="300" cy="184" r="64" fill="url(#hero-orb-1)" />
               </svg>
               <span className="cs-hero-hover-pill">
-                <span>&#123; 01 &middot; INSPECT DOSSIER &#125;</span>
+                <span>{copy.hoverDossier01}</span>
                 <ArrowUpRight size={13} />
               </span>
             </TiltVisualSurface>
@@ -1919,7 +1458,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             <TiltVisualSurface
               className="cs-hero-art-frame"
               onClick={() => openStudyDossier(CASE_STUDIES[1])}
-              ariaLabel="Inspect Kaffa Specialty Export case study dossier"
+              ariaLabel={copy.hoverAria02}
             >
               <svg className="cs-hero-art-svg" viewBox="0 0 600 380" preserveAspectRatio="xMidYMid slice">
                 <defs>
@@ -1964,7 +1503,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                 <circle className="cs-svg-float" cx="315" cy="238" r="30" fill="url(#hero-orb-2)" />
               </svg>
               <span className="cs-hero-hover-pill">
-                <span>&#123; 02 &middot; INSPECT DOSSIER &#125;</span>
+                <span>{copy.hoverDossier02}</span>
                 <ArrowUpRight size={13} />
               </span>
             </TiltVisualSurface>
@@ -1977,21 +1516,21 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             transition={{ delay: 0.4, duration: 0.6 }}
           >
             <p className="cs-hero-tagline">
-              The benchmark for milestone-verified engineering, brand identity, and regional execution across Ethiopia.
+              {copy.heroTagline}
             </p>
             <button
               type="button"
               className="cs-scroll-pill"
               onClick={() => worksSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
             >
-              &#123; SCROLL &darr; &#125;
+              {copy.scrollPill}
             </button>
           </motion.div>
         </div>
       </section>
 
       {/* ── SECTION 2: Crisp White { PROOF } Manifesto Band (Image 2 Second Band) ── */}
-      <section className="cs-manifesto-band" aria-label="Our Approach and Proof">
+      <section className="cs-manifesto-band" aria-label={copy.manifestoAria}>
         <div className="cs-band-inner">
           <motion.div
             className="cs-manifesto-grid"
@@ -2008,23 +1547,18 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
               transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
             >
               <span className="cs-brace-emblem-char">&#123;</span>
-              <span className="cs-brace-emblem-word">PROOF</span>
+              <span className="cs-brace-emblem-word">{copy.proofBraceWord}</span>
               <span className="cs-brace-emblem-char">&#125;</span>
             </motion.div>
 
             <div>
-              <ScrollIlluminatedHeadline
-                segments={[
-                  { text: "Great delivery is more than just promises—it’s about" },
-                  { text: "clear milestones, verified work, and measurable impact.", highlight: true },
-                ]}
-              />
+              <ScrollIlluminatedHeadline segments={copy.proofSegments} />
 
               <AnimatedCountUpStrip
                 metrics={[
-                  { value: 394, suffix: "K ETB", label: "FEATURED ESCROW VOLUME" },
-                  { value: 21, suffix: " PHASES", label: "VERIFIED MILESTONES" },
-                  { value: 100, suffix: "%", label: "ON-TIME RELEASE" },
+                  { value: 394, suffix: copy.kpiVolumeSuffix, label: copy.kpiVolumeLabel },
+                  { value: 21, suffix: copy.kpiPhasesSuffix, label: copy.kpiPhasesLabel },
+                  { value: 100, suffix: "%", label: copy.kpiReleaseLabel },
                 ]}
               />
             </div>
@@ -2033,7 +1567,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
       </section>
 
       {/* ── SECTION 3: Warm Alabaster { SELECTED WORK } Staggered Showcase (Image 2 Third Band) ── */}
-      <section className="cs-works-band" ref={worksSectionRef} aria-label="Selected Case Studies">
+      <section className="cs-works-band" ref={worksSectionRef} aria-label={copy.worksAria}>
         <div className="cs-band-inner">
           <motion.div
             className="cs-works-topbar"
@@ -2043,10 +1577,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             viewport={{ once: true, amount: 0.2 }}
           >
             <span className="cs-kicker" style={{ color: "#0e1410" }}>
-              &#123; SELECTED WORK &#125;
+              {copy.selectedWorkKicker}
             </span>
 
-            <div className="cs-works-tabs" role="tablist" aria-label="Filter case studies by discipline">
+            <div className="cs-works-tabs" role="tablist" aria-label={copy.filterAria}>
               {categories.map((cat) => {
                 const count =
                   cat.id === "ALL"
@@ -2088,7 +1622,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   >
                     <TiltVisualSurface
                       className="cs-work-visual"
-                      magneticLabel="OPEN DOSSIER"
+                      magneticLabel={copy.openDossierPill}
                     >
                       <ProjectSculpturalArt variant={study.artVariant} />
                       <div className="cs-work-visual-top">
@@ -2115,7 +1649,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             borderRadius: 4,
                           }}
                         >
-                          OPEN DOSSIER &rarr;
+                          {copy.openDossierBtn}
                         </span>
                       </div>
                     </TiltVisualSurface>
@@ -2124,7 +1658,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
                     <div className="cs-work-meta">
                       <span>
-                        Client:{" "}
+                        {copy.clientPrefix}{" "}
                         <button
                           type="button"
                           className="cs-work-company-btn"
@@ -2138,7 +1672,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                         &middot; {study.city}
                       </span>
                       <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 12 }}>
-                        {study.milestoneCount} Milestones &middot; {study.timeline}
+                        {study.milestoneCount} {copy.milestonesLabel} &middot; {study.timeline}
                       </span>
                     </div>
                   </article>
@@ -2153,16 +1687,16 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
               className="cs-see-all-btn"
               onClick={() => openStudyDossier(filteredStudies[0] ?? CASE_STUDIES[0])}
             >
-              <span>&rarr; Open full editorial dossier &#123;0{CASE_STUDIES.length}&#125;</span>
+              <span>{copy.openFullDossier} &#123;0{CASE_STUDIES.length}&#125;</span>
             </button>
           </div>
         </div>
       </section>
 
       {/* ── SECTION 4: Sticky Scroll-Pinned { SERVICES } 3-Column Stage ── */}
-      <section className="cs-services-band" aria-label="Marketplace Disciplines">
+      <section className="cs-services-band" aria-label={copy.servicesAria}>
         <StickyScrollServicesStage
-          kicker="{ SERVICES }"
+          kicker={copy.servicesKicker}
           activeId={activeDiscipline}
           onSelect={(id) => setActiveDiscipline(id as Exclude<CaseCategory, "ALL">)}
           items={DISCIPLINES.map((disc) => {
@@ -2175,9 +1709,9 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
               kickerBadge: featuredStudy.outcomeMetric,
               artNode: <ProjectSculpturalArt variant={featuredStudy.artVariant} />,
               rows: [
-                { label: "ESCROW RANGE", badge: disc.escrowRange },
-                { label: "SETTLEMENT", badge: disc.rails },
-                { label: "TRANCHES", badge: disc.avgTranches.toUpperCase() },
+                { label: copy.rowEscrowRange, badge: disc.escrowRange },
+                { label: copy.rowSettlement, badge: disc.rails },
+                { label: copy.rowTranches, badge: disc.avgTranches.toUpperCase() },
               ],
               onCardClick: () => openStudyDossier(featuredStudy),
             };
@@ -2186,7 +1720,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
       </section>
 
       {/* ── SECTION 5: Vibrant Studio Green { TESTIMONIALS } Band (Image 2 Fifth Band) ── */}
-      <section className="cs-testi-band" aria-label="Client Testimonials">
+      <section className="cs-testi-band" aria-label={copy.testimonialsAria}>
         <div className="cs-band-inner">
           <motion.div
             className="cs-testi-grid"
@@ -2197,10 +1731,10 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
           >
             <div className="cs-testi-left">
               <span className="cs-kicker" style={{ color: "#0c1409" }}>
-                &#123; TESTIMONIALS &#125;
+                {copy.testimonialsKicker}
               </span>
 
-              <div className="cs-testi-authors" role="tablist" aria-label="Choose client testimonial">
+              <div className="cs-testi-authors" role="tablist" aria-label={copy.chooseTestimonialAria}>
                 {CASE_STUDIES.map((study, idx) => (
                   <button
                     key={study.id}
@@ -2234,7 +1768,9 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   className="cs-testi-link"
                   onClick={() => openStudyDossier(activeTestimonial)}
                 >
-                  <span>Read {activeTestimonial.clientShort} (case study dossier)</span>
+                  <span>
+                    {copy.readDossierPrefix} {activeTestimonial.clientShort} {copy.readDossierSuffix}
+                  </span>
                   <ArrowUpRight size={15} />
                 </button>
               </motion.div>
@@ -2244,7 +1780,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
       </section>
 
       {/* ── SECTION 6: Dark Obsidian Studio CTA Band (Image 2 Bottom Band) ── */}
-      <section className="cs-outro-band" aria-label="Start a milestone project">
+      <section className="cs-outro-band" aria-label={copy.outroAria}>
         <div className="cs-band-inner">
           <motion.div
             className="cs-outro-grid"
@@ -2255,12 +1791,12 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
           >
             <div>
               <h2 className="cs-outro-title">
-                Got a project in mind?
+                {copy.outroTitleLine1}
                 <br />
-                Let’s fund it safely.
+                {copy.outroTitleLine2}
               </h2>
               <p style={{ fontSize: 15, lineHeight: 1.65, color: "rgba(244,247,244,0.72)", maxWidth: 460, marginBottom: 28 }}>
-                Post your scope for free, lock funds in ETB via Telebirr, CBE Birr, or M-Pesa only when you hire, and release payment milestone by milestone.
+                {copy.outroSubtitle}
               </p>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                 <button
@@ -2277,7 +1813,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                   onClick={() => onNavigate("fees")}
                 >
                   <Wallet size={17} />
-                  <span>Calculate Escrow Fees</span>
+                  <span>{copy.calculateFees}</span>
                 </button>
               </div>
             </div>
@@ -2293,7 +1829,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                 className="cs-outro-pill-btn"
                 onClick={handleStartProject}
               >
-                &#123;start-project@yekis.et&#125;
+                {copy.outroPillEmail}
               </button>
               <span className="cs-outro-giant-brace" aria-hidden="true">&#125;</span>
             </motion.div>

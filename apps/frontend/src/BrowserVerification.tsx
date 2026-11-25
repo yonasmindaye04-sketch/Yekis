@@ -2,14 +2,229 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, FileCheck, Fingerprint, HelpCircle, Lock, ShieldCheck } from "lucide-react";
 import { api, type KycStatusResponse } from "./api/client";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { formatStatusLabel, statusTone } from "./pages/ops/components/ui";
 import "./BrowserVerification.css";
 
+type BvCopy = {
+  badFileFormat: string;
+  fileTooLarge: string;
+  errName: string;
+  errDob: string;
+  errFin: string;
+  errFile: string;
+  biometricSuccess: string;
+  submitFailed: string;
+  errTin: string;
+  tier2Requested: string;
+  tier2Failed: string;
+  chipAwaiting: string;
+  chipVerified: (isTier2: boolean) => string;
+  chipReview: string;
+  chipRejected: string;
+  securedByFayda: string;
+  documentsSubmitted: string;
+  editDetails: string;
+  submissionError: string;
+  finHelp: string;
+  fileHint: string;
+  dropPrefix: string;
+  dropBrowse: string;
+  dropSub: string;
+  previewAlt: string;
+  readyToSubmit: string;
+  replaceFile: string;
+  removeFileAria: string;
+  biometricNoteBefore: string;
+  biometricNoteStrong: string;
+  biometricNoteAfter: string;
+  consent: string;
+  submittedBtn: string;
+  stepsAria: string;
+  nextLabel: string;
+  step1Label: string;
+  step2Label: string;
+  step3Label: string;
+  checklistSub: string;
+  complianceSub: string;
+};
+
+const BV_COPY: Record<Language, BvCopy> = {
+  en: {
+    badFileFormat: "Unsupported format — use JPG, PNG, WebP or PDF.",
+    fileTooLarge: "File is larger than 10 MB — please upload a smaller file.",
+    errName: "Enter your full name as shown on your ID.",
+    errDob: "Enter a valid date of birth.",
+    errFin: "Enter your Fayda ID number.",
+    errFile: "Upload a photo or PDF of your Fayda ID.",
+    biometricSuccess: "Complete the biometric selfie check from the Identity section to finish Tier 1 verification.",
+    submitFailed: "Unable to submit verification",
+    errTin: "Enter a TIN or business registration number.",
+    tier2Requested: "Tier 2 review requested. A compliance officer will review the screening result.",
+    tier2Failed: "Unable to request Tier 2",
+    chipAwaiting: "Tier 1 · Awaiting documents",
+    chipVerified: (isTier2) => `${isTier2 ? "Tier 2" : "Tier 1"} · Verified`,
+    chipReview: "Tier 1 · In review",
+    chipRejected: "Tier 1 · Action required",
+    securedByFayda: "Secured by Fayda eSignet",
+    documentsSubmitted: "Documents submitted",
+    editDetails: "Edit details",
+    submissionError: "Submission error",
+    finHelp: "The number printed on the front of your Fayda card.",
+    fileHint: "JPG, PNG, WebP or PDF · up to 10 MB",
+    dropPrefix: "Drag & drop or ",
+    dropBrowse: "browse file",
+    dropSub: "Make sure all four corners of the ID are visible",
+    previewAlt: "ID preview",
+    readyToSubmit: "Ready to submit",
+    replaceFile: "Replace",
+    removeFileAria: "Remove file",
+    biometricNoteBefore: "Identity verification uses ",
+    biometricNoteStrong: "Fayda (eSignet) biometrics",
+    biometricNoteAfter: ". After submitting your ID here, you can complete the verification check directly from the Identity section. Your document is transmitted over an encrypted connection.",
+    consent: "By submitting, you confirm this document is yours, valid, and unaltered.",
+    submittedBtn: "Submitted",
+    stepsAria: "Verification process",
+    nextLabel: "Next",
+    step1Label: "Submit ID",
+    step2Label: "Biometric selfie in secure popup",
+    step3Label: "Tier 1 decision",
+    checklistSub: "Tips for instant, automatic approval",
+    complianceSub: "National Bank of Ethiopia (NBE) & PDPP compliant",
+  },
+  am: {
+    badFileFormat: "የማይደገፍ ቅርጸት — JPG፣ PNG፣ WebP ወይም PDF ይጠቀሙ።",
+    fileTooLarge: "ፋይሉ ከ10 MB በላይ ነው — እባክዎ አነስ ያለ ፋይል ይጫኑ።",
+    errName: "በመታወቂያዎ ላይ እንደተጻፈው ሙሉ ስምዎን ያስገቡ።",
+    errDob: "ትክክለኛ የልደት ቀን ያስገቡ።",
+    errFin: "የፋይዳ መታወቂያ ቁጥርዎን ያስገቡ።",
+    errFile: "የፋይዳ መታወቂያዎን ፎቶ ወይም PDF ይጫኑ።",
+    biometricSuccess: "ደረጃ 1 ማረጋገጫን ለማጠናቀቅ ከማንነት ክፍል ውስጥ የባዮሜትሪክ ሰልፊ ምርመራውን ያጠናቅቁ።",
+    submitFailed: "ማረጋገጫውን መላክ አልተቻለም",
+    errTin: "የግብር ከፋይ መለያ ቁጥር (TIN) ወይም የንግድ ምዝገባ ቁጥር ያስገቡ።",
+    tier2Requested: "የደረጃ 2 ግምገማ ተጠይቋል። የተገዢነት ባለሙያ የማጣሪያ ውጤቱን ይገመግማል።",
+    tier2Failed: "ደረጃ 2 መጠየቅ አልተቻለም",
+    chipAwaiting: "ደረጃ 1 · ሰነዶች በመጠበቅ ላይ",
+    chipVerified: (isTier2) => `${isTier2 ? "ደረጃ 2" : "ደረጃ 1"} · የተረጋገጠ`,
+    chipReview: "ደረጃ 1 · በግምገማ ላይ",
+    chipRejected: "ደረጃ 1 · እርምጃ ያስፈልጋል",
+    securedByFayda: "በFayda eSignet የተጠበቀ",
+    documentsSubmitted: "ሰነዶች ቀርበዋል",
+    editDetails: "ዝርዝሮችን አርትዕ",
+    submissionError: "የማቅረቢያ ስህተት",
+    finHelp: "በፋይዳ ካርድዎ ፊት ለፊት የታተመው ቁጥር።",
+    fileHint: "JPG፣ PNG፣ WebP ወይም PDF · እስከ 10 MB",
+    dropPrefix: "ጎትተው ያስቀምጡ ወይም ",
+    dropBrowse: "ፋይል ይምረጡ",
+    dropSub: "የመታወቂያው አራቱም ማዕዘኖች በግልጽ መታየታቸውን ያረጋግጡ",
+    previewAlt: "የመታወቂያ ቅድመ-ዕይታ",
+    readyToSubmit: "ለማቅረብ ዝግጁ ነው",
+    replaceFile: "ቀይር",
+    removeFileAria: "ፋይል አስወግድ",
+    biometricNoteBefore: "የማንነት ማረጋገጫ ",
+    biometricNoteStrong: "Fayda (eSignet) ባዮሜትሪክስን",
+    biometricNoteAfter: " ይጠቀማል። መታወቂያዎን እዚህ ካስገቡ በኋላ የማረጋገጫ ምርመራውን በቀጥታ ከማንነት ክፍል ማጠናቀቅ ይችላሉ። ሰነድዎ በተመሰጠረ ግንኙነት ይተላለፋል።",
+    consent: "በማቅረብዎ ይህ ሰነድ የእርስዎ፣ ትክክለኛ እና ያልተቀየረ መሆኑን ያረጋግጣሉ።",
+    submittedBtn: "ቀርቧል",
+    stepsAria: "የማረጋገጫ ሂደት",
+    nextLabel: "ቀጣይ",
+    step1Label: "መታወቂያ ያቅርቡ",
+    step2Label: "ደህንነቱ በተጠበቀ መስኮት የባዮሜትሪክ ሰልፊ",
+    step3Label: "የደረጃ 1 ውሳኔ",
+    checklistSub: "ፈጣንና አውቶማቲክ ማጽደቂያ ምክሮች",
+    complianceSub: "ከኢትዮጵያ ብሔራዊ ባንክ (NBE) እና PDPP ጋር የተጣጣመ",
+  },
+  om: {
+    badFileFormat: "Bifa hin deeggaramne — JPG, PNG, WebP ykn PDF fayyadamaa.",
+    fileTooLarge: "Faayilichi MB 10 ol caala — maaloo faayilii xiqqaa fe'aa.",
+    errName: "Akkuma waraqaa eenyummaa keessan irratti barreeffametti maqaa guutuu keessan galchaa.",
+    errDob: "Guyyaa dhalootaa sirrii ta'e galchaa.",
+    errFin: "Lakkoofsa eenyummaa Fayda keessan galchaa.",
+    errFile: "Suuraa ykn PDF eenyummaa Fayda keessan fe'aa.",
+    biometricSuccess: "Mirkaneessa Sadarkaa 1 xumuruuf kutaa Eenyummaa keessaa qorannoo selfie baayomeetrikii xumuraa.",
+    submitFailed: "Mirkaneessa erguun hin danda'amne",
+    errTin: "Lakkoofsa TIN ykn galmee daldalaa galchaa.",
+    tier2Requested: "Gamaaggamni Sadarkaa 2 gaafatameera. Qondaalli seera-kabachiisaa bu'aa qulqulleessuu ni ilaala.",
+    tier2Failed: "Sadarkaa 2 gaafachuun hin danda'amne",
+    chipAwaiting: "Sadarkaa 1 · Sanadoota eegaa jira",
+    chipVerified: (isTier2) => `${isTier2 ? "Sadarkaa 2" : "Sadarkaa 1"} · Mirkanaa'eera`,
+    chipReview: "Sadarkaa 1 · Gamaaggama irra",
+    chipRejected: "Sadarkaa 1 · Tarkaanfii barbaachisa",
+    securedByFayda: "Fayda eSignet'n eegama",
+    documentsSubmitted: "Sanadoonni ergamaniiru",
+    editDetails: "Bal'ina gulaali",
+    submissionError: "Dogoggora erguu",
+    finHelp: "Lakkoofsa fuuldura kaardii Fayda keessan irratti maxxanfame.",
+    fileHint: "JPG, PNG, WebP ykn PDF · hanga MB 10",
+    dropPrefix: "Harkisaatii kaa'aa ykn ",
+    dropBrowse: "faayilii filadhaa",
+    dropSub: "Kallattiiwwan arfan waraqaa eenyummaa ifatti mul'achuu isaanii mirkaneeffadhaa",
+    previewAlt: "Dur-argii waraqaa eenyummaa",
+    readyToSubmit: "Erguuf qophii dha",
+    replaceFile: "Bakka buusi",
+    removeFileAria: "Faayilii balleessi",
+    biometricNoteBefore: "Mirkaneessi eenyummaa ",
+    biometricNoteStrong: "baayomeetrikii Fayda (eSignet)",
+    biometricNoteAfter: " fayyadama. Waraqaa eenyummaa keessan asitti erga ergitanii booda, qorannoo mirkaneessaa kallattiin kutaa Eenyummaa keessaa xumuruu dandeessu. Sanadni keessan walqunnamtii icciitaa'een darba.",
+    consent: "Erguudhaan, sanadni kun kan keessan, sirrii fi kan hin jijjiiramne ta'uu ni mirkaneessitu.",
+    submittedBtn: "Ergameera",
+    stepsAria: "Adeemsa mirkaneessaa",
+    nextLabel: "Itti aanee",
+    step1Label: "Eenyummaa ergi",
+    step2Label: "Selfie baayomeetrikii foddaa nageenyaa keessatti",
+    step3Label: "Murtoo Sadarkaa 1",
+    checklistSub: "Gorsaawwan mirkaneessa saffisaa fi ofumaan argachuuf",
+    complianceSub: "Baankii Biyyaalessaa Itoophiyaa (NBE) & PDPP waliin walsima",
+  },
+  ti: {
+    badFileFormat: "ዘይድገፍ ቅርጺ — JPG፣ PNG፣ WebP ወይ PDF ተጠቐሙ።",
+    fileTooLarge: "እቲ ፋይል ልዕሊ 10 MB እዩ — በጃኹም ዝነኣሰ ፋይል ጽዓኑ።",
+    errName: "ኣብ መንነትኩም ከም ዝተጻሕፈ ሙሉእ ስምኩም የእትዉ።",
+    errDob: "ቅኑዕ ዕለተ ልደት የእትዉ።",
+    errFin: "ቁጽሪ መንነት ፋይዳኹም የእትዉ።",
+    errFile: "ስእሊ ወይ PDF መንነት ፋይዳኹም ጽዓኑ።",
+    biometricSuccess: "ምርግጋጽ ደረጃ 1 ንምዝዛም ካብ ክፍሊ መንነት መርመራ ባዮሜትሪክ ሰልፊ ዛዝሙ።",
+    submitFailed: "ምርግጋጽ ምልኣኽ ኣይተኻእለን",
+    errTin: "ቁጽሪ ግብሪ (TIN) ወይ ቁጽሪ ምዝገባ ንግዲ የእትዉ።",
+    tier2Requested: "ግምገማ ደረጃ 2 ተሓቲቱ ኣሎ። ክኢላ ተገዛእነት ውጽኢት መጽረዪ ክግምግሞ እዩ።",
+    tier2Failed: "ደረጃ 2 ምሕታት ኣይተኻእለን",
+    chipAwaiting: "ደረጃ 1 · ሰነዳት ይጽበ ኣሎ",
+    chipVerified: (isTier2) => `${isTier2 ? "ደረጃ 2" : "ደረጃ 1"} · ተረጋጊጹ`,
+    chipReview: "ደረጃ 1 · ኣብ ግምገማ",
+    chipRejected: "ደረጃ 1 · ስጉምቲ የድሊ",
+    securedByFayda: "ብFayda eSignet ዝተሓለወ",
+    documentsSubmitted: "ሰነዳት ቀሪቦም",
+    editDetails: "ዝርዝራት ኣርትዕ",
+    submissionError: "ጌጋ ምቕራብ",
+    finHelp: "ኣብ ቅድሚት ካርድ ፋይዳኹም ዝተሓተመ ቁጽሪ።",
+    fileHint: "JPG፣ PNG፣ WebP ወይ PDF · ክሳብ 10 MB",
+    dropPrefix: "ስሒብኩም ኣቐምጡ ወይ ",
+    dropBrowse: "ፋይል ምረጹ",
+    dropSub: "ኣርባዕቲኦም ኩርናዓት እቲ መንነት ብግልጺ ከም ዝረኣዩ ኣረጋግጹ",
+    previewAlt: "ቅድመ-ርኢት መንነት",
+    readyToSubmit: "ንምቕራብ ድሉው እዩ",
+    replaceFile: "ቀይር",
+    removeFileAria: "ፋይል ኣልግስ",
+    biometricNoteBefore: "ምርግጋጽ መንነት ",
+    biometricNoteStrong: "ባዮሜትሪክስ Fayda (eSignet)",
+    biometricNoteAfter: " ይጥቀም። መንነትኩም ኣብዚ ምስ ኣእተኹም ነቲ መርመራ ምርግጋጽ ብቀጥታ ካብ ክፍሊ መንነት ክትዛዝምዎ ትኽእሉ ኢኹም። ሰነድኩም ብምስጢራዊ መስመር ይመሓላለፍ።",
+    consent: "ብምቕራብኩም እዚ ሰነድ ናትኩም፣ ቅኑዕን ዘይተለወጠን ምዃኑ ተረጋግጹ።",
+    submittedBtn: "ቀሪቡ",
+    stepsAria: "መስርሕ ምርግጋጽ",
+    nextLabel: "ዝቕጽል",
+    step1Label: "መንነት ኣቕርቡ",
+    step2Label: "ኣብ ውሑስ መስኮት ባዮሜትሪክ ሰልፊ",
+    step3Label: "ውሳነ ደረጃ 1",
+    checklistSub: "ቅልጡፍን ኣውቶማቲክን ፍቓድ ንምርካብ ምኽርታት",
+    complianceSub: "ምስ ብሄራዊ ባንክ ኢትዮጵያ (NBE) ከምኡ'ውን PDPP ዝተሳነየ",
+  },
+};
+
 // === MAIN COMPONENT ===
 export function BrowserVerification() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const k = t.workspace.kycFlow;
+  const copy = BV_COPY[language] ?? BV_COPY.en;
   const [status, setStatus] = useState<KycStatusResponse | null>(null);
   const [fullName, setFullName] = useState("");
   const [dob, setDob] = useState("");
@@ -79,14 +294,14 @@ export function BrowserVerification() {
     if (!validTypes.includes(file.type) && !isExtensionOk) {
       setFieldErrors((prev) => ({
         ...prev,
-        file: "Unsupported format — use JPG, PNG, WebP or PDF.",
+        file: copy.badFileFormat,
       }));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
       setFieldErrors((prev) => ({
         ...prev,
-        file: "File is larger than 10 MB — please upload a smaller file.",
+        file: copy.fileTooLarge,
       }));
       return;
     }
@@ -110,22 +325,22 @@ export function BrowserVerification() {
     let firstBadId: string | null = null;
 
     if (fullName.trim().length < 2) {
-      errors.name = "Enter your full name as shown on your ID.";
+      errors.name = copy.errName;
       if (!firstBadId) firstBadId = "fullName";
     }
 
     if (!dob || new Date(dob) > new Date()) {
-      errors.dob = "Enter a valid date of birth.";
+      errors.dob = copy.errDob;
       if (!firstBadId) firstBadId = "dob";
     }
 
     if (!documentNumber.trim()) {
-      errors.fin = "Enter your Fayda ID number.";
+      errors.fin = copy.errFin;
       if (!firstBadId) firstBadId = "fin";
     }
 
     if (!idPhoto) {
-      errors.file = "Upload a photo or PDF of your Fayda ID.";
+      errors.file = copy.errFile;
       if (!firstBadId) firstBadId = "dropzone";
     }
 
@@ -151,11 +366,11 @@ export function BrowserVerification() {
 
       await api.submitKycDocument(data);
       setSubmitted(true);
-      setMessage("Complete the biometric selfie check from the Identity section to finish Tier 1 verification.");
+      setMessage(copy.biometricSuccess);
       await refresh();
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Unable to submit verification",
+        err instanceof Error ? err.message : copy.submitFailed,
       );
     } finally {
       setSending(false);
@@ -175,7 +390,7 @@ export function BrowserVerification() {
 
   const requestTier2 = async () => {
     if (!tin.trim() && !businessRegNumber.trim()) {
-      setErrorMessage("Enter a TIN or business registration number.");
+      setErrorMessage(copy.errTin);
       return;
     }
     setSending(true);
@@ -185,13 +400,11 @@ export function BrowserVerification() {
         tin: tin.trim() || undefined,
         businessRegNumber: businessRegNumber.trim() || undefined,
       });
-      setMessage(
-        "Tier 2 review requested. A compliance officer will review the screening result.",
-      );
+      setMessage(copy.tier2Requested);
       await refresh();
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Unable to request Tier 2",
+        err instanceof Error ? err.message : copy.tier2Failed,
       );
     } finally {
       setSending(false);
@@ -211,13 +424,13 @@ export function BrowserVerification() {
   const isReview = submitted || currentStatus === "UNDER_REVIEW";
   const isVerified = currentStatus === "VERIFIED";
 
-  let statusChipText = "Tier 1 · Awaiting documents";
+  let statusChipText = copy.chipAwaiting;
   if (isVerified) {
-    statusChipText = `${currentTier === "TIER_2" ? "Tier 2" : "Tier 1"} · Verified`;
+    statusChipText = copy.chipVerified(currentTier === "TIER_2");
   } else if (isReview) {
-    statusChipText = "Tier 1 · In review";
+    statusChipText = copy.chipReview;
   } else if (currentStatus === "REJECTED") {
-    statusChipText = "Tier 1 · Action required";
+    statusChipText = copy.chipRejected;
   }
 
   return (
@@ -378,7 +591,7 @@ export function BrowserVerification() {
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 22s8-3.5 8-10V5l-8-3-8 3v7c0 6.5 8 10 8 10z" />
                 </svg>
-                Secured by Fayda eSignet
+                {copy.securedByFayda}
               </span>
             </div>
           </header>
@@ -393,11 +606,11 @@ export function BrowserVerification() {
                 <path d="m8.5 12.5 2.5 2.5 5-5.5" />
               </svg>
               <div>
-                <strong>Documents submitted</strong>
-                <p>{message || "Complete the biometric selfie check from the Identity section to finish Tier 1 verification."}</p>
+                <strong>{copy.documentsSubmitted}</strong>
+                <p>{message || copy.biometricSuccess}</p>
               </div>
               <button type="button" id="resetDemo" onClick={resetForm}>
-                Edit details
+                {copy.editDetails}
               </button>
             </div>
           )}
@@ -410,7 +623,7 @@ export function BrowserVerification() {
                 <path d="M12 8v4M12 16h.01" />
               </svg>
               <div>
-                <strong style={{ color: "var(--danger)" }}>Submission error</strong>
+                <strong style={{ color: "var(--danger)" }}>{copy.submissionError}</strong>
                 <p style={{ color: "var(--text)" }}>{errorMessage}</p>
               </div>
             </div>
@@ -518,7 +731,7 @@ export function BrowserVerification() {
                     }}
                   />
                 </div>
-                <p className="idv-help">The number printed on the front of your Fayda card.</p>
+                <p className="idv-help">{copy.finHelp}</p>
                 {fieldErrors.fin && (
                   <p className="idv-error">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -536,7 +749,7 @@ export function BrowserVerification() {
                   <span className="idv-label" id="uploadLabel">
                     {k.faydaPhotoLabel || "Fayda ID photo"}
                   </span>
-                  <span className="idv-label-hint">JPG, PNG, WebP or PDF · up to 10 MB</span>
+                  <span className="idv-label-hint">{copy.fileHint}</span>
                 </div>
 
                 <div
@@ -585,17 +798,17 @@ export function BrowserVerification() {
                         </svg>
                       </div>
                       <p className="idv-drop-title">
-                        Drag &amp; drop or <span className="browse">browse file</span>
+                        {copy.dropPrefix}<span className="browse">{copy.dropBrowse}</span>
                       </p>
                       <p className="idv-drop-sub" id="dropSub">
-                        Make sure all four corners of the ID are visible
+                        {copy.dropSub}
                       </p>
                     </div>
                   ) : (
                     <div className="idv-file">
                       <div className="idv-file-thumb" id="fileThumb">
                         {previewUrl ? (
-                          <img src={previewUrl} alt="ID preview" />
+                          <img src={previewUrl} alt={copy.previewAlt} />
                         ) : (
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -614,7 +827,7 @@ export function BrowserVerification() {
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
                               <path d="m4.5 12.5 5 5 10-11" />
                             </svg>
-                            Ready to submit
+                            {copy.readyToSubmit}
                           </span>
                         </p>
                       </div>
@@ -629,13 +842,13 @@ export function BrowserVerification() {
                             fileInputRef.current?.click();
                           }}
                         >
-                          Replace
+                          {copy.replaceFile}
                         </button>
                         <button
                           type="button"
                           className="remove"
                           id="removeFile"
-                          aria-label="Remove file"
+                          aria-label={copy.removeFileAria}
                           disabled={sending || isReview}
                           onClick={(e) => {
                             e.stopPropagation();
@@ -684,14 +897,16 @@ export function BrowserVerification() {
                 </svg>
               </div>
               <p>
-                Identity verification uses <strong>Fayda (eSignet) biometrics</strong>. After submitting your ID here, you can complete the verification check directly from the Identity section. Your document is transmitted over an encrypted connection.
+                {copy.biometricNoteBefore}
+                <strong>{copy.biometricNoteStrong}</strong>
+                {copy.biometricNoteAfter}
               </p>
             </div>
 
             {/* Submit row */}
             <div className="idv-actions">
               <p className="idv-consent">
-                By submitting, you confirm this document is yours, valid, and unaltered.
+                {copy.consent}
               </p>
               <button
                 className={`idv-submit ${sending ? "loading" : ""}`}
@@ -705,7 +920,7 @@ export function BrowserVerification() {
                   <path d="m9 12 2 2 4-4" />
                 </svg>
                 <span id="submitLabel">
-                  {sending ? (k.submittingBtn || "Submitting…") : isReview ? "Submitted" : (k.submitTier1Btn || "Submit Tier 1 documents")}
+                  {sending ? (k.submittingBtn || "Submitting…") : isReview ? copy.submittedBtn : (k.submitTier1Btn || "Submit Tier 1 documents")}
                 </span>
               </button>
             </div>
@@ -713,22 +928,22 @@ export function BrowserVerification() {
         </div>
 
         {/* What happens next strip */}
-        <footer className="idv-steps" aria-label="Verification process">
-          <span className="idv-steps-label">Next</span>
+        <footer className="idv-steps" aria-label={copy.stepsAria}>
+          <span className="idv-steps-label">{copy.nextLabel}</span>
           <span className={`idv-step ${!isReview && !isVerified ? "current" : ""}`} id="step1">
-            <b>1</b>Submit ID
+            <b>1</b>{copy.step1Label}
           </span>
           <svg className="idv-step-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m9 6 6 6-6 6" />
           </svg>
           <span className={`idv-step ${isReview && !isVerified ? "current" : ""}`} id="step2">
-            <b>2</b>Biometric selfie in secure popup
+            <b>2</b>{copy.step2Label}
           </span>
           <svg className="idv-step-arrow" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="m9 6 6 6-6 6" />
           </svg>
           <span className={`idv-step ${isVerified ? "current" : ""}`} id="step3">
-            <b>3</b>Tier 1 decision
+            <b>3</b>{copy.step3Label}
           </span>
         </footer>
       </section>
@@ -786,7 +1001,7 @@ export function BrowserVerification() {
             </div>
             <div>
               <h2 className="idv-sidebar-title">{k.checklistTitle || "Photo Guidelines"}</h2>
-              <p className="idv-sidebar-sub">Tips for instant, automatic approval</p>
+              <p className="idv-sidebar-sub">{copy.checklistSub}</p>
             </div>
           </div>
           <ul className="idv-checklist">
@@ -822,7 +1037,7 @@ export function BrowserVerification() {
             </div>
             <div>
               <h2 className="idv-sidebar-title">{k.securityTitle || "Compliance & Privacy"}</h2>
-              <p className="idv-sidebar-sub">National Bank of Ethiopia (NBE) &amp; PDPP compliant</p>
+              <p className="idv-sidebar-sub">{copy.complianceSub}</p>
             </div>
           </div>
           <p className="idv-security-text">

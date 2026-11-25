@@ -9,7 +9,7 @@ export function mainMenuKeyboard(ctx: BotContext): InlineKeyboard {
   // LAN address is rejected and would fail the entire sendMessage.
   const frontendUrl = buildPublicWebAppUrl("/");
   if (frontendUrl) {
-    kb.webApp("Open Yekis Jobs", frontendUrl).row();
+    kb.webApp(ctx.t("open_yekis_jobs_btn") || "Open Yekis Jobs", frontendUrl).row();
   }
 
   // Common for all authenticated users

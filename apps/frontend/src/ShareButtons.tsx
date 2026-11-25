@@ -1,5 +1,6 @@
 import { Share2, MessageCircle, Link2 } from "lucide-react";
 import { useState } from "react";
+import { type Language, useI18n } from "./i18n";
 
 function Twitter(props: { size?: number }) {
   return (
@@ -25,7 +26,49 @@ interface ShareButtonsProps {
   compact?: boolean;
 }
 
+const SHARE_COPY: Record<
+  Language,
+  {
+    share: string;
+    telegramAria: string;
+    xAria: string;
+    copyLink: string;
+    copied: string;
+  }
+> = {
+  en: {
+    share: "Share",
+    telegramAria: "Share on Telegram",
+    xAria: "Share on X",
+    copyLink: "Copy link",
+    copied: "Copied!",
+  },
+  am: {
+    share: "አጋራ",
+    telegramAria: "በቴሌግራም አጋራ",
+    xAria: "በX አጋራ",
+    copyLink: "አገናኝ ቅዳ",
+    copied: "ተቀድቷል!",
+  },
+  om: {
+    share: "Qoodi",
+    telegramAria: "Telegram irratti qoodi",
+    xAria: "X irratti qoodi",
+    copyLink: "Liinkii waraabi",
+    copied: "Waraabameera!",
+  },
+  ti: {
+    share: "ኣካፍል",
+    telegramAria: "ብቴሌግራም ኣካፍል",
+    xAria: "ብX ኣካፍል",
+    copyLink: "ሊንክ ቅዳሕ",
+    copied: "ተቐዲሑ!",
+  },
+};
+
 export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
+  const { language } = useI18n();
+  const copy = SHARE_COPY[language] ?? SHARE_COPY.en;
   const [copied, setCopied] = useState(false);
   const shareUrl =
     url ||
@@ -61,10 +104,10 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
         <button
           onClick={handleNativeShare}
           className="share-btn share-native"
-          aria-label="Share"
+          aria-label={copy.share}
         >
           <Share2 size={16} />
-          {!compact && <span>Share</span>}
+          {!compact && <span>{copy.share}</span>}
         </button>
       )}
       <a
@@ -72,7 +115,7 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
         target="_blank"
         rel="noopener noreferrer"
         className="share-btn share-telegram"
-        aria-label="Share on Telegram"
+        aria-label={copy.telegramAria}
       >
         <MessageCircle size={16} />
         {!compact && <span>Telegram</span>}
@@ -82,7 +125,7 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
         target="_blank"
         rel="noopener noreferrer"
         className="share-btn share-twitter"
-        aria-label="Share on X"
+        aria-label={copy.xAria}
       >
         <Twitter size={16} />
         {!compact && <span>X</span>}
@@ -90,10 +133,10 @@ export function ShareButtons({ title, url, compact }: ShareButtonsProps) {
       <button
         onClick={handleCopy}
         className="share-btn share-copy"
-        aria-label="Copy link"
+        aria-label={copy.copyLink}
       >
         <Link2 size={16} />
-        {!compact && <span>{copied ? "Copied!" : "Copy link"}</span>}
+        {!compact && <span>{copied ? copy.copied : copy.copyLink}</span>}
       </button>
     </div>
   );

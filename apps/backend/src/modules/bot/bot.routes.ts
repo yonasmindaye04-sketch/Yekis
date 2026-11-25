@@ -32,52 +32,74 @@ function webhookOrigin(url: string | undefined): string | null {
   }
 }
 
-// Webhook endpoint - must be before body parser for raw body access
+/**
+ * Authenticates a Telegram webhook delivery before its body is parsed.
+ *
+ * Telegram sends the configured secret in this header, and it is the only thing
+ * distinguishing a genuine update from anybody who found the URL. Without it
+ * this endpoint is an open door: it runs commands on behalf of whoever posts
+ * to it, and Mini App initData payloads are bearer credentials.
+ *
+ * The check used to be skipped entirely when the secret was unset
+ * (`if (env.TELEGRAM_WEBHOOK_SECRET && ...)`). Production is protected by
+ * assertProductionSafety refusing to boot without one, so the gap was dev and
+ * staging — the environments most likely to be reachable and least likely to
+ * be watched. An unset secret is now a hard failure: fail closed, and say why.
+ */
+function requireTelegramWebhookSecret(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
+  if (!configuredSecret) {
+    logger.error(
+      {},
+      "TELEGRAM_WEBHOOK_SECRET is not set - refusing webhook updates rather than accepting unauthenticated ones",
+    );
+    res.status(503).json({
+      error: "WEBHOOK_NOT_CONFIGURED",
+      message: "Webhook secret is not configured; updates are refused.",
+    });
+    return;
+  }
+
+  const secretToken = req.headers["x-telegram-bot-api-secret-token"];
+  if (
+    typeof secretToken !== "string" ||
+    !timingSafeEqualStrings(secretToken, configuredSecret)
+  ) {
+    logger.warn(
+      { secretProvided: typeof secretToken === "string" },
+      "Invalid webhook secret token",
+    );
+    res.status(401).json({ error: "Invalid secret token" });
+    return;
+  }
+
+  next();
+}
+
+// Telegram webhook endpoint.
+//
+// Telegram authenticates webhook deliveries with the secret-token HEADER, not
+// with a signature over the request body. grammY's Express adapter reads the
+// update from `req.body`, though, and this router is mounted before the
+// application's global `express.json()` middleware so the payment webhook
+// routes can preserve their raw bytes. Without a route-local JSON parser,
+// `req.body` was undefined here: every genuine Telegram delivery reached the
+// adapter as `undefined`, the request failed with HTTP 500, and Telegram kept
+// retrying while the bot appeared completely dead.
+//
+// Authenticate first, then parse this route's JSON explicitly. The payment
+// webhooks still use their raw body parser; they verify signatures over the
+// exact bytes sent by a provider.
 router.post(
   "/webhook",
+  requireTelegramWebhookSecret,
+  json({ limit: "1mb" }),
   async (req: Request, res: Response, next: NextFunction) => {
-try {
-      // Authentication comes FIRST, before getBot() and before any body
-      // handling. An unauthenticated caller must not be able to make the process
-      // do work, and the two failure modes must stay distinguishable so a
-      // misconfiguration is not mistaken for an attack.
-      //
-      // Telegram sends the configured secret in this header, and it is the only
-      // thing distinguishing a genuine update from anybody who found the URL.
-      // Without it this endpoint is an open door: it runs commands on behalf of
-      // whoever posts to it, and Mini App initData payloads are bearer
-      // credentials.
-      //
-      // The check used to be skipped entirely when the secret was unset
-      // (`if (env.TELEGRAM_WEBHOOK_SECRET && ...)`). Production is protected by
-      // assertProductionSafety refusing to boot without one, so the gap was dev
-      // and staging — the environments most likely to be reachable and least
-      // likely to be watched. An unset secret is now a hard failure: fail closed,
-      // and say why.
-      const configuredSecret = env.TELEGRAM_WEBHOOK_SECRET;
-      if (!configuredSecret) {
-        logger.error(
-          {},
-          "TELEGRAM_WEBHOOK_SECRET is not set - refusing webhook updates rather than accepting unauthenticated ones",
-        );
-        return res.status(503).json({
-          error: "WEBHOOK_NOT_CONFIGURED",
-          message: "Webhook secret is not configured; updates are refused.",
-        });
-      }
-
-      const secretToken = req.headers["x-telegram-bot-api-secret-token"];
-      if (
-        typeof secretToken !== "string" ||
-        !timingSafeEqualStrings(secretToken, configuredSecret)
-      ) {
-        logger.warn(
-          { secretProvided: typeof secretToken === "string" },
-          "Invalid webhook secret token",
-        );
-        return res.status(401).json({ error: "Invalid secret token" });
-      }
-
+    try {
       const bot = getBot();
       if (!bot) {
         return res.status(503).json({ error: "Bot not initialized" });
@@ -86,7 +108,14 @@ try {
       // Use Grammy's webhook handler
       await webhookHandler(bot)(req, res);
     } catch (error) {
-      logger.error({ error }, "Webhook processing failed");
+      logger.error(
+        {
+          errorName: error instanceof Error ? error.name : typeof error,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        },
+        "Webhook processing failed",
+      );
       next(error);
     }
   },

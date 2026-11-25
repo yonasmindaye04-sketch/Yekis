@@ -271,7 +271,7 @@ The mounted base path is `/api/v1/escrow/topups` (with wallet shortcuts at `/api
 
 Manual top-up is `multipart/form-data` with `receipt`, `amountMinor`, `provider`, and `referenceNumber`. Supported rails are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`; maximum receipt size is 8 MB.
 
-Automatic top-up accepts `{ amountMinor, provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA" }` and returns `{ redirectUrl, topUpId }`. If an automated gateway is unreachable or experiences latency, users can utilize the **Manual Verification Fallback** to transfer funds directly and submit the transfer reference and receipt for immediate staff queue review without losing transaction context.
+Automatic top-up accepts `{ amountMinor, provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA" }` and returns `{ redirectUrl, topUpId, providerTransactionId }` (where `redirectUrl` is `null` in uncredentialed local mock mode; CBE Birr and M-Pesa checkout initiation is rejected with `400 PROVIDER_NOT_AVAILABLE` until merchant APIs are enabled). In `BrowserWallet.tsx`, initiating checkout opens a native `<dialog>` instructions modal that polls `GET /api/v1/wallet/topups/:topUpId` for confirmation, offers `Simulate Instant Payment (Sandbox)` in `import.meta.env.DEV`, and links directly to `POST /api/v1/wallet/topups/:topUpId/attach-receipt` (the **Manual Verification Fallback**) so users can transfer funds directly and submit the transfer reference and receipt for immediate staff queue review without losing transaction context.
 
 ## Signed Payment Webhooks
 

@@ -1,18 +1,20 @@
 import { BotContext } from "../types.js";
+import { toIntlLocale } from "../utils/markdown.js";
 
 export function formatJobCard(job: any, ctx: BotContext): string {
   const locale = ctx.i18n.locale;
+  const intlLocale = toIntlLocale(locale);
 
   const deadline = job.deadline
     ? new Date(job.deadline).toLocaleDateString(
-        locale === "am" ? "am-ET" : "en-US",
+        intlLocale,
         { year: "numeric", month: "short", day: "numeric" },
       )
     : ctx.t("jobs_no_deadline");
 
-  const budgetMin = (job.budgetMinMinor / 100).toLocaleString(locale);
+  const budgetMin = (job.budgetMinMinor / 100).toLocaleString(intlLocale);
   const budgetMax = job.budgetMaxMinor
-    ? (job.budgetMaxMinor / 100).toLocaleString(locale)
+    ? (job.budgetMaxMinor / 100).toLocaleString(intlLocale)
     : null;
   const budget = budgetMax
     ? `${budgetMin} - ${budgetMax} ETB`
@@ -25,6 +27,10 @@ export function formatJobCard(job: any, ctx: BotContext): string {
     CONTENT_WRITING: ctx.t("category_writing"),
     TRANSLATION: ctx.t("category_translation"),
     DATA_ENTRY: ctx.t("category_data_entry"),
+    VIDEO_PRODUCTION: ctx.t("category_video_production"),
+    ACCOUNTING_BOOKKEEPING: ctx.t("category_accounting"),
+    LEGAL_RESEARCH: ctx.t("category_legal_research"),
+    DATA_ANALYTICS: ctx.t("category_data_analytics"),
   };
 
   const statusMap: Record<string, string> = {
@@ -52,7 +58,7 @@ export function formatJobCard(job: any, ctx: BotContext): string {
 }
 
 export function formatProposalCard(proposal: any, ctx: BotContext): string {
-  const locale = ctx.i18n.locale;
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
 
   const statusMap: Record<string, string> = {
     SUBMITTED: ctx.t("proposal_status_submitted"),
@@ -62,15 +68,13 @@ export function formatProposalCard(proposal: any, ctx: BotContext): string {
     WITHDRAWN: ctx.t("proposal_status_withdrawn"),
   };
 
-  const amount = (proposal.quotedAmountMinor / 100).toLocaleString(locale);
+  const amount = (proposal.quotedAmountMinor / 100).toLocaleString(intlLocale);
   const status = statusMap[proposal.status] || proposal.status;
-  const createdAt = new Date(proposal.createdAt).toLocaleDateString(
-    locale === "am" ? "am-ET" : "en-US",
-  );
+  const createdAt = new Date(proposal.createdAt).toLocaleDateString(intlLocale);
 
   return (
-    ` *${escapeMd(proposal.job?.title || "Unknown Job")}*\n` +
-    ` ${amount} ETB | ⏱ ${proposal.estimatedDays} ${ctx.t("propose_days_label")}\n` +
+    ` *${escapeMd(proposal.job?.title || ctx.t("unknown_job"))}*\n` +
+    ` ${amount} ETB | ${proposal.estimatedDays} ${ctx.t("propose_days_label")}\n` +
     ` ${status}\n` +
     ` ${ctx.t("proposal_created")}: ${createdAt}\n` +
     `\n${escapeMd(proposal.coverLetter?.slice(0, 100) || "")}${proposal.coverLetter?.length > 100 ? "..." : ""}`
@@ -78,7 +82,7 @@ export function formatProposalCard(proposal: any, ctx: BotContext): string {
 }
 
 export function formatContractCard(contract: any, ctx: BotContext): string {
-  const locale = ctx.i18n.locale;
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
 
   const statusMap: Record<string, string> = {
     PENDING_SIGNATURES: ctx.t("contract_status_pending_signatures"),
@@ -88,10 +92,8 @@ export function formatContractCard(contract: any, ctx: BotContext): string {
   };
 
   const status = statusMap[contract.status] || contract.status;
-  const totalAmount = (contract.totalAmountMinor / 100).toLocaleString(locale);
-  const createdAt = new Date(contract.createdAt).toLocaleDateString(
-    locale === "am" ? "am-ET" : "en-US",
-  );
+  const totalAmount = (contract.totalAmountMinor / 100).toLocaleString(intlLocale);
+  const createdAt = new Date(contract.createdAt).toLocaleDateString(intlLocale);
 
   const clientSigned = contract.clientAcceptedAt
     ? ctx.t("contract_signed")
@@ -101,7 +103,7 @@ export function formatContractCard(contract: any, ctx: BotContext): string {
     : ctx.t("contract_pending");
 
   return (
-    ` *${escapeMd(contract.title || "Contract")}*\n` +
+    ` *${escapeMd(contract.title || ctx.t("contract_default_title"))}*\n` +
     ` ${status} | ${totalAmount} ETB\n` +
     ` ${ctx.t("contract_client")}: ${clientSigned} | ${ctx.t("contract_freelancer")}: ${freelancerSigned}\n` +
     ` ${ctx.t("contract_created")}: ${createdAt}\n` +
@@ -112,15 +114,15 @@ export function formatContractCard(contract: any, ctx: BotContext): string {
 }
 
 export function formatWalletCard(wallet: any, ctx: BotContext): string {
-  const locale = ctx.i18n.locale;
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
 
-  const balance = (wallet.balanceMinor / 100).toLocaleString(locale, {
+  const balance = (wallet.balanceMinor / 100).toLocaleString(intlLocale, {
     minimumFractionDigits: 2,
   });
-  const pending = (wallet.pendingMinor / 100).toLocaleString(locale, {
+  const pending = (wallet.pendingMinor / 100).toLocaleString(intlLocale, {
     minimumFractionDigits: 2,
   });
-  const available = (wallet.availableMinor / 100).toLocaleString(locale, {
+  const available = (wallet.availableMinor / 100).toLocaleString(intlLocale, {
     minimumFractionDigits: 2,
   });
 
@@ -133,6 +135,7 @@ export function formatWalletCard(wallet: any, ctx: BotContext): string {
 }
 
 export function formatDisputeCard(dispute: any, ctx: BotContext): string {
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
   const stageMap: Record<string, string> = {
     STAGE_1_NEGOTIATION: ctx.t("dispute_stage_negotiation"),
     STAGE_2_EVIDENCE: ctx.t("dispute_stage_evidence"),
@@ -156,8 +159,8 @@ export function formatDisputeCard(dispute: any, ctx: BotContext): string {
   return (
     ` *${ctx.t("dispute_id")}: ${dispute.id.slice(0, 8)}*\n` +
     ` ${stage} | ${category}\n` +
-    ` ${dispute.amountMinor ? (dispute.amountMinor / 100).toLocaleString() + " ETB" : ctx.t("dispute_amount_pending")}\n` +
-    ` ${ctx.t("dispute_created")}: ${new Date(dispute.createdAt).toLocaleDateString()}`
+    ` ${dispute.amountMinor ? (dispute.amountMinor / 100).toLocaleString(intlLocale) + " ETB" : ctx.t("dispute_amount_pending")}\n` +
+    ` ${ctx.t("dispute_created")}: ${new Date(dispute.createdAt).toLocaleDateString(intlLocale)}`
   );
 }
 
@@ -166,64 +169,64 @@ export function formatNotification(
   data: any,
   ctx: BotContext,
 ): string {
-  const locale = ctx.i18n.locale;
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
 
   const formatters: Record<string, (data: any) => string> = {
     "job.new_match": (d) =>
-      ` *${ctx.t("notify_job_new_match")}*\n` +
+      ` *${ctx.t("notify_job_new_match", { title: d.title, budget: (d.budgetMinor / 100).toLocaleString(intlLocale) })}*\n` +
       `${d.title}\n` +
-      ` ${(d.budgetMinor / 100).toLocaleString(locale)} ETB\n` +
-      ` ${new Date(d.deadline).toLocaleDateString(locale === "am" ? "am-ET" : "en-US")}`,
+      ` ${(d.budgetMinor / 100).toLocaleString(intlLocale)} ETB\n` +
+      ` ${new Date(d.deadline).toLocaleDateString(intlLocale)}`,
 
     "proposal.received": (d) =>
-      ` *${ctx.t("notify_proposal_received")}*\n` +
+      ` *${ctx.t("notify_proposal_received", { jobTitle: d.jobTitle, freelancerName: d.freelancerName })}*\n` +
       `${d.freelancerName} ${ctx.t("notify_proposal_for")} "${d.jobTitle}"\n` +
-      ` ${(d.amountMinor / 100).toLocaleString(locale)} ETB`,
+      ` ${(d.amountMinor / 100).toLocaleString(intlLocale)} ETB`,
 
     "proposal.accepted": (d) =>
-      ` *${ctx.t("notify_proposal_accepted")}*\n` +
-      `Your proposal for "${d.jobTitle}" was accepted!\n` +
+      ` *${ctx.t("notify_proposal_accepted", { jobTitle: d.jobTitle })}*\n` +
+      `${ctx.t("notify_proposal_accepted_detail", { jobTitle: d.jobTitle })}\n` +
       ` ${ctx.t("notify_contract_ready")}`,
 
     "escrow.funded": (d) =>
-      ` *${ctx.t("notify_escrow_funded")}*\n` +
-      `${(d.amountMinor / 100).toLocaleString(locale)} ETB ${ctx.t("notify_held_in_escrow")} "${d.title}"`,
+      ` *${ctx.t("notify_escrow_funded", { amount: (d.amountMinor / 100).toLocaleString(intlLocale), title: d.title })}*\n` +
+      `${(d.amountMinor / 100).toLocaleString(intlLocale)} ETB ${ctx.t("notify_held_in_escrow")} "${d.title}"`,
 
     "milestone.submitted": (d) =>
-      ` *${ctx.t("notify_milestone_submitted")}*\n` +
+      ` *${ctx.t("notify_milestone_submitted", { freelancerName: d.freelancerName, title: d.title })}*\n` +
       `${d.freelancerName} ${ctx.t("notify_submitted_work")} "${d.title}"\n` +
       ` ${ctx.t("notify_review_window")}`,
 
     "milestone.auto_release_warning": (d) =>
-      ` *${ctx.t("notify_auto_release_warning")}*\n` +
-      `${(d.amountMinor / 100).toLocaleString(locale)} ETB for "${d.title}"\n` +
+      ` *${ctx.t("notify_auto_release_warning", { title: d.title, amount: (d.amountMinor / 100).toLocaleString(intlLocale) })}*\n` +
+      `${ctx.t("notify_auto_release_detail", { amount: (d.amountMinor / 100).toLocaleString(intlLocale), title: d.title })}\n` +
       `${ctx.t("notify_review_now")}`,
 
     "milestone.released": (d) =>
-      ` *${ctx.t("notify_milestone_released")}*\n` +
-      `${(d.amountMinor / 100).toLocaleString(locale)} ETB ${ctx.t("notify_released_to")} ${d.freelancerName}`,
+      ` *${ctx.t("notify_milestone_released", { amount: (d.amountMinor / 100).toLocaleString(intlLocale), title: d.title })}*\n` +
+      `${(d.amountMinor / 100).toLocaleString(intlLocale)} ETB ${ctx.t("notify_released_to")} ${d.freelancerName}`,
 
     "dispute.raised": (d) =>
-      ` *${ctx.t("notify_dispute_raised")}*\n` +
+      ` *${ctx.t("notify_dispute_raised", { title: d.title })}*\n` +
       `"${d.title}" - ${d.category}\n` +
       `${ctx.t("notify_dispute_stage")}: ${d.stage}`,
 
     "dispute.mediation_proposal": (d) =>
-      ` *${ctx.t("notify_mediation_proposal")}*\n` +
+      ` *${ctx.t("notify_mediation_proposal", { title: d.title })}*\n` +
       `"${d.title}"\n` +
       `${ctx.t("notify_freelancer_share")}: ${d.freelancerShare}%`,
 
     "kyc.status_changed": (d) =>
-      `${d.status === "VERIFIED" ? "" : ""} *${ctx.t("notify_kyc_status")}*\n` +
+      ` *${ctx.t("notify_kyc_status", { status: d.status })}*\n` +
       `${ctx.t("kyc_tier_" + d.tier.toLowerCase())}: ${d.status}`,
 
     "wallet.topup_approved": (d) =>
-      ` *${ctx.t("notify_topup_approved")}*\n` +
-      `${(d.amountMinor / 100).toLocaleString(locale)} ETB ${ctx.t("notify_added_to_wallet")}`,
+      ` *${ctx.t("notify_topup_approved", { amount: (d.amountMinor / 100).toLocaleString(intlLocale) })}*\n` +
+      `${(d.amountMinor / 100).toLocaleString(intlLocale)} ETB ${ctx.t("notify_added_to_wallet")}`,
 
     "wallet.withdrawal_completed": (d) =>
       ` *${ctx.t("notify_withdrawal_completed")}*\n` +
-      `${(d.amountMinor / 100).toLocaleString(locale)} ETB ${ctx.t("notify_sent_to")} ${d.destination}`,
+      `${(d.amountMinor / 100).toLocaleString(intlLocale)} ETB ${ctx.t("notify_sent_to")} ${d.destination}`,
   };
 
   const formatter = formatters[event];
@@ -235,13 +238,12 @@ function escapeMd(text: string): string {
 }
 
 export function formatKycQueueItem(item: any, ctx: BotContext): string {
-  const locale = ctx.i18n?.locale || "en";
   return `*KYC Record*: ${escapeMd(item.id)}\nUser: ${escapeMd(item.user?.email || item.user?.phone || item.userId)}\nTier: ${item.tier}\nStatus: ${item.status}`;
 }
 
 export function formatTopupQueueItem(item: any, ctx: BotContext): string {
-  const locale = ctx.i18n?.locale || "en";
-  return `*Top-up*: ${escapeMd(item.id)}\nUser: ${escapeMd(item.user?.email || item.userId)}\nAmount: ${(item.amountMinor / 100).toLocaleString(locale)} ETB\nProvider: ${item.provider}`;
+  const intlLocale = toIntlLocale(ctx.i18n?.locale || "en");
+  return `*Top-up*: ${escapeMd(item.id)}\nUser: ${escapeMd(item.user?.email || item.userId)}\nAmount: ${(item.amountMinor / 100).toLocaleString(intlLocale)} ETB\nProvider: ${item.provider}`;
 }
 
 export function formatDisputeQueueItem(item: any, ctx: BotContext): string {

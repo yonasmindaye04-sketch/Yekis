@@ -83,6 +83,24 @@ describe("T0.4 log redaction", () => {
     expect(out).not.toContain("session=abc123");
   });
 
+  it("redacts the Telegram webhook secret header", () => {
+    const webhookSecret = "telegram-webhook-secret-that-must-not-be-logged";
+    const out = capture((l) =>
+      l.info(
+        {
+          req: {
+            headers: {
+              "x-telegram-bot-api-secret-token": webhookSecret,
+            },
+          },
+        },
+        "req",
+      ),
+    );
+    expect(out).not.toContain(webhookSecret);
+    expect(out).toContain("[REDACTED]");
+  });
+
   it("redacts secret keys at the ROOT of the logged object", () => {
     const out = capture((l) =>
       l.info(

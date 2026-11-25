@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Upload, Trash2, Check, Image as ImageIcon, Sparkles, SlidersHorizontal } from "lucide-react";
+import { type Language, useI18n } from "../i18n";
 
 const BANNER_OVERRIDE_PREFIX = "yekis_banner_override_";
 export const BANNER_UPDATED_EVENT = "yekis:banner-updated";
@@ -27,6 +28,156 @@ export interface BannerPresetDefinition {
   label: string;
   subtitle: string;
   background: string;
+}
+
+type BannerPresetText = Record<BannerPresetId, { label: string; subtitle: string }>;
+
+const BANNER_PRESET_TEXT: Record<Language, BannerPresetText> = {
+  en: {
+    "emerald-canopy": { label: "Emerald Canopy", subtitle: "Signature green radial glow" },
+    "abyssal-slate": { label: "Abyssal Slate", subtitle: "Deep architectural slate" },
+    "addis-sunrise": { label: "Addis Sunrise", subtitle: "Warm gold & highland horizon" },
+    "highland-indigo": { label: "Highland Indigo", subtitle: "Cobalt & twilight dusk" },
+    "warm-terracotta": { label: "Red Sea Coral", subtitle: "Muted bronze & mineral earth" },
+    "obsidian-grid": { label: "Obsidian Grid", subtitle: "Precision technical blueprint" },
+  },
+  am: {
+    "emerald-canopy": { label: "ኤመራልድ ካኖፒ", subtitle: "ልዩ አረንጓዴ ብርሃን" },
+    "abyssal-slate": { label: "ጥልቅ ስሌት", subtitle: "ጥልቅ የሥነ-ሕንጻ ግራጫ" },
+    "addis-sunrise": { label: "የአዲስ ንጋት", subtitle: "ሞቅ ያለ ወርቃማ እና የተራራ አድማስ" },
+    "highland-indigo": { label: "የደጋ ኢንዲጎ", subtitle: "ኮባልት እና የምሽት ብርሃን" },
+    "warm-terracotta": { label: "ቀይ ባሕር ኮራል", subtitle: "ለስላሳ ነሐስ እና የምድር ቀለም" },
+    "obsidian-grid": { label: "ኦብሲዲያን ግሪድ", subtitle: "ትክክለኛ የቴክኒክ ንድፍ" },
+  },
+  om: {
+    "emerald-canopy": { label: "Emerald Canopy", subtitle: "Ifa magariisa addaa" },
+    "abyssal-slate": { label: "Abyssal Slate", subtitle: "Diimaa-bulee gad-fagoo" },
+    "addis-sunrise": { label: "Bariisaa Finfinnee", subtitle: "Bifa warqee ho'aa fi gaarreenii" },
+    "highland-indigo": { label: "Highland Indigo", subtitle: "Buluee fi dimimmisa galgalaa" },
+    "warm-terracotta": { label: "Koraalii Galaana Diimaa", subtitle: "Bifa naasaa fi biyyoo" },
+    "obsidian-grid": { label: "Obsidian Grid", subtitle: "Saxaxa teeknikaa qindaa'aa" },
+  },
+  ti: {
+    "emerald-canopy": { label: "ኤመራልድ ካኖፒ", subtitle: "ፍሉይ ቀጠልያ ብርሃን" },
+    "abyssal-slate": { label: "ዓሚቕ ስሌት", subtitle: "ዓሚቕ ሕብሪ ስነ-ህንጻ" },
+    "addis-sunrise": { label: "ወጋሕታ ኣዲስ", subtitle: "ውዑይ ወርቃውን ኣድማስ ከበሳን" },
+    "highland-indigo": { label: "ከበሳ ኢንዲጎ", subtitle: "ኮባልትን ምሸታዊ ብርሃንን" },
+    "warm-terracotta": { label: "ኮራል ቀይሕ ባሕሪ", subtitle: "ህዱእ ነሓስን ሕብሪ መሬትን" },
+    "obsidian-grid": { label: "ኦብሲድያን ግሪድ", subtitle: "ንጹር ቴክኒካዊ ንድፊ" },
+  },
+};
+
+type BannerCopy = {
+  invalidImageType: string;
+  imageTooLarge: string;
+  couldNotRead: string;
+  couldNotProcess: string;
+  bannerAlt: string;
+  studioTitle: string;
+  studioSubtitle: string;
+  processingCover: string;
+  replaceCover: string;
+  uploadCover: string;
+  resetDefault: string;
+  done: string;
+  verticalFocus: string;
+  posTop: string;
+  posCenter: string;
+  posBottom: string;
+  customActiveNote: string;
+  curatedPresets: string;
+};
+
+const BANNER_COPY: Record<Language, BannerCopy> = {
+  en: {
+    invalidImageType: "Please choose a valid image file (JPG, PNG, WEBP, or GIF).",
+    imageTooLarge: "Banner image must be smaller than 10 MB.",
+    couldNotRead: "Could not read image file.",
+    couldNotProcess: "Could not process banner image.",
+    bannerAlt: "Profile cover banner",
+    studioTitle: "Cover Banner Customization",
+    studioSubtitle: "Upload a wide cover photo (recommended 1280×320) or pick a curated theme for your profile header card.",
+    processingCover: "Processing cover...",
+    replaceCover: "Replace Cover Photo",
+    uploadCover: "Upload Cover Photo",
+    resetDefault: "Reset Default",
+    done: "Done",
+    verticalFocus: "Image Vertical Focus:",
+    posTop: "Top",
+    posCenter: "Center",
+    posBottom: "Bottom",
+    customActiveNote: "Custom cover image active",
+    curatedPresets: "Curated Theme Presets",
+  },
+  am: {
+    invalidImageType: "እባክዎ ትክክለኛ የምስል ፋይል ይምረጡ (JPG፣ PNG፣ WEBP ወይም GIF)።",
+    imageTooLarge: "የባነር ምስሉ ከ10 MB ያነሰ መሆን አለበት።",
+    couldNotRead: "የምስል ፋይሉን ማንበብ አልተቻለም።",
+    couldNotProcess: "የባነር ምስሉን ማስኬድ አልተቻለም።",
+    bannerAlt: "የመገለጫ ሽፋን ባነር",
+    studioTitle: "የሽፋን ባነር ማስተካከያ",
+    studioSubtitle: "ሰፊ የሽፋን ፎቶ ይጫኑ (የሚመከር 1280×320) ወይም ለመገለጫ ራስጌዎ የተዘጋጀ ገጽታ ይምረጡ።",
+    processingCover: "ሽፋኑ በመዘጋጀት ላይ...",
+    replaceCover: "የሽፋን ፎቶ ቀይር",
+    uploadCover: "የሽፋን ፎቶ ጫን",
+    resetDefault: "ወደ ነባሪ መልስ",
+    done: "ተከናውኗል",
+    verticalFocus: "የምስል ቁመታዊ ትኩረት፡",
+    posTop: "ላይ",
+    posCenter: "መሃል",
+    posBottom: "ታች",
+    customActiveNote: "ብጁ የሽፋን ምስል ንቁ ነው",
+    curatedPresets: "የተመረጡ የገጽታ አማራጮች",
+  },
+  om: {
+    invalidImageType: "Maaloo faayilii suuraa sirrii filadhaa (JPG, PNG, WEBP, ykn GIF).",
+    imageTooLarge: "Suuraan baanarii MB 10 gadi ta'uu qaba.",
+    couldNotRead: "Faayilii suuraa dubbisuun hin danda'amne.",
+    couldNotProcess: "Suuraa baanarii qindeessuun hin danda'amne.",
+    bannerAlt: "Baanarii haguuggaa piroofaayilii",
+    studioTitle: "Sirreeffama Baanarii Haguuggaa",
+    studioSubtitle: "Suuraa haguuggaa bal'aa fe'aa (1280×320 gorfama) ykn mataa piroofaayilii keessaniif unka filadhaa.",
+    processingCover: "Haguuggaa qindeessaa jira...",
+    replaceCover: "Suuraa Haguuggaa Bakka Buusi",
+    uploadCover: "Suuraa Haguuggaa Fe'i",
+    resetDefault: "Gara Duraaniitti Deebisi",
+    done: "Xumurame",
+    verticalFocus: "Xiyyeeffannoo Dhaabbataa Suuraa:",
+    posTop: "Olii",
+    posCenter: "Gidduu",
+    posBottom: "Jala",
+    customActiveNote: "Suuraan haguuggaa dhuunfaa hojiirra jira",
+    curatedPresets: "Unkaalee Filataman",
+  },
+  ti: {
+    invalidImageType: "በጃኹም ቅኑዕ ፋይል ስእሊ ምረጹ (JPG፣ PNG፣ WEBP ወይ GIF)።",
+    imageTooLarge: "ስእሊ ባነር ካብ 10 MB ዝነኣሰ ክኸውን ኣለዎ።",
+    couldNotRead: "ፋይል ስእሊ ምንባብ ኣይተኻእለን።",
+    couldNotProcess: "ስእሊ ባነር ምስላጥ ኣይተኻእለን።",
+    bannerAlt: "መሸፈኒ ባነር ፕሮፋይል",
+    studioTitle: "ምትዕርራይ መሸፈኒ ባነር",
+    studioSubtitle: "ሰፊሕ መሸፈኒ ስእሊ ጽዓኑ (ዝምከር 1280×320) ወይ ንፕሮፋይልኩም ዝተዳለወ ቅዲ ምረጹ።",
+    processingCover: "መሸፈኒ ይስራሕ ኣሎ...",
+    replaceCover: "መሸፈኒ ስእሊ ቀይር",
+    uploadCover: "መሸፈኒ ስእሊ ጽዓን",
+    resetDefault: "ናብ ንቡር ምለስ",
+    done: "ተዛዚሙ",
+    verticalFocus: "ትኹል ኣተኲሮ ስእሊ፡",
+    posTop: "ላዕሊ",
+    posCenter: "ማእከል",
+    posBottom: "ታሕቲ",
+    customActiveNote: "ውልቃዊ መሸፈኒ ስእሊ ንጡፍ እዩ",
+    curatedPresets: "ዝተመርጹ ቅድታት",
+  },
+};
+
+export function getBannerPresets(language: Language): BannerPresetDefinition[] {
+  const txt = BANNER_PRESET_TEXT[language] ?? BANNER_PRESET_TEXT.en;
+  return BANNER_PRESETS.map((p) => ({
+    ...p,
+    label: txt[p.id]?.label ?? p.label,
+    subtitle: txt[p.id]?.subtitle ?? p.subtitle,
+  }));
 }
 
 export const BANNER_PRESETS: BannerPresetDefinition[] = [
@@ -135,22 +286,20 @@ export function compressBannerImage(
   file: File,
   maxWidth = 1280,
   maxHeight = 420,
+  language: Language = "en",
 ): Promise<string> {
+  const copy = BANNER_COPY[language] ?? BANNER_COPY.en;
   return new Promise((resolve, reject) => {
     if (!file.type.startsWith("image/")) {
-      reject(
-        new Error(
-          "Please choose a valid image file (JPG, PNG, WEBP, or GIF).",
-        ),
-      );
+      reject(new Error(copy.invalidImageType));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      reject(new Error("Banner image must be smaller than 10 MB."));
+      reject(new Error(copy.imageTooLarge));
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error("Could not read image file."));
+    reader.onerror = () => reject(new Error(copy.couldNotRead));
     reader.onload = () => {
       const dataUrl = reader.result as string;
       const img = new Image();
@@ -201,6 +350,8 @@ export const ProfileBannerSurface: React.FC<ProfileBannerSurfaceProps> = ({
   className = "",
   children,
 }) => {
+  const { language } = useI18n();
+  const copy = BANNER_COPY[language] ?? BANNER_COPY.en;
   const [stored, setStored] = useState<StoredBannerOverride>(() =>
     disableStoredOverride ? DEFAULT_BANNER_OVERRIDE : loadBannerOverride(userId),
   );
@@ -240,7 +391,7 @@ export const ProfileBannerSurface: React.FC<ProfileBannerSurfaceProps> = ({
       {showCustomImage && active.bannerUrl && (
         <img
           src={active.bannerUrl}
-          alt="Profile cover banner"
+          alt={copy.bannerAlt}
           referrerPolicy="no-referrer"
           className="hero-banner-img"
           style={{
@@ -268,6 +419,9 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
   onClose,
   compact = false,
 }) => {
+  const { language } = useI18n();
+  const copy = BANNER_COPY[language] ?? BANNER_COPY.en;
+  const presets = getBannerPresets(language);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -279,7 +433,7 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
     setError(null);
     setUploading(true);
     try {
-      const dataUrl = await compressBannerImage(file);
+      const dataUrl = await compressBannerImage(file, 1280, 420, language);
       onChange({
         ...value,
         mode: "custom",
@@ -288,7 +442,7 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
       });
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not process banner image.",
+        err instanceof Error ? err.message : copy.couldNotProcess,
       );
     } finally {
       setUploading(false);
@@ -336,10 +490,10 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
       <div className="banner-studio-header">
         <div className="banner-studio-title-wrap">
           <strong className="banner-studio-title">
-            Cover Banner Customization
+            {copy.studioTitle}
           </strong>
           <span className="banner-studio-subtitle">
-            Upload a wide cover photo (recommended 1280×320) or pick a curated theme for your profile header card.
+            {copy.studioSubtitle}
           </span>
         </div>
 
@@ -353,10 +507,10 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
             <Upload size={14} />
             <span>
               {uploading
-                ? "Processing cover..."
+                ? copy.processingCover
                 : isCustomActive
-                  ? "Replace Cover Photo"
-                  : "Upload Cover Photo"}
+                  ? copy.replaceCover
+                  : copy.uploadCover}
             </span>
           </button>
 
@@ -367,7 +521,7 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
               onClick={handleReset}
             >
               <Trash2 size={14} />
-              <span>Reset Default</span>
+              <span>{copy.resetDefault}</span>
             </button>
           )}
 
@@ -378,7 +532,7 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
               onClick={onClose}
             >
               <Check size={14} />
-              <span>Done</span>
+              <span>{copy.done}</span>
             </button>
           )}
         </div>
@@ -387,7 +541,7 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
       {isCustomActive && (
         <div className="banner-alignment-bar">
           <span className="banner-alignment-label">
-            <SlidersHorizontal size={13} /> Image Vertical Focus:
+            <SlidersHorizontal size={13} /> {copy.verticalFocus}
           </span>
           <div className="banner-alignment-group">
             {(["top", "center", "bottom"] as const).map((pos) => (
@@ -397,13 +551,17 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
                 className={`banner-align-btn ${(value.objectPosition || "center") === pos ? "active" : ""}`}
                 onClick={() => handlePositionChange(pos)}
               >
-                {pos === "top" ? "Top" : pos === "center" ? "Center" : "Bottom"}
+                {pos === "top"
+                  ? copy.posTop
+                  : pos === "center"
+                    ? copy.posCenter
+                    : copy.posBottom}
               </button>
             ))}
           </div>
           {value.bannerUrl && (
             <span className="banner-custom-active-note">
-              <ImageIcon size={13} /> Custom cover image active
+              <ImageIcon size={13} /> {copy.customActiveNote}
             </span>
           )}
         </div>
@@ -411,10 +569,10 @@ export const ProfileBannerStudio: React.FC<ProfileBannerStudioProps> = ({
 
       <div className="banner-presets-section">
         <div className="banner-presets-label">
-          <Sparkles size={13} /> Curated Theme Presets
+          <Sparkles size={13} /> {copy.curatedPresets}
         </div>
         <div className="banner-presets-grid">
-          {BANNER_PRESETS.map((preset) => {
+          {presets.map((preset) => {
             const isSelected =
               value.mode === "preset" && value.presetId === preset.id;
             return (

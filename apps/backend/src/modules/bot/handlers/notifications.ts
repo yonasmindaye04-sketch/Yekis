@@ -73,7 +73,7 @@ export async function sendNotification(
       await bot.api.sendMessage(user.telegramChatId, message, {
         parse_mode: "HTML", // Changed from MarkdownV2 per H4
         reply_markup: deepLink 
-          ? { inline_keyboard: [[{ text: "View", url: deepLink }]] }
+          ? { inline_keyboard: [[{ text: t("view_btn"), url: deepLink }]] }
           : undefined,
       });
     } catch (err: any) {

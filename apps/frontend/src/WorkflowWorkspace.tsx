@@ -22,6 +22,7 @@ import {
 } from "./api/client";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
+import { WORKFLOW_WORKSPACE_COPY } from "./workflowWorkspaceCopy";
 import {
   ConfirmActionModal,
   EscrowFeeBreakdown,
@@ -117,7 +118,8 @@ export function JobsWorkspace({
   /** Called when the person asks to go back to the briefs board. */
   onBrowseJobs?: () => void;
 }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const copy = WORKFLOW_WORKSPACE_COPY[language] ?? WORKFLOW_WORKSPACE_COPY.en;
   const jf = t.workspace.jobsFlow;
   const fb = t.workspace.feeBreakdown;
   const statuses = t.workspace.statuses;
@@ -192,7 +194,7 @@ export function JobsWorkspace({
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Action failed.";
+      const msg = err instanceof Error ? err.message : copy.common.actionFailed;
       try {
         fallbackUpdate();
         setMessage(success);
@@ -212,9 +214,7 @@ export function JobsWorkspace({
       amountMinor <= 0 ||
       !dueDate
     ) {
-      setErrorMessage(
-        "Add a detailed cover letter (min 20 chars), valid amount, delivery estimate, and milestone due date.",
-      );
+      setErrorMessage(copy.jobs.validationError);
       return;
     }
 
@@ -234,12 +234,12 @@ export function JobsWorkspace({
         quotedAmountMinor: amountMinor,
         estimatedDays: Number(days),
         milestoneBreakdown: [
-          { title: "Project delivery", amountMinor, dueDate },
+          { title: copy.jobs.defaultMilestoneTitle, amountMinor, dueDate },
         ],
         attachmentPaths,
       });
       events.proposalSubmitted();
-      setMessage("Proposal submitted.");
+      setMessage(copy.jobs.proposalSubmitted);
       setCoverLetter("");
       setAmount("");
       setDueDate("");
@@ -248,7 +248,7 @@ export function JobsWorkspace({
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Unable to submit proposal.",
+        err instanceof Error ? err.message : copy.jobs.unableToSubmitProposal,
       );
     } finally {
       setBusy(false);
@@ -269,7 +269,7 @@ export function JobsWorkspace({
           <h3 className="sh-card-title">{jf.tabMyBriefs}</h3>
           <p className="sh-card-desc">{jf.tabMyBriefsDesc}</p>
         </div>
-        <span className="sh-kbd">{ownedJobs.length} Active Briefs</span>
+        <span className="sh-kbd">{copy.jobs.activeBriefsCount(ownedJobs.length)}</span>
       </div>
       {ownedJobs.length === 0 ? (
         <p className="empty-state">{jf.noBriefsYet}</p>
@@ -289,12 +289,12 @@ export function JobsWorkspace({
                   </div>
                   <h3>{job.title}</h3>
                   <small className="sh-cell-meta">
-                    Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
+                    {copy.common.categoryPrefix}: {formatCategoryName(job.category, categoryLabels)} · {copy.common.deadlinePrefix}:{" "}
                     <span className="sh-mono">{date(job.deadline)}</span>
                   </small>
                 </div>
                 <span className="sh-kbd">
-                  {proposalsByJob[job.id]?.length ?? 0} proposals
+                  {copy.jobs.proposalsCount(proposalsByJob[job.id]?.length ?? 0)}
                 </span>
               </div>
             </article>
@@ -318,10 +318,10 @@ export function JobsWorkspace({
           <h3 className="sh-card-title">{jf.pipelineTitle}</h3>
           <p className="sh-card-desc">{jf.pipelineDesc}</p>
         </div>
-        <span className="sh-kbd">{ownedJobs.length} Active Briefs</span>
+        <span className="sh-kbd">{copy.jobs.activeBriefsCount(ownedJobs.length)}</span>
       </div>
       {ownedJobs.length === 0 ? (
-        <p className="empty-state">Your published jobs will appear here.</p>
+        <p className="empty-state">{copy.jobs.yourPublishedJobsEmpty}</p>
       ) : (
         <div className="workflow-stack">
           {ownedJobs.map((job) => (
@@ -339,12 +339,12 @@ export function JobsWorkspace({
                   <h3>{job.title}</h3>
                   <p>{job.description}</p>
                   <small className="sh-cell-meta">
-                    Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
+                    {copy.common.categoryPrefix}: {formatCategoryName(job.category, categoryLabels)} · {copy.common.deadlinePrefix}:{" "}
                     <span className="sh-mono">{date(job.deadline)}</span>
                   </small>
                 </div>
                 <span className="sh-kbd">
-                  {proposalsByJob[job.id]?.length ?? 0} proposals
+                  {copy.jobs.proposalsCount(proposalsByJob[job.id]?.length ?? 0)}
                 </span>
               </div>
               {(proposalsByJob[job.id] ?? []).length > 0 && (
@@ -362,14 +362,14 @@ export function JobsWorkspace({
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <strong style={{ fontSize: "0.92rem", color: "var(--color-text)" }}>
-                          {proposal.freelancer?.email ?? "Freelancer"}
+                          {proposal.freelancer?.email ?? copy.common.freelancerFallback}
                         </strong>
                         <div style={{ display: "flex", gap: 8, alignItems: "center", margin: "3px 0 6px" }}>
                           <span className="sh-mono" style={{ fontWeight: 600, color: "var(--color-primary)", fontSize: "0.86rem" }}>
                             {money(proposal.quotedAmountMinor)}
                           </span>
                           <span className="sh-mono" style={{ color: "var(--color-text-secondary)", fontSize: "0.82rem" }}>
-                            · {proposal.estimatedDays} days
+                            · {copy.common.daysCount(proposal.estimatedDays)}
                           </span>
                           <span
                             className={`sh-status-inline ${
@@ -405,11 +405,11 @@ export function JobsWorkspace({
                                           : p,
                                       ),
                                     })),
-                                  "Proposal shortlisted.",
+                                  copy.jobs.proposalShortlisted,
                                 )
                               }
                             >
-                              Shortlist
+                              {copy.jobs.shortlistBtn}
                             </button>
                           )}
                           <button
@@ -427,11 +427,11 @@ export function JobsWorkspace({
                                         : p,
                                     ),
                                   })),
-                                "Proposal accepted and contract generated.",
+                                copy.jobs.proposalAccepted,
                               )
                             }
                           >
-                            Accept <Check size={14} />
+                            {copy.jobs.acceptBtn} <Check size={14} />
                           </button>
                           <button
                             className="sh-icon-only-btn"
@@ -448,10 +448,10 @@ export function JobsWorkspace({
                                         : p,
                                     ),
                                   })),
-                                "Proposal rejected.",
+                                copy.jobs.proposalRejected,
                               )
                             }
-                            aria-label="Reject proposal"
+                            aria-label={copy.jobs.rejectProposalAria}
                           >
                             <X size={14} />
                           </button>
@@ -587,11 +587,11 @@ export function JobsWorkspace({
           <div className="sh-card-header">
             <div>
               <h3 className="sh-card-title">{jf.tabMyProposals}</h3>
-              <p className="sh-card-desc">
-                Active bids and milestone quotes awaiting client review
-              </p>
+              <p className="sh-card-desc">{copy.jobs.myProposalsDesc}</p>
             </div>
-            <span className="sh-kbd sh-mono">{myProposals.length} Bids</span>
+            <span className="sh-kbd sh-mono">
+              {copy.jobs.bidsCount(myProposals.length)}
+            </span>
           </div>
           {myProposals.length === 0 ? (
             <div style={{ padding: "24px 8px", textAlign: "center" }}>
@@ -615,12 +615,14 @@ export function JobsWorkspace({
                 <div className="sh-compact-row" key={proposal.id}>
                   <div className="sh-compact-row-main">
                     <div className="sh-cell-primary">
-                      {proposal.job?.title ?? "Job Brief"}
+                      {proposal.job?.title ?? copy.common.jobBriefFallback}
                     </div>
                     <div className="sh-cell-meta">
                       <span className="sh-mono">{money(proposal.quotedAmountMinor)}</span>
                       <span>·</span>
-                      <span className="sh-mono">{proposal.estimatedDays} days delivery</span>
+                      <span className="sh-mono">
+                        {copy.common.daysDelivery(proposal.estimatedDays)}
+                      </span>
                     </div>
                   </div>
                   <div className="sh-compact-row-right">
@@ -658,12 +660,13 @@ export function JobsWorkspace({
           <div className="sh-card-header">
             <div>
               <h3 className="sh-card-title">{jf.tabBrowseBriefs}</h3>
-              <p className="sh-card-desc">
-                Verified Ethiopian clients with milestone-backed escrow budgets
-              </p>
+              <p className="sh-card-desc">{copy.jobs.browseBriefsDesc}</p>
             </div>
             <span className="sh-kbd sh-mono">
-              Showing {filteredOpenJobs.length} of {effectiveOpenJobs.length} briefs
+              {copy.jobs.showingBriefsCount(
+                filteredOpenJobs.length,
+                effectiveOpenJobs.length,
+              )}
             </span>
           </div>
 
@@ -671,7 +674,7 @@ export function JobsWorkspace({
           <div
             className="sh-table-toolbar"
             role="region"
-            aria-label="Filter open job briefs"
+            aria-label={copy.jobs.filterOpenBriefsAria}
             style={{
               paddingBottom: 12,
               borderBottom: "1px solid var(--color-border)",
@@ -683,14 +686,14 @@ export function JobsWorkspace({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={jf.searchPlaceholder}
-                aria-label="Search briefs by keyword"
+                aria-label={copy.jobs.searchBriefsAria}
               />
               {searchQuery && (
                 <button
                   type="button"
                   className="sh-clear-input"
                   onClick={() => setSearchQuery("")}
-                  aria-label="Clear search query"
+                  aria-label={copy.jobs.clearSearchAria}
                 >
                   <X size={13} />
                 </button>
@@ -709,9 +712,9 @@ export function JobsWorkspace({
                 className="sh-select"
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                aria-label="Filter by category"
+                aria-label={copy.jobs.filterCategoryAria}
               >
-                <option value="ALL">All categories</option>
+                <option value="ALL">{copy.jobs.allCategories}</option>
                 {availableCategories.map((cat) => (
                   <option key={cat} value={cat}>
                     {formatCategoryName(cat, categoryLabels)}
@@ -730,14 +733,14 @@ export function JobsWorkspace({
                     setCustomMaxEtb("");
                   }
                 }}
-                aria-label="Filter by budget range"
+                aria-label={copy.jobs.filterBudgetAria}
               >
-                <option value="ALL">Any budget (ETB)</option>
-                <option value="UNDER_10K">Under ETB 10,000</option>
-                <option value="10K_30K">ETB 10,000 – 30,000</option>
-                <option value="30K_75K">ETB 30,000 – 75,000</option>
-                <option value="OVER_75K">ETB 75,000+</option>
-                <option value="CUSTOM">Custom ETB range…</option>
+                <option value="ALL">{copy.jobs.budgetAll}</option>
+                <option value="UNDER_10K">{copy.jobs.budgetUnder10k}</option>
+                <option value="10K_30K">{copy.jobs.budget10kTo30k}</option>
+                <option value="30K_75K">{copy.jobs.budget30kTo75k}</option>
+                <option value="OVER_75K">{copy.jobs.budgetOver75k}</option>
+                <option value="CUSTOM">{copy.jobs.budgetCustom}</option>
               </select>
 
               {budgetPreset === "CUSTOM" && (
@@ -755,8 +758,8 @@ export function JobsWorkspace({
                     className="sh-mono"
                     value={customMinEtb}
                     onChange={(e) => setCustomMinEtb(e.target.value)}
-                    placeholder="Min ETB"
-                    aria-label="Minimum budget in ETB"
+                    placeholder={copy.jobs.minEtbPlaceholder}
+                    aria-label={copy.jobs.minEtbAria}
                     style={{
                       width: 104,
                       height: 34,
@@ -784,8 +787,8 @@ export function JobsWorkspace({
                     className="sh-mono"
                     value={customMaxEtb}
                     onChange={(e) => setCustomMaxEtb(e.target.value)}
-                    placeholder="Max ETB"
-                    aria-label="Maximum budget in ETB"
+                    placeholder={copy.jobs.maxEtbPlaceholder}
+                    aria-label={copy.jobs.maxEtbAria}
                     style={{
                       width: 104,
                       height: 34,
@@ -806,13 +809,13 @@ export function JobsWorkspace({
                 onChange={(e) =>
                   setDeadlineWindow(e.target.value as DeadlineWindow)
                 }
-                aria-label="Filter by deadline proximity"
+                aria-label={copy.jobs.filterDeadlineAria}
               >
-                <option value="ALL">Any deadline</option>
-                <option value="3">Due within 3 days</option>
-                <option value="7">Due within 7 days</option>
-                <option value="14">Due within 14 days</option>
-                <option value="30">Due within 30 days</option>
+                <option value="ALL">{copy.jobs.deadlineAll}</option>
+                <option value="3">{copy.jobs.deadline3Days}</option>
+                <option value="7">{copy.jobs.deadline7Days}</option>
+                <option value="14">{copy.jobs.deadline14Days}</option>
+                <option value="30">{copy.jobs.deadline30Days}</option>
               </select>
 
               {hasActiveFilters && (
@@ -821,7 +824,7 @@ export function JobsWorkspace({
                   className="sh-btn sh-btn-secondary"
                   onClick={resetAllFilters}
                 >
-                  <X size={13} /> Reset filters
+                  <X size={13} /> {copy.jobs.resetFiltersBtn}
                 </button>
               )}
             </div>
@@ -876,7 +879,7 @@ export function JobsWorkspace({
                           </p>
                         )}
                         <small className="sh-cell-meta">
-                          Category: {formatCategoryName(job.category, categoryLabels)} · Deadline:{" "}
+                          {copy.common.categoryPrefix}: {formatCategoryName(job.category, categoryLabels)} · {copy.common.deadlinePrefix}:{" "}
                           <span className="sh-mono">{date(job.deadline)}</span>
                           {daysUntil !== null && (
                             <>
@@ -884,10 +887,10 @@ export function JobsWorkspace({
                               ·{" "}
                               <span className="sh-mono">
                                 {daysUntil < 0
-                                  ? `${Math.abs(daysUntil)}d overdue`
+                                  ? copy.jobs.daysOverdue(Math.abs(daysUntil))
                                   : daysUntil === 0
-                                    ? "Due today"
-                                    : `${daysUntil}d left`}
+                                    ? copy.jobs.dueToday
+                                    : copy.jobs.daysLeft(daysUntil)}
                               </span>
                             </>
                           )}
@@ -930,7 +933,7 @@ export function JobsWorkspace({
 
                     {showDetail && !showForm && (
                       <div className="job-detail-panel" style={{ marginTop: 14 }}>
-                        <h4>Scope & Deliverables</h4>
+                        <h4>{copy.jobs.scopeDeliverablesHeading}</h4>
                         <p>{job.description}</p>
                         {!existing && (
                           <button
@@ -1022,16 +1025,15 @@ export function JobsWorkspace({
                         </div>
 
                         <div className="proposal-attachments form-wide" style={{ gridColumn: "1 / -1" }}>
-                          <span style={{ fontSize: "0.85rem", fontWeight: 500, display: "block", marginBottom: 6 }}>
-                            {jf.attachSpecBtn}
-                          </span>
                           <FileUploader
                             compact
                             showCard={false}
                             showHeader={false}
                             maxFiles={6}
                             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                            acceptedLabel="PDF, DOCX, PNG, JPG · up to 25 MB each"
+                            label={jf.attachSpecBtn}
+                            acceptedLabel={copy.jobs.uploadAcceptedLabel}
+                            dropSubtitle={copy.jobs.uploadDropSubtitle}
                             maxSizeMB={25}
                             onFilesChange={(files) => setAttachments(files)}
                             value={attachments}
@@ -1071,8 +1073,8 @@ export function JobsWorkspace({
           withdrawTarget
             ? [
                 {
-                  label: "Brief",
-                  value: withdrawTarget.job?.title ?? "Job Brief",
+                  label: copy.jobs.briefSummaryLabel,
+                  value: withdrawTarget.job?.title ?? copy.common.jobBriefFallback,
                 },
                 {
                   label: jf.quoteEtbLabel,
@@ -1094,7 +1096,7 @@ export function JobsWorkspace({
             () => api.withdrawProposal(target.id),
             () =>
               setMyProposals((prev) => prev.filter((p) => p.id !== target.id)),
-            "Proposal withdrawn.",
+            copy.jobs.proposalWithdrawn,
           );
         }}
       />
@@ -1115,7 +1117,8 @@ export function ContractsWorkspace({
   onOpenEscrow?: (contractId: string) => void;
   onOpenChat?: (conversationId: string) => void;
 }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
+  const copy = WORKFLOW_WORKSPACE_COPY[language] ?? WORKFLOW_WORKSPACE_COPY.en;
   const statuses = t.workspace.statuses;
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [message, setMessage] = useState("");
@@ -1140,13 +1143,17 @@ export function ContractsWorkspace({
     setMessage("");
     setErrorMessage("");
     try {
-      const subject = "Contract: " + (contract.job?.title || "Milestone Agreement");
+      const subject = copy.contracts.directChatSubject(
+        contract.job?.title || copy.contracts.milestoneAgreementFallback,
+      );
       const conv = await api.createDirectConversation(recipientId, subject);
       if (onOpenChat) {
         onOpenChat(conv.id);
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Failed to open direct chat");
+      setErrorMessage(
+        err instanceof Error ? err.message : copy.contracts.failedOpenChat,
+      );
     } finally {
       setBusy(false);
     }
@@ -1178,7 +1185,7 @@ export function ContractsWorkspace({
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Action failed.";
+      const msg = err instanceof Error ? err.message : copy.common.actionFailed;
       try {
         fallbackUpdate();
         setMessage(success);
@@ -1198,14 +1205,14 @@ export function ContractsWorkspace({
       window.open(url, "_blank", "noopener,noreferrer");
     } catch {
       setMessage(
-        `Generated bilingual AACCSA agreement preview for contract #${contractId.slice(0, 8)}.`,
+        copy.contracts.generatedPreviewNotice(contractId.slice(0, 8)),
       );
     }
   };
 
   const raise = async (contract: Contract, milestoneId: string) => {
     if (description.trim().length < 20) {
-      setErrorMessage("Describe the issue in at least 20 characters.");
+      setErrorMessage(copy.contracts.disputeDescMinLength);
       return;
     }
     await act(
@@ -1230,7 +1237,7 @@ export function ContractsWorkspace({
           ),
         );
       },
-      "Dispute opened and auto-release timer paused.",
+      copy.contracts.disputeOpenedSuccess,
     );
     setDescription("");
     setDisputeMilestoneId(null);

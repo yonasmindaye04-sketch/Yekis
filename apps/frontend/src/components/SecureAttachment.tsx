@@ -19,6 +19,29 @@
 import { useEffect, useState } from "react";
 import { FileText, ExternalLink, Paperclip } from "lucide-react";
 import { api } from "../api/client";
+import { type Language, useI18n } from "../i18n";
+
+const ATTACHMENT_COPY: Record<
+  Language,
+  { unavailable: string; loadingPrefix: (label: string) => string }
+> = {
+  en: {
+    unavailable: "Attachment unavailable.",
+    loadingPrefix: (label) => `Loading ${label}`,
+  },
+  am: {
+    unavailable: "አባሪው አይገኝም።",
+    loadingPrefix: (label) => `${label} በመጫን ላይ`,
+  },
+  om: {
+    unavailable: "Maxxantuun hin argamu.",
+    loadingPrefix: (label) => `${label} fe'aa jira`,
+  },
+  ti: {
+    unavailable: "ተተሓሒዙ ዝመጸ ፋይል የለን።",
+    loadingPrefix: (label) => `${label} ይጽዓን ኣሎ`,
+  },
+};
 
 /**
  * Compact, click-to-load variant for dense lists (the staff support desk shows
@@ -110,6 +133,8 @@ export function SecureAttachment({
   label,
   isImage,
 }: SecureAttachmentProps) {
+  const { language } = useI18n();
+  const copy = ATTACHMENT_COPY[language] ?? ATTACHMENT_COPY.en;
   const [loaded, setLoaded] = useState<LoadedState>({
     key: "",
     objectUrl: null,
@@ -153,7 +178,7 @@ export function SecureAttachment({
 
   if (missingCredentials || failed) {
     return (
-      <div className="bubble-attachment" title="Attachment unavailable.">
+      <div className="bubble-attachment" title={copy.unavailable}>
         <Paperclip size={14} />
         <span>{label}</span>
       </div>
@@ -181,7 +206,7 @@ export function SecureAttachment({
           <div
             className="bubble-attachment-preview"
             aria-busy={loading}
-            aria-label={loading ? `Loading ${label}` : label}
+            aria-label={loading ? copy.loadingPrefix(label) : label}
           />
         )}
       </div>

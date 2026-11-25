@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { api, type Gig, type GigPackage } from "./api/client";
 import { events } from "./analytics";
+import { useI18n } from "./i18n";
+import { GIG_MARKETPLACE_COPY } from "./gigMarketplaceCopy";
 import { YekisAvatar } from "./components/YekisAvatar";
 import {
   Breadcrumb,
@@ -103,6 +105,8 @@ function formatBirr(minor: number): string {
 
 // === MAIN COMPONENT ===
 export function GigMarketplace() {
+  const { language } = useI18n();
+  const copy = GIG_MARKETPLACE_COPY[language] ?? GIG_MARKETPLACE_COPY.en;
   const [gigs, setGigs] = useState<Gig[]>([]);
   const [total, setTotal] = useState(0);
   const [category, setCategory] = useState("");
@@ -129,7 +133,7 @@ export function GigMarketplace() {
       setGigs(res.items ?? []);
       setTotal(res.total ?? 0);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load gigs.");
+      setError(err instanceof Error ? err.message : copy.loadErrorFallback);
     } finally {
       setLoading(false);
     }
@@ -149,12 +153,10 @@ export function GigMarketplace() {
       const funded = await api.fundGigOrder(created.id);
       events.escrowFunded("gig_order");
       setOrderSuccess(true);
-      setNotice(
-        `Order placed and funded (${formatBirr(funded.totalChargeMinor)}) via Yekis automated escrow. The freelancer has been notified to begin work.`,
-      );
+      setNotice(copy.orderPlacedNotice(formatBirr(funded.totalChargeMinor)));
     } catch (err) {
       setOrderSuccess(false);
-      setNotice(err instanceof Error ? err.message : "Order placement failed.");
+      setNotice(err instanceof Error ? err.message : copy.orderFailedFallback);
     } finally {
       setOrdering(false);
     }
@@ -209,6 +211,11 @@ export function GigMarketplace() {
       packages.find((p) => p.tier === activeTier) ?? packages[0];
     const categoryInfo = categoryConfig[selected.category];
 
+    const categoryLabel =
+      copy.categories[selected.category] ??
+      categoryInfo?.label ??
+      selected.category;
+
     return (
       <section className="afro-gigs-section">
         {/* Navigation Breadcrumb (shadcn UI) */}
@@ -221,7 +228,7 @@ export function GigMarketplace() {
               setNotice("");
             }}
           >
-            <ArrowLeft size={16} /> Back to Marketplace
+            <ArrowLeft size={16} /> {copy.backToMarketplace}
           </button>
           <Breadcrumb className="afro-breadcrumb-text">
             <BreadcrumbList>
@@ -234,7 +241,7 @@ export function GigMarketplace() {
                   }}
                   className="cursor-pointer"
                 >
-                  Gigs
+                  {copy.breadcrumbGigs}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -248,7 +255,7 @@ export function GigMarketplace() {
                   }}
                   className="cursor-pointer"
                 >
-                  {categoryInfo?.label ?? selected.category}
+                  {categoryLabel}
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
@@ -279,22 +286,23 @@ export function GigMarketplace() {
             {/* Title Block */}
             <div className="afro-detail-title-block">
               <span className="afro-category-tag">
-                {categoryInfo?.label ?? selected.category}
+                {categoryLabel}
               </span>
               <h1 className="afro-detail-title">{selected.title}</h1>
               <div className="afro-detail-meta-line">
                 <span className="afro-rating-badge">
                   <Star size={15} className="afro-star-icon" />
                   {averageRating(selected.ratingAverage)} (
-                  {selected.ratingCount} reviews)
+                  {copy.reviewsCount(selected.ratingCount)})
                 </span>
                 <span>·</span>
                 <span className="afro-delivery-tag">
-                  <Clock size={14} /> Turnaround: {activePkg?.deliveryDays ?? 3} days
+                  <Clock size={14} />{" "}
+                  {copy.turnaroundDays(activePkg?.deliveryDays ?? 3)}
                 </span>
                 <span>·</span>
                 <span style={{ color: "var(--color-primary)", fontWeight: 700 }}>
-                  Escrow Protected
+                  {copy.escrowProtected}
                 </span>
               </div>
             </div>
@@ -310,22 +318,23 @@ export function GigMarketplace() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div className="afro-seller-name-row">
                   <strong style={{ fontSize: "1rem", color: "var(--color-text)" }}>
-                    {selected.freelancer?.displayName || "Verified Freelancer"}
+                    {selected.freelancer?.displayName ||
+                      copy.verifiedFreelancerFallback}
                   </strong>
                   <ShieldCheck size={16} className="afro-verified-icon" />
                 </div>
                 <p className="afro-seller-detail-bio">
-                  {selected.freelancer?.bio ||
-                    "Professional Ethiopian digital specialist verified on Yekis."}
+                  {selected.freelancer?.bio || copy.specialistBioFallback}
                 </p>
                 <div className="afro-seller-badges">
-                  <span>Addis Ababa, Ethiopia</span>
+                  <span>{copy.locationEthiopia}</span>
                   <span>·</span>
-                  <span>Response time: &lt; 2 hrs</span>
+                  <span>{copy.responseTimeBadge}</span>
                   <span>·</span>
                   <span>
-                    Completeness:{" "}
-                    {selected.freelancer?.profileCompleteness ?? 95}%
+                    {copy.completenessLabel(
+                      selected.freelancer?.profileCompleteness ?? 95,
+                    )}
                   </span>
                 </div>
               </div>
@@ -351,14 +360,18 @@ export function GigMarketplace() {
 
             {/* Description Section */}
             <div className="afro-section-panel">
-              <h2 className="afro-section-heading">Service Overview</h2>
+              <h2 className="afro-section-heading">
+                {copy.serviceOverviewHeading}
+              </h2>
               <div className="afro-prose">{selected.description}</div>
             </div>
 
             {/* Requirements Section (if any) */}
             {selected.requirements && selected.requirements.length > 0 && (
               <div className="afro-section-panel">
-                <h2 className="afro-section-heading">What the Freelancer Needs from You</h2>
+                <h2 className="afro-section-heading">
+                  {copy.requirementsHeading}
+                </h2>
                 <ul className="afro-checklist">
                   {selected.requirements.map((req, idx) => (
                     <li key={idx} className="afro-checklist-item">
@@ -367,7 +380,7 @@ export function GigMarketplace() {
                         <strong>{req.label}</strong>{" "}
                         {req.required && (
                           <span style={{ color: "var(--color-primary)", fontSize: "0.8rem", fontWeight: 700 }}>
-                            (Required)
+                            {copy.requiredTag}
                           </span>
                         )}
                       </div>
@@ -380,7 +393,7 @@ export function GigMarketplace() {
             {/* FAQ Section (if any) */}
             {selected.faqJson && selected.faqJson.length > 0 && (
               <div className="afro-section-panel">
-                <h2 className="afro-section-heading">Frequently Asked Questions</h2>
+                <h2 className="afro-section-heading">{copy.faqHeading}</h2>
                 <div>
                   {selected.faqJson.map((faq, idx) => (
                     <div key={idx} className="afro-faq-item">
@@ -397,13 +410,10 @@ export function GigMarketplace() {
               <ShieldCheck size={28} className="afro-trust-icon" />
               <div className="afro-escrow-promise-content">
                 <h4 className="afro-escrow-promise-title">
-                  100% Escrow Protection Guarantee
+                  {copy.escrowPromiseTitle}
                 </h4>
                 <p className="afro-escrow-promise-text">
-                  Your funds are secured in Yekis automated escrow upon ordering. The
-                  freelancer is notified and begins work immediately. Payment is only
-                  disbursed to the freelancer once you review and approve the completed
-                  deliverables. Supported by standard 7-day cooling-off protection.
+                  {copy.escrowPromiseText}
                 </p>
               </div>
             </div>
@@ -423,7 +433,7 @@ export function GigMarketplace() {
                       }`}
                       onClick={() => setActiveTier(pkg.tier)}
                     >
-                      {pkg.tier}
+                      {copy.tiers[pkg.tier] ?? pkg.tier}
                     </button>
                   ))}
                 </div>
@@ -433,7 +443,11 @@ export function GigMarketplace() {
               {activePkg ? (
                 <div className="afro-pkg-body">
                   <div className="afro-pkg-price-row">
-                    <span className="afro-pkg-tier-name">{activePkg.tier} Package</span>
+                    <span className="afro-pkg-tier-name">
+                      {copy.packageSuffix(
+                        copy.tiers[activePkg.tier] ?? activePkg.tier,
+                      )}
+                    </span>
                     <span className="afro-pkg-price-major">
                       {formatBirr(activePkg.priceMinor)}
                     </span>
@@ -445,11 +459,13 @@ export function GigMarketplace() {
                   <div className="afro-pkg-specs">
                     <div className="afro-spec-item">
                       <Clock size={16} className="afro-spec-icon" />
-                      <span>{activePkg.deliveryDays} Days Delivery</span>
+                      <span>{copy.daysDelivery(activePkg.deliveryDays)}</span>
                     </div>
                     <div className="afro-spec-item">
                       <RefreshCw size={16} className="afro-spec-icon" />
-                      <span>{activePkg.revisionsIncluded} Revisions</span>
+                      <span>
+                        {copy.revisionsCount(activePkg.revisionsIncluded)}
+                      </span>
                     </div>
                   </div>
 
@@ -459,17 +475,16 @@ export function GigMarketplace() {
                     onClick={() => void order(activePkg)}
                   >
                     <Package size={16} />
-                    {ordering ? "Funding Escrow..." : `Order & Pay ${formatBirr(activePkg.priceMinor)}`}
+                    {ordering
+                      ? copy.fundingEscrowBtn
+                      : copy.orderAndPayBtn(formatBirr(activePkg.priceMinor))}
                   </button>
 
-                  <p className="afro-order-note">
-                    Instant escrow lock from your Yekis wallet. Direct top-ups available via
-                    Telebirr, CBE Birr & M-Pesa.
-                  </p>
+                  <p className="afro-order-note">{copy.orderNote}</p>
                 </div>
               ) : (
                 <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-secondary)" }}>
-                  No packages currently configured for this gig.
+                  {copy.noPackagesConfigured}
                 </div>
               )}
             </div>
@@ -480,18 +495,18 @@ export function GigMarketplace() {
                 <div className="afro-trust-item">
                   <ShieldCheck size={18} className="afro-trust-icon" />
                   <div className="afro-trust-content">
-                    <span className="afro-trust-title">Zero Risk Escrow</span>
-                    <span className="afro-trust-desc">
-                      Funds remain locked until you review the final output.
-                    </span>
+                    <span className="afro-trust-title">{copy.zeroRiskTitle}</span>
+                    <span className="afro-trust-desc">{copy.zeroRiskDesc}</span>
                   </div>
                 </div>
                 <div className="afro-trust-item">
                   <Zap size={18} className="afro-trust-icon" />
                   <div className="afro-trust-content">
-                    <span className="afro-trust-title">Ethiopian Banking Rails</span>
+                    <span className="afro-trust-title">
+                      {copy.ethiopianRailsTitle}
+                    </span>
                     <span className="afro-trust-desc">
-                      Settle seamlessly with local mobile money and banks.
+                      {copy.ethiopianRailsDesc}
                     </span>
                   </div>
                 </div>
@@ -508,40 +523,30 @@ export function GigMarketplace() {
     <section className="afro-gigs-section">
       {/* Afro-Tech Command Hero Banner */}
       <div className="afro-hero-card">
-        <h1 className="afro-headline">Predefined Gigs, Protected by Escrow</h1>
+        <h1 className="afro-headline">{copy.heroTitle}</h1>
 
-        <p className="afro-subtitle">
-          Browse verified fixed-price gigs from top Ethiopian engineers, designers,
-          writers, and translators. Instant delivery scope, guaranteed turnaround, and
-          automatic escrow protection backed by Telebirr, CBE Birr, and M-Pesa.
-        </p>
+        <p className="afro-subtitle">{copy.heroSubtitle}</p>
 
         <div className="afro-trust-strip">
           <div className="afro-trust-item">
             <ShieldCheck size={20} className="afro-trust-icon" />
             <div className="afro-trust-content">
-              <span className="afro-trust-title">100% Escrow Protection</span>
-              <span className="afro-trust-desc">
-                Payment is held in secure trust and only disbursed after your approval.
-              </span>
+              <span className="afro-trust-title">{copy.trust1Title}</span>
+              <span className="afro-trust-desc">{copy.trust1Desc}</span>
             </div>
           </div>
           <div className="afro-trust-item">
             <Zap size={20} className="afro-trust-icon" />
             <div className="afro-trust-content">
-              <span className="afro-trust-title">Direct Ethiopian Rails</span>
-              <span className="afro-trust-desc">
-                Fund orders seamlessly via Telebirr, CBE Birr, and Safaricom M-Pesa.
-              </span>
+              <span className="afro-trust-title">{copy.trust2Title}</span>
+              <span className="afro-trust-desc">{copy.trust2Desc}</span>
             </div>
           </div>
           <div className="afro-trust-item">
             <Clock size={20} className="afro-trust-icon" />
             <div className="afro-trust-content">
-              <span className="afro-trust-title">Guaranteed Turnaround</span>
-              <span className="afro-trust-desc">
-                Pre-agreed milestones, scoped deliverables, and included revisions.
-              </span>
+              <span className="afro-trust-title">{copy.trust3Title}</span>
+              <span className="afro-trust-desc">{copy.trust3Desc}</span>
             </div>
           </div>
         </div>
@@ -550,7 +555,7 @@ export function GigMarketplace() {
       {/* Category Header & Breadcrumb Navigation (shadcn / Watermelon UI) */}
       <nav
         className="afro-category-header-shell"
-        aria-label="Category and Service Navigation"
+        aria-label={copy.navAria}
       >
         {/* Tier 1: Breadcrumb Trail & Quick Meta Controls */}
         <div className="afro-cat-header-top">
@@ -560,8 +565,8 @@ export function GigMarketplace() {
                 type="button"
                 className="afro-cat-back-crumb"
                 onClick={() => setCategory("")}
-                title="Reset to all services"
-                aria-label="Back to all services"
+                title={copy.resetAllServicesTitle}
+                aria-label={copy.backAllServicesAria}
               >
                 <ArrowLeft size={14} />
               </button>
@@ -577,7 +582,7 @@ export function GigMarketplace() {
                       setCategory("");
                     }}
                   >
-                    Services
+                    {copy.servicesCrumb}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
 
@@ -588,7 +593,7 @@ export function GigMarketplace() {
                     <DropdownMenuTrigger
                       type="button"
                       className="afro-breadcrumb-dropdown-trigger"
-                      aria-label="Select category"
+                      aria-label={copy.selectCategoryAria}
                     >
                       <span className="afro-breadcrumb-trigger-content">
                         {category ? (
@@ -597,7 +602,8 @@ export function GigMarketplace() {
                               {categoryConfig[category]?.icon}
                             </span>
                             <span className="afro-breadcrumb-active-label">
-                              {categoryConfig[category]?.label}
+                              {copy.categories[category] ??
+                                categoryConfig[category]?.label}
                             </span>
                           </>
                         ) : (
@@ -606,7 +612,7 @@ export function GigMarketplace() {
                               <Layers size={14} />
                             </span>
                             <span className="afro-breadcrumb-active-label">
-                              All Services
+                              {copy.allServices}
                             </span>
                           </>
                         )}
@@ -623,7 +629,7 @@ export function GigMarketplace() {
                         )}
                       >
                         <Layers size={14} />
-                        <span className="flex-1">All Services</span>
+                        <span className="flex-1">{copy.allServices}</span>
                         {category === "" && <Check size={14} className="text-primary" />}
                       </DropdownMenuItem>
 
@@ -640,7 +646,9 @@ export function GigMarketplace() {
                             )}
                           >
                             {conf.icon}
-                            <span className="flex-1">{conf.label}</span>
+                            <span className="flex-1">
+                              {copy.categories[c] ?? conf.label}
+                            </span>
                             {isCurrent && <Check size={14} className="text-primary" />}
                           </DropdownMenuItem>
                         );
@@ -658,17 +666,16 @@ export function GigMarketplace() {
                 type="button"
                 className="afro-cat-clear-btn"
                 onClick={() => setCategory("")}
-                title="Clear selected category filter"
-                aria-label="Clear selected category filter"
+                title={copy.clearCategoryTitle}
+                aria-label={copy.clearCategoryTitle}
               >
                 <X size={12} />
-                <span>Clear filter</span>
+                <span>{copy.clearFilterBtn}</span>
               </button>
             )}
 
             <span className="afro-cat-count-badge">
-              {total || sortedGigs.length}{" "}
-              {(total || sortedGigs.length) === 1 ? "service" : "services"}
+              {copy.servicesCount(total || sortedGigs.length)}
             </span>
           </div>
         </div>
@@ -677,7 +684,7 @@ export function GigMarketplace() {
         <div
           className="afro-cat-header-tabs-wrap"
           role="tablist"
-          aria-label="Service categories"
+          aria-label={copy.serviceCategoriesAria}
         >
           <button
             type="button"
@@ -690,7 +697,7 @@ export function GigMarketplace() {
             onClick={() => setCategory("")}
           >
             <Layers size={14} aria-hidden="true" />
-            <span>All Services</span>
+            <span>{copy.allServices}</span>
           </button>
           {categories.map((c) => {
             const conf = categoryConfig[c];
@@ -708,7 +715,7 @@ export function GigMarketplace() {
                 onClick={() => setCategory(c)}
               >
                 {conf.icon}
-                <span>{conf.label}</span>
+                <span>{copy.categories[c] ?? conf.label}</span>
               </button>
             );
           })}
@@ -725,7 +732,7 @@ export function GigMarketplace() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && load()}
-              placeholder="Search services, skills, or tech (e.g. Telebirr, React, Figma)..."
+              placeholder={copy.searchPlaceholder}
             />
             {q && (
               <button
@@ -734,7 +741,7 @@ export function GigMarketplace() {
                   setQ("");
                   void load();
                 }}
-                aria-label="Clear search"
+                aria-label={copy.clearSearchAria}
               >
                 <X size={14} />
               </button>
@@ -744,21 +751,20 @@ export function GigMarketplace() {
 
         <div className="afro-filter-group">
           <span className="afro-count-pill">
-            {total || sortedGigs.length}{" "}
-            {(total || sortedGigs.length) === 1 ? "gig" : "gigs"} available
+            {copy.gigsAvailableCount(total || sortedGigs.length)}
           </span>
 
           <select
             className="afro-sort-select"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            aria-label="Sort gigs"
+            aria-label={copy.sortAria}
           >
-            <option value="recommended">Recommended &amp; Trending</option>
-            <option value="rating">Highest Rated</option>
-            <option value="price-asc">Price: Low to High</option>
-            <option value="price-desc">Price: High to Low</option>
-            <option value="delivery">Fastest Turnaround</option>
+            <option value="recommended">{copy.sortOptions.recommended}</option>
+            <option value="rating">{copy.sortOptions.rating}</option>
+            <option value="price-asc">{copy.sortOptions.priceAsc}</option>
+            <option value="price-desc">{copy.sortOptions.priceDesc}</option>
+            <option value="delivery">{copy.sortOptions.delivery}</option>
           </select>
         </div>
       </div>
@@ -776,10 +782,8 @@ export function GigMarketplace() {
       ) : sortedGigs.length === 0 ? (
         <div className="afro-empty-state">
           <Package size={42} className="afro-empty-icon" />
-          <h3 className="afro-empty-title">No gigs found in this category</h3>
-          <p className="afro-empty-desc">
-            Try adjusting your search query or selecting a different service category.
-          </p>
+          <h3 className="afro-empty-title">{copy.emptyTitle}</h3>
+          <p className="afro-empty-desc">{copy.emptyDesc}</p>
           {(q || category) && (
             <button
               className="afro-empty-reset-btn"
@@ -788,7 +792,7 @@ export function GigMarketplace() {
                 setCategory("");
               }}
             >
-              Reset Filters
+              {copy.resetFiltersBtn}
             </button>
           )}
         </div>
@@ -829,10 +833,12 @@ export function GigMarketplace() {
                   </div>
                   <div className="afro-card-meta-bar">
                     <span className="afro-category-tag">
-                      {conf?.label ?? gig.category}
+                      {copy.categories[gig.category] ??
+                        conf?.label ??
+                        gig.category}
                     </span>
                     <span className="afro-delivery-tag">
-                      <Clock size={12} /> {fastestDelivery}d delivery
+                      <Clock size={12} /> {copy.cardDelivery(fastestDelivery)}
                     </span>
                   </div>
                 </div>
@@ -850,12 +856,13 @@ export function GigMarketplace() {
                     <div className="afro-seller-info">
                       <div className="afro-seller-name-row">
                         <span className="afro-seller-name">
-                          {gig.freelancer?.displayName || "Verified Freelancer"}
+                          {gig.freelancer?.displayName ||
+                            copy.verifiedFreelancerFallback}
                         </span>
                         <ShieldCheck size={13} className="afro-verified-icon" />
                       </div>
                       <span className="afro-seller-title">
-                        {gig.freelancer?.bio || "Ethiopian Digital Specialist"}
+                        {gig.freelancer?.bio || copy.specialistFallback}
                       </span>
                     </div>
                   </div>
@@ -884,7 +891,7 @@ export function GigMarketplace() {
                       </span>
                     </span>
                     <span style={{ fontSize: "0.76rem", color: "var(--color-primary)", fontWeight: 700 }}>
-                      Escrow Protected
+                      {copy.escrowProtected}
                     </span>
                   </div>
                 </div>
@@ -892,7 +899,7 @@ export function GigMarketplace() {
                 {/* Card Footer Rail */}
                 <div className="afro-card-footer">
                   <div className="afro-price-group">
-                    <span className="afro-price-label">Starting at</span>
+                    <span className="afro-price-label">{copy.startingAt}</span>
                     <span className="afro-price-value">
                       {cheapest ? formatBirr(cheapest.priceMinor) : "ETB 0.00"}
                     </span>
@@ -907,7 +914,7 @@ export function GigMarketplace() {
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                   >
-                    View Packages <ArrowRight size={14} />
+                    {copy.viewPackagesBtn} <ArrowRight size={14} />
                   </button>
                 </div>
               </div>

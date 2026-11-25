@@ -1,12 +1,162 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "../api/client";
 import { events } from "../analytics";
+import { type Language, useI18n } from "../i18n";
 import { Send, X, ExternalLink } from "lucide-react";
 import {
   loadGoogleIdentity,
   renderGoogleIdentityButton,
   googleClientId,
 } from "../lib/googleIdentity";
+
+const SOCIAL_COPY: Record<
+  Language,
+  {
+    signInFailed: (provider: string) => string;
+    googleBlocked: string;
+    googleLoading: string;
+    enterBotCode: string;
+    codeRedeemFailed: string;
+    appleNotConfigured: string;
+    roleNames: Record<"CLIENT" | "FREELANCER" | "BOTH", string>;
+    orRegisterAs: (roleLabel: string) => string;
+    orContinueWith: string;
+    googleAria: string;
+    telegramAria: string;
+    appleAria: string;
+    closeAria: string;
+    telegramTitle: string;
+    telegramRegisterSubtitle: (roleLabel: string) => string;
+    telegramSignInSubtitle: string;
+    orDivider: string;
+    openBotForCode: (username: string) => string;
+    widgetFailedNoticeTitle: string;
+    widgetFailedUseCode: string;
+    widgetFailedStepsBefore: string;
+    widgetFailedStepsAfter: string;
+    codePlaceholder: string;
+    codeInputAria: string;
+    verifying: string;
+    signIn: string;
+  }
+> = {
+  en: {
+    signInFailed: (p) => `${p} sign-in failed`,
+    googleBlocked: "Google Sign-In is blocked or unconfigured on this origin.",
+    googleLoading: "Loading Google Sign-In, please try again in a moment.",
+    enterBotCode: "Enter the code the bot gave you.",
+    codeRedeemFailed: "That code could not be redeemed. Send /login to the bot for a new one.",
+    appleNotConfigured: "Apple sign-in is not configured.",
+    roleNames: { CLIENT: "client", FREELANCER: "freelancer", BOTH: "client & freelancer" },
+    orRegisterAs: (r) => `Or register as ${r} with`,
+    orContinueWith: "Or continue with",
+    googleAria: "Sign in or register with Google",
+    telegramAria: "Sign in or register with Telegram",
+    appleAria: "Sign in or register with Apple",
+    closeAria: "Close",
+    telegramTitle: "Continue with Telegram",
+    telegramRegisterSubtitle: (r) => `Register your new Yekis ${r} account via Telegram.`,
+    telegramSignInSubtitle: "Sign in with your verified Telegram identity.",
+    orDivider: "OR",
+    openBotForCode: (u) => `Open @${u} for a sign-in code`,
+    widgetFailedNoticeTitle:
+      "The Telegram sign-in button could not load. This usually means this domain is not registered with @BotFather, or your network blocks telegram.org.",
+    widgetFailedUseCode: "Use a code instead:",
+    widgetFailedStepsBefore: "open the bot above, press Start, then send ",
+    widgetFailedStepsAfter: " and enter the code here.",
+    codePlaceholder: "Enter code from the bot",
+    codeInputAria: "Telegram sign-in code",
+    verifying: "Verifying…",
+    signIn: "Sign in",
+  },
+  am: {
+    signInFailed: (p) => `በ${p} መግባት አልተቻለም`,
+    googleBlocked: "Google መግቢያ በዚህ አድራሻ ታግዷል ወይም አልተዋቀረም።",
+    googleLoading: "Google መግቢያ በመጫን ላይ ነው፣ እባክዎ ትንሽ ቆይተው ይሞክሩ።",
+    enterBotCode: "ቦቱ የሰጠዎትን ኮድ ያስገቡ።",
+    codeRedeemFailed: "ኮዱን ማረጋገጥ አልተቻለም። አዲስ ኮድ ለማግኘት ለቦቱ /login ይላኩ።",
+    appleNotConfigured: "Apple መግቢያ አልተዋቀረም።",
+    roleNames: { CLIENT: "ደንበኛ", FREELANCER: "ባለሙያ", BOTH: "ደንበኛ እና ባለሙያ" },
+    orRegisterAs: (r) => `ወይም እንደ ${r} በሚከተሉት ይመዝገቡ`,
+    orContinueWith: "ወይም በሚከተሉት ይቀጥሉ",
+    googleAria: "በGoogle ይግቡ ወይም ይመዝገቡ",
+    telegramAria: "በቴሌግራም ይግቡ ወይም ይመዝገቡ",
+    appleAria: "በApple ይግቡ ወይም ይመዝገቡ",
+    closeAria: "ዝጋ",
+    telegramTitle: "በቴሌግራም ይቀጥሉ",
+    telegramRegisterSubtitle: (r) => `አዲሱን የYeKis ${r} መለያዎን በቴሌግራም ይመዝገቡ።`,
+    telegramSignInSubtitle: "በተረጋገጠ የቴሌግራም ማንነትዎ ይግቡ።",
+    orDivider: "ወይም",
+    openBotForCode: (u) => `የመግቢያ ኮድ ለማግኘት @${u}ን ይክፈቱ`,
+    widgetFailedNoticeTitle:
+      "የቴሌግራም መግቢያ ቁልፍ መጫን አልቻለም። ይህ ብዙውን ጊዜ ዶሜይኑ ከ@BotFather ጋር ካልተመዘገበ ወይም ኔትወርክ telegram.orgን ሲዘጋ ይከሰታል።",
+    widgetFailedUseCode: "በምትኩ ኮድ ይጠቀሙ:",
+    widgetFailedStepsBefore: "ከላይ ያለውን ቦት ይክፈቱ፣ Startን ይጫኑ፣ ከዚያ ",
+    widgetFailedStepsAfter: " ብለው ይላኩ እና ኮዱን እዚህ ያስገቡ።",
+    codePlaceholder: "ከቦቱ የተገኘውን ኮድ ያስገቡ",
+    codeInputAria: "የቴሌግራም መግቢያ ኮድ",
+    verifying: "በማረጋገጥ ላይ…",
+    signIn: "ግባ",
+  },
+  om: {
+    signInFailed: (p) => `Seensi ${p} hin milkoofne`,
+    googleBlocked: "Google Sign-In teessoo kana irratti cufameera ykn hin qindoofne.",
+    googleLoading: "Google Sign-In fe'aa jira, maaloo sekondii muraasa booda yaalaa.",
+    enterBotCode: "Koodii bootiin isiniif kenne galchaa.",
+    codeRedeemFailed: "Koodichi hin mirkanoofne. Koodii haaraa argachuuf bootiif /login ergaa.",
+    appleNotConfigured: "Apple Sign-In hin qindoofne.",
+    roleNames: { CLIENT: "maamila", FREELANCER: "ogeessa", BOTH: "maamila & ogeessa" },
+    orRegisterAs: (r) => `Ykn akka ${r}tti kanaan galmaa'aa`,
+    orContinueWith: "Ykn kanaan itti fufaa",
+    googleAria: "Google dhaan seeni ykn galmaa'i",
+    telegramAria: "Telegramiin seeni ykn galmaa'i",
+    appleAria: "Apple dhaan seeni ykn galmaa'i",
+    closeAria: "Cufi",
+    telegramTitle: "Telegramiin itti fufi",
+    telegramRegisterSubtitle: (r) => `Herrega YeKis ${r} haaraa Telegramiin galmaa'aa.`,
+    telegramSignInSubtitle: "Eenyummaa Telegram mirkanaa'een seenaa.",
+    orDivider: "YKN",
+    openBotForCode: (u) => `Koodii seenumsaa argachuuf @${u} bani`,
+    widgetFailedNoticeTitle:
+      "Qabduun seenumsa Telegram fe'amuu hin dandeenye. Kun yeroo baay'ee domeeniin @BotFather irratti hin galmoofne ykn interneetiin telegram.org cufe ta'uu danda'a.",
+    widgetFailedUseCode: "Koodii fayyadamaa:",
+    widgetFailedStepsBefore: "bootii olii banaa, Start tuqaa, achiis ",
+    widgetFailedStepsAfter: " ergaatii koodicha asitti galchaa.",
+    codePlaceholder: "Koodii bootii irraa galchaa",
+    codeInputAria: "Koodii seenumsa Telegram",
+    verifying: "Mirkaneessaa jira…",
+    signIn: "Seeni",
+  },
+  ti: {
+    signInFailed: (p) => `ብ${p} ምእታው ኣይተሳኸዐን`,
+    googleBlocked: "Google Sign-In ኣብዚ ኣድራሻ ተዓጊቱ ወይ ኣይተሰርዐን።",
+    googleLoading: "Google Sign-In ይጽዓን ኣሎ፣ ቁሩብ ጸኒሕኩም እንደገና ፈትኑ።",
+    enterBotCode: "እቲ ቦት ዝሃበኩም ኮድ የእትዉ።",
+    codeRedeemFailed: "እቲ ኮድ ክረጋገጽ ኣይከኣለን። ሓድሽ ኮድ ንምርካብ ናብቲ ቦት /login ስደዱ።",
+    appleNotConfigured: "Apple Sign-In ኣይተሰርዐን።",
+    roleNames: { CLIENT: "ዓሚል", FREELANCER: "ክኢላ", BOTH: "ዓሚልን ክኢላን" },
+    orRegisterAs: (r) => `ወይ ከም ${r} በዚ ተመዝገቡ`,
+    orContinueWith: "ወይ በዚ ቀጽሉ",
+    googleAria: "ብGoogle እተዉ ወይ ተመዝገቡ",
+    telegramAria: "ብቴሌግራም እተዉ ወይ ተመዝገቡ",
+    appleAria: "ብApple እተዉ ወይ ተመዝገቡ",
+    closeAria: "ዕጾ",
+    telegramTitle: "ብቴሌግራም ቀጽል",
+    telegramRegisterSubtitle: (r) => `ሓድሽ ናይ YeKis ${r} ኣካውንትኹም ብቴሌግራም ተመዝገቡ።`,
+    telegramSignInSubtitle: "ብዝተረጋገጸ መንነት ቴሌግራምኩም እተዉ።",
+    orDivider: "ወይ",
+    openBotForCode: (u) => `ኮድ መእተዊ ንምርካብ @${u} ክፈቱ`,
+    widgetFailedNoticeTitle:
+      "መጠወቒ መእተዊ ቴሌግራም ክጽዓን ኣይከኣለን። እዚ ብልምዲ ዶመይን ምስ @BotFather ዘይተመዝገበ እንተኾይኑ ወይ ኔትወርክ telegram.org እንተዓጊቱ የጋጥም።",
+    widgetFailedUseCode: "ኣብ ክንዳኡ ኮድ ተጠቐሙ:",
+    widgetFailedStepsBefore: "ላዕለዋይ ቦት ክፈቱ፣ Start ጠውቑ፣ ድሕሪኡ ",
+    widgetFailedStepsAfter: " ስደዱ እሞ ነቲ ኮድ ኣብዚ የእትዉ።",
+    codePlaceholder: "ካብ ቦት ዝረኸብኩምዎ ኮድ የእትዉ",
+    codeInputAria: "ኮድ መእተዊ ቴሌግራም",
+    verifying: "የረጋግጽ ኣሎ…",
+    signIn: "እቶ",
+  },
+};
 
 /**
  * Social sign-in and registration buttons for Google / Telegram / Apple.
@@ -79,6 +229,8 @@ export interface SocialSignInButtonsProps {
 }
 
 export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps) {
+  const { language } = useI18n();
+  const copy = SOCIAL_COPY[language] ?? SOCIAL_COPY.en;
   const [providers, setProviders] = useState<Providers>({
     google: Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID),
     apple: Boolean(import.meta.env.VITE_APPLE_CLIENT_ID),
@@ -150,12 +302,12 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
         api.setSession(session);
         finish(provider);
       } catch (err) {
-        setError(err instanceof Error ? err.message : `${provider} sign-in failed`);
+        setError(err instanceof Error ? err.message : copy.signInFailed(provider));
       } finally {
         setBusy(null);
       }
     },
-    [finish],
+    [copy, finish],
   );
 
   // ---- Google GIS setup ----
@@ -197,11 +349,11 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
     if (window.google?.accounts?.id) {
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed()) {
-          setError("Google Sign-In is blocked or unconfigured on this origin.");
+          setError(copy.googleBlocked);
         }
       });
     } else {
-      setError("Loading Google Sign-In, please try again in a moment.");
+      setError(copy.googleLoading);
     }
   };
 
@@ -297,7 +449,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
     async (code: string) => {
       const trimmed = code.trim();
       if (!trimmed) {
-        setError("Enter the code the bot gave you.");
+        setError(copy.enterBotCode);
         return;
       }
       setError(null);
@@ -311,13 +463,13 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
         setError(
           err instanceof Error
             ? err.message
-            : "That code could not be redeemed. Send /login to the bot for a new one.",
+            : copy.codeRedeemFailed,
         );
       } finally {
         setBusy(null);
       }
     },
-    [finish],
+    [copy, finish],
   );
 
   // Arriving from the bot's "Sign in on the web" button carries the code in the
@@ -374,7 +526,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
     handle("APPLE", async () => {
       const clientId = import.meta.env.VITE_APPLE_CLIENT_ID as
         string | undefined;
-      if (!clientId) throw new Error("Apple sign-in is not configured.");
+      if (!clientId) throw new Error(copy.appleNotConfigured);
       await loadScript(
         "https://appleid.cdn-apple.com/appleauth/static/jsapi/appleid/1/en_US/appleid.auth.js",
         "apple-id-sdk",
@@ -419,7 +571,11 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
         }}
       >
         <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
-        <span>Or {role ? `register as ${role.toLowerCase()} with` : "continue with"}</span>
+        <span>
+          {role
+            ? copy.orRegisterAs(copy.roleNames[role])
+            : copy.orContinueWith}
+        </span>
         <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
       </div>
 
@@ -453,7 +609,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
               boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
               padding: 0,
             }}
-            aria-label="Sign in or register with Google"
+            aria-label={copy.googleAria}
             title="Google"
           >
             {/* Visual 4-color Google Icon (Always rendered) */}
@@ -514,7 +670,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
               padding: 0,
               transition: "transform 0.15s ease",
             }}
-            aria-label="Sign in or register with Telegram"
+            aria-label={copy.telegramAria}
             title="Telegram"
           >
             {/* Official Telegram Paper Airplane Icon */}
@@ -543,7 +699,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
               boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
               padding: 0,
             }}
-            aria-label="Sign in or register with Apple"
+            aria-label={copy.appleAria}
             title="Apple"
           >
             <svg width="18" height="18" viewBox="0 0 384 512" fill="#000000">
@@ -614,7 +770,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                 cursor: "pointer",
                 padding: 4,
               }}
-              aria-label="Close"
+              aria-label={copy.closeAria}
             >
               <X size={20} />
             </button>
@@ -636,12 +792,12 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
             </div>
 
             <h3 style={{ margin: "0 0 6px 0", color: "var(--color-text)", fontSize: "1.2rem" }}>
-              Continue with Telegram
+              {copy.telegramTitle}
             </h3>
             <p style={{ margin: "0 0 20px 0", color: "var(--color-text-secondary)", fontSize: "0.88rem" }}>
               {role
-                ? `Register your new Yekis ${role.toLowerCase()} account via Telegram.`
-                : "Sign in with your verified Telegram identity."}
+                ? copy.telegramRegisterSubtitle(copy.roleNames[role])
+                : copy.telegramSignInSubtitle}
             </p>
 
             {/* ── PATH 1: official Telegram Login Widget ── */}
@@ -669,7 +825,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                   }}
                 >
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
-                  <span>OR</span>
+                  <span>{copy.orDivider}</span>
                   <div style={{ flex: 1, height: 1, background: "var(--color-border)" }} />
                 </div>
               </>
@@ -702,7 +858,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                   marginBottom: 14,
                 }}
               >
-                <ExternalLink size={16} /> Open @{botUsername} for a sign-in code
+                <ExternalLink size={16} /> {copy.openBotForCode(botUsername)}
               </a>
             )}
 
@@ -720,12 +876,12 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                   width: "100%",
                 }}
               >
-                The Telegram sign-in button could not load. This usually means
-                this domain is not registered with @BotFather, or your network
-                blocks telegram.org.
+                {copy.widgetFailedNoticeTitle}
                 <br />
-                <strong>Use a code instead:</strong> open the bot above, press
-                Start, then send <code>/login</code> and enter the code here.
+                <strong>{copy.widgetFailedUseCode}</strong>{" "}
+                {copy.widgetFailedStepsBefore}
+                <code>/login</code>
+                {copy.widgetFailedStepsAfter}
               </p>
             )}
 
@@ -740,8 +896,8 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                     void submitTelegramCode(codeInput);
                   }
                 }}
-                placeholder="Enter code from the bot"
-                aria-label="Telegram sign-in code"
+                placeholder={copy.codePlaceholder}
+                aria-label={copy.codeInputAria}
                 autoComplete="one-time-code"
                 spellCheck={false}
                 maxLength={16}
@@ -780,7 +936,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
                       : "pointer",
                 }}
               >
-                {busy === "TELEGRAM" ? "Verifying…" : "Sign in"}
+                {busy === "TELEGRAM" ? copy.verifying : copy.signIn}
               </button>
             </div>
           </div>

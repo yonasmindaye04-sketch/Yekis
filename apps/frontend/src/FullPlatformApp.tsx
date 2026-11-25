@@ -43,7 +43,6 @@ import {
   LogOut,
   ArrowLeft,
   User as UserIcon,
-  Edit,
   Sun,
   Moon,
   Eye,
@@ -85,7 +84,12 @@ import { SocialSignInButtons } from "./components/SocialSignInButtons";
 import { GigMarketplace } from "./GigMarketplace";
 import { GigSellerDashboard } from "./GigSellerDashboard";
 import { TelegramAuthPage } from "./pages/TelegramAuthPage";
-import { useI18n, isLanguage } from "./i18n";
+import { useI18n, isLanguage, type Language } from "./i18n";
+import {
+  FULL_PLATFORM_CATEGORY_LABELS,
+  FULL_PLATFORM_COPY,
+  type FullPlatformCopy,
+} from "./fullPlatformCopy";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
 import "./styles/shadcn-dashboard.css";
@@ -208,18 +212,11 @@ const profileNudgeDismissedKey = (userId: string) =>
   `yekis_profile_nudge_dismissed_${userId}`;
 
 // === MAIN COMPONENT ===
-function roleLabel(role: PlatformRole) {
+function roleLabel(role: PlatformRole, language: Language = "en") {
   /* BOTH previously fell through to "Client", so a dual-role account saw
      "Client workspace" in the shell while being able to do both. */
-  return role === "FREELANCER"
-    ? "Freelancer"
-    : role === "BOTH"
-      ? "Client & Freelancer"
-      : role === "ADMIN"
-        ? "Operations"
-        : role === "MEDIATOR"
-          ? "Mediator"
-          : "Client";
+  const roles = (FULL_PLATFORM_COPY[language] ?? FULL_PLATFORM_COPY.en).roles;
+  return roles[role] ?? roles.CLIENT;
 }
 
 const navIconMap: Record<string, React.ReactNode> = {
@@ -237,7 +234,11 @@ const navIconMap: Record<string, React.ReactNode> = {
   profile: <UserIcon size={18} />,
 };
 
-function AuthVisualAnimation() {
+function AuthVisualAnimation({
+  copy = FULL_PLATFORM_COPY.en.authVis,
+}: {
+  copy?: FullPlatformCopy["authVis"];
+}) {
   return (
     <div className="auth-vis" aria-hidden="true">
       {/* Soft gradient accent */}
@@ -264,18 +265,18 @@ function AuthVisualAnimation() {
       {/* Metrics row — 3 key indicators */}
       <div className="auth-vis-metrics">
         <div className="auth-vis-metric" style={{ animationDelay: "0.4s" }}>
-          <span className="auth-vis-metric-num">2,400+</span>
-          <span className="auth-vis-metric-label">Contracts signed</span>
+          <span className="auth-vis-metric-num">{copy.contractsSignedNum}</span>
+          <span className="auth-vis-metric-label">{copy.contractsSignedLabel}</span>
         </div>
         <div className="auth-vis-metric-divider" />
         <div className="auth-vis-metric" style={{ animationDelay: "0.7s" }}>
-          <span className="auth-vis-metric-num">ETB 12M+</span>
-          <span className="auth-vis-metric-label">Secured in escrow</span>
+          <span className="auth-vis-metric-num">{copy.escrowedNum}</span>
+          <span className="auth-vis-metric-label">{copy.escrowedLabel}</span>
         </div>
         <div className="auth-vis-metric-divider" />
         <div className="auth-vis-metric" style={{ animationDelay: "1.0s" }}>
-          <span className="auth-vis-metric-num">98%</span>
-          <span className="auth-vis-metric-label">Payout success rate</span>
+          <span className="auth-vis-metric-num">{copy.payoutRateNum}</span>
+          <span className="auth-vis-metric-label">{copy.payoutRateLabel}</span>
         </div>
       </div>
 
@@ -284,26 +285,26 @@ function AuthVisualAnimation() {
         <div className="auth-vis-feed-item" style={{ animationDelay: "1.2s" }}>
           <div className="auth-vis-feed-icon green" />
           <div className="auth-vis-feed-body">
-            <strong>Milestone delivered</strong>
-            <span>UI Design — ETB 18,000</span>
+            <strong>{copy.milestoneDelivered}</strong>
+            <span>{copy.milestoneDeliveredSub}</span>
           </div>
-          <span className="auth-vis-feed-time">2m ago</span>
+          <span className="auth-vis-feed-time">{copy.ago2m}</span>
         </div>
         <div className="auth-vis-feed-item" style={{ animationDelay: "1.8s" }}>
           <div className="auth-vis-feed-icon blue" />
           <div className="auth-vis-feed-body">
-            <strong>Contract signed</strong>
-            <span>Mobile App Development</span>
+            <strong>{copy.contractSigned}</strong>
+            <span>{copy.contractSignedSub}</span>
           </div>
-          <span className="auth-vis-feed-time">8m ago</span>
+          <span className="auth-vis-feed-time">{copy.ago8m}</span>
         </div>
         <div className="auth-vis-feed-item" style={{ animationDelay: "2.4s" }}>
           <div className="auth-vis-feed-icon green" />
           <div className="auth-vis-feed-body">
-            <strong>Escrow funded</strong>
-            <span>ETB 24,500 locked</span>
+            <strong>{copy.escrowFunded}</strong>
+            <span>{copy.escrowFundedSub}</span>
           </div>
-          <span className="auth-vis-feed-time">14m ago</span>
+          <span className="auth-vis-feed-time">{copy.ago14m}</span>
         </div>
       </div>
 
@@ -311,15 +312,15 @@ function AuthVisualAnimation() {
       <div className="auth-vis-trust">
         <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Held while you review</span>
+          <span>{copy.heldWhileReview}</span>
         </div>
         <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>KYC verified</span>
+          <span>{copy.kycVerified}</span>
         </div>
         <div className="auth-vis-trust-badge" style={{ animationDelay: "3.4s" }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          <span>Telebirr &amp; CBE</span>
+          <span>{copy.telebirrCbe}</span>
         </div>
       </div>
     </div>
@@ -336,6 +337,9 @@ export function FullPlatformApp() {
 
 function FullPlatformAppInner() {
   const { language, setLanguage, t } = useI18n();
+  const copy = FULL_PLATFORM_COPY[language] ?? FULL_PLATFORM_COPY.en;
+  const localizedCategoryLabels =
+    FULL_PLATFORM_CATEGORY_LABELS[language] ?? FULL_PLATFORM_CATEGORY_LABELS.en;
   const { theme, toggleTheme } = useTheme();
   const {
     sidebarVariant,
@@ -620,7 +624,7 @@ function FullPlatformAppInner() {
     try {
       const directConv = await api.createDirectConversation(
         recipientId,
-        recipientName ? `Direct discussion with ${recipientName}` : "Direct Project Discussion",
+        recipientName ? copy.directDiscussionWith(recipientName) : copy.directProjectDiscussion,
       );
       if (directConv?.id) {
         setFocusChatConversationId(directConv.id);
@@ -653,6 +657,27 @@ function FullPlatformAppInner() {
    */
   const viewingOwnProfile = !viewUserId || viewUserId === user?.id;
 
+
+  const isAuthenticatedRef = useRef(Boolean(user));
+  useEffect(() => {
+    isAuthenticatedRef.current = Boolean(user);
+  }, [user]);
+
+  useEffect(() => {
+    return api.onUnauthorized(() => {
+      if (!isAuthenticatedRef.current) return;
+      realtimeSocket.disconnect();
+      setUser(null);
+      setWallet({ balanceMinor: 0 });
+      setTopUps([]);
+      setMilestones([]);
+      setJobs([]);
+      setView("overview");
+      setShowLanding(false);
+      setAuthMode("login");
+      setError("Your session expired. Please sign in again to continue.");
+    });
+  }, []);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1019,15 +1044,13 @@ const loadWorkspace = async () => {
     try {
       if (authMode === "forgot-password") {
         await api.requestPasswordReset(email);
-        setSuccessMessage(
-          "If an account exists, a reset token has been sent to your email.",
-        );
+        setSuccessMessage(copy.passwordResetSent);
         setAuthMode("reset-password");
         return;
       }
       if (authMode === "reset-password") {
         await api.resetPassword(resetToken, password);
-        setSuccessMessage("Password reset successful. You can now log in.");
+        setSuccessMessage(copy.passwordResetSuccess);
         setAuthMode("login");
         setPassword("");
         return;
@@ -1057,12 +1080,12 @@ const loadWorkspace = async () => {
       events.login("email");
       await loadWorkspace();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to continue";
+      const message = err instanceof Error ? err.message : copy.unableToContinue;
       setError(
         message === "DUPLICATE_USER"
-          ? "This email or phone already has an account. Switch to Sign in."
+          ? copy.duplicateUserError
           : wasRegistering && message === "INVALID_CREDENTIALS"
-            ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
+            ? copy.registerPhoneExistsError
             : message,
       );
     } finally {
@@ -1071,7 +1094,8 @@ const loadWorkspace = async () => {
   };
 
   const logout = () => {
-    api.setToken(null);
+    api.clearToken();
+    realtimeSocket.disconnect();
     setUser(null);
     setPassword("");
     setResetToken("");
@@ -1092,19 +1116,17 @@ const loadWorkspace = async () => {
       const min = Math.round(Number(jobBudgetMin) * 100);
       const max = Math.round(Number(jobBudgetMax) * 100);
       if (jobTitle.trim().length < 5)
-        throw new Error("Job title must be at least 5 characters.");
+        throw new Error(copy.jobErrTitleLength);
       if (jobDescription.trim().length < 20)
-        throw new Error("Description must be at least 20 characters.");
+        throw new Error(copy.jobErrDescLength);
       if (
         !Number.isFinite(min) ||
         !Number.isFinite(max) ||
         min <= 0 ||
         max < min
       )
-        throw new Error(
-          "Enter valid budgets; maximum must be greater than or equal to minimum.",
-        );
-      if (!jobDeadline) throw new Error("Choose a deadline.");
+        throw new Error(copy.jobErrBudgetRange);
+      if (!jobDeadline) throw new Error(copy.jobErrChooseDeadline);
       await api.createJob({
         title: jobTitle,
         category: jobCategory,
@@ -1113,7 +1135,7 @@ const loadWorkspace = async () => {
         budgetMax: { amountMinor: max, currency: "ETB" },
         proposedMilestones: [
           {
-            title: "Initial delivery",
+            title: copy.initialDeliveryMilestone,
             amount: { amountMinor: max, currency: "ETB" },
             dueDate: jobDeadline,
           },
@@ -1133,12 +1155,12 @@ const loadWorkspace = async () => {
     } catch (err) {
       const withAction = err as Error & { nextAction?: { type: string; path: string } };
       setJobError(
-        withAction instanceof Error ? withAction.message : "Unable to publish job",
+        withAction instanceof Error ? withAction.message : copy.unableToPublishJob,
       );
       setJobErrorNextAction(
         withAction?.nextAction?.type === "KYC" ? "verification" : null,
       );
-      setError(err instanceof Error ? err.message : "Unable to publish job");
+      setError(err instanceof Error ? err.message : copy.unableToPublishJob);
     } finally {
       setIsLoading(false);
     }
@@ -1328,18 +1350,18 @@ const loadWorkspace = async () => {
 
     // Update document title per marketing page (Item 20: unique page titles)
     const pageTitles: Record<MarketingPage, string> = {
-      home: "Yekis — Ethiopia's Freelance Marketplace with milestone payments held until approval",
-      faq: "FAQ — Yekis",
-      fees: "Pricing & Fees — Yekis",
-      privacy: "Privacy Policy — Yekis",
-      terms: "Terms of Service — Yekis",
-      about: "About — Yekis",
-      "case-studies": "Case Studies — Yekis",
-      "404": "Page Not Found — Yekis",
-      "thank-you-signup": "Welcome to Yekis!",
-      "thank-you-job-posted": "Job Posted — Yekis",
-      "thank-you-contact": "Message Sent — Yekis",
-      telegram_auth: "Sign in with Telegram — Yekis",
+      home: copy.pageTitles.home,
+      faq: copy.pageTitles.faq,
+      fees: copy.pageTitles.fees,
+      privacy: copy.pageTitles.privacy,
+      terms: copy.pageTitles.terms,
+      about: copy.pageTitles.about,
+      "case-studies": copy.pageTitles.caseStudies,
+      "404": copy.pageTitles.notFound,
+      "thank-you-signup": copy.pageTitles.thankYouSignup,
+      "thank-you-job-posted": copy.pageTitles.thankYouJobPosted,
+      "thank-you-contact": copy.pageTitles.thankYouContact,
+      telegram_auth: copy.pageTitles.telegramAuth,
     };
     document.title = pageTitles[marketingPage] || pageTitles.home;
 
@@ -1452,7 +1474,7 @@ const loadWorkspace = async () => {
               className="theme-toggle"
               onClick={toggleTheme}
               aria-label={
-                theme === "light" ? "Switch to dark mode" : "Switch to light mode"
+                theme === "light" ? copy.switchToDark : copy.switchToLight
               }
               style={{
                 display: "inline-flex",
@@ -1474,25 +1496,24 @@ const loadWorkspace = async () => {
         <div className="platform-auth-art">
           <img
             src="/svgviewer-output.svg"
-            alt="Yekis Logo"
+            alt={copy.yekisLogoAlt}
             className="platform-logo"
             style={{ width: 72, height: 72, borderRadius: 18, marginBottom: 8 }}
           />
-          <p className="eyebrow">Yekis jobs</p>
-          <h1>Work with clarity.</h1>
+          <p className="eyebrow">{copy.heroEyebrow}</p>
+          <h1>{copy.heroTitle}</h1>
           <p>
-            Find trusted talent, manage milestone work, and keep payments
-            visible from brief to delivery.
+            {copy.heroSubtitle}
           </p>
           <div className="auth-proof">
             <span>01</span>
-            <strong>Jobs, contracts, and escrow in one workspace.</strong>
+            <strong>{copy.heroProof1}</strong>
           </div>
           <div className="auth-proof">
             <span>02</span>
-            <strong>Built for Ethiopian clients and freelancers.</strong>
+            <strong>{copy.heroProof2}</strong>
           </div>
-          <AuthVisualAnimation />
+          <AuthVisualAnimation copy={copy.authVis} />
         </div>
         {onboardingChannel ? (
           <div className="auth-panel">
@@ -1513,10 +1534,10 @@ const loadWorkspace = async () => {
                 void completeRegistration()
                   .catch((err) => {
                     const message =
-                      err instanceof Error ? err.message : "Unable to continue";
+                      err instanceof Error ? err.message : copy.unableToContinue;
                     setError(
                       message === "INVALID_CREDENTIALS"
-                        ? "We could not create the account. If that phone number is already registered, sign in with the email address you used the first time — or use a different number."
+                        ? copy.registerPhoneExistsError
                         : message,
                     );
                   })
@@ -1535,7 +1556,7 @@ const loadWorkspace = async () => {
                 void completeRegistration()
                   .catch((err) => {
                     const message =
-                      err instanceof Error ? err.message : "Unable to continue";
+                      err instanceof Error ? err.message : copy.unableToContinue;
                     setError(message);
                   })
                   .finally(() => setIsLoading(false));
@@ -1587,7 +1608,7 @@ const loadWorkspace = async () => {
                 type="button"
                 className={role === "BOTH" ? "selected" : ""}
                 onClick={() => setRole("BOTH")}
-                title="Hire talent and take on work with one account"
+                title={copy.bothRoleTitle}
               >
                 {t.workspace.roles.both}
               </button>
@@ -1612,8 +1633,8 @@ const loadWorkspace = async () => {
                 onChange={(event) => setEmail(event.target.value)}
                 placeholder={
                   authMode === "login"
-                    ? "you@example.com or 0911223344"
-                    : "you@example.com"
+                    ? copy.loginIdentifierPlaceholder
+                    : copy.emailPlaceholder
                 }
                 required
                 style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
@@ -1659,7 +1680,7 @@ const loadWorkspace = async () => {
                 type="text"
                 value={resetToken}
                 onChange={(event) => setResetToken(event.target.value)}
-                placeholder="Enter reset token"
+                placeholder={copy.resetTokenPlaceholder}
                 required
                 style={{ padding: "8px 12px", marginTop: "3px", fontSize: "0.88rem", borderRadius: "8px" }}
               />
@@ -1717,7 +1738,7 @@ const loadWorkspace = async () => {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Your password"
+                  placeholder={copy.passwordPlaceholder}
                   minLength={
                     authMode === "register" || authMode === "reset-password"
                       ? 10
@@ -1753,7 +1774,7 @@ const loadWorkspace = async () => {
                     cursor: "pointer",
                     padding: 0,
                   }}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? copy.hidePassword : copy.showPassword}
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -1807,7 +1828,7 @@ const loadWorkspace = async () => {
                     }}
                   />
                   <span>
-                    I agree to the{" "}
+                    {copy.agreePrefix}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1826,9 +1847,9 @@ const loadWorkspace = async () => {
                         fontSize: "inherit",
                       }}
                     >
-                      Terms
+                      {copy.termsLink}
                     </button>
-                    {" & "}
+                    {copy.andSeparator}
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1847,7 +1868,7 @@ const loadWorkspace = async () => {
                         fontSize: "inherit",
                       }}
                     >
-                      Privacy Policy
+                      {copy.privacyLink}
                     </button>
                   </span>
                 </label>
@@ -1868,9 +1889,9 @@ const loadWorkspace = async () => {
                     alignItems: "center",
                     gap: 2,
                   }}
-                  title="Customize privacy & notification preferences"
+                  title={copy.customizePrefsTitle}
                 >
-                  {showCookiePrefs ? "Options ▲" : "Options ▾"}
+                  {showCookiePrefs ? copy.optionsOpen : copy.optionsClosed}
                 </button>
               </div>
 
@@ -1890,7 +1911,7 @@ const loadWorkspace = async () => {
                   }}
                 >
                   <span style={{ fontWeight: 600, color: "var(--color-text)" }}>
-                    Optional privacy & notification preferences:
+                    {copy.optionalPrefsHeading}
                   </span>
                   <label
                     style={{
@@ -1912,7 +1933,7 @@ const loadWorkspace = async () => {
                         margin: 0,
                       }}
                     />
-                    <span>Platform alerts (milestones & escrow updates)</span>
+                    <span>{copy.optPlatformAlerts}</span>
                   </label>
                   <label
                     style={{
@@ -1934,7 +1955,7 @@ const loadWorkspace = async () => {
                         margin: 0,
                       }}
                     />
-                    <span>Marketing communications</span>
+                    <span>{copy.optMarketing}</span>
                   </label>
                   <label
                     style={{
@@ -1956,7 +1977,7 @@ const loadWorkspace = async () => {
                         margin: 0,
                       }}
                     />
-                    <span>Anonymized product telemetry</span>
+                    <span>{copy.optTelemetry}</span>
                   </label>
                 </div>
               )}
@@ -2068,7 +2089,7 @@ const loadWorkspace = async () => {
                 }}
               >
                 <strong style={{ fontSize: "1.15rem", color: "var(--color-text)" }}>
-                  {legalModal === "terms" ? "Terms of Service" : "Privacy Policy"}
+                  {legalModal === "terms" ? copy.termsModalTitle : copy.privacyModalTitle}
                 </strong>
                 <button
                   type="button"
@@ -2080,7 +2101,7 @@ const loadWorkspace = async () => {
                     cursor: "pointer",
                     padding: 4,
                   }}
-                  aria-label="Close"
+                  aria-label={copy.closeModalAria}
                 >
                   <X size={20} />
                 </button>
@@ -2088,43 +2109,23 @@ const loadWorkspace = async () => {
 
               {legalModal === "terms" ? (
                 <div style={{ fontSize: "0.86rem", lineHeight: 1.55, color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <p style={{ margin: 0 }}>
-                    Welcome to <strong>Yekis Jobs</strong>. By creating an account or using the platform, you agree to these fundamental marketplace standards:
-                  </p>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>1. Escrow Protection</strong>
-                    <p style={{ margin: "2px 0 0" }}>Clients deposit milestone funds into secure escrow before work begins. Funds are disbursed upon milestone approval.</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>2. Dispute Mediation</strong>
-                    <p style={{ margin: "2px 0 0" }}>Disputes are resolved through fair evidence submission, staff mediation, and AACCSA arbitration standards.</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>3. Identity Verification (KYC)</strong>
-                    <p style={{ margin: "2px 0 0" }}>Users agree to verify identity via Fayda / Ethiopian National ID before initiating withdrawals, ensuring a trusted marketplace.</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>4. Fee Attribution</strong>
-                    <p style={{ margin: "2px 0 0" }}>Platform commissions and Telebirr/CBE payment rail charges adhere to the posted transparent fee schedule.</p>
-                  </div>
+                  <p style={{ margin: 0 }}>{copy.termsModalIntro}</p>
+                  {copy.termsClauses.map((clause) => (
+                    <div key={clause.title}>
+                      <strong style={{ color: "var(--color-text)" }}>{clause.title}</strong>
+                      <p style={{ margin: "2px 0 0" }}>{clause.body}</p>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <div style={{ fontSize: "0.86rem", lineHeight: 1.55, color: "var(--color-text-secondary)", display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <p style={{ margin: 0 }}>
-                    <strong>Yekis Jobs</strong> values your confidentiality and complies with the Ethiopian Personal Data Protection Proclamation:
-                  </p>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>1. Data Collection & Purpose</strong>
-                    <p style={{ margin: "2px 0 0" }}>We collect phone numbers, emails, and KYC identification strictly to safeguard payments and satisfy AML/CTF statutory compliance.</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>2. Bank-Grade Encryption</strong>
-                    <p style={{ margin: "2px 0 0" }}>All identification documents and transaction records are encrypted at rest and in transit.</p>
-                  </div>
-                  <div>
-                    <strong style={{ color: "var(--color-text)" }}>3. No Third-Party Selling</strong>
-                    <p style={{ margin: "2px 0 0" }}>Your personal data is never sold or shared with third-party marketing networks.</p>
-                  </div>
+                  <p style={{ margin: 0 }}>{copy.privacyModalIntro}</p>
+                  {copy.privacyClauses.map((clause) => (
+                    <div key={clause.title}>
+                      <strong style={{ color: "var(--color-text)" }}>{clause.title}</strong>
+                      <p style={{ margin: "2px 0 0" }}>{clause.body}</p>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -2138,7 +2139,7 @@ const loadWorkspace = async () => {
                   }}
                   style={{ padding: "8px 18px", fontSize: "0.88rem" }}
                 >
-                  I Understand & Agree
+                  {copy.agreeBtn}
                 </button>
               </div>
             </div>
@@ -2162,7 +2163,7 @@ const loadWorkspace = async () => {
       <aside
         id="workspace-mobile-drawer"
         className={`platform-sidebar${mobileDrawerOpen ? " mobile-open" : ""}`}
-        aria-label="Workspace navigation"
+        aria-label={copy.workspaceNavAria}
       >
         <div className="sidebar-brand-row">
           <button
@@ -2172,12 +2173,12 @@ const loadWorkspace = async () => {
               setView("overview");
               setMobileDrawerOpen(false);
             }}
-            title="Yekis — Go to Dashboard Overview"
-            aria-label="Yekis — Go to Dashboard Overview"
+            title={copy.brandOverviewAria}
+            aria-label={copy.brandOverviewAria}
           >
             <img
               src="/svgviewer-output.svg"
-              alt="Yekis Logo"
+              alt={copy.yekisLogoAlt}
               className="sidebar-brand-logo"
               referrerPolicy="no-referrer"
             />
@@ -2198,17 +2199,17 @@ const loadWorkspace = async () => {
             aria-controls="workspace-mobile-drawer"
             title={
               isMobileViewport
-                ? "Close navigation drawer"
+                ? copy.closeDrawerAria
                 : sidebarCollapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
+                  ? copy.expandSidebarAria
+                  : copy.collapseSidebarAria
             }
             aria-label={
               isMobileViewport
-                ? "Close navigation drawer"
+                ? copy.closeDrawerAria
                 : sidebarCollapsed
-                  ? "Expand sidebar"
-                  : "Collapse sidebar"
+                  ? copy.expandSidebarAria
+                  : copy.collapseSidebarAria
             }
           >
             {isMobileViewport ? (
@@ -2223,7 +2224,7 @@ const loadWorkspace = async () => {
         {isMobileViewport && basePlatformRole === "BOTH" && (
           <div className="sh-mobile-drawer-role-switch">
             <label className="sh-customizer-label" htmlFor="mobile-role-select">
-              Workspace Mode
+              {copy.workspaceModeLabel}
             </label>
             <select
               id="mobile-role-select"
@@ -2236,9 +2237,9 @@ const loadWorkspace = async () => {
               }
               style={{ width: "100%" }}
             >
-              <option value="BOTH">Mode: Client &amp; Freelancer</option>
-              <option value="CLIENT">Mode: Client (Hiring)</option>
-              <option value="FREELANCER">Mode: Freelancer (Work)</option>
+              <option value="BOTH">{t.workspace.roles.modeBoth}</option>
+              <option value="CLIENT">{t.workspace.roles.modeClient}</option>
+              <option value="FREELANCER">{t.workspace.roles.modeFreelancer}</option>
             </select>
           </div>
         )}
@@ -2312,8 +2313,8 @@ const loadWorkspace = async () => {
                 openMyProfile();
                 setMobileDrawerOpen(false);
               }}
-              title={`${roleLabel(platformRole)} — ${user.email}`}
-              aria-label={`View profile — signed in as ${roleLabel(platformRole)} (${user.email})`}
+              title={`${roleLabel(platformRole, language)} — ${user.email}`}
+              aria-label={copy.viewProfileAria(roleLabel(platformRole, language), user.email ?? "")}
             >
               <span className="avatar yk-chip-avatar">
                 <YekisAvatar
@@ -2327,7 +2328,7 @@ const loadWorkspace = async () => {
               </span>
               {(!sidebarCollapsed || isMobileViewport) && (
                 <span className="user-chip-id">
-                  <span className="nm">{roleLabel(platformRole)}</span>
+                  <span className="nm">{roleLabel(platformRole, language)}</span>
                   <span className="em">{user.email || "—"}</span>
                 </span>
               )}
@@ -2361,8 +2362,8 @@ const loadWorkspace = async () => {
                 onClick={() => setMobileDrawerOpen((prev) => !prev)}
                 aria-expanded={mobileDrawerOpen}
                 aria-controls="workspace-mobile-drawer"
-                title="Open navigation drawer"
-                aria-label="Open navigation drawer"
+                title={copy.openDrawerAria}
+                aria-label={copy.openDrawerAria}
               >
                 <Menu size={17} />
               </button>
@@ -2372,14 +2373,14 @@ const loadWorkspace = async () => {
               type="button"
               className="sh-icon-only-btn sh-topbar-back-btn"
               onClick={handleUniversalBack}
-              title="Go back"
-              aria-label="Go back"
+              title={copy.goBackAria}
+              aria-label={copy.goBackAria}
             >
               <ArrowLeft size={17} />
             </button>
             <div className="sh-breadcrumb">
               <span className="sh-breadcrumb-muted">
-                {roleLabel(platformRole)} {t.workspace.nav.workspaceLabel}
+                {roleLabel(platformRole, language)} {t.workspace.nav.workspaceLabel}
               </span>
               <span className="sh-breadcrumb-sep">/</span>
               <strong className="sh-breadcrumb-current">
@@ -2393,8 +2394,10 @@ const loadWorkspace = async () => {
                       // reports an empty string, and an empty heading is
                       // worse than the generic one.
                       viewedProfileName || t.workspace.profile.memberProfileLabel
-                    : navItems.find((item) => item.view === view)?.label ||
-                      t.nav.settings}
+                    : view === "profile-edit"
+                      ? t.workspace.profile.editHeading
+                      : navItems.find((item) => item.view === view)?.label ||
+                        t.nav.settings}
               </strong>
             </div>
           </div>
@@ -2416,8 +2419,8 @@ const loadWorkspace = async () => {
                 onChange={(e) =>
                   switchDualRoleMode(e.target.value as "CLIENT" | "FREELANCER" | "BOTH")
                 }
-                aria-label="Switch workspace mode"
-                title="Switch between Client and Freelancer modes"
+                aria-label={copy.switchModeAria}
+                title={copy.switchModeTitle}
               >
                 <option value="BOTH">{t.workspace.roles.modeBoth}</option>
                 <option value="CLIENT">{t.workspace.roles.modeClient}</option>
@@ -2433,8 +2436,8 @@ const loadWorkspace = async () => {
               onClick={toggleTheme}
               aria-label={
                 theme === "light"
-                  ? "Switch to dark mode"
-                  : "Switch to light mode"
+                  ? copy.switchToDark
+                  : copy.switchToLight
               }
             >
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
@@ -2444,8 +2447,8 @@ const loadWorkspace = async () => {
               type="button"
               className="user-menu"
               onClick={openMyProfile}
-              title={`${roleLabel(platformRole)} — ${user.email}`}
-              aria-label={`Open profile (${user.email})`}
+              title={`${roleLabel(platformRole, language)} — ${user.email}`}
+              aria-label={copy.openProfileAria(user.email ?? "")}
             >
               <span className="avatar yk-topbar-avatar">
                 <YekisAvatar
@@ -2476,7 +2479,7 @@ const loadWorkspace = async () => {
           !profileNudgeDismissed &&
           (!effectiveUserAvatarUrl ||
             (profileCompleteness !== null && profileCompleteness < 85)) && (
-            <div className="sh-profile-setup-banner" role="region" aria-label="Complete your profile">
+            <div className="sh-profile-setup-banner" role="region" aria-label={copy.completeProfileAria}>
               <div className="sh-profile-setup-left">
                 <div className="sh-profile-setup-avatar-wrap">
                   <YekisAvatar
@@ -2493,14 +2496,13 @@ const loadWorkspace = async () => {
                 </div>
                 <div className="sh-profile-setup-copy">
                   <div className="sh-profile-setup-title-row">
-                    <strong>Finish your profile</strong>
+                    <strong>{copy.finishProfileTitle}</strong>
                     <span className="sh-profile-setup-badge sh-mono">
-                      {profileCompleteness ?? user.profileCompleteness ?? 75}% complete
+                      {copy.percentComplete(profileCompleteness ?? user.profileCompleteness ?? 75)}
                     </span>
                   </div>
                   <p>
-                    Add a photo and a short bio so clients and collaborators
-                    know who they are working with.
+                    {copy.finishProfileDesc}
                   </p>
                 </div>
               </div>
@@ -2518,21 +2520,21 @@ const loadWorkspace = async () => {
                     })
                   }
                 >
-                  View checklist
+                  {copy.viewChecklistBtn}
                 </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-primary"
                   onClick={() => setView("profile-edit")}
                 >
-                  <Camera size={14} /> Edit profile
+                  <Camera size={14} /> {copy.editProfileBtn}
                 </button>
                 <button
                   type="button"
                   className="sh-icon-only-btn"
                   onClick={dismissProfileNudge}
-                  title="Dismiss — it will not come back until your profile is complete"
-                  aria-label="Dismiss profile setup banner"
+                  title={copy.dismissBannerTitle}
+                  aria-label={copy.dismissBannerAria}
                 >
                   <X size={15} />
                 </button>
@@ -2571,70 +2573,70 @@ const loadWorkspace = async () => {
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
                   {canHire && canWork
-                    ? "Marketplace Briefs & Your Posts"
+                    ? copy.jobsTitleBoth
                     : canHire
-                      ? "Job Postings & Talent Pipeline"
-                      : "Browse Open Marketplace Briefs"}
+                      ? copy.jobsTitleHire
+                      : copy.jobsTitleWork}
                 </h2>
                 <p className="sh-card-desc">
                   {canHire && canWork
-                    ? "Take on open escrow-backed opportunities, or post a brief and manage your own talent pipeline."
+                    ? copy.jobsDescBoth
                     : canHire
-                      ? "Publish structured milestone briefs and shortlist verified Ethiopian freelancers."
-                      : "Apply to milestone-funded opportunities across Ethiopia's verified marketplace."}
+                      ? copy.jobsDescHire
+                      : copy.jobsDescWork}
                 </p>
               </div>
-              <span className="sh-kbd">{jobs.length} Open Briefs</span>
+              <span className="sh-kbd">{copy.openBriefsCount(jobs.length)}</span>
             </div>
 
             {canHire && (
               <form className="sh-card job-form" onSubmit={submitJob}>
                 <div className="sh-card-header">
                   <div>
-                    <h3 className="sh-card-title">Publish New Job Brief</h3>
+                    <h3 className="sh-card-title">{copy.publishBriefTitle}</h3>
                     <p className="sh-card-desc">
-                      Define project scope, ETB budget range, and target milestone delivery date
+                      {copy.publishBriefDesc}
                     </p>
                   </div>
-                  <span className="sh-kbd">Escrow Protected</span>
+                  <span className="sh-kbd">{copy.escrowProtectedBadge}</span>
                 </div>
                 <div className="form-grid">
                   <label className="form-span-2">
-                    Brief Title
+                    {copy.briefTitleLabel}
                     <input
                       value={jobTitle}
                       onChange={(event) => setJobTitle(event.target.value)}
-                      placeholder="e.g., Telebirr H5 Merchant Checkout & Reconciliation API"
+                      placeholder={copy.briefTitlePlaceholder}
                       required
                     />
                   </label>
                   <label>
-                    Category
+                    {copy.categoryLabel}
                     <select
                       value={jobCategory}
                       onChange={(event) => setJobCategory(event.target.value)}
                     >
                       {categories.map((category) => (
                         <option key={category} value={category}>
-                          {categoryLabels[category]}
+                          {localizedCategoryLabels[category] ?? categoryLabels[category]}
                         </option>
                       ))}
                     </select>
                   </label>
                   <label className="form-wide">
-                    Scope & Deliverable Specification
+                    {copy.scopeLabel}
                     <textarea
                       value={jobDescription}
                       onChange={(event) =>
                         setJobDescription(event.target.value)
                       }
-                      placeholder="Describe the outcome, acceptance criteria, and milestone deliverables (min 20 characters)."
+                      placeholder={copy.scopePlaceholder}
                       minLength={20}
                       required
                     />
                   </label>
                   <label>
-                    Minimum Budget (ETB)
+                    {copy.minBudgetLabel}
                     <input
                       type="number"
                       value={jobBudgetMin}
@@ -2644,7 +2646,7 @@ const loadWorkspace = async () => {
                     />
                   </label>
                   <label>
-                    Maximum Budget (ETB)
+                    {copy.maxBudgetLabel}
                     <input
                       type="number"
                       value={jobBudgetMax}
@@ -2654,7 +2656,7 @@ const loadWorkspace = async () => {
                     />
                   </label>
                   <label>
-                    Target Deadline
+                    {copy.targetDeadlineLabel}
                     <input
                       type="date"
                       value={jobDeadline}
@@ -2673,7 +2675,7 @@ const loadWorkspace = async () => {
                         style={{ marginTop: 10 }}
                         onClick={() => setView("verification")}
                       >
-                        Verify your identity
+                        {copy.verifyIdentityBtn}
                       </button>
                     )}
                   </div>
@@ -2683,7 +2685,7 @@ const loadWorkspace = async () => {
                     className="sh-btn sh-btn-primary"
                     disabled={isLoading}
                   >
-                    Publish Job Brief
+                    {copy.publishBriefBtn}
                   </button>
                 </div>
               </form>
@@ -2693,7 +2695,7 @@ const loadWorkspace = async () => {
               openJobs={jobs}
               onChanged={loadWorkspace}
               categories={categories}
-              categoryLabels={categoryLabels}
+              categoryLabels={localizedCategoryLabels}
               section="jobs"
               onBrowseJobs={() => setView("jobs")}
             />
@@ -2706,17 +2708,17 @@ const loadWorkspace = async () => {
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
                   {canHire && canWork
-                    ? "Proposals You Sent & Received"
+                    ? copy.proposalsTitleBoth
                     : canHire
-                      ? "Talent Pipeline"
-                      : "My Submitted Proposals"}
+                      ? copy.proposalsTitleHire
+                      : copy.proposalsTitleWork}
                 </h2>
                 <p className="sh-card-desc">
                   {canHire && canWork
-                    ? "Track the bids you have sent, and review the proposals that came in against your own briefs."
+                    ? copy.proposalsDescBoth
                     : canHire
-                      ? "Review incoming proposals, shortlist candidates, and generate escrow contracts."
-                      : "Track the milestone quotes you have sent and the client's decision on each one."}
+                      ? copy.proposalsDescHire
+                      : copy.proposalsDescWork}
                 </p>
               </div>
             </div>
@@ -2725,7 +2727,7 @@ const loadWorkspace = async () => {
               openJobs={jobs}
               onChanged={loadWorkspace}
               categories={categories}
-              categoryLabels={categoryLabels}
+              categoryLabels={localizedCategoryLabels}
               section="proposals"
               onBrowseJobs={() => setView("jobs")}
             />
@@ -2748,13 +2750,13 @@ const loadWorkspace = async () => {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Contracts & Service Agreements
+                  {copy.contractsTitle}
                 </h2>
                 <p className="sh-card-desc">
-                  Review and sign bilingual AACCSA agreements, inspect bilateral e-signatures, and download executed contract PDFs.
+                  {copy.contractsDesc}
                 </p>
               </div>
-              <span className="sh-kbd">AACCSA Standard v2.4</span>
+              <span className="sh-kbd">{copy.aaccsaBadge}</span>
             </div>
             <ContractsWorkspace
               userId={user.id}
@@ -2780,10 +2782,10 @@ const loadWorkspace = async () => {
                   {t.escrow.title}
                 </h2>
                 <p className="sh-card-desc">
-                  Fund milestone escrow vaults, submit deliverables for review, approve payouts, and inspect withholding tax breakdowns.
+                  {copy.escrowDesc}
                 </p>
               </div>
-              <span className="sh-kbd">7-Day Auto-Release Protection</span>
+              <span className="sh-kbd">{copy.autoReleaseBadge}</span>
             </div>
             <EscrowWorkspace
               userId={user.id}
@@ -2806,10 +2808,10 @@ const loadWorkspace = async () => {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Escrow Wallet & Payment Rails
+                  {copy.walletTitle}
                 </h2>
                 <p className="sh-card-desc">
-                  Fund escrow or withdraw settled earnings via Telebirr, CBE Birr, and Safaricom M-Pesa.
+                  {copy.walletDesc}
                 </p>
               </div>
               <span className="sh-kbd sh-mono">
@@ -2849,7 +2851,9 @@ const loadWorkspace = async () => {
                 </p>
               </div>
               <span className="sh-kbd">
-                {user.kyc?.tier ?? "TIER_2"} · {user.kyc?.status ?? "VERIFIED"}
+                {(t.workspace.statuses as Record<string, string>)[user.kyc?.tier ?? "TIER_2"] ?? user.kyc?.tier ?? "TIER_2"}{" "}
+                ·{" "}
+                {(t.workspace.statuses as Record<string, string>)[user.kyc?.status ?? "VERIFIED"] ?? user.kyc?.status ?? "VERIFIED"}
               </span>
             </div>
             <BrowserVerification />
@@ -2861,13 +2865,13 @@ const loadWorkspace = async () => {
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  Dispute Resolution & Mediation Center
+                  {copy.casesTitle}
                 </h2>
                 <p className="sh-card-desc">
-                  Negotiate milestone adjustments, submit immutable evidence, and track staff mediation or AACCSA arbitration.
+                  {copy.casesDesc}
                 </p>
               </div>
-              <span className="sh-kbd">3-Stage Escrow Protection</span>
+              <span className="sh-kbd">{copy.threeStageEscrowBadge}</span>
             </div>
             <DisputesWorkspace />
           </section>
@@ -2886,17 +2890,6 @@ const loadWorkspace = async () => {
                   {t.workspace.profile.publicDesc}
                 </p>
               </div>
-              {/* "Edit Profile" edits MY profile. Offering it over somebody
-                  else's page said that their page was mine — and the editor
-                  it opened was mine too, which is worse. */}
-              {viewingOwnProfile && (
-                <button
-                  className="sh-btn sh-btn-secondary"
-                  onClick={() => setView("profile-edit")}
-                >
-                  <Edit size={14} /> {t.workspace.profile.editProfileBtn}
-                </button>
-              )}
             </div>
             <ProfilePage
               userId={viewUserId || user.id}
@@ -2907,6 +2900,9 @@ const loadWorkspace = async () => {
                 setViewedProfileName(loaded.displayName || null)
               }
               onOpenChat={(id, name) => void openChatWithUser(id, name)}
+              onEditProfile={
+                viewingOwnProfile ? () => setView("profile-edit") : undefined
+              }
             />
           </section>
         )}
@@ -2929,7 +2925,10 @@ const loadWorkspace = async () => {
                 <ArrowLeft size={14} /> {t.workspace.profile.backToProfileBtn}
               </button>
             </div>
-            <ProfileEditPage onSaved={() => void loadWorkspace()} />
+            <ProfileEditPage
+              role={platformRole}
+              onSaved={() => void loadWorkspace()}
+            />
           </section>
         )}
 
@@ -2957,7 +2956,7 @@ const loadWorkspace = async () => {
         )}
       </main>
 
-      <nav className="platform-mobile-nav" aria-label="Primary mobile navigation">
+      <nav className="platform-mobile-nav" aria-label={copy.mobileNavAria}>
         {navItems.slice(0, 4).map((item) => {
           // The same dot the sidebar shows, so the thumb-zone bar and the
           // drawer never disagree about what is waiting.
