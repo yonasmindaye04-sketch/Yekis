@@ -42,7 +42,7 @@ async function kycUploadScene(conversation: MyConversation, ctx: MyContext) {
   const docType = ctx.session.sceneData?.docType;
 
   if (!docType) {
-    await ctx.reply("Invalid document type");
+    await ctx.reply(ctx.t("kyc_invalid_doc_type"));
     clearScene(ctx);
     return;
   }
@@ -99,7 +99,7 @@ async function proposeScene(conversation: MyConversation, ctx: MyContext) {
   const jobId = ctx.session.sceneData?.jobId;
 
   if (!jobId) {
-    await ctx.reply("No job selected");
+    await ctx.reply(ctx.t("propose_no_job"));
     clearScene(ctx);
     return;
   }
@@ -109,7 +109,7 @@ async function proposeScene(conversation: MyConversation, ctx: MyContext) {
   const coverLetter = coverLetterMsg.message.text;
 
   if (coverLetter.length > 2000) {
-    await ctx.reply("Cover letter too long (max 2000 characters)");
+    await ctx.reply(ctx.t("propose_cover_letter_too_long"));
     clearScene(ctx);
     return;
   }
@@ -121,7 +121,7 @@ async function proposeScene(conversation: MyConversation, ctx: MyContext) {
   const amount = parseFloat(amountMsg.message.text);
 
   if (isNaN(amount) || amount < 100 || amount > 10_000_000) {
-    await ctx.reply("Invalid amount (100 - 10,000,000 ETB)");
+    await ctx.reply(ctx.t("propose_invalid_amount"));
     clearScene(ctx);
     return;
   }
@@ -133,7 +133,7 @@ async function proposeScene(conversation: MyConversation, ctx: MyContext) {
   const estimatedDays = parseInt(daysMsg.message.text, 10);
 
   if (isNaN(estimatedDays) || estimatedDays < 1 || estimatedDays > 365) {
-    await ctx.reply("Invalid days (1 - 365)");
+    await ctx.reply(ctx.t("propose_invalid_days"));
     clearScene(ctx);
     return;
   }
@@ -183,7 +183,7 @@ async function withdrawScene(conversation: MyConversation, ctx: MyContext) {
   const amount = parseFloat(amountMsg.message.text);
 
   if (isNaN(amount) || amount < 100) {
-    await ctx.reply("Invalid amount");
+    await ctx.reply(ctx.t("wallet_invalid_amount"));
     clearScene(ctx);
     return;
   }
@@ -309,28 +309,28 @@ async function disputeRaiseScene(conversation: MyConversation, ctx: MyContext) {
   const milestoneId = ctx.session.sceneData?.milestoneId;
 
   if (!milestoneId) {
-    await ctx.reply("No milestone selected");
+    await ctx.reply(ctx.t("dispute_no_milestone"));
     clearScene(ctx);
     return;
   }
 
   await ctx.reply(ctx.t("dispute_raise"));
 
-  await ctx.reply("Select dispute category:", {
+  await ctx.reply(ctx.t("dispute_select_category"), {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "Non-delivery", callback_data: "dispute:cat:NON_DELIVERY" },
-          { text: "Quality Issue", callback_data: "dispute:cat:QUALITY_ISSUE" },
+          { text: ctx.t("dispute_category_non_delivery"), callback_data: "dispute:cat:NON_DELIVERY" },
+          { text: ctx.t("dispute_category_quality"), callback_data: "dispute:cat:QUALITY_ISSUE" },
         ],
         [
-          { text: "Scope Creep", callback_data: "dispute:cat:SCOPE_CREEP" },
-          { text: "Non-payment", callback_data: "dispute:cat:NON_PAYMENT" },
+          { text: ctx.t("dispute_category_scope_creep"), callback_data: "dispute:cat:SCOPE_CREEP" },
+          { text: ctx.t("dispute_category_non_payment"), callback_data: "dispute:cat:NON_PAYMENT" },
         ],
         [
-          { text: "Late Delivery", callback_data: "dispute:cat:LATE_DELIVERY" },
+          { text: ctx.t("dispute_category_late_delivery"), callback_data: "dispute:cat:LATE_DELIVERY" },
           {
-            text: "Communication",
+            text: ctx.t("dispute_category_communication"),
             callback_data: "dispute:cat:COMMUNICATION_BREAKDOWN",
           },
         ],
@@ -342,7 +342,7 @@ async function disputeRaiseScene(conversation: MyConversation, ctx: MyContext) {
   const category = catMsg.callbackQuery.data.split(":")[2];
   advanceScene(ctx, { category });
 
-  await ctx.reply("Describe the issue:");
+  await ctx.reply(ctx.t("dispute_describe_issue"));
   const descMsg = await conversation.waitFor("message:text");
   const description = descMsg.message.text;
   advanceScene(ctx, { description });
@@ -361,7 +361,7 @@ async function disputeRaiseScene(conversation: MyConversation, ctx: MyContext) {
 
   advanceScene(ctx, { evidenceFiles });
 
-  await ctx.reply("Submit dispute?", {
+  await ctx.reply(ctx.t("dispute_confirm_submit"), {
     reply_markup: {
       inline_keyboard: [
         [
@@ -382,7 +382,7 @@ async function disputeRaiseScene(conversation: MyConversation, ctx: MyContext) {
   }
 
   try {
-    await ctx.reply("Dispute submitted successfully!");
+    await ctx.reply(ctx.t("dispute_submitted_success"));
     clearScene(ctx);
   } catch (error) {
     logger.error({ error }, "Dispute creation failed");
@@ -427,7 +427,7 @@ async function staffKycReviewScene(
   });
 
   if (!kyc) {
-    await ctx.reply("KYC record not found");
+    await ctx.reply(ctx.t("staff_kyc_not_found"));
     clearScene(ctx);
     return;
   }
@@ -518,7 +518,7 @@ async function staffTopupReviewScene(
   });
 
   if (!topup) {
-    await ctx.reply("TopUp not found");
+    await ctx.reply(ctx.t("staff_topup_not_found"));
     clearScene(ctx);
     return;
   }
@@ -583,7 +583,7 @@ async function staffMediationScene(
   });
 
   if (!dispute) {
-    await ctx.reply("Dispute not found");
+    await ctx.reply(ctx.t("staff_dispute_not_found"));
     clearScene(ctx);
     return;
   }

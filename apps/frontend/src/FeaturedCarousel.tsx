@@ -15,6 +15,9 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { api } from "./api/client";
+import { useI18n } from "./i18n";
+import { FEATURED_CAROUSEL_COPY } from "./featuredCarouselCopy";
+import { localizeSkillName } from "./lib/skillLabels";
 
 export interface TalentReview {
   name: string;
@@ -318,6 +321,8 @@ export const FeaturedCarousel = ({
   onProfileClick?: (id: string) => void;
   onOpenChat?: (userId: string, userName?: string) => void;
 }) => {
+  const { language } = useI18n();
+  const copy = FEATURED_CAROUSEL_COPY[language] ?? FEATURED_CAROUSEL_COPY.en;
   const [talents, setTalents] = useState<TalentItem[]>(DEMO_TALENTS);
   const [activeFilter, setActiveFilter] = useState<"all" | "saved">("all");
   const [savedIds, setSavedIds] = useState<Set<string>>(() => getSavedTalentIds());
@@ -405,10 +410,10 @@ export const FeaturedCarousel = ({
     const isNowSaved = !next.has(talent.id);
     if (isNowSaved) {
       next.add(talent.id);
-      showToast(`${talent.displayName.split(" ")[0]} saved to your shortlist`);
+      showToast(copy.savedToast(talent.displayName.split(" ")[0]));
     } else {
       next.delete(talent.id);
-      showToast(`${talent.displayName.split(" ")[0]} removed from your shortlist`);
+      showToast(copy.removedToast(talent.displayName.split(" ")[0]));
     }
     setSavedIds(next);
     persistSavedTalentIds(next);
@@ -422,10 +427,10 @@ export const FeaturedCarousel = ({
     if (navigator?.clipboard?.writeText) {
       navigator.clipboard
         .writeText(url)
-        .then(() => showToast(`${firstName}'s profile link copied to clipboard!`))
-        .catch(() => showToast(`Link: ${url}`));
+        .then(() => showToast(copy.linkCopiedToast(firstName)))
+        .catch(() => showToast(copy.linkFallbackToast(url)));
     } else {
-      showToast(`Link for ${firstName} copied.`);
+      showToast(copy.linkCopiedGenericToast(firstName));
     }
   };
 
@@ -450,7 +455,7 @@ export const FeaturedCarousel = ({
   };
 
   return (
-    <section className="ft-wrap" aria-label="Featured Talent">
+    <section className="ft-wrap" aria-label={copy.sectionAria}>
       {/* Toast Notification */}
       {toastMessage && (
         <div className="ft-toast show" role="status">
@@ -461,12 +466,12 @@ export const FeaturedCarousel = ({
       {/* Header */}
       <div className="ft-head">
         <div>
-          <h2 className="ft-title">Featured Talent</h2>
-          <p className="ft-sub">Verified Ethiopian professionals available for hire</p>
+          <h2 className="ft-title">{copy.heading}</h2>
+          <p className="ft-sub">{copy.subtitle}</p>
         </div>
 
         <div className="ft-controls">
-          <div className="ft-tabs" role="tablist" aria-label="Talent filter">
+          <div className="ft-tabs" role="tablist" aria-label={copy.filterAria}>
             <button
               type="button"
               className={`ft-tab ${activeFilter === "all" ? "active" : ""}`}
@@ -474,7 +479,7 @@ export const FeaturedCarousel = ({
               aria-selected={activeFilter === "all"}
               onClick={() => setActiveFilter("all")}
             >
-              All <span>({talents.length})</span>
+              {copy.tabAll} <span>({talents.length})</span>
             </button>
             <button
               type="button"
@@ -484,7 +489,7 @@ export const FeaturedCarousel = ({
               onClick={() => setActiveFilter("saved")}
             >
               <Bookmark size={12} strokeWidth={2} />
-              Saved <span>({savedIds.size})</span>
+              {copy.tabSaved} <span>({savedIds.size})</span>
             </button>
           </div>
         </div>
@@ -492,17 +497,15 @@ export const FeaturedCarousel = ({
 
       {/* Grid */}
       {displayedTalents.length === 0 ? (
-        <div className="ft-empty">
-          No saved professionals yet. Use the bookmark icon to save a profile.
-        </div>
+        <div className="ft-empty">{copy.emptySaved}</div>
       ) : (
-        <section className="ft-grid" aria-label="Featured professionals">
+        <section className="ft-grid" aria-label={copy.gridAria}>
           {displayedTalents.map((talent) => {
-            const name = talent.displayName?.trim() || "Verified Freelancer";
+            const name = talent.displayName?.trim() || copy.verifiedFreelancerFallback;
             const role =
               talent.roleTitle ||
               talent.primarySkill?.nameEn ||
-              "Professional Freelancer";
+              copy.professionalFreelancerFallback;
             const isSaved = savedIds.has(talent.id);
             const initials = getInitials(name);
             const avatarBg = getAvatarColor(talent);
@@ -513,11 +516,10 @@ export const FeaturedCarousel = ({
             ).slice(0, 3);
             const isNew = talent.isNew || talent.totalJobsCompleted === 0;
             const isTopRated = !isNew && (talent.ratingAverage ?? 0) >= 4.8;
-            const statusText =
-              talent.totalJobsCompleted > 0
-                ? `${talent.totalJobsCompleted} jobs delivered`
-                : "Available";
-            const isAvailable = statusText === "Available";
+            const isAvailable = talent.totalJobsCompleted <= 0;
+            const statusText = !isAvailable
+              ? copy.jobsDelivered(talent.totalJobsCompleted)
+              : copy.statusAvailable;
 
             return (
               <article
@@ -537,7 +539,7 @@ export const FeaturedCarousel = ({
                 <div className="ft-card-top">
                   <div className="ft-avatar" style={{ backgroundColor: avatarBg }}>
                     {initials}
-                    <span className="check" title="Verified">
+                    <span className="check" title={copy.verifiedTitle}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                         <path d="M5 12l5 5L20 7" />
                       </svg>
@@ -548,7 +550,7 @@ export const FeaturedCarousel = ({
                       type="button"
                       className="ft-mini"
                       onClick={(e) => handleShare(e, talent)}
-                      aria-label={`Share ${name}`}
+                      aria-label={copy.shareAria(name)}
                     >
                       <Share2 size={13} strokeWidth={2} />
                     </button>
@@ -557,7 +559,7 @@ export const FeaturedCarousel = ({
                       className="ft-mini"
                       onClick={(e) => toggleSaveTalent(e, talent)}
                       aria-pressed={isSaved}
-                      aria-label={`Save ${name}`}
+                      aria-label={copy.saveAria(name)}
                     >
                       <Bookmark
                         size={13}
@@ -571,9 +573,9 @@ export const FeaturedCarousel = ({
                 <h3 className="ft-card-name">
                   {name}{" "}
                   {isNew ? (
-                    <span className="ft-badge new">New</span>
+                    <span className="ft-badge new">{copy.badgeNew}</span>
                   ) : isTopRated ? (
-                    <span className="ft-badge top">Top rated</span>
+                    <span className="ft-badge top">{copy.badgeTopRated}</span>
                   ) : null}
                 </h3>
 
@@ -583,7 +585,7 @@ export const FeaturedCarousel = ({
                   {skills.map((skill, idx) => (
                     <React.Fragment key={skill}>
                       {idx > 0 && <span className="dot">·</span>}
-                      {skill}
+                      {localizeSkillName(skill, language)}
                     </React.Fragment>
                   ))}
                 </p>
@@ -601,7 +603,7 @@ export const FeaturedCarousel = ({
                       handleCardClick(talent);
                     }}
                   >
-                    View profile <ArrowRight size={13} strokeWidth={2} />
+                    {copy.viewProfileBtn} <ArrowRight size={13} strokeWidth={2} />
                   </button>
                 </div>
               </article>
@@ -612,8 +614,7 @@ export const FeaturedCarousel = ({
 
       {/* Count footer */}
       <p className="ft-count">
-        {displayedTalents.length} {activeFilter === "saved" ? "saved" : "featured"}{" "}
-        professional{displayedTalents.length === 1 ? "" : "s"}
+        {copy.countFooter(displayedTalents.length, activeFilter === "saved")}
       </p>
 
       {/* Quick-View Profile Modal (Functional inspection) */}
@@ -636,13 +637,13 @@ export const FeaturedCarousel = ({
                 className="ft-modal-back-btn"
                 onClick={() => setSelectedTalent(null)}
               >
-                <ChevronLeft size={16} /> Featured Talent
+                <ChevronLeft size={16} /> {copy.modalBackBtn}
               </button>
               <button
                 type="button"
                 className="ft-modal-close-btn"
                 onClick={() => setSelectedTalent(null)}
-                aria-label="Close modal"
+                aria-label={copy.modalCloseAria}
               >
                 <X size={18} />
               </button>
@@ -663,7 +664,7 @@ export const FeaturedCarousel = ({
                   {getInitials(selectedTalent.displayName)}
                   <span
                     className="check"
-                    title="Verified"
+                    title={copy.verifiedTitle}
                     style={{ width: 22, height: 22, right: -3, bottom: -3 }}
                   >
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" style={{ width: 12, height: 12 }}>
@@ -677,18 +678,18 @@ export const FeaturedCarousel = ({
               <p className="ft-modal-role">
                 {selectedTalent.roleTitle ||
                   selectedTalent.primarySkill?.nameEn ||
-                  "Professional Freelancer"}
+                  copy.professionalFreelancerFallback}
               </p>
 
               <div className="ft-modal-meta">
                 <span>
-                  <MapPin size={14} /> {selectedTalent.location || "Addis Ababa, Ethiopia"}
+                  <MapPin size={14} /> {selectedTalent.location || copy.locationDefault}
                 </span>
                 <span>
-                  <Globe size={14} /> {selectedTalent.languages || "Amharic, English"}
+                  <Globe size={14} /> {selectedTalent.languages || copy.languagesDefault}
                 </span>
                 <span>
-                  <Calendar size={14} /> Since {selectedTalent.memberSince || "2025"}
+                  <Calendar size={14} /> {copy.sincePrefix(selectedTalent.memberSince || "2025")}
                 </span>
               </div>
 
@@ -699,7 +700,7 @@ export const FeaturedCarousel = ({
                   className="ft-btn-primary"
                   onClick={() => {
                     const fn = selectedTalent.displayName.split(" ")[0];
-                    showToast(`Starting project proposal with ${fn}...`);
+                    showToast(copy.startingProposalToast(fn));
                     const id = selectedTalent.id;
                     const name = selectedTalent.displayName;
                     setSelectedTalent(null);
@@ -710,14 +711,14 @@ export const FeaturedCarousel = ({
                     }
                   }}
                 >
-                  <Briefcase size={16} /> Hire {selectedTalent.displayName.split(" ")[0]}
+                  <Briefcase size={16} /> {copy.hireBtn(selectedTalent.displayName.split(" ")[0])}
                 </button>
                 <button
                   type="button"
                   className="ft-btn-secondary"
                   onClick={() => {
                     const fn = selectedTalent.displayName.split(" ")[0];
-                    showToast(`Opening direct conversation with ${fn}...`);
+                    showToast(copy.openingChatToast(fn));
                     const id = selectedTalent.id;
                     const name = selectedTalent.displayName;
                     setSelectedTalent(null);
@@ -728,20 +729,20 @@ export const FeaturedCarousel = ({
                     }
                   }}
                 >
-                  <MessageSquare size={16} /> Message
+                  <MessageSquare size={16} /> {copy.messageBtn}
                 </button>
                 <button
                   type="button"
                   className="ft-btn-secondary"
                   onClick={() => handleOpenFullProfile(selectedTalent.id)}
                 >
-                  Open Full Profile <ExternalLink size={14} />
+                  {copy.openFullProfileBtn} <ExternalLink size={14} />
                 </button>
                 <button
                   type="button"
                   className={`carousel-circle-btn ${savedIds.has(selectedTalent.id) ? "saved" : ""}`}
                   onClick={(e) => toggleSaveTalent(e, selectedTalent)}
-                  title={savedIds.has(selectedTalent.id) ? "Remove from shortlist" : "Save to shortlist"}
+                  title={savedIds.has(selectedTalent.id) ? copy.removeShortlistTitle : copy.saveShortlistTitle}
                   style={{ width: 44, height: 44 }}
                 >
                   <Bookmark
@@ -754,20 +755,20 @@ export const FeaturedCarousel = ({
               {/* Stat Strip */}
               <div className="ft-statstrip">
                 <div className="ft-stat-box">
-                  <b>{selectedTalent.ratingAverage ? Number(selectedTalent.ratingAverage).toFixed(1) : "New"}</b>
-                  <span>Rating</span>
+                  <b>{selectedTalent.ratingAverage ? Number(selectedTalent.ratingAverage).toFixed(1) : copy.statNew}</b>
+                  <span>{copy.statRating}</span>
                 </div>
                 <div className="ft-stat-box">
                   <b>{selectedTalent.totalJobsCompleted || 0}</b>
-                  <span>Jobs done</span>
+                  <span>{copy.statJobsDone}</span>
                 </div>
                 <div className="ft-stat-box">
                   <b>{selectedTalent.onTimePercent || "100%"}</b>
-                  <span>On-time</span>
+                  <span>{copy.statOnTime}</span>
                 </div>
                 <div className="ft-stat-box">
                   <b>{selectedTalent.responseTime || "~1 hr"}</b>
-                  <span>Response</span>
+                  <span>{copy.statResponse}</span>
                 </div>
               </div>
             </div>
@@ -777,21 +778,20 @@ export const FeaturedCarousel = ({
               {/* Main Column */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <section className="ft-card-box">
-                  <h3 className="ft-box-label">About</h3>
+                  <h3 className="ft-box-label">{copy.aboutHeading}</h3>
                   <p className="ft-about-text">
-                    {selectedTalent.about ||
-                      "Verified Ethiopian freelancer specializing in high-quality deliverables, dependable milestone execution, and clear client communication."}
+                    {selectedTalent.about || copy.aboutFallback}
                   </p>
                 </section>
 
                 <section className="ft-card-box">
-                  <h3 className="ft-box-label">Skills & Expertise</h3>
+                  <h3 className="ft-box-label">{copy.skillsHeading}</h3>
                   <div className="ft-modal-tags">
                     {(selectedTalent.skills || [
-                      selectedTalent.primarySkill?.nameEn || "Professional Freelancer",
+                      selectedTalent.primarySkill?.nameEn || copy.professionalFreelancerFallback,
                     ]).map((s, idx) => (
                       <span key={idx} className="carousel-tag">
-                        {s}
+                        {localizeSkillName(s, language)}
                       </span>
                     ))}
                   </div>
@@ -799,11 +799,11 @@ export const FeaturedCarousel = ({
 
                 <section className="ft-card-box">
                   <h3 className="ft-box-label">
-                    Client Reviews{" "}
+                    {copy.reviewsHeading}{" "}
                     {selectedTalent.ratingAverage && (
                       <span style={{ marginLeft: "auto", color: "var(--color-text)", textTransform: "none", display: "inline-flex", alignItems: "center", gap: 4 }}>
                         <Star size={13} fill="var(--color-warning)" color="var(--color-warning)" />
-                        {selectedTalent.ratingAverage.toFixed(1)} · {selectedTalent.ratingCount || selectedTalent.reviews?.length || 0} reviews
+                        {selectedTalent.ratingAverage.toFixed(1)} · {copy.reviewsCount(selectedTalent.ratingCount || selectedTalent.reviews?.length || 0)}
                       </span>
                     )}
                   </h3>
@@ -843,10 +843,10 @@ export const FeaturedCarousel = ({
                         style={{ margin: "0 auto 8px", color: "var(--color-primary)", opacity: 0.8 }}
                       />
                       <strong style={{ display: "block", fontSize: "0.92rem", marginBottom: 4 }}>
-                        New Verified Talent
+                        {copy.newVerifiedTalentTitle}
                       </strong>
                       <p style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)", margin: "0 auto 14px", maxWidth: "38ch" }}>
-                        {selectedTalent.displayName.split(" ")[0]} recently completed Fayda identity verification. Be the first client to collaborate and leave a review.
+                        {copy.newVerifiedTalentDesc(selectedTalent.displayName.split(" ")[0])}
                       </p>
                     </div>
                   )}
@@ -856,30 +856,30 @@ export const FeaturedCarousel = ({
               {/* Aside Column */}
               <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <section className="ft-card-box">
-                  <h3 className="ft-box-label">Engagement</h3>
+                  <h3 className="ft-box-label">{copy.engagementHeading}</h3>
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 }}>
                     <span className="ft-rate-lg">
                       ETB {(selectedTalent.hourlyRateETB || 950).toLocaleString()}
                     </span>
-                    <span className="ft-rate-unit">/ hr starting</span>
+                    <span className="ft-rate-unit">{copy.perHourUnit}</span>
                   </div>
 
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", fontWeight: 600, color: "var(--color-primary)", marginBottom: 14 }}>
                     <span className="carousel-live-dot" />
-                    Available for new projects
+                    {copy.availableNewProjects}
                   </div>
 
                   <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10, fontSize: "0.82rem" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-                      <span style={{ color: "var(--color-text-tertiary)" }}>Jobs completed</span>
+                      <span style={{ color: "var(--color-text-tertiary)" }}>{copy.jobsCompletedLabel}</span>
                       <strong style={{ color: "var(--color-text)" }}>{selectedTalent.totalJobsCompleted || "—"}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-                      <span style={{ color: "var(--color-text-tertiary)" }}>On-time rate</span>
+                      <span style={{ color: "var(--color-text-tertiary)" }}>{copy.onTimeRateLabel}</span>
                       <strong style={{ color: "var(--color-text)" }}>{selectedTalent.onTimePercent || "100%"}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
-                      <span style={{ color: "var(--color-text-tertiary)" }}>Response time</span>
+                      <span style={{ color: "var(--color-text-tertiary)" }}>{copy.responseTimeLabel}</span>
                       <strong style={{ color: "var(--color-text)" }}>{selectedTalent.responseTime || "~1 hr"}</strong>
                     </div>
                   </div>
@@ -890,7 +890,7 @@ export const FeaturedCarousel = ({
                     style={{ width: "100%", marginTop: 14 }}
                     onClick={() => {
                       const fn = selectedTalent.displayName.split(" ")[0];
-                      showToast(`Starting proposal for ${fn}...`);
+                      showToast(copy.startingProposalToast(fn));
                       const id = selectedTalent.id;
                       const name = selectedTalent.displayName;
                       setSelectedTalent(null);
@@ -901,34 +901,34 @@ export const FeaturedCarousel = ({
                       }
                     }}
                   >
-                    Hire {selectedTalent.displayName.split(" ")[0]}
+                    {copy.hireBtn(selectedTalent.displayName.split(" ")[0])}
                   </button>
                   <p style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.4 }}>
-                    Contact is free — escrow funds are protected until milestones are delivered.
+                    {copy.escrowNote}
                   </p>
                 </section>
 
                 <section className="ft-card-box">
                   <h3 className="ft-box-label">
-                    Identity Verification
+                    {copy.identityVerificationHeading}
                     <span className="ft-bold-verified" style={{ marginLeft: "auto", fontSize: "0.76rem" }}>
-                      Tier {selectedTalent.kycTier || 1}
+                      {copy.tierBadge(selectedTalent.kycTier || 1)}
                     </span>
                   </h3>
 
                   <div className="ft-verify-row">
                     <CheckCircle size={15} />
                     <div>
-                      National ID (Fayda) Verified
-                      <small>Matched against the national identity database</small>
+                      {copy.faydaVerifiedTitle}
+                      <small>{copy.faydaVerifiedDesc}</small>
                     </div>
                   </div>
 
                   <div className="ft-verify-row">
                     <CheckCircle size={15} />
                     <div>
-                      Biometric Selfie Matched
-                      <small>Liveness matched during registration</small>
+                      {copy.biometricMatchedTitle}
+                      <small>{copy.biometricMatchedDesc}</small>
                     </div>
                   </div>
 
@@ -936,14 +936,14 @@ export const FeaturedCarousel = ({
                     <div className="ft-verify-row">
                       <CheckCircle size={15} />
                       <div>
-                        Enhanced Review Approved
-                        <small>Work background and payment rails confirmed</small>
+                        {copy.enhancedApprovedTitle}
+                        <small>{copy.enhancedApprovedDesc}</small>
                       </div>
                     </div>
                   )}
 
                   <p style={{ margin: "12px 0 0", paddingTop: 10, borderTop: "1px solid var(--color-border)", fontSize: "0.72rem", color: "var(--color-text-tertiary)", lineHeight: 1.45 }}>
-                    Verified via Fayda eSignet — Ethiopia&apos;s national digital identity framework.
+                    {copy.faydaFootnote}
                   </p>
                 </section>
               </aside>

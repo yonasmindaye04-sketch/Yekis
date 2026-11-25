@@ -26,6 +26,10 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert"
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { api, type MeResponse } from "./api/client";
 import { useI18n, type Language } from "./i18n";
+import {
+  SETTINGS_WORKSPACE_COPY,
+  type SettingsWorkspaceCopy,
+} from "./settingsWorkspaceCopy";
 import { cn } from "@/lib/utils";
 import {
   loadGoogleIdentity,
@@ -42,14 +46,19 @@ import "./SettingsWorkspace.css";
  * step-up middleware answers with a code only, so those two are translated
  * here — "REAUTH_REQUIRED" is not an instruction anyone can follow.
  */
-function describeCredentialError(err: unknown): string {
+function describeCredentialError(
+  err: unknown,
+  copy: SettingsWorkspaceCopy = SETTINGS_WORKSPACE_COPY.en,
+): string {
   const raw =
-    err instanceof Error && err.message ? err.message : "Something went wrong.";
+    err instanceof Error && err.message
+      ? err.message
+      : copy.common.somethingWentWrong;
   switch (raw) {
     case "REAUTH_REQUIRED":
-      return "Your sign-in is too old to change how you sign in. Sign in again with your password, then try this.";
+      return copy.credentialErrors.reauthRequired;
     case "STEP_UP_REQUIRED":
-      return "Sign in with your password first, then link Google.";
+      return copy.credentialErrors.stepUpRequired;
     default:
       return raw;
   }

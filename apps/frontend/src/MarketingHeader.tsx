@@ -2,8 +2,63 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Sun, Moon, Menu, X } from "lucide-react";
 import { useTheme } from "./theme/ThemeContext";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { LanguageSelector } from "./components/LanguageSelector";
+
+const HEADER_ARIA: Record<
+  Language,
+  {
+    mobileMenu: string;
+    switchToDark: string;
+    switchToLight: string;
+    closeMenu: string;
+    openMenu: string;
+    mobileNav: string;
+    primaryNav: string;
+    logoAlt: string;
+  }
+> = {
+  en: {
+    mobileMenu: "Mobile navigation menu",
+    switchToDark: "Switch to dark mode",
+    switchToLight: "Switch to light mode",
+    closeMenu: "Close navigation menu",
+    openMenu: "Open navigation menu",
+    mobileNav: "Mobile navigation",
+    primaryNav: "Primary navigation",
+    logoAlt: "Yekis — Ethiopian freelance marketplace logo",
+  },
+  am: {
+    mobileMenu: "የሞባይል አሰሳ ምናሌ",
+    switchToDark: "ወደ ጨለማ ገጽታ ቀይር",
+    switchToLight: "ወደ ብርሃን ገጽታ ቀይር",
+    closeMenu: "የአሰሳ ምናሌውን ዝጋ",
+    openMenu: "የአሰሳ ምናሌውን ክፈት",
+    mobileNav: "የሞባይል አሰሳ",
+    primaryNav: "ዋና አሰሳ",
+    logoAlt: "YeKis — የኢትዮጵያ የፍሪላንስ ገበያ ቦታ አርማ",
+  },
+  om: {
+    mobileMenu: "Menyuu moobaayilaa",
+    switchToDark: "Gara bifa dukkanaatti jijjiiri",
+    switchToLight: "Gara bifa ifaatti jijjiiri",
+    closeMenu: "Menyuu cufi",
+    openMenu: "Menyuu bani",
+    mobileNav: "Qajeelfama moobaayilaa",
+    primaryNav: "Qajeelfama ijoo",
+    logoAlt: "Yekis — Asxaa gabaa hojii Itoophiyaa",
+  },
+  ti: {
+    mobileMenu: "ምናሌ ሞባይል",
+    switchToDark: "ናብ ጸልማት ቅዲ ቀይር",
+    switchToLight: "ናብ ብርሃን ቅዲ ቀይር",
+    closeMenu: "ምናሌ ዕጾ",
+    openMenu: "ምናሌ ክፈት",
+    mobileNav: "ኣሰሳ ሞባይል",
+    primaryNav: "ቀንዲ ኣሰሳ",
+    logoAlt: "YeKis — ምልክት ዕዳጋ ፍሪላንስ ኢትዮጵያ",
+  },
+};
 
 type MarketingHeaderProps = {
   onNavigate: (page: string) => void;
@@ -17,7 +72,8 @@ export function MarketingHeader({
   currentPage,
 }: MarketingHeaderProps) {
   const { theme, toggleTheme } = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const aria = HEADER_ARIA[language] ?? HEADER_ARIA.en;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const primaryNav = [
@@ -81,7 +137,7 @@ export function MarketingHeader({
         role="dialog"
         aria-modal="true"
         aria-hidden={!mobileMenuOpen}
-        aria-label="Mobile navigation menu"
+        aria-label={aria.mobileMenu}
       >
         <div className="marketing-mobile-drawer-head">
           <LanguageSelector variant="dropdown" className="marketing-drawer-language" />
@@ -89,9 +145,7 @@ export function MarketingHeader({
             type="button"
             className="marketing-mobile-icon-btn"
             onClick={toggleTheme}
-            aria-label={
-              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-            }
+            aria-label={theme === "light" ? aria.switchToDark : aria.switchToLight}
           >
             {theme === "light" ? <Moon size={18} /> : <Sun size={18} />}
           </button>
@@ -99,12 +153,12 @@ export function MarketingHeader({
             type="button"
             className="marketing-mobile-close"
             onClick={() => setMobileMenuOpen(false)}
-            aria-label="Close navigation menu"
+            aria-label={aria.closeMenu}
           >
             <X size={20} />
           </button>
         </div>
-        <nav className="marketing-mobile-links" aria-label="Mobile navigation">
+        <nav className="marketing-mobile-links" aria-label={aria.mobileNav}>
           {primaryNav.map((item) => (
             <button
               type="button"
@@ -147,13 +201,13 @@ export function MarketingHeader({
           >
             <img
               src="/svgviewer-output.svg"
-              alt="Yekis — Ethiopian freelance marketplace logo"
+              alt={aria.logoAlt}
               className="platform-logo"
             />
             <strong><span>YE</span>KIS</strong>
           </a>
         </div>
-        <nav className="marketing-nav-center" aria-label="Primary navigation">
+        <nav className="marketing-nav-center" aria-label={aria.primaryNav}>
           {primaryNav.map((item) => (
             <button
               type="button"
@@ -172,9 +226,7 @@ export function MarketingHeader({
             type="button"
             className="theme-toggle"
             onClick={toggleTheme}
-            aria-label={
-              theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-            }
+            aria-label={theme === "light" ? aria.switchToDark : aria.switchToLight}
           >
             {theme === "light" ? <Moon size={20} /> : <Sun size={20} />}
           </button>
@@ -198,7 +250,7 @@ export function MarketingHeader({
             onClick={() => setMobileMenuOpen((prev) => !prev)}
             aria-expanded={mobileMenuOpen}
             aria-controls="marketing-mobile-drawer"
-            aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-label={mobileMenuOpen ? aria.closeMenu : aria.openMenu}
           >
             {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
           </button>

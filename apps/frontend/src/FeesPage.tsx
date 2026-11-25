@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { openSupportChat } from "./components/supportChatEvents";
 import { FiscalDocumentSheet, type FiscalDocType } from "./components/FiscalDocumentModal";
 import {
@@ -21,10 +21,18 @@ type PaymentRailId = "telebirr" | "cbebirr" | "mpesa" | "erca";
 
 interface RailServiceItem {
   id: PaymentRailId;
-  label: { en: string; am: string };
-  topChip: string;
-  badge: string;
-  rows: { label: string; badge: string }[];
+  label: Record<Language, string>;
+  topChip: Record<Language, string>;
+  badge: Record<Language, string>;
+  rows: { label: Record<Language, string>; badge: Record<Language, string> }[];
+}
+
+interface PlatformComparisonItem {
+  id: string;
+  name: Record<Language, string>;
+  role: Record<Language, string>;
+  quote: Record<Language, string>;
+  metric: Record<Language, string>;
 }
 
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -34,76 +42,511 @@ const PRESET_AMOUNTS = [15000, 50000, 120000, 350000];
 const RAIL_SERVICES: RailServiceItem[] = [
   {
     id: "telebirr",
-    label: { en: "Telebirr", am: "ቴሌብር" },
-    topChip: "ETHIO TELECOM RAIL",
-    badge: "0 ETB PAYOUT FEE",
+    label: {
+      en: "Telebirr",
+      am: "ቴሌብር",
+      om: "Telebirr",
+      ti: "ቴሌብር",
+    },
+    topChip: {
+      en: "ETHIO TELECOM RAIL",
+      am: "የኢትዮ ቴሌኮም መስመር",
+      om: "SARARA ETHIO TELECOM",
+      ti: "መስመር ኢትዮ ቴሌኮም",
+    },
+    badge: {
+      en: "0 ETB PAYOUT FEE",
+      am: "0 ብር የማውጫ ክፍያ",
+      om: "BAASII ETB 0",
+      ti: "0 ብር ክፍሊት ምውጻእ",
+    },
     rows: [
-      { label: "ESCROW DEPOSIT", badge: "INSTANT" },
-      { label: "WALLET PAYOUT", badge: "< 45 SEC" },
-      { label: "RAIL SURCHARGE", badge: "0.0% ETB" },
+      {
+        label: { en: "ESCROW DEPOSIT", am: "የኤስክሮ ተቀማጭ", om: "KUUSAA ISKUUROO", ti: "ተቐማጢ ኤስክሮ" },
+        badge: { en: "INSTANT", am: "ወዲያውኑ", om: "BATTALAA", ti: "ብኡንብኡ" },
+      },
+      {
+        label: { en: "WALLET PAYOUT", am: "የዋሌት ክፍያ", om: "KAFFALTII WALLET", ti: "ክፍሊት ዋሌት" },
+        badge: { en: "< 45 SEC", am: "< 45 ሰከንድ", om: "< SEKONDII 45", ti: "< 45 ካልኢት" },
+      },
+      {
+        label: { en: "RAIL SURCHARGE", am: "ተጨማሪ ክፍያ", om: "DABALATA SARARAA", ti: "ተወሳኺ ክፍሊት" },
+        badge: { en: "0.0% ETB", am: "0.0% ብር", om: "0.0% ETB", ti: "0.0% ብር" },
+      },
     ],
   },
   {
     id: "cbebirr",
-    label: { en: "CBE Birr", am: "ሲቢኢ ብር" },
-    topChip: "COMMERCIAL BANK ET",
-    badge: "UP TO 5M ETB",
+    label: {
+      en: "CBE Birr",
+      am: "ሲቢኢ ብር",
+      om: "CBE Birr",
+      ti: "CBE ብር",
+    },
+    topChip: {
+      en: "COMMERCIAL BANK ET",
+      am: "የኢትዮጵያ ንግድ ባንክ",
+      om: "BAANKII DALDALA ITOOPHIYAA",
+      ti: "ባንኪ ንግዲ ኢትዮጵያ",
+    },
+    badge: {
+      en: "UP TO 5M ETB",
+      am: "እስከ 5 ሚሊዮን ብር",
+      om: "HANGA ETB 5M",
+      ti: "ክሳብ 5 ሚልዮን ብር",
+    },
     rows: [
-      { label: "CBE BIRR WALLET", badge: "< 90 SEC" },
-      { label: "BANK RTGS LIMIT", badge: "5,000,000 ETB" },
-      { label: "ESCROW FEE", badge: "7.5% FLAT" },
+      {
+        label: { en: "CBE BIRR WALLET", am: "የCBE ብር ዋሌት", om: "WALLET CBE BIRR", ti: "ዋሌት CBE ብር" },
+        badge: { en: "< 90 SEC", am: "< 90 ሰከንድ", om: "< SEKONDII 90", ti: "< 90 ካልኢት" },
+      },
+      {
+        label: { en: "BANK RTGS LIMIT", am: "የባንክ RTGS ገደብ", om: "DAANGAA RTGS BAANKII", ti: "ገደብ RTGS ባንኪ" },
+        badge: { en: "5,000,000 ETB", am: "5,000,000 ብር", om: "ETB 5,000,000", ti: "5,000,000 ብር" },
+      },
+      {
+        label: { en: "ESCROW FEE", am: "የኤስክሮ ክፍያ", om: "KAFFALTII ISKUUROO", ti: "ክፍሊት ኤስክሮ" },
+        badge: { en: "7.5% FLAT", am: "7.5% ቋሚ", om: "7.5% DHAABBATA", ti: "7.5% ቀዋሚ" },
+      },
     ],
   },
   {
     id: "mpesa",
-    label: { en: "M-Pesa ET", am: "ኤም-ፔሳ" },
-    topChip: "SAFARICOM · AWASH",
-    badge: "MULTI-RAIL",
+    label: {
+      en: "M-Pesa ET",
+      am: "ኤም-ፔሳ ኢትዮጵያ",
+      om: "M-Pesa ET",
+      ti: "M-Pesa ኢትዮጵያ",
+    },
+    topChip: {
+      en: "SAFARICOM · AWASH",
+      am: "ሳፋሪኮም · አዋሽ",
+      om: "SAFARICOM · AWASH",
+      ti: "ሳፋሪኮም · ኣዋሽ",
+    },
+    badge: {
+      en: "MULTI-RAIL",
+      am: "ብዙ መስመሮች",
+      om: "SARARA HEDDUU",
+      ti: "ብዙሕ መስመራት",
+    },
     rows: [
-      { label: "M-PESA (07)", badge: "< 60 SEC" },
-      { label: "AWASH / ABYSSINIA", badge: "< 3 MIN" },
-      { label: "FX CONVERSION LOSS", badge: "0.00 ETB" },
+      {
+        label: { en: "M-PESA (07)", am: "ኤም-ፔሳ (07)", om: "M-PESA (07)", ti: "M-PESA (07)" },
+        badge: { en: "< 60 SEC", am: "< 60 ሰከንድ", om: "< SEKONDII 60", ti: "< 60 ካልኢት" },
+      },
+      {
+        label: { en: "AWASH / ABYSSINIA", am: "አዋሽ / አቢሲኒያ", om: "AWASH / ABYSSINIA", ti: "ኣዋሽ / ኣቢሲንያ" },
+        badge: { en: "< 3 MIN", am: "< 3 ደቂቃ", om: "< DAQIIQAA 3", ti: "< 3 ደቒቕ" },
+      },
+      {
+        label: { en: "FX CONVERSION LOSS", am: "የምንዛሪ ኪሳራ", om: "KASAARA JIJJIIRRAA", ti: "ክሳራ ሸርፊ" },
+        badge: { en: "0.00 ETB", am: "0.00 ብር", om: "0.00 ETB", ti: "0.00 ብር" },
+      },
     ],
   },
   {
     id: "erca",
-    label: { en: "ERCA Tax", am: "የገቢዎች ታክስ" },
-    topChip: "FISCAL LEDGER",
-    badge: "FREE PDF & CSV",
+    label: {
+      en: "ERCA Tax",
+      am: "የገቢዎች ታክስ",
+      om: "Gibira ERCA",
+      ti: "ግብሪ ERCA",
+    },
+    topChip: {
+      en: "FISCAL LEDGER",
+      am: "የታክስ መዝገብ",
+      om: "GALMEE GIBIRAA",
+      ti: "መዝገብ ግብሪ",
+    },
+    badge: {
+      en: "FREE PDF & CSV",
+      am: "ነጻ PDF እና CSV",
+      om: "PDF & CSV BILISAA",
+      ti: "ነጻ PDFን CSVን",
+    },
     rows: [
-      { label: "15% VAT SCHEDULE", badge: "AUTO" },
-      { label: "WITHHOLDING TAX", badge: "DEFERRED" },
-      { label: "AUDIT EXPORT", badge: "0 ETB" },
+      {
+        label: { en: "15% VAT SCHEDULE", am: "የ15% ቫት ሰንጠረዥ", om: "TARREE VAT 15%", ti: "ሰንጠረዥ 15% ቫት" },
+        badge: { en: "AUTO", am: "በራስ-ሰር", om: "OFUMAA", ti: "ብቐጥታ" },
+      },
+      {
+        label: { en: "WITHHOLDING TAX", am: "ዊዝሆልዲንግ ታክስ", om: "GIBIRA QABAMU", ti: "ዝተሓዝ ግብሪ" },
+        badge: { en: "DEFERRED", am: "በክፍያ ጊዜ", om: "YEROO KAFFALTII", ti: "ኣብ ግዜ ክፍሊት" },
+      },
+      {
+        label: { en: "AUDIT EXPORT", am: "የኦዲት ሰነድ", om: "ERGAA OODIITII", ti: "ውጽኢት ኦዲት" },
+        badge: { en: "0 ETB", am: "0 ብር", om: "0 ETB", ti: "0 ብር" },
+      },
     ],
   },
 ];
 
-const PLATFORM_COMPARISONS = [
+const PLATFORM_COMPARISONS: PlatformComparisonItem[] = [
   {
     id: "comp-yekis",
-    name: "YeKis General Escrow (7.5%)",
-    role: "92.5% FREELANCER TAKE-HOME · NATIVE ETB",
-    quote:
-      "On a 100,000 ETB software contract, the freelancer receives 92,500 ETB directly into Telebirr or CBE Birr in under two minutes.",
-    metric: "92.5% KEPT",
+    name: {
+      en: "YeKis General Escrow (7.5%)",
+      am: "YeKis መደበኛ ኤስክሮ (7.5%)",
+      om: "Iskuuroo Idilee YeKis (7.5%)",
+      ti: "ስሩዕ ኤስክሮ YeKis (7.5%)",
+    },
+    role: {
+      en: "92.5% FREELANCER TAKE-HOME · NATIVE ETB",
+      am: "92.5% የባለሙያ የተጣራ ገቢ · በቀጥታ በብር",
+      om: "GALII OGEEYYII 92.5% · ETB KALLATTII",
+      ti: "92.5% ጽሩይ እቶት ክኢላ · ብቐጥታ ብብር",
+    },
+    quote: {
+      en: "On a 100,000 ETB software contract, the freelancer receives 92,500 ETB directly into Telebirr or CBE Birr in under two minutes.",
+      am: "በ100,000 ብር የሶፍትዌር ውል ባለሙያው 92,500 ብር ከሁለት ደቂቃ ባነሰ ጊዜ ውስጥ በቀጥታ ወደ ቴሌብር ወይም CBE ብር ይቀበላል።",
+      om: "Waliigaltee sooftiweerii ETB 100,000 irratti, ogeessi daqiiqaa lama hin guunne keessatti Telebirr ykn CBE Birr isaanii keessatti ETB 92,500 kallattiin argata.",
+      ti: "ኣብ 100,000 ብር ውዕል ሶፍትዌር፣ ክኢላ ኣብ ትሕቲ ክልተ ደቒቕ 92,500 ብር ብቐጥታ ናብ ቴሌብር ወይ CBE ብር ይቕበል።",
+    },
+    metric: {
+      en: "92.5% KEPT",
+      am: "92.5% ይቀርለታል",
+      om: "92.5% HAFA",
+      ti: "92.5% ይተርፈሉ",
+    },
   },
   {
     id: "comp-global",
-    name: "Overseas Portals (15%–20%)",
-    role: "UPWORK / FIVERR + WIRE & FX SPREAD",
-    quote:
-      "Global platforms deduct 10% to 20% in marketplace commissions plus $30–$50 USD wire fees before a single Birr reaches Addis Ababa.",
-    metric: "~78% KEPT",
+    name: {
+      en: "Overseas Portals (15%–20%)",
+      am: "የውጭ ፕላትፎርሞች (15%–20%)",
+      om: "Waltajjiiwwan Alaa (15%–20%)",
+      ti: "ወጻኢ መድረኻት (15%–20%)",
+    },
+    role: {
+      en: "UPWORK / FIVERR + WIRE & FX SPREAD",
+      am: "UPWORK / FIVERR + የባንክ ማስተላለፊያ እና የምንዛሪ ልዩነት",
+      om: "UPWORK / FIVERR + BAASII BAANKII & JIJJIIRRAA",
+      ti: "UPWORK / FIVERR + ክፍሊት ባንክን ፍልልይ ሸርፍን",
+    },
+    quote: {
+      en: "Global platforms deduct 10% to 20% in marketplace commissions plus $30–$50 USD wire fees before a single Birr reaches Addis Ababa.",
+      am: "ዓለም አቀፍ ፕላትፎርሞች ገንዘቡ አዲስ አበባ ከመድረሱ በፊት ከ10% እስከ 20% ኮሚሽን እና ከ30–50 ዶላር የባንክ ክፍያ ይቆርጣሉ።",
+      om: "Waltajjiiwwan addunyaa Birriin tokko Finfinnee osoo hin ga'in dura komishinii %10–20 fi kaffaltii baankii USD $30–$50 hir'isu.",
+      ti: "ዓለምለኸ መድረኻት ገንዘብ ኣዲስ ኣበባ ከይበጽሐ ካብ 10% ክሳብ 20% ኮሚሽንን $30–$50 USD ክፍሊት ባንክን ይቆርጹ።",
+    },
+    metric: {
+      en: "~78% KEPT",
+      am: "~78% ይቀርለታል",
+      om: "~78% HAFA",
+      ti: "~78% ይተርፈሉ",
+    },
   },
   {
     id: "comp-informal",
-    name: "Informal Transfers (0% Protection)",
-    role: "UNPROTECTED BANK TRANSFERS · HIGH RISK",
-    quote:
-      "Unsecured 50% upfront transfers leave clients exposed to vanished deliverables and leave freelancers chasing final invoices without mediation.",
-    metric: "HIGH RISK",
+    name: {
+      en: "Informal Transfers (0% Protection)",
+      am: "መደበኛ ያልሆነ ክፍያ (0% ጥበቃ)",
+      om: "Dabarsa Seera-alaa (Eegumsa 0%)",
+      ti: "ዘይስሩዕ ክፍሊት (0% ሓለዋ)",
+    },
+    role: {
+      en: "UNPROTECTED BANK TRANSFERS · HIGH RISK",
+      am: "ጥበቃ የሌለው የባንክ ዝውውር · ከፍተኛ ስጋት",
+      om: "DABARSA BAANKII EEGUMSA MALEE · BALAA OLAANAA",
+      ti: "ዘይተሓለወ ዝውውር ባንኪ · ልዑል ስግኣት",
+    },
+    quote: {
+      en: "Unsecured 50% upfront transfers leave clients exposed to vanished deliverables and leave freelancers chasing final invoices without mediation.",
+      am: "ያለ ዋስትና የሚፈጸም 50% ቅድመ ክፍያ ደንበኞችን ለኪሳራ፣ ባለሙያዎችንም ያለ ሽምግልና ቀሪ ክፍያ ለመጠበቅ ይዳርጋል።",
+      om: "Kaffaltiin dursaa %50 wabii malee kaffalamu maamiltoota hojii dhabuuf, ogeeyyii ammoo kaffaltii dhumaa araara malee ari'uuf saaxila.",
+      ti: "ብዘይ ውሕስነት ዝግበር 50% ቅድመ ክፍሊት ንዓማዊል ንኽሳራ፣ ንኽኢላታት ድማ ብዘይ ዕርቂ ክፍሊት ንምጽባይ የቃልዕ።",
+    },
+    metric: {
+      en: "HIGH RISK",
+      am: "ከፍተኛ ስጋት",
+      om: "BALAA OLAANAA",
+      ti: "ልዑል ስግኣት",
+    },
   },
 ];
+
+const FEES_COPY: Record<
+  Language,
+  {
+    home: string;
+    zeroClientFeeCode: string;
+    pricingBreadcrumb: string;
+    etbTag: string;
+    feeCalculatorPill: string;
+    slaTag: string;
+    escrowFaqPill: string;
+    heroLine1: string;
+    heroLine2: string;
+    heroLeftPill: string;
+    heroRightPill: string;
+    openCalculator: string;
+    manifestoSegments: { text: string; highlight?: boolean }[];
+    kpiTakeHome: string;
+    kpiPlatformFee: string;
+    kpiSubscription: string;
+    currencyCode: string;
+    simulatorKicker: string;
+    milestoneValueLabel: string;
+    milestoneSliderAria: string;
+    settlementRailLabel: string;
+    rails: { id: "telebirr" | "cbebirr" | "mpesa"; name: string; speed: string }[];
+    vatToggle: string;
+    whtToggle: string;
+    railPrefix: string;
+    dossierTitle: string;
+    netBadge: string;
+    tableLineCol: string;
+    tableRateCol: string;
+    rowGross: string;
+    rowGrossRate: string;
+    rowClientFee: string;
+    rowPlatformFee: string;
+    rowVat: string;
+    rowWithholding: string;
+    clientDepositLabel: string;
+    freelancerPayoutLabel: string;
+    clientTaxInvoiceBtn: string;
+    payoutVoucherBtn: string;
+    railsKicker: string;
+    comparisonKicker: string;
+    readFaqLink: string;
+    zeroSubKicker: string;
+    outroTitle: string;
+    hireEscrowBtn: string;
+    keepTalentBtn: string;
+    taxDeskBtn: string;
+  }
+> = {
+  en: {
+    home: "Home",
+    zeroClientFeeCode: "0% CLIENT FEE",
+    pricingBreadcrumb: "Pricing & Fee Schedule",
+    etbTag: "ETB",
+    feeCalculatorPill: "Fee Calculator ↓",
+    slaTag: "SLA",
+    escrowFaqPill: "Escrow FAQ",
+    heroLine1: "we keep",
+    heroLine2: "in your pocket",
+    heroLeftPill: "{ ETB Calculator } ↗",
+    heroRightPill: "{ ERCA Tax Dossier } ↗",
+    openCalculator: "Open calculator ↓",
+    manifestoSegments: [
+      { text: "While global portals take up to 20%, YeKis charges a flat" },
+      { text: "7.5% total fee (7% platform + 0.5% payment)", highlight: true },
+      { text: "—with native ETB payouts and zero hidden charges." },
+    ],
+    kpiTakeHome: "FREELANCER TAKE-HOME",
+    kpiPlatformFee: "GENERAL PLATFORM FEE",
+    kpiSubscription: "SUBSCRIPTION COST",
+    currencyCode: "ETB",
+    simulatorKicker: "ETB ESCROW SIMULATOR",
+    milestoneValueLabel: "MILESTONE VALUE",
+    milestoneSliderAria: "Milestone contract amount in ETB",
+    settlementRailLabel: "SETTLEMENT RAIL",
+    rails: [
+      { id: "telebirr", name: "Telebirr", speed: "< 45 sec" },
+      { id: "cbebirr", name: "CBE Birr", speed: "< 90 sec" },
+      { id: "mpesa", name: "M-Pesa ET", speed: "< 60 sec" },
+    ],
+    vatToggle: "15% Ethiopian VAT",
+    whtToggle: "Statutory withholding tax (deferred)",
+    railPrefix: "RAIL:",
+    dossierTitle: "Settlement Dossier",
+    netBadge: "92.5% NET",
+    tableLineCol: "LINE",
+    tableRateCol: "RATE",
+    rowGross: "Gross Milestone",
+    rowGrossRate: "Base",
+    rowClientFee: "Client Escrow Fee",
+    rowPlatformFee: "Freelancer Platform Fee",
+    rowVat: "ERCA VAT",
+    rowWithholding: "ERCA Withholding",
+    clientDepositLabel: "CLIENT DEPOSIT",
+    freelancerPayoutLabel: "FREELANCER PAYOUT",
+    clientTaxInvoiceBtn: "Client Tax Invoice ↗",
+    payoutVoucherBtn: "Payout Voucher ↗",
+    railsKicker: "{ RAILS }",
+    comparisonKicker: "COMPARISON",
+    readFaqLink: "Read escrow & tax FAQ ↗",
+    zeroSubKicker: "0 ETB SUBSCRIPTION",
+    outroTitle: "Open your workspace for 0 ETB today.",
+    hireEscrowBtn: "Hire with Escrow ↗",
+    keepTalentBtn: "Keep 92.5% as Talent",
+    taxDeskBtn: "Tax Desk",
+  },
+  am: {
+    home: "መነሻ",
+    zeroClientFeeCode: "0% የደንበኛ ክፍያ",
+    pricingBreadcrumb: "ክፍያዎች እና ኢስክሮ",
+    etbTag: "ETB",
+    feeCalculatorPill: "የክፍያ ማስያ ↓",
+    slaTag: "SLA",
+    escrowFaqPill: "ደንቦች",
+    heroLine1: "የድካምዎን",
+    heroLine2: "በኪስዎ እናስቀራለን",
+    heroLeftPill: "{ የክፍያ ማስያ } ↗",
+    heroRightPill: "{ የERCA ደረሰኝ } ↗",
+    openCalculator: "ማስያውን ይመልከቱ ↓",
+    manifestoSegments: [
+      { text: "ዓለም አቀፍ ፕላትፎርሞች 20% ሲቆርጡ፣ YeKis ግን" },
+      { text: "92.5% ክፍያዎ በቀጥታ", highlight: true },
+      { text: "ወደ ቴሌብር ወይም ንግድ ባንክ እንዲገባ ያደርጋል።" },
+    ],
+    kpiTakeHome: "የባለሙያ የተጣራ ገቢ",
+    kpiPlatformFee: "መደበኛ የፕላትፎርም ክፍያ",
+    kpiSubscription: "ወርሃዊ የደንበኝነት ክፍያ",
+    currencyCode: "ብር",
+    simulatorKicker: "የክፍያ እና የታክስ ማስያ",
+    milestoneValueLabel: "የምዕራፍ ዋጋ (ብር)",
+    milestoneSliderAria: "የምዕራፍ ውል መጠን በብር",
+    settlementRailLabel: "የክፍያ መስመር",
+    rails: [
+      { id: "telebirr", name: "ቴሌብር", speed: "< 45 ሰከንድ" },
+      { id: "cbebirr", name: "ሲቢኢ ብር", speed: "< 90 ሰከንድ" },
+      { id: "mpesa", name: "ኤም-ፔሳ", speed: "< 60 ሰከንድ" },
+    ],
+    vatToggle: "15% ተጨማሪ እሴት ታክስ (VAT)",
+    whtToggle: "ሕጋዊ የዊዝሆልዲንግ ታክስ (በክፍያ ጊዜ)",
+    railPrefix: "መስመር:",
+    dossierTitle: "የክፍያ ሰነድ",
+    netBadge: "92.5% የተጣራ",
+    tableLineCol: "መደብ",
+    tableRateCol: "ተመን",
+    rowGross: "ጠቅላላ የምዕራፍ ክፍያ",
+    rowGrossRate: "መነሻ",
+    rowClientFee: "የደንበኛ ኤስክሮ ክፍያ",
+    rowPlatformFee: "የባለሙያ የፕላትፎርም ክፍያ",
+    rowVat: "የገቢዎች VAT",
+    rowWithholding: "የገቢዎች ዊዝሆልዲንግ",
+    clientDepositLabel: "ደንበኛው የሚያስይዘው",
+    freelancerPayoutLabel: "ባለሙያው የሚቀበለው",
+    clientTaxInvoiceBtn: "የደንበኛ ደረሰኝ ↗",
+    payoutVoucherBtn: "የባለሙያ ሰነድ ↗",
+    railsKicker: "{ መስመሮች }",
+    comparisonKicker: "ንጽጽር",
+    readFaqLink: "የኤስክሮ ደንቦችን ያንብቡ ↗",
+    zeroSubKicker: "በነጻ ይጀምሩ",
+    outroTitle: "የመጀመሪያ የኤስክሮ ውልዎን በ0 ብር ይክፈቱ።",
+    hireEscrowBtn: "እንደ ደንበኛ ይጀምሩ ↗",
+    keepTalentBtn: "እንደ ባለሙያ ይቀላቀሉ",
+    taxDeskBtn: "የታክስ ምክክር",
+  },
+  om: {
+    home: "Mana",
+    zeroClientFeeCode: "KAFFALTII MAAMILAA 0%",
+    pricingBreadcrumb: "Gatii & Tarree Kaffaltii",
+    etbTag: "ETB",
+    feeCalculatorPill: "Herregaa Kaffaltii ↓",
+    slaTag: "SLA",
+    escrowFaqPill: "Gaaffilee Iskuuroo",
+    heroLine1: "galii keessan",
+    heroLine2: "kiisii keessan keessa tursuu",
+    heroLeftPill: "{ Herregaa ETB } ↗",
+    heroRightPill: "{ Galmee Gibiraa ERCA } ↗",
+    openCalculator: "Herregaa bani ↓",
+    manifestoSegments: [
+      { text: "Waltajjiiwwan addunyaa hanga %20 yoo fudhatan, YeKis garuu" },
+      { text: "kaffaltii waligalaa dhaabbataa %7.5 (7% waltajjii + 0.5% kaffaltii)", highlight: true },
+      { text: "kaffaltii ETB kallattiin baasii dhokataa malee kenna." },
+    ],
+    kpiTakeHome: "GALII QULQULLUU OGEEYYII",
+    kpiPlatformFee: "KAFFALTII WALTAJJII IDILEE",
+    kpiSubscription: "KAFFALTII GALMEE",
+    currencyCode: "ETB",
+    simulatorKicker: "HERREGAA ISKUUROO ETB",
+    milestoneValueLabel: "GATII BOQONNAA",
+    milestoneSliderAria: "Hanga waliigaltee boqonnaa ETB dhaan",
+    settlementRailLabel: "SARARA KAFFALTII",
+    rails: [
+      { id: "telebirr", name: "Telebirr", speed: "< sekondii 45" },
+      { id: "cbebirr", name: "CBE Birr", speed: "< sekondii 90" },
+      { id: "mpesa", name: "M-Pesa ET", speed: "< sekondii 60" },
+    ],
+    vatToggle: "VAT Itoophiyaa 15%",
+    whtToggle: "Gibira seeraan qabamu (yeroo kaffaltii)",
+    railPrefix: "SARARA:",
+    dossierTitle: "Galmee Kaffaltii",
+    netBadge: "92.5% QULQULLUU",
+    tableLineCol: "TARREE",
+    tableRateCol: "SAFARTUU",
+    rowGross: "Boqonnaa Waliigalaa",
+    rowGrossRate: "Bu'uura",
+    rowClientFee: "Kaffaltii Iskuuroo Maamilaa",
+    rowPlatformFee: "Kaffaltii Waltajjii Ogeessaa",
+    rowVat: "ERCA VAT",
+    rowWithholding: "Gibira Qabamu ERCA",
+    clientDepositLabel: "KUUSAA MAAMILAA",
+    freelancerPayoutLabel: "KAFFALTII OGEESSAA",
+    clientTaxInvoiceBtn: "Nagahee Gibira Maamilaa ↗",
+    payoutVoucherBtn: "Boocharii Kaffaltii ↗",
+    railsKicker: "{ SARAROOTA }",
+    comparisonKicker: "MADAALLII",
+    readFaqLink: "Gaaffilee iskuuroo & gibiraa dubbisi ↗",
+    zeroSubKicker: "GALMEE ETB 0",
+    outroTitle: "Har'a ETB 0 dhaan bakka hojii keessan banaa.",
+    hireEscrowBtn: "Iskuuroodhaan Qacari ↗",
+    keepTalentBtn: "Akka Ogeessaatti %92.5 Fudhadhu",
+    taxDeskBtn: "Deeggarsa Gibiraa",
+  },
+  ti: {
+    home: "መበገሲ",
+    zeroClientFeeCode: "0% ክፍሊት ዓሚል",
+    pricingBreadcrumb: "ዋጋን መምርሒ ክፍሊትን",
+    etbTag: "ETB",
+    feeCalculatorPill: "መስልሒ ክፍሊት ↓",
+    slaTag: "SLA",
+    escrowFaqPill: "ሕቶታት ኤስክሮ",
+    heroLine1: "ናይ ጻዕርኹም",
+    heroLine2: "ኣብ ጁባኹም ነቐርዮ",
+    heroLeftPill: "{ መስልሒ ETB } ↗",
+    heroRightPill: "{ ሰነድ ግብሪ ERCA } ↗",
+    openCalculator: "መስልሒ ክፈት ↓",
+    manifestoSegments: [
+      { text: "ዓለምለኸ መድረኻት ክሳብ 20% ክቖርጹ ከለዉ፣ YeKis ግን" },
+      { text: "ቀዋሚ 7.5% ጠቕላላ ክፍሊት (7% መድረኽ + 0.5% ክፍሊት)", highlight: true },
+      { text: "—ብብር ብቐጥታን ብዘይ ሕቡእ ወጻእን የኽፍል።" },
+    ],
+    kpiTakeHome: "ጽሩይ እቶት ክኢላ",
+    kpiPlatformFee: "ስሩዕ ክፍሊት መድረኽ",
+    kpiSubscription: "ወርሓዊ ክፍሊት ኣባልነት",
+    currencyCode: "ብር",
+    simulatorKicker: "መስልሒ ኤስክሮን ግብርን ETB",
+    milestoneValueLabel: "ዋጋ ምዕራፍ ስራሕ",
+    milestoneSliderAria: "መጠን ውዕል ምዕራፍ ብብር",
+    settlementRailLabel: "መስመር ክፍሊት",
+    rails: [
+      { id: "telebirr", name: "ቴሌብር", speed: "< 45 ካልኢት" },
+      { id: "cbebirr", name: "CBE ብር", speed: "< 90 ካልኢት" },
+      { id: "mpesa", name: "M-Pesa ET", speed: "< 60 ካልኢት" },
+    ],
+    vatToggle: "15% ተወሳኺ እሴት ታክስ (VAT)",
+    whtToggle: "ሕጋዊ ዝተሓዝ ግብሪ (ኣብ ግዜ ክፍሊት)",
+    railPrefix: "መስመር:",
+    dossierTitle: "ሰነድ ክፍሊት",
+    netBadge: "92.5% ጽሩይ",
+    tableLineCol: "ዓይነት",
+    tableRateCol: "መጠን",
+    rowGross: "ጠቕላላ ምዕራፍ",
+    rowGrossRate: "መሰረት",
+    rowClientFee: "ክፍሊት ኤስክሮ ዓሚል",
+    rowPlatformFee: "ክፍሊት መድረኽ ክኢላ",
+    rowVat: "ቫት ERCA",
+    rowWithholding: "ዝተሓዝ ግብሪ ERCA",
+    clientDepositLabel: "ተቐማጢ ዓሚል",
+    freelancerPayoutLabel: "ክፍሊት ክኢላ",
+    clientTaxInvoiceBtn: "ደረሰኝ ግብሪ ዓሚል ↗",
+    payoutVoucherBtn: "ወረቐት ክፍሊት ክኢላ ↗",
+    railsKicker: "{ መስመራት }",
+    comparisonKicker: "ምንጽጻር",
+    readFaqLink: "ሕቶታት ኤስክሮን ግብርን ኣንብብ ↗",
+    zeroSubKicker: "ብ0 ብር ጀምር",
+    outroTitle: "ናይ መጀመርታ ስራሕኩም ሎሚ ብ0 ብር ክፈቱ።",
+    hireEscrowBtn: "ብኤስክሮ ቅጸር ↗",
+    keepTalentBtn: "ከም ክኢላ 92.5% ውሰድ",
+    taxDeskBtn: "ደገፍ ግብሪ",
+  },
+};
 
 function TiltVisualSurface({
   children,
@@ -231,7 +674,8 @@ function renderRailArtwork(railId: PaymentRailId, variant: "hero-left" | "hero-r
 
 export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
   const { language } = useI18n();
-  const lang: "en" | "am" = language === "am" ? "am" : "en";
+  const lang: Language = language;
+  const copy = FEES_COPY[lang] ?? FEES_COPY.en;
   const [amount, setAmount] = useState<number>(50000);
   const [selectedRail, setSelectedRail] = useState<"telebirr" | "cbebirr" | "mpesa">("telebirr");
   const [includeVat, setIncludeVat] = useState<boolean>(true);
@@ -275,16 +719,20 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
       RAIL_SERVICES.map((rail) => ({
         id: rail.id,
         title: rail.label[lang],
-        topChip: rail.topChip,
-        kickerBadge: rail.badge,
+        topChip: rail.topChip[lang],
+        kickerBadge: rail.badge[lang],
         artNode: renderRailArtwork(rail.id, "fluted"),
-        rows: rail.rows,
+        rows: rail.rows.map((row) => ({
+          label: row.label[lang],
+          badge: row.badge[lang],
+        })),
         onCardClick: () => calculatorRef.current?.scrollIntoView({ behavior: "smooth" }),
       })),
     [lang]
   );
 
   const activeComp = PLATFORM_COMPARISONS[activeCompIdx] ?? PLATFORM_COMPARISONS[0];
+  const selectedRailInfo = copy.rails.find((r) => r.id === selectedRail) ?? copy.rails[0];
 
   return (
     <div className="yk-v2 yk-v2-subpage yk-cs-studio">
@@ -296,12 +744,12 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           <StudioBreadcrumb
             items={[
               {
-                label: lang === "am" ? "መነሻ" : "Home",
+                label: copy.home,
                 onClick: () => onNavigate?.("home"),
               },
               {
-                code: "0% CLIENT FEE",
-                label: lang === "am" ? "ክፍያዎች እና ኢስክሮ" : "Pricing & Fee Schedule",
+                code: copy.zeroClientFeeCode,
+                label: copy.pricingBreadcrumb,
                 active: true,
               },
             ]}
@@ -312,16 +760,16 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   className="cs-studio-band-pill is-active"
                   onClick={() => calculatorRef.current?.scrollIntoView({ behavior: "smooth" })}
                 >
-                  <span>ETB</span>
-                  <span>{lang === "am" ? "የክፍያ ማስያ" : "Fee Calculator ↓"}</span>
+                  <span>{copy.etbTag}</span>
+                  <span>{copy.feeCalculatorPill}</span>
                 </button>
                 <button
                   type="button"
                   className="cs-studio-band-pill"
                   onClick={() => onNavigate?.("faq")}
                 >
-                  <span>SLA</span>
-                  <span>{lang === "am" ? "ደንቦች" : "Escrow FAQ"}</span>
+                  <span>{copy.slaTag}</span>
+                  <span>{copy.escrowFaqPill}</span>
                 </button>
               </div>
             }
@@ -334,14 +782,14 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           >
             <h1 className="cs-hero-display">
               <span className="cs-hero-line">
-                {lang === "am" ? "የድካምዎን" : "we keep"}{" "}
+                {copy.heroLine1}{" "}
                 <span className="cs-hero-brace">{"{92.5%}"}</span>
               </span>
               <span className="cs-hero-line">
                 <span className="cs-hero-arrow" aria-hidden="true">
                   →
                 </span>
-                {lang === "am" ? "በኪስዎ እናስቀራለን" : "in your pocket"}
+                {copy.heroLine2}
               </span>
             </h1>
           </motion.div>
@@ -355,7 +803,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               >
                 {renderRailArtwork("telebirr", "hero-left")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ የክፍያ ማስያ } ↗" : "{ ETB Calculator } ↗"}
+                  {copy.heroLeftPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -369,7 +817,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               >
                 {renderRailArtwork("cbebirr", "hero-right")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ የERCA ደረሰኝ } ↗" : "{ ERCA Tax Dossier } ↗"}
+                  {copy.heroRightPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -381,7 +829,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               className="cs-scroll-pill"
               onClick={() => calculatorRef.current?.scrollIntoView({ behavior: "smooth" })}
             >
-              {lang === "am" ? "ማስያውን ይመልከቱ ↓" : "Open calculator ↓"}
+              {copy.openCalculator}
             </button>
           </div>
         </div>
@@ -404,27 +852,13 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
             </motion.div>
 
             <div>
-              <ScrollIlluminatedHeadline
-                segments={
-                  lang === "am"
-                    ? [
-                        { text: "ዓለም አቀፍ ፕላትፎርሞች 20% ሲቆርጡ፣ YeKis ግን" },
-                        { text: "92.5% ክፍያዎ በቀጥታ", highlight: true },
-                        { text: "ወደ ቴሌብር ወይም ንግድ ባንክ እንዲገባ ያደርጋል።" },
-                      ]
-                    : [
-                        { text: "While global portals take up to 20%, YeKis charges a flat" },
-                        { text: "7.5% total fee (7% platform + 0.5% payment)", highlight: true },
-                        { text: "—with native ETB payouts and zero hidden charges." },
-                      ]
-                }
-              />
+              <ScrollIlluminatedHeadline segments={copy.manifestoSegments} />
 
               <AnimatedCountUpStrip
                 metrics={[
-                  { value: 93, decimals: 0, suffix: "%", label: "FREELANCER TAKE-HOME" },
-                  { value: 7, decimals: 0, suffix: "%", label: "GENERAL PLATFORM FEE" },
-                  { value: 0, suffix: " ETB", label: "SUBSCRIPTION COST" },
+                  { value: 93, decimals: 0, suffix: "%", label: copy.kpiTakeHome },
+                  { value: 7, decimals: 0, suffix: "%", label: copy.kpiPlatformFee },
+                  { value: 0, suffix: ` ${copy.currencyCode}`, label: copy.kpiSubscription },
                 ]}
               />
             </div>
@@ -439,7 +873,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
         <div className="cs-band-inner">
           <div className="cs-works-topbar">
             <span className="cs-kicker" style={{ color: "#0b0f0c" }}>
-              {"{"} {lang === "am" ? "የክፍያ እና የታክስ ማስያ" : "ETB ESCROW SIMULATOR"} {"}"}
+              {"{"} {copy.simulatorKicker} {"}"}
             </span>
 
             <div className="cs-calc-presets">
@@ -450,7 +884,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   className={`cs-works-tab ${amount === preset ? "is-active" : ""}`}
                   onClick={() => setAmount(preset)}
                 >
-                  {preset.toLocaleString()} ETB
+                  {preset.toLocaleString()} {copy.currencyCode}
                 </button>
               ))}
             </div>
@@ -470,9 +904,11 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                       textTransform: "uppercase",
                     }}
                   >
-                    {lang === "am" ? "የምዕራፍ ዋጋ (ETB)" : "MILESTONE VALUE"}
+                    {copy.milestoneValueLabel}
                   </span>
-                  <span className="cs-calc-amount-display">{amount.toLocaleString()} ETB</span>
+                  <span className="cs-calc-amount-display">
+                    {amount.toLocaleString()} {copy.currencyCode}
+                  </span>
                 </div>
 
                 <input
@@ -483,7 +919,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   value={amount}
                   onChange={(e) => setAmount(Number(e.target.value))}
                   className="cs-calc-slider"
-                  aria-label="Milestone contract amount in ETB"
+                  aria-label={copy.milestoneSliderAria}
                 />
                 <div
                   style={{
@@ -495,9 +931,9 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     marginTop: 6,
                   }}
                 >
-                  <span>2,000 ETB</span>
-                  <span>250,000 ETB</span>
-                  <span>500,000 ETB</span>
+                  <span>2,000 {copy.currencyCode}</span>
+                  <span>250,000 {copy.currencyCode}</span>
+                  <span>500,000 {copy.currencyCode}</span>
                 </div>
               </div>
 
@@ -514,16 +950,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     textTransform: "uppercase",
                   }}
                 >
-                  {lang === "am" ? "የክፍያ መስመር" : "SETTLEMENT RAIL"}
+                  {copy.settlementRailLabel}
                 </span>
                 <div className="cs-calc-rail-grid">
-                  {(
-                    [
-                      { id: "telebirr", name: "Telebirr", speed: "< 45 sec" },
-                      { id: "cbebirr", name: "CBE Birr", speed: "< 90 sec" },
-                      { id: "mpesa", name: "M-Pesa ET", speed: "< 60 sec" },
-                    ] as const
-                  ).map((rail) => (
+                  {copy.rails.map((rail) => (
                     <button
                       key={rail.id}
                       type="button"
@@ -553,7 +983,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               >
                 <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {lang === "am" ? "15% ተጨማሪ እሴት ታክስ (VAT)" : "15% Ethiopian VAT"}
+                    {copy.vatToggle}
                   </span>
                   <input
                     type="checkbox"
@@ -565,7 +995,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
 
                 <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    {lang === "am" ? "ግምርኛ ካቲስ ግብር (ዘግየተ)" : "Statutory withholding tax (deferred)"}
+                    {copy.whtToggle}
                   </span>
                   <input
                     type="checkbox"
@@ -600,7 +1030,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                         display: "block",
                       }}
                     >
-                      RAIL: {selectedRail.toUpperCase()}
+                      {copy.railPrefix} {selectedRailInfo.name.toUpperCase()}
                     </span>
                     <h3
                       style={{
@@ -610,7 +1040,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                         margin: "4px 0 0",
                       }}
                     >
-                      {lang === "am" ? "የክፍያ ሰነድ" : "Settlement Dossier"}
+                      {copy.dossierTitle}
                     </h3>
                   </div>
                   <span
@@ -624,52 +1054,52 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                       borderRadius: 6,
                     }}
                   >
-                    92.5% NET
+                    {copy.netBadge}
                   </span>
                 </div>
 
                 <table className="cs-ledger-table">
                   <thead>
                     <tr>
-                      <th>{lang === "am" ? "መደብ" : "LINE"}</th>
-                      <th>{lang === "am" ? "ተመን" : "RATE"}</th>
-                      <th style={{ textAlign: "right" }}>ETB</th>
+                      <th>{copy.tableLineCol}</th>
+                      <th>{copy.tableRateCol}</th>
+                      <th style={{ textAlign: "right" }}>{copy.currencyCode}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr>
-                      <td><strong>Gross Milestone</strong></td>
-                      <td>Base</td>
+                      <td><strong>{copy.rowGross}</strong></td>
+                      <td>{copy.rowGrossRate}</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)", fontWeight: 700 }}>
-                        {amount.toLocaleString()} ETB
+                        {amount.toLocaleString()} {copy.currencyCode}
                       </td>
                     </tr>
                     <tr>
-                      <td>Client Escrow Fee</td>
+                      <td>{copy.rowClientFee}</td>
                       <td>0%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        0 ETB
+                        0 {copy.currencyCode}
                       </td>
                     </tr>
                     <tr>
-                      <td>Freelancer Platform Fee</td>
+                      <td>{copy.rowPlatformFee}</td>
                       <td>−7%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        −{calc.freelancerFee.toLocaleString()} ETB
+                        −{calc.freelancerFee.toLocaleString()} {copy.currencyCode}
                       </td>
                     </tr>
                     <tr>
-                      <td>ERCA VAT</td>
+                      <td>{copy.rowVat}</td>
                       <td>{includeVat ? "+15%" : "0%"}</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        {includeVat ? `+${calc.vatAmount.toLocaleString()} ETB` : "0 ETB"}
+                        {includeVat ? `+${calc.vatAmount.toLocaleString()} ${copy.currencyCode}` : `0 ${copy.currencyCode}`}
                       </td>
                     </tr>
                     <tr>
-                      <td>ERCA Withholding</td>
+                      <td>{copy.rowWithholding}</td>
                       <td>0%</td>
                       <td style={{ textAlign: "right", fontFamily: "var(--v2-font-mono)" }}>
-                        0 ETB
+                        0 {copy.currencyCode}
                       </td>
                     </tr>
                   </tbody>
@@ -679,19 +1109,19 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               <div className="cs-findings-kpi-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
                 <div className="cs-findings-kpi" style={{ background: "#141715", color: "#fafaf7", borderRadius: 12 }}>
                   <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10, color: "rgba(250,250,247,0.65)" }}>
-                    {lang === "am" ? "ደንበኛው የሚያስይዘው" : "CLIENT DEPOSIT"}
+                    {copy.clientDepositLabel}
                   </span>
                   <strong style={{ fontFamily: "var(--v2-font-display)", fontSize: 22, color: "#f5c518" }}>
-                    {calc.totalClientEscrowFunding.toLocaleString()} ETB
+                    {calc.totalClientEscrowFunding.toLocaleString()} {copy.currencyCode}
                   </strong>
                 </div>
 
                 <div className="cs-findings-kpi" style={{ borderRadius: 12 }}>
                   <span style={{ fontFamily: "var(--v2-font-mono)", fontSize: 10 }}>
-                    {lang === "am" ? "ባለሙያው የሚቀበለው" : "FREELANCER PAYOUT"}
+                    {copy.freelancerPayoutLabel}
                   </span>
                   <strong style={{ fontFamily: "var(--v2-font-display)", fontSize: 22 }}>
-                    {calc.netFreelancerTakeHome.toLocaleString()} ETB
+                    {calc.netFreelancerTakeHome.toLocaleString()} {copy.currencyCode}
                   </strong>
                 </div>
               </div>
@@ -703,7 +1133,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   style={{ flex: 1, justifyContent: "center", fontSize: 15 }}
                   onClick={() => setActiveDocPreview((prev) => (prev === "CLIENT_INVOICE" ? null : "CLIENT_INVOICE"))}
                 >
-                  {lang === "am" ? "የደንበኛ ደረሰኝ ↗" : "Client Tax Invoice ↗"}
+                  {copy.clientTaxInvoiceBtn}
                 </button>
                 <button
                   type="button"
@@ -713,7 +1143,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     setActiveDocPreview((prev) => (prev === "FREELANCER_VOUCHER" ? null : "FREELANCER_VOUCHER"))
                   }
                 >
-                  {lang === "am" ? "የባለሙያ ሰነድ ↗" : "Payout Voucher ↗"}
+                  {copy.payoutVoucherBtn}
                 </button>
               </div>
             </div>
@@ -752,7 +1182,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           ================================================================ */}
       <section className="cs-services-band">
         <StickyScrollServicesStage
-          kicker={lang === "am" ? "{ መስመሮች }" : "{ RAILS }"}
+          kicker={copy.railsKicker}
           items={stickyItems}
           activeId={activeRailServiceId}
           onSelect={(id) => setActiveRailServiceId(id as PaymentRailId)}
@@ -767,7 +1197,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           <div className="cs-testi-grid">
             <div className="cs-testi-left">
               <span className="cs-kicker" style={{ color: "#070a08" }}>
-                {"{"} {lang === "am" ? "ንጽጽር" : "COMPARISON"} {"}"}
+                {"{"} {copy.comparisonKicker} {"}"}
               </span>
 
               <div className="cs-testi-authors">
@@ -778,8 +1208,8 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                     className={`cs-testi-author-btn ${idx === activeCompIdx ? "is-active" : ""}`}
                     onClick={() => setActiveCompIdx(idx)}
                   >
-                    <span>{item.name}</span>
-                    <span className="cs-testi-metric-pill">{item.metric}</span>
+                    <span>{item.name[lang]}</span>
+                    <span className="cs-testi-metric-pill">{item.metric[lang]}</span>
                   </button>
                 ))}
               </div>
@@ -794,10 +1224,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
                 >
-                  <p className="cs-testi-quote">“{activeComp.quote}”</p>
-                  <div className="cs-testi-role">{activeComp.role}</div>
+                  <p className="cs-testi-quote">“{activeComp.quote[lang]}”</p>
+                  <div className="cs-testi-role">{activeComp.role[lang]}</div>
                   <button type="button" className="cs-testi-link" onClick={() => onNavigate?.("faq")}>
-                    {lang === "am" ? "የኤስክሮ ደንቦችን ያንብቡ ↗" : "Read escrow & tax FAQ ↗"}
+                    {copy.readFaqLink}
                   </button>
                 </motion.div>
               </AnimatePresence>
@@ -814,10 +1244,10 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
           <div className="cs-outro-grid">
             <div>
               <span className="cs-kicker" style={{ color: "#78c841" }}>
-                {"{"} {lang === "am" ? "በነጻ ይጀምሩ" : "0 ETB SUBSCRIPTION"} {"}"}
+                {"{"} {copy.zeroSubKicker} {"}"}
               </span>
               <h2 className="cs-outro-title">
-                {lang === "am" ? "የመጀመሪያ የኤስክሮ ውልዎን በ0 ብር ይክፈቱ።" : "Open your workspace for 0 ETB today."}
+                {copy.outroTitle}
               </h2>
             </div>
 
@@ -825,7 +1255,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
               <span className="cs-outro-giant-brace">{"{"}</span>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
                 <button type="button" className="cs-outro-pill-btn" onClick={() => onStart?.("register")}>
-                  {lang === "am" ? "እንደ ደንበኛ ይጀምሩ ↗" : "Hire with Escrow ↗"}
+                  {copy.hireEscrowBtn}
                 </button>
                 <button
                   type="button"
@@ -833,7 +1263,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   style={{ background: "transparent", color: "#f4f7f4", border: "1px solid rgba(255,255,255,0.28)" }}
                   onClick={() => onStart?.("register")}
                 >
-                  {lang === "am" ? "እንደ ባለሙያ ይቀላቀሉ" : "Keep 92.5% as Talent"}
+                  {copy.keepTalentBtn}
                 </button>
                 <button
                   type="button"
@@ -841,7 +1271,7 @@ export function FeesPage({ onNavigate, onStart }: FeesPageProps) {
                   style={{ background: "transparent", color: "#9be564", border: "1px solid rgba(155,229,100,0.35)" }}
                   onClick={() => openSupportChat()}
                 >
-                  {lang === "am" ? "የታክስ ምክክር" : "Tax Desk"}
+                  {copy.taxDeskBtn}
                 </button>
               </div>
               <span className="cs-outro-giant-brace">{"}"}</span>

@@ -1738,6 +1738,9 @@ class MockStore {
   customLastName: string | null = null;
   customBio: string | null = null;
   customPrimarySkillId: string | null = null;
+  customSkillIds: string[] | null = null;
+  customAvailability: boolean | null = null;
+  customProfileVisibility: "PUBLIC" | "PROPOSERS" | "PRIVATE" | null = null;
   customProfileCompleteness: number | null = null;
   registeredRolesByEmail: Record<string, DemoWorkspaceRole> = {};
 
@@ -2070,6 +2073,47 @@ class MockStore {
     }
     if (cleanPath === "/wallet/topups" && method === "GET") {
       return this.topUps;
+    }
+    const simCheckoutMatch = cleanPath.match(/^\/wallet\/topups\/checkout\/([^/]+)\/simulate-success$/);
+    if (simCheckoutMatch && method === "POST") {
+      const targetId = simCheckoutMatch[1];
+      const found = this.topUps.find((t) => t.id === targetId);
+      if (found && found.status !== "APPROVED") {
+        found.status = "APPROVED";
+        found.reviewedAt = new Date().toISOString();
+        this.walletMinor += found.amountMinor;
+      }
+      return { success: true, message: "Top-up approved successfully." };
+    }
+    const attachMatch = cleanPath.match(/^\/wallet\/topups\/([^/]+)\/attach-receipt$/);
+    if (attachMatch && method === "POST") {
+      const targetId = attachMatch[1];
+      const found = this.topUps.find((t) => t.id === targetId);
+      if (found) {
+        found.referenceNumber = String(parsedBody?.referenceNumber || found.referenceNumber || `REF-${Date.now().toString().slice(-6)}`);
+        found.status = "PENDING";
+        return found;
+      }
+    }
+    if (cleanPath === "/wallet/topups/checkout" && method === "POST") {
+      const amt = Number(parsedBody?.amountMinor || 5000000);
+      const prov = (parsedBody?.provider as "TELEBIRR" | "CBE_BIRR" | "M_PESA") || "TELEBIRR";
+      const providerTransactionId = `mock-${prov.toLowerCase()}-${Date.now()}`;
+      const added: TopUpRequest = {
+        id: `tu-${Date.now()}`,
+        userId: this.getCurrentUser().id,
+        amountMinor: amt,
+        provider: prov,
+        senderName: "Dawit Mekonnen",
+        referenceNumber: providerTransactionId,
+        providerTransactionId,
+        status: "CHECKOUT_PENDING",
+        createdAt: new Date().toISOString(),
+        reviewedAt: null,
+        rejectionReason: null,
+      };
+      this.topUps = [added, ...this.topUps];
+      return { redirectUrl: null, topUpId: added.id, providerTransactionId };
     }
     if (cleanPath.startsWith("/wallet/topups") && method === "POST") {
       const amt = Number(parsedBody?.amountMinor || 5000000);
@@ -2629,11 +2673,27 @@ class MockStore {
           title: String(parsedBody?.title || "New Portfolio Case Study"),
           description: String(parsedBody?.description || "Delivered with Yekis milestone escrow."),
           thumbnailUrl: String(parsedBody?.thumbnailUrl || "/marketing/yekis-collaboration-banner.png"),
-          projectUrl: String(parsedBody?.projectUrl || "https://yekis.et"),
+          projectUrl: typeof parsedBody?.projectUrl === "string" ? parsedBody.projectUrl : "",
           displayOrder: this.portfolioItems.length + 1,
         };
         this.portfolioItems = [...this.portfolioItems, item];
         return item;
+      }
+      if (method === "PATCH" || method === "PUT") {
+        const itemId = cleanPath.split("/").pop();
+        let updated: (typeof this.portfolioItems)[number] | undefined;
+        this.portfolioItems = this.portfolioItems.map((i) => {
+          if (i.id !== itemId) return i;
+          updated = {
+            ...i,
+            ...(typeof parsedBody?.title === "string" ? { title: parsedBody.title } : {}),
+            ...(typeof parsedBody?.description === "string" ? { description: parsedBody.description } : {}),
+            ...(typeof parsedBody?.thumbnailUrl === "string" ? { thumbnailUrl: parsedBody.thumbnailUrl } : {}),
+            ...(typeof parsedBody?.projectUrl === "string" ? { projectUrl: parsedBody.projectUrl } : {}),
+          };
+          return updated;
+        });
+        return updated ?? { updated: true };
       }
       if (method === "DELETE") {
         const itemId = cleanPath.split("/").pop();
@@ -2775,6 +2835,21 @@ class MockStore {
         if (typeof parsedBody.primarySkillId === "string") {
           this.customPrimarySkillId = parsedBody.primarySkillId;
         }
+        if (Array.isArray(parsedBody.skillIds)) {
+          this.customSkillIds = parsedBody.skillIds.filter(
+            (id): id is string => typeof id === "string",
+          );
+        }
+        if (typeof parsedBody.isAvailableForWork === "boolean") {
+          this.customAvailability = parsedBody.isAvailableForWork;
+        }
+        if (
+          parsedBody.profileVisibility === "PUBLIC" ||
+          parsedBody.profileVisibility === "PROPOSERS" ||
+          parsedBody.profileVisibility === "PRIVATE"
+        ) {
+          this.customProfileVisibility = parsedBody.profileVisibility;
+        }
         if ("avatarUrl" in parsedBody) {
           this.customAvatarUrl =
             typeof parsedBody.avatarUrl === "string" && parsedBody.avatarUrl.trim()
@@ -2815,10 +2890,20 @@ class MockStore {
               ),
         avatarUrl: u.avatarUrl ?? null,
         profileCompleteness: u.profileCompleteness ?? 75,
-        isAvailableForWork: parsedBody?.isAvailableForWork !== undefined ? Boolean(parsedBody.isAvailableForWork) : true,
-        profileVisibility: (parsedBody?.profileVisibility as "PUBLIC" | "PROPOSERS" | "PRIVATE") || "PUBLIC",
+        isAvailableForWork:
+          this.customAvailability !== null
+            ? this.customAvailability
+            : parsedBody?.isAvailableForWork !== undefined
+              ? Boolean(parsedBody.isAvailableForWork)
+              : true,
+        profileVisibility:
+          this.customProfileVisibility ??
+          (parsedBody?.profileVisibility as "PUBLIC" | "PROPOSERS" | "PRIVATE") ??
+          "PUBLIC",
         primarySkillId: this.customPrimarySkillId || String(parsedBody?.primarySkillId || "sk-1"),
-        skills: this.skills.slice(0, 6),
+        skills: this.customSkillIds
+          ? this.skills.filter((s) => this.customSkillIds!.includes(s.id))
+          : this.skills.slice(0, 6),
         portfolio: this.portfolioItems,
         kyc: { tier: u.kyc?.tier ?? "TIER_2", status: u.kyc?.status ?? "VERIFIED", badgeType: "FAYDA_VERIFIED" },
         stats: {

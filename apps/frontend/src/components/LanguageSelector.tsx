@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Languages, Check, ChevronDown } from "lucide-react";
-import { useI18n, SUPPORTED_LANGUAGES } from "../i18n";
+import { useI18n, SUPPORTED_LANGUAGES, type Language } from "../i18n";
 import "./LanguageSelector.css";
 
 interface LanguageSelectorProps {
@@ -8,8 +8,35 @@ interface LanguageSelectorProps {
   className?: string;
 }
 
+const SELECTOR_LABELS: Record<
+  Language,
+  { selectLanguage: string; changeCurrent: (langName: string) => string; availableLanguages: string }
+> = {
+  en: {
+    selectLanguage: "Select language",
+    changeCurrent: (langName) => `Change language, current: ${langName}`,
+    availableLanguages: "Available languages",
+  },
+  am: {
+    selectLanguage: "ቋንቋ ይምረጡ",
+    changeCurrent: (langName) => `ቋንቋ ይቀይሩ፣ የአሁኑ: ${langName}`,
+    availableLanguages: "የሚገኙ ቋንቋዎች",
+  },
+  om: {
+    selectLanguage: "Afaan filadhu",
+    changeCurrent: (langName) => `Afaan jijjiiri, kan ammaa: ${langName}`,
+    availableLanguages: "Afaanoota jiran",
+  },
+  ti: {
+    selectLanguage: "ቋንቋ ምረጽ",
+    changeCurrent: (langName) => `ቋንቋ ቀይር፣ ናይ ሕጂ: ${langName}`,
+    availableLanguages: "ዝርከቡ ቋንቋታት",
+  },
+};
+
 export function LanguageSelector({ variant = "dropdown", className = "" }: LanguageSelectorProps) {
   const { language, setLanguage } = useI18n();
+  const labels = SELECTOR_LABELS[language] ?? SELECTOR_LABELS.en;
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +63,7 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
 
   if (variant === "segmented") {
     return (
-      <div className={`yk-lang-segmented ${className}`} role="group" aria-label="Select language">
+      <div className={`yk-lang-segmented ${className}`} role="group" aria-label={labels.selectLanguage}>
         {SUPPORTED_LANGUAGES.map((lang) => {
           const isActive = lang.code === language;
           return (
@@ -64,7 +91,7 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
         onClick={() => setIsOpen((prev) => !prev)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        aria-label={`Change language, current: ${currentLang.nativeName}`}
+        aria-label={labels.changeCurrent(currentLang.nativeName)}
       >
         <Languages size={17} className="yk-lang-icon" />
         <span className="yk-lang-trigger-label">{currentLang.short}</span>
@@ -72,7 +99,7 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
       </button>
 
       {isOpen && (
-        <ul className="yk-lang-menu" role="listbox" aria-label="Available languages">
+        <ul className="yk-lang-menu" role="listbox" aria-label={labels.availableLanguages}>
           {SUPPORTED_LANGUAGES.map((lang) => {
             const isSelected = lang.code === language;
             return (

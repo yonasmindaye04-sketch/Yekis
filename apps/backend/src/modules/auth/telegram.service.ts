@@ -109,6 +109,14 @@ function telegramChatId(telegramId: bigint) {
   return String(telegramId);
 }
 
+function resolveTelegramLanguage(code?: string | null): "en" | "am" | "om" | "ti" {
+  const normalized = (code ?? "").trim().toLowerCase();
+  if (normalized.startsWith("am")) return "am";
+  if (normalized.startsWith("om")) return "om";
+  if (normalized.startsWith("ti")) return "ti";
+  return "en";
+}
+
 function profileFields(telegram: TgUser) {
   const displayName = telegram.firstName
     ? `${telegram.firstName}${telegram.lastName ? " " + telegram.lastName : ""}`
@@ -119,7 +127,7 @@ function profileFields(telegram: TgUser) {
     lastName: telegram.lastName || undefined,
     displayName,
     avatarUrl: telegram.photoUrl || undefined,
-    languagePreference: telegram.languageCode === "am" ? "am" : "en",
+    languagePreference: resolveTelegramLanguage(telegram.languageCode),
   };
 }
 

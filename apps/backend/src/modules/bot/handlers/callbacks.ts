@@ -33,11 +33,13 @@ import {
   isEmptyKeyboard,
 } from "../utils/deepLink.js";
 import { registerStaffHandlers } from "./staff.js";
+import { toIntlLocale } from "../utils/markdown.js";
 
-const money = (minor: number) => (minor / 100).toLocaleString("en-US", { minimumFractionDigits: 2 });
+const money = (minor: number, locale?: string) =>
+  (minor / 100).toLocaleString(toIntlLocale(locale), { minimumFractionDigits: 2 });
 
-function jobSummary(job: any): string {
-  return `${job.title}\n${money(job.budgetMinMinor)}–${money(job.budgetMaxMinor)} ETB · ${job.status}`;
+function jobSummary(job: any, locale?: string): string {
+  return `${job.title}\n${money(job.budgetMinMinor, locale)}–${money(job.budgetMaxMinor, locale)} ETB · ${job.status}`;
 }
 
 async function getWalletSummary(userId: string) {
@@ -77,7 +79,9 @@ async function renderJobs(ctx: BotContext, page: number, filters: Record<string,
   const hasNext = jobs.length > 5;
   const visible = jobs.slice(0, 5);
   await ctx.editMessageText(
-    visible.length ? `Job Opportunities\n\n${visible.map(jobSummary).join("\n\n")}` : ctx.t("jobs_no_results"),
+    visible.length
+      ? `${ctx.t("jobs_title")}\n\n${visible.map((j) => jobSummary(j, ctx.i18n.locale)).join("\n\n")}`
+      : ctx.t("jobs_no_results"),
     { reply_markup: jobFiltersKeyboard(ctx, page, filters) },
   );
   return hasNext;
@@ -85,16 +89,19 @@ async function renderJobs(ctx: BotContext, page: number, filters: Record<string,
 
 async function showWalletActivity(ctx: BotContext, mode: "recent" | "all") {
   const userId = ctx.session.userId!;
+  const intlLocale = toIntlLocale(ctx.i18n.locale);
   const [topups, payouts] = await Promise.all([
     prisma.walletTopUp.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: mode === "recent" ? 5 : 10 }),
     prisma.payoutTransaction.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: mode === "recent" ? 5 : 10 }),
   ]);
   const activity = [
-    ...topups.map((x) => ({ at: x.createdAt, text: `Top up · ${money(x.amountMinor)} ETB · ${x.status}` })),
-    ...payouts.map((x) => ({ at: x.createdAt, text: `Withdrawal · ${money(x.amountMinor)} ETB · ${x.status}` })),
+    ...topups.map((x) => ({ at: x.createdAt, text: `${ctx.t("wallet_activity_topup")} · ${money(x.amountMinor, ctx.i18n.locale)} ETB · ${x.status}` })),
+    ...payouts.map((x) => ({ at: x.createdAt, text: `${ctx.t("wallet_activity_withdrawal")} · ${money(x.amountMinor, ctx.i18n.locale)} ETB · ${x.status}` })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime()).slice(0, 10);
   await ctx.editMessageText(
-    activity.length ? `Wallet activity\n\n${activity.map((x) => `${x.text}\n${x.at.toLocaleDateString("en-GB")}`).join("\n\n")}` : "No wallet activity yet.",
+    activity.length
+      ? `${ctx.t("wallet_activity_title")}\n\n${activity.map((x) => `${x.text}\n${x.at.toLocaleDateString(intlLocale)}`).join("\n\n")}`
+      : ctx.t("wallet_activity_empty"),
     { reply_markup: walletActionsKeyboard(ctx) },
   );
 }
@@ -104,10 +111,10 @@ async function openMiniAppRoute(
   text: string,
   url: string,
 ): Promise<void> {
-  const keyboard = safeUrlKeyboard([{ text: "Open Mini App", url }]);
+  const keyboard = safeUrlKeyboard([{ text: ctx.t("miniapp_open_btn"), url }]);
   if (isEmptyKeyboard(keyboard)) {
     await ctx.answerCallbackQuery({
-      text: "Mini App is unavailable until a public HTTPS URL is configured.",
+      text: ctx.t("miniapp_unavailable"),
       show_alert: true,
     });
     return;
@@ -168,23 +175,23 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     const category = ctx.match[1] ?? "";
     ctx.session.pagination = { type: "jobs", page: 0, filters: { category } };
     await renderJobs(ctx, 0, { category });
-    await ctx.answerCallbackQuery({ text: `Filter: ${category}` });
+    await ctx.answerCallbackQuery({ text: ctx.t("jobs_filter_applied", { category }) });
   });
 
   bot.callbackQuery(/^jobs:filter:budget:(.+)$/, async (ctx) => {
-    const budget = ctx.match[1];
+    const budget = ctx.match[1] ?? "";
     const filters = { ...(ctx.session.pagination?.filters || {}), budget };
     ctx.session.pagination = { type: "jobs", page: 0, filters };
     await renderJobs(ctx, 0, filters);
-    await ctx.answerCallbackQuery({ text: `Budget: ${budget}` });
+    await ctx.answerCallbackQuery({ text: ctx.t("jobs_budget_applied", { budget }) });
   });
 
   bot.callbackQuery(/^jobs:filter:sort:(.+)$/, async (ctx) => {
-    const sort = ctx.match[1];
+    const sort = ctx.match[1] ?? "";
     const filters = { ...(ctx.session.pagination?.filters || {}), sort };
     ctx.session.pagination = { type: "jobs", page: 0, filters };
     await renderJobs(ctx, 0, filters);
-    await ctx.answerCallbackQuery({ text: `Sort: ${sort}` });
+    await ctx.answerCallbackQuery({ text: ctx.t("jobs_sort_applied", { sort }) });
   });
 
   bot.callbackQuery("jobs:filter:clear", async (ctx) => {
@@ -198,7 +205,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     const page = Math.max(0, parseInt(ctx.match[1]!, 10));
     const filters = ctx.session.pagination?.filters || {};
     await renderJobs(ctx, page, filters);
-    await ctx.answerCallbackQuery({ text: `Page ${page + 1}` });
+    await ctx.answerCallbackQuery({ text: ctx.t("jobs_page_label", { page: page + 1 }) });
   });
 
   bot.callbackQuery("menu:my_jobs", async (ctx) => {
@@ -210,9 +217,14 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       return;
     }
     const jobs = await prisma.job.findMany({ where: { clientId: ctx.session.userId }, orderBy: { createdAt: "desc" }, take: 5 });
-    await ctx.editMessageText(jobs.length ? `My Jobs\n\n${jobs.map(jobSummary).join("\n\n")}` : "You have not posted any jobs yet.", {
-      reply_markup: mainMenuKeyboard(ctx),
-    });
+    await ctx.editMessageText(
+      jobs.length
+        ? `${ctx.t("menu_my_jobs")}\n\n${jobs.map((j) => jobSummary(j, ctx.i18n.locale)).join("\n\n")}`
+        : ctx.t("my_jobs_empty"),
+      {
+        reply_markup: mainMenuKeyboard(ctx),
+      },
+    );
     await ctx.answerCallbackQuery();
   });
 
@@ -225,9 +237,14 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       return;
     }
     const proposals = await prisma.proposal.findMany({ where: { freelancerId: ctx.session.userId }, include: { job: { select: { title: true } } }, orderBy: { createdAt: "desc" }, take: 8 });
-    await ctx.editMessageText(proposals.length ? `My Proposals\n\n${proposals.map((p) => `${p.job.title}\n${money(p.quotedAmountMinor)} ETB · ${p.status}`).join("\n\n")}` : "You have not submitted any proposals yet.", {
-      reply_markup: mainMenuKeyboard(ctx),
-    });
+    await ctx.editMessageText(
+      proposals.length
+        ? `${ctx.t("my_proposals_title")}\n\n${proposals.map((p) => `${p.job.title}\n${money(p.quotedAmountMinor, ctx.i18n.locale)} ETB · ${p.status}`).join("\n\n")}`
+        : ctx.t("my_proposals_empty"),
+      {
+        reply_markup: mainMenuKeyboard(ctx),
+      },
+    );
     await ctx.answerCallbackQuery();
   });
 
@@ -239,6 +256,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       });
       return;
     }
+    const intlLocale = toIntlLocale(ctx.i18n.locale);
     const contracts = await prisma.contract.findMany({
       where: { OR: [{ clientId: ctx.session.userId }, { freelancerId: ctx.session.userId }] },
       include: { job: { select: { title: true } } },
@@ -247,8 +265,8 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     });
     await ctx.editMessageText(
       contracts.length
-        ? `Your Contracts\n\n${contracts.map((c) => `${c.job.title}\n${c.status} · created ${c.createdAt.toLocaleDateString("en-GB")}`).join("\n\n")}`
-        : "You do not have any contracts yet.",
+        ? `${ctx.t("menu_contracts")}\n\n${contracts.map((c) => `${c.job.title}\n${c.status} · ${ctx.t("contract_created_label")} ${c.createdAt.toLocaleDateString(intlLocale)}`).join("\n\n")}`
+        : ctx.t("contracts_empty"),
       { reply_markup: mainMenuKeyboard(ctx) },
     );
     await ctx.answerCallbackQuery();
@@ -265,9 +283,9 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     const wallet = await getWalletSummary(ctx.session.userId);
     await ctx.editMessageText(
       ctx.t("wallet_balance", {
-        balance: money(wallet.balanceMinor),
-        pending: money(wallet.pendingMinor),
-        available: money(wallet.availableMinor),
+        balance: money(wallet.balanceMinor, ctx.i18n.locale),
+        pending: money(wallet.pendingMinor, ctx.i18n.locale),
+        available: money(wallet.availableMinor, ctx.i18n.locale),
       }),
       {
         reply_markup: walletActionsKeyboard(ctx),
@@ -300,6 +318,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       });
       return;
     }
+    const intlLocale = toIntlLocale(ctx.i18n.locale);
     const disputes = await prisma.dispute.findMany({
       where: { raisedByUserId: ctx.session.userId },
       orderBy: { updatedAt: "desc" },
@@ -307,8 +326,8 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     });
     await ctx.editMessageText(
       disputes.length
-        ? `Your Disputes\n\n${disputes.map((d) => `${d.category}\n${d.stage} · updated ${d.updatedAt.toLocaleDateString("en-GB")}`).join("\n\n")}`
-        : "You do not have any disputes yet.",
+        ? `${ctx.t("disputes_title")}\n\n${disputes.map((d) => `${d.category}\n${d.stage} · ${ctx.t("dispute_updated_label")} ${d.updatedAt.toLocaleDateString(intlLocale)}`).join("\n\n")}`
+        : ctx.t("disputes_empty"),
       { reply_markup: mainMenuKeyboard(ctx) },
     );
     await ctx.answerCallbackQuery();
@@ -320,7 +339,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
       : [];
     await ctx.editMessageText(
       notifications.length
-        ? `Notifications\n\n${notifications.map((n) => `${n.isRead ? "" : "• "}${n.message}`).join("\n")}`
+        ? `${ctx.t("notifications_title")}\n\n${notifications.map((n) => `${n.isRead ? "" : "• "}${n.message}`).join("\n")}`
         : ctx.t("notifications_empty"),
       {
       reply_markup: mainMenuKeyboard(ctx),
@@ -409,11 +428,11 @@ export function registerCallbacks(bot: Bot<BotContext>) {
     await ctx.editMessageText(ctx.t("settings_notifications"), {
       reply_markup: notificationSettingsKeyboard(ctx),
     });
-    await ctx.answerCallbackQuery({ text: value ? "Enabled" : "Disabled" });
+    await ctx.answerCallbackQuery({ text: value ? ctx.t("notif_enabled") : ctx.t("notif_disabled") });
   });
 
   bot.callbackQuery("settings:privacy", async (ctx) => {
-    await ctx.editMessageText("Privacy & security\n\nYour account data is protected by authenticated access. KYC documents are private and available only to authorized reviewers. Contact support for a data-access or deletion request.", {
+    await ctx.editMessageText(ctx.t("privacy_summary"), {
       reply_markup: settingsKeyboard(ctx),
     });
     await ctx.answerCallbackQuery();
@@ -478,39 +497,39 @@ export function registerCallbacks(bot: Bot<BotContext>) {
 
   // Proposal callbacks
   bot.callbackQuery(/^proposal:shortlist:(\w+)$/, async (ctx) => {
-    await openMiniAppRoute(ctx, "Open the proposal in the Mini App to shortlist it securely.", webAppRoutes.proposals());
+    await openMiniAppRoute(ctx, ctx.t("miniapp_proposal_shortlist"), webAppRoutes.proposals());
   });
 
   bot.callbackQuery(/^proposal:accept:(\w+)$/, async (ctx) => {
-    await openMiniAppRoute(ctx, "Open the proposal in the Mini App to accept it securely.", webAppRoutes.proposals());
+    await openMiniAppRoute(ctx, ctx.t("miniapp_proposal_accept"), webAppRoutes.proposals());
   });
 
   bot.callbackQuery(/^proposal:reject:(\w+)$/, async (ctx) => {
-    await openMiniAppRoute(ctx, "Open the proposal in the Mini App to reject it securely.", webAppRoutes.proposals());
+    await openMiniAppRoute(ctx, ctx.t("miniapp_proposal_reject"), webAppRoutes.proposals());
   });
 
   bot.callbackQuery(/^proposal:view:(\w+)$/, async (ctx) => {
-    await openMiniAppRoute(ctx, "Open the proposal in the Mini App to view its details.", webAppRoutes.proposals());
+    await openMiniAppRoute(ctx, ctx.t("miniapp_proposal_view"), webAppRoutes.proposals());
   });
 
   bot.callbackQuery(/^proposal:withdraw:(\w+)$/, async (ctx) => {
-    await openMiniAppRoute(ctx, "Open the proposal in the Mini App to withdraw it securely.", webAppRoutes.proposals());
+    await openMiniAppRoute(ctx, ctx.t("miniapp_proposal_withdraw"), webAppRoutes.proposals());
   });
 
   // Contract callbacks
   bot.callbackQuery(/^contract:sign:(\w+)$/, async (ctx) => {
     const contractId = ctx.match[1]!;
-    await openMiniAppRoute(ctx, "Open the contract in the Mini App to sign it.", webAppRoutes.contract(contractId));
+    await openMiniAppRoute(ctx, ctx.t("miniapp_contract_sign"), webAppRoutes.contract(contractId));
   });
 
   bot.callbackQuery(/^contract:view:(\w+)$/, async (ctx) => {
     const contractId = ctx.match[1]!;
-    await openMiniAppRoute(ctx, "Open the contract in the Mini App to view it.", webAppRoutes.contract(contractId));
+    await openMiniAppRoute(ctx, ctx.t("miniapp_contract_view"), webAppRoutes.contract(contractId));
   });
 
   bot.callbackQuery(/^contract:fund:(\w+)$/, async (ctx) => {
     const contractId = ctx.match[1]!;
-    await openMiniAppRoute(ctx, "Open the contract in the Mini App to fund it securely.", webAppRoutes.contract(contractId));
+    await openMiniAppRoute(ctx, ctx.t("miniapp_contract_fund"), webAppRoutes.contract(contractId));
   });
 
   bot.callbackQuery(/^contract:deliver:(\w+)$/, async (ctx) => {
@@ -533,7 +552,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
   // Milestone callbacks
   bot.callbackQuery(/^milestone:fund:(\w+)$/, async (ctx) => {
     const milestoneId = ctx.match[1];
-    await openMiniAppRoute(ctx, "Open Contracts in the Mini App to fund this milestone securely.", webAppRoutes.contract(""));
+    await openMiniAppRoute(ctx, ctx.t("miniapp_milestone_fund"), webAppRoutes.contract(""));
   });
 
   bot.callbackQuery(/^milestone:deliver:(\w+)$/, async (ctx) => {
@@ -544,7 +563,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
 
   bot.callbackQuery(/^milestone:accept:(\w+)$/, async (ctx) => {
     const milestoneId = ctx.match[1];
-    await openMiniAppRoute(ctx, "Open Contracts in the Mini App to accept this milestone securely.", webAppRoutes.contract(""));
+    await openMiniAppRoute(ctx, ctx.t("miniapp_milestone_accept"), webAppRoutes.contract(""));
   });
 
   bot.callbackQuery(/^milestone:dispute:(\w+)$/, async (ctx) => {
@@ -587,7 +606,7 @@ export function registerCallbacks(bot: Bot<BotContext>) {
 
   bot.callbackQuery(/^dispute:accept:(\w+)$/, async (ctx) => {
     const disputeId = ctx.match[1];
-    await ctx.answerCallbackQuery({ text: "Proposal accepted" });
+    await ctx.answerCallbackQuery({ text: ctx.t("dispute_proposal_accepted") });
   });
 
   bot.callbackQuery(/^dispute:arbitrate:(\w+)$/, async (ctx) => {

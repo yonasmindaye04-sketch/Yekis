@@ -37,6 +37,8 @@ import {
   type SmartReplyItem,
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
+import { useI18n } from "./i18n";
+import { CHAT_WORKSPACE_COPY } from "./chatWorkspaceCopy";
 import "./ChatWorkspace.css";
 import { TbFileAlert } from "react-icons/tb";
 import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert";
@@ -66,6 +68,8 @@ export function ChatWorkspace({
   onNavigateToContracts,
   initialConversationId,
 }: ChatWorkspaceProps) {
+  const { language } = useI18n();
+  const copy = CHAT_WORKSPACE_COPY[language] ?? CHAT_WORKSPACE_COPY.en;
   const currentUserId = userId || user?.id || "";
 
   // Conversation & message state
@@ -363,7 +367,12 @@ export function ChatWorkspace({
         setSmartReplyItems(
           suggestions.map((text, idx) => ({
             id: `reply-${idx}`,
-            label: idx === 0 ? "Recommended Reply" : idx === 1 ? "Alternative" : "Follow-Up",
+            label:
+              idx === 0
+                ? copy.recommendedReplyLabel
+                : idx === 1
+                  ? copy.alternativeReplyLabel
+                  : copy.followUpReplyLabel,
             text,
           })),
         );
@@ -417,7 +426,7 @@ export function ChatWorkspace({
       const summary = await api.summarizeChat(activeConversationId);
       setSummaryData(summary);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to summarize chat");
+      setError(err instanceof Error ? err.message : copy.failedSummarize);
     } finally {
       setIsLoadingSummary(false);
     }
@@ -432,7 +441,7 @@ export function ChatWorkspace({
       const deal = await api.extractDealTerms(activeConversationId);
       setDealData(deal);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to extract deal terms");
+      setError(err instanceof Error ? err.message : copy.failedExtractDeal);
     } finally {
       setIsLoadingDeal(false);
     }
@@ -443,11 +452,11 @@ export function ChatWorkspace({
     if (!draft.trim()) return null;
     for (const rx of CIRCUMVENTION_REGEXES) {
       if (rx.test(draft)) {
-        return "Escrow Safety Notice: Direct contact details or off-platform payment terms detected. Direct transactions void escrow insurance, dispute resolution, and AML statutory protections. Keep communication and payments strictly on Yekis.";
+        return copy.circumventionNotice;
       }
     }
     return null;
-  }, [draft]);
+  }, [copy.circumventionNotice, draft]);
 
   // --- Handle user typing event ---
   const handleDraftChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -497,7 +506,7 @@ export function ChatWorkspace({
         }
       }
 
-      const textToSend = rawText || (fileToUpload ? `📎 ${fileToUpload.name}` : "📎 Attachment");
+      const textToSend = rawText || (fileToUpload ? fileToUpload.name : copy.attachmentFallback);
 
       const newMsg = await api.sendChatMessage(
         activeConversationId,
@@ -536,7 +545,7 @@ export function ChatWorkspace({
         )
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send message");
+      setError(err instanceof Error ? err.message : copy.failedSendMessage);
     } finally {
       setIsSending(false);
       setIsUploadingAttachment(false);
@@ -554,7 +563,7 @@ export function ChatWorkspace({
       let createdId = "";
       if (newChatType === "DIRECT") {
         if (!newChatRecipientId.trim()) {
-          setError("Recipient User ID or Email is required for direct chat");
+          setError(copy.recipientRequiredError);
           setIsCreatingChat(false);
           return;
         }
@@ -577,7 +586,7 @@ export function ChatWorkspace({
       setNewChatRecipientId("");
       setShowMobileChatView(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create conversation");
+      setError(err instanceof Error ? err.message : copy.failedCreateConversation);
     } finally {
       setIsCreatingChat(false);
     }
@@ -617,20 +626,20 @@ export function ChatWorkspace({
         <div className="chat-sidebar-header">
           <div className="chat-sidebar-title-row">
             <div>
-              <h2>Messages</h2>
+              <h2>{copy.messagesHeading}</h2>
               <span className="chat-sidebar-subtitle">
                 {role === "FREELANCER"
-                  ? "Client conversations & proposals"
-                  : "Your project discussions"}
+                  ? copy.subtitleFreelancer
+                  : copy.subtitleClient}
               </span>
             </div>
             <button
               className="chat-btn-new"
               onClick={() => setShowNewChatModal(true)}
-              title="Start new conversation"
+              title={copy.newChatBtnTitle}
             >
               <Plus size={16} />
-              <span>New</span>
+              <span>{copy.newChatBtn}</span>
             </button>
           </div>
 
@@ -638,7 +647,7 @@ export function ChatWorkspace({
             <Search size={15} className="chat-search-icon" />
             <input
               type="text"
-              placeholder="Search conversations..."
+              placeholder={copy.searchPlaceholder}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -657,19 +666,19 @@ export function ChatWorkspace({
               className={`filter-tab ${activeFilter === "ALL" ? "active" : ""}`}
               onClick={() => setActiveFilter("ALL")}
             >
-              All
+              {copy.filterAll}
             </button>
             <button
               className={`filter-tab ${activeFilter === "DIRECT" ? "active" : ""}`}
               onClick={() => setActiveFilter("DIRECT")}
             >
-              Direct
+              {copy.filterDirect}
             </button>
             <button
               className={`filter-tab ${activeFilter === "SUPPORT" ? "active" : ""}`}
               onClick={() => setActiveFilter("SUPPORT")}
             >
-              Support
+              {copy.filterSupport}
             </button>
           </div>
         </div>
@@ -679,10 +688,10 @@ export function ChatWorkspace({
             <div className="chat-empty-threads">
               <p>
                 {activeFilter === "SUPPORT"
-                  ? "No support tickets found"
+                  ? copy.emptySupport
                   : role === "FREELANCER"
-                  ? "No client conversations found"
-                  : "No conversations found"}
+                  ? copy.emptyFreelancer
+                  : copy.emptyDefault}
               </p>
               <button
                 className="chat-empty-cta"
@@ -692,10 +701,10 @@ export function ChatWorkspace({
                 }}
               >
                 {activeFilter === "SUPPORT"
-                  ? "Contact Support"
+                  ? copy.ctaSupport
                   : role === "CLIENT"
-                  ? "Message a Freelancer"
-                  : "Start a Conversation"}
+                  ? copy.ctaClient
+                  : copy.ctaDefault}
               </button>
             </div>
           ) : (
@@ -703,19 +712,20 @@ export function ChatWorkspace({
               const isActive = c.id === activeConversationId;
               const isSupport = c.isSupport;
               const title = isSupport
-                ? "Yekis Support"
+                ? copy.yekisSupportName
                 : c.otherParticipant?.displayName ||
                   c.otherParticipant?.email?.split("@")[0] ||
                   c.subject;
               const avatarLetter = isSupport
                 ? "Y"
                 : (title[0] || "U").toUpperCase();
+              const rawRole = c.otherParticipant?.role || "CLIENT";
               const roleBadge = isSupport
-                ? "SUPPORT"
-                : c.otherParticipant?.role || "CLIENT";
+                ? copy.supportBadge
+                : copy.roles[rawRole] ?? rawRole;
               const roleBadgeClass = isSupport
                 ? "support"
-                : (c.otherParticipant?.role || "CLIENT").toLowerCase();
+                : rawRole.toLowerCase();
 
               return (
                 <div
@@ -784,7 +794,7 @@ export function ChatWorkspace({
               <button
                 className="chat-mobile-back"
                 onClick={() => setShowMobileChatView(false)}
-                title="Back to conversations"
+                title={copy.backToConversationsTitle}
               >
                 <ArrowLeft size={18} />
               </button>
@@ -805,7 +815,7 @@ export function ChatWorkspace({
               <div className="chat-header-meta">
                 <h3>
                   {activeConversation.isSupport
-                    ? "Yekis Support"
+                    ? copy.yekisSupportName
                     : activeConversation.otherParticipant?.displayName ||
                       activeConversation.otherParticipant?.email ||
                       activeConversation.subject}
@@ -813,17 +823,19 @@ export function ChatWorkspace({
                 <div className="chat-header-sub">
                   {isRemoteTyping ? (
                     <span className="typing-indicator-text">
-                      typing<span className="typing-dot">.</span>
+                      {copy.typingWord}<span className="typing-dot">.</span>
                       <span className="typing-dot">.</span>
                       <span className="typing-dot">.</span>
                     </span>
                   ) : (
 <span>
                       {activeConversation.isSupport
-                        ? "Official Support"
+                        ? copy.officialSupportSub
                         : `${
-                            activeConversation.otherParticipant?.role || "CLIENT"
-                          } · Online`}
+                            copy.roles[activeConversation.otherParticipant?.role || "CLIENT"] ??
+                            activeConversation.otherParticipant?.role ??
+                            "CLIENT"
+                          } · ${copy.onlineSuffix}`}
                     </span>
                   )}
                 </div>
@@ -834,10 +846,10 @@ export function ChatWorkspace({
                 <button
                   className="chat-copilot-btn"
                   onClick={handleSummarize}
-                  title="Mini-Me: Summarize Thread"
+                  title={copy.summarizeTitle}
                 >
                   <Bot size={15} />
-                  <span>Thread Summary</span>
+                  <span>{copy.threadSummaryBtn}</span>
                 </button>
 
                 {!activeConversation.isSupport && (
@@ -846,12 +858,12 @@ export function ChatWorkspace({
                     onClick={handleExtractDeal}
                     title={
                       role === "CLIENT"
-                        ? "Mini-Me: Extract milestone terms & create contract"
-                        : "Mini-Me: Extract Deal Terms"
+                        ? copy.extractDealClientTitle
+                        : copy.extractDealDefaultTitle
                     }
                   >
                     <Sparkles size={15} />
-                    <span>Extract Deal</span>
+                    <span>{copy.extractDealBtn}</span>
                   </button>
                 )}
               </div>
@@ -870,15 +882,15 @@ export function ChatWorkspace({
                   </div>
                   <h4>
                     {activeConversation.isSupport
-                      ? "Yekis Support Desk"
-                      : "Direct Workspace"}
+                      ? copy.supportDeskTitle
+                      : copy.directWorkspaceTitle}
                   </h4>
                   <p>
                     {activeConversation.isSupport
-                      ? "Have questions about payments, disputes, or account verification? Our support team is here to help."
+                      ? copy.supportDeskDesc
                       : role === "CLIENT"
-? "Negotiate deliverables, discuss milestones, or clarify requirements with this freelancer. Payment is held while you review the work."
-: "Discuss project details, propose milestones, and align with your client. Payment is released when you approve the work, or after the review window if you do not respond."}
+? copy.directWorkspaceClientDesc
+: copy.directWorkspaceFreelancerDesc}
                   </p>
                 </div>
               ) : (
@@ -891,9 +903,9 @@ export function ChatWorkspace({
                         ? m.senderId !== activeConversation.otherParticipant.id
                         : false);
                   const senderName = isMine
-                    ? "You"
+                    ? copy.youLabel
                     : m.sender.displayName ||
-                      (m.sender.staffRole ? "Yekis Support" : m.sender.email);
+                      (m.sender.staffRole ? copy.yekisSupportName : m.sender.email);
 
                   return (
                     <div
@@ -931,7 +943,7 @@ export function ChatWorkspace({
               )}
               {isRemoteTyping && (
                 <div className="chat-typing-bubble">
-                  <span>typing</span>
+                  <span>{copy.typingWord}</span>
                   <div className="typing-dots">
                     <span />
                     <span />

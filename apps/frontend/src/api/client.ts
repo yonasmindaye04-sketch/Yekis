@@ -594,6 +594,36 @@ class ApiClient {
   private accessToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
   private refreshToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-refresh-token") : null;
   private refreshPromise: Promise<void> | null = null;
+  private unauthorizedListeners = new Set<() => void>();
+
+  onUnauthorized(listener: () => void): () => void {
+    this.unauthorizedListeners.add(listener);
+    return () => {
+      this.unauthorizedListeners.delete(listener);
+    };
+  }
+
+  private canRefreshAuthForPath(path: string): boolean {
+    if (!path.includes("/auth/")) return true;
+    return (
+      path.startsWith("/api/v1/auth/me") ||
+      path.startsWith("/api/v1/auth/identities") ||
+      path.startsWith("/api/v1/auth/telegram/link") ||
+      path.startsWith("/api/v1/auth/oauth/google/link")
+    );
+  }
+
+  private handleUnauthorized(path: string) {
+    if (!this.canRefreshAuthForPath(path)) return;
+    this.clearToken();
+    for (const listener of this.unauthorizedListeners) {
+      try {
+        listener();
+      } catch {
+        // Ignore listener errors during forced sign-out
+      }
+    }
+  }
 
   setToken(token: string | null) {
     this.accessToken = token;
@@ -634,6 +664,17 @@ class ApiClient {
 
   getToken(): string | null {
     return this.accessToken;
+  }
+
+  /**
+   * True when the active session holds an explicit offline/mock token
+   * (`"mock-jwt-access-token"` or `"demo-..."`) minted by `mockStore`.
+   */
+  private isMockSessionToken(): boolean {
+    return (
+      this.accessToken === "mock-jwt-access-token" ||
+      Boolean(this.accessToken?.startsWith("demo-"))
+    );
   }
 
   /**
@@ -685,6 +726,14 @@ class ApiClient {
     options: RequestInit = {},
     behaviour: { strictHttpErrors?: boolean } = {},
   ): Promise<T> {
+    if (this.isMockSessionToken() && !behaviour.strictHttpErrors) {
+      return mockStore.handleApiFallback(
+        path,
+        options.method || "GET",
+        options.body,
+      ) as T;
+    }
+
     const performRequest = async (token: string | null) => {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -717,7 +766,7 @@ class ApiClient {
     if (
       response.status === 401 &&
       this.refreshToken &&
-      !path.includes("/auth/")
+      this.canRefreshAuthForPath(path)
     ) {
       try {
         await this.tryRefresh();
@@ -726,6 +775,10 @@ class ApiClient {
         // tryRefresh already cleared the session on failure - let the original
         // 401 surface below (app will re-render the login screen).
       }
+    }
+
+    if (response.status === 401) {
+      this.handleUnauthorized(path);
     }
 
     if (response.headers.get("x-yekis-offline") === "1") {
@@ -799,10 +852,12 @@ class ApiClient {
         error.message || error.error || `HTTP ${response.status}`,
       ) as Error & {
         code?: string;
+        status?: number;
         nextAction?: { type: string; path: string };
         blockers?: { code: string; message: string }[];
       };
       thrown.code = error.error;
+      thrown.status = response.status;
       if (error.nextAction) thrown.nextAction = error.nextAction;
       if ((error as any).blockers) thrown.blockers = (error as any).blockers;
       if ((error as any).details) (thrown as any).details = (error as any).details;
@@ -952,6 +1007,95 @@ class ApiClient {
         options.method || "GET",
         options.body,
       ) as T;
+    }
+  }
+
+  /**
+   * Sends an authenticated multipart FormData POST request, falling back to
+   * mockStore only when the backend server is offline or unreachable.
+   */
+  private async requestFormData<T>(
+    path: string,
+    formData: FormData,
+    fallbackBody: Record<string, unknown>,
+  ): Promise<T> {
+    if (this.isMockSessionToken()) {
+      return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+    }
+
+    const performUpload = async (token: string | null) => {
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      return fetch(`${API_BASE_URL}${path}`, {
+        method: "POST",
+        headers,
+        body: formData,
+      });
+    };
+
+    let response: Response;
+    try {
+      response = await performUpload(this.accessToken);
+    } catch {
+      return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+    }
+
+    if (response.status === 401 && this.refreshToken && this.canRefreshAuthForPath(path)) {
+      try {
+        await this.tryRefresh();
+        response = await performUpload(this.accessToken);
+      } catch {
+        // Let the original 401 surface below.
+      }
+    }
+
+    if (response.status === 401) {
+      this.handleUnauthorized(path);
+    }
+
+    if (response.headers.get("x-yekis-offline") === "1") {
+      return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok) {
+      if (
+        response.status === 503 ||
+        response.status === 502 ||
+        response.status === 504 ||
+        response.status === 404 ||
+        !contentType.includes("application/json")
+      ) {
+        return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+      }
+      let error: { message?: string; error?: string };
+      try {
+        error = await response.json();
+      } catch {
+        return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+      }
+      const thrown = new Error(
+        error.message || error.error || `HTTP ${response.status}`,
+      ) as Error & { code?: string; status?: number };
+      thrown.code = error.error;
+      thrown.status = response.status;
+      throw thrown;
+    }
+
+    if (!contentType.includes("application/json")) {
+      return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+    }
+
+    try {
+      const data = await response.json();
+      if (data && typeof data === "object" && "__backendOffline" in data) {
+        return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
+      }
+      return data as T;
+    } catch {
+      return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
     }
   }
 
@@ -1736,7 +1880,10 @@ class ApiClient {
     return this.request(`/api/v1/wallet/topups/${topUpId}/receipt-url`);
   }
 
-  async initiateCheckoutTopUp(amountMinor: number, provider: string): Promise<{ redirectUrl: string; topUpId: string }> {
+  async initiateCheckoutTopUp(
+    amountMinor: number,
+    provider: string,
+  ): Promise<{ redirectUrl: string | null; topUpId: string; providerTransactionId?: string }> {
     return this.request("/api/v1/wallet/topups/checkout", {
       method: "POST",
       body: JSON.stringify({ amountMinor, provider }),
@@ -1768,17 +1915,17 @@ class ApiClient {
   }
 
   async createTopUpRequest(data: FormData): Promise<TopUpRequest> {
-    return mockStore.handleApiFallback("/api/v1/wallet/topups", "POST", {
+    return this.requestFormData<TopUpRequest>("/api/v1/wallet/topups", data, {
       amountMinor: Number(data.get("amountMinor") || 5000000),
       provider: String(data.get("provider") || "TELEBIRR"),
       referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
-    }) as TopUpRequest;
+    });
   }
 
   async attachTopUpReceipt(topUpId: string, data: FormData): Promise<TopUpRequest> {
-    return mockStore.handleApiFallback(`/api/v1/wallet/topups/${topUpId}/attach-receipt`, "POST", {
+    return this.requestFormData<TopUpRequest>(`/api/v1/wallet/topups/${topUpId}/attach-receipt`, data, {
       referenceNumber: String(data.get("referenceNumber") || `REF-${Date.now().toString().slice(-6)}`),
-    }) as TopUpRequest;
+    });
   }
 
   // KYC

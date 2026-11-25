@@ -5,9 +5,64 @@ import "./index.css";
 import "./telegram/miniApp.css";
 import "./website-icons.css";
 import { ThemeProvider } from "./theme/ThemeContext";
-import { LanguageProvider } from "./i18n";
+import { LanguageProvider, useI18n, type Language } from "./i18n";
 import { HashRouter } from "./router/HashRouter";
 import App from "./App.tsx";
+
+const CRASH_COPY: Record<
+  Language,
+  { eyebrow: string; title: string; body: string; reload: string }
+> = {
+  en: {
+    eyebrow: "Yekis jobs",
+    title: "The workspace needs a refresh.",
+    body: "The workspace hit an unexpected error. Reload the page and try the action again.",
+    reload: "Reload Yekis",
+  },
+  am: {
+    eyebrow: "YeKis ሥራዎች",
+    title: "ገጹን እንደገና መጫን ያስፈልጋል።",
+    body: "ያልተጠበቀ ስህተት አጋጥሟል። ገጹን እንደገና ይጫኑ እና እርምጃውን ደግመው ይሞክሩ።",
+    reload: "YeKisን ዳግም ጫን",
+  },
+  om: {
+    eyebrow: "Hojiiwwan Yekis",
+    title: "Bakki hojii haarawoomfamuu qaba.",
+    body: "Dogoggorri hin eegamne mudateera. Fuula kana irra deebi'ii fe'iitii ammas yaali.",
+    reload: "Yekis irra deebi'ii fe'i",
+  },
+  ti: {
+    eyebrow: "ስራሕቲ YeKis",
+    title: "መድረኽ ዳግም ምጽዓን የድልዮ።",
+    body: "ዘይተጸበናዮ ጌጋ ኣጋጢሙ። ነቲ ገጽ ዳግም ጽዒንኩም እንደገና ፈትኑ።",
+    reload: "YeKis ዳግም ጽዓን",
+  },
+};
+
+function CrashFallbackView({ error }: { error: Error }) {
+  const { language } = useI18n();
+  const copy = CRASH_COPY[language] ?? CRASH_COPY.en;
+  return (
+    <main className="crash-screen">
+      <img
+        src="/svgviewer-output.svg"
+        alt="Yekis"
+        className="platform-logo"
+        style={{ marginBottom: "28px" }}
+      />
+      <p className="eyebrow">{copy.eyebrow}</p>
+      <h1>{copy.title}</h1>
+      <p>{copy.body}</p>
+      <code>{error.message}</code>
+      <button
+        className="btn-primary"
+        onClick={() => window.location.reload()}
+      >
+        {copy.reload}
+      </button>
+    </main>
+  );
+}
 
 // === MAIN COMPONENT ===
 class AppErrorBoundary extends Component<
@@ -26,29 +81,7 @@ class AppErrorBoundary extends Component<
 
   render() {
     if (this.state.error) {
-      return (
-        <main className="crash-screen">
-          <img
-            src="/svgviewer-output.svg"
-            alt="Yekis Logo"
-            className="platform-logo"
-            style={{ marginBottom: "28px" }}
-          />
-          <p className="eyebrow">Yekis jobs</p>
-          <h1>The workspace needs a refresh.</h1>
-          <p>
-            The Mini App hit an unexpected error. Reload it and try the action
-            again.
-          </p>
-          <code>{this.state.error.message}</code>
-          <button
-            className="btn-primary"
-            onClick={() => window.location.reload()}
-          >
-            Reload Yekis
-          </button>
-        </main>
-      );
+      return <CrashFallbackView error={this.state.error} />;
     }
     return this.props.children;
   }

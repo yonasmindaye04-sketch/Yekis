@@ -41,7 +41,7 @@ export function registerCommands(bot: Bot<BotContext>) {
   // to sign in on the web, because the browser cannot present this proof.
   bot.command("start", async (ctx) => {
     const payload = ctx.match?.[0]?.trim();
-    const name = ctx.from?.first_name || "there";
+    const name = ctx.from?.first_name || ctx.t("start_greeting_fallback");
 
     // When a member arrives via the web's "Continue with Telegram" button
     // (?start=web_auth), they came explicitly to get a code. Reply immediately
@@ -56,14 +56,15 @@ export function registerCommands(bot: Bot<BotContext>) {
         const link = webAuthRoute(authCode);
         const kb = new InlineKeyboard();
         if (canLinkToWeb()) {
-          kb.url("🌐 Sign in on the web", link).row();
+          kb.url(ctx.t("start_sign_in_web_btn"), link).row();
         }
+        const minutes = Math.round(TELEGRAM_CODE_TTL_SECONDS / 60);
         await ctx.reply(
-          `<b>Your Yekis sign-in code:</b> <code>${authCode}</code>\n\n` +
+          `<b>${ctx.t("start_web_code_title")}</b> <code>${authCode}</code>\n\n` +
             (canLinkToWeb()
-              ? `Tap <b>"Sign in on the web"</b> to open Yekis in your browser — it signs you in automatically.`
-              : `Open ${env.FRONTEND_URL} in your browser and enter this code under "Continue with Telegram".`) +
-            `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+              ? ctx.t("start_tap_web_signin")
+              : ctx.t("start_open_browser_code", { url: env.FRONTEND_URL })) +
+            `\n\n<i>${ctx.t("start_code_expiry", { minutes })}</i>`,
           { reply_markup: kb, parse_mode: "HTML" },
         );
         return;
@@ -90,7 +91,7 @@ export function registerCommands(bot: Bot<BotContext>) {
     // the bot look dead.
     const signIn = await mintWebSignIn(ctx);
     if (signIn && canLinkToWeb()) {
-      kb.url("🌐 Sign in on the web", signIn.link).row();
+      kb.url(ctx.t("start_sign_in_web_btn"), signIn.link).row();
     }
 
     // A Mini App button is only valid on a public HTTPS origin. Skip it rather
@@ -98,27 +99,22 @@ export function registerCommands(bot: Bot<BotContext>) {
     // that resolves nowhere.
     const miniAppUrl = buildPublicWebAppUrl("/");
     if (miniAppUrl) {
-      kb.webApp("Open Yekis Jobs", miniAppUrl).row();
+      kb.webApp(ctx.t("open_yekis_jobs_btn"), miniAppUrl).row();
     }
 
-    kb.text("Browse Jobs", "menu:jobs")
-      .text("My Contracts", "menu:contracts")
+    kb.text(ctx.t("menu_jobs"), "menu:jobs")
+      .text(ctx.t("menu_contracts"), "menu:contracts")
       .row()
-      .text("Wallet", "menu:wallet")
-      .text("KYC Verification", "menu:kyc")
+      .text(ctx.t("menu_wallet"), "menu:wallet")
+      .text(ctx.t("menu_kyc"), "menu:kyc")
       .row()
-      .text("Settings", "menu:settings")
-      .text("Help", "menu:help");
+      .text(ctx.t("menu_settings"), "menu:settings")
+      .text(ctx.t("menu_help"), "menu:help");
 
-const welcomeMsg =
-      `<b>Welcome to Yekis Jobs, ${name}!</b>\n\n` +
-      `You are signed in with Telegram.\n\n` +
-      `<b>What you can do:</b>\n` +
-      `• <b>Clients:</b> Post jobs, review proposals, and fund secure escrow.\n` +
-      `• <b>Freelancers:</b> Browse jobs, submit proposals, and get guaranteed payouts.\n\n` +
-      (canLinkToWeb()
-        ? `Tap <b>"Sign in on the web"</b> to open Yekis in your browser — it signs you in automatically.`
-        : `Use the buttons below, or take the sign-in code below to Yekis on the web.`);
+    const webHint = canLinkToWeb()
+      ? ctx.t("start_web_hint_link")
+      : ctx.t("start_web_hint_manual");
+    const welcomeMsg = ctx.t("start_welcome_html", { name, webHint });
 
     await ctx.reply(welcomeMsg, {
       reply_markup: kb,
@@ -130,15 +126,14 @@ const welcomeMsg =
     // Telegram refuses buttons pointing at localhost over http.
     if (signIn) {
       const reachable = canLinkToWeb();
+      const minutes = Math.round(TELEGRAM_CODE_TTL_SECONDS / 60);
       await ctx.reply(
-        `Your one-time web sign-in code is <code>${signIn.code}</code>.\n\n` +
+        `${ctx.t("start_one_time_code_intro", { code: signIn.code })}\n\n` +
           (reachable
-            ? `Tap <b>"Sign in on the web"</b> above, or type the code on the ` +
-              `Yekis sign-in page under "Continue with Telegram".`
-            : `Open ${env.FRONTEND_URL} in your browser and enter this code ` +
-              `under "Continue with Telegram".\n\n` +
-              `<i>Set FRONTEND_URL to a public https origin to enable one-tap sign-in.</i>`) +
-          `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+            ? ctx.t("start_one_time_code_tap")
+            : ctx.t("start_open_browser_code", { url: env.FRONTEND_URL }) +
+              `\n\n<i>${ctx.t("start_one_time_code_dev_hint")}</i>`) +
+          `\n\n<i>${ctx.t("start_code_expiry", { minutes })}</i>`,
         { parse_mode: "HTML" },
       );
     }
@@ -154,9 +149,7 @@ const welcomeMsg =
     // telegramUserId is stored as 0 until authMiddleware populates it.
     // Guard against that so BigInt(0) doesn't produce a bogus code record.
     if (!ctx.session.telegramUserId) {
-      await ctx.reply(
-        "Could not identify your Telegram account. Please send /start and try again.",
-      );
+      await ctx.reply(ctx.t("login_no_telegram_id"));
       return;
     }
 
@@ -164,7 +157,7 @@ const welcomeMsg =
     const last = ctx.session.codeIssuedAt ?? 0;
     if (now - last < CODE_ISSUE_COOLDOWN_SECONDS) {
       await ctx.reply(
-        `Please wait ${CODE_ISSUE_COOLDOWN_SECONDS - (now - last)}s before requesting another code.`,
+        ctx.t("login_cooldown", { seconds: CODE_ISSUE_COOLDOWN_SECONDS - (now - last) }),
       );
       return;
     }
@@ -180,16 +173,17 @@ const welcomeMsg =
     // Only offer the button when Telegram will accept the URL — a rejected
     // button URL fails the whole sendMessage and the member gets nothing.
     if (canLinkToWeb()) {
-      kb.url("🌐 Open Yekis & sign in", link).row();
-      kb.text("New code", "auth:new_code");
+      kb.url(ctx.t("login_open_yekis_btn"), link).row();
+      kb.text(ctx.t("login_new_code_btn"), "auth:new_code");
     }
 
+    const minutes = Math.round(TELEGRAM_CODE_TTL_SECONDS / 60);
     await ctx.reply(
-      `<b>Your Yekis web sign-in code:</b> <code>${code}</code>\n\n` +
+      `<b>${ctx.t("login_code_title")}:</b> <code>${code}</code>\n\n` +
         (canLinkToWeb()
-          ? `Tap the button to sign in automatically, or type the code on the Yekis sign-in page.`
-          : `Open ${env.FRONTEND_URL} in your browser and enter this code under "Continue with Telegram".`) +
-        `\n\n<i>It works once and expires in ${Math.round(TELEGRAM_CODE_TTL_SECONDS / 60)} minutes.</i>`,
+          ? ctx.t("login_code_body_link")
+          : ctx.t("start_open_browser_code", { url: env.FRONTEND_URL })) +
+        `\n\n<i>${ctx.t("start_code_expiry", { minutes })}</i>`,
       { reply_markup: kb, parse_mode: "HTML" },
     );
   });
@@ -218,13 +212,13 @@ const welcomeMsg =
     }
 
     await ctx.reply(
-      `<b>Your Yekis account</b>\n\n` +
-        `Customer ID: <code>${user.ucid}</code>\n` +
-        `Role: ${user.staffRole ?? user.role}\n` +
-        `Email: ${user.email}\n` +
-        `Telegram linked: ${user.telegramUserId ? "yes" : "no"}\n` +
-        `Push notifications: ${user.telegramChatId ? "active" : "paused"}\n` +
-        `KYC: ${user.kyc?.tier ?? "TIER_1"} / ${user.kyc?.status ?? "PENDING"}`,
+      `<b>${ctx.t("account_title")}</b>\n\n` +
+        `${ctx.t("account_customer_id")}: <code>${user.ucid}</code>\n` +
+        `${ctx.t("account_role")}: ${user.staffRole ?? user.role}\n` +
+        `${ctx.t("account_email")}: ${user.email}\n` +
+        `${ctx.t("account_telegram_linked")}: ${user.telegramUserId ? ctx.t("confirm_yes") : ctx.t("confirm_no")}\n` +
+        `${ctx.t("account_push_notifications")}: ${user.telegramChatId ? ctx.t("account_push_active") : ctx.t("account_push_paused")}\n` +
+        `${ctx.t("account_kyc")}: ${user.kyc?.tier ?? "TIER_1"} / ${user.kyc?.status ?? "PENDING"}`,
       { parse_mode: "HTML" },
     );
   });
@@ -238,23 +232,12 @@ const welcomeMsg =
   bot.command("link", async (ctx) => {
     const miniAppUrl = buildPublicWebAppUrl("/");
     if (!miniAppUrl) {
-      await ctx.reply(
-        "No public web app URL is configured yet.\n\n" +
-          "Start the app with <code>pnpm dev:tunnel</code> (Cloudflare Tunnel), or set " +
-          "<code>FRONTEND_URL</code> to a public https origin, then run /link again.",
-        { parse_mode: "HTML" },
-      );
+      await ctx.reply(ctx.t("link_none"), { parse_mode: "HTML" });
       return;
     }
-    await ctx.reply(
-      `<b>Current Yekis Mini App link</b>\n\n` +
-        `<code>${miniAppUrl}</code>\n\n` +
-        "Open the Mini App from the chat menu button (the button under the " +
-        "message box) or the <b>Open Yekis Jobs</b> button — they always use " +
-        "this current link. The bot updates them automatically each time the " +
-        "server starts, so you never need to change the link in BotFather.",
-      { parse_mode: "HTML" },
-    );
+    await ctx.reply(ctx.t("link_current", { url: miniAppUrl }), {
+      parse_mode: "HTML",
+    });
   });
 
   // ── /menu ───────────────────────────────────────────────────────────────
@@ -347,7 +330,7 @@ const welcomeMsg =
 
     await ctx.reply(ctx.t("contract_list_prompt", { id: "" }), {
       reply_markup: safeUrlKeyboard([
-        { text: "📄 View Contracts", url: webAppRoutes.contract("") },
+        { text: ctx.t("contracts_view_btn"), url: webAppRoutes.contract("") },
       ]),
     });
   });
@@ -359,9 +342,9 @@ const welcomeMsg =
       return;
     }
 
-    await ctx.reply("Your disputes:", {
+    await ctx.reply(`${ctx.t("disputes_title")}:`, {
       reply_markup: safeUrlKeyboard([
-        { text: "⚖️ View Disputes", url: webAppRoutes.disputes() },
+        { text: ctx.t("disputes_view_btn"), url: webAppRoutes.disputes() },
       ]),
     });
   });
@@ -373,9 +356,9 @@ const welcomeMsg =
       return;
     }
 
-    await ctx.reply("Your proposals:", {
+    await ctx.reply(`${ctx.t("my_proposals_title")}:`, {
       reply_markup: safeUrlKeyboard([
-        { text: "📝 View Proposals", url: webAppRoutes.proposals() },
+        { text: ctx.t("proposals_view_btn"), url: webAppRoutes.proposals() },
       ]),
     });
   });
@@ -420,7 +403,7 @@ const welcomeMsg =
       return;
     }
 
-    await ctx.reply("Broadcast feature coming soon. Use the Staff Dashboard.");
+    await ctx.reply(ctx.t("broadcast_coming_soon"));
   });
 
   // Callback for "give me a fresh code" without retyping /login.
@@ -431,9 +414,7 @@ const welcomeMsg =
       return;
     }
     if (!ctx.session.telegramUserId) {
-      await ctx.reply(
-        "Could not identify your Telegram account. Please send /start and try again.",
-      );
+      await ctx.reply(ctx.t("login_no_telegram_id"));
       return;
     }
 
@@ -445,13 +426,12 @@ const welcomeMsg =
     const link = safeWebUrl(webAuthRoute(code));
     await ctx.reply(
       link
-        ? `<b>New code:</b> <code>${code}</code>\n\nTap to sign in on the web:`
-        : `<b>New code:</b> <code>${code}</code>\n\n` +
-            `Open ${env.FRONTEND_URL} in your browser and enter it under ` +
-            `"Continue with Telegram".`,
+        ? `<b>${ctx.t("auth_new_code_title")}</b> <code>${code}</code>\n\n${ctx.t("auth_new_code_tap")}`
+        : `<b>${ctx.t("auth_new_code_title")}</b> <code>${code}</code>\n\n` +
+            ctx.t("auth_new_code_manual", { url: env.FRONTEND_URL }),
       link
         ? {
-            reply_markup: new InlineKeyboard().url("🌐 Open Yekis & sign in", link),
+            reply_markup: new InlineKeyboard().url(ctx.t("login_open_yekis_btn"), link),
             parse_mode: "HTML",
           }
         : { parse_mode: "HTML" },
@@ -465,9 +445,7 @@ const welcomeMsg =
  */
 async function replyLoginBlocked(ctx: BotContext) {
   await ctx.reply(
-    ctx.session.loginBlocked ??
-      "I could not sign you in automatically.\n\n" +
-        "Please try /start again, or sign in on the web with Google, Apple, or your email and password.",
+    ctx.session.loginBlocked ?? ctx.t("login_blocked_fallback"),
   );
 }
 

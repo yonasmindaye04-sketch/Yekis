@@ -84,8 +84,10 @@ export function OnboardingVerification({
   onBack,
   onSkip,
 }: OnboardingVerificationProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const ob = t.workspace.onboarding;
+  const backLabel =
+    { en: "Back", am: "ተመለስ", om: "Deebi'i", ti: "ተመለስ" }[language] ?? "Back";
 
   const [phase, setPhase] = useState<Phase>("sending");
   const [code, setCode] = useState("");
@@ -198,7 +200,7 @@ export function OnboardingVerification({
               style={{ marginTop: "16px", width: "100%" }}
               onClick={onBack}
             >
-              Back
+              {backLabel}
             </button>
           )}
         </div>

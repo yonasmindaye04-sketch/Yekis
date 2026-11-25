@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { events } from "./analytics";
 import { openSupportChat } from "./components/supportChatEvents";
 import {
@@ -23,18 +23,26 @@ interface FAQItem {
   id: string;
   num: string;
   category: FAQCategoryId;
-  question: { en: string; am: string };
-  answer: { en: string; am: string };
-  goldHighlight: { en: string; am: string };
-  slaMetric: string;
+  question: Record<Language, string>;
+  answer: Record<Language, string>;
+  goldHighlight: Record<Language, string>;
+  slaMetric: Record<Language, string>;
 }
 
 interface FAQTopicService {
   id: FAQCategoryId;
-  label: { en: string; am: string };
-  topChip: string;
-  slaBadge: string;
-  rows: { label: string; badge: string }[];
+  label: Record<Language, string>;
+  topChip: Record<Language, string>;
+  slaBadge: Record<Language, string>;
+  rows: { label: Record<Language, string>; badge: Record<Language, string> }[];
+}
+
+interface SlaAssuranceItem {
+  id: string;
+  name: Record<Language, string>;
+  role: Record<Language, string>;
+  quote: Record<Language, string>;
+  metric: Record<Language, string>;
 }
 
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -42,57 +50,177 @@ const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const FAQ_TOPICS: FAQTopicService[] = [
   {
     id: "escrow",
-    label: { en: "Escrow Locks", am: "የኤስክሮ ጥበቃ" },
-    topChip: "NBE ESCROW TRUST",
-    slaBadge: "100% RINGFENCED",
+    label: {
+      en: "Escrow Locks",
+      am: "የኤስክሮ ጥበቃ",
+      om: "Eegumsa Iskuuroo",
+      ti: "ሓለዋ ኤስክሮ",
+    },
+    topChip: {
+      en: "NBE ESCROW TRUST",
+      am: "የብሔራዊ ባንክ ኤስክሮ ጥበቃ",
+      om: "EEGUMSA ISKUUROO NBE",
+      ti: "ሓለዋ ኤስክሮ ብሄራዊ ባንኪ",
+    },
+    slaBadge: {
+      en: "100% RINGFENCED",
+      am: "100% የተጠበቀ",
+      om: "100% EEGAME",
+      ti: "100% ዝተሓለወ",
+    },
     rows: [
-      { label: "SCOPE DEPOSIT", badge: "100% LOCKED" },
-      { label: "DELIVERY PROOF", badge: "SHA-256" },
-      { label: "AUTO-RELEASE", badge: "120 HOURS" },
+      {
+        label: { en: "SCOPE DEPOSIT", am: "የውል ተቀማጭ", om: "KUUSAA WALIIGALTEE", ti: "ተቐማጢ ውዕል" },
+        badge: { en: "100% LOCKED", am: "100% ተቆልፏል", om: "100% CUFAME", ti: "100% ተዓጽዩ" },
+      },
+      {
+        label: { en: "DELIVERY PROOF", am: "የማስረከቢያ ማስረጃ", om: "RAGAA RAAWWII", ti: "መረጋገጺ ርክክብ" },
+        badge: { en: "SHA-256", am: "SHA-256", om: "SHA-256", ti: "SHA-256" },
+      },
+      {
+        label: { en: "AUTO-RELEASE", am: "ራስ-ሰር ክፍያ መልቀቂያ", om: "GADHIISA OFUMAA", ti: "ብቐጥታ ዝፍኖ ክፍሊት" },
+        badge: { en: "120 HOURS", am: "120 ሰዓታት", om: "SA'AATII 120", ti: "120 ሰዓታት" },
+      },
     ],
   },
   {
     id: "payouts",
-    label: { en: "Instant Payouts", am: "ፈጣን ክፍያዎች" },
-    topChip: "TELEBIRR · CBE BIRR",
-    slaBadge: "< 45 SEC PAYOUT",
+    label: {
+      en: "Instant Payouts",
+      am: "ፈጣን ክፍያዎች",
+      om: "Kaffaltii Saffisaa",
+      ti: "ቅልጡፍ ክፍሊታት",
+    },
+    topChip: {
+      en: "TELEBIRR · CBE BIRR",
+      am: "ቴሌብር · ሲቢኢ ብር",
+      om: "TELEBIRR · CBE BIRR",
+      ti: "ቴሌብር · CBE ብር",
+    },
+    slaBadge: {
+      en: "< 45 SEC PAYOUT",
+      am: "< 45 ሰከንድ ክፍያ",
+      om: "< SEKONDII 45",
+      ti: "< 45 ካልኢት ክፍሊት",
+    },
     rows: [
-      { label: "TELEBIRR WALLET", badge: "< 45 SEC" },
-      { label: "CBE BIRR / RTGS", badge: "< 90 SEC" },
-      { label: "M-PESA ETHIOPIA", badge: "< 60 SEC" },
+      {
+        label: { en: "TELEBIRR WALLET", am: "የቴሌብር ዋሌት", om: "WALLET TELEBIRR", ti: "ዋሌት ቴሌብር" },
+        badge: { en: "< 45 SEC", am: "< 45 ሰከንድ", om: "< SEKONDII 45", ti: "< 45 ካልኢት" },
+      },
+      {
+        label: { en: "CBE BIRR / RTGS", am: "ሲቢኢ ብር / RTGS", om: "CBE BIRR / RTGS", ti: "CBE ብር / RTGS" },
+        badge: { en: "< 90 SEC", am: "< 90 ሰከንድ", om: "< SEKONDII 90", ti: "< 90 ካልኢት" },
+      },
+      {
+        label: { en: "M-PESA ETHIOPIA", am: "ኤም-ፔሳ ኢትዮጵያ", om: "M-PESA ITOOPHIYAA", ti: "M-PESA ኢትዮጵያ" },
+        badge: { en: "< 60 SEC", am: "< 60 ሰከንድ", om: "< SEKONDII 60", ti: "< 60 ካልኢት" },
+      },
     ],
   },
   {
     id: "disputes",
-    label: { en: "48h Mediation", am: "የ48 ሰዓት ሽምግልና" },
-    topChip: "ADDIS ABABA DESK",
-    slaBadge: "48H BINDING SLA",
+    label: {
+      en: "48h Mediation",
+      am: "የ48 ሰዓት ሽምግልና",
+      om: "Araara Sa'aatii 48",
+      ti: "ዕርቂ 48 ሰዓት",
+    },
+    topChip: {
+      en: "ADDIS ABABA DESK",
+      am: "የአዲስ አበባ ቢሮ",
+      om: "WAAJJIRA FINFINNEE",
+      ti: "ቤት ጽሕፈት ኣዲስ ኣበባ",
+    },
+    slaBadge: {
+      en: "48H BINDING SLA",
+      am: "የ48 ሰዓት ውሳኔ",
+      om: "MURTOO SA'AATII 48",
+      ti: "ውሳነ 48 ሰዓት",
+    },
     rows: [
-      { label: "ESCROW FREEZE", badge: "INSTANT" },
-      { label: "EVIDENCE AUDIT", badge: "12 HOURS" },
-      { label: "FINAL RULING", badge: "48 HOURS" },
+      {
+        label: { en: "ESCROW FREEZE", am: "ኤስክሮ ማገድ", om: "DHORKA ISKUUROO", ti: "ምእጋድ ኤስክሮ" },
+        badge: { en: "INSTANT", am: "ወዲያውኑ", om: "YEROO SANAA", ti: "ብኡንብኡ" },
+      },
+      {
+        label: { en: "EVIDENCE AUDIT", am: "የማስረጃ ምርመራ", om: "QORANNOO RAGAA", ti: "ምርመራ መርትዖ" },
+        badge: { en: "12 HOURS", am: "12 ሰዓታት", om: "SA'AATII 12", ti: "12 ሰዓታት" },
+      },
+      {
+        label: { en: "FINAL RULING", am: "የመጨረሻ ውሳኔ", om: "MURTOO XUMURAA", ti: "ናይ መወዳእታ ውሳነ" },
+        badge: { en: "48 HOURS", am: "48 ሰዓታት", om: "SA'AATII 48", ti: "48 ሰዓታት" },
+      },
     ],
   },
   {
     id: "verification",
-    label: { en: "Fayda ID", am: "ፋይዳ መታወቂያ" },
-    topChip: "BIOMETRIC & TIN",
-    slaBadge: "3-MIN KYC",
+    label: {
+      en: "Fayda ID",
+      am: "ፋይዳ መታወቂያ",
+      om: "Eenyummaa Fayda",
+      ti: "መንነት ፋይዳ",
+    },
+    topChip: {
+      en: "BIOMETRIC & TIN",
+      am: "ባዮሜትሪክ እና TIN",
+      om: "BAAYOOMEETIRIKII & TIN",
+      ti: "ባዮሜትሪክን TINን",
+    },
+    slaBadge: {
+      en: "3-MIN KYC",
+      am: "3 ደቂቃ KYC",
+      om: "KYC DAQIIQAA 3",
+      ti: "3 ደቒቕ KYC",
+    },
     rows: [
-      { label: "FAYDA / KEBELE", badge: "VERIFIED" },
-      { label: "PORTFOLIO VETTING", badge: "AUDITED" },
-      { label: "CORPORATE TIN", badge: "LICENSED" },
+      {
+        label: { en: "FAYDA / KEBELE", am: "ፋይዳ / ቀበሌ", om: "FAYDA / GANDA", ti: "ፋይዳ / ቀበሌ" },
+        badge: { en: "VERIFIED", am: "ተረጋግጧል", om: "MIRKANA'E", ti: "ተረጋጊጹ" },
+      },
+      {
+        label: { en: "PORTFOLIO VETTING", am: "የሥራ ናሙና ማረጋገጫ", om: "QORANNOO HOJII", ti: "ምርመራ ስራሕቲ" },
+        badge: { en: "AUDITED", am: "ተፈትሿል", om: "SAKATTA'AME", ti: "ተመርሚሩ" },
+      },
+      {
+        label: { en: "CORPORATE TIN", am: "የድርጅት TIN", om: "TIN DHAABBATA", ti: "TIN ትካል" },
+        badge: { en: "LICENSED", am: "ፈቃድ ያለው", om: "HAYYAMA QABA", ti: "ፍቓድ ዘለዎ" },
+      },
     ],
   },
   {
     id: "tax",
-    label: { en: "ERCA Tax", am: "የገቢዎች ታክስ" },
-    topChip: "FISCAL LEDGER",
-    slaBadge: "AUDIT-READY PDF",
+    label: {
+      en: "ERCA Tax",
+      am: "የገቢዎች ታክስ",
+      om: "Gibira ERCA",
+      ti: "ግብሪ ERCA",
+    },
+    topChip: {
+      en: "FISCAL LEDGER",
+      am: "የታክስ መዝገብ",
+      om: "GALMEE GIBIRAA",
+      ti: "መዝገብ ግብሪ",
+    },
+    slaBadge: {
+      en: "AUDIT-READY PDF",
+      am: "ለኦዲት ዝግጁ PDF",
+      om: "PDF OODIITIIF QOPHAA'E",
+      ti: "ንኦዲት ድሉው PDF",
+    },
     rows: [
-      { label: "ETHIOPIAN VAT", badge: "15% AUTO" },
-      { label: "WITHHOLDING", badge: "3% / 30% > 10K" },
-      { label: "FINANCE EXPORT", badge: "PDF + CSV" },
+      {
+        label: { en: "ETHIOPIAN VAT", am: "የኢትዮጵያ ቫት", om: "VAT ITOOPHIYAA", ti: "ቫት ኢትዮጵያ" },
+        badge: { en: "15% AUTO", am: "15% በራስ-ሰር", om: "15% OFUMAA", ti: "15% ብቐጥታ" },
+      },
+      {
+        label: { en: "WITHHOLDING", am: "ዊዝሆልዲንግ", om: "GIBIRA QABAMU", ti: "ዝተሓዝ ግብሪ" },
+        badge: { en: "3% / 30% > 10K", am: "3% / 30% > 10ሺ", om: "3% / 30% > 10K", ti: "3% / 30% > 10ሽ" },
+      },
+      {
+        label: { en: "FINANCE EXPORT", am: "የፋይናንስ ኤክስፖርት", om: "ERGAA FAYINAANSII", ti: "ውጽኢት ፋይናንስ" },
+        badge: { en: "PDF + CSV", am: "PDF + CSV", om: "PDF + CSV", ti: "PDF + CSV" },
+      },
     ],
   },
 ];
@@ -105,16 +233,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "How does YeKis milestone escrow protect both clients and freelancers?",
       am: "የYeKis ኤስክሮ ደንበኞችን እና ባለሙያዎችን እንዴት ይጠብቃል?",
+      om: "Iskuuroon boqonnaa YeKis maamiltootaa fi ogeeyyii akkamitti eega?",
+      ti: "ኤስክሮ ምዕራፋት YeKis ንዓማዊልን ክኢላታትን ከመይ ይሕሉ?",
     },
     answer: {
       en: "Before work starts on any phase, the client funds that milestone in Ethiopian Birr (ETB). YeKis ringfences the capital in an audited escrow trust account and releases funds the moment deliverables are approved.",
       am: "ሥራ ከመጀመሩ በፊት ደንበኛው ክፍያውን በብር ወደ ኤስክሮ ያስገባል። ሥራው በትክክል መጠናቀቁ ሲረጋገጥ ክፍያው ወዲያውኑ ይለቀቃል።",
+      om: "Hojiin kamiyyuu osoo hin jalqabin dura, maamilli boqonnaa sana Birrii Itoophiyaan (ETB) kuusaa iskuurootti kaffala. YeKis maallaqa kana herrega amanamaa keessatti eegee yeroo hojiin mirkanaa'u battalumatti gadhiisa.",
+      ti: "ስራሕ ቅድሚ ምጅማሩ ዓሚል ክፍሊት ብብር (ETB) ናብ ኤስክሮ የእቱ። YeKis ነቲ ገንዘብ ኣብ ዝተመርመረ ሕሳብ ሓልዩ፣ ስራሕ ምስ ጸደቐ ብኡንብኡ ይፍኖ።",
     },
     goldHighlight: {
       en: "Zero unpaid trial work · Zero deposit risk.",
       am: "ያለ ክፍያ የሚባክን ድካም የለም · ቅድመ ክፍያ ተከፍሎ የሚጠፋ ሥራ የለም።",
+      om: "Hojii yaalii kaffaltii malee zeroo · Balaa kuusaa zeroo.",
+      ti: "ብዘይ ክፍሊት ዝባኽን ስራሕ የለን · ስግኣት ቅድመ ክፍሊት የለን።",
     },
-    slaMetric: "100% ESCROW BACKED",
+    slaMetric: {
+      en: "100% ESCROW BACKED",
+      am: "100% በኤስክሮ የተጠበቀ",
+      om: "100% ISKUUROON EEGAME",
+      ti: "100% ብኤስክሮ ዝተሓለወ",
+    },
   },
   {
     id: "faq-client-ghost",
@@ -123,16 +262,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "What happens if a client goes silent after I submit completed milestone files?",
       am: "ሥራዬን አጠናቅቄ ካስረከብኩ በኋላ ደንበኛው ምላሽ ባይሰጥ ምን ይሆናል?",
+      om: "Ergan faayila hojii xumurame ergee booda maamilli yoo callise maaltu ta'a?",
+      ti: "ዝተዛዘመ ስራሕ ምስ ኣረከብኩ ዓሚል ስቕ እንተበለ እንታይ ይኸውን?",
     },
     answer: {
       en: "Uploading deliverables starts an automated 120-hour (5-business-day) review timer. If the client neither approves nor requests a scope-backed revision before the clock hits zero, 100% of the milestone releases automatically.",
       am: "ሥራዎን እንዳስረከቡ የ120 ሰዓታት ቆጣሪ ይጀምራል። ደንበኛው ምላሽ ካልሰጠ ሲስተሙ ክፍያውን በራሱ ወደ ቦርሳዎ ይለቃል።",
+      om: "Faayiloota hojii erguun lakkooftuu sa'aatii 120 (guyyoota hojii 5) ofumaan jalqabsiisa. Maamilli sa'aatiin osoo hin xumuramin yoo hin mirkaneessine ykn sirreeffama hin gaafanne, kaffaltiin 100% ofumaan gadhiifama.",
+      ti: "ስራሕ ምስ ኣረከብኩም ናይ 120 ሰዓት (5 መዓልቲ ስራሕ) ቆጻሪ ይጅምር። ዓሚል ከይፈቐደ ወይ ሕጋዊ ምምሕያሽ ከይሓተተ ግዜኡ እንተኣኺሉ፣ 100% ክፍሊት ብቐጥታ ይፍኖ።",
     },
     goldHighlight: {
       en: "120-Hour Auto-Release Covenant.",
       am: "የ120 ሰዓት አውቶማቲክ የክፍያ መልቀቂያ ዋስትና።",
+      om: "Waadaa Gadhiisa Ofumaa Sa'aatii 120.",
+      ti: "ውዕል ብቐጥታ መፍነዊ 120 ሰዓት።",
     },
-    slaMetric: "120H AUTO-RELEASE",
+    slaMetric: {
+      en: "120H AUTO-RELEASE",
+      am: "የ120 ሰዓት ራስ-ሰር ክፍያ",
+      om: "GADHIISA OFUMAA 120H",
+      ti: "120 ሰዓት ብቐጥታ",
+    },
   },
   {
     id: "faq-payout-rails",
@@ -141,16 +291,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "Which Ethiopian payment methods are supported for funding and instant withdrawals?",
       am: "ክፍያ ለመፈጸም እና ገንዘብ ለማውጣት የትኞቹ የኢትዮጵያ የክፍያ አማራጮች ይሠራሉ?",
+      om: "Kaffaltii galchuu fi baasiif tooftaaleen kaffaltii Itoophiyaa kamfaatu hojjeta?",
+      ti: "ክፍሊት ንምእታውን ብቕልጡፍ ንምውጻእን ኣየኖት መንገድታት ክፍሊት ኢትዮጵያ ይሰርሑ?",
     },
     answer: {
       en: "YeKis natively integrates Telebirr, CBE Birr, Commercial Bank of Ethiopia RTGS, Awash Birr, Abyssinia, Dashen Amole, and M-Pesa Ethiopia in 100% native ETB.",
       am: "ቴሌብር፣ ሲቢኢ ብር፣ የኢትዮጵያ ንግድ ባንክ፣ አዋሽ ብር፣ አቢሲኒያ ባንክ፣ አሞሌ እና ኤም-ፔሳ ኢትዮጵያ በሙሉ በቀጥታ ይሠራሉ።",
+      om: "YeKis Telebirr, CBE Birr, Baankii Daldala Itoophiyaa RTGS, Awash Birr, Abyssinia, Dashen Amole fi M-Pesa Itoophiyaa guutummaatti ETB dhaan walitti hidheera.",
+      ti: "YeKis ምስ ቴሌብር፣ CBE ብር፣ ባንኪ ንግዲ ኢትዮጵያ RTGS፣ ኣዋሽ ብር፣ ኣቢሲንያ፣ ዳሽን ኣሞሌን M-Pesa ኢትዮጵያን 100% ብብር ይሰርሕ።",
     },
     goldHighlight: {
       en: "Median Telebirr & CBE Birr payout speed: 42 seconds.",
       am: "በአማካይ በ42 ሰከንድ ውስጥ ወደ ቴሌብር ይገባል።",
+      om: "Saffisni giddugaleessaa kaffaltii Telebirr & CBE Birr: sekondii 42.",
+      ti: "ማእከላይ ፍጥነት ክፍሊት ቴሌብርን CBE ብርን፡ 42 ካልኢት።",
     },
-    slaMetric: "< 45 SEC PAYOUT",
+    slaMetric: {
+      en: "< 45 SEC PAYOUT",
+      am: "< 45 ሰከንድ ክፍያ",
+      om: "< SEKONDII 45",
+      ti: "< 45 ካልኢት ክፍሊት",
+    },
   },
   {
     id: "faq-fee-split",
@@ -159,16 +320,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "How much does YeKis charge compared to international freelance platforms?",
       am: "የYeKis የአገልግሎት ክፍያ ከውጭ ፕላትፎርሞች አንጻር ምን ያህል ነው?",
+      om: "Kaffaltiin tajaajilaa YeKis waltajjiiwwan addunyaa biroo waliin yoo madaalamu hammami?",
+      ti: "ክፍሊት ኣገልግሎት YeKis ምስ ዓለምለኸ መድረኻት ስራሕ ክነጻጸር ከሎ ክንደይ እዩ?",
     },
     answer: {
       en: "YeKis charges a flat 7% platform fee on released milestones and no client deposit fee. Freelancers keep 93% of every contract with zero monthly subscriptions.",
-      am: "YeKis ከተለቀበ የሥራ ምዕራፍ 7% ጠቅላላ ክፍያ ከደንበኛው ግን የምንም ክፍያ አያስገኝም። ባለሙያዎች የውሉን 93% በሙሉ ያገኛሉ።",
+      am: "YeKis ከተለቀቀ የሥራ ምዕራፍ 7% ክፍያ ያስከፍላል፤ ከደንበኛው ግን ምንም የቅድመ ክፍያ አይጠየቅም። ባለሙያዎች የውሉን 93% በሙሉ ያገኛሉ።",
+      om: "YeKis boqonnaa gadhiifame irraa kaffaltii dhaabbataa 7% fudhata; maamila irraa kaffaltiin kuusaa hin jiru. Ogeeyyiin kaffaltii ji'aa tokko malee %93 ni argatu.",
+      ti: "YeKis ካብ ዝተፈነወ ምዕራፍ ስራሕ 7% ክፍሊት ይወስድ፤ ካብ ዓሚል ግን ናይ ምእታው ክፍሊት የለን። ክኢላታት ብዘይ ወርሓዊ ክፍሊት 93% ይረኽቡ።",
     },
     goldHighlight: {
       en: "Freelancers take home 93% of every ETB milestone.",
       am: "ባለሙያዎች የድካማቸውን 93% ያለምንም ወርሃዊ ክፍያ ያገኛሉ።",
+      om: "Ogeeyyiin boqonnaa ETB hunda keessaa %93 mana isaanii fudhatu.",
+      ti: "ክኢላታት ካብ ነፍሲ ወከፍ ምዕራፍ ETB 93% ናብ ኢዶም ይወስዱ።",
     },
-    slaMetric: "93% TAKE-HOME",
+    slaMetric: {
+      en: "93% TAKE-HOME",
+      am: "93% የተጣራ ገቢ",
+      om: "93% GALII QULQULLUU",
+      ti: "93% ጽሩይ እቶት",
+    },
   },
   {
     id: "faq-dispute-sla",
@@ -177,16 +349,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "How does the 48-hour bilingual dispute mediation process work?",
       am: "የ48 ሰዓት የሽምግልና እና የዳኝነት ሂደት እንዴት ይሠራል?",
+      om: "Adeemsi araara falmii sa'aatii 48 afaanoota hedduun akkamitti hojjeta?",
+      ti: "ናይ 48 ሰዓት መስርሕ ዕርቂ ክትዕ ከመይ ይሰርሕ?",
     },
     answer: {
       en: "Our Addis Ababa arbitration desk audits the signed milestone rubric, SHA-256 deliverable hashes, and workspace logs in Amharic and English, issuing a binding settlement within 48 hours.",
       am: "የአዲስ አበባ የሽምግልና ቡድናችን ውሉን እና የተላኩ ፋይሎችን መርምሮ በ48 ሰዓት ውስጥ ውሳኔ ይሰጣል።",
+      om: "Gareen araara keenya Finfinnee waliigaltee mallattaa'e, haashii faayilii SHA-256 fi galmee hojii Afaan Oromoo, Amaaraa fi Ingiliffaan qoratee sa'aatii 48 keessatti murtoo kenna.",
+      ti: "ጉጅለ ዕርቅና ኣብ ኣዲስ ኣበባ ዝተፈረመ ውዕል፣ ሃሽ SHA-256ን መዝገብ ስራሕን መርሚሩ ኣብ ውሽጢ 48 ሰዓት ቀያዲ ውሳነ ይህብ።",
     },
     goldHighlight: {
       en: "99.4% dispute-free rate · 48h human resolution.",
       am: "99.4% የሚሆኑ ሥራዎች በሰላም ይጠናቀቃሉ፤ ክርክሮች በ48 ሰዓት ይፈታሉ።",
+      om: "99.4% falmii malee xumurama · Furmaata namaan sa'aatii 48 keessatti.",
+      ti: "99.4% ብዘይ ክትዕ ይዛዘም · ኣብ 48 ሰዓት ብሰብ ይፍታሕ።",
     },
-    slaMetric: "48H HUMAN REVIEW",
+    slaMetric: {
+      en: "48H HUMAN REVIEW",
+      am: "የ48 ሰዓት ግምገማ",
+      om: "QORANNOO 48H",
+      ti: "ገምጋም 48 ሰዓት",
+    },
   },
   {
     id: "faq-fayda-kyc",
@@ -195,16 +378,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "Do I need a Fayda National ID or Trade License to join YeKis?",
       am: "በYeKis ለመመዝገብ የፋይዳ ብሔራዊ መታወቂያ ወይም የንግድ ፈቃድ ያስፈልገኛል?",
+      om: "YeKis tti makamuuf Waraqaa Eenyummaa Biyyaalessaa Fayda ykn Hayyama Daldalaa nan barbaachisaa?",
+      ti: "ኣብ YeKis ንምምዝጋብ ብሄራዊ መታወቂያ ፋይዳ ወይ ፍቓድ ንግዲ የድልየኒ ድዩ?",
     },
     answer: {
       en: "Individuals verify in 3 minutes using Fayda National ID (FAN), Kebele ID, or Passport. Registered companies attach their TIN and Trade License for enterprise escrow limits.",
       am: "የግል ባለሙያዎች በፋይዳ መታወቂያ፣ በቀበሌ መታወቂያ ወይም በፓስፖርት በ3 ደቂቃ መመዝገብ ይችላሉ።",
+      om: "Namoonni dhuunfaa Fayda (FAN), Waraqaa Ganda ykn Paaspoortiin daqiiqaa 3 keessatti mirkanaa'u. Dhaabbileen TIN fi Hayyama Daldalaa isaanii dhiyeessu.",
+      ti: "ውልቀ ሰባት ብፋይዳ (FAN)፣ መታወቂያ ቀበሌ ወይ ፓስፖርት ኣብ 3 ደቒቕ ይረጋገጹ። ትካላት ድማ TINን ፍቓድ ንግድን የቕርቡ።",
     },
     goldHighlight: {
       en: "Verified badges boost proposal acceptance by 3.4×.",
       am: "ማንነታቸው የተረጋገጠ ባለሙያዎች በ3.4 እጥፍ የበለጠ ሥራ ያገኛሉ።",
+      om: "Mallattoon mirkanaa'inaa fudhatama yaada hojii dachaa 3.4 dabala.",
+      ti: "ዝተረጋገጸ መለለዪ ተቐባልነት ሕቶ ስራሕ ብ3.4 ዕጽፊ የዕቢ።",
     },
-    slaMetric: "3-MIN KYC CHECK",
+    slaMetric: {
+      en: "3-MIN KYC CHECK",
+      am: "የ3 ደቂቃ KYC ማረጋገጫ",
+      om: "QORANNOO KYC DAQIIQAA 3",
+      ti: "መረጋገጺ KYC 3 ደቒቕ",
+    },
   },
   {
     id: "faq-erca-tax",
@@ -213,16 +407,27 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "Does YeKis generate ERCA-compliant VAT and Withholding Tax certificates?",
       am: "YeKis ለገቢዎች ሚኒስቴር የሚሆን የ15% ቫት እና የዊዝሆልዲንግ ታክስ ሰነድ ያዘጋጃል?",
+      om: "YeKis waraqaa ragaa VAT fi Gibira Qabamu (Withholding Tax) ERCA waliin walsimu ni qopheessaa?",
+      ti: "YeKis ምስ ERCA ዝሰማማዕ ወረቐት ቫትን ዝተሓዝ ግብርን (Withholding) የዳሉ ድዩ?",
     },
     answer: {
       en: "Yes. Our fiscal engine automatically calculates optional 15% VAT and statutory withholding tax on contracts above 10,000 ETB — 3% where the freelancer holds a TIN, 30% where they do not — issuing downloadable PDFs.",
-      am: "አዎ! ሲስተሙ የ15% ቫት እና ከ10,000 ብር በላይ ለሆኑ ውሎች የዊዝሆልዲንግ ታክስ ያስልቶ (በTIN ያለ ባለሙያ 3%， ሳይኖር 30%) ሕጋዊ የPDF ሰነድ ያዘጋጃል።",
+      am: "አዎ! ሲስተሙ የ15% ቫት እና ከ10,000 ብር በላይ ለሆኑ ውሎች የዊዝሆልዲንግ ታክስ አስልቶ (TIN ላለው ባለሙያ 3%፣ ከሌለው 30%) ሕጋዊ የPDF ሰነድ ያዘጋጃል።",
+      om: "Eeyyee. Sirni herregaa keenya waliigaltee ETB 10,000 oliitiif VAT %15 fi gibira qabamu (ogeessa TIN qabuuf %3, kan hin qabneef %30) ofumaan herregee PDF qopheessa.",
+      ti: "እወ። ስርዓት ሕሳብና ልዕሊ 10,000 ETB ንዝኾኑ ውዕላት 15% ቫትን ሕጋዊ ዝተሓዝ ግብርን (TIN ንዘለዎ ክኢላ 3%፣ ንዘይብሉ 30%) ብቐጥታ ኣስሊሑ PDF ይፈጥር።",
     },
     goldHighlight: {
       en: "Instant ERCA tax invoices & withholding vouchers.",
       am: "አውቶማቲክ የታክስ ሰነዶች የሂሳብ ክፍሎችን ጊዜ ይቆጥባሉ።",
+      om: "Nagahee gibiraa ERCA fi boochariiwwan battalaa.",
+      ti: "ቅጽበታዊ ደረሰኛት ግብሪ ERCAን ወረቐት ምስክርን።",
     },
-    slaMetric: "ERCA COMPLIANT",
+    slaMetric: {
+      en: "ERCA COMPLIANT",
+      am: "ከERCA ጋር የሚጣጣም",
+      om: "ERCA WALIIN WALSIMA",
+      ti: "ምስ ERCA ዝሰማማዕ",
+    },
   },
   {
     id: "faq-milestone-edits",
@@ -231,45 +436,332 @@ const FAQ_ITEMS: FAQItem[] = [
     question: {
       en: "Can we add new milestones or adjust scope mid-project without restarting?",
       am: "ፕሮጀክቱ በመካከል ላይ እያለ አዲስ ምዕራፍ መጨመር ወይም ማስተካከል ይቻላል?",
+      om: "Piroojektii gidduutti boqonnaa haaraa dabaluu ykn daangaa hojii jijjiiruun ni danda'amaa?",
+      ti: "ፕሮጀክት ኣብ ማእከሉ ከሎ ሓድሽ ምዕራፍ ምውሳኽ ወይ ስፍሓት ስራሕ ምምዕርራይ ይከኣል ድዩ?",
     },
     answer: {
       en: "Either party can propose an Addendum Milestone inside the active contract ledger. Once funded via Telebirr or bank transfer, the new tranche joins the escrow timeline.",
       am: "በማንኛውም ጊዜ አዲስ የሥራ ምዕራፍ መጨመር ወይም ያልተጀመሩ ምዕራፎችን ማስተካከል ይቻላል።",
+      om: "Gareen kamiyyuu galmee waliigaltee hojjechaa jiru keessatti boqonnaa dabalataa dhiyeessuu danda'a. Akkuma Telebirr ykn baankiin kaffalameen tarree iskuurootti makama.",
+      ti: "ዝኾነ ወገን ኣብ ውሽጢ ንጡፍ መዝገብ ውዕል ተወሳኺ ምዕራፍ ክሓትት ይኽእል። ብቴሌብር ወይ ባንኪ ምስ ተኸፍለ ናብ መስመር ኤስክሮ ይጽንበር።",
     },
     goldHighlight: {
       en: "Scales from 5,000 ETB sprints to 2M+ ETB rollouts.",
       am: "ከ5,000 ብር እስከ 2 ሚሊዮን ብር ፕሮጀክቶች በተለዋዋጭ ይሠራል።",
+      om: "Piroojektoota ETB 5,000 irraa hanga ETB 2M+ oliitiif hojjeta.",
+      ti: "ካብ 5,000 ETB ክሳብ 2M+ ETB ንዝበጽሑ ፕሮጀክታት ይሰርሕ።",
     },
-    slaMetric: "DYNAMIC ADDENDUMS",
+    slaMetric: {
+      en: "DYNAMIC ADDENDUMS",
+      am: "ተለዋዋጭ ማሻሻያዎች",
+      om: "DABALATA HARIIROO",
+      ti: "ተዓጻጻፊ ተወሳኺ ምዕራፍ",
+    },
   },
 ];
 
-const SLA_ASSURANCES = [
+const SLA_ASSURANCES: SlaAssuranceItem[] = [
   {
     id: "sla-auto",
-    name: "120-Hour Auto-Release",
-    role: "FREELANCER PROTECTION COVENANT · CLAUSE 04",
-    quote:
-      "Silent clients can never trap completed work in limbo—verified milestone uploads release automatically at hour 120.",
-    metric: "100% ON-TIME",
+    name: {
+      en: "120-Hour Auto-Release",
+      am: "የ120 ሰዓት ራስ-ሰር ክፍያ",
+      om: "Gadhiisa Ofumaa Sa'aatii 120",
+      ti: "ብቐጥታ መፍነዊ 120 ሰዓት",
+    },
+    role: {
+      en: "FREELANCER PROTECTION COVENANT · CLAUSE 04",
+      am: "የባለሙያዎች ጥበቃ ቃል ኪዳን · አንቀጽ 04",
+      om: "WAADAA EEGUMSA OGEEYYII · KEEWWATA 04",
+      ti: "ውዕል ሓለዋ ክኢላታት · ዓንቀጽ 04",
+    },
+    quote: {
+      en: "Silent clients can never trap completed work in limbo—verified milestone uploads release automatically at hour 120.",
+      am: "ምላሽ የማይሰጡ ደንበኞች የተጠናቀቀ ሥራን ማገድ አይችሉም—የተረጋገጡ የሥራ ምዕራፎች በ120ኛው ሰዓት በራስ-ሰር ይለቀቃሉ።",
+      om: "Maamiltoonni callisan hojii xumurame hidhuu hin danda'an—hojiin ergame sa'aatii 120ffaa irratti ofumaan gadhiifama.",
+      ti: "ስቕ ዝበሉ ዓማዊል ዝተዛዘመ ስራሕ ክዓግቱ ኣይክእሉን—ዝተረጋገጸ ስራሕ ኣብ 120 ሰዓት ብቐጥታ ይፍኖ።",
+    },
+    metric: {
+      en: "100% ON-TIME",
+      am: "100% በሰዓቱ",
+      om: "100% YEROOTTI",
+      ti: "100% ኣብ ግዜኡ",
+    },
   },
   {
     id: "sla-mediation",
-    name: "48-Hour Human Arbitration",
-    role: "ADDIS ABABA DISPUTE DESK · BILINGUAL PANEL",
-    quote:
-      "Senior Ethiopian engineering, design, and legal mediators inspect your signed scope and SHA-256 artifacts to issue a binding ETB split within 48 hours.",
-    metric: "48H BINDING SLA",
+    name: {
+      en: "48-Hour Human Arbitration",
+      am: "የ48 ሰዓት የሰው ሽምግልና",
+      om: "Araara Namaa Sa'aatii 48",
+      ti: "ናይ 48 ሰዓት ሰብኣዊ ዕርቂ",
+    },
+    role: {
+      en: "ADDIS ABABA DISPUTE DESK · MULTILINGUAL PANEL",
+      am: "የአዲስ አበባ የክርክር ቢሮ · ባለብዙ ቋንቋ ፓነል",
+      om: "WAAJJIRA FALMII FINFINNEE · GAREE AFAANOOTAA",
+      ti: "ቤት ጽሕፈት ክትዕ ኣዲስ ኣበባ · ብዙሕ ቋንቋ ጉጅለ",
+    },
+    quote: {
+      en: "Senior Ethiopian engineering, design, and legal mediators inspect your signed scope and SHA-256 artifacts to issue a binding ETB split within 48 hours.",
+      am: "ከፍተኛ የኢትዮጵያ የኢንጂነሪንግ፣ የዲዛይን እና የሕግ አሸማጋዮች የተፈረመውን ውል እና የSHA-256 ማስረጃዎችን መርምረው በ48 ሰዓት ውስጥ ውሳኔ ይሰጣሉ።",
+      om: "Araarsitoonni olaanoon injinariingii, dizaayinii fi seeraa Itoophiyaa waliigaltee fi ragaalee SHA-256 qoratanii sa'aatii 48 keessatti murtoo kenna.",
+      ti: "ላዕለዎት ኢትዮጵያውያን ሽማግለታት ኢንጂነሪንግ፣ ዲዛይንን ሕግን ዝተፈረመ ውዕልን መርትዖ SHA-256ን መርሚሮም ኣብ 48 ሰዓት ውሳነ ይህቡ።",
+    },
+    metric: {
+      en: "48H BINDING SLA",
+      am: "የ48 ሰዓት ቀያዲ SLA",
+      om: "SLA MURTII 48H",
+      ti: "ቀያዲ SLA 48 ሰዓት",
+    },
   },
   {
     id: "sla-ringfence",
-    name: "1:1 NBE Escrow Custody",
-    role: "CAPITAL RINGFENCING · ZERO REHYPOTHECATION",
-    quote:
-      "Every Ethiopian Birr locked in a YeKis contract sits 1:1 in segregated commercial trust accounts—ready for instant Telebirr or CBE Birr settlement.",
-    metric: "1:1 ETB RESERVE",
+    name: {
+      en: "1:1 NBE Escrow Custody",
+      am: "1:1 የብሔራዊ ባንክ ኤስክሮ ጥበቃ",
+      om: "Eegumsa Iskuuroo NBE 1:1",
+      ti: "1:1 ሓለዋ ኤስክሮ ብሄራዊ ባንኪ",
+    },
+    role: {
+      en: "CAPITAL RINGFENCING · ZERO REHYPOTHECATION",
+      am: "የገንዘብ ጥበቃ · ያልተነካ ተቀማጭ",
+      om: "EEGUMSA MAALLAQAA · QABIIYYEE QULQULLUU",
+      ti: "ሓለዋ ርእሰ-ማል · ዘይትንከፍ ተቐማጢ",
+    },
+    quote: {
+      en: "Every Ethiopian Birr locked in a YeKis contract sits 1:1 in segregated commercial trust accounts—ready for instant Telebirr or CBE Birr settlement.",
+      am: "በYeKis ውል ውስጥ የተቀመጠ እያንዳንዱ ብር 1:1 በተለየ የባንክ የአደራ ሂሳብ ይጠበቃል—ለፈጣን የቴሌብር ወይም የCBE ብር ክፍያ ዝግጁ።",
+      om: "Birriin Itoophiyaa waliigaltee YeKis keessatti qabame hundi 1:1 herrega amanamaa qophaa keessatti eegama—kaffaltii Telebirr ykn CBE Birr battalaaf qophii dha.",
+      ti: "ኣብ ውዕል YeKis ዝተዓጽወ ነፍሲ ወከፍ ብር 1:1 ኣብ ዝተፈልየ ናይ ሓደራ ሕሳብ ባንኪ ይሕሎ—ንቅልጡፍ ክፍሊት ቴሌብር ወይ CBE ብር ድሉው።",
+    },
+    metric: {
+      en: "1:1 ETB RESERVE",
+      am: "1:1 የብር መጠባበቂያ",
+      om: "KUUSAA ETB 1:1",
+      ti: "1:1 መጠባበቒ ETB",
+    },
   },
 ];
+
+const FAQ_COPY: Record<
+  Language,
+  {
+    home: string;
+    helpGovernance: string;
+    topicPrefix: string;
+    categoryLabels: Record<"all" | FAQCategoryId, string>;
+    feesTag: string;
+    feeSchedule: string;
+    legalTag: string;
+    terms: string;
+    heroLine1: string;
+    heroBrace: string;
+    heroLine2: string;
+    heroLeftPill: string;
+    heroRightPill: string;
+    scrollDown: string;
+    clarityBraceWord: string;
+    manifestoSegments: { text: string; highlight?: boolean }[];
+    searchPlaceholder: string;
+    clear: string;
+    pressSlash: string;
+    kpiEscrow: string;
+    kpiTelebirr: string;
+    kpiAutoRelease: string;
+    questionsKicker: string;
+    allTabPrefix: string;
+    inspectFeeCalculator: string;
+    topicsKicker: string;
+    covenantsKicker: string;
+    readDossiers: string;
+    liveDeskKicker: string;
+    outroTitle: string;
+    askSupport: string;
+    startContract: string;
+  }
+> = {
+  en: {
+    home: "Home",
+    helpGovernance: "Help & Governance",
+    topicPrefix: "Topic ·",
+    categoryLabels: {
+      all: "ALL",
+      escrow: "ESCROW",
+      payouts: "PAYOUTS",
+      disputes: "DISPUTES",
+      verification: "FAYDA ID",
+      tax: "ERCA TAX",
+    },
+    feesTag: "FEES",
+    feeSchedule: "Fee Schedule",
+    legalTag: "LEGAL",
+    terms: "Terms",
+    heroLine1: "we make",
+    heroBrace: "{escrow}",
+    heroLine2: "clear before you start",
+    heroLeftPill: "{ Escrow Locks } ↗",
+    heroRightPill: "{ Instant Payouts } ↗",
+    scrollDown: "Scroll down ↓",
+    clarityBraceWord: "CLARITY",
+    manifestoSegments: [
+      { text: "Every rule in the YeKis ledger is engineered for" },
+      { text: "predictable ETB settlement", highlight: true },
+      { text: "—protecting talent and buyers alike." },
+    ],
+    searchPlaceholder: "Search Telebirr, 120h auto-release, Fayda ID, ERCA VAT...",
+    clear: "CLEAR",
+    pressSlash: "PRESS /",
+    kpiEscrow: "ESCROW RINGFENCED",
+    kpiTelebirr: "TELEBIRR PAYOUT",
+    kpiAutoRelease: "AUTO-RELEASE SLA",
+    questionsKicker: "QUESTIONS & CLAUSES",
+    allTabPrefix: "All",
+    inspectFeeCalculator: "Inspect interactive fee calculator ↗",
+    topicsKicker: "{ TOPICS }",
+    covenantsKicker: "COVENANTS",
+    readDossiers: "Read verified escrow dossiers ↗",
+    liveDeskKicker: "LIVE DESK",
+    outroTitle: "Let’s structure your first ETB milestone.",
+    askSupport: "Ask Support Desk ↗",
+    startContract: "Start Contract",
+  },
+  am: {
+    home: "መነሻ",
+    helpGovernance: "የእገዛ ማዕከል",
+    topicPrefix: "ምድብ ·",
+    categoryLabels: {
+      all: "ሁሉም",
+      escrow: "ኤስክሮ",
+      payouts: "ክፍያዎች",
+      disputes: "ሽምግልና",
+      verification: "ፋይዳ ID",
+      tax: "ታክስ",
+    },
+    feesTag: "ክፍያ",
+    feeSchedule: "የክፍያ ማስያ",
+    legalTag: "ሕግ",
+    terms: "የአገልግሎት ውል",
+    heroLine1: "ኤስክሮን",
+    heroBrace: "{ግልጽ}",
+    heroLine2: "ከመጀመርዎ በፊት",
+    heroLeftPill: "{ ኤስክሮ } ↗",
+    heroRightPill: "{ ቴሌብር ክፍያ } ↗",
+    scrollDown: "ጥያቄዎችን ይመልከቱ ↓",
+    clarityBraceWord: "ግልጽነት",
+    manifestoSegments: [
+      { text: "የኢትዮጵያ የዲጂታል ሥራ ውሎች" },
+      { text: "ያለምንም ብዥታ እና በኤስክሮ ዋስትና", highlight: true },
+      { text: "እንዲፈጸሙ የተነደፉ ናቸው።" },
+    ],
+    searchPlaceholder: "ቴሌብር፣ ኤስክሮ፣ ፋይዳ ወይም ታክስ ይፈልጉ...",
+    clear: "አጽዳ",
+    pressSlash: "/ ይጫኑ",
+    kpiEscrow: "በኤስክሮ የተጠበቀ",
+    kpiTelebirr: "የቴሌብር ክፍያ",
+    kpiAutoRelease: "ራስ-ሰር ክፍያ ገደብ",
+    questionsKicker: "ተደጋጋሚ ጥያቄዎች",
+    allTabPrefix: "ሁሉም",
+    inspectFeeCalculator: "የክፍያ ማስያ ይመልከቱ ↗",
+    topicsKicker: "{ ዘርፎች }",
+    covenantsKicker: "ቃል ኪዳን",
+    readDossiers: "የተጠናቀቁ ፕሮጀክቶችን ይመልከቱ ↗",
+    liveDeskKicker: "ቀጥታ ድጋፍ",
+    outroTitle: "ከቡድናችን ጋር በቀጥታ ይወያዩ።",
+    askSupport: "የቀጥታ ድጋፍ ↗",
+    startContract: "ውል ይጀምሩ",
+  },
+  om: {
+    home: "Mana",
+    helpGovernance: "Gargaarsa & Seera",
+    topicPrefix: "Mata Duree ·",
+    categoryLabels: {
+      all: "HUNDA",
+      escrow: "ISKUUROO",
+      payouts: "KAFFALTII",
+      disputes: "ARAARA",
+      verification: "FAYDA ID",
+      tax: "GIBIRA ERCA",
+    },
+    feesTag: "KAFFALTII",
+    feeSchedule: "Tarree Kaffaltii",
+    legalTag: "SEERA",
+    terms: "Waliigaltee",
+    heroLine1: "iskuuroo",
+    heroBrace: "{ifa}",
+    heroLine2: "osoo hin jalqabin goona",
+    heroLeftPill: "{ Eegumsa Iskuuroo } ↗",
+    heroRightPill: "{ Kaffaltii Saffisaa } ↗",
+    scrollDown: "Gaaffilee ilaali ↓",
+    clarityBraceWord: "IFTOOMINA",
+    manifestoSegments: [
+      { text: "Seerri galmee YeKis hundi kan qophaa'eef" },
+      { text: "kaffaltii ETB tilmaamamaa", highlight: true },
+      { text: "ogeeyyii fi maamiltoota eeguufidha." },
+    ],
+    searchPlaceholder: "Telebirr, sa'aatii 120, Fayda ID, ERCA VAT barbaadi...",
+    clear: "HAQI",
+    pressSlash: "/ TUQI",
+    kpiEscrow: "ISKUUROO EEGAME",
+    kpiTelebirr: "KAFFALTII TELEBIRR",
+    kpiAutoRelease: "YEROO GADHIISAA",
+    questionsKicker: "GAAFFILEE FI KEEWWATOOTA",
+    allTabPrefix: "Hunda",
+    inspectFeeCalculator: "Herregaa kaffaltii ilaali ↗",
+    topicsKicker: "{ MATA DUREEWWAN }",
+    covenantsKicker: "WAADAAWWAN",
+    readDossiers: "Piroojektoota mirkanaa'an dubbisi ↗",
+    liveDeskKicker: "GARGAARSA KALLATTII",
+    outroTitle: "Boqonnaa ETB keessan jalqabaa haa qindeessinu.",
+    askSupport: "Deeggarsa Gaafadhu ↗",
+    startContract: "Waliigaltee Jalqabi",
+  },
+  ti: {
+    home: "መበገሲ",
+    helpGovernance: "ሓገዝን ምምሕዳርን",
+    topicPrefix: "ዓውዲ ·",
+    categoryLabels: {
+      all: "ኩሉ",
+      escrow: "ኤስክሮ",
+      payouts: "ክፍሊታት",
+      disputes: "ዕርቂ",
+      verification: "ፋይዳ ID",
+      tax: "ግብሪ ERCA",
+    },
+    feesTag: "ክፍሊት",
+    feeSchedule: "መምርሒ ክፍሊት",
+    legalTag: "ሕጊ",
+    terms: "ውዕል ኣገልግሎት",
+    heroLine1: "ኤስክሮ",
+    heroBrace: "{ንጹር}",
+    heroLine2: "ቅድሚ ምጅማርኩም ንገብሮ",
+    heroLeftPill: "{ ሓለዋ ኤስክሮ } ↗",
+    heroRightPill: "{ ቅልጡፍ ክፍሊት } ↗",
+    scrollDown: "ንታሕቲ ውረድ ↓",
+    clarityBraceWord: "ንጹርነት",
+    manifestoSegments: [
+      { text: "ኣብ መዝገብ YeKis ዘሎ ነፍሲ ወከፍ ሕጊ" },
+      { text: "ንርጉጽ ክፍሊት ETB", highlight: true },
+      { text: "—ንኽኢላታትን ዓማዊልን ንምሕላው ዝተነድፈ እዩ።" },
+    ],
+    searchPlaceholder: "ቴሌብር፣ ኤስክሮ፣ ፋይዳ ወይ ግብሪ ድለ...",
+    clear: "ኣጽሪ",
+    pressSlash: "/ ጠውቕ",
+    kpiEscrow: "ብኤስክሮ ዝተሓለወ",
+    kpiTelebirr: "ክፍሊት ቴሌብር",
+    kpiAutoRelease: "ብቐጥታ መፍነዊ ግዜ",
+    questionsKicker: "ሕቶታትን ዓንቀጻትን",
+    allTabPrefix: "ኩሉ",
+    inspectFeeCalculator: "መስልሒ ክፍሊት ርአ ↗",
+    topicsKicker: "{ ዓውድታት }",
+    covenantsKicker: "ውዕላት ሓለዋ",
+    readDossiers: "ዝተረጋገጹ ፕሮጀክታት ኣንብብ ↗",
+    liveDeskKicker: "ቀጥታዊ ደገፍ",
+    outroTitle: "ናይ መጀመርታ ምዕራፍ ETB ብሓባር ነዳሉ።",
+    askSupport: "ደገፍ ሕተት ↗",
+    startContract: "ውዕል ጀምር",
+  },
+};
 
 function TiltVisualSurface({
   children,
@@ -466,7 +958,8 @@ function renderTopicArtwork(topicId: FAQCategoryId, variant: "hero-left" | "hero
 
 export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
   const { language } = useI18n();
-  const lang: "en" | "am" = language === "am" ? "am" : "en";
+  const lang: Language = language;
+  const copy = FAQ_COPY[lang] ?? FAQ_COPY.en;
   const [activeCategory, setActiveCategory] = useState<"all" | FAQCategoryId>("all");
   const [activeTopicId, setActiveTopicId] = useState<FAQCategoryId>("escrow");
   const [searchQuery, setSearchQuery] = useState("");
@@ -499,24 +992,34 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
       const matchesCat = activeCategory === "all" || item.category === activeCategory;
       if (!matchesCat) return false;
       if (!q) return true;
-      return (
-        item.question.en.toLowerCase().includes(q) ||
-        item.question.am.toLowerCase().includes(q) ||
-        item.answer.en.toLowerCase().includes(q) ||
-        item.answer.am.toLowerCase().includes(q)
-      );
+      const fields = [
+        item.question[lang],
+        item.answer[lang],
+        item.question.en,
+        item.answer.en,
+        item.question.am,
+        item.answer.am,
+        item.question.om,
+        item.answer.om,
+        item.question.ti,
+        item.answer.ti,
+      ];
+      return fields.some((text) => text.toLowerCase().includes(q));
     });
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, lang]);
 
   const stickyItems: StickyStackItem[] = useMemo(
     () =>
       FAQ_TOPICS.map((topic) => ({
         id: topic.id,
         title: topic.label[lang],
-        topChip: topic.topChip,
-        kickerBadge: topic.slaBadge,
+        topChip: topic.topChip[lang],
+        kickerBadge: topic.slaBadge[lang],
         artNode: renderTopicArtwork(topic.id, "fluted"),
-        rows: topic.rows,
+        rows: topic.rows.map((row) => ({
+          label: row.label[lang],
+          badge: row.badge[lang],
+        })),
         onCardClick: () => {
           setActiveCategory(topic.id);
           questionsSectionRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -542,19 +1045,16 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           <StudioBreadcrumb
             items={[
               {
-                label: lang === "am" ? "መነሻ" : "Home",
+                label: copy.home,
                 onClick: () => onNavigate?.("home"),
               },
               {
-                label: lang === "am" ? "የእገዛ ማዕከል" : "Help & Governance",
+                label: copy.helpGovernance,
                 onClick: () => questionsSectionRef.current?.scrollIntoView({ behavior: "smooth" }),
               },
               {
-                code: activeCategory.toUpperCase(),
-                label:
-                  lang === "am"
-                    ? `ምድብ · ${activeCategory.toUpperCase()}`
-                    : `Topic · ${activeCategory.toUpperCase()}`,
+                code: copy.categoryLabels[activeCategory],
+                label: `${copy.topicPrefix} ${copy.categoryLabels[activeCategory]}`,
                 active: true,
               },
             ]}
@@ -565,16 +1065,16 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                   className="cs-studio-band-pill"
                   onClick={() => onNavigate?.("fees")}
                 >
-                  <span>FEES</span>
-                  <span>{lang === "am" ? "የክፍያ ማስያ" : "Fee Schedule"}</span>
+                  <span>{copy.feesTag}</span>
+                  <span>{copy.feeSchedule}</span>
                 </button>
                 <button
                   type="button"
                   className="cs-studio-band-pill"
                   onClick={() => onNavigate?.("terms")}
                 >
-                  <span>LEGAL</span>
-                  <span>{lang === "am" ? "የአገልግሎት ውል" : "Terms"}</span>
+                  <span>{copy.legalTag}</span>
+                  <span>{copy.terms}</span>
                 </button>
               </div>
             }
@@ -587,14 +1087,14 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           >
             <h1 className="cs-hero-display">
               <span className="cs-hero-line">
-                {lang === "am" ? "ኤስክሮን" : "we make"}{" "}
-                <span className="cs-hero-brace">{lang === "am" ? "{ግልጽ}" : "{escrow}"}</span>
+                {copy.heroLine1}{" "}
+                <span className="cs-hero-brace">{copy.heroBrace}</span>
               </span>
               <span className="cs-hero-line">
                 <span className="cs-hero-arrow" aria-hidden="true">
                   →
                 </span>
-                {lang === "am" ? "ከመጀመርዎ በፊት" : "clear before you start"}
+                {copy.heroLine2}
               </span>
             </h1>
           </motion.div>
@@ -611,7 +1111,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
               >
                 {renderTopicArtwork("escrow", "hero-left")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ ኤስክሮ } ↗" : "{ Escrow Locks } ↗"}
+                  {copy.heroLeftPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -625,7 +1125,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
               >
                 {renderTopicArtwork("payouts", "hero-right")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ ቴሌብር ክፍያ } ↗" : "{ Instant Payouts } ↗"}
+                  {copy.heroRightPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -637,7 +1137,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
               className="cs-scroll-pill"
               onClick={() => questionsSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
             >
-              {lang === "am" ? "ጥያቄዎችን ይመልከቱ ↓" : "Scroll down ↓"}
+              {copy.scrollDown}
             </button>
           </div>
         </div>
@@ -655,26 +1155,12 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
               transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
             >
               <span className="cs-brace-emblem-char">{"{"}</span>
-              <span className="cs-brace-emblem-word">{lang === "am" ? "ግልጽነት" : "CLARITY"}</span>
+              <span className="cs-brace-emblem-word">{copy.clarityBraceWord}</span>
               <span className="cs-brace-emblem-char">{"}"}</span>
             </motion.div>
 
             <div>
-              <ScrollIlluminatedHeadline
-                segments={
-                  lang === "am"
-                    ? [
-                        { text: "የኢትዮጵያ የዲጂታል ሥራ ውሎች" },
-                        { text: "ያለምንም ብዥታ እና በኤስክሮ ዋስትና", highlight: true },
-                        { text: "እንዲፈጸሙ የተነደፉ ናቸው።" },
-                      ]
-                    : [
-                        { text: "Every rule in the YeKis ledger is engineered for" },
-                        { text: "predictable ETB settlement", highlight: true },
-                        { text: "—protecting talent and buyers alike." },
-                      ]
-                }
-              />
+              <ScrollIlluminatedHeadline segments={copy.manifestoSegments} />
 
               {/* Live Search Bar with `/` Shortcut */}
               <div className="cs-search-shell">
@@ -688,11 +1174,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                   className="cs-search-input"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={
-                    lang === "am"
-                      ? "ቴሌብር፣ ኤስክሮ፣ ፋይዳ ወይም ታክስ ይፈልጉ..."
-                      : "Search Telebirr, 120h auto-release, Fayda ID, ERCA VAT..."
-                  }
+                  placeholder={copy.searchPlaceholder}
                 />
                 {searchQuery ? (
                   <button
@@ -701,19 +1183,19 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                     onClick={() => setSearchQuery("")}
                     style={{ cursor: "pointer", border: "none" }}
                   >
-                    CLEAR
+                    {copy.clear}
                   </button>
                 ) : (
-                  <span className="cs-search-kbd">PRESS /</span>
+                  <span className="cs-search-kbd">{copy.pressSlash}</span>
                 )}
               </div>
 
               {/* Self-Counting Bold KPI Strip (Replaces small text columns) */}
               <AnimatedCountUpStrip
                 metrics={[
-                  { value: 100, suffix: "%", label: "ESCROW RINGFENCED" },
-                  { prefix: "< ", value: 45, suffix: "s", label: "TELEBIRR PAYOUT" },
-                  { value: 120, suffix: "h", label: "AUTO-RELEASE SLA" },
+                  { value: 100, suffix: "%", label: copy.kpiEscrow },
+                  { prefix: "< ", value: 45, suffix: "s", label: copy.kpiTelebirr },
+                  { value: 120, suffix: "h", label: copy.kpiAutoRelease },
                 ]}
               />
             </div>
@@ -728,18 +1210,18 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
         <div className="cs-band-inner">
           <div className="cs-works-topbar">
             <span className="cs-kicker" style={{ color: "#0b0f0c" }}>
-              {"{"} {lang === "am" ? "ተደጋጋሚ ጥያቄዎች" : "QUESTIONS & CLAUSES"} {"}"}
+              {"{"} {copy.questionsKicker} {"}"}
             </span>
 
             <div className="cs-works-tabs" role="tablist">
               {(
                 [
-                  { id: "all", label: lang === "am" ? "ሁሉም (8)" : "All (8)" },
-                  { id: "escrow", label: lang === "am" ? "ኤስክሮ" : "Escrow" },
-                  { id: "payouts", label: lang === "am" ? "ክፍያዎች" : "Payouts" },
-                  { id: "disputes", label: lang === "am" ? "ሽምግልና" : "Disputes" },
-                  { id: "verification", label: lang === "am" ? "ፋይዳ ID" : "Fayda ID" },
-                  { id: "tax", label: lang === "am" ? "ታክስ" : "ERCA Tax" },
+                  { id: "all", label: `${copy.allTabPrefix} (${FAQ_ITEMS.length})` },
+                  { id: "escrow", label: copy.categoryLabels.escrow },
+                  { id: "payouts", label: copy.categoryLabels.payouts },
+                  { id: "disputes", label: copy.categoryLabels.disputes },
+                  { id: "verification", label: copy.categoryLabels.verification },
+                  { id: "tax", label: copy.categoryLabels.tax },
                 ] as const
               ).map((tab) => (
                 <button
@@ -774,7 +1256,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                   >
                     <div>
                       <span className="cs-faq-num">
-                        {item.num} · {item.slaMetric}
+                        {item.num} · {item.slaMetric[lang]}
                       </span>
                       <h3 className="cs-faq-q">{item.question[lang]}</h3>
                     </div>
@@ -804,7 +1286,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
 
           <div className="cs-works-footer-row">
             <button type="button" className="cs-see-all-btn" onClick={() => onNavigate?.("fees")}>
-              {lang === "am" ? "የክፍያ ማስያ ይመልከቱ ↗" : "Inspect interactive fee calculator ↗"}
+              {copy.inspectFeeCalculator}
             </button>
           </div>
         </div>
@@ -815,7 +1297,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           ================================================================ */}
       <section className="cs-services-band">
         <StickyScrollServicesStage
-          kicker={lang === "am" ? "{ ዘርፎች }" : "{ TOPICS }"}
+          kicker={copy.topicsKicker}
           items={stickyItems}
           activeId={activeTopicId}
           onSelect={(id) => setActiveTopicId(id as FAQCategoryId)}
@@ -830,7 +1312,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           <div className="cs-testi-grid">
             <div className="cs-testi-left">
               <span className="cs-kicker" style={{ color: "#070a08" }}>
-                {"{"} {lang === "am" ? "ቃል ኪዳን" : "COVENANTS"} {"}"}
+                {"{"} {copy.covenantsKicker} {"}"}
               </span>
 
               <div className="cs-testi-authors">
@@ -841,8 +1323,8 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                     className={`cs-testi-author-btn ${idx === activeSlaIdx ? "is-active" : ""}`}
                     onClick={() => setActiveSlaIdx(idx)}
                   >
-                    <span>{item.name}</span>
-                    <span className="cs-testi-metric-pill">{item.metric}</span>
+                    <span>{item.name[lang]}</span>
+                    <span className="cs-testi-metric-pill">{item.metric[lang]}</span>
                   </button>
                 ))}
               </div>
@@ -857,10 +1339,10 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
                 >
-                  <p className="cs-testi-quote">“{activeSla.quote}”</p>
-                  <div className="cs-testi-role">{activeSla.role}</div>
+                  <p className="cs-testi-quote">“{activeSla.quote[lang]}”</p>
+                  <div className="cs-testi-role">{activeSla.role[lang]}</div>
                   <button type="button" className="cs-testi-link" onClick={() => onNavigate?.("casestudies")}>
-                    {lang === "am" ? "የተጠናቀቁ ፕሮጀክቶችን ይመልከቱ ↗" : "Read verified escrow dossiers ↗"}
+                    {copy.readDossiers}
                   </button>
                 </motion.div>
               </AnimatePresence>
@@ -877,10 +1359,10 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
           <div className="cs-outro-grid">
             <div>
               <span className="cs-kicker" style={{ color: "#78c841" }}>
-                {"{"} {lang === "am" ? "ቀጥታ ድጋፍ" : "LIVE DESK"} {"}"}
+                {"{"} {copy.liveDeskKicker} {"}"}
               </span>
               <h2 className="cs-outro-title">
-                {lang === "am" ? "ከቡድናችን ጋር በቀጥታ ይወያዩ።" : "Let’s structure your first ETB milestone."}
+                {copy.outroTitle}
               </h2>
             </div>
 
@@ -888,7 +1370,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
               <span className="cs-outro-giant-brace">{"{"}</span>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
                 <button type="button" className="cs-outro-pill-btn" onClick={() => openSupportChat()}>
-                  {lang === "am" ? "የቀጥታ ድጋፍ ↗" : "Ask Support Desk ↗"}
+                  {copy.askSupport}
                 </button>
                 <button
                   type="button"
@@ -896,7 +1378,7 @@ export function FAQPage({ onNavigate, onStart }: FAQPageProps) {
                   style={{ background: "transparent", color: "#f4f7f4", border: "1px solid rgba(255,255,255,0.28)" }}
                   onClick={() => onStart?.("register")}
                 >
-                  {lang === "am" ? "ውል ይጀምሩ" : "Start Contract"}
+                  {copy.startContract}
                 </button>
               </div>
               <span className="cs-outro-giant-brace">{"}"}</span>

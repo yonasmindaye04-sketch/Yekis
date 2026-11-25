@@ -36,21 +36,30 @@ export function getBotTranslation(locale: string, key: string, params?: Record<s
 
 export function i18nMiddleware() {
   return async (ctx: BotContext, next: () => Promise<void>) => {
-    const locale = (ctx.session?.language || "en") as SupportedLang;
-
-    // Inject ctx.t
-    ctx.t = (key: string, params?: Record<string, any>) => {
-      return getBotTranslation(locale, key, params);
+    const resolveLocale = (): SupportedLang => {
+      const candidate = ctx.session?.language;
+      return candidate && supportedLangs.includes(candidate as SupportedLang)
+        ? (candidate as SupportedLang)
+        : "en";
     };
 
-    // Inject ctx.i18n
-    ctx.i18n = {
-      t: (key: string, params?: Record<string, any>) => getBotTranslation(locale, key, params),
+    // Inject ctx.t so downstream authMiddleware language updates apply immediately
+    ctx.t = (key: string, params?: Record<string, any>) => {
+      return getBotTranslation(resolveLocale(), key, params);
+    };
+
+    // Inject ctx.i18n with a live locale getter matching types.ts
+    const i18nObj = {
+      t: (key: string, params?: Record<string, any>) =>
+        getBotTranslation(resolveLocale(), key, params),
       setLocale: async (lang: SupportedLang) => {
         if (ctx.session) ctx.session.language = lang;
       },
-      locale: () => ctx.session?.language || "en",
-    } as any;
+      get locale(): SupportedLang {
+        return resolveLocale();
+      },
+    };
+    ctx.i18n = i18nObj as any;
 
     await next();
   };

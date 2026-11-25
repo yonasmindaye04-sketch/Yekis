@@ -25,7 +25,297 @@ import {
 } from "./YekisAvatar";
 import { compressAvatarImage } from "../lib/avatarImage";
 import { useLocation, useNavigate } from "../router/HashRouter";
-import { useI18n } from "../i18n";
+import { useI18n, type Language } from "../i18n";
+import { localizeSkillName } from "../lib/skillLabels";
+
+type PcdCopy = {
+  couldNotProcessImage: string;
+  unableToSave: string;
+  yourFullNameFallback: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  closeAria: string;
+  closeTitle: string;
+  progressComplete: (completed: number, total: number) => string;
+  profilePhoto: string;
+  added: string;
+  required: string;
+  nameAndBio: string;
+  skills: string;
+  countSelected: (count: number) => string;
+  chooseTwoPlus: string;
+  uploadCustomPhotoAria: string;
+  processing: string;
+  changePhoto: string;
+  uploadPhoto: string;
+  remove: string;
+  shuffle: string;
+  photoHint: string;
+  firstName: string;
+  firstNamePlaceholder: string;
+  lastName: string;
+  lastNamePlaceholder: string;
+  bio: string;
+  bioPlaceholderClient: string;
+  bioPlaceholderWorker: string;
+  primarySkill: string;
+  selectPrimarySkill: string;
+  additionalSkills: string;
+  additionalSkillsHint: string;
+  previewAria: string;
+  profilePreview: string;
+  hide: string;
+  show: string;
+  previewHeading: string;
+  publicProfile: string;
+  identityVerifiedTitle: string;
+  verifiedBadge: string;
+  clientEthiopia: string;
+  freelancerEthiopia: string;
+  about: string;
+  bioPreviewPlaceholder: string;
+  skillsPreviewPlaceholder: string;
+  footClient: string;
+  footWorker: string;
+  savedSuccess: string;
+  skipForNow: string;
+  fullProfileEditor: string;
+  saving: string;
+  saveAndFinish: string;
+  saveChanges: string;
+};
+
+const PCD_COPY: Record<Language, PcdCopy> = {
+  en: {
+    couldNotProcessImage: "Could not process image.",
+    unableToSave: "Unable to save profile updates.",
+    yourFullNameFallback: "Your Full Name",
+    eyebrow: "Profile setup",
+    title: "Complete your profile",
+    subtitle: "Add a photo and a few details so clients and collaborators know who they are working with.",
+    closeAria: "Close profile setup",
+    closeTitle: "Close",
+    progressComplete: (done, total) => `${done} of ${total} complete`,
+    profilePhoto: "Profile photo",
+    added: "Added",
+    required: "Required",
+    nameAndBio: "Name & bio",
+    skills: "Skills",
+    countSelected: (n) => `${n} selected`,
+    chooseTwoPlus: "Choose 2+",
+    uploadCustomPhotoAria: "Upload custom profile picture",
+    processing: "Processing...",
+    changePhoto: "Change photo",
+    uploadPhoto: "Upload photo",
+    remove: "Remove",
+    shuffle: "Shuffle",
+    photoHint: "JPG, PNG or WEBP, up to 10 MB. Without a photo, we use a generated avatar.",
+    firstName: "First name",
+    firstNamePlaceholder: "Dawit",
+    lastName: "Last name",
+    lastNamePlaceholder: "Mekonnen",
+    bio: "Bio",
+    bioPlaceholderClient: "What does your company hire for?",
+    bioPlaceholderWorker: "What do you do, and what are you known for?",
+    primarySkill: "Primary skill",
+    selectPrimarySkill: "Select your primary skill",
+    additionalSkills: "Additional skills",
+    additionalSkillsHint: "Select at least two. Click a skill to add or remove it.",
+    previewAria: "Profile preview",
+    profilePreview: "Profile preview",
+    hide: "Hide",
+    show: "Show",
+    previewHeading: "Preview",
+    publicProfile: "Public profile",
+    identityVerifiedTitle: "Identity verified",
+    verifiedBadge: "Verified",
+    clientEthiopia: "Client · Ethiopia",
+    freelancerEthiopia: "Freelancer · Ethiopia",
+    about: "About",
+    bioPreviewPlaceholder: "Your bio will appear here.",
+    skillsPreviewPlaceholder: "Selected skills will appear here.",
+    footClient: "Escrow-protected hiring",
+    footWorker: "Available for milestone work",
+    savedSuccess: "Profile saved. Updating your workspace...",
+    skipForNow: "Skip for now",
+    fullProfileEditor: "Full profile editor",
+    saving: "Saving...",
+    saveAndFinish: "Save and finish",
+    saveChanges: "Save changes",
+  },
+  am: {
+    couldNotProcessImage: "ምስሉን ማስኬድ አልተቻለም።",
+    unableToSave: "የመገለጫ ማሻሻያዎችን ማስቀመጥ አልተቻለም።",
+    yourFullNameFallback: "ሙሉ ስምዎ",
+    eyebrow: "የመገለጫ ማዋቀር",
+    title: "መገለጫዎን ያጠናቅቁ",
+    subtitle: "ደንበኞች እና ተባባሪዎች ከማን ጋር እንደሚሠሩ እንዲያውቁ ፎቶ እና ጥቂት ዝርዝሮችን ያክሉ።",
+    closeAria: "የመገለጫ ማዋቀርን ዝጋ",
+    closeTitle: "ዝጋ",
+    progressComplete: (done, total) => `ከ${total} ውስጥ ${done} ተጠናቋል`,
+    profilePhoto: "የመገለጫ ፎቶ",
+    added: "ታክሏል",
+    required: "ያስፈልጋል",
+    nameAndBio: "ስም እና መግለጫ",
+    skills: "ክህሎቶች",
+    countSelected: (n) => `${n} ተመርጠዋል`,
+    chooseTwoPlus: "2+ ይምረጡ",
+    uploadCustomPhotoAria: "የግል መገለጫ ፎቶ ይጫኑ",
+    processing: "በማስኬድ ላይ...",
+    changePhoto: "ፎቶ ቀይር",
+    uploadPhoto: "ፎቶ ጫን",
+    remove: "አስወግድ",
+    shuffle: "ቀያይር",
+    photoHint: "JPG፣ PNG ወይም WEBP፣ እስከ 10 MB። ፎቶ ከሌለ በራስ-ሰር የተፈጠረ አቫታር እንጠቀማለን።",
+    firstName: "የመጀመሪያ ስም",
+    firstNamePlaceholder: "ዳዊት",
+    lastName: "የአባት ስም",
+    lastNamePlaceholder: "መኮንን",
+    bio: "መግለጫ",
+    bioPlaceholderClient: "ድርጅትዎ ለምን ዓይነት ሥራ ይቀጥራል?",
+    bioPlaceholderWorker: "ምን ይሠራሉ፣ በምንስ ይታወቃሉ?",
+    primarySkill: "ዋና ክህሎት",
+    selectPrimarySkill: "ዋና ክህሎትዎን ይምረጡ",
+    additionalSkills: "ተጨማሪ ክህሎቶች",
+    additionalSkillsHint: "ቢያንስ ሁለት ይምረጡ። ለመጨመር ወይም ለማስወገድ ክህሎቱን ይንኩ።",
+    previewAria: "የመገለጫ ቅድመ-ዕይታ",
+    profilePreview: "የመገለጫ ቅድመ-ዕይታ",
+    hide: "ደብቅ",
+    show: "አሳይ",
+    previewHeading: "ቅድመ-ዕይታ",
+    publicProfile: "የሕዝብ መገለጫ",
+    identityVerifiedTitle: "ማንነት ተረጋግጧል",
+    verifiedBadge: "የተረጋገጠ",
+    clientEthiopia: "ደንበኛ · ኢትዮጵያ",
+    freelancerEthiopia: "ባለሙያ · ኢትዮጵያ",
+    about: "ስለ እኔ",
+    bioPreviewPlaceholder: "መግለጫዎ እዚህ ይታያል።",
+    skillsPreviewPlaceholder: "የተመረጡ ክህሎቶች እዚህ ይታያሉ።",
+    footClient: "በኤስክሮ የተጠበቀ ቅጥር",
+    footWorker: "ለምዕራፍ ሥራ ዝግጁ",
+    savedSuccess: "መገለጫው ተቀምጧል። የሥራ ቦታዎ በመዘመን ላይ...",
+    skipForNow: "ለጊዜው ዝለል",
+    fullProfileEditor: "ሙሉ የመገለጫ አርታዒ",
+    saving: "በማስቀመጥ ላይ...",
+    saveAndFinish: "አስቀምጥ እና ጨርስ",
+    saveChanges: "ለውጦችን አስቀምጥ",
+  },
+  om: {
+    couldNotProcessImage: "Suuraa qindeessuun hin danda'amne.",
+    unableToSave: "Fooyya'iinsa piroofaayilii olkaa'uun hin danda'amne.",
+    yourFullNameFallback: "Maqaa Guutuu Keessan",
+    eyebrow: "Qophii piroofaayilii",
+    title: "Piroofaayilii keessan guutaa",
+    subtitle: "Maamiltoonni fi tumsaan eenyu waliin akka hojjetan akka beekaniif suuraa fi bal'ina muraasa dabalaa.",
+    closeAria: "Qophii piroofaayilii cufi",
+    closeTitle: "Cufi",
+    progressComplete: (done, total) => `${total} keessaa ${done} xumurameera`,
+    profilePhoto: "Suuraa piroofaayilii",
+    added: "Dabalameera",
+    required: "Barbaachisaa",
+    nameAndBio: "Maqaa & ibsa",
+    skills: "Ogummaalee",
+    countSelected: (n) => `${n} filataman`,
+    chooseTwoPlus: "2+ filadhaa",
+    uploadCustomPhotoAria: "Suuraa piroofaayilii dhuunfaa fe'i",
+    processing: "Qindeessaa jira...",
+    changePhoto: "Suuraa jijjiiri",
+    uploadPhoto: "Suuraa fe'i",
+    remove: "Balleessi",
+    shuffle: "Walmaki",
+    photoHint: "JPG, PNG ykn WEBP, hanga MB 10. Suuraa malee avataara uumame fayyadamna.",
+    firstName: "Maqaa duraa",
+    firstNamePlaceholder: "Daawit",
+    lastName: "Maqaa akaakayyuu",
+    lastNamePlaceholder: "Mokonnin",
+    bio: "Ibsa dhuunfaa",
+    bioPlaceholderClient: "Dhaabbanni keessan hojii akkamiif qaxara?",
+    bioPlaceholderWorker: "Maal hojjettu, maaliinis beekamtu?",
+    primarySkill: "Ogummaa ijoo",
+    selectPrimarySkill: "Ogummaa ijoo keessan filadhaa",
+    additionalSkills: "Ogummaalee dabalataa",
+    additionalSkillsHint: "Yoo xiqqaate lama filadhaa. Dabaluu ykn haquuf ogummaa irratti cuqaasaa.",
+    previewAria: "Dur-argii piroofaayilii",
+    profilePreview: "Dur-argii piroofaayilii",
+    hide: "Dhoksi",
+    show: "Mul'isi",
+    previewHeading: "Dur-argii",
+    publicProfile: "Piroofaayilii ummataa",
+    identityVerifiedTitle: "Eenyummaan mirkanaa'eera",
+    verifiedBadge: "Mirkanaa'e",
+    clientEthiopia: "Maamila · Itoophiyaa",
+    freelancerEthiopia: "Ogeessa · Itoophiyaa",
+    about: "Waa'ee koo",
+    bioPreviewPlaceholder: "Ibsi keessan asitti mul'ata.",
+    skillsPreviewPlaceholder: "Ogummaaleen filataman asitti mul'atu.",
+    footClient: "Qaxara iskuuroon eegame",
+    footWorker: "Hojii boqonnaaf qophii",
+    savedSuccess: "Piroofaayiliin olkaa'ameera. Bakki hojii kee haaromfamaa jira...",
+    skipForNow: "Ammaaf irra darbi",
+    fullProfileEditor: "Gulaalaa piroofaayilii guutuu",
+    saving: "Olkaa'aa jira...",
+    saveAndFinish: "Olkaa'ii xumuri",
+    saveChanges: "Jijjiirama olkaa'i",
+  },
+  ti: {
+    couldNotProcessImage: "ነቲ ስእሊ ምስላጥ ኣይተኻእለን።",
+    unableToSave: "ምምሕያሻት ፕሮፋይል ምዕቃብ ኣይተኻእለን።",
+    yourFullNameFallback: "ሙሉእ ስምኩም",
+    eyebrow: "ምድላው ፕሮፋይል",
+    title: "ፕሮፋይልኩም ዛዝሙ",
+    subtitle: "ዓማዊልን መሻርኽትን ምስ መን ከም ዝሰርሑ ምእንቲ ክፈልጡ ስእልን ሒደት ዝርዝራትን ወስኹ።",
+    closeAria: "ምድላው ፕሮፋይል ዕጾ",
+    closeTitle: "ዕጾ",
+    progressComplete: (done, total) => `ካብ ${total} እቶም ${done} ተዛዚሞም`,
+    profilePhoto: "ስእሊ ፕሮፋይል",
+    added: "ተወሲኹ",
+    required: "የድሊ",
+    nameAndBio: "ስምን መግለጽን",
+    skills: "ክእለታት",
+    countSelected: (n) => `${n} ተመሪጾም`,
+    chooseTwoPlus: "2+ ምረጹ",
+    uploadCustomPhotoAria: "ውልቃዊ ስእሊ ፕሮፋይል ጽዓኑ",
+    processing: "የሰላስል ኣሎ...",
+    changePhoto: "ስእሊ ቀይር",
+    uploadPhoto: "ስእሊ ጽዓን",
+    remove: "ኣልግስ",
+    shuffle: "ቀያይር",
+    photoHint: "JPG፣ PNG ወይ WEBP፣ ክሳብ 10 MB። ብዘይ ስእሊ ዝተፈጥረ ኣቫታር ንጥቀም።",
+    firstName: "ቀዳማይ ስም",
+    firstNamePlaceholder: "ዳዊት",
+    lastName: "ስም ኣቦ",
+    lastNamePlaceholder: "መኮነን",
+    bio: "መግለጺ",
+    bioPlaceholderClient: "ትካልኩም ንምንታይ ዓይነት ስራሕ ይቖጽር?",
+    bioPlaceholderWorker: "እንታይ ትሰርሑ፣ ብምንታይከ ትፍለጡ?",
+    primarySkill: "ቀንዲ ክእለት",
+    selectPrimarySkill: "ቀንዲ ክእለትኩም ምረጹ",
+    additionalSkills: "ተወሰኽቲ ክእለታት",
+    additionalSkillsHint: "ብውሑዱ ክልተ ምረጹ። ንምውሳኽ ወይ ንምልጋስ ኣብ ክእለት ጠውቑ።",
+    previewAria: "ቅድመ-ርኢት ፕሮፋይል",
+    profilePreview: "ቅድመ-ርኢት ፕሮፋይል",
+    hide: "ሕባእ",
+    show: "ኣርኢ",
+    previewHeading: "ቅድመ-ርኢት",
+    publicProfile: "ህዝባዊ ፕሮፋይል",
+    identityVerifiedTitle: "መንነት ተረጋጊጹ",
+    verifiedBadge: "ዝተረጋገጸ",
+    clientEthiopia: "ዓሚል · ኢትዮጵያ",
+    freelancerEthiopia: "ክኢላ · ኢትዮጵያ",
+    about: "ብዛዕባይ",
+    bioPreviewPlaceholder: "መግለጺኹም ኣብዚ ክርአ እዩ።",
+    skillsPreviewPlaceholder: "ዝተመርጹ ክእለታት ኣብዚ ክርኣዩ እዮም።",
+    footClient: "ብኤስክሮ ዝተሓለወ ቅጥዒ",
+    footWorker: "ንስራሕ ምዕራፍ ድሉው",
+    savedSuccess: "ፕሮፋይል ተዓቂቡ። ቦታ ስራሕኩም ይሕደስ ኣሎ...",
+    skipForNow: "ንሕጂ ሕለፍ",
+    fullProfileEditor: "ሙሉእ ኣርታዒ ፕሮፋይል",
+    saving: "ይዕቅብ ኣሎ...",
+    saveAndFinish: "ዓቅብ እሞ ዛዝም",
+    saveChanges: "ለውጥታት ዓቅብ",
+  },
+};
 
 interface SkillTaxonomyItem {
   id: string;
@@ -103,6 +393,7 @@ export function ProfileCompletionDialog({
   onOpenFullEditor,
 }: ProfileCompletionDialogProps) {
   const { language: lang } = useI18n();
+  const copy = PCD_COPY[lang] ?? PCD_COPY.en;
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -253,7 +544,7 @@ export function ProfileCompletionDialog({
       });
     } catch (err) {
       setPhotoError(
-        err instanceof Error ? err.message : "Could not process image.",
+        err instanceof Error ? err.message : copy.couldNotProcessImage,
       );
     } finally {
       setUploadingPhoto(false);
@@ -322,21 +613,20 @@ export function ProfileCompletionDialog({
       }, 450);
     } catch (err) {
       setSaveError(
-        err instanceof Error ? err.message : "Unable to save profile updates.",
+        err instanceof Error ? err.message : copy.unableToSave,
       );
     } finally {
       setSaving(false);
     }
   };
 
-  const skillLabel = (s: SkillTaxonomyItem) =>
-    (lang === "am" && s.nameAm) || s.nameEn || s.name || s.id;
+  const skillLabel = (s: SkillTaxonomyItem) => localizeSkillName(s, lang);
 
   const liveDisplayName =
     `${firstName.trim()} ${lastName.trim()}`.trim() ||
     user.displayName ||
     user.email?.split("@")[0] ||
-    "Your Full Name";
+    copy.yourFullNameFallback;
 
   const primarySkillObj = skillsCatalog.find((s) => s.id === primarySkillId);
   const selectedSkillObjects = skillsCatalog.filter((s) =>
@@ -357,21 +647,20 @@ export function ProfileCompletionDialog({
       >
         <div className="sh-pcd-header">
           <div className="sh-pcd-header-left">
-            <span className="sh-pcd-eyebrow">Profile setup</span>
+            <span className="sh-pcd-eyebrow">{copy.eyebrow}</span>
             <h2 id="profile-completion-dialog-title" className="sh-pcd-title">
-              Complete your profile
+              {copy.title}
             </h2>
             <p className="sh-pcd-subtitle">
-              Add a photo and a few details so clients and collaborators
-              know who they are working with.
+              {copy.subtitle}
             </p>
           </div>
           <button
             type="button"
             className="sh-icon-only-btn"
             onClick={closeDialog}
-            aria-label="Close profile setup"
-            title="Close"
+            aria-label={copy.closeAria}
+            title={copy.closeTitle}
           >
             <X size={17} />
           </button>
@@ -380,7 +669,7 @@ export function ProfileCompletionDialog({
         <div className="sh-pcd-checklist-bar">
           <div className="sh-pcd-progress-row">
             <span className="sh-pcd-progress-label">
-              {summary.completedCount} of {summary.totalCount} complete
+              {copy.progressComplete(summary.completedCount, summary.totalCount)}
             </span>
             <span className="sh-pcd-progress-pct sh-mono">
               {summary.percentage}%
@@ -412,8 +701,8 @@ export function ProfileCompletionDialog({
                   <Circle size={12} />
                 )}
               </span>
-              <span className="sh-pcd-check-name">Profile photo</span>
-              <small>{summary.hasCustomPhoto ? "Added" : "Required"}</small>
+              <span className="sh-pcd-check-name">{copy.profilePhoto}</span>
+              <small>{summary.hasCustomPhoto ? copy.added : copy.required}</small>
             </button>
 
             <button
@@ -434,8 +723,8 @@ export function ProfileCompletionDialog({
                   <Circle size={12} />
                 )}
               </span>
-              <span className="sh-pcd-check-name">Name &amp; bio</span>
-              <small>{summary.hasBioAndName ? "Added" : "Required"}</small>
+              <span className="sh-pcd-check-name">{copy.nameAndBio}</span>
+              <small>{summary.hasBioAndName ? copy.added : copy.required}</small>
             </button>
 
             {summary.requiresSkills && (
@@ -457,11 +746,11 @@ export function ProfileCompletionDialog({
                     <Circle size={12} />
                   )}
                 </span>
-                <span className="sh-pcd-check-name">Skills</span>
+                <span className="sh-pcd-check-name">{copy.skills}</span>
                 <small>
                   {summary.hasRequiredSkills
-                    ? `${skillIds.length} selected`
-                    : "Choose 2+"}
+                    ? copy.countSelected(skillIds.length)
+                    : copy.chooseTwoPlus}
                 </small>
               </button>
             )}
@@ -482,7 +771,7 @@ export function ProfileCompletionDialog({
                     <div className="sh-pcd-section-head">
                       <div className="sh-pcd-section-title">
                         <Camera size={16} />
-                        <h3>Profile photo</h3>
+                        <h3>{copy.profilePhoto}</h3>
                       </div>
                     </div>
 
@@ -508,8 +797,8 @@ export function ProfileCompletionDialog({
                           type="button"
                           className="sh-pcd-avatar-cam-btn"
                           onClick={() => fileInputRef.current?.click()}
-                          title="Upload custom profile picture"
-                          aria-label="Upload custom profile picture"
+                          title={copy.uploadCustomPhotoAria}
+                          aria-label={copy.uploadCustomPhotoAria}
                         >
                           <Camera size={13} />
                         </button>
@@ -525,10 +814,10 @@ export function ProfileCompletionDialog({
                           >
                             <Upload size={14} />
                             {uploadingPhoto
-                              ? "Processing..."
+                              ? copy.processing
                               : summary.hasCustomPhoto
-                                ? "Change photo"
-                                : "Upload photo"}
+                                ? copy.changePhoto
+                                : copy.uploadPhoto}
                           </button>
 
                           {summary.hasCustomPhoto ? (
@@ -537,7 +826,7 @@ export function ProfileCompletionDialog({
                               className="sh-btn sh-btn-secondary"
                               onClick={handleRevertToBlobatar}
                             >
-                              <Trash2 size={14} /> Remove
+                              <Trash2 size={14} /> {copy.remove}
                             </button>
                           ) : (
                             <button
@@ -554,13 +843,12 @@ export function ProfileCompletionDialog({
                                 });
                               }}
                             >
-                              <RefreshCw size={14} /> Shuffle
+                              <RefreshCw size={14} /> {copy.shuffle}
                             </button>
                           )}
                         </div>
                         <p className="sh-pcd-hint">
-                          JPG, PNG or WEBP, up to 10 MB. Without a photo, we
-                          use a generated avatar.
+                          {copy.photoHint}
                         </p>
                         {photoError && (
                           <p className="sh-pcd-error-inline">{photoError}</p>
@@ -573,28 +861,28 @@ export function ProfileCompletionDialog({
                     <div className="sh-pcd-section-head">
                       <div className="sh-pcd-section-title">
                         <FileText size={16} />
-                        <h3>Name &amp; bio</h3>
+                        <h3>{copy.nameAndBio}</h3>
                       </div>
                     </div>
 
                     <div className="sh-pcd-grid-2">
                       <label className="sh-pcd-field">
-                        <span>First name</span>
+                        <span>{copy.firstName}</span>
                         <input
                           type="text"
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          placeholder="Dawit"
+                          placeholder={copy.firstNamePlaceholder}
                           required
                         />
                       </label>
                       <label className="sh-pcd-field">
-                        <span>Last name</span>
+                        <span>{copy.lastName}</span>
                         <input
                           type="text"
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          placeholder="Mekonnen"
+                          placeholder={copy.lastNamePlaceholder}
                           required
                         />
                       </label>
@@ -602,7 +890,7 @@ export function ProfileCompletionDialog({
 
                     <label className="sh-pcd-field sh-pcd-field-bio">
                       <span className="sh-pcd-field-row">
-                        <span>Bio</span>
+                        <span>{copy.bio}</span>
                         <small className={bio.trim().length >= 20 ? "ok" : ""}>
                           {Math.min(20, bio.trim().length)}/20
                         </small>
@@ -613,8 +901,8 @@ export function ProfileCompletionDialog({
                         onChange={(e) => setBio(e.target.value)}
                         placeholder={
                           role === "CLIENT"
-                            ? "What does your company hire for?"
-                            : "What do you do, and what are you known for?"
+                            ? copy.bioPlaceholderClient
+                            : copy.bioPlaceholderWorker
                         }
                       />
                     </label>
@@ -625,19 +913,19 @@ export function ProfileCompletionDialog({
                       <div className="sh-pcd-section-head">
                         <div className="sh-pcd-section-title">
                           <Briefcase size={16} />
-                          <h3>Skills</h3>
+                          <h3>{copy.skills}</h3>
                         </div>
                       </div>
 
                       <label className="sh-pcd-field">
-                        <span>Primary skill</span>
+                        <span>{copy.primarySkill}</span>
                         <select
                           value={primarySkillId}
                           onChange={(e) =>
                             handlePrimarySkillSelect(e.target.value)
                           }
                         >
-                          <option value="">Select your primary skill</option>
+                          <option value="">{copy.selectPrimarySkill}</option>
                           {skillsCatalog.map((skill) => (
                             <option key={skill.id} value={skill.id}>
                               {skillLabel(skill)}
@@ -647,9 +935,9 @@ export function ProfileCompletionDialog({
                       </label>
 
                       <div className="sh-pcd-field">
-                        <span>Additional skills</span>
+                        <span>{copy.additionalSkills}</span>
                         <p className="sh-pcd-hint">
-                          Select at least two. Click a skill to add or remove it.
+                          {copy.additionalSkillsHint}
                         </p>
                         <div className="sh-pcd-skill-tags">
                           {skillsCatalog.map((skill) => {
@@ -682,7 +970,7 @@ export function ProfileCompletionDialog({
 
                 <aside
                   className={`sh-pcd-preview-col ${mobileSheetOpen ? "sheet-open" : "sheet-collapsed"}`}
-                  aria-label="Profile preview"
+                  aria-label={copy.previewAria}
                 >
                   <div
                     className="sh-pcd-sheet-bar"
@@ -700,16 +988,16 @@ export function ProfileCompletionDialog({
                     <div className="sh-pcd-sheet-pill" aria-hidden="true" />
                     <div className="sh-pcd-sheet-bar-row">
                       <span className="sh-pcd-sheet-bar-title">
-                        Profile preview
+                        {copy.profilePreview}
                       </span>
                       <span className="sh-pcd-sheet-toggle-chip">
                         {mobileSheetOpen ? (
                           <>
-                            Hide <ChevronDown size={13} />
+                            {copy.hide} <ChevronDown size={13} />
                           </>
                         ) : (
                           <>
-                            Show <ChevronUp size={13} />
+                            {copy.show} <ChevronUp size={13} />
                           </>
                         )}
                       </span>
@@ -717,8 +1005,8 @@ export function ProfileCompletionDialog({
                   </div>
 
                   <div className="sh-pcd-preview-head">
-                    <span>Preview</span>
-                    <small>Public profile</small>
+                    <span>{copy.previewHeading}</span>
+                    <small>{copy.publicProfile}</small>
                   </div>
 
                   <div className="sh-pcd-preview-card">
@@ -744,10 +1032,10 @@ export function ProfileCompletionDialog({
                             {user.kyc?.tier && (
                               <span
                                 className="sh-pcd-preview-kyc"
-                                title="Identity verified"
+                                title={copy.identityVerifiedTitle}
                               >
                                 <ShieldCheck size={12} />
-                                Verified
+                                {copy.verifiedBadge}
                               </span>
                             )}
                           </div>
@@ -755,21 +1043,21 @@ export function ProfileCompletionDialog({
                             {primarySkillObj
                               ? skillLabel(primarySkillObj)
                               : role === "CLIENT"
-                                ? "Client · Ethiopia"
-                                : "Freelancer · Ethiopia"}
+                                ? copy.clientEthiopia
+                                : copy.freelancerEthiopia}
                           </span>
                         </div>
                       </div>
 
                       <div className="sh-pcd-preview-block">
                         <div className="sh-pcd-preview-block-head">
-                          <span>About</span>
+                          <span>{copy.about}</span>
                         </div>
                         {bio.trim() ? (
                           <p className="sh-pcd-preview-bio-text">{bio.trim()}</p>
                         ) : (
                           <p className="sh-pcd-preview-bio-placeholder">
-                            Your bio will appear here.
+                            {copy.bioPreviewPlaceholder}
                           </p>
                         )}
                       </div>
@@ -778,9 +1066,9 @@ export function ProfileCompletionDialog({
                         selectedSkillObjects.length > 0) && (
                         <div className="sh-pcd-preview-block">
                           <div className="sh-pcd-preview-block-head">
-                            <span>Skills</span>
+                            <span>{copy.skills}</span>
                             <small>
-                              {selectedSkillObjects.length} selected
+                              {copy.countSelected(selectedSkillObjects.length)}
                             </small>
                           </div>
                           {selectedSkillObjects.length > 0 ? (
@@ -800,7 +1088,7 @@ export function ProfileCompletionDialog({
                             </div>
                           ) : (
                             <p className="sh-pcd-preview-bio-placeholder">
-                              Selected skills will appear here.
+                              {copy.skillsPreviewPlaceholder}
                             </p>
                           )}
                         </div>
@@ -808,8 +1096,8 @@ export function ProfileCompletionDialog({
 
                       <div className="sh-pcd-preview-foot">
                         {role === "CLIENT"
-                          ? "Escrow-protected hiring"
-                          : "Available for milestone work"}
+                          ? copy.footClient
+                          : copy.footWorker}
                       </div>
                     </div>
                   </div>
@@ -820,8 +1108,7 @@ export function ProfileCompletionDialog({
             {saveError && <div className="sh-pcd-alert-error">{saveError}</div>}
             {saveSuccess && (
               <div className="sh-pcd-alert-success">
-                <CheckCircle2 size={15} /> Profile saved. Updating your
-                workspace...
+                <CheckCircle2 size={15} /> {copy.savedSuccess}
               </div>
             )}
           </div>
@@ -833,7 +1120,7 @@ export function ProfileCompletionDialog({
                 className="sh-pcd-text-btn"
                 onClick={closeDialog}
               >
-                Skip for now
+                {copy.skipForNow}
               </button>
               {onOpenFullEditor && (
                 <button
@@ -844,7 +1131,7 @@ export function ProfileCompletionDialog({
                     onOpenFullEditor();
                   }}
                 >
-                  <ExternalLink size={13} /> Full profile editor
+                  <ExternalLink size={13} /> {copy.fullProfileEditor}
                 </button>
               )}
             </div>
@@ -856,10 +1143,10 @@ export function ProfileCompletionDialog({
             >
               <Save size={14} />
               {saving
-                ? "Saving..."
+                ? copy.saving
                 : summary.isComplete
-                  ? "Save and finish"
-                  : "Save changes"}
+                  ? copy.saveAndFinish
+                  : copy.saveChanges}
             </button>
           </div>
         </form>

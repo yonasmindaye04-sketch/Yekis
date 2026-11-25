@@ -44,6 +44,7 @@ const SECRET_KEYS = new Set([
   "bottoken",
   "telegram_bot_token",
   "telegram_webhook_secret",
+  "x-telegram-bot-api-secret-token",
   "jwt_access_secret",
   "jwt_refresh_secret",
 ]);
@@ -62,8 +63,10 @@ const REDACT_PATHS = [
   "req.headers.authorization",
   "req.headers.cookie",
   "req.headers.set-cookie",
+  "req.headers.x-telegram-bot-api-secret-token",
   "headers.authorization",
   "headers.cookie",
+  "headers.x-telegram-bot-api-secret-token",
   "res.headers.set-cookie",
 ];
 

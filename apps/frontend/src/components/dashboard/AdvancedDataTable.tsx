@@ -20,6 +20,7 @@ import {
 import type { LedgerContractRecord } from "./dashboardData";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
 
+
 interface AdvancedDataTableProps {
   records: LedgerContractRecord[];
   onOpenContracts?: () => void;

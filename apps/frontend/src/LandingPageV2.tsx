@@ -35,6 +35,12 @@ import { ProximityPopTitle } from "./components/ProximityPopTitle";
 import { events } from "./analytics";
 import { useI18n } from "./i18n";
 import { FooterV2 } from "./MarketingFooter";
+import {
+  ESCROW_STEP_ROWS_BY_LANG,
+  getLandingReviews,
+  LANDING_V2_EXTRA,
+  type MemberReview,
+} from "./landingV2Copy";
 import "./landing-v2.css";
 
 /* ─────────────────────────────────────────────────
@@ -49,142 +55,6 @@ type LandingPageV2Props = {
    Constants
 ───────────────────────────────────────────────── */
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-
-type ReviewSource = "google" | "trustpilot";
-
-type MemberReview = {
-  source: ReviewSource;
-  rating: number;
-  quote: string;
-  name: string;
-  meta: string;
-  when: string;
-  tone: 1 | 2 | 3 | 4 | 5;
-};
-
-const REVIEWS: MemberReview[] = [
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "As a freelancer in Bahir Dar, getting paid used to be the hardest part. Now funds land in my wallet the moment the client approves.",
-    name: "Abel T.",
-    meta: "Full-stack developer",
-    when: "2 weeks ago",
-    tone: 1,
-  },
-  {
-    source: "trustpilot",
-    rating: 5,
-    quote:
-      "Escrow on every contract means I never chase invoices again. The payout to my local bank is quicker than my old platform ever managed.",
-    name: "Meron G.",
-    meta: "Brand designer · Addis Ababa",
-    when: "a month ago",
-    tone: 2,
-  },
-  {
-    source: "google",
-    rating: 4,
-    quote:
-      "Clear milestones, clear fees, no surprises. Support answered my payout question in Amharic within the hour — that meant a lot.",
-    name: "Dawit B.",
-    meta: "Mobile developer",
-    when: "3 weeks ago",
-    tone: 3,
-  },
-  {
-    source: "trustpilot",
-    rating: 5,
-    quote:
-      "We hired three developers through YEKIS last quarter. Approving a milestone releases payment instantly; our contractors stopped asking about delays.",
-    name: "Hanna L.",
-    meta: "Startup founder",
-    when: "2 months ago",
-    tone: 4,
-  },
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "The wallet view is the best part — pending, escrowed and released amounts at a glance. Invoicing used to take me a whole evening.",
-    name: "Samuel K.",
-    meta: "Data analyst · Hawassa",
-    when: "a week ago",
-    tone: 5,
-  },
-  {
-    source: "trustpilot",
-    rating: 5,
-    quote:
-      "Dispute handling was fair and fast when scope changed mid-project. Both sides saw exactly what was agreed in the milestone trail.",
-    name: "Lidia F.",
-    meta: "Content strategist",
-    when: "3 months ago",
-    tone: 1,
-  },
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "I switched from Upwork because the fees were eating me alive. YEKIS is transparent about what I pay and clients see the same numbers.",
-    name: "Yonas M.",
-    meta: "DevOps engineer",
-    when: "5 days ago",
-    tone: 2,
-  },
-  {
-    source: "trustpilot",
-    rating: 4,
-    quote:
-      "Onboarding my studio took one afternoon. Contracts, escrow and payouts in one place — my accountant is happier too.",
-    name: "Betty A.",
-    meta: "Studio owner · Mekelle",
-    when: "6 weeks ago",
-    tone: 3,
-  },
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "Client approved at 9pm, money was in my wallet before I closed the laptop. That has never happened to me on any other platform.",
-    name: "Kalid H.",
-    meta: "Flutter developer",
-    when: "4 days ago",
-    tone: 4,
-  },
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "I funded escrow on a Friday and the first milestone was approved by Tuesday. No chasing, no awkward money conversations.",
-    name: "Hanna G.",
-    meta: "Founder, import & retail",
-    when: "3 days ago",
-    tone: 5,
-  },
-  {
-    source: "trustpilot",
-    rating: 5,
-    quote:
-      "We had one disagreement about scope. Support reviewed the brief and messages and settled it in two days — fairly.",
-    name: "Sara M.",
-    meta: "Marketing lead, NGO",
-    when: "1 month ago",
-    tone: 1,
-  },
-  {
-    source: "google",
-    rating: 5,
-    quote:
-      "Milestones, invoices and payouts live in the same tab now. My clients see exactly where every birr is sitting.",
-    name: "Nardos A.",
-    meta: "Backend engineer · Dire Dawa",
-    when: "2 weeks ago",
-    tone: 2,
-  },
-];
 
 /* avatar gradient pairs, drawn from the V2 palette */
 const REVIEW_TONES: Record<MemberReview["tone"], [string, string]> = {
@@ -391,8 +261,10 @@ function V2Avatar({
 
 /* Stars */
 function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
+  const { language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   return (
-    <span style={{ display: "flex", gap: 3, color: "var(--v2-primary)" }} aria-label={`${rating} out of 5`}>
+    <span style={{ display: "flex", gap: 3, color: "var(--v2-primary)" }} aria-label={extra.ratingAria(rating)}>
       {[0, 1, 2, 3, 4].map((i) => (
         <Star key={i} size={s} style={{ opacity: i < Math.round(rating) ? 1 : 0.26 }} fill="currentColor" stroke="none" />
       ))}
@@ -698,7 +570,9 @@ const ESCROW_STEPS = [
 ];
 
 function EscrowSection() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
+  const localizedRows = ESCROW_STEP_ROWS_BY_LANG[language] ?? ESCROW_STEP_ROWS_BY_LANG.en;
   const stageRef = useRef<HTMLElement>(null);
   const leftRef = useRef<HTMLDivElement>(null);
   const wordRefs = useRef<(HTMLElement | null)[]>([]);
@@ -781,8 +655,8 @@ function EscrowSection() {
       const LOOP_MS = 6000;
       const start = performance.now();
       const autoTick = (now: number) => {
-        const t = ((now - start) % LOOP_MS) / LOOP_MS;
-        const step = Math.min(N - 1, Math.floor(t * N));
+        const tVal = ((now - start) % LOOP_MS) / LOOP_MS;
+        const step = Math.min(N - 1, Math.floor(tVal * N));
         apply(step);
         raf = requestAnimationFrame(autoTick);
       };
@@ -841,7 +715,7 @@ function EscrowSection() {
         ref={stageRef}
         className={`stage${stageInView ? " v2-inview" : ""}`}
         id="how-it-works"
-        aria-label="How YEKIS works, step by step"
+        aria-label={extra.escrowAria}
       >
         <div className="stage-pin" id="pin">
           <div className="stage-glows" aria-hidden="true">
@@ -908,18 +782,21 @@ function EscrowSection() {
                     </span>
                   </div>
                   <ul className="rows">
-                    {s.rows.map((r, ri) => (
-                      <li
-                        key={`row-${ri}`}
-                        className="st"
-                        style={{ "--d": r.d } as React.CSSProperties}
-                      >
-                        <div>
-                          <b>{r.bold}</b>
-                          <small>{r.small}</small>
-                        </div>
-                      </li>
-                    ))}
+                    {s.rows.map((r, ri) => {
+                      const rowCopy = localizedRows[i]?.[ri] ?? r;
+                      return (
+                        <li
+                          key={`row-${ri}`}
+                          className="st"
+                          style={{ "--d": r.d } as React.CSSProperties}
+                        >
+                          <div>
+                            <b>{rowCopy.bold}</b>
+                            <small>{rowCopy.small}</small>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 </article>
               ))}
@@ -935,6 +812,8 @@ function EscrowSection() {
    Fees
 ───────────────────────────────────────────────── */
 function FeesSection() {
+  const { language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   const feesRef = useRef<HTMLElement>(null);
   const feesInView = useSectionVisible(feesRef, "180px 0px");
 
@@ -946,9 +825,9 @@ function FeesSection() {
     >
       <Reveal dir="zoom" amount={0.14}>
         <HandWrittenTitle
-          eyebrow="Yekis Jobs"
-          title="Make ideas visible."
-          subtitle="Where verified Ethiopian talent and ambitious teams build together."
+          eyebrow={extra.feesEyebrow}
+          title={extra.feesTitle}
+          subtitle={extra.feesSubtitle}
         />
       </Reveal>
     </section>
@@ -982,7 +861,8 @@ const easeOutExpo = (t: number) => {
 };
 
 function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => void }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   const rootRef = useRef<HTMLElement>(null);
   const cardRefs = useRef<(HTMLElement | null)[]>([]);
   const copyRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -1448,7 +1328,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       ref={rootRef}
       className={`v2-section stk-root${catInView ? " v2-inview" : ""}`}
       id="categories"
-      aria-label="Explore expertise"
+      aria-label={extra.categoriesAria}
     >
       <div className="v2-container stk-section-head">
         <Reveal delay={0.04}>
@@ -1460,10 +1340,13 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
       </div>
 
       <div id="stk-wrap" className="stk-wrap" ref={wrapRef}>
-        <section className="stk-pin" ref={pinRef} aria-label="Pinned category card stack">
+        <section className="stk-pin" ref={pinRef} aria-label={extra.cardDeckAria}>
           <div className="stk-stage" ref={stageRef}>
             {cards.map((c, i) => {
               const isActive = isReduced || activeIndex === i;
+              const categoryName = c.kicker.includes("/")
+                ? c.kicker.split("/").slice(1).join("/").trim()
+                : c.kicker;
               return (
                 <article
                   key={c.num}
@@ -1483,7 +1366,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
                   role="button"
                   tabIndex={isActive ? 0 : -1}
                   aria-hidden={isActive ? "false" : "true"}
-                  aria-label={`Browse ${c.category}: ${c.title1} ${c.title2}`}
+                  aria-label={extra.browseCategoryAria(categoryName, c.title1, c.title2)}
                   onClick={() => onStart("register")}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -1539,18 +1422,23 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
           </div>
 
           <div className={`stk-hud-right${hudOn ? " on" : ""}`}>
-            <nav className="stk-dots" aria-label="Jump to category">
-              {cards.map((c, i) => (
-                <button
-                  key={c.num}
-                  type="button"
-                  className="stk-dot"
-                  title={c.category}
-                  aria-label={`Jump to ${c.category}`}
-                  aria-current={activeIndex === i ? "true" : undefined}
-                  onClick={() => goToCard(i)}
-                />
-              ))}
+            <nav className="stk-dots" aria-label={extra.jumpToCategoryAria}>
+              {cards.map((c, i) => {
+                const categoryName = c.kicker.includes("/")
+                  ? c.kicker.split("/").slice(1).join("/").trim()
+                  : c.kicker;
+                return (
+                  <button
+                    key={c.num}
+                    type="button"
+                    className="stk-dot"
+                    title={`${c.title1} ${c.title2}`}
+                    aria-label={extra.jumpToItemAria(categoryName)}
+                    aria-current={activeIndex === i ? "true" : undefined}
+                    onClick={() => goToCard(i)}
+                  />
+                );
+              })}
             </nav>
             <div className="stk-count" aria-live="polite">
               <b>{String(activeIndex + 1).padStart(2, "0")}</b> / {String(total).padStart(2, "0")}
@@ -1564,7 +1452,7 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
         className="stk-flat stk-outro"
         ref={outroRef}
         role="complementary"
-        aria-label="Call to action"
+        aria-label={extra.ctaAria}
       >
         <div className="stk-outro-ambient" aria-hidden="true" />
 
@@ -1642,6 +1530,8 @@ function TrustpilotMark() {
 }
 
 function ReviewCard({ review }: { review: MemberReview }) {
+  const { language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   const [a1, a2] = REVIEW_TONES[review.tone];
   return (
     <article className="v2-testi-card">
@@ -1659,7 +1549,7 @@ function ReviewCard({ review }: { review: MemberReview }) {
         <div className="v2-testi-id">
           <span className="v2-testi-name">
             {review.name}
-            <BadgeCheck size={13} aria-label="Verified member" />
+            <BadgeCheck size={13} aria-label={extra.verifiedMemberAria} />
           </span>
           <span className="v2-testi-meta">
             {review.meta} · {review.when}
@@ -1671,14 +1561,15 @@ function ReviewCard({ review }: { review: MemberReview }) {
 }
 
 function TestimonialsSection() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const sectionRef = useRef<HTMLElement>(null);
   const inView = useSectionVisible(sectionRef, "180px 0px");
   const columns = useMemo(() => {
+    const reviews = getLandingReviews(language);
     const cols: MemberReview[][] = [[], [], []];
-    REVIEWS.forEach((r, i) => cols[i % cols.length].push(r));
+    reviews.forEach((r, i) => cols[i % cols.length].push(r));
     return cols;
-  }, []);
+  }, [language]);
 
   return (
     <section
@@ -1738,7 +1629,8 @@ function TestimonialsSection() {
    About / Studio — editorial split layout
 ───────────────────────────────────────────────── */
 function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   const aboutFeatures = [
     { n: "01", title: t.marketing.about.feature1Title, body: t.marketing.about.feature1Desc },
     { n: "02", title: t.marketing.about.feature2Title, body: t.marketing.about.feature2Desc },
@@ -1786,7 +1678,7 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
             {/* Right: Lottie business handshake & escrow payment animation */}
             <div
               className="v2-about-visual"
-              aria-label="Escrow agreement and guaranteed milestone payout animation"
+              aria-label={extra.aboutVideoAria}
             >
               <video
                 className="v2-about-lottie-video"
@@ -1795,12 +1687,12 @@ function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
                 muted
                 playsInline
                 poster="/lottie/escrow-deal.gif"
-                aria-label="Escrow agreement and guaranteed milestone payout animation"
+                aria-label={extra.aboutVideoAria}
               >
                 <source src="/lottie/escrow-deal.webm" type="video/webm" />
                 <img
                   src="/lottie/escrow-deal.gif"
-                  alt="Escrow agreement and guaranteed milestone payout animation"
+                  alt={extra.aboutVideoAria}
                   loading="eager"
                   className="v2-about-lottie-fallback"
                 />
@@ -2174,6 +2066,8 @@ function FinalCTASection({ onStart }: { onStart: (m: "login" | "register") => vo
    Back to Top
 ───────────────────────────────────────────────── */
 function BackToTop() {
+  const { language } = useI18n();
+  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
   const [show, setShow] = useState(false);
   useEffect(() => {
     const onScroll = () => setShow(window.scrollY > 400);
@@ -2191,7 +2085,7 @@ function BackToTop() {
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => window.scrollTo({ top: 0, behavior: prefersReduced() ? "auto" : "smooth" })}
-          aria-label="Back to top"
+          aria-label={extra.backToTopAria}
         >
           <ArrowUp size={20} />
         </motion.button>

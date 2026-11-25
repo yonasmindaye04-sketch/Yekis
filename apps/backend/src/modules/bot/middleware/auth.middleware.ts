@@ -3,6 +3,15 @@ import { prisma } from "../../../lib/prisma.js";
 import { logger } from "../../../lib/logger.js";
 import type { StaffRole } from "@prisma/client";
 import { toTelegramBigInt } from "../../../lib/json.js";
+import { getBotTranslation } from "./i18n.middleware.js";
+
+function normalizeSupportedLanguage(code?: string | null): "en" | "am" | "om" | "ti" {
+  const normalized = (code ?? "").trim().toLowerCase();
+  if (normalized.startsWith("am")) return "am";
+  if (normalized.startsWith("om")) return "om";
+  if (normalized.startsWith("ti")) return "ti";
+  return "en";
+}
 
 const userSelect = {
   id: true,
@@ -88,8 +97,11 @@ export async function authMiddleware(
     ctx.session.kycTier = undefined;
     ctx.session.kycStatus = undefined;
     ctx.session.staffRole = undefined;
-    ctx.session.loginBlocked = "You are not registered. Please sign in via the web.";
-    ctx.session.language = from.language_code === "am" ? "am" : "en";
+    ctx.session.loginBlocked = getBotTranslation(
+      normalizeSupportedLanguage(from.language_code),
+      "auth_not_registered",
+    );
+    ctx.session.language = normalizeSupportedLanguage(from.language_code);
     ctx.session.telegramUserId = telegramId;
     ctx.session.telegramChatId = chatId;
     return next();
@@ -103,7 +115,7 @@ export async function authMiddleware(
     ctx.session.kycTier = user.kyc?.tier as BotContext["session"]["kycTier"];
     ctx.session.kycStatus = user.kyc?.status as BotContext["session"]["kycStatus"];
     ctx.session.staffRole = user.staffRole ?? undefined;
-    ctx.session.language = user.languagePreference === "am" ? "am" : "en";
+    ctx.session.language = normalizeSupportedLanguage(user.languagePreference);
 
     // The bot clears telegramChatId when a member blocks it. Re-assert it on
     // any inbound message so push notifications resume for returning users.
@@ -114,7 +126,7 @@ export async function authMiddleware(
       });
     }
   } else {
-    ctx.session.language = from.language_code === "am" ? "am" : "en";
+    ctx.session.language = normalizeSupportedLanguage(from.language_code);
   }
 
   ctx.session.telegramUserId = telegramId;

@@ -47,9 +47,9 @@ The API is the authority for roles, KYC gates, contract signatures, state transi
 ```text
 request
   -> Helmet and CORS
-  -> raw webhook router (provider routes only, before express.json())
-  -> Telegram bot router (raw body for secret-token verification)
-  -> JSON body parser
+  -> raw payment-webhook router (provider routes only, before express.json())
+  -> Telegram bot router (route-local JSON parser; secret-token header auth)
+  -> global JSON body parser
   -> Cache-Control: no-store header
   -> API rate limiter (2,000 req/15m prod, 10,000 dev)
   -> route authentication and role/KYC/party guards
@@ -60,7 +60,7 @@ request
   -> JSON response
 ```
 
-Webhook routes are deliberately mounted before `express.json()` so raw request bytes are preserved for header-based HMAC and body-embedded RSA-PSS signature verification.
+The payment webhook routes are deliberately mounted before `express.json()` so raw request bytes are preserved for header-based HMAC and body-embedded RSA-PSS signature verification. The Telegram webhook does **not** verify a body signature: Telegram authenticates deliveries with the `X-Telegram-Bot-Api-Secret-Token` header. Because the Telegram router is also mounted before the global JSON parser, its webhook route parses JSON locally before handing the update to grammY's Express adapter.
 
 ## Domain Modules
 

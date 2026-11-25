@@ -1,6 +1,15 @@
 import { Bot } from "grammy";
 import { BotContext } from "../types.js";
 import { logger } from "../../../lib/logger.js";
+import { getBotTranslation } from "./i18n.middleware.js";
+
+function resolveFromLanguage(code?: string): "en" | "am" | "om" | "ti" {
+  const norm = (code ?? "").trim().toLowerCase();
+  if (norm.startsWith("am")) return "am";
+  if (norm.startsWith("om")) return "om";
+  if (norm.startsWith("ti")) return "ti";
+  return "en";
+}
 
 /**
  * Refuses updates that grammY cannot give a session for.
@@ -30,9 +39,8 @@ export function requireChatSession() {
         "Ignoring update with no chat (no session key): inline mode is not supported",
       );
 
-      const notice =
-        "This action needs to run inside our chat with the bot. " +
-        "Open @ye_kis_bot and send /start there, then use the buttons.";
+      const locale = resolveFromLanguage(ctx.from?.language_code);
+      const notice = getBotTranslation(locale, "session_inline_only");
 
       try {
         // A callback query can be answered even without a chat — Telegram shows

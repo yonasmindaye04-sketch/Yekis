@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useI18n } from "./i18n";
+import { type Language, useI18n } from "./i18n";
 import { openSupportChat } from "./components/supportChatEvents";
 import {
   AnimatedCountUpStrip,
@@ -20,19 +20,27 @@ type PillarId = "escrow" | "fayda" | "mediation" | "erca";
 
 interface TrustPillarItem {
   id: PillarId;
-  label: { en: string; am: string };
-  topChip: string;
-  badge: string;
-  rows: { label: string; badge: string }[];
+  label: Record<Language, string>;
+  topChip: Record<Language, string>;
+  badge: Record<Language, string>;
+  rows: { label: Record<Language, string>; badge: Record<Language, string> }[];
 }
 
 interface TeamLeader {
   id: string;
   name: string;
-  role: { en: string; am: string };
-  corridor: string;
-  credential: string;
+  role: Record<Language, string>;
+  corridor: Record<Language, string>;
+  credential: Record<Language, string>;
   theme: "emerald" | "gold" | "obsidian" | "cobalt";
+}
+
+interface RegionalCorridorItem {
+  id: string;
+  name: Record<Language, string>;
+  role: Record<Language, string>;
+  quote: Record<Language, string>;
+  metric: Record<Language, string>;
 }
 
 const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
@@ -40,46 +48,142 @@ const EASE_OUT_EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 const TRUST_PILLARS: TrustPillarItem[] = [
   {
     id: "escrow",
-    label: { en: "Escrow Vaults", am: "የኤስክሮ ጥበቃ" },
-    topChip: "1:1 NBE CUSTODY",
-    badge: "ZERO UNPAID WORK",
+    label: {
+      en: "Escrow Vaults",
+      am: "የኤስክሮ ጥበቃ",
+      om: "Kuusaa Iskuuroo",
+      ti: "ሓለዋ ኤስክሮ",
+    },
+    topChip: {
+      en: "1:1 NBE CUSTODY",
+      am: "1:1 የብሔራዊ ባንክ ጥበቃ",
+      om: "EEGUMSA NBE 1:1",
+      ti: "1:1 ሓለዋ ብሄራዊ ባንኪ",
+    },
+    badge: {
+      en: "ZERO UNPAID WORK",
+      am: "ያልተከፈለ ሥራ የለም",
+      om: "HOJII KAFFALTII MALEE ZERO",
+      ti: "ዘይተኸፍለ ስራሕ የለን",
+    },
     rows: [
-      { label: "CAPITAL CUSTODY", badge: "100% ETB" },
-      { label: "SILENT-CLIENT SLA", badge: "120 HOURS" },
-      { label: "WALLET PAYOUT", badge: "< 45 SEC" },
+      {
+        label: { en: "CAPITAL CUSTODY", am: "የገንዘብ ጥበቃ", om: "EEGUMSA MAALLAQAA", ti: "ሓለዋ ገንዘብ" },
+        badge: { en: "100% ETB", am: "100% ብር", om: "100% ETB", ti: "100% ብር" },
+      },
+      {
+        label: { en: "SILENT-CLIENT SLA", am: "የደንበኛ ምላሽ ገደብ", om: "DAANGAA DEEBII MAAMILAA", ti: "ገደብ ምላሽ ዓሚል" },
+        badge: { en: "120 HOURS", am: "120 ሰዓታት", om: "SA'AATII 120", ti: "120 ሰዓታት" },
+      },
+      {
+        label: { en: "WALLET PAYOUT", am: "የዋሌት ክፍያ", om: "KAFFALTII WALLET", ti: "ክፍሊት ዋሌት" },
+        badge: { en: "< 45 SEC", am: "< 45 ሰከንድ", om: "< SEKONDII 45", ti: "< 45 ካልኢት" },
+      },
     ],
   },
   {
     id: "fayda",
-    label: { en: "Fayda KYC", am: "ፋይዳ መታወቂያ" },
-    topChip: "NATIONAL ID & TIN",
-    badge: "100% VETTED",
+    label: {
+      en: "Fayda KYC",
+      am: "ፋይዳ መታወቂያ",
+      om: "Mirkaneessa Fayda",
+      ti: "መረጋገጺ ፋይዳ",
+    },
+    topChip: {
+      en: "NATIONAL ID & TIN",
+      am: "ብሔራዊ መታወቂያ እና TIN",
+      om: "WARAQAA EENYUMMAA & TIN",
+      ti: "ብሄራዊ መታወቂያን TINን",
+    },
+    badge: {
+      en: "100% VETTED",
+      am: "100% የተረጋገጠ",
+      om: "100% MIRKANA'AA",
+      ti: "100% ዝተረጋገጸ",
+    },
     rows: [
-      { label: "INDIVIDUAL KYC", badge: "FAYDA FAN" },
-      { label: "CORPORATE KYB", badge: "TIN + LICENSE" },
-      { label: "IMPERSONATION", badge: "0.00%" },
+      {
+        label: { en: "INDIVIDUAL KYC", am: "የግል ማረጋገጫ", om: "MIRKANEESSA DHUNFAA", ti: "ውልቃዊ መረጋገጺ" },
+        badge: { en: "FAYDA FAN", am: "ፋይዳ FAN", om: "FAYDA FAN", ti: "ፋይዳ FAN" },
+      },
+      {
+        label: { en: "CORPORATE KYB", am: "የድርጅት ማረጋገጫ", om: "MIRKANEESSA DHAABBATA", ti: "መረጋገጺ ትካል" },
+        badge: { en: "TIN + LICENSE", am: "TIN + ፈቃድ", om: "TIN + HAYYAMA", ti: "TIN + ፍቓድ" },
+      },
+      {
+        label: { en: "IMPERSONATION", am: "ማጭበርበር", om: "FAKKESSUU", ti: "ምትላል መንነት" },
+        badge: { en: "0.00%", am: "0.00%", om: "0.00%", ti: "0.00%" },
+      },
     ],
   },
   {
     id: "mediation",
-    label: { en: "48h Mediation", am: "የ48 ሰዓት ሽምግልና" },
-    topChip: "BOLE ARBITRATION",
-    badge: "99.4% DISPUTE-FREE",
+    label: {
+      en: "48h Mediation",
+      am: "የ48 ሰዓት ሽምግልና",
+      om: "Araara Sa'aatii 48",
+      ti: "ዕርቂ 48 ሰዓት",
+    },
+    topChip: {
+      en: "BOLE ARBITRATION",
+      am: "የቦሌ ሽምግልና ቢሮ",
+      om: "GIDDUGALA ARAARA BOLEE",
+      ti: "ቤት ጽሕፈት ዕርቂ ቦሌ",
+    },
+    badge: {
+      en: "99.4% DISPUTE-FREE",
+      am: "99.4% ያለክርክር",
+      om: "99.4% FALMII MALEE",
+      ti: "99.4% ብዘይ ክትዕ",
+    },
     rows: [
-      { label: "ARBITRATION SLA", badge: "48 HOURS" },
-      { label: "FILE TIMESTAMP", badge: "SHA-256" },
-      { label: "AMICABLE RATE", badge: "99.4%" },
+      {
+        label: { en: "ARBITRATION SLA", am: "የሽምግልና ጊዜ", om: "YEROO ARAARAA", ti: "ግዜ ዕርቂ" },
+        badge: { en: "48 HOURS", am: "48 ሰዓታት", om: "SA'AATII 48", ti: "48 ሰዓታት" },
+      },
+      {
+        label: { en: "FILE TIMESTAMP", am: "የፋይል ሰዓት ማረጋገጫ", om: "MALLATTOO YEROO FAAYILII", ti: "መረጋገጺ ግዜ ፋይል" },
+        badge: { en: "SHA-256", am: "SHA-256", om: "SHA-256", ti: "SHA-256" },
+      },
+      {
+        label: { en: "AMICABLE RATE", am: "በስምምነት የተፈታ", om: "SAFARTUU WALII GALTEE", ti: "ብስምምዕ ዝተፈትሐ" },
+        badge: { en: "99.4%", am: "99.4%", om: "99.4%", ti: "99.4%" },
+      },
     ],
   },
   {
     id: "erca",
-    label: { en: "ERCA Ledgers", am: "የገቢዎች ታክስ" },
-    topChip: "FISCAL ENGINE",
-    badge: "AUDIT-READY",
+    label: {
+      en: "ERCA Ledgers",
+      am: "የገቢዎች ታክስ",
+      om: "Galmee Gibiraa ERCA",
+      ti: "መዝገብ ግብሪ ERCA",
+    },
+    topChip: {
+      en: "FISCAL ENGINE",
+      am: "የታክስ ስርዓት",
+      om: "SIRNA HERREGA GIBIRAA",
+      ti: "ስርዓት ሕሳብ ግብሪ",
+    },
+    badge: {
+      en: "AUDIT-READY",
+      am: "ለኦዲት ዝግጁ",
+      om: "OODIITIIF QOPHAA'AA",
+      ti: "ንኦዲት ድሉው",
+    },
     rows: [
-      { label: "VAT COMPUTATION", badge: "15% AUTO" },
-      { label: "WITHHOLDING", badge: "3% / 30% > 10K" },
-      { label: "FINANCE EXPORT", badge: "PDF + CSV" },
+      {
+        label: { en: "VAT COMPUTATION", am: "የቫት ስሌት", om: "HERREGA VAT", ti: "ሕሳብ ቫት" },
+        badge: { en: "15% AUTO", am: "15% በራስ-ሰር", om: "15% OFUMAA", ti: "15% ብቐጥታ" },
+      },
+      {
+        label: { en: "WITHHOLDING", am: "ዊዝሆልዲንግ", om: "GIBIRA QABAMU", ti: "ዝተሓዝ ግብሪ" },
+        badge: { en: "3% / 30% > 10K", am: "3% / 30% > 10ሺ", om: "3% / 30% > 10K", ti: "3% / 30% > 10ሽ" },
+      },
+      {
+        label: { en: "FINANCE EXPORT", am: "የፋይናንስ ኤክስፖርት", om: "ERGAA FAYINAANSII", ti: "ውጽኢት ፋይናንስ" },
+        badge: { en: "PDF + CSV", am: "PDF + CSV", om: "PDF + CSV", ti: "PDF + CSV" },
+      },
     ],
   },
 ];
@@ -88,63 +192,397 @@ const LEADERSHIP_TEAM: TeamLeader[] = [
   {
     id: "dawit",
     name: "Dawit Alemu",
-    role: { en: "Co-Founder & Chief Executive Officer", am: "መስራች እና ዋና ሥራ አስፈጻሚ" },
-    corridor: "ADDIS ABABA · FINTECH",
-    credential: "CORE BANKING ARCHITECT",
+    role: {
+      en: "Co-Founder & Chief Executive Officer",
+      am: "መስራች እና ዋና ሥራ አስፈጻሚ",
+      om: "Hundeessaa & Hogganaa Olaanaa (CEO)",
+      ti: "መስራትን ዋና ፈጻሚ ስራሕን (CEO)",
+    },
+    corridor: {
+      en: "ADDIS ABABA · FINTECH",
+      am: "አዲስ አበባ · ፊንቴክ",
+      om: "FINFINNEE · FIINTEK",
+      ti: "ኣዲስ ኣበባ · ፊንቴክ",
+    },
+    credential: {
+      en: "CORE BANKING ARCHITECT",
+      am: "የባንክ ስርዓት መሃንዲስ",
+      om: "QOPHEESSAA SIRNA BAANKII",
+      ti: "መሃንዲስ ስርዓት ባንኪ",
+    },
     theme: "emerald",
   },
   {
     id: "selamawit",
     name: "Selamawit Tadesse",
-    role: { en: "Chief Trust & Escrow Officer", am: "የኤስክሮ እና የሕግ ጉዳዮች ኃላፊ" },
-    corridor: "ADDIS ABABA · LEGAL SLA",
-    credential: "COMMERCIAL COMPLIANCE",
+    role: {
+      en: "Chief Trust & Escrow Officer",
+      am: "የኤስክሮ እና የሕግ ጉዳዮች ኃላፊ",
+      om: "Hogganaa Olaanaa Amanamummaa & Iskuuroo",
+      ti: "ሓላፊት እምነትን ኤስክሮን",
+    },
+    corridor: {
+      en: "ADDIS ABABA · LEGAL SLA",
+      am: "አዲስ አበባ · የሕግ ማዕቀፍ",
+      om: "FINFINNEE · SEERA SLA",
+      ti: "ኣዲስ ኣበባ · ሕጋዊ SLA",
+    },
+    credential: {
+      en: "COMMERCIAL COMPLIANCE",
+      am: "የንግድ ሕግ ተገዢነት",
+      om: "WALSIMANNAA DALDALAA",
+      ti: "ምኽባር ሕጊ ንግዲ",
+    },
     theme: "gold",
   },
   {
     id: "bereket",
     name: "Bereket Hailu",
-    role: { en: "VP of Engineering & Security", am: "የኢንጂነሪንግ ምክትል ፕሬዝዳንት" },
-    corridor: "AAiT · DISTRIBUTED LEDGERS",
-    credential: "TELEBIRR & CBE API LEAD",
+    role: {
+      en: "VP of Engineering & Security",
+      am: "የኢንጂነሪንግ እና ደህንነት ምክትል ፕሬዝዳንት",
+      om: "Itti Aanaa Pireezidaantii Injinariingii & Nageenyaa",
+      ti: "ምክትል ፕረዚደንት ኢንጂነሪንግን ድሕነትን",
+    },
+    corridor: {
+      en: "AAiT · DISTRIBUTED LEDGERS",
+      am: "AAiT · የተከፋፈሉ ሌጀሮች",
+      om: "AAiT · GALMEEWWAN QOODAMAN",
+      ti: "AAiT · ዝተዘርግሑ መዛግብቲ",
+    },
+    credential: {
+      en: "TELEBIRR & CBE API LEAD",
+      am: "የቴሌብር እና ንግድ ባንክ API መሪ",
+      om: "HOGGANAA API TELEBIRR & CBE",
+      ti: "መራሒ API ቴሌብርን CBEን",
+    },
     theme: "obsidian",
   },
   {
     id: "hana",
     name: "Hana Mekonnen",
-    role: { en: "Head of Talent & Regional Corridors", am: "የባለሙያዎች ማረጋገጫ ኃላፊ" },
-    corridor: "ADDIS · HAWASSA · BAHIR DAR",
-    credential: "FAYDA KYC DIRECTOR",
+    role: {
+      en: "Head of Talent & Regional Corridors",
+      am: "የባለሙያዎች እና የክልል ማዕከላት ኃላፊ",
+      om: "Hogganaa Ogeeyyii & Naannolee",
+      ti: "ሓላፊት ክኢላታትን ዞባዊ ማእከላትን",
+    },
+    corridor: {
+      en: "ADDIS · HAWASSA · BAHIR DAR",
+      am: "አዲስ · ሀዋሳ · ባህር ዳር",
+      om: "FINFINNEE · HAWAASAA · BAAHIR DAAR",
+      ti: "ኣዲስ · ሃዋሳ · ባህር ዳር",
+    },
+    credential: {
+      en: "FAYDA KYC DIRECTOR",
+      am: "የፋይዳ KYC ዳይሬክተር",
+      om: "DAARIKTEERA FAYDA KYC",
+      ti: "ዳይሬክተር ፋይዳ KYC",
+    },
     theme: "cobalt",
   },
 ];
 
-const REGIONAL_CORRIDORS = [
+const REGIONAL_CORRIDORS: RegionalCorridorItem[] = [
   {
     id: "addis",
-    name: "Addis Ababa HQ (Bole Atlas)",
-    role: "ENTERPRISE ESCROW · FINTECH · FULL-STACK ENGINEERING",
-    quote:
-      "Our Bole Atlas studio coordinates enterprise software escrows, commercial bank RTGS custody, and our bilingual 48-hour mediation desk.",
-    metric: "12,400+ TALENT",
+    name: {
+      en: "Addis Ababa HQ (Bole Atlas)",
+      am: "የአዲስ አበባ ዋና መስሪያ ቤት (ቦሌ አትላስ)",
+      om: "Waajjira Muummee Finfinnee (Bolee Atlaas)",
+      ti: "ዋና ቤት ጽሕፈት ኣዲስ ኣበባ (ቦሌ ኣትላስ)",
+    },
+    role: {
+      en: "ENTERPRISE ESCROW · FINTECH · FULL-STACK ENGINEERING",
+      am: "የድርጅት ኤስክሮ · ፊንቴክ · ፉል-ስታክ ኢንጂነሪንግ",
+      om: "ISKUUROO DHAABBATA · FIINTEK · INJINARIINGII FULL-STACK",
+      ti: "ኤስክሮ ትካላት · ፊንቴክ · ፉል-ስታክ ኢንጂነሪንግ",
+    },
+    quote: {
+      en: "Our Bole Atlas studio coordinates enterprise software escrows, commercial bank RTGS custody, and our bilingual 48-hour mediation desk.",
+      am: "የቦሌ አትላስ ማዕከላችን የድርጅት ሶፍትዌር ኤስክሮዎችን፣ የንግድ ባንክ RTGS ጥበቃን እና የ48 ሰዓት ባለብዙ ቋንቋ የሽምግልና ቢሮአችንን ያስተባብራል።",
+      om: "Istudiyoon keenya Bolee Atlaas iskuuroo sooftiweerii dhaabbilee, eegumsa baankii daldalaa RTGS fi tajaajila araara sa'aatii 48 afaanoota hedduun ni qindeessa.",
+      ti: "ማእከልና ቦሌ ኣትላስ ኤስክሮ ሶፍትዌር ትካላት፣ ሓለዋ RTGS ባንኪ ንግድን ብዙሕ ቋንቋ ዘለዎ ናይ 48 ሰዓት ቤት ጽሕፈት ዕርቅን የዋህድ።",
+    },
+    metric: {
+      en: "12,400+ TALENT",
+      am: "12,400+ ባለሙያዎች",
+      om: "OGEEYYII 12,400+",
+      ti: "12,400+ ክኢላታት",
+    },
   },
   {
     id: "hawassa",
-    name: "Hawassa & Adama Corridor",
-    role: "AGRITECH · INDUSTRIAL IOT · MOBILE COMMERCE",
-    quote:
-      "Connecting Rift Valley agro-processors and industrial parks with vetted mobile engineers, UI/UX specialists, and data analysts.",
-    metric: "3,100+ TALENT",
+    name: {
+      en: "Hawassa & Adama Corridor",
+      am: "የሀዋሳ እና አዳማ ማዕከል",
+      om: "Sarara Hawaasaa & Adaamaa",
+      ti: "ማእከል ሃዋሳን ኣዳማን",
+    },
+    role: {
+      en: "AGRITECH · INDUSTRIAL IOT · MOBILE COMMERCE",
+      am: "አግሪቴክ · የኢንዱስትሪ IoT · የሞባይል ንግድ",
+      om: "AGRITEK · IOT INDUSTIRII · DALDALA MOOBAAYILAA",
+      ti: "ኣግሪቴክ · ኢንዱስትርያዊ IoT · ንግዲ ሞባይል",
+    },
+    quote: {
+      en: "Connecting Rift Valley agro-processors and industrial parks with vetted mobile engineers, UI/UX specialists, and data analysts.",
+      am: "በስምጥ ሸለቆ የሚገኙ የግብርና ማቀነባበሪያዎችን እና የኢንዱስትሪ ፓርኮችን ከተረጋገጡ የሞባይል ኢንጂነሮች፣ UI/UX ባለሙያዎች እና የውሂብ ተንታኞች ጋር እናገናኛለን።",
+      om: "Warshaalee qonnaa Sulula Qiinxamaa fi paarkiiwwan industirii injinaroota moobaayilaa mirkanaa'an, ogeeyyii UI/UX fi xiinxaltoota daataa waliin walqunnamsiisa.",
+      ti: "ኣብ ስንጭሮ ስምጥ ዝርከቡ ኣፍረይቲ ሕርሻን ኢንዱስትሪ ፓርክታትን ምስ ዝተረጋገጹ ኢንጂነራት ሞባይል፣ ክኢላታት UI/UXን ተንተንቲ ዳታን ነራኽብ።",
+    },
+    metric: {
+      en: "3,100+ TALENT",
+      am: "3,100+ ባለሙያዎች",
+      om: "OGEEYYII 3,100+",
+      ti: "3,100+ ክኢላታት",
+    },
   },
   {
     id: "bahirdar",
-    name: "Bahir Dar, Mekelle & Dire Dawa",
-    role: "MULTILINGUAL LOCALIZATION · AI DATA · DESIGN",
-    quote:
-      "Instant Telebirr and CBE Birr milestone releases empower university graduates across regional capitals to execute national contracts.",
-    metric: "2,900+ TALENT",
+    name: {
+      en: "Bahir Dar, Mekelle & Dire Dawa",
+      am: "ባህር ዳር፣ መቀሌ እና ድሬዳዋ",
+      om: "Baahir Daar, Maqalee & Dirree Dhawaa",
+      ti: "ባህር ዳር፣ መቐለን ድሬዳዋን",
+    },
+    role: {
+      en: "MULTILINGUAL LOCALIZATION · AI DATA · DESIGN",
+      am: "ባለብዙ ቋንቋ ትርጉም · AI ውሂብ · ዲዛይን",
+      om: "HIWIKA AFAANOOTAA · DAATAA AI · DIZAAYINII",
+      ti: "ትርጉም ብዙሕ ቋንቋታት · ዳታ AI · ዲዛይን",
+    },
+    quote: {
+      en: "Instant Telebirr and CBE Birr milestone releases empower university graduates across regional capitals to execute national contracts.",
+      am: "ፈጣን የቴሌብር እና የንግድ ባንክ ብር ክፍያዎች በክልል ዋና ከተሞች የሚገኙ የዩኒቨርሲቲ ምሩቃን ሀገር አቀፍ ውሎችን በብቃት እንዲያከናውኑ ያስችላቸዋል።",
+      om: "Kaffaltiin saffisaan Telebirr fi CBE Birr eebbifamtoota yuunivarsiitii magaalaalee naannoo hunda keessa jiran waliigaltee biyyaalessaa akka raawwatan gargaara.",
+      ti: "ቅልጡፍ ክፍሊት ቴሌብርን CBE ብርን ተመረቕቲ ዩኒቨርሲቲታት ኣብ ርእሰ ከተማታት ክልላት ሃገራዊ ውዕላት ብብቕዓት ክፍጽሙ የኽእሎም።",
+    },
+    metric: {
+      en: "2,900+ TALENT",
+      am: "2,900+ ባለሙያዎች",
+      om: "OGEEYYII 2,900+",
+      ti: "2,900+ ክኢላታት",
+    },
   },
 ];
+
+const ABOUT_COPY: Record<
+  Language,
+  {
+    home: string;
+    studioCode: string;
+    aboutBreadcrumb: string;
+    fees: string;
+    cases: string;
+    faq: string;
+    heroLine1: string;
+    heroBrace: string;
+    heroLine2: string;
+    heroLeftPill: string;
+    heroRightPill: string;
+    exploreStudio: string;
+    trustBraceWord: string;
+    manifestoSegments: { text: string; highlight?: boolean }[];
+    kpiEscrowSuffix: string;
+    kpiEscrowLabel: string;
+    kpiTalentLabel: string;
+    kpiDisputeLabel: string;
+    leadershipKicker: string;
+    pillarsKicker: string;
+    corridorsKicker: string;
+    hireTalent: string;
+    boleKicker: string;
+    dispatchTitle: string;
+    dispatchHeader: string;
+    dispatchSla: string;
+    dispatchSentTitle: string;
+    dispatchAnother: string;
+    namePlaceholder: string;
+    orgPlaceholder: string;
+    messagePlaceholder: string;
+    topics: { value: string; label: string }[];
+    sendDispatch: string;
+    startContract: string;
+  }
+> = {
+  en: {
+    home: "Home",
+    studioCode: "STUDIO",
+    aboutBreadcrumb: "About & Architecture",
+    fees: "Fees",
+    cases: "Cases",
+    faq: "FAQ",
+    heroLine1: "we build",
+    heroBrace: "{trust}",
+    heroLine2: "for Ethiopian work",
+    heroLeftPill: "{ Addis Ababa Studio } ↗",
+    heroRightPill: "{ Bole Atlas HQ } ↗",
+    exploreStudio: "Explore studio ↓",
+    trustBraceWord: "TRUST",
+    manifestoSegments: [
+      { text: "Ethiopia never lacked world-class talent—it needed" },
+      { text: "institutional escrow infrastructure", highlight: true },
+      { text: "so teams can build together with zero fear." },
+    ],
+    kpiEscrowSuffix: "M+ ETB",
+    kpiEscrowLabel: "RINGFENCED ESCROW",
+    kpiTalentLabel: "FAYDA-VETTED TALENT",
+    kpiDisputeLabel: "DISPUTE-FREE RATE",
+    leadershipKicker: "STUDIO LEADERSHIP",
+    pillarsKicker: "{ PILLARS }",
+    corridorsKicker: "CORRIDORS",
+    hireTalent: "Hire verified talent ↗",
+    boleKicker: "BOLE ATLAS HQ",
+    dispatchTitle: "Dispatch our Addis Ababa studio.",
+    dispatchHeader: "STUDIO DISPATCH",
+    dispatchSla: "SLA: < 2 HOURS",
+    dispatchSentTitle: "Dispatch received by Bole Atlas HQ.",
+    dispatchAnother: "Send another dispatch",
+    namePlaceholder: "Your full name *",
+    orgPlaceholder: "Company or Telebirr phone",
+    messagePlaceholder: "Brief inquiry...",
+    topics: [
+      { value: "Enterprise Escrow Onboarding", label: "Enterprise Escrow Onboarding" },
+      { value: "ERCA VAT & Withholding Integration", label: "ERCA VAT & Withholding Integration" },
+      { value: "Fayda KYC & Agency Verification", label: "Fayda KYC & Agency Verification" },
+    ],
+    sendDispatch: "Send Dispatch ↗",
+    startContract: "Start Contract",
+  },
+  am: {
+    home: "መነሻ",
+    studioCode: "ስቱዲዮ",
+    aboutBreadcrumb: "ስለ እኛ እና መዋቅር",
+    fees: "ክፍያዎች",
+    cases: "ፕሮጀክቶች",
+    faq: "ጥያቄዎች",
+    heroLine1: "ለኢትዮጵያ",
+    heroBrace: "{እምነት}",
+    heroLine2: "የዲጂታል ሥራ መሠረት",
+    heroLeftPill: "{ የአመራር ቡድን } ↗",
+    heroRightPill: "{ ቦሌ አትላስ ቢሮ } ↗",
+    exploreStudio: "አመራሩን ይመልከቱ ↓",
+    trustBraceWord: "እምነት",
+    manifestoSegments: [
+      { text: "ኢትዮጵያ ድንቅ ባለሙያዎች አሏት፤ YeKis ደግሞ" },
+      { text: "ሁለቱንም ወገን የሚጠብቅ የኤስክሮ ድልድይ", highlight: true },
+      { text: "በአዲስ አበባ ገንብቷል።" },
+    ],
+    kpiEscrowSuffix: "ሚ+ ብር",
+    kpiEscrowLabel: "የኤስክሮ ጥበቃ መጠን",
+    kpiTalentLabel: "በፋይዳ የተረጋገጡ ባለሙያዎች",
+    kpiDisputeLabel: "ያለክርክር የተጠናቀቁ",
+    leadershipKicker: "መስራቾች እና አመራሮች",
+    pillarsKicker: "{ ምሰሶዎች }",
+    corridorsKicker: "የሥራ ማዕከላት",
+    hireTalent: "ባለሙያ ይቅጠሩ ↗",
+    boleKicker: "ቦሌ አትላስ · አዲስ አበባ",
+    dispatchTitle: "ከYeKis ቡድን ጋር ይገናኙ።",
+    dispatchHeader: "የቢሮ መልዕክት",
+    dispatchSla: "ምላሽ: < 2 ሰዓት",
+    dispatchSentTitle: "መልዕክትዎ ለቦሌ አትላስ ቢሮ ደርሷል!",
+    dispatchAnother: "ሌላ መልዕክት ይላኩ",
+    namePlaceholder: "ሙሉ ስም *",
+    orgPlaceholder: "ድርጅት / የቴሌብር ስልክ",
+    messagePlaceholder: "መልዕክትዎን ይጻፉ...",
+    topics: [
+      { value: "Enterprise Escrow Onboarding", label: "የድርጅት ኤስክሮ ምዝገባ" },
+      { value: "ERCA VAT & Withholding Integration", label: "የERCA ቫት እና ዊዝሆልዲንግ ውህደት" },
+      { value: "Fayda KYC & Agency Verification", label: "የፋይዳ KYC እና የኤጀንሲ ማረጋገጫ" },
+    ],
+    sendDispatch: "መልዕክት ይላኩ ↗",
+    startContract: "ውል ይጀምሩ",
+  },
+  om: {
+    home: "Mana",
+    studioCode: "ISTUDIYOO",
+    aboutBreadcrumb: "Waa'ee Keenyaa & Caasaa",
+    fees: "Kaffaltii",
+    cases: "Piroojektoota",
+    faq: "Gaaffilee",
+    heroLine1: "hojiif",
+    heroBrace: "{amanamummaa}",
+    heroLine2: "Itoophiyaa keessatti ijaarra",
+    heroLeftPill: "{ Istudiyoo Finfinnee } ↗",
+    heroRightPill: "{ Waajjira Bolee Atlaas } ↗",
+    exploreStudio: "Istudiyoo ilaali ↓",
+    trustBraceWord: "AMANA",
+    manifestoSegments: [
+      { text: "Itoophiyaan ogeeyyii addunyaa qabdi—wanti barbaachisu garuu" },
+      { text: "caasaa iskuuroo dhaabbataa", highlight: true },
+      { text: "kan gareen lamaanuu sodaa malee ittiin hojjetaniidha." },
+    ],
+    kpiEscrowSuffix: "M+ ETB",
+    kpiEscrowLabel: "ISKUUROO EEGAME",
+    kpiTalentLabel: "OGEEYYII FAYDA MIRKANA'AN",
+    kpiDisputeLabel: "FALMII MALEE XUMURAME",
+    leadershipKicker: "HOGGANSA ISTUDIYOO",
+    pillarsKicker: "{ UTUBAAWWAN }",
+    corridorsKicker: "SARARA HOJII",
+    hireTalent: "Ogeessa mirkanaa'e qacari ↗",
+    boleKicker: "WAAJJIRA BOLEE ATLAAS",
+    dispatchTitle: "Istudiyoo Finfinnee keenya quunnamaa.",
+    dispatchHeader: "ERGAA ISTUDIYOO",
+    dispatchSla: "DEEBII: < SA'AATII 2",
+    dispatchSentTitle: "Ergaan keessan Waajjira Bolee Atlaas ga'eera!",
+    dispatchAnother: "Ergaa biraa ergi",
+    namePlaceholder: "Maqaa guutuu *",
+    orgPlaceholder: "Dhaabbata ykn lakk. Telebirr",
+    messagePlaceholder: "Gaaffii gabaabaa...",
+    topics: [
+      { value: "Enterprise Escrow Onboarding", label: "Galmee Iskuuroo Dhaabbilee" },
+      { value: "ERCA VAT & Withholding Integration", label: "Walitti Hidhamiinsa ERCA VAT & Gibiraa" },
+      { value: "Fayda KYC & Agency Verification", label: "Mirkaneessa Fayda KYC & Ejensii" },
+    ],
+    sendDispatch: "Ergaa Ergi ↗",
+    startContract: "Waliigaltee Jalqabi",
+  },
+  ti: {
+    home: "መበገሲ",
+    studioCode: "ስቱድዮ",
+    aboutBreadcrumb: "ብዛዕባናን መዋቕርን",
+    fees: "ክፍሊታት",
+    cases: "ፕሮጀክታት",
+    faq: "ሕቶታት",
+    heroLine1: "ንኢትዮጵያ",
+    heroBrace: "{እምነት}",
+    heroLine2: "መሰረት ዲጂታል ስራሕ",
+    heroLeftPill: "{ ጉጅለ ኣመራርሓ } ↗",
+    heroRightPill: "{ ቤት ጽሕፈት ቦሌ ኣትላስ } ↗",
+    exploreStudio: "ኣመራርሓ ርአ ↓",
+    trustBraceWord: "እምነት",
+    manifestoSegments: [
+      { text: "ኢትዮጵያ ድንቂ ክኢላታት ኣለውዋ—ዘድልያ ግን" },
+      { text: "ትካላዊ መሰረተ-ልምዓት ኤስክሮ", highlight: true },
+      { text: "ክልቲኦም ወገናት ብዘይ ስግኣት ክሰርሑ ዘኽእል እዩ።" },
+    ],
+    kpiEscrowSuffix: "ሚ+ ብር",
+    kpiEscrowLabel: "ዝተሓለወ ኤስክሮ",
+    kpiTalentLabel: "ብፋይዳ ዝተረጋገጹ ክኢላታት",
+    kpiDisputeLabel: "ብዘይ ክትዕ ዝተዛዘመ",
+    leadershipKicker: "መስረትትን ኣመራርሓን",
+    pillarsKicker: "{ ዓንድታት }",
+    corridorsKicker: "ዞባዊ ማእከላት",
+    hireTalent: "ዝተረጋገጸ ክኢላ ቅጸር ↗",
+    boleKicker: "ቦሌ ኣትላስ · ኣዲስ ኣበባ",
+    dispatchTitle: "ምስ ጉጅለ YeKis ተራኸቡ።",
+    dispatchHeader: "መልእኽቲ ቤት ጽሕፈት",
+    dispatchSla: "ምላሽ: < 2 ሰዓት",
+    dispatchSentTitle: "መልእኽትኹም ናብ ቤት ጽሕፈት ቦሌ ኣትላስ በጺሑ ኣሎ!",
+    dispatchAnother: "ካልእ መልእኽቲ ስደድ",
+    namePlaceholder: "ምሉእ ስም *",
+    orgPlaceholder: "ትካል / ስልኪ ቴሌብር",
+    messagePlaceholder: "መልእኽትኹም ጸሓፉ...",
+    topics: [
+      { value: "Enterprise Escrow Onboarding", label: "ምዝገባ ኤስክሮ ትካላት" },
+      { value: "ERCA VAT & Withholding Integration", label: "ውህደት ቫትን ዝተሓዝ ግብርን ERCA" },
+      { value: "Fayda KYC & Agency Verification", label: "መረጋገጺ ፋይዳ KYCን ኤጀንሲን" },
+    ],
+    sendDispatch: "መልእኽቲ ስደድ ↗",
+    startContract: "ውዕል ጀምር",
+  },
+};
 
 function TiltVisualSurface({
   children,
@@ -283,7 +721,8 @@ function renderAboutArtwork(key: string) {
 
 export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
   const { language } = useI18n();
-  const lang: "en" | "am" = language === "am" ? "am" : "en";
+  const lang: Language = language;
+  const copy = ABOUT_COPY[lang] ?? ABOUT_COPY.en;
   const [activePillarId, setActivePillarId] = useState<PillarId>("escrow");
   const [activeCorridorIdx, setActiveCorridorIdx] = useState<number>(0);
   const [contactName, setContactName] = useState("");
@@ -304,10 +743,13 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
       TRUST_PILLARS.map((pillar) => ({
         id: pillar.id,
         title: pillar.label[lang],
-        topChip: pillar.topChip,
-        kickerBadge: pillar.badge,
+        topChip: pillar.topChip[lang],
+        kickerBadge: pillar.badge[lang],
         artNode: renderAboutArtwork(pillar.id),
-        rows: pillar.rows,
+        rows: pillar.rows.map((row) => ({
+          label: row.label[lang],
+          badge: row.badge[lang],
+        })),
         onCardClick: () => onNavigate?.("faq"),
       })),
     [lang, onNavigate]
@@ -331,12 +773,12 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           <StudioBreadcrumb
             items={[
               {
-                label: lang === "am" ? "መነሻ" : "Home",
+                label: copy.home,
                 onClick: () => onNavigate?.("home"),
               },
               {
-                code: "STUDIO",
-                label: lang === "am" ? "ስለ እኛ እና መዋቅር" : "About & Architecture",
+                code: copy.studioCode,
+                label: copy.aboutBreadcrumb,
                 active: true,
               },
             ]}
@@ -348,7 +790,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   onClick={() => onNavigate?.("fees")}
                 >
                   <span>01</span>
-                  <span>{lang === "am" ? "ክፍያዎች" : "Fees"}</span>
+                  <span>{copy.fees}</span>
                 </button>
                 <button
                   type="button"
@@ -356,7 +798,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   onClick={() => onNavigate?.("case-studies")}
                 >
                   <span>02</span>
-                  <span>{lang === "am" ? "ፕሮጀክቶች" : "Cases"}</span>
+                  <span>{copy.cases}</span>
                 </button>
                 <button
                   type="button"
@@ -364,7 +806,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   onClick={() => onNavigate?.("faq")}
                 >
                   <span>03</span>
-                  <span>{lang === "am" ? "ጥያቄዎች" : "FAQ"}</span>
+                  <span>{copy.faq}</span>
                 </button>
               </div>
             }
@@ -377,14 +819,14 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           >
             <h1 className="cs-hero-display">
               <span className="cs-hero-line">
-                {lang === "am" ? "ለኢትዮጵያ" : "we build"}{" "}
-                <span className="cs-hero-brace">{lang === "am" ? "{እምነት}" : "{trust}"}</span>
+                {copy.heroLine1}{" "}
+                <span className="cs-hero-brace">{copy.heroBrace}</span>
               </span>
               <span className="cs-hero-line">
                 <span className="cs-hero-arrow" aria-hidden="true">
                   →
                 </span>
-                {lang === "am" ? "የዲጂታል ሥራ መሠረት" : "for Ethiopian work"}
+                {copy.heroLine2}
               </span>
             </h1>
           </motion.div>
@@ -398,7 +840,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
               >
                 {renderAboutArtwork("hero-left")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ የአመራር ቡድን } ↗" : "{ Addis Ababa Studio } ↗"}
+                  {copy.heroLeftPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -409,7 +851,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
               >
                 {renderAboutArtwork("hero-right")}
                 <span className="cs-hero-hover-pill">
-                  {lang === "am" ? "{ መልዕክት ይላኩ } ↗" : "{ Bole Atlas HQ } ↗"}
+                  {copy.heroRightPill}
                 </span>
               </TiltVisualSurface>
             }
@@ -421,7 +863,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
               className="cs-scroll-pill"
               onClick={() => teamSectionRef.current?.scrollIntoView({ behavior: "smooth" })}
             >
-              {lang === "am" ? "አመራሩን ይመልከቱ ↓" : "Explore studio ↓"}
+              {copy.exploreStudio}
             </button>
           </div>
         </div>
@@ -439,32 +881,18 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
               transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
             >
               <span className="cs-brace-emblem-char">{"{"}</span>
-              <span className="cs-brace-emblem-word">{lang === "am" ? "እምነት" : "TRUST"}</span>
+              <span className="cs-brace-emblem-word">{copy.trustBraceWord}</span>
               <span className="cs-brace-emblem-char">{"}"}</span>
             </motion.div>
 
             <div>
-              <ScrollIlluminatedHeadline
-                segments={
-                  lang === "am"
-                    ? [
-                        { text: "ኢትዮጵያ ድንቅ ባለሙያዎች አሏት፤ YeKis ደግሞ" },
-                        { text: "ሁለቱንም ወገን የሚጠብቅ የኤስክሮ ድልድይ", highlight: true },
-                        { text: "በአዲስ አበባ ገንብቷል።" },
-                      ]
-                    : [
-                        { text: "Ethiopia never lacked world-class talent—it needed" },
-                        { text: "institutional escrow infrastructure", highlight: true },
-                        { text: "so teams can build together with zero fear." },
-                      ]
-                }
-              />
+              <ScrollIlluminatedHeadline segments={copy.manifestoSegments} />
 
               <AnimatedCountUpStrip
                 metrics={[
-                  { value: 142, suffix: "M+ ETB", label: "RINGFENCED ESCROW" },
-                  { value: 18400, suffix: "+", label: "FAYDA-VETTED TALENT" },
-                  { value: 99.4, decimals: 1, suffix: "%", label: "DISPUTE-FREE RATE" },
+                  { value: 142, suffix: copy.kpiEscrowSuffix, label: copy.kpiEscrowLabel },
+                  { value: 18400, suffix: "+", label: copy.kpiTalentLabel },
+                  { value: 99.4, decimals: 1, suffix: "%", label: copy.kpiDisputeLabel },
                 ]}
               />
             </div>
@@ -479,7 +907,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
         <div className="cs-band-inner">
           <div className="cs-works-topbar">
             <span className="cs-kicker" style={{ color: "#0b0f0c" }}>
-              {"{"} {lang === "am" ? "መስራቾች እና አመራሮች" : "STUDIO LEADERSHIP"} {"}"}
+              {"{"} {copy.leadershipKicker} {"}"}
             </span>
           </div>
 
@@ -500,8 +928,8 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   >
                     {renderAboutArtwork(member.theme)}
                     <div className="cs-work-visual-top">
-                      <span className="cs-work-client-chip">{member.corridor}</span>
-                      <span className="cs-work-year-chip">{member.credential}</span>
+                      <span className="cs-work-client-chip">{member.corridor[lang]}</span>
+                      <span className="cs-work-year-chip">{member.credential[lang]}</span>
                     </div>
                   </TiltVisualSurface>
 
@@ -523,7 +951,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           ================================================================ */}
       <section className="cs-services-band">
         <StickyScrollServicesStage
-          kicker={lang === "am" ? "{ ምሰሶዎች }" : "{ PILLARS }"}
+          kicker={copy.pillarsKicker}
           items={stickyItems}
           activeId={activePillarId}
           onSelect={(id) => setActivePillarId(id as PillarId)}
@@ -538,7 +966,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           <div className="cs-testi-grid">
             <div className="cs-testi-left">
               <span className="cs-kicker" style={{ color: "#070a08" }}>
-                {"{"} {lang === "am" ? "የሥራ ማዕከላት" : "CORRIDORS"} {"}"}
+                {"{"} {copy.corridorsKicker} {"}"}
               </span>
 
               <div className="cs-testi-authors">
@@ -549,8 +977,8 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                     className={`cs-testi-author-btn ${idx === activeCorridorIdx ? "is-active" : ""}`}
                     onClick={() => setActiveCorridorIdx(idx)}
                   >
-                    <span>{corridor.name}</span>
-                    <span className="cs-testi-metric-pill">{corridor.metric}</span>
+                    <span>{corridor.name[lang]}</span>
+                    <span className="cs-testi-metric-pill">{corridor.metric[lang]}</span>
                   </button>
                 ))}
               </div>
@@ -565,10 +993,10 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.35, ease: EASE_OUT_EXPO }}
                 >
-                  <p className="cs-testi-quote">“{activeCorridor.quote}”</p>
-                  <div className="cs-testi-role">{activeCorridor.role}</div>
+                  <p className="cs-testi-quote">“{activeCorridor.quote[lang]}”</p>
+                  <div className="cs-testi-role">{activeCorridor.role[lang]}</div>
                   <button type="button" className="cs-testi-link" onClick={() => onStart?.("register")}>
-                    {lang === "am" ? "ባለሙያ ይቅጠሩ ↗" : "Hire verified talent ↗"}
+                    {copy.hireTalent}
                   </button>
                 </motion.div>
               </AnimatePresence>
@@ -585,10 +1013,10 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
           <div className="cs-outro-grid" style={{ alignItems: "start" }}>
             <div>
               <span className="cs-kicker" style={{ color: "#78c841" }}>
-                {"{"} {lang === "am" ? "ቦሌ አትላስ · አዲስ አበባ" : "BOLE ATLAS HQ"} {"}"}
+                {"{"} {copy.boleKicker} {"}"}
               </span>
               <h2 className="cs-outro-title" style={{ marginBottom: 18 }}>
-                {lang === "am" ? "ከYeKis ቡድን ጋር ይገናኙ።" : "Dispatch our Addis Ababa studio."}
+                {copy.dispatchTitle}
               </h2>
 
               <div className="cs-outro-brace-stage" style={{ justifyContent: "flex-start", marginTop: 24 }}>
@@ -616,8 +1044,8 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   letterSpacing: "0.08em",
                 }}
               >
-                <span>STUDIO DISPATCH</span>
-                <span>SLA: &lt; 2 HOURS</span>
+                <span>{copy.dispatchHeader}</span>
+                <span>{copy.dispatchSla}</span>
               </div>
 
               {contactSent ? (
@@ -631,7 +1059,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                   }}
                 >
                   <h3 style={{ margin: "0 0 12px", fontSize: 20 }}>
-                    {lang === "am" ? "መልዕክትዎ ደርሶናል!" : "Dispatch received by Bole Atlas HQ."}
+                    {copy.dispatchSentTitle}
                   </h3>
                   <button
                     type="button"
@@ -641,7 +1069,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                       setContactMessage("");
                     }}
                   >
-                    {lang === "am" ? "ሌላ መልዕክት ይላኩ" : "Send another dispatch"}
+                    {copy.dispatchAnother}
                   </button>
                 </div>
               ) : (
@@ -651,14 +1079,14 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                       type="text"
                       required
                       className="cs-contact-input"
-                      placeholder={lang === "am" ? "ሙሉ ስም *" : "Your full name *"}
+                      placeholder={copy.namePlaceholder}
                       value={contactName}
                       onChange={(e) => setContactName(e.target.value)}
                     />
                     <input
                       type="text"
                       className="cs-contact-input"
-                      placeholder={lang === "am" ? "ድርጅት / ስልክ" : "Company or Telebirr phone"}
+                      placeholder={copy.orgPlaceholder}
                       value={contactOrg}
                       onChange={(e) => setContactOrg(e.target.value)}
                     />
@@ -669,23 +1097,25 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                     value={contactTopic}
                     onChange={(e) => setContactTopic(e.target.value)}
                   >
-                    <option value="Enterprise Escrow Onboarding">Enterprise Escrow Onboarding</option>
-                    <option value="ERCA VAT & Withholding Integration">ERCA VAT &amp; Withholding Integration</option>
-                    <option value="Fayda KYC & Agency Verification">Fayda KYC &amp; Agency Verification</option>
+                    {copy.topics.map((topic) => (
+                      <option key={topic.value} value={topic.value}>
+                        {topic.label}
+                      </option>
+                    ))}
                   </select>
 
                   <textarea
                     required
                     rows={3}
                     className="cs-contact-textarea"
-                    placeholder={lang === "am" ? "መልዕክትዎን ይጻፉ..." : "Brief inquiry..."}
+                    placeholder={copy.messagePlaceholder}
                     value={contactMessage}
                     onChange={(e) => setContactMessage(e.target.value)}
                   />
 
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                     <button type="submit" className="cs-outro-pill-btn">
-                      {lang === "am" ? "መልዕክት ይላኩ ↗" : "Send Dispatch ↗"}
+                      {copy.sendDispatch}
                     </button>
                     <button
                       type="button"
@@ -697,7 +1127,7 @@ export function AboutPage({ onNavigate, onStart }: AboutPageProps) {
                       }}
                       onClick={() => onStart?.("register")}
                     >
-                      {lang === "am" ? "ውል ይጀምሩ" : "Start Contract"}
+                      {copy.startContract}
                     </button>
                   </div>
                 </>

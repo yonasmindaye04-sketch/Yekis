@@ -1,6 +1,7 @@
 import { InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
 import { buildPublicWebAppUrl } from "../utils/deepLink.js";
+import { toIntlLocale } from "../utils/markdown.js";
 
 export function jobFiltersKeyboard(
   ctx: BotContext,
@@ -121,7 +122,7 @@ export function jobFiltersKeyboard(
 export function jobCard(job: any, ctx: BotContext): string {
   const deadline = job.deadline
     ? new Date(job.deadline).toLocaleDateString(
-        ctx.i18n.locale === "am" ? "am-ET" : "en-US",
+        toIntlLocale(ctx.i18n.locale),
       )
     : ctx.t("jobs_no_deadline");
   const budget = job.budgetMaxMinor

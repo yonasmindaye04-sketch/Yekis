@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import type { KanbanColumnId, KanbanTask } from "./dashboardData";
 
+
 interface KanbanBoardViewProps {
   tasks: KanbanTask[];
   onTasksChange: (next: KanbanTask[]) => void;

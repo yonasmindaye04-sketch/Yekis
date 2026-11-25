@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { type Language, useI18n } from "./i18n";
 import "./LegalDocumentPage.css";
 
 export type LegalSection = {
@@ -17,6 +18,61 @@ type LegalDocumentPageProps = {
   onNavigate: (page: string) => void;
 };
 
+const LEGAL_CHROME: Record<
+  Language,
+  {
+    breadcrumbAria: string;
+    home: string;
+    detailsAria: string;
+    effectivePrefix: string;
+    version: string;
+    languageLabel: string;
+    onThisPage: string;
+    needHelp: string;
+  }
+> = {
+  en: {
+    breadcrumbAria: "Breadcrumb",
+    home: "Home",
+    detailsAria: "Document details",
+    effectivePrefix: "Effective",
+    version: "Version 1.1",
+    languageLabel: "English",
+    onThisPage: "On this page",
+    needHelp: "Need help?",
+  },
+  am: {
+    breadcrumbAria: "መዳረሻ",
+    home: "መነሻ",
+    detailsAria: "የሰነድ ዝርዝሮች",
+    effectivePrefix: "የሚፀናበት ቀን",
+    version: "እትም 1.1",
+    languageLabel: "አማርኛ",
+    onThisPage: "በዚህ ገጽ ላይ",
+    needHelp: "እገዛ ይፈልጋሉ?",
+  },
+  om: {
+    breadcrumbAria: "Daandii fuulaa",
+    home: "Mana",
+    detailsAria: "Bal'ina sanadaa",
+    effectivePrefix: "Hojiirra kan oolu",
+    version: "Gulantaa 1.1",
+    languageLabel: "Afaan Oromoo",
+    onThisPage: "Fuula kana irratti",
+    needHelp: "Gargaarsa barbaadduu?",
+  },
+  ti: {
+    breadcrumbAria: "መገዲ ገጽ",
+    home: "መበገሲ",
+    detailsAria: "ዝርዝራት ሰነድ",
+    effectivePrefix: "ዝጸንዓሉ ዕለት",
+    version: "ሕታም 1.1",
+    languageLabel: "ትግርኛ",
+    onThisPage: "ኣብዚ ገጽ",
+    needHelp: "ሓገዝ የድልየኩም ድዩ?",
+  },
+};
+
 export function LegalDocumentPage({
   eyebrow,
   title,
@@ -26,12 +82,15 @@ export function LegalDocumentPage({
   contactEmail,
   onNavigate,
 }: LegalDocumentPageProps) {
+  const { language } = useI18n();
+  const chrome = LEGAL_CHROME[language] ?? LEGAL_CHROME.en;
+
   return (
     <main className="legal-page">
       <div className="legal-page-container">
-        <nav className="legal-breadcrumbs" aria-label="Breadcrumb">
+        <nav className="legal-breadcrumbs" aria-label={chrome.breadcrumbAria}>
           <button type="button" onClick={() => onNavigate("home")}>
-            Home
+            {chrome.home}
           </button>
           <span aria-hidden="true">/</span>
           <span aria-current="page">{title}</span>
@@ -41,16 +100,18 @@ export function LegalDocumentPage({
           <p className="legal-eyebrow">{eyebrow}</p>
           <h1>{title}</h1>
           <p className="legal-summary">{summary}</p>
-          <div className="legal-meta" aria-label="Document details">
-            <span>Effective {effectiveDate}</span>
-            <span>Version 1.1</span>
-            <span>English</span>
+          <div className="legal-meta" aria-label={chrome.detailsAria}>
+            <span>
+              {chrome.effectivePrefix} {effectiveDate}
+            </span>
+            <span>{chrome.version}</span>
+            <span>{chrome.languageLabel}</span>
           </div>
         </header>
 
         <div className="legal-layout">
           <aside className="legal-toc">
-            <p className="legal-toc-title">On this page</p>
+            <p className="legal-toc-title">{chrome.onThisPage}</p>
             <ol>
               {sections.map((section, index) => (
                 <li key={section.id}>
@@ -62,7 +123,7 @@ export function LegalDocumentPage({
               ))}
             </ol>
             <div className="legal-toc-contact">
-              <strong>Need help?</strong>
+              <strong>{chrome.needHelp}</strong>
               <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
             </div>
           </aside>

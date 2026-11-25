@@ -59,18 +59,31 @@ export function truncate(text: string, maxLength: number): string {
   return text.slice(0, maxLength - 3) + "...";
 }
 
+export type BotLocale = "en" | "am" | "om" | "ti";
+
+const INTL_LOCALE_MAP: Record<BotLocale, string> = {
+  en: "en-US",
+  am: "am-ET",
+  om: "om-ET",
+  ti: "ti-ET",
+};
+
+export function toIntlLocale(locale?: string): string {
+  return INTL_LOCALE_MAP[(locale as BotLocale) || "en"] ?? "en-US";
+}
+
 /**
  * Format number with locale-aware formatting
  */
-export function formatNumber(num: number, locale: "en" | "am" = "en"): string {
-  return num.toLocaleString(locale === "am" ? "am-ET" : "en-US");
+export function formatNumber(num: number, locale: BotLocale = "en"): string {
+  return num.toLocaleString(toIntlLocale(locale));
 }
 
 /**
  * Format ETB amount from minor units (cents)
  */
-export function formatETB(minor: number, locale: "en" | "am" = "en"): string {
-  return `${(minor / 100).toLocaleString(locale === "am" ? "am-ET" : "en-US", { minimumFractionDigits: 2 })} ETB`;
+export function formatETB(minor: number, locale: BotLocale = "en"): string {
+  return `${(minor / 100).toLocaleString(toIntlLocale(locale), { minimumFractionDigits: 2 })} ETB`;
 }
 
 /**
@@ -78,12 +91,12 @@ export function formatETB(minor: number, locale: "en" | "am" = "en"): string {
  */
 export function formatDate(
   date: Date | string,
-  locale: "en" | "am" = "en",
+  locale: BotLocale = "en",
   options?: Intl.DateTimeFormatOptions,
 ): string {
   const d = typeof date === "string" ? new Date(date) : date;
   return d.toLocaleDateString(
-    locale === "am" ? "am-ET" : "en-US",
+    toIntlLocale(locale),
     options || { year: "numeric", month: "short", day: "numeric" },
   );
 }
@@ -93,7 +106,7 @@ export function formatDate(
  */
 export function formatRelativeTime(
   date: Date | string,
-  locale: "en" | "am" = "en",
+  locale: BotLocale = "en",
 ): string {
   const d = typeof date === "string" ? new Date(date) : date;
   const now = new Date();
@@ -105,7 +118,9 @@ export function formatRelativeTime(
   const t = {
     en: { min: "min", hour: "h", day: "d", justNow: "just now" },
     am: { min: "ደቂቃ", hour: "ሰዓት", day: "ቀን", justNow: "አሁን" },
-  }[locale];
+    om: { min: "daq", hour: "sa'", day: "g", justNow: "amma" },
+    ti: { min: "ደቒ", hour: "ሰዓ", day: "መዓ", justNow: "ሕጂ" },
+  }[locale] ?? { min: "min", hour: "h", day: "d", justNow: "just now" };
 
   if (diffMins < 1) return t.justNow;
   if (diffMins < 60) return `${diffMins} ${t.min}`;

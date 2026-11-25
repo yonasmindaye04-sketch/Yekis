@@ -1,0 +1,437 @@
+/* ── Fayda-Aligned Dropzone Styles for FileUploader ───────────────────── */
+
+.yk-upload {
+  --yk-fu-surface: #ffffff;
+  --yk-fu-surface-2: #f6f8fa;
+  --yk-fu-surface-3: #eef2f5;
+  --yk-fu-border: #e2e8ee;
+  --yk-fu-border-strong: #c6d0da;
+  --yk-fu-text: #1b2530;
+  --yk-fu-text-muted: #55677a;
+  --yk-fu-text-faint: #8b98a6;
+  --yk-fu-accent: #0c7a52;
+  --yk-fu-accent-soft: rgba(12, 122, 82, 0.09);
+  --yk-fu-accent-ring: rgba(12, 122, 82, 0.22);
+  --yk-fu-accent-text: #0c7a52;
+  --yk-fu-danger: #c2413b;
+  --yk-fu-danger-soft: rgba(194, 65, 59, 0.09);
+
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  color: var(--yk-fu-text);
+  box-sizing: border-box;
+}
+
+:root[data-theme="light"] .yk-upload,
+[data-theme="light"] .yk-upload {
+  --yk-fu-surface: #ffffff;
+  --yk-fu-surface-2: #f6f8fa;
+  --yk-fu-surface-3: #eef2f5;
+  --yk-fu-border: #e2e8ee;
+  --yk-fu-border-strong: #c6d0da;
+  --yk-fu-text: #1b2530;
+  --yk-fu-text-muted: #55677a;
+  --yk-fu-text-faint: #8b98a6;
+  --yk-fu-accent: #0c7a52;
+  --yk-fu-accent-soft: rgba(12, 122, 82, 0.09);
+  --yk-fu-accent-ring: rgba(12, 122, 82, 0.22);
+  --yk-fu-accent-text: #0c7a52;
+  --yk-fu-danger: #c2413b;
+  --yk-fu-danger-soft: rgba(194, 65, 59, 0.09);
+}
+
+:root[data-theme="dark"] .yk-upload,
+[data-theme="dark"] .yk-upload,
+.dark .yk-upload {
+  --yk-fu-surface: #121820;
+  --yk-fu-surface-2: #171f29;
+  --yk-fu-surface-3: #1d2733;
+  --yk-fu-border: #243040;
+  --yk-fu-border-strong: #334154;
+  --yk-fu-text: #e7edf3;
+  --yk-fu-text-muted: #9fadbb;
+  --yk-fu-text-faint: #6e7d8c;
+  --yk-fu-accent: #2ba06e;
+  --yk-fu-accent-soft: rgba(43, 160, 110, 0.13);
+  --yk-fu-accent-ring: rgba(43, 160, 110, 0.28);
+  --yk-fu-accent-text: #4cc794;
+  --yk-fu-danger: #e0655f;
+  --yk-fu-danger-soft: rgba(224, 101, 95, 0.12);
+}
+
+.yk-upload *,
+.yk-upload *::before,
+.yk-upload *::after {
+  box-sizing: border-box;
+}
+
+/* ── Label Row ────────────────────────────────────────────────────────── */
+.yk-upload .yk-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  min-width: 0;
+}
+
+.yk-upload .yk-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--yk-fu-text);
+  letter-spacing: 0.01em;
+}
+
+.yk-upload .yk-label-hint {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--yk-fu-text-faint);
+}
+
+/* ── Dropzone Button / Box ────────────────────────────────────────────── */
+.yk-upload .yk-drop {
+  width: 100%;
+  display: block;
+  margin-top: 2px;
+  border: 1.5px dashed var(--yk-fu-border-strong);
+  border-radius: 12px;
+  background: var(--yk-fu-surface-2);
+  padding: 26px 20px;
+  text-align: center;
+  cursor: pointer;
+  outline: none;
+  color: var(--yk-fu-text);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.yk-upload .yk-drop:hover:not(:disabled):not(.has-file) {
+  border-color: var(--yk-fu-accent);
+  background: var(--yk-fu-surface-3);
+}
+
+.yk-upload .yk-drop:focus-visible {
+  border-color: var(--yk-fu-accent);
+  box-shadow: 0 0 0 3px var(--yk-fu-accent-ring);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.yk-upload .yk-drop.dragover {
+  border-color: var(--yk-fu-accent);
+  border-style: solid;
+  background: var(--yk-fu-accent-soft);
+  box-shadow: 0 0 0 3px var(--yk-fu-accent-ring);
+}
+
+.yk-upload .yk-drop:disabled,
+.yk-upload .yk-drop.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.yk-upload.invalid .yk-drop {
+  border-color: var(--yk-fu-danger);
+}
+
+.yk-upload .yk-drop-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.yk-upload .yk-drop-icon {
+  width: 42px;
+  height: 42px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: var(--yk-fu-surface-3);
+  border: 1px solid var(--yk-fu-border);
+  display: grid;
+  place-items: center;
+  color: var(--yk-fu-text-muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.yk-upload .yk-drop-icon svg {
+  display: block;
+}
+
+.yk-upload .yk-drop:hover:not(:disabled) .yk-drop-icon,
+.yk-upload .yk-drop.dragover .yk-drop-icon {
+  color: var(--yk-fu-accent-text);
+  border-color: var(--yk-fu-accent-ring);
+}
+
+.yk-upload .yk-drop-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 0 0 4px;
+  color: var(--yk-fu-text);
+}
+
+.yk-upload .yk-drop-browse {
+  color: var(--yk-fu-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.yk-upload .yk-drop-sub {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--yk-fu-text-faint);
+  margin: 0;
+}
+
+/* ── Populated File Preview Row ───────────────────────────────────────── */
+.yk-upload .yk-drop.has-file {
+  cursor: default;
+  padding: 14px 16px;
+  text-align: left;
+  border-style: solid;
+  border-color: var(--yk-fu-border);
+  background: var(--yk-fu-surface-2);
+}
+
+.yk-upload .yk-drop.has-file.dragover {
+  border-color: var(--yk-fu-accent);
+  background: var(--yk-fu-accent-soft);
+}
+
+.yk-upload .yk-drop.has-file:hover:not(.dragover) {
+  border-color: var(--yk-fu-border-strong);
+  background: var(--yk-fu-surface-2);
+}
+
+.yk-upload .yk-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yk-upload .yk-file-card {
+  border: 1px solid var(--yk-fu-border);
+  border-radius: 12px;
+  background: var(--yk-fu-surface-2);
+  padding: 12px 14px;
+}
+
+.yk-upload .yk-file {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.yk-upload .yk-file-thumb {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  border: 1px solid var(--yk-fu-border);
+  background: var(--yk-fu-surface-3);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  color: var(--yk-fu-text-muted);
+}
+
+.yk-upload .yk-file-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.yk-upload .yk-file-meta {
+  min-width: 0;
+  flex: 1;
+}
+
+.yk-upload .yk-file-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0 0 3px;
+  color: var(--yk-fu-text);
+}
+
+.yk-upload .yk-file-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--yk-fu-text-faint);
+  margin: 0;
+}
+
+.yk-upload .yk-file-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--yk-fu-accent-text);
+  font-weight: 600;
+}
+
+.yk-upload .yk-file-err {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--yk-fu-danger);
+  font-weight: 600;
+}
+
+.yk-upload .yk-file-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.yk-upload .yk-file-replace {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--yk-fu-text-muted);
+  background: transparent;
+  border: 0;
+  padding: 6px 10px;
+  min-height: 32px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.yk-upload .yk-file-replace:hover:not(:disabled) {
+  color: var(--yk-fu-text);
+  background: var(--yk-fu-surface-3);
+}
+
+.yk-upload .yk-file-replace:focus-visible {
+  outline: 2px solid var(--yk-fu-accent);
+  outline-offset: 2px;
+}
+
+.yk-upload .yk-file-remove {
+  min-width: 32px;
+  min-height: 32px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: var(--yk-fu-text-faint);
+  cursor: pointer;
+  padding: 6px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.yk-upload .yk-file-remove:hover:not(:disabled) {
+  color: var(--yk-fu-danger);
+  background: var(--yk-fu-danger-soft);
+}
+
+.yk-upload .yk-file-remove:focus-visible {
+  outline: 2px solid var(--yk-fu-danger);
+  outline-offset: 2px;
+}
+
+.yk-upload .yk-file-progress {
+  margin-top: 10px;
+}
+
+/* ── Summary & Error Row ──────────────────────────────────────────────── */
+.yk-upload .yk-upload-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--yk-fu-text-faint);
+  margin-top: 2px;
+}
+
+.yk-upload .yk-upload-clear {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yk-fu-text-muted);
+  background: transparent;
+  border: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.yk-upload .yk-upload-clear:hover:not(:disabled) {
+  color: var(--yk-fu-text);
+  background: var(--yk-fu-surface-3);
+}
+
+.yk-upload .yk-upload-error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--yk-fu-danger);
+  margin: 2px 0 0;
+}
+
+.yk-upload .yk-upload-error svg {
+  flex: none;
+  display: block;
+}
+
+/* ── Responsive & Accessibility Media Queries ─────────────────────────── */
+@media (max-width: 640px) {
+  .yk-upload .yk-drop {
+    padding: 22px 14px;
+  }
+  .yk-upload .yk-drop.has-file {
+    padding: 12px 12px;
+  }
+  .yk-upload .yk-file {
+    gap: 10px;
+  }
+}
+
+@media (pointer: coarse) {
+  .yk-upload .yk-file-replace,
+  .yk-upload .yk-file-remove,
+  .yk-upload .yk-upload-clear {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (forced-colors: active) {
+  .yk-upload .yk-drop:focus-visible,
+  .yk-upload .yk-file-replace:focus-visible,
+  .yk-upload .yk-file-remove:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .yk-upload *,
+  .yk-upload *::before,
+  .yk-upload *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}
