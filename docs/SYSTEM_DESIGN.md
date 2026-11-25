@@ -1381,6 +1381,7 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 
 * **Purpose:** Implements the official Yekis Telegram Bot via the Grammy framework. Handles `/start` deep linking, user account linking, interactive scene wizards (browse jobs, proposal bidding, wallet balance check, KYC guide), and bot webhooks.
 * **Owns:** Grammy bot instance, conversation scenes (`apps/backend/src/modules/bot/scenes/index.ts`).
+* **Webhook ingestion:** `POST /api/v1/telegram/webhook` authenticates Telegram's `X-Telegram-Bot-Api-Secret-Token` header with a constant-time comparison and fails closed when the secret is unset. Telegram authenticates the **header**, not the body, so the route parses JSON locally before handing the update to grammY's Express adapter. This route-local parser is required because the Telegram router is mounted before the application's global `express.json()` middleware; without it, `req.body` was `undefined`, every delivery failed with HTTP 500, and Telegram retried the update indefinitely while the bot remained silent.
 
 ---
 
@@ -1633,7 +1634,7 @@ Both reject an invalid signature with a logged warning before any state change.
 
 Two further guards apply to the Telebirr handler: the webhook is **idempotent** (a replayed callback does not double-apply the state transition), and the callback is **bound to the transaction** it created, so a forged payload cannot credit a milestone that was never paid for.
 
-> **Mounting order matters.** The webhook routers are mounted **before** `express.json()` in `app.ts` (lines 101 and 106), because they must parse the raw body themselves to verify a signature over the exact bytes the provider sent. Re-serialising the JSON to verify a signature can differ byte-for-byte from what was signed, and silently break verification.
+> **Mounting order matters.** The payment webhook routers are mounted **before** `express.json()` in `app.ts`, because they must parse the raw body themselves to verify a signature over the exact bytes the provider sent. Re-serialising the JSON to verify a signature can differ byte-for-byte from what was signed, and silently break verification. The Telegram router is mounted there as well, but it does not need raw bytes: Telegram's secret token is carried in a header, and the webhook route installs its own JSON parser before passing the parsed update to grammY.
 
 ---
 

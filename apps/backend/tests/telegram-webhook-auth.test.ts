@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { Express } from "express";
 import request from "supertest";
 import { prisma } from "../src/lib/prisma.js";
+import { installFakeTelegramApi } from "./fixtures/telegramApi.js";
 
 /**
  * The Telegram webhook is an unauthenticated endpoint by necessity — Telegram
@@ -164,6 +165,34 @@ describe("with a secret configured, only Telegram gets through", () => {
     expect(res.status).not.toBe(401);
     expect(res.body.error).not.toBe("Invalid secret token");
     expect(res.body.error).not.toBe("WEBHOOK_NOT_CONFIGURED");
+  });
+
+  it("parses Telegram's JSON body before handing the update to grammY", async () => {
+    // The bot router is mounted before the application's global express.json()
+    // middleware. grammY's Express adapter reads `req.body`, so without a
+    // route-local parser a genuine delivery arrived as `undefined`, failed with
+    // HTTP 500, and Telegram retried it forever. The earlier authentication
+    // tests could not catch this: they stopped at "bot not initialized" before
+    // the adapter received the update.
+    const built = await loadAppWith({
+      TELEGRAM_WEBHOOK_SECRET: SECRET,
+      TELEGRAM_BOT_TOKEN: "123456789:ABCdefGHIjklMNOpqrsTUVwxyz",
+    });
+    const { createBot } = await import("../src/modules/bot/bot.service.js");
+    const bot = createBot();
+    const telegram = installFakeTelegramApi(bot, "fake-token");
+
+    const res = await request(built)
+      .post("/api/v1/telegram/webhook")
+      .set("x-telegram-bot-api-secret-token", SECRET)
+      .send({ update_id: 6 });
+
+    expect(res.status).toBe(200);
+    expect(telegram.of("getMe").length).toBeGreaterThan(0);
+
+    // The bot module keeps the initialized instance in module state. Clear the
+    // module graph so later tests still exercise the uninitialized-bot branch.
+    vi.resetModules();
   });
 });
 
