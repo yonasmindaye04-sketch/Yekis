@@ -1423,6 +1423,66 @@ polling and with an **empty** token, webhook URL and secret. To drive the real
 bot from a laptop, use a tunnel
 (`docs/CLOUDFLARE_TUNNEL_PLAYBOOK.md`) and a bot token of your own.
 
+### The full four-language release goes live - 2026-11-25
+
+The batch that had been sitting uncommitted on `feat/multi-channel-auth` was
+committed as `6db3672`, merged into `main` as `d660b47`, and then merged with
+the deployed branch's own bot-recovery work (`4f3e810`) as `4cfe1d9`. The
+deployed branch was fast-forwarded from `4f3e810` to `4cfe1d9` - no force-push,
+and no commit on either side was dropped.
+
+**What shipped:**
+
+- The Telegram bot now speaks English, Amharic, Afaan Oromoo and Tigrigna.
+  Commands, callbacks, formatters, keyboards, scenes and middleware all read
+  from the locale catalogues, and the language is resolved from the member's
+  Telegram profile (`am*` → `am`, `om*` → `om`, `ti*` → `ti`, otherwise `en`).
+- The webhook fails closed when `TELEGRAM_WEBHOOK_SECRET` is unset, parses its
+  JSON route-locally before grammY sees it, and logs the scrubbed error instead
+  of an empty object. The founder's locale-bundle, error-boundary and
+  Markdown-fallback work from `361b46b` is in the same tree.
+- The frontend copy for the public pages, workspace, dashboard and profile
+  views moved into per-view `*Copy` modules; the public profile and profile
+  editor were rebuilt on the workspace background board; the wallet gained a
+  native checkout-instructions dialog, real multipart top-up and receipt
+  uploads, and 401 session-expiry handling; the file uploader was rebuilt on
+  the Fayda dropzone pattern; mock-session routing, the public-profile report
+  enum and the Ethiopian calendar helpers were fixed.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-25T17:04:30Z` (the bot-recovery code came up at
+  `2026-11-25T15:46:25Z`; the later docs commits rebuilt the same assets), on
+  `fix/code-only-compliance-gaps`, with **55** environment variables.
+- Served assets: `/assets/index-BY8XTnbd.css` (identical to the local
+  production build) and `/assets/index-BzX3RWd1.js` (the hash differs from the
+  local build only because the host bakes its `VITE_*` values in).
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- `GET /api/v1/auth/identities` and `GET /api/v1/users/me/erasure/blockers`
+  answer **401** without a session; the providers endpoint answers
+  `google:true`, `telegram:true`, `telegramBotUsername:"ye_kis_bot"`.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"`,
+  `"pendingUpdateCount":0`, and the webhook registered at
+  `https://yekis.app.aletcloud.com/api/v1/telegram/webhook`.
+- The log reports `40 migrations found` and `No pending migrations to apply.`,
+  and shows no "Webhook processing failed" after the new container started.
+- Gates before the push: backend `tsc --noEmit` and frontend `tsc -b` clean;
+  the production `vite build` clean; **70 of 71** backend test files pass, the
+  only failure being the known pre-existing `withdrawal-2fa` SMS-provider case;
+  the bot and webhook suites (`bot-error-resilience`, `bot-updates`,
+  `telegram-webhook-auth`, `log-redaction`) pass **4/4 files**; the route
+  audit, doc parity, secret scan and lockfile parity all pass.
+
+The docs commit that records this deployment triggers one more build of the
+same tree. The served assets stay identical, so `lastDeployedAt` moves a few
+minutes past the timestamp above without the code changing.
+
+**Still on the founder:** `https://yekis.app.aletcloud.com` must be added to
+the Google OAuth client's **Authorized JavaScript origins**
+(`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). Nothing on the platform can
+change that.
+
 ### Teardown
 
 ```bash
