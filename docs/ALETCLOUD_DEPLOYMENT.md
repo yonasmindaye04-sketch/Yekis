@@ -1646,6 +1646,45 @@ client still does not list `https://yekis.app.aletcloud.com` under
 **Authorized JavaScript origins**. The verified-email auto-linking change in
 this release is therefore not yet observable through the Google button.
 
+### The landing-hero spacing release - 2026-11-26
+
+A landing-hero spacing change (`landing-v2.css`) appeared in the working tree
+while the release above was deploying. It was reviewed rather than assumed:
+the `.v2-hero-inner` container keeps a definite width (`width: 100%`,
+`max-width: 1120px`), so the `container-type: inline-size` containment cannot
+collapse it; `.v2-btn` stays `position: relative`, so the shine sweep keeps
+anchoring to its own button; the `600px` rule sits after the `@supports`
+block, so the stacked `gap: 1rem` wins when the buttons stack; and every
+changed value is in the un-themed base rules, so light and dark keep identical
+geometry.
+
+**Deployed** as `795e249` (the change) and `058b732` (the change plus the
+release record), fast-forwarded onto `fix/code-only-compliance-gaps` with no
+force-push.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-26T12:52:26Z`, with **55** environment variables.
+- The served bundle is `/assets/index-B3UfU-8d.css` - the same hash the
+  local production build and the container image produce, so the host is
+  running the committed stylesheet.
+- Measured in a browser on the live host: the subheadline's clearance is
+  **60.996px** (it was **28.704px**), the gap between the two hero buttons is
+  **20.178px** (it was **14px**), `container-type` computes to
+  `inline-size`, and the page has no horizontal overflow and no clipped
+  hero. Toggling the theme changed no geometry value.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11** again on this deployment, the OAuth provider endpoint still
+  answers `{"google":true,…,"telegram":true}`, the four authenticated probes
+  still answer **401** rather than **404**, and the Telegram health endpoint
+  still answers **200** with `"status":"ok"` and `"pendingUpdateCount":0`.
+- `docker build -t yekis:check .` builds the whole image from this commit,
+  and its bundle's CSS hash matches the host's byte for byte.
+
+The branch was then fast-forwarded once more for this documentation commit,
+so the host rebuilds it a final time; that rebuild is documentation-only and
+changes no asset.
+
 ### Teardown
 
 ```bash
