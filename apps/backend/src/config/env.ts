@@ -175,6 +175,19 @@ const EnvSchema = z.object({
 
   SMS_ETHIOPIA_API_KEY: z.string().optional(),
 
+  // ── Staff provisioning ────────────────────────────────────────────────
+  // See apps/backend/src/bootstrap/admin.ts and docs/ADMIN_ACCESS.md.
+  //
+  // Both must be set for anything to happen; the bootstrap refuses to touch
+  // an existing account and refuses to mint a second full-access
+  // administrator while one exists. The password lives only in the host's
+  // environment — it is never written to a file, a log line or the
+  // repository. Unset both once the account exists.
+  ADMIN_BOOTSTRAP_EMAIL: z.string().optional(),
+  ADMIN_BOOTSTRAP_PASSWORD: z.string().optional(),
+  ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL: z.enum(["true", "false"]).optional(),
+  ADMIN_BOOTSTRAP_RESET: z.enum(["true", "false"]).optional(),
+
   TELEGRAM_BOT_TOKEN: z
     .string()
     .transform((val) =>

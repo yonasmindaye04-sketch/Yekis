@@ -24,6 +24,7 @@ import { logger } from "./lib/logger.js";
 import { prisma } from "./lib/prisma.js";
 import { initWebSocketServer } from "./lib/socket.js";
 import { ensureObjectStoreReady } from "./lib/objectStore.js";
+import { bootstrapAdminFromEnv } from "./bootstrap/admin.js";
 import { startBotDetailed, stopBot } from "./modules/bot/bot.service.js";
 // Importing the worker file starts it listening on the queue as a side effect.
 // In production, run workers as a separate process/container from the API
@@ -116,6 +117,18 @@ const server = app.listen(env.PORT, async () => {
   ensureObjectStoreReady().catch((err) =>
     logger.error({ err }, "Failed to initialize object store bucket"),
   );
+
+  // Staff provisioning (apps/backend/src/bootstrap/admin.ts).
+  //
+  // A host whose database has no administrator is a platform nobody can
+  // operate, and the managed database on AletCloud is not reachable from
+  // outside the app's own network — so this runs here, in the one process
+  // that does hold a connection. It is inert unless the operator set
+  // ADMIN_BOOTSTRAP_EMAIL and ADMIN_BOOTSTRAP_PASSWORD, it never touches an
+  // existing account, and it never logs the password.
+  bootstrapAdminFromEnv().catch((err) => {
+    logger.error({ err }, "Admin bootstrap failed; no administrator was created");
+  });
 
   // Start Telegram bot.
   //

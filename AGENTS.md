@@ -60,6 +60,10 @@ docker build -t yekis:check .                        # the deployment image
   scripts in `scripts/*.sql` are destructive. Never run them against anything
   that is not a local scratch database, and never without being asked.
 - An unscoped filter once deleted every `Milestone` row. Scope every write.
+- Staff accounts are never created through an API route. On a host whose
+  database is unreachable (the AletCloud one is `publicAccess: false`), the
+  supported way to create one is the start-up bootstrap in
+  `apps/backend/src/bootstrap/admin.ts` — see `docs/ADMIN_ACCESS.md`.
 
 ## Documentation is part of the change
 

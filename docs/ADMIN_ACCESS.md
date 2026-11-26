@@ -1,6 +1,6 @@
 # Admin Portal Access Guide
 
-Last updated: 2026-08-07
+Last updated: 2026-11-26
 
 ## How Staff Access Works
 
@@ -35,12 +35,12 @@ VALUES (
   'STAFF-' || substr(gen_random_uuid()::text, 1, 8),
   '<staff@yourdomain.com>',
   '<+251911000000>',
-  -- bcrypt hash of a strong password (generate with: node -e "require('bcrypt').hash('yourpassword',12).then(console.log)")
-  '<bcrypt_hash_here>',
+  -- Argon2id hash of a strong password (generate with: node -e "require('./apps/backend/src/lib/password.ts')..." or see below)
+  '<argon2id_hash_here>',
   'CLIENT',            -- marketplace role (not used for staff)
   '1990-01-01',
   'en',
-  'COMPLIANCE_OFFICER', -- or 'ADMIN'
+  'COMPLIANCE_OFFICER', -- or 'ADMIN', 'SUPER_ADMIN'
   now(),
   now()
 );
@@ -64,7 +64,7 @@ await prisma.user.upsert({
   create: {
     email: 'admin@yekis.et',
     phone: '+251911000001',
-    passwordHash: await bcrypt.hash('ChangeMe123!', 12),
+    passwordHash: await hashPassword('ChangeMe123!'),
     role: 'CLIENT',
     dateOfBirth: new Date('1990-01-01'),
     staffRole: 'ADMIN',
@@ -79,6 +79,55 @@ Then run:
 ```bash
 pnpm --filter backend exec prisma db seed
 ```
+
+### Option C — Provision from inside the application (a host you cannot reach with a database client)
+
+**This is the method to use when the database is not reachable from your machine** — which is the
+case for the AletCloud deployment, whose managed PostgreSQL is published with `publicAccess: false`
+and is reachable only from the application's own network. Without it, a perfectly healthy host can
+be running with no administrator at all and nobody able to operate it.
+
+The API process can provision the first administrator for itself, at start-up, when the operator
+asks for it through the environment. See `apps/backend/src/bootstrap/admin.ts`.
+
+**Set these two environment variables on the app, then deploy:**
+
+| Variable | Meaning |
+|---|---|
+| `ADMIN_BOOTSTRAP_EMAIL` | The address the administrator signs in with. |
+| `ADMIN_BOOTSTRAP_PASSWORD` | The password. **14 characters minimum.** It is never logged, never written to a file, and never leaves the host. |
+
+Two optional flags, both off by default:
+
+| Variable | Meaning |
+|---|---|
+| `ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL=true` | Permits creating a *second* full-access administrator while one already exists. Without it, the run is refused. |
+| `ADMIN_BOOTSTRAP_RESET=true` | Permits resetting the password of the account that already holds `ADMIN_BOOTSTRAP_EMAIL`. Without it, an existing account is **never** touched. A reset also bumps `sessionVersion`, which retires every session already issued for that account. |
+
+On the next deployment the container creates the account and logs one line:
+
+```
+Admin bootstrap created the platform administrator account
+```
+
+**Then remove both variables and deploy again.** The account persists; the password stops sitting
+in the host's environment. This is the intended end state — the variables are a tool for the moment
+an administrator is needed, not a standing configuration.
+
+What the bootstrap will **not** do, by design:
+
+- It will not touch an account that already exists (unless `ADMIN_BOOTSTRAP_RESET=true`).
+- It will not create a second full-access administrator (unless `ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL=true`).
+- It will not invent a date of birth — `User.dateOfBirth` stays empty, because a fabricated one
+  corrupts KYC data (AML integrity).
+- It will not grant anything the role matrix does not already grant. It creates a login and sets
+  `staffRole`; it does not touch escrow state, step-up policy, balances or any money path. The
+  wallet it opens is empty.
+
+The account it creates is a `SUPER_ADMIN`, which holds all 30 permissions in the matrix. To grant a
+*different*, narrower role instead (`FINANCE_ADMIN`, `SUPPORT`, `COMPLIANCE_ADMIN`, …), set
+`ADMIN_BOOTSTRAP_EMAIL` to that operator's address, let the bootstrap create the account, and then
+change the role from the Operations Console's **Admins & Permissions** page.
 
 ---
 
@@ -109,8 +158,17 @@ pnpm --filter backend exec prisma db seed
 
 | `staffRole` value | Access level |
 |---|---|
-| `COMPLIANCE_OFFICER` | Full access to KYC, top-up, dispute, TMS, and support queues |
-| `ADMIN` | Same as `COMPLIANCE_OFFICER` (can be extended with platform-wide controls) |
+| `SUPER_ADMIN` | All 30 permissions. The founder's own account. |
+| `ADMIN` | All 30 permissions (legacy full-access). |
+| `OPERATIONS_ADMIN` | Operations, contracts, jobs, gigs, escalations. |
+| `FINANCE_ADMIN` | Escrow, payouts, ledger, reconciliation, top-ups, receipts. |
+| `COMPLIANCE_ADMIN` | KYC decisions, PEP and sanctions. |
+| `DISPUTE_MEDIATOR` | Dispute queue and mediation. |
+| `COMPLIANCE_OFFICER` | Full access to KYC, top-up, dispute, TMS, and support queues (legacy). |
+| `SUPPORT` | Support desk, reports queue, KYC queue (read-mostly). |
+
+The full matrix is in `docs/SYSTEM_DESIGN.md` §3.16 and is served live at
+`GET /api/v1/admin/permissions/matrix`.
 
 ---
 
@@ -128,27 +186,22 @@ The support desk inside the Staff Dashboard provides:
 
 ---
 
-## Generating a bcrypt Password Hash
+## Generating a Password Hash
 
-If you need to generate a hash for Option A above:
-
-```bash
-node -e "const b=require('bcryptjs'); b.hash('YourStrongPassword!',12).then(h=>console.log(h))"
-```
-
-Or with bcrypt:
+The platform hashes passwords with **Argon2id** (`@node-rs/argon2`, 64 MiB / 3 passes / 4 lanes),
+not bcrypt. `apps/backend/src/lib/password.ts` owns the parameters, so a hash generated anywhere
+else must use the same ones to verify.
 
 ```bash
-node -e "const b=require('bcrypt'); b.hash('YourStrongPassword!',12).then(h=>console.log(h))"
+# From apps/backend, with tsx available:
+node_modules/.bin/tsx.CMD -e "import { hashPassword } from './src/lib/password.ts'; hashPassword('YourStrongPassword!').then(console.log);"
 ```
-
----
 
 ## Security Notes
 
 - Staff passwords must be strong (≥ 14 characters, mixed case, numbers, symbols)
 - Staff accounts should not be shared — create one per operator
 - The `staffRole` field cannot be set through any public API endpoint; it requires direct database
-  access or a privileged seed script
+  access, the start-up bootstrap, or a privileged seed script
 - All compliance decisions (KYC approvals, dispute resolutions, TMS dismissals) are written to the
   immutable `AuditLog` table

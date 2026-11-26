@@ -1685,6 +1685,43 @@ The branch was then fast-forwarded once more for this documentation commit,
 so the host rebuilds it a final time; that rebuild is documentation-only and
 changes no asset.
 
+### The platform administrator - 2026-11-26
+
+**The live platform had no administrator.** `docs/ADMIN_ACCESS.md` has always
+said that a staff account must be created directly in the database, because
+`staffRole` cannot be set through any public endpoint - a member who could
+promote themselves could take over every queue in the Operations Console.
+That rule assumes the operator holds a database connection, and on AletCloud
+they cannot: the managed PostgreSQL instance `yekis-jobs` is published with
+`publicAccess: false` and answers only at
+`yekis-jobs-rw.db-1370.svc.cluster.local:5432`, from inside the provider's
+network. The platform was running, serving, and unoperable.
+
+**The way in is the API process itself.** `apps/backend/src/bootstrap/admin.ts`
+runs once per start-up and provisions the first administrator when, and only
+when, the operator asks for it through the environment:
+
+| Variable | Meaning |
+|---|---|
+| `ADMIN_BOOTSTRAP_EMAIL` | The address the administrator signs in with. |
+| `ADMIN_BOOTSTRAP_PASSWORD` | The password, 14 characters minimum. Never logged, never written to a file, never committed. |
+| `ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL` | `true` permits a second full-access administrator. Off by default. |
+| `ADMIN_BOOTSTRAP_RESET` | `true` permits resetting the password of the account that already holds the address. Off by default. |
+
+**Order of operations on this host.** The variables are set **before** the
+deployment that carries the feature, never during a build. The container then
+creates the account and logs one line - *Admin bootstrap created the platform
+administrator account* - and the deployment is verified by signing in with
+the new credential and calling an authenticated staff route with the returned
+token. The variables are then removed and the host is redeployed once more, so
+the password stops sitting in the environment; the account persists.
+
+The bootstrap is deliberately narrow: it refuses to touch an account that
+already exists, refuses to mint a second full-access administrator while one
+exists, never fabricates a date of birth, and grants nothing the role matrix
+does not already grant. It creates a login - it touches no escrow state, no
+step-up policy and no balance.
+
 ### Teardown
 
 ```bash
