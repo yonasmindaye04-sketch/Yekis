@@ -1687,13 +1687,13 @@ changes no asset.
 
 ### The platform administrator - 2026-11-26
 
-**The live platform had no administrator.** `docs/ADMIN_ACCESS.md` has always
-said that a staff account must be created directly in the database, because
-`staffRole` cannot be set through any public endpoint - a member who could
-promote themselves could take over every queue in the Operations Console.
-That rule assumes the operator holds a database connection, and on AletCloud
-they cannot: the managed PostgreSQL instance `yekis-jobs` is published with
-`publicAccess: false` and answers only at
+**The live platform had an administrator nobody could sign in as.**
+`docs/ADMIN_ACCESS.md` has always said that a staff account must be created
+directly in the database, because `staffRole` cannot be set through any public
+endpoint - a member who could promote themselves could take over every queue
+in the Operations Console. That rule assumes the operator holds a database
+connection, and on AletCloud they cannot: the managed PostgreSQL instance
+`yekis-jobs` is published with `publicAccess: false` and answers only at
 `yekis-jobs-rw.db-1370.svc.cluster.local:5432`, from inside the provider's
 network. The platform was running, serving, and unoperable.
 
@@ -1708,19 +1708,69 @@ when, the operator asks for it through the environment:
 | `ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL` | `true` permits a second full-access administrator. Off by default. |
 | `ADMIN_BOOTSTRAP_RESET` | `true` permits resetting the password of the account that already holds the address. Off by default. |
 
-**Order of operations on this host.** The variables are set **before** the
-deployment that carries the feature, never during a build. The container then
-creates the account and logs one line - *Admin bootstrap created the platform
-administrator account* - and the deployment is verified by signing in with
-the new credential and calling an authenticated staff route with the returned
-token. The variables are then removed and the host is redeployed once more, so
-the password stops sitting in the environment; the account persists.
-
 The bootstrap is deliberately narrow: it refuses to touch an account that
 already exists, refuses to mint a second full-access administrator while one
 exists, never fabricates a date of birth, and grants nothing the role matrix
 does not already grant. It creates a login - it touches no escrow state, no
 step-up policy and no balance.
+
+#### What actually happened here - three deployments
+
+**Deployment #58** carried the feature (`e22a52b`, fast-forwarded from `main`
+to `fix/code-only-compliance-gaps`; no force-push) with
+`ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` set **before** the
+build started. The container refused to create anything and logged:
+
+> `Admin bootstrap skipped: the address already has an account, and it was left untouched.`
+
+The account was there because the seeded demo data had been applied to the
+production database, and migration `20261109120000_rotate_seeded_demo_passwords`
+had then done exactly what it was written to do: it replaced the four
+committed demo password hashes with a hash of a random value **stored nowhere**,
+so the seeded rows became unusable for login - the migration's own comment
+says so, and names the remedy: *"until an operator deliberately runs
+`prisma/seed.ts` with `SEED_DEMO_PASSWORD` (local/staging only) **or provisions
+real staff accounts**"*. That remedy was the gap: seeding is refused in
+production and the database is unreachable, so nothing else could.
+
+**Deployment #59** added the explicit `ADMIN_BOOTSTRAP_RESET=true` and
+re-credentialed that row. The log line:
+
+> `Admin bootstrap reset the password of an existing account by explicit operator request`
+
+The reset changes `passwordHash` and `passwordSetAt` and increments
+`sessionVersion` - the same "rotate and retire the old sessions" pattern the
+C-01 migration used. It changes nothing else: `staffRole` stays `ADMIN` (all
+30 permissions, the same set as `SUPER_ADMIN`), the KYC row, the wallet and
+the date of birth are untouched.
+
+**Deployment #60** removed all three variables and redeployed. The host is
+back to **55 environment variables**, the password no longer sits in the
+environment, and the start-up log carries **no bootstrap line at all** -
+with no variables set the module returns immediately and writes nothing.
+
+#### Verification against the live host
+
+| Check | Result |
+|---|---|
+| `POST /api/v1/auth/login` with the new credential | **200**, access and refresh tokens issued |
+| `GET /api/v1/auth/me` | `email: admin@yekis.et`, `staffRole: ADMIN` |
+| `GET /api/v1/admin/staff` | **200** |
+| `GET /api/v1/admin/permissions/matrix` | **200** |
+| Login re-checked after deployment #60 | **200** |
+| Environment variables on the host | **55**, no `ADMIN_BOOTSTRAP_*` |
+| Start-up log after deployment #60 | no bootstrap line |
+
+The credential was handed to the founder in chat and was never written to the
+repository, a file, or a log line. The one thing that is still missing is
+**not** a credential but a domain: `https://yekis.app.aletcloud.com` is still
+absent from the Google OAuth client's **Authorized JavaScript origins**, so
+Google sign-in remains unusable on the live host.
+
+**Rotating this credential later** takes the same three steps: set
+`ADMIN_BOOTSTRAP_EMAIL` and `ADMIN_BOOTSTRAP_PASSWORD` to the new values,
+add `ADMIN_BOOTSTRAP_RESET=true`, deploy, verify the login, then remove all
+three and deploy once more.
 
 ### Teardown
 

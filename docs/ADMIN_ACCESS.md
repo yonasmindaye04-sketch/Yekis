@@ -85,7 +85,7 @@ pnpm --filter backend exec prisma db seed
 **This is the method to use when the database is not reachable from your machine** — which is the
 case for the AletCloud deployment, whose managed PostgreSQL is published with `publicAccess: false`
 and is reachable only from the application's own network. Without it, a perfectly healthy host can
-be running with no administrator at all and nobody able to operate it.
+be running with no usable administrator at all and nobody able to operate it.
 
 The API process can provision the first administrator for itself, at start-up, when the operator
 asks for it through the environment. See `apps/backend/src/bootstrap/admin.ts`.
@@ -113,6 +113,30 @@ Admin bootstrap created the platform administrator account
 **Then remove both variables and deploy again.** The account persists; the password stops sitting
 in the host's environment. This is the intended end state — the variables are a tool for the moment
 an administrator is needed, not a standing configuration.
+
+#### If the address already has an account
+
+This is the common case on a host whose database was seeded and then had its demo credentials
+rotated away: the row exists, but its password is a value nobody holds. The bootstrap will refuse
+and say so:
+
+```
+Admin bootstrap skipped: the address already has an account, and it was left untouched.
+```
+
+That refusal is the point — a stale environment variable must never silently reset somebody's
+password. To re-credential the account on purpose, add `ADMIN_BOOTSTRAP_RESET=true` to the same
+deployment. The log then reads:
+
+```
+Admin bootstrap reset the password of an existing account by explicit operator request
+```
+
+A reset changes **only** the password hash, the `passwordSetAt` stamp and `sessionVersion` (so
+every token already issued for that account stops working). It does not change `staffRole`, the
+KYC record, the wallet or the date of birth. If the existing account already holds a staff role,
+that role is kept — `ADMIN` and `SUPER_ADMIN` both hold all 30 permissions, so neither is weaker
+than the other.
 
 What the bootstrap will **not** do, by design:
 
