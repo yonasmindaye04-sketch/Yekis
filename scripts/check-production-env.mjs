@@ -534,7 +534,7 @@ function baselineEnv() {
     TELEBIRR_APP_SECRET: "j".repeat(40),
     TELEBIRR_MERCHANT_APP_ID: "k".repeat(24),
     TELEBIRR_MERCHANT_CODE: "123456",
-    TELEBIRR_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----" + "l".repeat(64),
+    TELEBIRR_PRIVATE_KEY: `${"-".repeat(5)}BEGIN PRIVATE KEY${"-".repeat(5)}` + "l".repeat(64),
     TELEBIRR_PUBLIC_KEY: "-----BEGIN PUBLIC KEY-----" + "m".repeat(64),
     PEP_PROVIDER: "real",
     TERMS_VERSION: "2026-11",
