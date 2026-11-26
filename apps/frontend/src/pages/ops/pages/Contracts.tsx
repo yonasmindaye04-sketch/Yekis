@@ -7,25 +7,24 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Check,
   CheckCircle2,
   Download,
   ExternalLink,
   Eye,
   FileText,
-  PauseCircle,
   RefreshCw,
   Scale,
   Search,
   ShieldCheck,
   TriangleAlert,
-  XCircle,
 } from "lucide-react";
 import { dt, fmt, opsApi, opsListApi, withContractDetail } from "../opsApi";
 import { useListPage } from "../opsList";
 import { CONTRACT_STATUSES } from "../opsConst";
 import type { Contract } from "../opsTypes";
 import {
+  Button,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -33,48 +32,21 @@ import {
   LoadingBox,
   PageHead,
   Pager,
+  Pill,
   Rail,
-  formatStatusLabel,
   isTyping,
   useHotkeys,
-  useToast,
-  Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("TERMINAT")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
-const CONTRACT_INTERVENTION_TEMPLATES = [
-  "Milestone deliverable verified by Operations Admin; releasing escrow funds to freelancer.",
-  "Contract completed following final milestone acceptance and ERCA tax reconciliation.",
-  "Contract escalated to Stage 3 Mediation due to scope & deliverable disagreement.",
-  "Deadline extended by 7 days after mutual client-freelancer request in support desk.",
-  "Contract terminated for non-delivery; remaining held escrow refunded to client.",
-];
-
 export default function Contracts() {
   const ui = useOpsUi();
-  const toast = useToast();
 
   const [status, setStatus] = useState("");
   const [selId, setSelId] = useState<string | null>(null);
   const [detailMap, setDetailMap] = useState<Record<string, Contract>>({});
   const [detailBusy, setDetailBusy] = useState(false);
-
-  const [templateNote, setTemplateNote] = useState("");
-  const [customNote, setCustomNote] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const list = useListPage<Contract>(
     (p) => opsListApi.contracts({ ...p, status }),
@@ -116,53 +88,6 @@ export default function Contracts() {
   }, [baseRow, loadContractDetail]);
 
   const sel = baseRow ? detailMap[baseRow.id] ?? baseRow : null;
-
-  const executeIntervention = useCallback(
-    async (
-      action:
-        | "RELEASE_MILESTONE"
-        | "COMPLETE_CONTRACT"
-        | "EXTEND_DEADLINE"
-        | "OPEN_MEDIATION"
-        | "TERMINATE_REFUND",
-    ) => {
-      if (!sel || busy) return;
-      const finalReason =
-        templateNote === "custom"
-          ? customNote.trim()
-          : templateNote.trim() || CONTRACT_INTERVENTION_TEMPLATES[0];
-
-      if (finalReason.length < 5) {
-        toast("Please select an intervention reason or enter at approach notes.");
-        return;
-      }
-
-      setBusy(true);
-      try {
-        await opsApi.interveneContract(sel.id, { action, reason: finalReason });
-        const summaryMap: Record<typeof action, string> = {
-          RELEASE_MILESTONE: `Active milestone released & settled for ${sel.id}.`,
-          COMPLETE_CONTRACT: `Contract ${sel.id} marked as COMPLETED.`,
-          EXTEND_DEADLINE: `Milestone SLA extended by 7 days on ${sel.id}.`,
-          OPEN_MEDIATION: `Contract ${sel.id} escalated to Stage 3 Dispute Mediation.`,
-          TERMINATE_REFUND: `Contract ${sel.id} terminated & held escrow refunded to client.`,
-        };
-        toast(summaryMap[action]);
-        setTemplateNote("");
-        setCustomNote("");
-        reload();
-        if (baseRow) {
-          await loadContractDetail(baseRow);
-        }
-        ui.refreshBadges();
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "Contract intervention failed");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [sel, busy, templateNote, customNote, reload, baseRow, loadContractDetail, toast, ui],
-  );
 
   useHotkeys(
     useCallback(
@@ -346,7 +271,7 @@ export default function Contracts() {
         />
       </div>
 
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -365,12 +290,12 @@ export default function Contracts() {
         <Button variant="outline" onClick={list.reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={FileText}>No contracts match the current filters.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -389,7 +314,7 @@ export default function Contracts() {
                         {c.client} → {c.fl}
                       </div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(c.status)}>{formatStatusLabel(c.status)}</ShinyBadge>
+                    <Pill s={c.status} />
                   </div>
                   <div className="qi-foot">
                     <span className="mono">{c.id}</span>
@@ -405,7 +330,7 @@ export default function Contracts() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -417,11 +342,13 @@ export default function Contracts() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <ShinyBadge variant="info">{sel.cat.replace(/_/g, " ")}</ShinyBadge>
-                    <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
-                    <ShinyBadge variant="success">
+                    <span style={{ fontSize: 12, fontWeight: 700, color: "var(--ops-text-2)" }}>
+                      {sel.cat.replace(/_/g, " ")}
+                    </span>
+                    <Pill s={sel.status} />
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--ops-green)" }}>
                       Escrow Held: {fmt(sel.escrowHeld)}
-                    </ShinyBadge>
+                    </span>
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -555,7 +482,7 @@ export default function Contracts() {
                               ) : null}
                             </td>
                             <td>
-                              <ShinyBadge variant={statusToVariant(ms.s)}>{formatStatusLabel(ms.s)}</ShinyBadge>
+                              <Pill s={ms.s} />
                             </td>
                             <td className="amount">{fmt(ms.a)}</td>
                             <td className="amount" style={{ color: "var(--ops-text-2)" }}>
@@ -598,7 +525,7 @@ export default function Contracts() {
                               <Rail p={p.p} />
                             </td>
                             <td>
-                              <ShinyBadge variant={statusToVariant(p.s)}>{formatStatusLabel(p.s)}</ShinyBadge>
+                              <Pill s={p.s} />
                             </td>
                             <td className="amount">{fmt(p.a)}</td>
                             <td style={{ color: "var(--ops-text-2)", fontSize: 12 }}>{dt(p.c)}</td>
@@ -644,77 +571,44 @@ export default function Contracts() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Administrative Contract & Milestone Execution
+                  Authoritative Intervention Workbenches
                 </div>
-                <div className="fld" style={{ marginBottom: 10 }}>
-                  <label className="lbl">Preset Intervention Rationale</label>
-                  <select
-                    className="sel"
-                    style={{ width: "100%" }}
-                    value={templateNote}
-                    onChange={(e) => setTemplateNote(e.target.value)}
-                  >
-                    <option value="">Select standard intervention note (or auto-fill)…</option>
-                    {CONTRACT_INTERVENTION_TEMPLATES.map((tpl) => (
-                      <option key={tpl} value={tpl}>
-                        {tpl}
-                      </option>
-                    ))}
-                    <option value="custom">Custom administrative note…</option>
-                  </select>
-                </div>
-
-                {templateNote === "custom" ? (
-                  <div className="fld" style={{ marginBottom: 10 }}>
-                    <label className="lbl">Custom Audit Note</label>
-                    <input
-                      className="inp"
-                      placeholder="Document the reason for this contract intervention…"
-                      value={customNote}
-                      onChange={(e) => setCustomNote(e.target.value)}
-                    />
-                  </div>
-                ) : null}
+                <p style={{ fontSize: 12.5, color: "var(--ops-text-2)", margin: "0 0 12px" }}>
+                  Milestone releases/holds are executed inside Escrow Oversight, and contract terminations or split settlements are decided inside Dispute Mediation.
+                </p>
 
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
                   <button
-                    className="btn btn-success"
-                    disabled={busy}
-                    onClick={() => void executeIntervention("RELEASE_MILESTONE")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("escrow")}
                   >
-                    <Check size={14} /> Release Active Milestone
+                    <ExternalLink size={14} /> Release or Hold Milestone in Escrow
                   </button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void executeIntervention("COMPLETE_CONTRACT")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("dispute-queue")}
                   >
-                    <CheckCircle2 size={14} /> Complete Contract
+                    <Scale size={14} /> Open Dispute Mediation
                   </button>
                   <button
-                    className="btn btn-ghost"
-                    disabled={busy}
-                    onClick={() => void executeIntervention("EXTEND_DEADLINE")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("payments")}
                   >
-                    <PauseCircle size={14} /> Extend SLA (+7d)
+                    <ExternalLink size={14} /> Inspect Inbound Funding
                   </button>
                   <button
-                    className="btn btn-warn"
-                    disabled={busy}
-                    onClick={() => void executeIntervention("OPEN_MEDIATION")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("users")}
                   >
-                    <Scale size={14} /> Escalate to Mediation
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void executeIntervention("TERMINATE_REFUND")}
-                  >
-                    <XCircle size={14} /> Terminate & Refund Escrow
+                    <ExternalLink size={14} /> Review Parties in User Directory
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

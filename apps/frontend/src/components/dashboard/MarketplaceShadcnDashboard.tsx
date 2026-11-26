@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   TrendingUp,
+  TrendingDown,
   Wallet,
   ShieldCheck,
   Briefcase,
@@ -26,9 +27,18 @@ import type {
   KanbanColumnId,
   KanbanTask,
   LedgerContractRecord,
+  PaymentRail,
   ScheduleEvent,
   TimeRangeKey,
 } from "./dashboardData";
+import { FUNDED_ESCROW_STATES } from "./dashboardData";
+import {
+  briefsCreatedSince,
+  escrowFundedTotals,
+  onTimeStats,
+  periodChange,
+  topUpTotals,
+} from "./dashboardAnalytics";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
 import {
   InteractiveCashflowAreaChart,
@@ -39,13 +49,18 @@ import { KanbanBoardView } from "./KanbanBoardView";
 import { CalendarScheduleView } from "./CalendarScheduleView";
 import { FeaturedCarousel } from "../../FeaturedCarousel";
 import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
 import { formatStatusLabel } from "../../pages/ops/components/ui";
+import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 interface MarketplaceShadcnDashboardProps {
   canHire: boolean;
   canWork: boolean;
   wallet: WalletResponse;
+  /** Open marketplace briefs — what a freelancer competes for. */
   jobs: Job[];
+  /** The caller's own posted briefs — what a client is hiring for. */
+  myJobs?: Job[];
   milestones: Milestone[];
   topUps: TopUpRequest[];
   isRefreshing: boolean;
@@ -54,6 +69,10 @@ interface MarketplaceShadcnDashboardProps {
   onSelectProfile?: (userId: string) => void;
   onOpenChat?: (userId: string, userName?: string) => void;
 }
+
+/** The window the KPI trend cards compare against. */
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 function toKanbanCol(state: string): KanbanColumnId {
   if (state === "ESCROW_HELD") return "ESCROW_HELD";
@@ -64,6 +83,14 @@ function toKanbanCol(state: string): KanbanColumnId {
   return "BACKLOG";
 }
 
+/**
+ * The escrow state as the ledger shows it.
+ *
+ * Every state the platform can store is passed through unchanged. Previously
+ * only six of them were, so a refunded milestone was displayed as "Escrow
+ * Held" — a row that claimed money was still secured when it had already
+ * gone back to the client.
+ */
 function toLedgerState(
   state: string,
 ): LedgerContractRecord["escrowState"] {
@@ -71,9 +98,12 @@ function toLedgerState(
     state === "ESCROW_HELD" ||
     state === "WORK_IN_PROGRESS" ||
     state === "SUBMITTED_FOR_REVIEW" ||
+    state === "ACCEPTED" ||
     state === "RELEASED" ||
     state === "PAYMENT_PENDING" ||
-    state === "DISPUTED"
+    state === "DISPUTED" ||
+    state === "REFUNDED" ||
+    state === "PARTIAL_REFUND"
   ) {
     return state;
   }
@@ -85,6 +115,7 @@ export function MarketplaceShadcnDashboard({
   canWork,
   wallet,
   jobs,
+  myJobs,
   milestones,
   topUps,
   isRefreshing,
@@ -100,7 +131,8 @@ export function MarketplaceShadcnDashboard({
     setOpsSubTab,
     setCommandPaletteOpen,
   } = useShadcnLayout();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).overview;
   const d = t.workspace.dashboard;
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
@@ -109,9 +141,20 @@ export function MarketplaceShadcnDashboard({
   >(null);
 
   const effectiveWallet = wallet;
-  const effectiveJobs = jobs;
   const effectiveMilestones = milestones;
   const effectiveTopUps = topUps;
+
+  /**
+   * A client is hiring against their own briefs; a freelancer is competing
+   * for the open marketplace. Showing one account the other's briefs under a
+   * headline that says "your hiring briefs" is how the workspace ended up
+   * presenting another account's work as the caller's own.
+   */
+  const effectiveJobs = useMemo(
+    () => (canWork ? jobs : (myJobs ?? [])),
+    [canWork, jobs, myJobs],
+  );
+  const briefScope = canWork ? "marketplace" : "own";
 
   // Track user-driven local overrides/additions on top of live API records
   const [stateOverrides, setStateOverrides] = useState<
@@ -120,75 +163,44 @@ export function MarketplaceShadcnDashboard({
   const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
   const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
 
-  const CONTRACT_META_MAP: Record<
-    string,
-    {
-      contractTitle: string;
-      counterparty: string;
-      counterpartyEmail: string;
-      category: string;
-      rail: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
-    }
-  > = {
-    "ctr-301": {
-      contractTitle: "Telebirr SuperApp Mini-Program",
-      counterparty: "Hanna Tadesse",
-      counterpartyEmail: "hanna.tadesse@addisdev.et",
-      category: "Web app development",
-      rail: "TELEBIRR",
-    },
-    "ctr-302": {
-      contractTitle: "Addis Coffee Export ERP",
-      counterparty: "Dawit Mekonnen",
-      counterpartyEmail: "dawit.mekonnen@ethio-digital.et",
-      category: "Web app development",
-      rail: "CBE_BIRR",
-    },
-    "ctr-303": {
-      contractTitle: "Amharic & Afaan Oromo FinTech Localization",
-      counterparty: "Meron Alemu",
-      counterpartyEmail: "meron.alemu@lexethiopia.et",
-      category: "Translation",
-      rail: "CBE_BIRR",
-    },
-    "ctr-304": {
-      contractTitle: "Fayda National ID KYC Onboarding",
-      counterparty: "Nahom Girma",
-      counterpartyEmail: "nahom.girma@addisdesign.et",
-      category: "Graphic design",
-      rail: "CBE_BIRR",
-    },
-    "ctr-305": {
-      contractTitle: "M-Pesa Till Reconciliation & Ledger",
-      counterparty: "Robel Tesfaye",
-      counterpartyEmail: "robel@ethiofintech.et",
-      category: "Web app development",
-      rail: "M_PESA",
-    },
-    "ctr-306": {
-      contractTitle: "Legacy Inventory ERP API Connector",
-      counterparty: "Bereket Haile",
-      counterpartyEmail: "bereket@coders.et",
-      category: "Data entry",
-      rail: "M_PESA",
-    },
+  /**
+   * The facts the ledger, kanban and schedule need for one milestone.
+   *
+   * Every value comes from the milestone payload the API returns for the
+   * signed-in account. Nothing is looked up in a fixture table and nothing is
+   * derived from the row's position in a list, so a row can only ever show
+   * the contract, the counterparty and the rail that actually belong to it.
+   */
+  const metaFor = (m: Milestone) => {
+    const funded = FUNDED_ESCROW_STATES.has(m.escrowState);
+    const rail: PaymentRail = m.paymentRail
+      ? (m.paymentRail as PaymentRail)
+      : funded
+        ? "INTERNAL_WALLET"
+        : "UNFUNDED";
+    return {
+      contractTitle: m.contract?.title?.trim() || `Contract ${m.contractId.slice(0, 8)}`,
+      counterparty: m.counterparty?.name?.trim() || m.counterparty?.email || "Unknown counterparty",
+      counterpartyEmail: m.counterparty?.email ?? "",
+      category:
+        m.contract?.category?.replaceAll("_", " ").toLowerCase() || "Uncategorised",
+      rail,
+    };
   };
-
-  const RAILS: Array<"TELEBIRR" | "CBE_BIRR" | "M_PESA"> = ["TELEBIRR", "CBE_BIRR", "M_PESA"];
 
   const ledgerRecords = useMemo<LedgerContractRecord[]>(
     () =>
       effectiveMilestones.map((m, idx) => {
-        const meta = CONTRACT_META_MAP[m.contractId];
+        const meta = metaFor(m);
         return {
           id: m.id,
           code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
           title: m.title,
-          contractTitle: meta?.contractTitle ?? `Contract #${m.contractId.slice(0, 8)}`,
-          counterparty: meta?.counterparty ?? "Hanna Tadesse",
-          counterpartyEmail: meta?.counterpartyEmail ?? "hanna.tadesse@addisdev.et",
-          category: meta?.category ?? "Web app development",
-          rail: meta?.rail ?? RAILS[idx % RAILS.length],
+          contractTitle: meta.contractTitle,
+          counterparty: meta.counterparty,
+          counterpartyEmail: meta.counterpartyEmail,
+          category: meta.category,
+          rail: meta.rail,
           escrowState: stateOverrides[m.id] ?? toLedgerState(m.escrowState),
           amountMinor: m.amountMinor,
           feeMinor: Math.round(m.amountMinor * 0.1),
@@ -202,34 +214,43 @@ export function MarketplaceShadcnDashboard({
   const derivedKanbanTasks = useMemo<KanbanTask[]>(
     () =>
       effectiveMilestones.map((m, idx) => {
-        const meta = CONTRACT_META_MAP[m.contractId];
+        const meta = metaFor(m);
         const state = stateOverrides[m.id] ?? m.escrowState;
         return {
           id: m.id,
           code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
           title: m.title,
-          contractTitle: meta?.contractTitle ?? `Contract #${m.contractId.slice(0, 8)}`,
-          counterparty: meta?.counterparty ?? "Hanna Tadesse",
-          rail: meta?.rail ?? RAILS[idx % RAILS.length],
+          contractTitle: meta.contractTitle,
+          counterparty: meta.counterparty,
+          rail: meta.rail,
           amountMinor: m.amountMinor,
           dueDate: (m.dueDate || "").slice(0, 10),
           priority: m.amountMinor >= 5_000_000 ? "HIGH" : m.amountMinor >= 3_500_000 ? "MEDIUM" : "LOW",
           column: toKanbanCol(state),
-          category: meta?.category ?? "Web app development",
+          category: meta.category,
         };
       }),
     [effectiveMilestones, stateOverrides],
   );
 
   const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
-    const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m, idx) => {
-      const meta = CONTRACT_META_MAP[m.contractId];
+    const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m) => {
+      const meta = metaFor(m);
+      const due = m.dueDate ? new Date(m.dueDate) : null;
+      const dueTime =
+        due && !Number.isNaN(due.getTime())
+          ? due.toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Africa/Addis_Ababa",
+            })
+          : "";
       return {
         id: `ms-${m.id}`,
         title: m.title,
-        contractRef: `${meta?.contractTitle ?? m.contractId} · MS-0${m.sequenceNumber || 1}`,
+        contractRef: `${meta.contractTitle} · ${m.id.replace(/^ms-/, "").toUpperCase()}`,
         date: (m.dueDate || new Date().toISOString()).slice(0, 10),
-        time: idx % 2 === 0 ? "14:00 EAT" : "17:00 EAT",
+        time: dueTime,
         type:
           m.escrowState === "RELEASED"
             ? "PAYOUT_RELEASE"
@@ -237,28 +258,41 @@ export function MarketplaceShadcnDashboard({
               ? "COMPLIANCE_KYC"
               : "MILESTONE_DUE",
         amountMinor: m.amountMinor,
-        rail: meta?.rail ?? RAILS[idx % RAILS.length],
+        rail: meta.rail,
         status:
           m.escrowState === "RELEASED"
             ? "COMPLETED"
             : m.escrowState === "DISPUTED"
               ? "AT_RISK"
               : "SCHEDULED",
-        counterparty: meta?.counterparty ?? "Hanna Tadesse",
+        counterparty: meta.counterparty,
       };
     });
-    const jobEvents: ScheduleEvent[] = effectiveJobs.slice(0, 10).map((j, idx) => ({
-      id: `job-${j.id}`,
-      title: j.title,
-      contractRef: `BRIEF-${j.id.replace(/^job-/, "")}`,
-      date: (j.deadline || new Date().toISOString()).slice(0, 10),
-      time: "18:00 EAT",
-      type: "PROPOSAL_DEADLINE",
-      amountMinor: j.budgetMaxMinor,
-      rail: RAILS[idx % RAILS.length],
-      status: j.status === "OPEN" ? "SCHEDULED" : "COMPLETED",
-      counterparty: j.category.replaceAll("_", " "),
-    }));
+    const jobEvents: ScheduleEvent[] = effectiveJobs.slice(0, 10).map((j) => {
+      const deadline = j.deadline ? new Date(j.deadline) : null;
+      const deadlineTime =
+        deadline && !Number.isNaN(deadline.getTime())
+          ? deadline.toLocaleTimeString("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+              timeZone: "Africa/Addis_Ababa",
+            })
+          : "";
+      return {
+        id: `job-${j.id}`,
+        title: j.title,
+        contractRef: j.id,
+        date: (j.deadline || new Date().toISOString()).slice(0, 10),
+        time: deadlineTime,
+        type: "PROPOSAL_DEADLINE",
+        amountMinor: j.budgetMaxMinor,
+        // A brief is not a payment: there is no rail until a contract is
+        // funded, so the schedule says so instead of picking one.
+        rail: null,
+        status: j.status === "OPEN" ? "SCHEDULED" : "COMPLETED",
+        counterparty: j.category.replaceAll("_", " "),
+      };
+    });
     return [...milestoneEvents, ...jobEvents];
   }, [effectiveMilestones, effectiveJobs]);
 
@@ -269,13 +303,12 @@ export function MarketplaceShadcnDashboard({
   const escrowSecuredMinor = useMemo(
     () =>
       effectiveMilestones
-        .filter((m) =>
-          [
-            "ESCROW_HELD",
-            "WORK_IN_PROGRESS",
-            "SUBMITTED_FOR_REVIEW",
-            "ACCEPTED",
-          ].includes(m.escrowState),
+        .filter(
+          (m) =>
+            FUNDED_ESCROW_STATES.has(m.escrowState) &&
+            m.escrowState !== "RELEASED" &&
+            m.escrowState !== "REFUNDED" &&
+            m.escrowState !== "PARTIAL_REFUND",
         )
         .reduce((sum, m) => sum + m.amountMinor, 0),
     [effectiveMilestones],
@@ -289,9 +322,17 @@ export function MarketplaceShadcnDashboard({
     [effectiveMilestones],
   );
 
+  // Deliverables still in flight: not yet released, refunded or partially
+  // refunded. A milestone awaiting funding counts — it is a deliverable the
+  // account is committed to.
   const activeMilestoneCount = useMemo(
     () =>
-      effectiveMilestones.filter((m) => m.escrowState !== "RELEASED").length,
+      effectiveMilestones.filter(
+        (m) =>
+          m.escrowState !== "RELEASED" &&
+          m.escrowState !== "REFUNDED" &&
+          m.escrowState !== "PARTIAL_REFUND",
+      ).length,
     [effectiveMilestones],
   );
 
@@ -299,6 +340,53 @@ export function MarketplaceShadcnDashboard({
     () => effectiveJobs.filter((j) => j.status === "OPEN").length,
     [effectiveJobs],
   );
+
+  /**
+   * Real trend figures for the KPI cards.
+   *
+   * Every one of these used to be a constant ("+18.4%", "+24.2%", "98.2%
+   * on-time", "+5 this week"). They are now derived from the account's own
+   * records, and they are null — not zero, not a guess — when the account has
+   * no history to compare against.
+   */
+  const walletTrend = useMemo(() => {
+    const { current, prior } = topUpTotals(effectiveTopUps, THIRTY_DAYS_MS);
+    return {
+      current,
+      prior,
+      change: periodChange(current, prior),
+      topUpCount: effectiveTopUps.filter((t) => t.status === "APPROVED").length,
+    };
+  }, [effectiveTopUps]);
+
+  const escrowTrend = useMemo(() => {
+    const { current, prior } = escrowFundedTotals(
+      effectiveMilestones,
+      THIRTY_DAYS_MS,
+    );
+    return { current, prior, change: periodChange(current, prior) };
+  }, [effectiveMilestones]);
+
+  const deliveryStats = useMemo(
+    () => onTimeStats(effectiveMilestones),
+    [effectiveMilestones],
+  );
+
+  const briefsThisWeek = useMemo(
+    () => briefsCreatedSince(effectiveJobs, SEVEN_DAYS_MS),
+    [effectiveJobs],
+  );
+
+  const contractCount = useMemo(
+    () => new Set(effectiveMilestones.map((m) => m.contractId)).size,
+    [effectiveMilestones],
+  );
+
+  const formatTrend = (change: number | null, suffix = "%") => {
+    if (change === null) return null;
+    const sign = change > 0 ? "+" : "";
+    return `${sign}${change.toFixed(1)}${suffix}`;
+  };
 
   const handleStatusUpdate = (
     id: string,
@@ -315,7 +403,8 @@ export function MarketplaceShadcnDashboard({
           <div
             className="sh-segmented"
             role="tablist"
-            aria-label="Select Dashboard Template Mode"
+            aria-label={copy.modeAria}
+            data-tour="dashboard-mode-switcher"
           >
             <button
               type="button"
@@ -340,42 +429,47 @@ export function MarketplaceShadcnDashboard({
           </div>
 
           {dashboardVariant === "dashboard-2" && (
-            <div
-              className="sh-segmented"
-              role="tablist"
-              aria-label="Operations view mode"
-            >
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("table")}
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <div
+                className="sh-segmented"
+                role="tablist"
+                aria-label={copy.opsModeAria}
               >
-                <Table2 size={13} /> {d.subTabTable} ({ledgerRecords.length})
-              </button>
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("kanban")}
-              >
-                <Kanban size={13} /> {d.subTabKanban} ({kanbanTasks.length})
-              </button>
-              <button
-                type="button"
-                className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
-                onClick={() => setOpsSubTab("calendar")}
-              >
-                <Calendar size={13} /> {d.subTabCalendar} ({scheduleEvents.length})
-              </button>
+                <button
+                  type="button"
+                  className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
+                  onClick={() => setOpsSubTab("table")}
+                >
+                  <Table2 size={13} /> {d.subTabTable} ({ledgerRecords.length})
+                </button>
+                <button
+                  type="button"
+                  className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
+                  onClick={() => setOpsSubTab("kanban")}
+                >
+                  <Kanban size={13} /> {d.subTabKanban} ({kanbanTasks.length})
+                </button>
+                <button
+                  type="button"
+                  className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
+                  onClick={() => setOpsSubTab("calendar")}
+                >
+                  <Calendar size={13} /> {d.subTabCalendar} ({scheduleEvents.length})
+                </button>
+              </div>
+              <ContextualHelpTrigger helpId="dashboard-pipeline-stages" />
             </div>
           )}
         </div>
 
         <div className="sh-subnav-right">
+          <ContextualHelpTrigger helpId="dashboard-kpis" />
           <button
             type="button"
             className="sh-btn sh-btn-secondary"
             onClick={() => setCommandPaletteOpen(true)}
-            title="Open Command Palette (Ctrl+K)"
+            title={copy.quickJumpTitle}
+            data-tour="dashboard-quick-jump"
           >
             <Search size={14} />
             <span>{d.quickJump}</span>
@@ -387,8 +481,8 @@ export function MarketplaceShadcnDashboard({
             className="sh-icon-only-btn"
             onClick={onRefresh}
             disabled={isRefreshing}
-            title="Refresh workspace data"
-            aria-label="Refresh workspace data"
+            title={copy.refreshTitle}
+            aria-label={copy.refreshAria}
           >
             <RefreshCw
               size={14}
@@ -418,7 +512,7 @@ export function MarketplaceShadcnDashboard({
       </div>
 
       {/* 4-Column KPI Stat Strip (Visible in both dashboards, interactive drill-down) */}
-      <div className="sh-kpi-grid">
+      <div className="sh-kpi-grid" data-tour="dashboard-kpis">
         {/* KPI 1: Available Wallet Balance */}
         <article
           className={`sh-kpi-card ${expandedKpi === "wallet" ? "expanded" : ""}`}
@@ -437,11 +531,32 @@ export function MarketplaceShadcnDashboard({
             ETB {(effectiveWallet.balanceMinor / 100).toLocaleString()}
           </div>
           <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <TrendingUp size={12} /> +18.4%
-            </span>
+            {walletTrend.change !== null ? (
+              <span
+                className={`sh-trend-delta sh-mono ${
+                  walletTrend.change >= 0 ? "positive" : "negative"
+                }`}
+              >
+                {walletTrend.change >= 0 ? (
+                  <TrendingUp size={12} />
+                ) : (
+                  <TrendingDown size={12} />
+                )}
+                {formatTrend(walletTrend.change)}
+              </span>
+            ) : (
+              <span className="sh-trend-delta neutral sh-mono">
+                {walletTrend.topUpCount > 0
+                  ? d.kpiNoPriorTopUps
+                  : d.kpiNoTopUpsYet}
+              </span>
+            )}
             <span className="sh-cell-meta">
-              vs prior 30d · {effectiveTopUps.length} top-ups
+              {walletTrend.topUpCount > 0
+                ? `${walletTrend.topUpCount} approved top-ups · ETB ${Math.round(
+                    walletTrend.current,
+                  ).toLocaleString()} in 30d`
+                : d.kpiWalletNoActivity}
             </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
@@ -452,7 +567,7 @@ export function MarketplaceShadcnDashboard({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sh-kv-row">
-                <span>Approved Telebirr / CBE Top-Ups</span>
+                <span>{copy.approvedTopUps}</span>
                 <strong className="sh-mono">
                   ETB{" "}
                   {(
@@ -463,7 +578,7 @@ export function MarketplaceShadcnDashboard({
                 </strong>
               </div>
               <div className="sh-kv-row">
-                <span>Pending Receipt Verification</span>
+                <span>{copy.pendingReceiptVerif}</span>
                 <strong className="sh-mono">
                   ETB{" "}
                   {(
@@ -479,7 +594,7 @@ export function MarketplaceShadcnDashboard({
                 style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
                 onClick={() => onNavigateView("wallet")}
               >
-                Open Wallet & Top-Up Desk <ArrowRight size={12} />
+                {copy.openWalletDeskBtn} <ArrowRight size={12} />
               </button>
             </div>
           )}
@@ -503,11 +618,28 @@ export function MarketplaceShadcnDashboard({
             ETB {(escrowSecuredMinor / 100).toLocaleString()}
           </div>
           <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <TrendingUp size={12} /> +24.2%
-            </span>
+            {escrowTrend.change !== null ? (
+              <span
+                className={`sh-trend-delta sh-mono ${
+                  escrowTrend.change >= 0 ? "positive" : "negative"
+                }`}
+              >
+                {escrowTrend.change >= 0 ? (
+                  <TrendingUp size={12} />
+                ) : (
+                  <TrendingDown size={12} />
+                )}
+                {formatTrend(escrowTrend.change)}
+              </span>
+            ) : (
+              <span className="sh-trend-delta neutral sh-mono">
+                {escrowTrend.current > 0 ? d.kpiNoPriorEscrow : d.kpiNoEscrowYet}
+              </span>
+            )}
             <span className="sh-cell-meta">
-              100% milestone-backed · {activeMilestoneCount} active
+              {escrowTrend.current > 0
+                ? `ETB ${Math.round(escrowTrend.current).toLocaleString()} funded in 30d · ${activeMilestoneCount} active`
+                : `${activeMilestoneCount} active · ${d.kpiEscrowMilestoneBacked}`}
             </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
@@ -518,13 +650,13 @@ export function MarketplaceShadcnDashboard({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sh-kv-row">
-                <span>Released & Settled YTD</span>
+                <span>{copy.releasedYtd}</span>
                 <strong className="sh-mono">
                   ETB {(releasedMinor / 100).toLocaleString()}
                 </strong>
               </div>
               <div className="sh-kv-row">
-                <span>Submitted Awaiting QA</span>
+                <span>{copy.submittedQa}</span>
                 <strong className="sh-mono">
                   ETB{" "}
                   {(
@@ -540,7 +672,7 @@ export function MarketplaceShadcnDashboard({
                 style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
                 onClick={() => onNavigateView("contracts")}
               >
-                Inspect Escrow Contracts <ArrowRight size={12} />
+                {copy.inspectContractsBtn} <ArrowRight size={12} />
               </button>
             </div>
           )}
@@ -564,12 +696,19 @@ export function MarketplaceShadcnDashboard({
           </div>
           <div className="sh-kpi-value sh-mono">{activeMilestoneCount}</div>
           <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <ArrowUpRight size={12} /> 98.2% on-time
-            </span>
+            {deliveryStats.rate !== null ? (
+              <span className="sh-trend-delta positive sh-mono">
+                <ArrowUpRight size={12} /> {deliveryStats.rate.toFixed(1)}% on-time
+              </span>
+            ) : (
+              <span className="sh-trend-delta neutral sh-mono">
+                {d.kpiNoSettledMilestones}
+              </span>
+            )}
             <span className="sh-cell-meta">
-              Across {new Set(effectiveMilestones.map((m) => m.contractId)).size}{" "}
-              contracts
+              {deliveryStats.released > 0
+                ? `${deliveryStats.onTime}/${deliveryStats.released} · ${copy.acrossContracts(contractCount)}`
+                : copy.acrossContracts(contractCount)}
             </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
@@ -580,25 +719,23 @@ export function MarketplaceShadcnDashboard({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sh-kv-row">
-                <span>In Active Delivery</span>
+                <span>{copy.inActiveDelivery}</span>
                 <strong className="sh-mono">
-                  {
+                  {copy.milestonesCount(
                     effectiveMilestones.filter(
                       (m) => m.escrowState === "WORK_IN_PROGRESS",
-                    ).length
-                  }{" "}
-                  milestones
+                    ).length,
+                  )}
                 </strong>
               </div>
               <div className="sh-kv-row">
-                <span>Escrow Funded & Ready</span>
+                <span>{copy.escrowFundedReady}</span>
                 <strong className="sh-mono">
-                  {
+                  {copy.milestonesCount(
                     effectiveMilestones.filter(
                       (m) => m.escrowState === "ESCROW_HELD",
-                    ).length
-                  }{" "}
-                  milestones
+                    ).length,
+                  )}
                 </strong>
               </div>
               <button
@@ -610,7 +747,7 @@ export function MarketplaceShadcnDashboard({
                   setOpsSubTab("kanban");
                 }}
               >
-                Open Milestone Kanban Board <ArrowRight size={12} />
+                {copy.openKanbanBtn} <ArrowRight size={12} />
               </button>
             </div>
           )}
@@ -625,15 +762,23 @@ export function MarketplaceShadcnDashboard({
           aria-expanded={expandedKpi === "jobs"}
         >
           <div className="sh-kpi-top">
-            <span className="sh-kpi-label">{d.kpiOpenBriefs}</span>
+            <span className="sh-kpi-label">
+              {briefScope === "own" ? d.kpiYourBriefs : d.kpiOpenBriefs}
+            </span>
             <Briefcase size={15} className="sh-text-muted" />
           </div>
           <div className="sh-kpi-value sh-mono">{openJobsCount}</div>
           <div className="sh-kpi-foot">
-            <span className="sh-trend-delta positive sh-mono">
-              <TrendingUp size={12} /> +5 this week
+            <span className="sh-trend-delta neutral sh-mono">
+              {briefsThisWeek > 0
+                ? `${briefsThisWeek} new this week`
+                : d.kpiNoNewBriefs}
             </span>
-            <span className="sh-cell-meta">Verified Ethiopian clients</span>
+            <span className="sh-cell-meta">
+              {briefScope === "own"
+                ? d.kpiYourBriefsSub
+                : d.kpiMarketplaceBriefsSub}
+            </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
 
@@ -643,7 +788,7 @@ export function MarketplaceShadcnDashboard({
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sh-kv-row">
-                <span>Combined Max Budget Pool</span>
+                <span>{copy.combinedBudgetPool}</span>
                 <strong className="sh-mono">
                   ETB{" "}
                   {(
@@ -657,7 +802,7 @@ export function MarketplaceShadcnDashboard({
                 style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
                 onClick={() => onNavigateView("jobs")}
               >
-                Explore All Briefs <ArrowRight size={12} />
+                {copy.exploreBriefsBtn} <ArrowRight size={12} />
               </button>
             </div>
           )}
@@ -727,7 +872,7 @@ export function MarketplaceShadcnDashboard({
                           <span aria-hidden="true">·</span>
                           <span>{formatStatusLabel(ms.escrowState, t.workspace.statuses)}</span>
                           <span aria-hidden="true">·</span>
-                          <span className="sh-mono">Due {ms.dueDate.slice(0, 10)}</span>
+                          <span className="sh-mono">{copy.duePrefix(ms.dueDate.slice(0, 10))}</span>
                         </div>
                       </div>
                       <div className="sh-compact-row-right">
@@ -756,7 +901,7 @@ export function MarketplaceShadcnDashboard({
                     {canWork ? d.recommendedBriefsTitle : d.activeHiringBriefsTitle}
                   </h3>
                   <p className="sh-card-desc">
-                    {d.recommendedBriefsDesc}
+                    {canWork ? d.recommendedBriefsDesc : d.activeHiringBriefsDesc}
                   </p>
                 </div>
                 <button
@@ -772,9 +917,11 @@ export function MarketplaceShadcnDashboard({
                 {effectiveJobs.length === 0 ? (
                   <div className="sh-compact-row">
                     <div className="sh-compact-row-main">
-                      <div className="sh-cell-primary">{d.noOpenBriefsTitle}</div>
+                      <div className="sh-cell-primary">
+                        {canWork ? d.noOpenBriefsTitle : d.noOwnBriefsTitle}
+                      </div>
                       <div className="sh-cell-meta">
-                        {d.noOpenBriefsDesc}
+                        {canWork ? d.noOpenBriefsDesc : d.noOwnBriefsDesc}
                       </div>
                     </div>
                   </div>
@@ -786,7 +933,7 @@ export function MarketplaceShadcnDashboard({
                         <div className="sh-cell-meta">
                           <span>{job.category.replaceAll("_", " ")}</span>
                           <span aria-hidden="true">·</span>
-                          <span className="sh-mono">Deadline {job.deadline.slice(0, 10)}</span>
+                          <span className="sh-mono">{copy.deadlinePrefix(job.deadline.slice(0, 10))}</span>
                         </div>
                       </div>
                       <div className="sh-compact-row-right">

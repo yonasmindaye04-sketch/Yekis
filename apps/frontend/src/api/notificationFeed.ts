@@ -27,6 +27,7 @@ import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { api, type NotificationItem } from "./client";
 import { appTargetFor } from "./notificationTargets";
 import { realtimeSocket } from "./socket";
+import { playSoundForNotificationEvent } from "../lib/soundEffects";
 
 /** How often the feed refreshes. Matches the bell's previous interval. */
 const POLL_MS = 15_000;
@@ -38,6 +39,7 @@ const listeners = new Set<Listener>();
 let timer: ReturnType<typeof setInterval> | null = null;
 let detachSocket: (() => void) | null = null;
 let inFlight = false;
+let hasInitialLoad = false;
 
 /**
  * Whether two fetched lists describe the same set of records.
@@ -67,8 +69,18 @@ async function refresh(): Promise<void> {
   try {
     const next = await api.getNotifications();
     if (!sameRecords(next, records)) {
+      if (hasInitialLoad) {
+        const prevIds = new Set(records.map((item) => item.id));
+        const newestUnread = next.find((item) => !item.isRead && !prevIds.has(item.id));
+        if (newestUnread) {
+          playSoundForNotificationEvent(newestUnread.type);
+        }
+      }
       records = next;
+      hasInitialLoad = true;
       listeners.forEach((listener) => listener());
+    } else {
+      hasInitialLoad = true;
     }
   } catch {
     /* Unavailable notifications must not block the workspace. The last
@@ -86,7 +98,10 @@ function start(): void {
   // instead of waiting for the next poll tick.
   realtimeSocket.connect();
   detachSocket = realtimeSocket.onAny(({ event }) => {
-    if (event.startsWith("notify:")) void refresh();
+    if (event.startsWith("notify:")) {
+      playSoundForNotificationEvent(event);
+      void refresh();
+    }
   });
 }
 
@@ -99,6 +114,7 @@ function stop(): void {
     detachSocket();
     detachSocket = null;
   }
+  hasInitialLoad = false;
   // Nobody is listening, which normally means the person signed out. Drop the
   // records with the subscription: the next account must never see the
   // previous one's notifications while its first poll is still in flight.

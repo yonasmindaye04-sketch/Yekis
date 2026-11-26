@@ -1,867 +1,1228 @@
-/* ────────────────────────────────────────────────────────────────────────
-   Overview.tsx — Upgraded Shadcn Dual-Dashboard Command Center for Staff Ops:
-   - Dashboard 1: Executive Command, KPI Trend Cards, Action Center,
-     Interactive Cashflow & Rail Charts, Escrow Donut, Queue Workload
-   - Dashboard 2: Operations Ledger Data Grid, Case & Milestone Kanban Board,
-     and Compliance & Payout SLA Schedule Calendar
-   ──────────────────────────────────────────────────────────────────────── */
+/**
+ * Overview.tsx — Unified Dual-Dashboard Operations Command Center.
+ * - Executive Command (dashboard-1): Interactive expandable KPI cards (with drill-down
+ *   drawers), prioritized Action Center, real date-bucketed payment & payout charts
+ *   (zero synthetic fallbacks or hardcoded percentage deltas), escrow breakdown,
+ *   queue workload, system health, and recent audit activity.
+ * - Operations Console (dashboard-2): Multi-mode workbench synced with
+ *   ShadcnLayoutContext (`opsSubTab`: table | kanban | calendar) backed exclusively
+ *   by live API records.
+ */
 
 import { useMemo, useState } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import {
-  Activity,
-  BarChart3,
-  CreditCard,
-  DollarSign,
+  AlertTriangle,
+  ArrowRight,
+  Calendar,
+  ChevronDown,
+  Command,
+  Kanban,
   RefreshCw,
   Scale,
-  TriangleAlert,
-  UserCheck,
-  Users,
+  Search,
+  Shield,
+  ShieldAlert,
+  Table2,
   Wallet,
-  XCircle,
-  ChevronRight,
 } from "lucide-react";
-import { dts, fmt, opsApi, useApi } from "../opsApi";
-import type { OverviewBundle } from "../opsTypes";
-import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "./../components/charts";
-import { Empty, ErrorBox, LoadingBox } from "../components/ui";
+import { useOpsUi } from "../opsUiContext";
+import { dt, dts, fmt, opsApi, useApi } from "../opsApi";
+import type {
+  DisputeItem,
+  Escrow,
+  KycItem,
+  OverviewBundle,
+  Payment,
+  Payout,
+  ReconRow,
+  RiskFlag,
+} from "../opsTypes";
 import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
-import { useOpsUi } from "../opsUiContext";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { StatCard } from "../../../components/ui-v2/StatCard";
-import type { OpsPageId } from "../opsNav";
-import type {
-  KanbanColumnId,
-  KanbanTask,
-  LedgerContractRecord,
-  ScheduleEvent,
-  TimeRangeKey,
-  TimeSeriesPoint,
-} from "../../../components/dashboard/dashboardData";
-import {
-  InteractiveCashflowAreaChart,
-  InteractiveRailVelocityBarChart,
-} from "../../../components/dashboard/ShadcnCharts";
-import { AdvancedDataTable } from "../../../components/dashboard/AdvancedDataTable";
-import { KanbanBoardView } from "../../../components/dashboard/KanbanBoardView";
-import { CalendarScheduleView } from "../../../components/dashboard/CalendarScheduleView";
+import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
+import { Card, ErrorBox, LoadingBox, Pill } from "../components/ui";
+import { useShadcnLayout } from "../../../components/dashboard/ShadcnLayoutContext";
 
-const ESC_C: Record<string, string> = {
-  ESCROW_HELD: "#0284c7",
-  WORK_IN_PROGRESS: "#16a34a",
-  SUBMITTED_FOR_REVIEW: "#d97706",
-  DISPUTED: "#dc2626",
-  RELEASED: "#059669",
-};
+type TimeRange = "7d" | "30d" | "90d" | "12m";
+type KpiId = "escrow" | "disputes" | "payouts" | "compliance";
 
-const actTone = (a: string): [string, typeof Wallet] =>
-  a.includes("PAYOUT") || a.includes("PAYMENT")
-    ? ["#059669", CreditCard]
-    : a.includes("DISPUTE") || a.includes("RISK")
-      ? ["#dc2626", XCircle]
-      : a.includes("ESCROW")
-        ? ["#0284c7", DollarSign]
-        : ["#16a34a", Activity];
-
-function toRail(rail: string): "TELEBIRR" | "CBE_BIRR" | "M_PESA" {
-  const upper = (rail || "").toUpperCase();
-  if (upper.includes("CBE")) return "CBE_BIRR";
-  if (upper.includes("PESA")) return "M_PESA";
-  return "TELEBIRR";
+interface BucketSpec {
+  label: string;
+  startMs: number;
+  endMs: number;
 }
 
-function toEscrowState(
-  state: string,
-): LedgerContractRecord["escrowState"] {
-  if (
-    state === "ESCROW_HELD" ||
-    state === "WORK_IN_PROGRESS" ||
-    state === "SUBMITTED_FOR_REVIEW" ||
-    state === "RELEASED" ||
-    state === "PAYMENT_PENDING" ||
-    state === "DISPUTED"
-  ) {
-    return state;
+function buildBuckets(range: TimeRange, nowMs: number): BucketSpec[] {
+  const dayMs = 86_400_000;
+  if (range === "7d") {
+    const out: BucketSpec[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const end = nowMs - i * dayMs;
+      const start = end - dayMs;
+      const d = new Date(end);
+      out.push({
+        label: d.toLocaleDateString(undefined, { weekday: "short" }),
+        startMs: start,
+        endMs: end,
+      });
+    }
+    return out;
   }
-  return "ESCROW_HELD";
+  if (range === "30d") {
+    const out: BucketSpec[] = [];
+    const span = 3 * dayMs;
+    for (let i = 9; i >= 0; i--) {
+      const end = nowMs - i * span;
+      const start = end - span;
+      const d = new Date(end);
+      out.push({
+        label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        startMs: start,
+        endMs: end,
+      });
+    }
+    return out;
+  }
+  if (range === "90d") {
+    const out: BucketSpec[] = [];
+    const week = 7 * dayMs;
+    for (let i = 11; i >= 0; i--) {
+      const end = nowMs - i * week;
+      const start = end - week;
+      const d = new Date(end);
+      out.push({
+        label: d.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        startMs: start,
+        endMs: end,
+      });
+    }
+    return out;
+  }
+  // 12m
+  const out: BucketSpec[] = [];
+  const base = new Date(nowMs);
+  for (let i = 11; i >= 0; i--) {
+    const mStart = new Date(base.getFullYear(), base.getMonth() - i, 1);
+    const mEnd = new Date(base.getFullYear(), base.getMonth() - i + 1, 1);
+    out.push({
+      label: mStart.toLocaleDateString(undefined, { month: "short" }),
+      startMs: mStart.getTime(),
+      endMs: mEnd.getTime(),
+    });
+  }
+  return out;
 }
 
-function toKanbanCol(state: string): KanbanColumnId {
-  if (state === "ESCROW_HELD") return "ESCROW_HELD";
-  if (state === "WORK_IN_PROGRESS") return "WORK_IN_PROGRESS";
-  if (state === "SUBMITTED_FOR_REVIEW" || state === "ACCEPTED")
-    return "SUBMITTED_FOR_REVIEW";
-  if (state === "RELEASED") return "RELEASED";
-  return "BACKLOG";
+function parseTs(iso?: string): number {
+  if (!iso) return Number.NaN;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : Number.NaN;
 }
 
 export default function Overview() {
   const ui = useOpsUi();
+  const {
+    dashboardVariant,
+    setDashboardVariant,
+    opsSubTab,
+    setOpsSubTab,
+    setCommandPaletteOpen,
+  } = useShadcnLayout();
+
   const { data, error, loading, reload } = useApi<OverviewBundle>(opsApi.overview);
   const [done, setDone] = useState<Record<number, boolean>>({});
-  const [opsDashMode, setOpsDashMode] = useState<"dashboard-1" | "dashboard-2">(
-    "dashboard-1",
+  const [timeRange, setTimeRange] = useState<TimeRange>("30d");
+  const [expandedKpi, setExpandedKpi] = useState<KpiId | null>(null);
+  const [tableFilter, setTableFilter] = useState<"ALL" | "ESCROW" | "PAYOUT" | "DISPUTE" | "RISK">(
+    "ALL",
   );
-  const [opsSubTab, setOpsSubTab] = useState<"table" | "kanban" | "calendar">(
-    "table",
-  );
-  const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
+  const [tableSearch, setTableSearch] = useState("");
 
-  const [stateOverrides, setStateOverrides] = useState<
-    Record<string, LedgerContractRecord["escrowState"]>
-  >({});
-  const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
-  const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
-
-  const derivedLedgerRecords = useMemo<LedgerContractRecord[]>(() => {
+  const actionItems = useMemo(() => {
     if (!data) return [];
-    return data.escrows.map((e, idx) => ({
-      id: e.id,
-      code: `ESC-${e.id.slice(0, 6).toUpperCase() || 100 + idx}`,
-      title: e.title,
-      contractTitle: e.job,
-      counterparty: e.fl,
-      counterpartyEmail: "verified@yekis.et",
-      category: "ESCROW",
-      rail: toRail(e.rail),
-      escrowState: stateOverrides[e.id] ?? toEscrowState(e.state),
-      amountMinor: e.amt,
-      feeMinor: Math.round(e.amt * 0.08),
-      dueDate: (e.created || "").slice(0, 10),
-      updatedAt: (e.created || "").slice(0, 10),
-    }));
-  }, [data, stateOverrides]);
-
-  const derivedKanbanTasks = useMemo<KanbanTask[]>(() => {
-    if (!data) return [];
-    return data.escrows.map((e, idx) => ({
-      id: e.id,
-      code: `ESC-${e.id.slice(0, 6).toUpperCase() || 100 + idx}`,
-      title: e.title,
-      contractTitle: e.job,
-      counterparty: e.fl,
-      rail: toRail(e.rail),
-      amountMinor: e.amt,
-      dueDate: (e.created || "").slice(0, 10),
-      priority: e.held || e.amt >= 5_000_000 ? "HIGH" : "MEDIUM",
-      column: toKanbanCol(e.state),
-      category: "Escrow",
-    }));
+    return buildActionItems({
+      disputes: data.queues.disputes,
+      riskFlags: data.riskFlags,
+      health: data.health,
+      recon: data.recon,
+      payouts: data.queues.payouts,
+      kyc: data.queues.kyc,
+      reports: data.queues.reports,
+    });
   }, [data]);
 
-  const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
-    if (!data) return [];
-    const escEvents: ScheduleEvent[] = data.escrows.slice(0, 15).map((e) => ({
-      id: `esc-${e.id}`,
-      title: e.title,
-      contractRef: `ESC-${e.id.slice(0, 6).toUpperCase()}`,
-      date: (e.created || new Date().toISOString()).slice(0, 10),
-      time: "16:00",
-      type: e.state === "RELEASED" ? "PAYOUT_RELEASE" : "MILESTONE_DUE",
-      amountMinor: e.amt,
-      rail: toRail(e.rail),
-      status: e.state === "RELEASED" ? "COMPLETED" : e.held ? "AT_RISK" : "SCHEDULED",
-      counterparty: e.fl,
-    }));
-    const kycEvents: ScheduleEvent[] = data.queues.kyc.slice(0, 10).map((k) => ({
-      id: `kyc-${k.id}`,
-      title: `KYC Review: ${k.name || k.email}`,
-      contractRef: k.ucid,
-      date: (k.updated || new Date().toISOString()).slice(0, 10),
-      time: "11:00",
-      type: "COMPLIANCE_KYC",
-      amountMinor: 0,
-      rail: "TELEBIRR",
-      status: k.status === "VERIFIED" ? "COMPLETED" : "SCHEDULED",
-      counterparty: k.email,
-    }));
-    return [...escEvents, ...kycEvents];
-  }, [data]);
+  const seriesData = useMemo(() => {
+    if (!data) return null;
+    const nowMs = Date.now();
+    const buckets = buildBuckets(timeRange, nowMs);
+    const windowStart = buckets[0]?.startMs ?? 0;
 
-  const rangeBundle = useMemo(() => {
-    if (!data) {
-      return {
-        liveChartSeries: [] as TimeSeriesPoint[],
-        settlementTitle: "Daily Settlement Volume (30-Day Window)",
-        settlementUnit: "ETB millions / period",
-        settlementLabels: [] as string[],
-        settlementValues: [] as number[],
-        payoutTitle: "Payouts vs Refunds — Weekly",
-        payoutLabels: [] as string[],
-        payoutValues: [] as number[],
-        refundValues: [] as number[],
-        escSegs: [] as { label: string; value: number; color: string }[],
-      };
-    }
+    const paymentBuckets = buckets.map(() => 0);
+    let successCount = 0;
+    let totalSuccessMinor = 0;
 
-    const hasLiveVol14 = data.series.volume14.values.some((v) => v >= 0.25);
-    const baseVol = hasLiveVol14
-      ? data.series.volume14.values
-      : [1.4, 1.8, 1.6, 2.1, 2.4, 2.0, 2.7, 2.3, 2.9, 3.1, 2.6, 3.4, 3.2, 3.8];
-    const avgVol =
-      baseVol.reduce((acc, v) => acc + v, 0) / Math.max(1, baseVol.length);
-
-    const baseEscrowMap = new Map<string, number>();
-    data.escrows.forEach((e) =>
-      baseEscrowMap.set(e.state, (baseEscrowMap.get(e.state) ?? 0) + e.amt),
-    );
-    const heldBase = baseEscrowMap.get("ESCROW_HELD") ?? 18_500_000;
-    const wipBase = baseEscrowMap.get("WORK_IN_PROGRESS") ?? 14_200_000;
-    const revBase = baseEscrowMap.get("SUBMITTED_FOR_REVIEW") ?? 8_400_000;
-    const dispBase = baseEscrowMap.get("DISPUTED") ?? 3_100_000;
-    const relBase = baseEscrowMap.get("RELEASED") ?? 22_000_000;
-
-    if (timeRange === "7d") {
-      const labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-      const dailyFactors = [0.78, 0.94, 0.86, 1.12, 1.24, 0.68, 0.98];
-      const teleShares = [0.68, 0.64, 0.71, 0.66, 0.62, 0.74, 0.69];
-      const cbeShares = [0.22, 0.25, 0.19, 0.24, 0.27, 0.17, 0.21];
-
-      const settlementValues = labels.map((_, i) => {
-        const raw = baseVol[baseVol.length - 7 + i] ?? avgVol * dailyFactors[i];
-        return Number((raw * dailyFactors[i]).toFixed(2));
-      });
-      const payoutValues = settlementValues.map((v, i) =>
-        Number((v * (0.64 + (i % 3) * 0.05)).toFixed(2)),
-      );
-      const refundValues = settlementValues.map((v, i) =>
-        Number((v * (0.06 + (i === 4 ? 0.05 : 0.02))).toFixed(2)),
-      );
-
-      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
-        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
-        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
-        const telebirrETB = Math.round(inflowETB * teleShares[i]);
-        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
-        return {
-          label,
-          escrowInflowETB: inflowETB,
-          payoutReleasedETB: releasedETB,
-          telebirrETB,
-          cbeBirrETB,
-          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
-          milestonesCompleted: Math.max(1, Math.round(settlementValues[i] * 2)),
-        };
-      });
-
-      const escSegs = [
-        { label: "ESCROW HELD", value: Math.round(heldBase * 0.42), color: ESC_C.ESCROW_HELD },
-        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 0.38), color: ESC_C.WORK_IN_PROGRESS },
-        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 0.55), color: ESC_C.SUBMITTED_FOR_REVIEW },
-        { label: "DISPUTED", value: Math.round(dispBase * 0.25), color: ESC_C.DISPUTED },
-        { label: "RELEASED", value: Math.round(relBase * 0.31), color: ESC_C.RELEASED },
-      ].filter((s) => s.value > 0);
-
-      return {
-        liveChartSeries,
-        settlementTitle: "Daily Settlement Volume (7-Day Window)",
-        settlementUnit: "ETB millions / day",
-        settlementLabels: labels,
-        settlementValues,
-        payoutTitle: "Payouts vs Refunds — Daily (7D)",
-        payoutLabels: labels,
-        payoutValues,
-        refundValues,
-        escSegs,
-      };
-    }
-
-    if (timeRange === "90d") {
-      const labels = ["Jan W1", "Jan W3", "Feb W1", "Feb W3", "Mar W1", "Mar W3"];
-      const biweekFactors = [2.4, 2.75, 2.55, 3.15, 3.45, 3.85];
-      const teleShares = [0.56, 0.58, 0.55, 0.60, 0.59, 0.62];
-      const cbeShares = [0.31, 0.29, 0.32, 0.28, 0.29, 0.26];
-
-      const settlementValues = labels.map((_, i) =>
-        Number((avgVol * biweekFactors[i]).toFixed(2)),
-      );
-      const payoutValues = settlementValues.map((v, i) =>
-        Number((v * (0.76 + (i % 2) * 0.04)).toFixed(2)),
-      );
-      const refundValues = settlementValues.map((v, i) =>
-        Number((v * (0.07 + (i === 2 ? 0.03 : 0.01))).toFixed(2)),
-      );
-
-      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
-        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
-        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
-        const telebirrETB = Math.round(inflowETB * teleShares[i]);
-        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
-        return {
-          label,
-          escrowInflowETB: inflowETB,
-          payoutReleasedETB: releasedETB,
-          telebirrETB,
-          cbeBirrETB,
-          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
-          milestonesCompleted: Math.max(3, Math.round(settlementValues[i] * 2.4)),
-        };
-      });
-
-      const escSegs = [
-        { label: "ESCROW HELD", value: Math.round(heldBase * 1.65), color: ESC_C.ESCROW_HELD },
-        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 1.9), color: ESC_C.WORK_IN_PROGRESS },
-        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 1.4), color: ESC_C.SUBMITTED_FOR_REVIEW },
-        { label: "DISPUTED", value: Math.round(dispBase * 1.5), color: ESC_C.DISPUTED },
-        { label: "RELEASED", value: Math.round(relBase * 2.35), color: ESC_C.RELEASED },
-      ].filter((s) => s.value > 0);
-
-      return {
-        liveChartSeries,
-        settlementTitle: "Bi-Weekly Settlement Volume (90-Day Window)",
-        settlementUnit: "ETB millions / bi-week",
-        settlementLabels: labels,
-        settlementValues,
-        payoutTitle: "Payouts vs Refunds — Bi-Weekly (90D)",
-        payoutLabels: labels,
-        payoutValues,
-        refundValues,
-        escSegs,
-      };
-    }
-
-    if (timeRange === "12m") {
-      const labels = [
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec",
-        "Jan",
-        "Feb",
-        "Mar",
-      ];
-      const monthFactors = [
-        3.8, 4.1, 3.9, 4.5, 4.8, 5.2, 5.0, 5.6, 6.3, 5.9, 6.5, 7.1,
-      ];
-      const teleShares = [
-        0.52, 0.53, 0.54, 0.55, 0.56, 0.57, 0.58, 0.59, 0.61, 0.60, 0.62, 0.64,
-      ];
-      const cbeShares = [
-        0.35, 0.34, 0.33, 0.32, 0.31, 0.30, 0.29, 0.28, 0.27, 0.28, 0.26, 0.25,
-      ];
-
-      const settlementValues = labels.map((_, i) =>
-        Number((avgVol * monthFactors[i]).toFixed(2)),
-      );
-      const payoutValues = settlementValues.map((v, i) =>
-        Number((v * (0.81 + (i % 3) * 0.02)).toFixed(2)),
-      );
-      const refundValues = settlementValues.map((v, i) =>
-        Number((v * (0.055 + (i % 4 === 0 ? 0.02 : 0.01))).toFixed(2)),
-      );
-
-      const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
-        const inflowETB = Math.round(settlementValues[i] * 1_000_000);
-        const releasedETB = Math.round(payoutValues[i] * 1_000_000);
-        const telebirrETB = Math.round(inflowETB * teleShares[i]);
-        const cbeBirrETB = Math.round(inflowETB * cbeShares[i]);
-        return {
-          label,
-          escrowInflowETB: inflowETB,
-          payoutReleasedETB: releasedETB,
-          telebirrETB,
-          cbeBirrETB,
-          mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
-          milestonesCompleted: Math.max(8, Math.round(settlementValues[i] * 2.8)),
-        };
-      });
-
-      const escSegs = [
-        { label: "ESCROW HELD", value: Math.round(heldBase * 3.4), color: ESC_C.ESCROW_HELD },
-        { label: "WORK IN PROGRESS", value: Math.round(wipBase * 4.1), color: ESC_C.WORK_IN_PROGRESS },
-        { label: "SUBMITTED FOR REVIEW", value: Math.round(revBase * 2.9), color: ESC_C.SUBMITTED_FOR_REVIEW },
-        { label: "DISPUTED", value: Math.round(dispBase * 3.2), color: ESC_C.DISPUTED },
-        { label: "RELEASED", value: Math.round(relBase * 6.8), color: ESC_C.RELEASED },
-      ].filter((s) => s.value > 0);
-
-      return {
-        liveChartSeries,
-        settlementTitle: "Monthly Settlement Volume (12-Month Window)",
-        settlementUnit: "ETB millions / month",
-        settlementLabels: labels,
-        settlementValues,
-        payoutTitle: "Payouts vs Refunds — Monthly (12M)",
-        payoutLabels: labels,
-        payoutValues,
-        refundValues,
-        escSegs,
-      };
-    }
-
-    // Default: "30d"
-    const labels = data.series.volume14.labels.length
-      ? data.series.volume14.labels
-      : ["D1", "D3", "D5", "D7", "D9", "D11", "D13", "D15", "D17", "D19", "D21", "D23", "D26", "D30"];
-    const vals = baseVol;
-    const hasLivePayouts = data.series.payoutsWeekly.payouts.some((v) => v >= 0.15);
-    const defaultPayouts = [1.45, 1.72, 1.58, 1.94, 2.15, 2.38, 2.12, 2.65];
-    const defaultRefunds = [0.14, 0.18, 0.12, 0.22, 0.16, 0.25, 0.19, 0.21];
-    const payoutArr = hasLivePayouts ? data.series.payoutsWeekly.payouts : defaultPayouts;
-    const refundArr = hasLivePayouts ? data.series.payoutsWeekly.refunds : defaultRefunds;
-    const payoutLbls = data.series.payoutsWeekly.labels.length
-      ? data.series.payoutsWeekly.labels
-      : ["W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
-
-    const liveChartSeries: TimeSeriesPoint[] = labels.map((label, i) => {
-      const inflowETB = Math.round((vals[i] ?? 1.8) * 1_000_000);
-      const payoutIdx = Math.min(
-        payoutArr.length - 1,
-        Math.floor((i / Math.max(1, labels.length)) * payoutArr.length),
-      );
-      const releasedETB = Math.round(
-        ((payoutArr[payoutIdx] ?? 1.4) * 1_000_000) / 1.15,
-      );
-      const teleShare = 0.62 + ((i % 3) - 1) * 0.03;
-      const cbeShare = 0.26 - ((i % 2) * 0.02);
-      const telebirrETB = Math.round(inflowETB * teleShare);
-      const cbeBirrETB = Math.round(inflowETB * cbeShare);
-      return {
-        label,
-        escrowInflowETB: inflowETB,
-        payoutReleasedETB: releasedETB,
-        telebirrETB,
-        cbeBirrETB,
-        mpesaETB: Math.max(0, inflowETB - telebirrETB - cbeBirrETB),
-        milestonesCompleted: Math.max(1, Math.round((vals[i] ?? 1.8) * 1.8)),
-      };
+    (data.payments as Payment[]).forEach((p) => {
+      if (p.status !== "SUCCESS") return;
+      const ts = parseTs(p.created);
+      if (!Number.isFinite(ts) || ts < windowStart) return;
+      const idx = buckets.findIndex((b) => ts >= b.startMs && ts <= b.endMs);
+      if (idx >= 0) {
+        paymentBuckets[idx] += p.amount;
+        successCount += 1;
+        totalSuccessMinor += p.amount;
+      }
     });
 
-    const escSegs = [...baseEscrowMap.entries()].map(([s, v]) => ({
-      label: s.replace(/_/g, " "),
-      value: v,
-      color: ESC_C[s] ?? "#93a0b4",
-    }));
+    const payoutSettledBuckets = buckets.map(() => 0);
+    const payoutFailedBuckets = buckets.map(() => 0);
+    let payoutSettledMinor = 0;
+    let payoutPendingMinor = 0;
+
+    (data.queues.payouts as Payout[]).forEach((po) => {
+      const ts = parseTs(po.created);
+      if (po.status === "PENDING" || po.status === "PROCESSING") {
+        payoutPendingMinor += po.net;
+      }
+      if (!Number.isFinite(ts) || ts < windowStart) return;
+      const idx = buckets.findIndex((b) => ts >= b.startMs && ts <= b.endMs);
+      if (idx < 0) return;
+      if (po.status === "CONFIRMED") {
+        payoutSettledBuckets[idx] += po.net;
+        payoutSettledMinor += po.net;
+      } else if (po.status === "FAILED" || po.status === "REVERSED") {
+        payoutFailedBuckets[idx] += po.net;
+      }
+    });
+
+    const hasVolume = paymentBuckets.some((v) => v > 0);
+    const hasPayoutSeries =
+      payoutSettledBuckets.some((v) => v > 0) || payoutFailedBuckets.some((v) => v > 0);
 
     return {
-      liveChartSeries,
-      settlementTitle: "Daily Settlement Volume (30-Day Window)",
-      settlementUnit: "ETB millions / day",
-      settlementLabels: labels,
-      settlementValues: vals,
-      payoutTitle: "Payouts vs Refunds — Weekly (30D)",
-      payoutLabels: payoutLbls,
-      payoutValues: payoutArr,
-      refundValues: refundArr,
-      escSegs,
+      labels: buckets.map((b) => b.label),
+      paymentValues: paymentBuckets,
+      hasVolume,
+      successCount,
+      totalSuccessMinor,
+      estimatedFeeMinor: Math.round(totalSuccessMinor * 0.1),
+      payoutSettledBuckets,
+      payoutFailedBuckets,
+      hasPayoutSeries,
+      payoutSettledMinor,
+      payoutPendingMinor,
     };
   }, [data, timeRange]);
 
-  const ledgerRecords = derivedLedgerRecords;
-  const kanbanTasks = customTasks ?? derivedKanbanTasks;
-  const scheduleEvents = customEvents ?? derivedScheduleEvents;
+  const escrowSegments = useMemo(() => {
+    if (!data) return [];
+    const groups = {
+      held: 0,
+      submitted: 0,
+      disputed: 0,
+      adminHold: 0,
+      released: 0,
+    };
+    (data.escrows as Escrow[]).forEach((e) => {
+      if (e.held) {
+        groups.adminHold += e.amt;
+      } else if (e.state === "DISPUTED") {
+        groups.disputed += e.amt;
+      } else if (e.state === "SUBMITTED_FOR_REVIEW") {
+        groups.submitted += e.amt;
+      } else if (e.state === "RELEASED" || e.state === "ACCEPTED") {
+        groups.released += e.amt;
+      } else {
+        groups.held += e.amt;
+      }
+    });
+    return [
+      { label: "Active Custody", value: groups.held, color: "#059669" },
+      { label: "In Review", value: groups.submitted, color: "#2563eb" },
+      { label: "Disputed", value: groups.disputed, color: "#dc2626" },
+      { label: "Admin Hold", value: groups.adminHold, color: "#d97706" },
+      { label: "Released", value: groups.released, color: "#64748b" },
+    ].filter((s) => s.value > 0);
+  }, [data]);
+
+  const unifiedRows = useMemo(() => {
+    if (!data) return [];
+    const rows: Array<{
+      id: string;
+      kind: "ESCROW" | "PAYOUT" | "DISPUTE" | "RISK";
+      title: string;
+      party: string;
+      status: string;
+      amountMinor: number | null;
+      when: string;
+      page: "escrow" | "payouts" | "dispute-queue" | "risk";
+    }> = [];
+
+    (data.escrows as Escrow[]).forEach((e) => {
+      rows.push({
+        id: e.id,
+        kind: "ESCROW",
+        title: e.title,
+        party: `${e.job} · ${e.fl}`,
+        status: e.held ? "ADMIN_HOLD" : e.state,
+        amountMinor: e.amt,
+        when: e.created,
+        page: "escrow",
+      });
+    });
+    (data.queues.payouts as Payout[]).forEach((p) => {
+      rows.push({
+        id: p.id,
+        kind: "PAYOUT",
+        title: `${p.provider} · ${p.acct}`,
+        party: p.user.displayName,
+        status: p.status,
+        amountMinor: p.net,
+        when: p.created ?? "",
+        page: "payouts",
+      });
+    });
+    (data.queues.disputes as DisputeItem[]).forEach((d) => {
+      rows.push({
+        id: d.id,
+        kind: "DISPUTE",
+        title: d.job,
+        party: d.ms,
+        status: d.stage,
+        amountMinor: d.amt,
+        when: d.sla?.resolution.dueAt ?? "",
+        page: "dispute-queue",
+      });
+    });
+    (data.riskFlags as RiskFlag[]).forEach((f) => {
+      rows.push({
+        id: f.id,
+        kind: "RISK",
+        title: f.type.replace(/_/g, " "),
+        party: f.user.email,
+        status: f.status,
+        amountMinor: f.user.walletMinor,
+        when: f.created,
+        page: "risk",
+      });
+    });
+
+    const q = tableSearch.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (tableFilter !== "ALL" && r.kind !== tableFilter) return false;
+      if (!q) return true;
+      return (
+        r.id.toLowerCase().includes(q) ||
+        r.title.toLowerCase().includes(q) ||
+        r.party.toLowerCase().includes(q) ||
+        r.status.toLowerCase().includes(q)
+      );
+    });
+  }, [data, tableFilter, tableSearch]);
+
+  const kanbanCols = useMemo(() => {
+    if (!data) return [];
+    const triage: Array<{ id: string; tag: string; title: string; meta: string; status: string; page: Parameters<typeof ui.navigate>[0] }> = [];
+    const active: typeof triage = [];
+    const escalated: typeof triage = [];
+    const cleared: typeof triage = [];
+
+    (data.queues.kyc as KycItem[]).forEach((k) => {
+      const card = {
+        id: k.id,
+        tag: "KYC",
+        title: k.name || k.email,
+        meta: `${k.tier} · ${k.doc}`,
+        status: k.status,
+        page: "kyc" as const,
+      };
+      if (k.status === "VERIFIED") cleared.push(card);
+      else if (k.flag || k.dup || k.pep) escalated.push(card);
+      else triage.push(card);
+    });
+
+    (data.queues.disputes as DisputeItem[]).forEach((d) => {
+      const card = {
+        id: d.id,
+        tag: "Dispute",
+        title: d.job,
+        meta: `${fmt(d.amt)} · ${d.slaH < 0 ? `${Math.abs(d.slaH)}h overdue` : `${d.slaH}h SLA`}`,
+        status: d.stage,
+        page: "dispute-queue" as const,
+      };
+      if (d.stage === "RESOLVED") cleared.push(card);
+      else if (d.slaH < 0 || d.stage === "STAGE_4_ARBITRATION") escalated.push(card);
+      else active.push(card);
+    });
+
+    (data.queues.payouts as Payout[]).forEach((p) => {
+      const card = {
+        id: p.id,
+        tag: "Payout",
+        title: p.user.displayName,
+        meta: `${p.provider} · ${fmt(p.net)}`,
+        status: p.status,
+        page: "payouts" as const,
+      };
+      if (p.status === "CONFIRMED") cleared.push(card);
+      else if (p.status === "FAILED" || p.status === "REVERSED") escalated.push(card);
+      else if (p.status === "PROCESSING") active.push(card);
+      else triage.push(card);
+    });
+
+    return [
+      { id: "triage", label: "Needs Review", items: triage },
+      { id: "active", label: "In Progress", items: active },
+      { id: "escalated", label: "Escalated / Exception", items: escalated },
+      { id: "cleared", label: "Cleared / Settled", items: cleared },
+    ];
+  }, [data, ui]);
+
+  const scheduleItems = useMemo(() => {
+    if (!data) return [];
+    const events: Array<{
+      id: string;
+      when: string;
+      sortMs: number;
+      kind: string;
+      title: string;
+      detail: string;
+      status: string;
+      page: Parameters<typeof ui.navigate>[0];
+    }> = [];
+
+    (data.queues.disputes as DisputeItem[]).forEach((d) => {
+      const dueIso = d.sla?.resolution.dueAt;
+      const ms = dueIso ? parseTs(dueIso) : Date.now() + d.slaH * 3_600_000;
+      events.push({
+        id: d.id,
+        when: dueIso ? dt(dueIso) : d.slaH < 0 ? `${Math.abs(d.slaH)}h overdue` : `In ${d.slaH}h`,
+        sortMs: Number.isFinite(ms) ? ms : 0,
+        kind: "Dispute SLA",
+        title: d.job,
+        detail: `${d.ms} · ${fmt(d.amt)}`,
+        status: d.slaH < 0 ? "SLA_BREACHED" : d.stage,
+        page: "dispute-queue",
+      });
+    });
+
+    (data.queues.payouts as Payout[])
+      .filter((p) => p.status === "PENDING" || p.status === "PROCESSING")
+      .forEach((p) => {
+        const ms = parseTs(p.created);
+        events.push({
+          id: p.id,
+          when: p.created ? dt(p.created) : "Queued",
+          sortMs: Number.isFinite(ms) ? ms : 0,
+          kind: "Payout Window",
+          title: `${p.user.displayName} (${p.provider})`,
+          detail: `${fmt(p.net)} · ${p.acct}`,
+          status: p.status,
+          page: "payouts",
+        });
+      });
+
+    (data.riskFlags as RiskFlag[])
+      .filter((f) => f.status === "OPEN" || f.status === "REVIEWING")
+      .forEach((f) => {
+        const ms = parseTs(f.created);
+        events.push({
+          id: f.id,
+          when: dt(f.created),
+          sortMs: Number.isFinite(ms) ? ms : 0,
+          kind: "Compliance Review",
+          title: f.type.replace(/_/g, " "),
+          detail: f.user.email,
+          status: f.status,
+          page: "risk",
+        });
+      });
+
+    return events.sort((a, b) => a.sortMs - b.sortMs);
+  }, [data, ui]);
 
   if (loading && !data) return <LoadingBox />;
-  if (error || !data) return <ErrorBox error={error ?? "No data"} reload={reload} />;
+  if (error) return <ErrorBox error={error} reload={reload} />;
+  if (!data || !seriesData) return null;
 
   const m = data.metrics;
-  const items = buildActionItems({
-    disputes: data.queues.disputes,
-    riskFlags: data.riskFlags,
-    health: data.health,
-    recon: data.recon,
-    payouts: data.queues.payouts,
-    kyc: data.queues.kyc,
-    reports: data.queues.reports,
-  });
+  const openRiskCount = data.riskFlags.filter(
+    (f) => f.status === "OPEN" || f.status === "REVIEWING",
+  ).length;
+  const heldEscrowsCount = data.escrows.filter((e) => e.state !== "RELEASED" && e.state !== "REFUNDED").length;
+  const adminHoldCount = data.escrows.filter((e) => e.held).length;
+  const breachedDisputesCount = data.queues.disputes.filter((d) => d.slaH < 0).length;
+  const failedPayoutsCount = data.queues.payouts.filter((p) => p.status === "FAILED").length;
+  const complianceTotal = m.pendingIdentity + m.openSupportTickets + openRiskCount + m.pendingTopUps;
+  const reconExceptions = (data.recon as ReconRow[]).filter(
+    (r) => r.rec !== "MATCHED" || (r.diff !== null && r.diff !== 0),
+  ).length;
 
-  const {
-    liveChartSeries,
-    settlementTitle,
-    settlementUnit,
-    settlementLabels,
-    settlementValues,
-    payoutTitle,
-    payoutLabels,
-    payoutValues,
-    refundValues,
-    escSegs,
-  } = rangeBundle;
+  const handleActionOpen = (item: ActionItem) => {
+    ui.navigate(item.page, item.refId);
+  };
 
-  const wl = [
-    {
-      label: "KYC Reviews",
-      value: data.queues.kyc.filter((k) => k.status === "UNDER_REVIEW").length,
-      color: "#16a34a",
-      meta: "under review",
-    },
-    {
-      label: "Dispute Mediation",
-      value: data.queues.disputes.filter((d) => d.stage === "STAGE_3_MEDIATION").length,
-      color: "#dc2626",
-      meta: "stage 3",
-    },
-    {
-      label: "Profile Reports",
-      value: data.queues.reports.filter((r) => r.status === "OPEN").length,
-      color: "#d97706",
-      meta: "open",
-    },
-    {
-      label: "Payouts to Settle",
-      value: data.queues.payouts.filter(
-        (p) => p.status === "PENDING" || p.status === "PROCESSING",
-      ).length,
-      color: "#059669",
-      meta: "pending",
-    },
-    {
-      label: "Recon Mismatches",
-      value: data.recon.filter((r) => r.rec === "MISMATCH").length,
-      color: "#0284c7",
-      meta: "to clear",
-    },
-  ];
+  const healthEntries = Object.entries(data.health.checks);
 
-  const qa: [string, string, number, typeof Wallet, string][] = [
-    [
-      "kyc",
-      "KYC Reviews",
-      data.queues.kyc.filter((k) => k.status === "UNDER_REVIEW").length,
-      UserCheck,
-      "#16a34a",
-    ],
-    [
-      "dispute-queue",
-      "Dispute Mediation",
-      data.queues.disputes.filter((d) => d.stage === "STAGE_3_MEDIATION").length,
-      Scale,
-      "#dc2626",
-    ],
-    [
-      "reports-queue",
-      "Profile Reports",
-      data.queues.reports.filter((r) => r.status === "OPEN").length,
-      TriangleAlert,
-      "#d97706",
-    ],
-    ["payouts", "Review Payouts", m.pendingPayouts, Wallet, "#d97706"],
-    [
-      "monitoring",
-      "System Health Checks",
-      Object.values(data.health.checks).filter((c) => !c.ok).length,
-      Activity,
-      "#059669",
-    ],
-  ];
-
-  const onOpen = (it: ActionItem) => ui.navigate(it.page, it.refId);
-
-  /* The KPI cards are divs with role="button": Enter/Space must activate them
-     the same way a click does, otherwise the drill-down is mouse-only. */
-  const onKpiKey = (e: ReactKeyboardEvent<HTMLElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      e.currentTarget.click();
-    }
+  const toggleKpi = (id: KpiId) => {
+    setExpandedKpi((cur) => (cur === id ? null : id));
   };
 
   return (
     <div className="fade">
-      {/* Sub-navigation bar with Dual-Dashboard Mode Switcher */}
-      <div className="sh-subnav-bar" style={{ marginBottom: 18 }}>
+      {/* Unified Sub-navigation Toolbar matching Client & Freelancer Workspace */}
+      <div className="sh-subnav-bar" style={{ marginBottom: 16 }}>
         <div className="sh-subnav-left">
-          <div className="ops-seg" role="tablist">
+          <div className="sh-segmented" role="tablist" aria-label="Operations dashboard view">
             <button
-              className={`ops-seg-btn${opsDashMode === "dashboard-1" ? " active" : ""}`}
-              onClick={() => setOpsDashMode("dashboard-1")}
+              type="button"
               role="tab"
-              aria-selected={opsDashMode === "dashboard-1"}
+              aria-selected={dashboardVariant === "dashboard-1"}
+              className={`sh-seg-btn ${dashboardVariant === "dashboard-1" ? "active" : ""}`}
+              onClick={() => setDashboardVariant("dashboard-1")}
             >
-              Executive
+              Executive Command
             </button>
             <button
-              className={`ops-seg-btn${opsDashMode === "dashboard-2" ? " active" : ""}`}
-              onClick={() => setOpsDashMode("dashboard-2")}
+              type="button"
               role="tab"
-              aria-selected={opsDashMode === "dashboard-2"}
+              aria-selected={dashboardVariant === "dashboard-2"}
+              className={`sh-seg-btn ${dashboardVariant === "dashboard-2" ? "active" : ""}`}
+              onClick={() => setDashboardVariant("dashboard-2")}
             >
-              Operations Ledger
+              Operations Console
             </button>
           </div>
 
-          {opsDashMode === "dashboard-2" && (
-            <div className="ops-seg" role="tablist">
-              {(["table", "kanban", "calendar"] as const).map((t) => (
-                <button
-                  key={t}
-                  className={`ops-seg-btn${opsSubTab === t ? " active" : ""}`}
-                  onClick={() => setOpsSubTab(t)}
-                  role="tab"
-                  aria-selected={opsSubTab === t}
-                >
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              ))}
+          {dashboardVariant === "dashboard-2" && (
+            <div className="sh-segmented" role="tablist" aria-label="Console view mode">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={opsSubTab === "table"}
+                className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
+                onClick={() => setOpsSubTab("table")}
+              >
+                <Table2 size={13} /> Ledger
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={opsSubTab === "kanban"}
+                className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
+                onClick={() => setOpsSubTab("kanban")}
+              >
+                <Kanban size={13} /> Workboard
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={opsSubTab === "calendar"}
+                className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
+                onClick={() => setOpsSubTab("calendar")}
+              >
+                <Calendar size={13} /> SLA Schedule
+              </button>
             </div>
           )}
         </div>
 
         <div className="sh-subnav-right">
-          <span className="sh-cell-meta sh-mono">
-            Synced {dts(data.health.checkedAt)}
-          </span>
-          <button type="button" className="sh-btn sh-btn-secondary" onClick={reload}>
+          {dashboardVariant === "dashboard-1" && (
+            <div className="sh-segmented" role="group" aria-label="Chart date range">
+              {(["7d", "30d", "90d", "12m"] as TimeRange[]).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  className={`sh-seg-btn ${timeRange === r ? "active" : ""}`}
+                  onClick={() => setTimeRange(r)}
+                >
+                  {r.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+          <button
+            type="button"
+            className="sh-btn sh-btn-outline"
+            onClick={() => setCommandPaletteOpen(true)}
+            title="Open Command Palette (Ctrl/⌘K)"
+          >
+            <Command size={13} /> Jump <kbd className="kbd">⌘K</kbd>
+          </button>
+          <button
+            type="button"
+            className="sh-btn sh-btn-outline"
+            onClick={reload}
+            title="Refresh overview metrics"
+          >
             <RefreshCw size={13} /> Refresh
           </button>
         </div>
       </div>
 
-      {/* 4-Column Primary KPI Stat Cards */}
-      <div className="grid g4" style={{ gap: 16, marginBottom: 16 }}>
-        <div
-          onClick={() => ui.navigate("users")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={onKpiKey}
-          style={{ cursor: "pointer" }}
-        >
-          <StatCard
-            label="Registered Platform Users"
-            value={m.totalUsers.toLocaleString()}
-            accent="blue"
-            icon={Users}
-            delta={{ pct: 14.2, label: "vs last month" }}
-          />
-        </div>
-
-        <div
-          onClick={() => ui.navigate("escrow")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={onKpiKey}
-          style={{ cursor: "pointer" }}
-        >
-          <StatCard
-            label="Custodial Funds in Escrow"
-            value={fmt(m.fundsInEscrowMinor)}
-            accent="green"
-            icon={DollarSign}
-            delta={{ pct: 21.8, label: "vs last month" }}
-          />
-        </div>
-
-        <div
-          onClick={() => ui.navigate("payouts")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={onKpiKey}
-          style={{ cursor: "pointer" }}
-        >
-          <StatCard
-            label="Pending Disbursement Queue"
-            value={m.pendingPayouts}
-            accent="amber"
-            icon={Wallet}
-          />
-        </div>
-
-        <div
-          onClick={() => ui.navigate("dispute-queue")}
-          role="button"
-          tabIndex={0}
-          onKeyDown={onKpiKey}
-          style={{ cursor: "pointer" }}
-        >
-          <StatCard
-            label="Open Mediation & KYC Triage"
-            value={m.openDisputes + m.pendingIdentity}
-            accent="red"
-            icon={TriangleAlert}
-          />
-        </div>
-      </div>
-
-      {opsDashMode === "dashboard-1" ? (
+      {dashboardVariant === "dashboard-1" ? (
         <>
+          {/* Expandable KPI Trend Cards (flat hairline + bare Lucide icons + drill-down drawers) */}
+          <div className="sh-kpi-grid" style={{ marginBottom: 16 }}>
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedKpi === "escrow"}
+              className={`sh-kpi-card ${expandedKpi === "escrow" ? "expanded" : ""}`}
+              onClick={() => toggleKpi("escrow")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleKpi("escrow");
+                }
+              }}
+            >
+              <div className="sh-kpi-top">
+                <span className="sh-kpi-label">Funds in Escrow</span>
+                <Shield size={15} />
+              </div>
+              <div className="sh-kpi-value mono">{fmt(m.fundsInEscrowMinor)}</div>
+              <div className="sh-kpi-foot">
+                <span className="sh-trend-delta neutral">
+                  {heldEscrowsCount} active · {adminHoldCount} admin hold
+                </span>
+                <ChevronDown size={14} className="sh-kpi-chev" />
+              </div>
+              {expandedKpi === "escrow" && (
+                <div className="sh-kpi-drawer" onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Active contracts</span>
+                    <span className="mono">{m.activeContracts}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Recon exceptions</span>
+                    <span className="mono">{reconExceptions}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ marginTop: 4 }}
+                    onClick={() => ui.navigate("escrow")}
+                  >
+                    Open Escrow Oversight <ArrowRight size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedKpi === "disputes"}
+              className={`sh-kpi-card ${expandedKpi === "disputes" ? "expanded" : ""}`}
+              onClick={() => toggleKpi("disputes")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleKpi("disputes");
+                }
+              }}
+            >
+              <div className="sh-kpi-top">
+                <span className="sh-kpi-label">Open Disputes</span>
+                <Scale size={15} />
+              </div>
+              <div className="sh-kpi-value mono">{m.openDisputes}</div>
+              <div className="sh-kpi-foot">
+                <span
+                  className={`sh-trend-delta ${
+                    breachedDisputesCount > 0 ? "negative" : "neutral"
+                  }`}
+                >
+                  {breachedDisputesCount > 0
+                    ? `${breachedDisputesCount} SLA breached`
+                    : m.openDisputes > 0
+                      ? "Within SLA window"
+                      : "Queue clear"}
+                </span>
+                <ChevronDown size={14} className="sh-kpi-chev" />
+              </div>
+              {expandedKpi === "disputes" && (
+                <div className="sh-kpi-drawer" onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>In arbitration</span>
+                    <span className="mono">
+                      {
+                        data.queues.disputes.filter(
+                          (d) => d.stage === "STAGE_4_ARBITRATION",
+                        ).length
+                      }
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Due within 24h</span>
+                    <span className="mono">
+                      {
+                        data.queues.disputes.filter(
+                          (d) => d.slaH >= 0 && d.slaH < 24,
+                        ).length
+                      }
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ marginTop: 4 }}
+                    onClick={() => ui.navigate("dispute-queue")}
+                  >
+                    Open Dispute Mediation <ArrowRight size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedKpi === "payouts"}
+              className={`sh-kpi-card ${expandedKpi === "payouts" ? "expanded" : ""}`}
+              onClick={() => toggleKpi("payouts")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleKpi("payouts");
+                }
+              }}
+            >
+              <div className="sh-kpi-top">
+                <span className="sh-kpi-label">Pending Payouts</span>
+                <Wallet size={15} />
+              </div>
+              <div className="sh-kpi-value mono">{m.pendingPayouts}</div>
+              <div className="sh-kpi-foot">
+                <span
+                  className={`sh-trend-delta ${
+                    failedPayoutsCount > 0 ? "negative" : "neutral"
+                  }`}
+                >
+                  {failedPayoutsCount > 0
+                    ? `${failedPayoutsCount} failed rail`
+                    : fmt(seriesData.payoutPendingMinor)}
+                </span>
+                <ChevronDown size={14} className="sh-kpi-chev" />
+              </div>
+              {expandedKpi === "payouts" && (
+                <div className="sh-kpi-drawer" onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Queued net volume</span>
+                    <span className="mono">{fmt(seriesData.payoutPendingMinor)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Pending wallet topups</span>
+                    <span className="mono">{m.pendingTopUps}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ marginTop: 4 }}
+                    onClick={() => ui.navigate("payouts")}
+                  >
+                    Open Payouts Workbench <ArrowRight size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div
+              role="button"
+              tabIndex={0}
+              aria-expanded={expandedKpi === "compliance"}
+              className={`sh-kpi-card ${expandedKpi === "compliance" ? "expanded" : ""}`}
+              onClick={() => toggleKpi("compliance")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  toggleKpi("compliance");
+                }
+              }}
+            >
+              <div className="sh-kpi-top">
+                <span className="sh-kpi-label">Compliance Queues</span>
+                <ShieldAlert size={15} />
+              </div>
+              <div className="sh-kpi-value mono">{complianceTotal}</div>
+              <div className="sh-kpi-foot">
+                <span
+                  className={`sh-trend-delta ${
+                    openRiskCount > 0 ? "negative" : "neutral"
+                  }`}
+                >
+                  {m.pendingIdentity} KYC · {openRiskCount} AML · {m.openSupportTickets} Help
+                </span>
+                <ChevronDown size={14} className="sh-kpi-chev" />
+              </div>
+              {expandedKpi === "compliance" && (
+                <div className="sh-kpi-drawer" onClick={(e) => e.stopPropagation()}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>KYC review queue</span>
+                    <span className="mono">{m.pendingIdentity}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                    <span style={{ color: "var(--ops-text-2)" }}>Profile reports</span>
+                    <span className="mono">{data.queues.reports.length}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ marginTop: 4 }}
+                    onClick={() => ui.navigate("kyc")}
+                  >
+                    Open KYC Verification <ArrowRight size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Prioritized Action Center */}
           <ActionCenter
-            items={items}
+            items={actionItems}
             done={done}
-            onToggle={(i) => setDone((d) => ({ ...d, [i]: !d[i] }))}
-            onOpen={onOpen}
+            onToggle={(idx) => setDone((d) => ({ ...d, [idx]: !d[idx] }))}
+            onOpen={handleActionOpen}
           />
 
-          {/* Interactive Shadcn Cashflow & Rail Velocity Charts */}
+          {/* Real Date-Bucketed Cashflow & Payout Charts */}
           <div className="sh-charts-split" style={{ marginBottom: 16 }}>
-            <InteractiveCashflowAreaChart
-              range={timeRange}
-              onRangeChange={setTimeRange}
-              series={liveChartSeries}
-            />
-            <InteractiveRailVelocityBarChart
-              range={timeRange}
-              series={liveChartSeries}
-            />
-          </div>
+            <section className="sh-card">
+              <div className="sh-card-header">
+                <div>
+                  <h2 className="sh-card-title">
+                    Inbound Escrow Funding ({timeRange.toUpperCase()})
+                  </h2>
+                  <p className="sh-card-desc">
+                    Settled payment transactions grouped across real calendar buckets
+                  </p>
+                </div>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 700 }}>
+                  {fmt(seriesData.totalSuccessMinor)}
+                </div>
+              </div>
+              {seriesData.hasVolume ? (
+                <>
+                  <AreaChart
+                    labels={seriesData.labels}
+                    values={seriesData.paymentValues}
+                    color="#059669"
+                    unit="ETB"
+                  />
+                  <div className="sh-chart-summary-bar">
+                    <span>
+                      <strong>{seriesData.successCount}</strong> successful transactions
+                    </span>
+                    <span>
+                      Est. platform fee (10%):{" "}
+                      <strong className="mono">{fmt(seriesData.estimatedFeeMinor)}</strong>
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="sh-chart-empty">
+                  <strong>No settled payments in this {timeRange.toUpperCase()} window</strong>
+                  <span>Try extending the horizon or inspect Payments &amp; Receipts.</span>
+                </div>
+              )}
+            </section>
 
-          <div className="grid gc-2-1" style={{ marginBottom: 16 }}>
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <BarChart3 size={16} /> {settlementTitle}{" "}
-                  <span style={{ fontSize: 11, color: "var(--ops-text-3)", fontWeight: 700 }}>
-                    {settlementUnit}
-                  </span>
-                </span>
-              </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
-                <AreaChart
-                  labels={settlementLabels}
-                  values={settlementValues}
-                  color="#16a34a"
-                />
-              </div>
-            </GlassCard>
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <DollarSign size={16} /> Escrow by State ({timeRange.toUpperCase()})
-                </span>
-              </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
-                {escSegs.length ? (
-                  <Donut segs={escSegs} centerSub="in escrow" />
-                ) : (
-                  <Empty icon={DollarSign}>No escrow rows.</Empty>
-                )}
-              </div>
-            </GlassCard>
-          </div>
-
-          <div className="grid gc-1-1" style={{ marginBottom: 16 }}>
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Wallet size={16} /> {payoutTitle}
-                </span>
-              </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
-                <BarChart
-                  labels={payoutLabels}
-                  series={[
-                    {
-                      name: "Payouts",
-                      color: "#16a34a",
-                      values: payoutValues,
-                    },
-                    {
-                      name: "Refunds",
-                      color: "#dc2626",
-                      values: refundValues,
-                    },
-                  ]}
-                />
+            <section className="sh-card">
+              <div className="sh-card-header">
+                <div>
+                  <h2 className="sh-card-title">
+                    Payout Disbursements ({timeRange.toUpperCase()})
+                  </h2>
+                  <p className="sh-card-desc">Settled vs failed/reversed disbursements</p>
+                </div>
                 <ChartLegend
                   series={[
-                    { name: "Payouts", color: "#16a34a" },
-                    { name: "Refunds", color: "#dc2626" },
+                    { name: "Confirmed", color: "#2563eb" },
+                    { name: "Failed", color: "#dc2626" },
                   ]}
                 />
               </div>
-            </GlassCard>
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title" style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <Activity size={16} /> Review Workload — Open Items per Queue
-                </span>
-              </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
-                <HBars rows={wl} />
-              </div>
-            </GlassCard>
+              {seriesData.hasPayoutSeries ? (
+                <BarChart
+                  labels={seriesData.labels}
+                  series={[
+                    { name: "Confirmed", values: seriesData.payoutSettledBuckets, color: "#2563eb" },
+                    { name: "Failed", values: seriesData.payoutFailedBuckets, color: "#dc2626" },
+                  ]}
+                />
+              ) : (
+                <div className="sh-chart-empty">
+                  <strong>No payout executions in this window</strong>
+                  <span>{m.pendingPayouts} payouts currently awaiting processing.</span>
+                </div>
+              )}
+            </section>
           </div>
 
-          <div className="grid gc-2-1">
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title">
-                  Recent Platform Audit Stream
-                </span>
+          {/* Escrow Breakdown & Live Queue Workload */}
+          <div className="grid g2" style={{ marginBottom: 16 }}>
+            <Card className="card-pad">
+              <div className="ch-head">
+                <div>
+                  <div className="ch-title">Escrow Custody Allocation</div>
+                  <div className="ch-sub">Milestone funds across active lifecycle states</div>
+                </div>
                 <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => ui.navigate("audit")}
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => ui.navigate("escrow")}
                 >
-                  View all
+                  Inspect <ArrowRight size={12} />
                 </button>
               </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px" }}>
-                {data.activity.map((a, i) => {
-                  const [fg, Icon] = actTone(a.a);
-                  return (
-                    <div className="act-row" key={`${a.a}-${i}`}>
-                      <div className="act-ic" style={{ color: fg }}>
-                        <Icon size={17} />
+              {escrowSegments.length > 0 ? (
+                <Donut centerSub="Milestones" segs={escrowSegments} />
+              ) : (
+                <div className="sh-chart-empty">
+                  <strong>No milestone escrows loaded</strong>
+                  <span>Open Escrow Oversight to inspect historical milestones.</span>
+                </div>
+              )}
+            </Card>
+
+            <Card className="card-pad">
+              <div className="ch-head">
+                <div>
+                  <div className="ch-title">Live Queue Workload</div>
+                  <div className="ch-sub">Open cases &amp; reconciliation variances by desk</div>
+                </div>
+                <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
+                  {m.totalUsers.toLocaleString()} users
+                </span>
+              </div>
+              <HBars
+                rows={[
+                  { label: "Pending KYC", value: m.pendingIdentity, color: "#2563eb" },
+                  { label: "Open Disputes", value: m.openDisputes, color: "#dc2626" },
+                  { label: "Pending Payouts", value: m.pendingPayouts, color: "#059669" },
+                  { label: "Open AML Flags", value: openRiskCount, color: "#d97706" },
+                  { label: "Recon Exceptions", value: reconExceptions, color: "#7c3aed" },
+                  { label: "Support Tickets", value: m.openSupportTickets, color: "#0284c7" },
+                ]}
+              />
+            </Card>
+          </div>
+
+          {/* System Health & Recent Audit Feed */}
+          <div className="grid g2">
+            <Card className="card-pad">
+              <div className="ch-head">
+                <div>
+                  <div className="ch-title">Infrastructure &amp; Ledger Integrity</div>
+                  <div className="ch-sub">Checked {dts(data.health.checkedAt)}</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => ui.navigate("monitoring")}
+                >
+                  Monitoring <ArrowRight size={12} />
+                </button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {healthEntries.map(([name, chk]) => (
+                  <div
+                    key={name}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "8px 10px",
+                      border: "1px solid var(--ops-border-soft)",
+                      borderRadius: "var(--sh-radius)",
+                      fontSize: 12.5,
+                    }}
+                  >
+                    <div>
+                      <strong style={{ textTransform: "capitalize" }}>
+                        {name.replace(/_/g, " ")}
+                      </strong>
+                      <div style={{ fontSize: 11.5, color: "var(--ops-text-3)" }}>{chk.d}</div>
+                    </div>
+                    <Pill s={chk.ok ? "CONFIRMED" : "FAILED"} />
+                  </div>
+                ))}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    padding: "8px 10px",
+                    border: "1px solid var(--ops-border-soft)",
+                    borderRadius: "var(--sh-radius)",
+                    fontSize: 12.5,
+                  }}
+                >
+                  <div>
+                    <strong>Double-Entry Trial Balance</strong>
+                    <div className="mono" style={{ fontSize: 11.5, color: "var(--ops-text-3)" }}>
+                      DR {fmt(data.health.ledger.dr)} / CR {fmt(data.health.ledger.cr)}
+                    </div>
+                  </div>
+                  <Pill s={data.health.ledger.bal ? "MATCHED" : "DISCREPANCY"} />
+                </div>
+              </div>
+            </Card>
+
+            <Card className="card-pad">
+              <div className="ch-head">
+                <div>
+                  <div className="ch-title">Recent Audit Activity</div>
+                  <div className="ch-sub">Latest administrative &amp; automated ledger events</div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => ui.navigate("audit")}
+                >
+                  Audit Log <ArrowRight size={12} />
+                </button>
+              </div>
+              {data.activity.length === 0 ? (
+                <div className="sh-chart-empty">
+                  <strong>No recent audit activity returned</strong>
+                  <span>Inspect the full audit trail in Audit Logs.</span>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {data.activity.slice(0, 6).map((ev, idx) => (
+                    <div
+                      key={`${ev.t}-${idx}`}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        padding: "8px 10px",
+                        border: "1px solid var(--ops-border-soft)",
+                        borderRadius: "var(--sh-radius)",
+                        fontSize: 12.5,
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600 }}>{ev.a}</div>
+                        <div style={{ fontSize: 11.5, color: "var(--ops-text-2)" }}>{ev.e}</div>
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div className="act-t">{a.a.replace(/_/g, " ")}</div>
-                        <div className="act-s">
-                          {a.e} · {dts(a.t)}
-                        </div>
-                      </div>
-                      <span style={{ color: "var(--ops-text-3)" }}>
-                        <ChevronRight size={15} />
+                      <span className="mono" style={{ fontSize: 11.5, color: "var(--ops-text-3)", whiteSpace: "nowrap" }}>
+                        {dts(ev.t)}
                       </span>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+        </>
+      ) : opsSubTab === "table" ? (
+        <section className="sh-card">
+          <div className="sh-card-header">
+            <div>
+              <h2 className="sh-card-title">Cross-Queue Operations Ledger</h2>
+              <p className="sh-card-desc">
+                Click any row to open its dedicated workbench focused on that record
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              <div className="f-search" style={{ minWidth: 220 }}>
+                <Search size={14} />
+                <input
+                  placeholder="Filter ID, party, title or status…"
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                />
               </div>
-            </GlassCard>
-            <GlassCard noPadding className="ops-chart-panel">
-              <div className="ops-chart-panel__head">
-                <span className="ops-chart-panel__title">Priority Staff Queues</span>
-              </div>
-              <div className="ops-chart-panel__body" style={{ padding: "8px 16px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
-                {qa.map(([pg, l, n, Icon, c]) => (
+              <div className="sh-segmented" role="group" aria-label="Filter record type">
+                {(["ALL", "ESCROW", "PAYOUT", "DISPUTE", "RISK"] as const).map((k) => (
                   <button
-                    className="qa-btn"
-                    key={pg}
-                    onClick={() => ui.navigate(pg as OpsPageId)}
+                    key={k}
+                    type="button"
+                    className={`sh-seg-btn ${tableFilter === k ? "active" : ""}`}
+                    onClick={() => setTableFilter(k)}
                   >
-                    <span className="qa-l">
-                      <span className="qa-ic" style={{ color: c }}>
-                        <Icon size={16} />
-                      </span>
-                      {l}
-                    </span>
-                    <span className="qa-n sh-mono" style={{ color: c }}>
-                      {n}
-                    </span>
+                    {k === "ALL" ? "All" : k.charAt(0) + k.slice(1).toLowerCase()}
                   </button>
                 ))}
               </div>
-            </GlassCard>
+            </div>
           </div>
-        </>
-      ) : (
-        <div>
-          {opsSubTab === "table" && (
-            <AdvancedDataTable
-              records={ledgerRecords}
-              onOpenContracts={() => ui.navigate("contracts")}
-              onStatusUpdate={(id, nextState) =>
-                setStateOverrides((prev) => ({ ...prev, [id]: nextState }))
-              }
-            />
-          )}
-          {opsSubTab === "kanban" && (
-            <KanbanBoardView
-              tasks={kanbanTasks}
-              onTasksChange={setCustomTasks}
-            />
-          )}
-          {opsSubTab === "calendar" && (
-            <CalendarScheduleView
-              events={scheduleEvents}
-              onEventsChange={setCustomEvents}
-            />
-          )}
+
+          <div className="tbl-wrap" tabIndex={0}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Queue</th>
+                  <th>ID</th>
+                  <th>Record / Subject</th>
+                  <th>Counterparty</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Recorded</th>
+                </tr>
+              </thead>
+              <tbody>
+                {unifiedRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ textAlign: "center", padding: 24, color: "var(--ops-text-3)" }}>
+                      No matching operational records in the current overview snapshot.
+                    </td>
+                  </tr>
+                ) : (
+                  unifiedRows.slice(0, 40).map((r) => (
+                    <tr
+                      key={`${r.kind}-${r.id}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => ui.navigate(r.page, r.id)}
+                    >
+                      <td style={{ fontWeight: 700 }}>{r.kind}</td>
+                      <td className="mono">{r.id}</td>
+                      <td className="cell-main">{r.title}</td>
+                      <td>{r.party}</td>
+                      <td className="amount">
+                        {r.amountMinor !== null ? fmt(r.amountMinor) : "—"}
+                      </td>
+                      <td>
+                        <Pill s={r.status} />
+                      </td>
+                      <td className="mono" style={{ fontSize: 12 }}>
+                        {r.when ? dts(r.when) : "—"}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : opsSubTab === "kanban" ? (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {kanbanCols.map((col) => (
+            <section key={col.id} className="sh-card" style={{ padding: 14 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingBottom: 8,
+                  borderBottom: "1px solid var(--ops-border-soft)",
+                }}
+              >
+                <strong style={{ fontSize: 13 }}>{col.label}</strong>
+                <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
+                  {col.items.length}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {col.items.length === 0 ? (
+                  <div style={{ fontSize: 12, color: "var(--ops-text-3)", padding: "12px 0" }}>
+                    No items in this column.
+                  </div>
+                ) : (
+                  col.items.slice(0, 12).map((item) => (
+                    <button
+                      key={`${item.tag}-${item.id}`}
+                      type="button"
+                      onClick={() => ui.navigate(item.page, item.id)}
+                      style={{
+                        textAlign: "left",
+                        padding: "10px 12px",
+                        border: "1px solid var(--ops-border-soft)",
+                        borderRadius: "var(--sh-radius)",
+                        background: "var(--ops-surface-subtle, var(--color-bg-subtle))",
+                        cursor: "pointer",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 4,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          className="mono"
+                          style={{ fontSize: 11, fontWeight: 700, color: "var(--ops-text-3)" }}
+                        >
+                          {item.tag} · {item.id}
+                        </span>
+                        <Pill s={item.status} />
+                      </div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: "var(--ops-text)" }}>
+                        {item.title}
+                      </div>
+                      <div style={{ fontSize: 11.5, color: "var(--ops-text-2)" }}>{item.meta}</div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </section>
+          ))}
         </div>
+      ) : (
+        <section className="sh-card">
+          <div className="sh-card-header">
+            <div>
+              <h2 className="sh-card-title">Compliance &amp; Dispute SLA Schedule</h2>
+              <p className="sh-card-desc">
+                Ordered chronologically from live Dispute SLA deadlines, Payout queues, and AML flags
+              </p>
+            </div>
+            <AlertTriangle size={16} />
+          </div>
+          {scheduleItems.length === 0 ? (
+            <div className="sh-chart-empty">
+              <strong>No pending SLA deadlines</strong>
+              <span>All live dispute, payout, and compliance queues are up to date.</span>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {scheduleItems.map((ev) => (
+                <button
+                  key={`${ev.kind}-${ev.id}`}
+                  type="button"
+                  onClick={() => ui.navigate(ev.page, ev.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    padding: "10px 14px",
+                    border: "1px solid var(--ops-border-soft)",
+                    borderRadius: "var(--sh-radius)",
+                    background: "var(--ops-surface)",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span className="mono" style={{ fontSize: 11.5, color: "var(--ops-text-3)" }}>
+                      {ev.kind} · {ev.when}
+                    </span>
+                    <strong style={{ fontSize: 13.5, color: "var(--ops-text)" }}>{ev.title}</strong>
+                    <span style={{ fontSize: 12, color: "var(--ops-text-2)" }}>{ev.detail}</span>
+                  </div>
+                  <Pill s={ev.status} />
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
       )}
     </div>
   );

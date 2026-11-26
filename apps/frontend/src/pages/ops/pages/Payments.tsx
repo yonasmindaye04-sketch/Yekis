@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Check,
   CheckCircle2,
   CreditCard,
   Download,
@@ -15,16 +14,17 @@ import {
   Eye,
   FileText,
   RefreshCw,
-  RotateCcw,
   Search,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { dts, fmt, opsApi, opsListApi } from "../opsApi";
+import { dts, fmt, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { PAYMENT_STATUSES, RAILS } from "../opsConst";
 import type { Payment } from "../opsTypes";
 import {
+  Button,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -32,46 +32,20 @@ import {
   LoadingBox,
   PageHead,
   Pager,
+  Pill,
   Rail,
-  formatStatusLabel,
   isTyping,
   useHotkeys,
-  useToast,
-  Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("SUCCESS")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("REFUND")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
-const PAYMENT_ACTION_TEMPLATES = [
-  "Provider H5 webhook signature & settlement batch verified; credited to milestone escrow.",
-  "Manual callback re-sync triggered against Telebirr / CBE Birr merchant gateway.",
-  "Transaction flagged for manual rail reconciliation due to settlement timing variance.",
-  "Inbound payment reversed & refunded to client origin wallet per dispute / duplicate debit.",
-];
-
 export default function Payments() {
   const ui = useOpsUi();
-  const toast = useToast();
 
   const [status, setStatus] = useState("");
   const [provider, setProvider] = useState("");
   const [selId, setSelId] = useState<string | null>(null);
-  const [overrideRef, setOverrideRef] = useState("");
-  const [templateNote, setTemplateNote] = useState("");
-  const [customNote, setCustomNote] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const list = useListPage<Payment>(
     (p) => opsListApi.payments({ ...p, status, provider }),
@@ -89,47 +63,6 @@ export default function Payments() {
   }, [rows, selId]);
 
   const sel = useMemo(() => rows.find((r) => r.id === selId) ?? null, [rows, selId]);
-
-  const executePaymentTask = useCallback(
-    async (action: "VERIFY" | "RESYNC" | "FLAG" | "REFUND") => {
-      if (!sel || busy) return;
-      const reason =
-        templateNote === "custom"
-          ? customNote.trim()
-          : templateNote.trim() || PAYMENT_ACTION_TEMPLATES[0];
-
-      if (reason.length < 5) {
-        toast("Please select or enter an administrative audit note.");
-        return;
-      }
-
-      setBusy(true);
-      try {
-        await opsApi.actOnPayment(sel.id, {
-          action,
-          ref: overrideRef.trim() || undefined,
-          reason,
-        });
-        const messages: Record<typeof action, string> = {
-          VERIFY: `Payment ${sel.txId} verified and credited to escrow.`,
-          RESYNC: `Provider callback re-synced for ${sel.txId}.`,
-          FLAG: `Payment ${sel.txId} routed to Reconciliation queue.`,
-          REFUND: `Payment ${sel.txId} reversed and refunded to client.`,
-        };
-        toast(messages[action]);
-        setOverrideRef("");
-        setTemplateNote("");
-        setCustomNote("");
-        reload();
-        ui.refreshBadges();
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "Payment action failed");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [sel, busy, templateNote, customNote, overrideRef, reload, toast, ui],
-  );
 
   useHotkeys(
     useCallback(
@@ -256,7 +189,7 @@ export default function Payments() {
         />
       </div>
 
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -283,12 +216,12 @@ export default function Payments() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={CreditCard}>No inbound payments match this filter.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -307,7 +240,7 @@ export default function Payments() {
                         {p.client} · {p.job}
                       </div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(p.status)}>{formatStatusLabel(p.status)}</ShinyBadge>
+                    <Pill s={p.status} />
                   </div>
                   <div className="qi-foot">
                     <Rail p={p.provider} />
@@ -325,7 +258,7 @@ export default function Payments() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -338,7 +271,7 @@ export default function Payments() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Rail p={sel.provider} />
-                    <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
+                    <Pill s={sel.status} />
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       Internal ID: {sel.id}
                     </span>
@@ -382,9 +315,9 @@ export default function Payments() {
                 </div>
                 <div className="info-cell">
                   <div className="k">Beneficiary Freelancer</div>
-                  <div className="v">{sel.freelancer ?? "Hanna Tadesse"}</div>
+                  <div className="v">{sel.freelancer ?? "—"}</div>
                   <div style={{ fontSize: 11.5, color: "var(--ops-text-2)", marginTop: 2 }}>
-                    Contract {sel.contractId ?? "ctr-301"}
+                    {sel.contractId ? `Contract ${sel.contractId}` : "Escrow contract linked"}
                   </div>
                 </div>
                 <div className="info-cell">
@@ -459,81 +392,43 @@ export default function Payments() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Administrative Payment Execution Tasks
+                  Linked Finance &amp; Escrow Workbenches
                 </div>
-                <div className="grid g2" style={{ gap: 10, marginBottom: 10 }}>
-                  <div className="fld">
-                    <label className="lbl">Provider Reference Override (Optional)</label>
-                    <input
-                      className="inp mono"
-                      placeholder={sel.txId}
-                      value={overrideRef}
-                      onChange={(e) => setOverrideRef(e.target.value)}
-                    />
-                  </div>
-                  <div className="fld">
-                    <label className="lbl">Preset Audit Note</label>
-                    <select
-                      className="sel"
-                      style={{ width: "100%" }}
-                      value={templateNote}
-                      onChange={(e) => setTemplateNote(e.target.value)}
-                    >
-                      <option value="">Select standard payment audit note…</option>
-                      {PAYMENT_ACTION_TEMPLATES.map((tpl) => (
-                        <option key={tpl} value={tpl}>
-                          {tpl}
-                        </option>
-                      ))}
-                      <option value="custom">Custom audit note…</option>
-                    </select>
-                  </div>
-                </div>
-
-                {templateNote === "custom" ? (
-                  <div className="fld" style={{ marginBottom: 10 }}>
-                    <label className="lbl">Custom Audit Note</label>
-                    <input
-                      className="inp"
-                      placeholder="Enter reason for manual payment verification or reversal…"
-                      value={customNote}
-                      onChange={(e) => setCustomNote(e.target.value)}
-                    />
-                  </div>
-                ) : null}
-
+                <p style={{ fontSize: 12.5, color: "var(--ops-text-2)", margin: "0 0 12px" }}>
+                  Inbound payments are settled by signed gateway webhooks. To hold/release custody funds, inspect double-entry postings, or mediate refunds, jump to the authoritative workbench:
+                </p>
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
                   <button
-                    className="btn btn-success"
-                    disabled={busy}
-                    onClick={() => void executePaymentTask("VERIFY")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("escrow")}
                   >
-                    <Check size={14} /> Verify & Credit Escrow
+                    <ExternalLink size={14} /> Manage Linked Escrow
                   </button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void executePaymentTask("RESYNC")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("reconciliation")}
                   >
-                    <RefreshCw size={14} /> Re-Sync Rail Callback
+                    <ExternalLink size={14} /> Open Reconciliation
                   </button>
                   <button
-                    className="btn btn-warn"
-                    disabled={busy}
-                    onClick={() => void executePaymentTask("FLAG")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("ledger")}
                   >
-                    <TriangleAlert size={14} /> Flag for Reconciliation
+                    <ExternalLink size={14} /> Inspect Ledger Journal
                   </button>
                   <button
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void executePaymentTask("REFUND")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("dispute-queue")}
                   >
-                    <RotateCcw size={14} /> Reverse & Refund Client
+                    <ExternalLink size={14} /> Dispute Mediation
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

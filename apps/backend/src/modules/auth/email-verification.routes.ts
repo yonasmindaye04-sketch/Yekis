@@ -15,6 +15,7 @@ import {
   EmailCodeRateLimitedError,
   EmailCodeDeliveryFailedError,
   EmailCodeInvalidError,
+  EmailAlreadyRegisteredError,
 } from "./email-verification.service.js";
 
 /**
@@ -68,6 +69,10 @@ export function handleEmailVerificationError(
   err: unknown,
   res: Response,
 ): boolean {
+  if (err instanceof EmailAlreadyRegisteredError) {
+    res.status(409).json({ error: "EMAIL_IN_USE", message: err.message });
+    return true;
+  }
   if (err instanceof EmailCodeRateLimitedError) {
     res.status(429).json({ error: "RATE_LIMITED", message: err.message });
     return true;

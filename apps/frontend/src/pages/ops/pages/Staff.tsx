@@ -6,23 +6,21 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useMemo, useState } from "react";
-import { Check, RefreshCw, Shield, UserX, UserCheck } from "lucide-react";
+import { Check, RefreshCw, Shield, UserCheck, UserX } from "lucide-react";
 import { opsApi, opsListApi, useApi } from "../opsApi";
 import type { StaffMember, StaffRole } from "../opsTypes";
 import { useListPage } from "../opsList";
-import { ErrorBox, LoadingBox, OpsTable, PageHead, Pager, useToast } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
+import {
+  Card,
+  ErrorBox,
+  LoadingBox,
+  OpsActionModal,
+  OpsTable,
+  PageHead,
+  Pager,
+  Pill,
+  useToast,
+} from "../components/ui";
 
 const ROLE_LABELS: Record<StaffRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -43,6 +41,7 @@ export default function StaffPage() {
   const [editId, setEditId] = useState<string | null>(null);
   const [draft, setDraft] = useState<StaffRole | null>("SUPPORT");
   const [busy, setBusy] = useState(false);
+  const [suspendTarget, setSuspendTarget] = useState<StaffMember | null>(null);
 
   const columns = useMemo(() => {
     const roles = matrix.data?.roles ?? {};
@@ -66,19 +65,41 @@ export default function StaffPage() {
     }
   };
 
-  const toggleStatus = async (s: StaffMember) => {
-    const suspended = !s.suspended;
-    const reason = suspended ? window.prompt("Reason for suspending this staff account:") : undefined;
-    if (suspended && (!reason || reason.trim().length < 5)) { toast("A suspension reason of at least 5 characters is required."); return; }
+  const reactivate = async (s: StaffMember) => {
     setBusy(true);
-    try { await opsApi.setStaffStatus(s.id, suspended, reason?.trim()); toast(suspended ? "Staff account suspended." : "Staff account reactivated."); reload(); }
-    catch (e) { toast(e instanceof Error ? e.message : "Status update failed"); }
-    finally { setBusy(false); }
+    try {
+      await opsApi.setStaffStatus(
+        s.id,
+        false,
+        "Account reactivated by Super Admin after operational review.",
+      );
+      toast("Staff account reactivated.");
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Status update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmSuspend = async ({ values }: { values: Record<string, string> }) => {
+    if (!suspendTarget) return;
+    setBusy(true);
+    try {
+      await opsApi.setStaffStatus(suspendTarget.id, true, values.reason);
+      toast("Staff account suspended.");
+      setSuspendTarget(null);
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Status update failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const grants = (role: string, perm: string) => {
-    const list = matrix.data?.roles?.[role];
-    return Array.isArray(list) && (list.includes("*") || list.includes(perm));
+    const permList = matrix.data?.roles?.[role];
+    return Array.isArray(permList) && (permList.includes("*") || permList.includes(perm));
   };
 
   return (
@@ -86,44 +107,95 @@ export default function StaffPage() {
       <PageHead
         title="Administrators & Permissions"
         sub="Staff accounts and their permission scopes. All role changes are audited."
-        right={<button className="btn btn-ghost" onClick={reload}><RefreshCw size={14} /> Refresh</button>}
+        right={
+          <button type="button" className="btn btn-ghost" onClick={reload}>
+            <RefreshCw size={14} /> Refresh
+          </button>
+        }
       />
-      <OpsTable heads={["Email", "UCID", "User Role", "Staff Role", "Status", ""]} foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="accounts" />}>
+      <OpsTable
+        heads={["Email", "UCID", "User Role", "Staff Role", "Status", ""]}
+        foot={<Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="accounts" />}
+      >
         {rows.map((s) => (
           <tr key={s.id}>
-            <td className="cell-main" style={{ fontWeight: 600 }}>{s.email}</td>
-            <td className="mono" style={{ fontSize: 12, color: "var(--ops-text-2)" }}>{s.ucid}</td>
-            <td><ShinyBadge variant={statusToVariant(s.userRole)}>{s.userRole.replace(/_/g, " ")}</ShinyBadge></td>
+            <td className="cell-main" style={{ fontWeight: 600 }}>
+              {s.email}
+            </td>
+            <td className="mono" style={{ fontSize: 12, color: "var(--ops-text-2)" }}>
+              {s.ucid}
+            </td>
+            <td>
+              <Pill s={s.userRole} />
+            </td>
             <td>
               {editId === s.id ? (
                 <select
                   className="sel"
                   style={{ padding: "5px 9px" }}
                   value={draft ?? ""}
-                  onChange={(e) => setDraft(e.target.value ? (e.target.value as StaffRole) : null)}
+                  onChange={(e) =>
+                    setDraft(e.target.value ? (e.target.value as StaffRole) : null)
+                  }
                 >
                   <option value="">No console access</option>
                   {(Object.keys(ROLE_LABELS) as StaffRole[]).map((r) => (
-                    <option value={r} key={r}>{ROLE_LABELS[r]}</option>
+                    <option value={r} key={r}>
+                      {ROLE_LABELS[r]}
+                    </option>
                   ))}
                 </select>
               ) : s.staffRole ? (
-                <ShinyBadge variant={statusToVariant(s.staffRole)}>{ROLE_LABELS[s.staffRole] ?? s.staffRole.replace(/_/g, " ")}</ShinyBadge>
+                <Pill s={s.staffRole} />
               ) : (
                 <span style={{ color: "var(--ops-text-3)" }}>—</span>
               )}
             </td>
-            <td>{s.suspended ? <ShinyBadge variant="error">Suspended</ShinyBadge> : <ShinyBadge variant="success">Active</ShinyBadge>}</td>
+            <td>
+              <Pill s={s.suspended ? "SUSPENDED" : "ACTIVE"} />
+            </td>
             <td>
               {editId === s.id ? (
                 <span style={{ display: "flex", gap: 6 }}>
-                  <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => void save(s.id)}><Check size={12} /> Save</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)}>Cancel</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={busy}
+                    onClick={() => void save(s.id)}
+                  >
+                    <Check size={12} /> Save
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setEditId(null)}
+                  >
+                    Cancel
+                  </button>
                 </span>
               ) : (
                 <span style={{ display: "flex", gap: 6 }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setEditId(s.id); setDraft(s.staffRole); }}>Edit role</button>
-                  <button className="btn btn-ghost btn-sm" disabled={busy} onClick={() => void toggleStatus(s)}>{s.suspended ? <UserCheck size={12} /> : <UserX size={12} />} {s.suspended ? "Reactivate" : "Suspend"}</button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      setEditId(s.id);
+                      setDraft(s.staffRole);
+                    }}
+                  >
+                    Edit role
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    disabled={busy}
+                    onClick={() =>
+                      s.suspended ? void reactivate(s) : setSuspendTarget(s)
+                    }
+                  >
+                    {s.suspended ? <UserCheck size={12} /> : <UserX size={12} />}
+                    {s.suspended ? "Reactivate" : "Suspend"}
+                  </button>
                 </span>
               )}
             </td>
@@ -131,30 +203,45 @@ export default function StaffPage() {
         ))}
       </OpsTable>
 
-      <GlassCard className="card-pad" style={{ marginTop: 24 }}>
-        <div className="sec-title"><Shield size={17} /> Permission Matrix</div>
+      <Card className="card-pad" style={{ marginTop: 24 }}>
+        <div className="sec-title">
+          <Shield size={17} /> Permission Matrix
+        </div>
         {!matrix.data ? (
           <div className="empty">
-            {matrix.error ? `Could not load the matrix: ${matrix.error}` : "Loading matrix…"}
+            {matrix.error
+              ? `Could not load the matrix: ${matrix.error}`
+              : "Loading matrix…"}
           </div>
         ) : (
           <>
-            <div className="tbl-wrap">
+            <div className="tbl-wrap" tabIndex={0} role="region" aria-label="Role permission matrix">
               <table className="tbl matrix" style={{ width: "100%" }}>
                 <thead>
                   <tr>
                     <th>Permission</th>
                     {columns.map((r) => (
-                      <th style={{ textAlign: "center" }} className="mono" key={r}>{r.replace("_ADMIN", "")}</th>
+                      <th style={{ textAlign: "center" }} className="mono" key={r}>
+                        {r.replace("_ADMIN", "")}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {(matrix.data.permissions ?? []).map((p) => (
                     <tr key={p}>
-                      <td className="mono" style={{ fontSize: 11.5, color: "var(--ops-text-2)", fontWeight: 600 }}>{p}</td>
+                      <td
+                        className="mono"
+                        style={{ fontSize: 11.5, color: "var(--ops-text-2)", fontWeight: 600 }}
+                      >
+                        {p}
+                      </td>
                       {columns.map((r) => (
-                        <td style={{ textAlign: "center" }} className={grants(r, p) ? "yes" : "no"} key={r}>
+                        <td
+                          style={{ textAlign: "center" }}
+                          className={grants(r, p) ? "yes" : "no"}
+                          key={r}
+                        >
                           {grants(r, p) ? "●" : "—"}
                         </td>
                       ))}
@@ -169,7 +256,33 @@ export default function StaffPage() {
             </div>
           </>
         )}
-      </GlassCard>
+      </Card>
+
+      <OpsActionModal
+        open={suspendTarget !== null}
+        title="Suspend Staff Account"
+        description={
+          suspendTarget
+            ? `Suspending ${suspendTarget.email} revokes all active sessions immediately and records an immutable audit event.`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel="Suspend Staff Account"
+        busy={busy}
+        fields={[
+          {
+            name: "reason",
+            label: "Audit Reason (min 20 characters)",
+            placeholder: "Provide full operational or security justification for this suspension…",
+            multiline: true,
+            required: true,
+            minLength: 20,
+            maxLength: 500,
+          },
+        ]}
+        onConfirm={confirmSuspend}
+        onCancel={() => !busy && setSuspendTarget(null)}
+      />
     </div>
   );
 }

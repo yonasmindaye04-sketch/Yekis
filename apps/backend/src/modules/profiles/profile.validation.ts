@@ -50,5 +50,46 @@ export const reportProfileSchema = z.object({
   details: z.string().max(1000).optional(),
 });
 
+export const guideProgressModuleSchema = z.enum([
+  "overview",
+  "jobs",
+  "proposals",
+  "gigs",
+  "contracts",
+  "escrow",
+  "wallet",
+  "chat",
+  "profile",
+  "cases",
+  "verification",
+  "settings",
+]);
+
+export const guideProgressUpdateSchema = z
+  .object({
+    completeTour: guideProgressModuleSchema.optional(),
+    skipTour: guideProgressModuleSchema.optional(),
+    resetTour: guideProgressModuleSchema.optional(),
+    resetAll: z.boolean().optional(),
+    dismissPrompt: z.string().min(1).max(64).optional(),
+    lastStep: z
+      .object({
+        module: guideProgressModuleSchema,
+        stepIndex: z.number().int().min(0).max(50),
+      })
+      .optional(),
+  })
+  .refine(
+    (val) =>
+      val.completeTour !== undefined ||
+      val.skipTour !== undefined ||
+      val.resetTour !== undefined ||
+      val.resetAll !== undefined ||
+      val.dismissPrompt !== undefined ||
+      val.lastStep !== undefined,
+    { message: "At least one guide progress update field is required." },
+  );
+
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 export type ReportProfileInput = z.infer<typeof reportProfileSchema>;
+export type GuideProgressUpdateInput = z.infer<typeof guideProgressUpdateSchema>;

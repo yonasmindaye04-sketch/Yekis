@@ -131,12 +131,8 @@ function renderDocumentSheet(d: ViewerDoc) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                background: "#dcfce7",
                 color: "#166534",
-                border: "1px solid #86efac",
-                padding: "3px 9px",
-                borderRadius: 999,
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 800,
               }}
             >
@@ -368,12 +364,8 @@ function renderDocumentSheet(d: ViewerDoc) {
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 5,
-                background: "#dcfce7",
                 color: "#166534",
-                border: "1px solid #86efac",
-                padding: "3px 9px",
-                borderRadius: 999,
-                fontSize: 10.5,
+                fontSize: 11,
                 fontWeight: 800,
               }}
             >
@@ -624,12 +616,8 @@ function renderDocumentSheet(d: ViewerDoc) {
               display: "inline-flex",
               alignItems: "center",
               gap: 5,
-              background: "#dbeafe",
               color: "#1e40af",
-              border: "1px solid #93c5fd",
-              padding: "3px 9px",
-              borderRadius: 999,
-              fontSize: 10.5,
+              fontSize: 11,
               fontWeight: 800,
             }}
           >

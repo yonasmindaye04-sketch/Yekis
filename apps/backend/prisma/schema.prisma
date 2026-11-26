@@ -327,6 +327,7 @@ circumventionAlertCount Int        @default(0)
   passwordResetTokens  PasswordResetToken[]
   telegramLoginCodes   TelegramLoginCode[]
   notificationSettings Json?
+  guideProgress        Json?
 
   @@index([faydaPsut])
   @@index([isGuestContact])

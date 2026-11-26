@@ -4,6 +4,8 @@ import { logger } from "../../../lib/logger.js";
 import type { StaffRole } from "@prisma/client";
 import { toTelegramBigInt } from "../../../lib/json.js";
 import { getBotTranslation } from "./i18n.middleware.js";
+import { resolveOrProvisionTelegramUser } from "../../auth/telegram.service.js";
+import { AccountLinkRequiredError } from "../../auth/identity.js";
 
 function normalizeSupportedLanguage(code?: string | null): "en" | "am" | "om" | "ti" {
   const normalized = (code ?? "").trim().toLowerCase();
@@ -90,21 +92,45 @@ export async function authMiddleware(
     }) as unknown as ResolvedUser | null;
   }
 
-  // C5: Strict Onboarding - Do not auto-provision here
   if (!user) {
-    ctx.session.userId = undefined;
-    ctx.session.role = undefined;
-    ctx.session.kycTier = undefined;
-    ctx.session.kycStatus = undefined;
-    ctx.session.staffRole = undefined;
-    ctx.session.loginBlocked = getBotTranslation(
-      normalizeSupportedLanguage(from.language_code),
-      "auth_not_registered",
-    );
-    ctx.session.language = normalizeSupportedLanguage(from.language_code);
-    ctx.session.telegramUserId = telegramId;
-    ctx.session.telegramChatId = chatId;
-    return next();
+    try {
+      const provisioned = await resolveOrProvisionTelegramUser(
+        {
+          id: telegramBigId,
+          first_name: from.first_name,
+          last_name: from.last_name,
+          username: from.username,
+          language_code: from.language_code,
+        },
+        { chatId },
+      );
+      user = {
+        id: provisioned.id,
+        role: provisioned.role,
+        staffRole: provisioned.staffRole,
+        languagePreference: provisioned.languagePreference,
+        telegramUserId: provisioned.telegramUserId,
+        telegramChatId: provisioned.telegramChatId,
+        kyc: provisioned.kyc,
+      };
+    } catch (err) {
+      ctx.session.userId = undefined;
+      ctx.session.role = undefined;
+      ctx.session.kycTier = undefined;
+      ctx.session.kycStatus = undefined;
+      ctx.session.staffRole = undefined;
+      ctx.session.loginBlocked =
+        err instanceof AccountLinkRequiredError
+          ? err.message
+          : getBotTranslation(
+              normalizeSupportedLanguage(from.language_code),
+              "auth_not_registered",
+            );
+      ctx.session.language = normalizeSupportedLanguage(from.language_code);
+      ctx.session.telegramUserId = telegramId;
+      ctx.session.telegramChatId = chatId;
+      return next();
+    }
   }
 
   ctx.session.loginBlocked = undefined;

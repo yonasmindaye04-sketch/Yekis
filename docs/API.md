@@ -23,8 +23,8 @@ Shared payloads are defined in `packages/schemas`; some multipart and route-loca
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. `phone` is **optional** — an account created from an address alone gets the reserved `+2510…` placeholder number the federated sign-ins use. Returns `202` with a generic body for both new and already-registered **addresses**. `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account and the address is not — no account can be created for that registration, so the answer says so instead of accepting it and dropping it. `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
-| `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Never reveals whether the address is registered. `429` when throttled, `503` when mail cannot be delivered. **The code itself is never in the response** — only on a developer machine or in the test suite (`NODE_ENV=development` / `test`); on a reachable host the response carries only `sent`, `expiresAt` and `retryAfterSec` |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. `phone` is **optional** — an account created from an address alone gets the reserved `+2510…` placeholder number the federated sign-ins use. Returns `202` for new accounts, `409 {"error":"EMAIL_IN_USE"}` when the **address** is already registered, `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account, `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
+| `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Returns `409 EMAIL_IN_USE` when an unauthenticated signup targets an already-registered email, `429` when throttled, `503` when mail cannot be delivered. **The code itself is never in the response** — only on a developer machine or in the test suite (`NODE_ENV=development` / `test`); on a reachable host the response carries only `sent`, `expiresAt` and `retryAfterSec` |
 | `POST` | `/api/v1/auth/email/verify` | Public | Check a 6-digit email OTP. `400 INVALID_CODE` for both "no such code" and "wrong code", `410 CODE_EXPIRED`, `429 TOO_MANY_ATTEMPTS` |
 | `POST` | `/api/v1/auth/phone/code` | Public | Issue a 6-digit SMS OTP. Same shape as the email route; used for the payout number and for withdrawal approval. **The code itself is never in the response** outside a developer machine or the test suite; on a reachable host the response carries only `sent`, `expiresAt`, `retryAfterSec` and the `channel` it was delivered through |
 | `POST` | `/api/v1/auth/phone/verify` | Public | Check a 6-digit SMS OTP |
@@ -185,7 +185,7 @@ The 7-day cooling-off cancellation right may only be exercised by the client whi
 |---|---|---|---|
 | `POST` | `/api/v1/escrow/fund` | Contract client, Tier 1 verified | (Deprecated) Old external-provider funding path |
 | `POST` | `/api/v1/escrow/fund-from-wallet` | Contract client, Tier 1 verified | Initiate milestone funding from client wallet |
-| `GET` | `/api/v1/escrow/milestones` | Authenticated party | List milestones across current user's contracts |
+| `GET` | `/api/v1/escrow/milestones` | Authenticated party | List milestones across current user's contracts, each with its contract title, the counterparty, the payment rail and the funding timestamp |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/submit` | Contract freelancer | Mark funded work delivered and schedule auto-release |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
@@ -241,6 +241,54 @@ Withdrawal body:
 ```
 
 Providers are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`. Wallet mismatch returns `202` with `HELD_FOR_REVIEW` and does not debit the wallet. A passing request creates a `PayoutTransaction`, initiates automated B2C disbursement via the provider (with deterministic sandbox simulation when credentials are not configured), posts double-entry ledger entries upon confirmation, and rolls back the wallet balance if the provider rejects the payout.
+
+### `GET /api/v1/escrow/milestones` response
+
+Every row describes one milestone of the caller's own contract. The response
+carries the facts the workspace ledger renders, so the client never has to
+invent a counterparty, a contract name or a payment rail:
+
+```json
+{
+  "id": "clx...",
+  "contractId": "ctr...",
+  "title": "Phase 1: Telebirr H5 Checkout",
+  "amountMinor": 6500000,
+  "dueDate": "2026-10-24T00:00:00.000Z",
+  "escrowState": "WORK_IN_PROGRESS",
+  "deliverableUrl": null,
+  "submittedAt": null,
+  "autoReleaseAt": null,
+  "releasedAt": null,
+  "contract": {
+    "id": "ctr...",
+    "jobId": "job...",
+    "status": "ACTIVE",
+    "title": "Telebirr SuperApp Mini-Program",
+    "category": "WEB_APP_DEVELOPMENT"
+  },
+  "counterparty": {
+    "id": "usr...",
+    "role": "FREELANCER",
+    "name": "Hanna Tadesse",
+    "email": "hanna@example.et"
+  },
+  "paymentRail": "TELEBIRR",
+  "fundedAt": "2026-10-18T09:12:00.000Z"
+}
+```
+
+- `counterparty` is the **other** party on the contract: `role` is
+  `FREELANCER` when the caller is the client and `CLIENT` when the caller is
+  the freelancer.
+- `paymentRail` is the rail the money actually travelled on. It is `null`
+  when the milestone was funded from the caller's own wallet balance — that
+  is an internal transfer, not a payment rail — and `null` while the milestone
+  is still unfunded.
+- `fundedAt` is when the escrow was funded: the successful payment
+  transaction's timestamp for a rail payment, otherwise the escrow-funding
+  ledger journal's `postedAt` for a wallet-funded milestone. It is `null`
+  until the milestone is funded.
 
 Withdrawal response (`200 OK`):
 
@@ -364,6 +412,9 @@ Outcomes are `RELEASE_TO_FREELANCER`, `REFUND_TO_CLIENT`, and `PARTIAL_SPLIT`.
 | `GET` | `/api/v1/users/avatars/:avatarId` | Public | Serve an uploaded profile photo with `Cache-Control: public, max-age=31536000, immutable` and `X-Content-Type-Options: nosniff`. Unknown or malformed ids return `404` |
 | `GET` | `/api/v1/users/me/profile/completeness` | Authenticated | Get profile completeness score |
 | `POST` | `/api/v1/users/me/profile/views` | Authenticated | Record profile view |
+| `GET` | `/api/v1/users/me/guide-progress` | Authenticated | Get persisted per-user Yekis Guide onboarding and tour progress (`completedTours`, `skippedTours`, `dismissedPrompts`, `lastActiveStepByModule`) |
+| `PATCH` | `/api/v1/users/me/guide-progress` | Authenticated | Atomically record completed/skipped/reset tour, prompt dismissal, or last step index for the signed-in user |
+| `DELETE` | `/api/v1/users/me/guide-progress` | Authenticated | Reset all Yekis Guide onboarding and tour progress for the signed-in user |
 | `GET` | `/api/v1/users/me/export` | Authenticated | Export the complete PDPP data-subject archive as JSON — account, profile, verification, financials, marketplace activity, communications (consents, notifications, chat, DMs) and the compliance records the platform holds |
 | `GET` | `/api/v1/users/me/erasure/blockers` | Authenticated | Check whether the account has any outstanding obligations (open disputes, active contracts, wallet balance, pending payouts/topups) that block deactivation/erasure under statutory retention rules |
 | `POST` | `/api/v1/users/me/erasure` | Authenticated + fresh auth (5 min) | Erase personal data under PDPP Art. 15. Destroys profile, chat, DMs, portfolio, marketing and analytics data and the credentials; retains the identity, financial and AML records the law requires; closes the account. Returns `409 ERASURE_BLOCKED` with the outstanding items when money is still in flight |
@@ -643,8 +694,8 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. `phone` is **optional** — an account created from an address alone gets the reserved `+2510…` placeholder number the federated sign-ins use. Returns `202` with a generic body for both new and already-registered **addresses**. `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account and the address is not — no account can be created for that registration, so the answer says so instead of accepting it and dropping it. `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
-| `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Never reveals whether the address is registered. `429` when throttled, `503` when mail cannot be delivered. **The code itself is never in the response** — only on a developer machine or in the test suite (`NODE_ENV=development` / `test`); on a reachable host the response carries only `sent`, `expiresAt` and `retryAfterSec` |
+| `POST` | `/api/v1/auth/register` | Public | Register with age gate, role, password, and consents. `phone` is **optional** — an account created from an address alone gets the reserved `+2510…` placeholder number the federated sign-ins use. Returns `202` for new accounts, `409 {"error":"EMAIL_IN_USE"}` when the **address** is already registered, `409 {"error":"PHONE_IN_USE"}` when the **number** is already registered to another account, `403 AGE_RESTRICTED`, `400 VALIDATION_ERROR` |
+| `POST` | `/api/v1/auth/email/code` | Public | Issue a 6-digit email OTP for the onboarding step. The code is proven **before** the account exists, so the route is unauthenticated. Returns `409 EMAIL_IN_USE` when an unauthenticated signup targets an already-registered email, `429` when throttled, `503` when mail cannot be delivered. **The code itself is never in the response** — only on a developer machine or in the test suite (`NODE_ENV=development` / `test`); on a reachable host the response carries only `sent`, `expiresAt` and `retryAfterSec` |
 | `POST` | `/api/v1/auth/email/verify` | Public | Check a 6-digit email OTP. `400 INVALID_CODE` for both "no such code" and "wrong code", `410 CODE_EXPIRED`, `429 TOO_MANY_ATTEMPTS` |
 | `POST` | `/api/v1/auth/phone/code` | Public | Issue a 6-digit SMS OTP. Same shape as the email route; used for the payout number and for withdrawal approval. **The code itself is never in the response** outside a developer machine or the test suite; on a reachable host the response carries only `sent`, `expiresAt`, `retryAfterSec` and the `channel` it was delivered through |
 | `POST` | `/api/v1/auth/phone/verify` | Public | Check a 6-digit SMS OTP |
@@ -665,7 +716,7 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `GET` | `/api/v1/auth/telegram/web-login/:sid/status` | Public | Poll for session completion |
 | `POST` | `/api/v1/auth/telegram/web-login/redeem` | Public | Redeem a completed Telegram web-login session for JWTs |
 | `GET` | `/api/v1/auth/oauth/providers` | Public | Returns available OAuth provider list |
-| `POST` | `/api/v1/auth/oauth/google` | Public | Google OAuth sign-in / register. The account is found by the **provider id first** — that is the credential — and only then by the address, which is only a label. A Google sign-in whose provider id is bound to an account signs in; one that merely *matches the address* of a password account is refused with `409 ACCOUNT_LINK_REQUIRED` and is never merged |
+| `POST` | `/api/v1/auth/oauth/google` | Public | Google OAuth sign-in / register. The account is found by the **provider id first** — that is the credential — and only then by the address. A Google sign-in whose provider id is bound to an account signs in; if the address matches an existing password account whose email is **verified** (`emailVerified: true`, matching Google's verified email), it auto-links `googleId` and signs in; if the existing password account's email is **unverified**, it is refused with `409 ACCOUNT_LINK_REQUIRED` |
 | `POST` | `/api/v1/auth/oauth/google/link` | Authenticated + fresh session | Bind a Google credential to the account that is already signed in. The credential is verified against Google's JWKS, the address must be the account's own address, and a credential that already belongs to another account is refused. `401 OAUTH_VERIFICATION_FAILED`, `409 EMAIL_MISMATCH`, `409 PROVIDER_LINK_CONFLICT`, `403 STEP_UP_REQUIRED` when the session is not strong |
 | `DELETE` | `/api/v1/auth/oauth/google/link` | Authenticated + fresh session | Remove the Google credential. `409 LAST_CREDENTIAL` when Google is the last way into the account (no password, no verified address) |
 | `POST` | `/api/v1/auth/oauth/apple` | Public | Apple OAuth sign-in / register |

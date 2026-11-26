@@ -40,6 +40,12 @@ export interface TelegramMainButton {
   offClick: (callback: () => void) => void;
 }
 
+export interface TelegramHapticFeedback {
+  impactOccurred: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+  notificationOccurred: (type: "error" | "success" | "warning") => void;
+  selectionChanged: () => void;
+}
+
 export interface TelegramWebApp {
   initData: string;
   initDataUnsafe?: {
@@ -53,6 +59,7 @@ export interface TelegramWebApp {
   themeParams: TelegramThemeParams;
   BackButton: TelegramBackButton;
   MainButton: TelegramMainButton;
+  HapticFeedback?: TelegramHapticFeedback;
   ready: () => void;
   expand: () => void;
   openLink?: (url: string, options?: { try_instant_view?: boolean }) => void;

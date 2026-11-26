@@ -11,6 +11,7 @@ import { dt, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import type { KycDecision, KycItem } from "../opsTypes";
 import {
+  Card,
   ChecksRow,
   Empty,
   ErrorBox,
@@ -19,24 +20,12 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  formatStatusLabel,
+  Pill,
   isTyping,
   useHotkeys,
   useToast,
   Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 
 const KYC_REASONS = [
@@ -180,15 +169,11 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
     <div className="fade">
       <PageHead
         title="KYC Reviews"
-        sub="Identity verification queue — Fayda, TIN & business registration checks"
+        sub={`Identity verification queue — ${total.toLocaleString()} ${status === "UNDER_REVIEW" ? "pending review" : status ? status.toLowerCase().replace("_", " ") : "applications"}`}
         right={
-          <ShinyBadge variant="warning">
-            {/* Was `rows.filter(k => k.status === "UNDER_REVIEW").length`, which
-                always equals rows.length under the default filter and 0 under
-                any other — it read "0 pending review" on a full VERIFIED page.
-                `total` is the server's search+filter-aware match count. */}
-            {total.toLocaleString()} {status === "UNDER_REVIEW" ? "pending review" : status ? `${status.toLowerCase().replace("_", " ")}` : "applications"}
-          </ShinyBadge>
+          <Button variant="outline" onClick={reload}>
+            <RefreshCw size={14} /> Refresh
+          </Button>
         }
       />
       <div className="grid g4" style={{ marginBottom: 12 }}>
@@ -233,7 +218,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         />
       </div>
       {status === "UNDER_REVIEW" && counts ? (
-        <GlassCard style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
+        <Card className="card-pad" style={{ marginBottom: 12, padding: "10px 14px", fontSize: 13 }}>
           <b>{counts.underReview.toLocaleString()}</b> awaiting review (shown below).{" "}
           {counts.pending > 0 ? (
             <>
@@ -245,9 +230,9 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           <Button variant="outline" size="sm" style={{ marginLeft: 8 }} onClick={() => { setStatus(""); setSelId(null); }}>
             Show all statuses
           </Button>
-        </GlassCard>
+        </Card>
       ) : null}
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -269,14 +254,14 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
+            <Card className="card-pad" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={ShieldCheck}>No KYC applications in this view.</Empty>
-            </GlassCard>
+            </Card>
           ) : (
             rows.map((k) => (
               <button
@@ -290,12 +275,12 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 </div>
                 <div className="q-sub">
                   <span className="subject">{k.tier.replace("_", " ")} Request</span>
-                  <ShinyBadge variant={statusToVariant(k.status)}>{formatStatusLabel(k.status)}</ShinyBadge>
+                  <Pill s={k.status} />
                 </div>
                 {k.pep || k.dup ? (
                   <div style={{ marginTop: 7 }}>
                     <span className="check fail" style={{ fontSize: 11 }}>
-                      ⚠ {k.pep ? "PEP match" : "Duplicate identity"}
+                      {k.pep ? "PEP match" : "Duplicate identity"}
                     </span>
                   </div>
                 ) : null}
@@ -312,11 +297,11 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         </div>
 
         {detail ? (
-          <GlassCard className="queue-detail">
+          <Card className="queue-detail">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>Identity Review</h3>
-                <ShinyBadge variant={statusToVariant(detail.status)}>{formatStatusLabel(detail.status)}</ShinyBadge>
+                <Pill s={detail.status} />
               </div>
               <div className="qd-meta">
                 User: {detail.email} · UCID <span className="mono">{detail.ucid}</span> · {detail.name}
@@ -405,9 +390,9 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 <span className="kbd">Esc</span> close viewer
               </div>
             </div>
-          </GlassCard>
+          </Card>
         ) : (
-          <GlassCard className="queue-detail">
+          <Card className="queue-detail">
             <div className="empty-detail">
               <UserCheck size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a record to review.</p>
@@ -415,7 +400,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate the queue
               </span>
             </div>
-          </GlassCard>
+          </Card>
         )}
       </div>
     </div>

@@ -55,6 +55,8 @@ export interface OnboardingVerificationProps {
   onBack: () => void;
   /** Escape hatch. Never called on success. */
   onSkip?: () => void;
+  /** Called immediately when the target email/phone is already registered. */
+  onAlreadyRegistered?: (message: string) => void;
 }
 
 /** `alice@example.com` -> `a***@example.com` */
@@ -83,6 +85,7 @@ export function OnboardingVerification({
   onVerified,
   onBack,
   onSkip,
+  onAlreadyRegistered,
 }: OnboardingVerificationProps) {
   const { t, language } = useI18n();
   const ob = t.workspace.onboarding;
@@ -121,6 +124,15 @@ export function OnboardingVerification({
       // Focus once the field exists.
       setTimeout(() => inputRef.current?.focus(), 50);
     } catch (err) {
+      const code = errorCode(err);
+      if ((code === "EMAIL_IN_USE" || code === "PHONE_IN_USE") && onAlreadyRegistered) {
+        onAlreadyRegistered(
+          err instanceof Error && err.message
+            ? err.message
+            : "An account with this email already exists. Please sign in instead.",
+        );
+        return;
+      }
       setPhase("failed");
       setError(describeSendError(err, ob, masked));
     }

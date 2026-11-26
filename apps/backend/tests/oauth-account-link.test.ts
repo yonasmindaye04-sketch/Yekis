@@ -131,24 +131,41 @@ describe("a Google credential that was linked deliberately signs in", () => {
   });
 });
 
-describe("a matching address is never enough", () => {
-  it("refuses a password account with no Google link", async () => {
-    const user = await makePasswordUser();
+describe("a matching address is never enough when unverified, but auto-links when verified", () => {
+  it("refuses an unverified password account with no Google link", async () => {
+    const user = await makePasswordUser({ emailVerified: false });
 
     await expect(
       loginWithOAuthProfile(googleProfile(user.email, "g-unlinked-1")),
     ).rejects.toThrow(AccountLinkRequiredError);
   });
 
-  it("refuses even when the account's address is verified", async () => {
-    // The address being proven says the inbox belongs to this account. It
-    // does not say the person holding it at Google is the person who owns the
-    // account, and an unproven address is registerable by anyone.
+  it("auto-links Google and signs in when the password account email is verified", async () => {
     const user = await makePasswordUser({ emailVerified: true });
 
+    const session = await loginWithOAuthProfile(
+      googleProfile(user.email, "g-autolink-verified"),
+    );
+
+    expect(session.accessToken).toBeTruthy();
+    expect(session.user.id).toBe(user.id);
+
+    const after = await prisma.user.findUnique({ where: { id: user.id } });
+    expect(after?.googleId).toBe("g-autolink-verified");
+  });
+
+  it("refuses to overwrite a different Google account even when email is verified", async () => {
+    const user = await makePasswordUser({
+      emailVerified: true,
+      googleId: "g-already-bound",
+    });
+
     await expect(
-      loginWithOAuthProfile(googleProfile(user.email, "g-unlinked-2")),
-    ).rejects.toThrow(AccountLinkRequiredError);
+      loginWithOAuthProfile(googleProfile(user.email, "g-different-sub")),
+    ).rejects.toThrow();
+
+    const after = await prisma.user.findUnique({ where: { id: user.id } });
+    expect(after?.googleId).toBe("g-already-bound");
   });
 
   it("writes nothing onto the account it refused", async () => {

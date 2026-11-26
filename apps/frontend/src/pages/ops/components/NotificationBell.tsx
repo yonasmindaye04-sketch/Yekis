@@ -17,6 +17,7 @@ import { dts } from "../opsApi";
 import { useOpsUi } from "../opsUiContext";
 import type { OpsPageId } from "../opsPerms";
 import { realtimeSocket } from "../../../api/socket";
+import { playSoundForNotificationEvent } from "../../../lib/soundEffects";
 
 export default function NotificationBell() {
   const { navigate, toast, can, pageLabel } = useOpsUi();
@@ -57,7 +58,10 @@ export default function NotificationBell() {
   // of waiting for the user to reopen the console or reload the page.
   useEffect(() => {
     const off = realtimeSocket.onAny(({ event }) => {
-      if (event.startsWith("notify:")) void load();
+      if (event.startsWith("notify:")) {
+        playSoundForNotificationEvent(event);
+        void load();
+      }
     });
     return off;
   }, [load]);

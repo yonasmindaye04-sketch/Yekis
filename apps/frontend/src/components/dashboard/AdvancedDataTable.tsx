@@ -18,7 +18,11 @@ import {
   Table2,
 } from "lucide-react";
 import type { LedgerContractRecord } from "./dashboardData";
+import { railLabel } from "./dashboardData";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
+import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 
 interface AdvancedDataTableProps {
@@ -45,9 +49,12 @@ const STATUS_META: Record<
   ESCROW_HELD: { label: "Escrow Held", tone: "emerald" },
   WORK_IN_PROGRESS: { label: "In Progress", tone: "emerald" },
   SUBMITTED_FOR_REVIEW: { label: "Submitted", tone: "amber" },
+  ACCEPTED: { label: "Accepted", tone: "emerald" },
   RELEASED: { label: "Released", tone: "emerald" },
   PAYMENT_PENDING: { label: "Awaiting Funding", tone: "neutral" },
   DISPUTED: { label: "Disputed", tone: "crimson" },
+  REFUNDED: { label: "Refunded", tone: "neutral" },
+  PARTIAL_REFUND: { label: "Partially Refunded", tone: "amber" },
 };
 
 export function AdvancedDataTable({
@@ -56,6 +63,8 @@ export function AdvancedDataTable({
   onStatusUpdate,
 }: AdvancedDataTableProps) {
   const { density } = useShadcnLayout();
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).table;
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [railFilter, setRailFilter] = useState<string>("ALL");
@@ -182,12 +191,15 @@ export function AdvancedDataTable({
   const totalFilteredMinor = filtered.reduce((acc, r) => acc + r.amountMinor, 0);
 
   return (
-    <div className="sh-card">
+    <div className="sh-card" data-tour="dashboard-data-table">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Contracts, Milestones & Escrow Ledger</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{copy.title}</h3>
+            <ContextualHelpTrigger helpId="dashboard-data-table" />
+          </div>
           <p className="sh-card-desc">
-            {filtered.length} records · Total volume{" "}
+            {copy.subtitle(filtered.length)}{" "}
             <strong className="sh-mono">
               ETB {(totalFilteredMinor / 100).toLocaleString()}
             </strong>
@@ -203,7 +215,7 @@ export function AdvancedDataTable({
                 exportCsv(records.filter((r) => selectedIds.has(r.id)))
               }
             >
-              <Download size={14} /> Export Selected ({selectedIds.size})
+              <Download size={14} /> {copy.exportSelected(selectedIds.size)}
             </button>
           )}
           <button
@@ -211,7 +223,7 @@ export function AdvancedDataTable({
             className="sh-btn sh-btn-secondary"
             onClick={() => exportCsv()}
           >
-            <Download size={14} /> Export CSV
+            <Download size={14} /> {copy.exportCsv}
           </button>
           <div style={{ position: "relative" }}>
             <button
@@ -220,18 +232,18 @@ export function AdvancedDataTable({
               onClick={() => setColMenuOpen((o) => !o)}
               aria-expanded={colMenuOpen}
             >
-              <SlidersHorizontal size={14} /> Columns
+              <SlidersHorizontal size={14} /> {copy.columnsBtn}
             </button>
             {colMenuOpen && (
               <div className="sh-dropdown-menu" onClick={(e) => e.stopPropagation()}>
-                <div className="sh-dropdown-title">Toggle Columns</div>
+                <div className="sh-dropdown-title">{copy.toggleColumnsTitle}</div>
                 {(
                   [
-                    ["counterparty", "Counterparty"],
-                    ["category", "Category"],
-                    ["rail", "Payment Rail"],
-                    ["dueDate", "Due Date"],
-                    ["fee", "Platform Fee"],
+                    ["counterparty", copy.colCounterparty],
+                    ["category", copy.colCategory],
+                    ["rail", copy.colRail],
+                    ["dueDate", copy.colDueDate],
+                    ["fee", copy.colFee],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="sh-dropdown-check">
@@ -254,7 +266,7 @@ export function AdvancedDataTable({
           <div
             className="sh-segmented sh-mobile-view-switcher"
             role="group"
-            aria-label="Mobile layout view"
+            aria-label={copy.mobileViewAria}
           >
             <button
               type="button"
@@ -262,7 +274,7 @@ export function AdvancedDataTable({
               onClick={() => setMobileViewMode("cards")}
               aria-pressed={mobileViewMode === "cards"}
             >
-              <LayoutList size={13} /> Cards
+              <LayoutList size={13} /> {copy.cardsBtn}
             </button>
             <button
               type="button"
@@ -270,7 +282,7 @@ export function AdvancedDataTable({
               onClick={() => setMobileViewMode("table")}
               aria-pressed={mobileViewMode === "table"}
             >
-              <Table2 size={13} /> Table
+              <Table2 size={13} /> {copy.tableBtn}
             </button>
           </div>
         </div>
@@ -287,30 +299,30 @@ export function AdvancedDataTable({
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Filter milestones, contracts, or counterparty..."
-            aria-label="Filter milestones or contracts"
+            placeholder={copy.searchPlaceholder}
+            aria-label={copy.searchAria}
           />
           {search && (
             <button
               type="button"
               className="sh-clear-input"
               onClick={() => setSearch("")}
-              aria-label="Clear search"
+              aria-label={copy.clearSearchAria}
             >
               <X size={13} />
             </button>
           )}
         </div>
 
-        <div className="sh-segmented" role="group" aria-label="Filter by escrow state">
+        <div className="sh-segmented" role="group" aria-label={copy.filterStateAria}>
           {(
             [
-              ["ALL", "All"],
-              ["ESCROW_HELD", "Escrow Held"],
-              ["WORK_IN_PROGRESS", "In Progress"],
-              ["SUBMITTED_FOR_REVIEW", "Submitted"],
-              ["RELEASED", "Released"],
-              ["DISPUTED", "Disputed"],
+              ["ALL", copy.filterAll],
+              ["ESCROW_HELD", copy.statuses.ESCROW_HELD],
+              ["WORK_IN_PROGRESS", copy.statuses.WORK_IN_PROGRESS],
+              ["SUBMITTED_FOR_REVIEW", copy.statuses.SUBMITTED_FOR_REVIEW],
+              ["RELEASED", copy.statuses.RELEASED],
+              ["DISPUTED", copy.statuses.DISPUTED],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -334,23 +346,25 @@ export function AdvancedDataTable({
             setRailFilter(e.target.value);
             setPage(1);
           }}
-          aria-label="Filter by payment rail"
+          aria-label={copy.filterRailAria}
         >
-          <option value="ALL">All Payment Rails</option>
+          <option value="ALL">{copy.allRails}</option>
           <option value="TELEBIRR">Telebirr</option>
           <option value="CBE_BIRR">CBE Birr</option>
           <option value="M_PESA">M-Pesa</option>
+          <option value="INTERNAL_WALLET">Wallet</option>
+          <option value="UNFUNDED">Not funded</option>
         </select>
       </div>
 
       {/* Mobile Stacked Summary Cards (shown on <=768px when mobileViewMode === "cards") */}
       <div
         className={`sh-mobile-ledger-cards ${mobileViewMode === "cards" ? "is-active" : ""}`}
-        aria-label="Contracts and milestones card list"
+        aria-label={copy.cardsListAria}
       >
         {pagedRows.length === 0 ? (
           <div className="sh-kanban-empty">
-            No contract milestones match your current search or filter criteria.
+            {copy.emptyMsg}
           </div>
         ) : (
           pagedRows.map((row) => {
@@ -371,12 +385,12 @@ export function AdvancedDataTable({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => toggleRow(row.id)}
-                      aria-label={`Select ${row.title}`}
+                      aria-label={copy.selectItemAria(row.title)}
                     />
                     <span className="sh-mono sh-cell-meta">{row.code}</span>
                     <span aria-hidden="true" className="sh-cell-meta">·</span>
                     <span className="sh-mono sh-cell-meta">
-                      {row.rail.replace("_", " ")}
+                      {railLabel(row.rail)}
                     </span>
                   </div>
                   <span className={`sh-status-inline ${statusInfo.tone}`}>
@@ -384,7 +398,7 @@ export function AdvancedDataTable({
                     {statusInfo.tone === "amber" && <Clock size={13} />}
                     {statusInfo.tone === "crimson" && <AlertTriangle size={13} />}
                     {statusInfo.tone === "neutral" && <CheckCircle2 size={13} />}
-                    <span>{statusInfo.label}</span>
+                    <span>{copy.statuses[row.escrowState]}</span>
                   </span>
                 </div>
 
@@ -405,7 +419,7 @@ export function AdvancedDataTable({
                       })}
                     </strong>
                     <span className="sh-cell-meta sh-mono" style={{ display: "block" }}>
-                      Due {row.dueDate} · Fee ETB{" "}
+                      {copy.duePrefix(row.dueDate)} · {copy.feePrefix}{" "}
                       {(row.feeMinor / 100).toLocaleString()}
                     </span>
                   </div>
@@ -417,7 +431,7 @@ export function AdvancedDataTable({
                       setInspectedRecord(row);
                     }}
                   >
-                    Inspect <ExternalLink size={12} />
+                    {copy.inspectBtn} <ExternalLink size={12} />
                   </button>
                 </div>
               </article>
@@ -431,7 +445,7 @@ export function AdvancedDataTable({
         className={`sh-table-scroll ${mobileViewMode === "cards" ? "sh-hide-on-mobile-cards" : ""}`}
         tabIndex={0}
         role="region"
-        aria-label="Escrow contracts and milestone ledger"
+        aria-label={copy.regionAria}
       >
         <table className={`sh-data-table ${density === "compact" ? "compact" : "comfortable"}`}>
           <thead>
@@ -444,7 +458,7 @@ export function AdvancedDataTable({
                     pagedRows.every((r) => selectedIds.has(r.id))
                   }
                   onChange={toggleAllVisible}
-                  aria-label="Select all visible rows"
+                  aria-label={copy.selectAllAria}
                 />
               </th>
               <th>
@@ -453,7 +467,7 @@ export function AdvancedDataTable({
                   className="sh-th-sort"
                   onClick={() => handleSort("title")}
                 >
-                  <span>Milestone & Contract</span>
+                  <span>{copy.thMilestoneContract}</span>
                   {sortField === "title" ? (
                     sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
                   ) : (
@@ -468,7 +482,7 @@ export function AdvancedDataTable({
                     className="sh-th-sort"
                     onClick={() => handleSort("counterparty")}
                   >
-                    <span>Counterparty</span>
+                    <span>{copy.thCounterparty}</span>
                     {sortField === "counterparty" ? (
                       sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
                     ) : (
@@ -477,14 +491,14 @@ export function AdvancedDataTable({
                   </button>
                 </th>
               )}
-              {visibleCols.category && <th>Scope & Rail</th>}
+              {visibleCols.category && <th>{copy.thScopeRail}</th>}
               <th>
                 <button
                   type="button"
                   className="sh-th-sort"
                   onClick={() => handleSort("escrowState")}
                 >
-                  <span>State</span>
+                  <span>{copy.thState}</span>
                   {sortField === "escrowState" ? (
                     sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
                   ) : (
@@ -499,7 +513,7 @@ export function AdvancedDataTable({
                     className="sh-th-sort"
                     onClick={() => handleSort("dueDate")}
                   >
-                    <span>Due Date</span>
+                    <span>{copy.thDueDate}</span>
                     {sortField === "dueDate" ? (
                       sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
                     ) : (
@@ -514,7 +528,7 @@ export function AdvancedDataTable({
                   className="sh-th-sort right"
                   onClick={() => handleSort("amountMinor")}
                 >
-                  <span>Escrow (ETB)</span>
+                  <span>{copy.thEscrowEtb}</span>
                   {sortField === "amountMinor" ? (
                     sortDir === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
                   ) : (
@@ -522,15 +536,15 @@ export function AdvancedDataTable({
                   )}
                 </button>
               </th>
-              {visibleCols.fee && <th className="sh-num-col">Fee (10%)</th>}
-              <th className="sh-num-col">Actions</th>
+              {visibleCols.fee && <th className="sh-num-col">{copy.thFee10}</th>}
+              <th className="sh-num-col">{copy.thActions}</th>
             </tr>
           </thead>
           <tbody>
             {pagedRows.length === 0 ? (
               <tr>
                 <td colSpan={9} className="sh-table-empty">
-                  No contract milestones match your current search or filter criteria.
+                  {copy.emptyMsg}
                 </td>
               </tr>
             ) : (
@@ -549,7 +563,7 @@ export function AdvancedDataTable({
                         type="checkbox"
                         checked={isSelected}
                         onChange={() => toggleRow(row.id)}
-                        aria-label={`Select ${row.title}`}
+                        aria-label={copy.selectItemAria(row.title)}
                       />
                     </td>
                     <td>
@@ -573,7 +587,7 @@ export function AdvancedDataTable({
                           {visibleCols.rail && (
                             <>
                               <span aria-hidden="true">·</span>
-                              <span className="sh-mono">{row.rail.replace("_", " ")}</span>
+                              <span className="sh-mono">{railLabel(row.rail)}</span>
                             </>
                           )}
                         </div>
@@ -585,7 +599,7 @@ export function AdvancedDataTable({
                         {statusInfo.tone === "amber" && <Clock size={13} />}
                         {statusInfo.tone === "crimson" && <AlertTriangle size={13} />}
                         {statusInfo.tone === "neutral" && <CheckCircle2 size={13} />}
-                        <span>{statusInfo.label}</span>
+                        <span>{copy.statuses[row.escrowState]}</span>
                       </span>
                     </td>
                     {visibleCols.dueDate && (
@@ -614,7 +628,7 @@ export function AdvancedDataTable({
                         className="sh-row-action-btn"
                         onClick={() => setInspectedRecord(row)}
                       >
-                        Inspect <ExternalLink size={12} />
+                        {copy.inspectBtn} <ExternalLink size={12} />
                       </button>
                     </td>
                   </tr>
@@ -629,11 +643,11 @@ export function AdvancedDataTable({
       <div className="sh-table-footer">
         <div className="sh-table-footer-meta">
           <span>
-            {selectedIds.size} of {filtered.length} row(s) selected
+            {copy.selectedFooter(selectedIds.size, filtered.length)}
           </span>
           <span aria-hidden="true">·</span>
           <label className="sh-page-size-label">
-            Rows per page
+            {copy.rowsPerPage}
             <select
               className="sh-select compact"
               value={pageSize}
@@ -651,14 +665,14 @@ export function AdvancedDataTable({
 
         <div className="sh-pagination-controls">
           <span className="sh-mono" style={{ fontSize: "0.78rem" }}>
-            Page {safePage} of {totalPages}
+            {copy.pageOf(safePage, totalPages)}
           </span>
           <button
             type="button"
             className="sh-icon-only-btn"
             disabled={safePage <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            aria-label="Previous page"
+            aria-label={copy.prevPageAria}
           >
             <ChevronLeft size={15} />
           </button>
@@ -667,7 +681,7 @@ export function AdvancedDataTable({
             className="sh-icon-only-btn"
             disabled={safePage >= totalPages}
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            aria-label="Next page"
+            aria-label={copy.nextPageAria}
           >
             <ChevronRight size={15} />
           </button>
@@ -681,7 +695,7 @@ export function AdvancedDataTable({
           onClick={() => setInspectedRecord(null)}
           role="dialog"
           aria-modal="true"
-          aria-label="Milestone ledger details"
+          aria-label={copy.inspectorAria}
         >
           <aside
             className="sh-sheet-panel"
@@ -690,7 +704,7 @@ export function AdvancedDataTable({
             <div className="sh-sheet-header">
               <div>
                 <span className="sh-mono sh-text-muted" style={{ fontSize: "0.76rem" }}>
-                  {inspectedRecord.code} · {inspectedRecord.rail.replace("_", " ")}
+                  {inspectedRecord.code} · {railLabel(inspectedRecord.rail)}
                 </span>
                 <h3 className="sh-sheet-title">{inspectedRecord.title}</h3>
               </div>
@@ -698,7 +712,7 @@ export function AdvancedDataTable({
                 type="button"
                 className="sh-icon-only-btn"
                 onClick={() => setInspectedRecord(null)}
-                aria-label="Close inspector"
+                aria-label={copy.closeInspectorAria}
               >
                 <X size={16} />
               </button>
@@ -707,33 +721,33 @@ export function AdvancedDataTable({
             <div className="sh-sheet-body">
               <div className="sh-kv-list">
                 <div className="sh-kv-row">
-                  <span>Contract</span>
+                  <span>{copy.detailContract}</span>
                   <strong>{inspectedRecord.contractTitle}</strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Counterparty</span>
+                  <span>{copy.detailCounterparty}</span>
                   <strong>
                     {inspectedRecord.counterparty} ({inspectedRecord.counterpartyEmail})
                   </strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Category</span>
+                  <span>{copy.detailCategory}</span>
                   <strong>{inspectedRecord.category}</strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Gross Escrow Amount</span>
+                  <span>{copy.detailGross}</span>
                   <strong className="sh-mono">
                     ETB {(inspectedRecord.amountMinor / 100).toLocaleString()}
                   </strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Platform Commission (10%)</span>
+                  <span>{copy.detailFee}</span>
                   <strong className="sh-mono">
                     ETB {(inspectedRecord.feeMinor / 100).toLocaleString()}
                   </strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Net Freelancer Payout</span>
+                  <span>{copy.detailNet}</span>
                   <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
                     ETB{" "}
                     {(
@@ -743,25 +757,25 @@ export function AdvancedDataTable({
                   </strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Due Date</span>
+                  <span>{copy.detailDueDate}</span>
                   <strong className="sh-mono">{inspectedRecord.dueDate}</strong>
                 </div>
                 <div className="sh-kv-row">
-                  <span>Current Escrow State</span>
-                  <strong>{STATUS_META[inspectedRecord.escrowState].label}</strong>
+                  <span>{copy.detailState}</span>
+                  <strong>{copy.statuses[inspectedRecord.escrowState]}</strong>
                 </div>
               </div>
 
               {onStatusUpdate && (
                 <div className="sh-customizer-group" style={{ marginTop: 18 }}>
-                  <label className="sh-customizer-label">Update Milestone Workflow Stage</label>
+                  <label className="sh-customizer-label">{copy.updateStageLabel}</label>
                   <div className="sh-customizer-grid-2">
                     {(
                       [
-                        ["ESCROW_HELD", "Escrow Held"],
-                        ["WORK_IN_PROGRESS", "In Progress"],
-                        ["SUBMITTED_FOR_REVIEW", "Submitted"],
-                        ["RELEASED", "Release Payout"],
+                        ["ESCROW_HELD", copy.statuses.ESCROW_HELD],
+                        ["WORK_IN_PROGRESS", copy.statuses.WORK_IN_PROGRESS],
+                        ["SUBMITTED_FOR_REVIEW", copy.statuses.SUBMITTED_FOR_REVIEW],
+                        ["RELEASED", copy.stageReleasePayout],
                       ] as const
                     ).map(([st, lbl]) => (
                       <button
@@ -797,7 +811,7 @@ export function AdvancedDataTable({
                   }}
                   style={{ flex: 1, justifyContent: "center" }}
                 >
-                  Open Full Contract Room
+                  {copy.openContractRoomBtn}
                 </button>
               )}
               <button
@@ -805,7 +819,7 @@ export function AdvancedDataTable({
                 className="sh-btn sh-btn-secondary"
                 onClick={() => setInspectedRecord(null)}
               >
-                Close
+                {copy.closeBtn}
               </button>
             </div>
           </aside>

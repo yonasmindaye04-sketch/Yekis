@@ -433,6 +433,7 @@ export interface OverviewBundle {
   activity: ActivityEvent[];
   health: HealthState;
   escrows: Escrow[];
+  payments: Payment[];
   recon: ReconRow[];
   riskFlags: RiskFlag[];
   queues: {

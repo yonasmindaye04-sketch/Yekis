@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import {
   api,
   type Job,
@@ -21,6 +21,7 @@ import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
+import { SoundToggle } from "./components/SoundToggle";
 import { OnboardingVerification } from "./OnboardingVerification";
 import {
   ContractsWorkspace,
@@ -88,7 +89,6 @@ import { useI18n, isLanguage, type Language } from "./i18n";
 import {
   FULL_PLATFORM_CATEGORY_LABELS,
   FULL_PLATFORM_COPY,
-  type FullPlatformCopy,
 } from "./fullPlatformCopy";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
@@ -100,6 +100,18 @@ import {
 } from "./components/dashboard/ShadcnLayoutContext";
 import { MarketplaceShadcnDashboard } from "./components/dashboard/MarketplaceShadcnDashboard";
 import { WorkspaceCommandPalette } from "./components/dashboard/WorkspaceCommandPalette";
+import "./components/guide/guide.css";
+import {
+  GuideProvider,
+  type DashboardSubViewAction,
+} from "./components/guide/GuideContext";
+import type { GuideModuleId, GuideRole } from "./components/guide/guideTypes";
+import { ProductTourOverlay } from "./components/guide/ProductTourOverlay";
+import {
+  FirstVisitWelcomeBar,
+  GlobalHelpMenu,
+} from "./components/guide/GlobalHelpMenu";
+import { ContextualHelpTrigger } from "./components/guide/ContextualHelpTrigger";
 
 // === INTERFACES & TYPES ===
 /**
@@ -234,95 +246,257 @@ const navIconMap: Record<string, React.ReactNode> = {
   profile: <UserIcon size={18} />,
 };
 
-function AuthVisualAnimation({
-  copy = FULL_PLATFORM_COPY.en.authVis,
-}: {
-  copy?: FullPlatformCopy["authVis"];
-}) {
-  return (
-    <div className="auth-vis" aria-hidden="true">
-      {/* Soft gradient accent */}
-      <div className="auth-vis-glow" />
+/* ── Auth art: continuous irregular pixel field ───────────────────
+   One seamless pixel matrix covers the upper and upper-right canopy
+   (above the diagonal frontier that clears the Yekis logo and headline).
+   Two octaves of deterministic 2D value noise shape organic pixel-art
+   clusters, stepped ridges, and scattered outlier pixels on a crisp
+   integer grid (`shapeRendering="crispEdges"`), while pointer movement
+   writes normalized `--auth-px`/`--auth-py` custom properties for
+   compositor-only parallax and scroll timelines drive short viewports. */
+const AUTH_PIXEL_COLS = 70;
+const AUTH_PIXEL_ROWS = 43;
+const AUTH_PIXEL_STEP = 12;
+const AUTH_PIXEL_SIZE = 9;
+const AUTH_PIXEL_VIEWBOX_W = AUTH_PIXEL_COLS * AUTH_PIXEL_STEP;
+const AUTH_PIXEL_VIEWBOX_H = AUTH_PIXEL_ROWS * AUTH_PIXEL_STEP + 4;
 
-      {/* Dot grid texture */}
-      <svg className="auth-vis-dots" viewBox="0 0 200 200">
-        {Array.from({ length: 100 }, (_, i) => {
-          const col = i % 10;
-          const row = Math.floor(i / 10);
-          return (
-            <circle
-              key={i}
-              cx={col * 22 + 5}
-              cy={row * 22 + 5}
-              r="1.2"
-              fill="var(--color-text-secondary)"
-              opacity="0.18"
-            />
-          );
-        })}
+interface AuthPixelCell {
+  id: number;
+  x: number;
+  y: number;
+  tone: 0 | 1 | 2;
+  tier: "dim" | "mid" | "bright";
+  animated: boolean;
+  delay: number;
+}
+
+function authPixelHash(col: number, row: number, seed: number): number {
+  let h = (Math.imul(col + 37, 374761393) + Math.imul(row + 91, 668265263) + seed) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+function authSmoothstep(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+function authValueNoise2D(x: number, y: number, seed: number): number {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const fx = authSmoothstep(x - x0);
+  const fy = authSmoothstep(y - y0);
+
+  const n00 = authPixelHash(x0, y0, seed);
+  const n10 = authPixelHash(x0 + 1, y0, seed);
+  const n01 = authPixelHash(x0, y0 + 1, seed);
+  const n11 = authPixelHash(x0 + 1, y0 + 1, seed);
+
+  const nx0 = n00 + (n10 - n00) * fx;
+  const nx1 = n01 + (n11 - n01) * fx;
+  return nx0 + (nx1 - nx0) * fy;
+}
+
+/**
+ * Diagonal-curved boundary across the art stage matching the upper/right
+ * pixel zone: starts below the "Back to Home" control on the left, stays
+ * cleanly above the Yekis logo and headline, curves beneath the orbital
+ * centerpiece, and reaches roughly mid-height at the right edge.
+ */
+function getAuthZoneBoundaryRow(u: number): number {
+  const anchors: readonly [number, number][] = [
+    [0.0, 10.5],
+    [0.16, 14.5],
+    [0.36, 18.2],
+    [0.56, 28.5],
+    [0.78, 32.8],
+    [1.0, 34.8],
+  ];
+  let base = anchors[anchors.length - 1][1];
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const [u0, r0] = anchors[i];
+    const [u1, r1] = anchors[i + 1];
+    if (u <= u1) {
+      const t = authSmoothstep((u - u0) / (u1 - u0));
+      base = r0 + (r1 - r0) * t;
+      break;
+    }
+  }
+  const organicWave =
+    Math.sin(u * 13.7 + 0.6) * 1.9 +
+    Math.sin(u * 29.3 + 1.9) * 1.0 +
+    (authValueNoise2D(u * 9.5, 1.3, 0x4b1d) - 0.5) * 2.8;
+  return base + organicWave;
+}
+
+function buildAuthPixelField(): AuthPixelCell[] {
+  const cells: AuthPixelCell[] = [];
+
+  for (let row = 0; row < AUTH_PIXEL_ROWS; row++) {
+    for (let col = 0; col < AUTH_PIXEL_COLS; col++) {
+      const u = col / (AUTH_PIXEL_COLS - 1);
+      const boundaryRow = getAuthZoneBoundaryRow(u);
+      if (row > boundaryRow + 1.1) continue;
+
+      const macro = authValueNoise2D(col * 0.14 + 2.4, row * 0.16 + 1.1, 0x3b71);
+      const mid = authValueNoise2D(col * 0.27 + 6.8, row * 0.27 + 3.5, 0x8d42);
+      const micro = authValueNoise2D(col * 0.48 + 9.4, row * 0.48 + 5.2, 0x7c21);
+      const detail = authPixelHash(col, row, 0x2b95);
+      const toneNoise = authValueNoise2D(col * 0.24 + 1.2, row * 0.24 + 4.8, 0x51e7);
+      const shimmerRoll = authPixelHash(col, row, 0x9e37);
+
+      const edgeRatio = row / Math.max(1, boundaryRow);
+      const frontierFade =
+        edgeRatio > 0.68
+          ? Math.max(0, 1 - (edgeRatio - 0.68) / 0.36)
+          : 1;
+
+      const backButtonZone = col < 15 && row < 6;
+      const backButtonCalm = backButtonZone ? 0.78 : 1;
+      const orbitalBoost = u > 0.48 && edgeRatio < 0.78 ? 0.08 : 0;
+      const topCanopyBoost = row <= 4 ? 0.08 : 0;
+
+      const targetDensity =
+        (0.51 + orbitalBoost + topCanopyBoost) *
+        (0.18 + 0.82 * authSmoothstep(frontierFade)) *
+        backButtonCalm;
+
+      const score = macro * 0.36 + mid * 0.26 + micro * 0.18 + detail * 0.20;
+      if (score <= 1 - targetDensity) continue;
+
+      const intensityMix = macro * 0.4 + mid * 0.3 + detail * 0.3;
+      const tier: AuthPixelCell["tier"] =
+        backButtonZone
+          ? "dim"
+          : intensityMix > 0.72
+            ? "bright"
+            : intensityMix > 0.44
+              ? "mid"
+              : "dim";
+
+      const toneRoll = toneNoise * 0.55 + authPixelHash(col, row, 0x6a09) * 0.45;
+      const tone: AuthPixelCell["tone"] =
+        toneRoll > 0.86 && u > 0.24 ? 2 : toneRoll > 0.62 ? 1 : 0;
+
+      cells.push({
+        id: row * AUTH_PIXEL_COLS + col,
+        x: col * AUTH_PIXEL_STEP + 1,
+        y: row * AUTH_PIXEL_STEP + 1,
+        tone,
+        tier,
+        animated: shimmerRoll > 0.54,
+        delay: -Number((shimmerRoll * 9).toFixed(2)),
+      });
+    }
+  }
+
+  return cells;
+}
+
+const AUTH_PIXEL_FIELD = buildAuthPixelField();
+
+function AuthVisualAnimation() {
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame = 0;
+    let px = 0;
+    let py = 0;
+
+    const paint = () => {
+      frame = 0;
+      stage.style.setProperty("--auth-px", px.toFixed(3));
+      stage.style.setProperty("--auth-py", py.toFixed(3));
+    };
+
+    const queue = () => {
+      if (!frame) frame = window.requestAnimationFrame(paint);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      const bounds = stage.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const inside =
+        event.clientX >= bounds.left &&
+        event.clientX <= bounds.right &&
+        event.clientY >= bounds.top &&
+        event.clientY <= bounds.bottom;
+      if (!inside) {
+        if (px === 0 && py === 0) return;
+        px = 0;
+        py = 0;
+        queue();
+        return;
+      }
+      px = Math.max(
+        -1,
+        Math.min(1, ((event.clientX - bounds.left) / bounds.width - 0.5) * 2),
+      );
+      py = Math.max(
+        -1,
+        Math.min(1, ((event.clientY - bounds.top) / bounds.height - 0.5) * 2),
+      );
+      queue();
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onPointerMove);
+    };
+  }, []);
+
+  return (
+    <div className="auth-vis" aria-hidden="true" ref={stageRef}>
+      <div className="auth-vis-aurora auth-vis-aurora-a" />
+      <div className="auth-vis-aurora auth-vis-aurora-b" />
+      <div className="auth-vis-mesh" />
+      <div className="auth-vis-sweep" />
+
+      <div className="auth-vis-orbit">
+        <span className="auth-vis-orbit-ring" />
+        <span className="auth-vis-orbit-ring auth-vis-orbit-ring-inner" />
+        <span className="auth-vis-orbit-arc" />
+        <span className="auth-vis-orbit-spin">
+          <span className="auth-vis-orbit-satellite" />
+        </span>
+        <span className="auth-vis-orbit-spin auth-vis-orbit-spin-inner">
+          <span className="auth-vis-orbit-satellite auth-vis-orbit-satellite-small" />
+        </span>
+        <span className="auth-vis-orbit-core" />
+      </div>
+
+      <svg
+        className="auth-vis-pixel-field"
+        viewBox={`0 0 ${AUTH_PIXEL_VIEWBOX_W} ${AUTH_PIXEL_VIEWBOX_H}`}
+        preserveAspectRatio="xMidYMin meet"
+        shapeRendering="crispEdges"
+      >
+        {AUTH_PIXEL_FIELD.map((cell) => (
+          <rect
+            key={cell.id}
+            x={cell.x}
+            y={cell.y}
+            width={AUTH_PIXEL_SIZE}
+            height={AUTH_PIXEL_SIZE}
+            className={`auth-vis-pixel auth-vis-pixel-tone-${cell.tone} auth-vis-pixel-${cell.tier}${
+              cell.animated ? " is-animated" : ""
+            }`}
+            style={
+              cell.animated
+                ? ({ "--auth-delay": `${cell.delay}s` } as CSSProperties)
+                : undefined
+            }
+          />
+        ))}
       </svg>
 
-      {/* Metrics row — 3 key indicators */}
-      <div className="auth-vis-metrics">
-        <div className="auth-vis-metric" style={{ animationDelay: "0.4s" }}>
-          <span className="auth-vis-metric-num">{copy.contractsSignedNum}</span>
-          <span className="auth-vis-metric-label">{copy.contractsSignedLabel}</span>
-        </div>
-        <div className="auth-vis-metric-divider" />
-        <div className="auth-vis-metric" style={{ animationDelay: "0.7s" }}>
-          <span className="auth-vis-metric-num">{copy.escrowedNum}</span>
-          <span className="auth-vis-metric-label">{copy.escrowedLabel}</span>
-        </div>
-        <div className="auth-vis-metric-divider" />
-        <div className="auth-vis-metric" style={{ animationDelay: "1.0s" }}>
-          <span className="auth-vis-metric-num">{copy.payoutRateNum}</span>
-          <span className="auth-vis-metric-label">{copy.payoutRateLabel}</span>
-        </div>
-      </div>
-
-      {/* Live activity feed — staggered slide-ins */}
-      <div className="auth-vis-feed">
-        <div className="auth-vis-feed-item" style={{ animationDelay: "1.2s" }}>
-          <div className="auth-vis-feed-icon green" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.milestoneDelivered}</strong>
-            <span>{copy.milestoneDeliveredSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago2m}</span>
-        </div>
-        <div className="auth-vis-feed-item" style={{ animationDelay: "1.8s" }}>
-          <div className="auth-vis-feed-icon blue" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.contractSigned}</strong>
-            <span>{copy.contractSignedSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago8m}</span>
-        </div>
-        <div className="auth-vis-feed-item" style={{ animationDelay: "2.4s" }}>
-          <div className="auth-vis-feed-icon green" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.escrowFunded}</strong>
-            <span>{copy.escrowFundedSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago14m}</span>
-        </div>
-      </div>
-
-      {/* Trust badges row */}
-      <div className="auth-vis-trust">
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>{copy.heldWhileReview}</span>
-        </div>
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>{copy.kycVerified}</span>
-        </div>
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.4s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          <span>{copy.telebirrCbe}</span>
-        </div>
-      </div>
+      <span className="auth-vis-cursor" />
     </div>
   );
 }
@@ -345,6 +519,8 @@ function FullPlatformAppInner() {
     sidebarVariant,
     sidebarCollapsed,
     toggleSidebarCollapsed,
+    setDashboardVariant,
+    setOpsSubTab,
   } = useShadcnLayout();
   const hashLocation = useLocation();
   const hashNavigate = useNavigate();
@@ -541,6 +717,8 @@ function FullPlatformAppInner() {
   const [focusChatConversationId, setFocusChatConversationId] = useState<string | null>(null);
   const [marketingPage, setMarketingPage] = useState<MarketingPage>("home");
   const [jobs, setJobs] = useState<Job[]>([]);
+  /** The caller's own posted briefs — the hiring side of the workspace. */
+  const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
   const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
@@ -659,6 +837,7 @@ function FullPlatformAppInner() {
 
 
   const isAuthenticatedRef = useRef(Boolean(user));
+  const languageSyncedForUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     isAuthenticatedRef.current = Boolean(user);
   }, [user]);
@@ -666,6 +845,7 @@ function FullPlatformAppInner() {
   useEffect(() => {
     return api.onUnauthorized(() => {
       if (!isAuthenticatedRef.current) return;
+      languageSyncedForUserIdRef.current = null;
       realtimeSocket.disconnect();
       setUser(null);
       setWallet({ balanceMinor: 0 });
@@ -791,13 +971,15 @@ const loadWorkspace = async () => {
       meResult,
       walletResult,
       jobsResult,
+      myJobsResult,
       milestonesResult,
       topUpsResult,
       completenessResult,
     ] = await Promise.allSettled([
       api.getMe(),
       api.getWallet(),
-      api.getJobs({ status: "OPEN" }),
+      api.getJobFeed(),
+      api.getMyJobs(),
       api.getMilestones(),
       api.getTopUpRequests(),
       api.getProfileCompleteness(),
@@ -805,11 +987,15 @@ const loadWorkspace = async () => {
     if (meResult.status === "rejected") throw meResult.reason;
     const me = meResult.value;
     setUser(me);
-    if (isLanguage(me?.languagePreference)) {
-      setLanguage(me.languagePreference);
+    if (languageSyncedForUserIdRef.current !== me.id) {
+      languageSyncedForUserIdRef.current = me.id;
+      if (isLanguage(me?.languagePreference)) {
+        setLanguage(me.languagePreference);
+      }
     }
     if (walletResult.status === "fulfilled") setWallet(walletResult.value);
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
+    if (myJobsResult.status === "fulfilled") setMyJobs(myJobsResult.value);
     if (milestonesResult.status === "fulfilled")
     setMilestones(milestonesResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
@@ -1095,6 +1281,7 @@ const loadWorkspace = async () => {
 
   const logout = () => {
     api.clearToken();
+    languageSyncedForUserIdRef.current = null;
     realtimeSocket.disconnect();
     setUser(null);
     setPassword("");
@@ -1513,7 +1700,7 @@ const loadWorkspace = async () => {
             <span>02</span>
             <strong>{copy.heroProof2}</strong>
           </div>
-          <AuthVisualAnimation copy={copy.authVis} />
+          <AuthVisualAnimation />
         </div>
         {onboardingChannel ? (
           <div className="auth-panel">
@@ -1533,8 +1720,14 @@ const loadWorkspace = async () => {
                 setError("");
                 void completeRegistration()
                   .catch((err) => {
+                    const code = (err as { code?: string })?.code ?? "";
                     const message =
                       err instanceof Error ? err.message : copy.unableToContinue;
+                    if (code === "EMAIL_IN_USE" || code === "PHONE_IN_USE") {
+                      setOnboardingChannel(null);
+                      setError(message);
+                      return;
+                    }
                     setError(
                       message === "INVALID_CREDENTIALS"
                         ? copy.registerPhoneExistsError
@@ -1542,6 +1735,10 @@ const loadWorkspace = async () => {
                     );
                   })
                   .finally(() => setIsLoading(false));
+              }}
+              onAlreadyRegistered={(msg) => {
+                setOnboardingChannel(null);
+                setError(msg);
               }}
               onBack={() => {
                 setOnboardingChannel(null);
@@ -2149,10 +2346,46 @@ const loadWorkspace = async () => {
     );
   }
 
+  const activeGuideModule: GuideModuleId =
+    view === "my-gigs"
+      ? "gigs"
+      : view === "profile-edit"
+        ? "profile"
+        : view;
+  const activeGuideRole: GuideRole =
+    platformRole === "FREELANCER" || platformRole === "BOTH"
+      ? platformRole
+      : "CLIENT";
+
+  const handlePrepareDashboardSubView = (action: DashboardSubViewAction) => {
+    if (action === "dashboard-analytics") {
+      setDashboardVariant("dashboard-1");
+      return;
+    }
+    setDashboardVariant("dashboard-2");
+    if (action === "dashboard-table") setOpsSubTab("table");
+    if (action === "dashboard-kanban") setOpsSubTab("kanban");
+    if (action === "dashboard-calendar") setOpsSubTab("calendar");
+  };
+
+  const handleContactSupportFromGuide = () => {
+    setMobileDrawerOpen(false);
+    setView("chat");
+  };
+
   return (
-    <div
-      className={`platform-shell sh-shell sh-workspace-shell sh-variant-${sidebarVariant}${sidebarCollapsed && !isMobileViewport ? " sh-collapsed sh-sidebar-collapsed" : ""}`}
+    <GuideProvider
+      userId={user?.id ?? null}
+      tenantId={user?.id ?? null}
+      activeModule={activeGuideModule}
+      role={activeGuideRole}
+      onNavigateModule={(mod) => navigateToView(mod as View)}
+      onPrepareDashboardSubView={handlePrepareDashboardSubView}
+      onContactSupport={handleContactSupportFromGuide}
     >
+      <div
+        className={`platform-shell sh-shell sh-workspace-shell sh-variant-${sidebarVariant}${sidebarCollapsed && !isMobileViewport ? " sh-collapsed sh-sidebar-collapsed" : ""}`}
+      >
       {mobileDrawerOpen && (
         <div
           className="sh-mobile-backdrop"
@@ -2354,7 +2587,7 @@ const loadWorkspace = async () => {
       <main className="platform-main">
         <header className="platform-topbar sh-topbar">
           <div className="sh-topbar-left">
-            {/* Mobile: open drawer. Desktop: hidden (toggle lives in sidebar brand row) */}
+            {/* Mobile drawer control; desktop collapse/expand stays in the sidebar brand row */}
             {isMobileViewport && (
               <button
                 type="button"
@@ -2428,8 +2661,8 @@ const loadWorkspace = async () => {
               </select>
             )}
 
-            <LayoutCustomizerTrigger />
             <LanguageSelector variant="dropdown" />
+            <SoundToggle className="sh-icon-only-btn" size={16} />
             <button
               type="button"
               className="sh-icon-only-btn theme-toggle"
@@ -2443,6 +2676,7 @@ const loadWorkspace = async () => {
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
             <NotificationCenter onNavigate={(v) => navigateToView(v as View)} />
+            <GlobalHelpMenu />
             <button
               type="button"
               className="user-menu"
@@ -2542,6 +2776,8 @@ const loadWorkspace = async () => {
             </div>
           )}
 
+        <FirstVisitWelcomeBar />
+
         <ProfileCompletionDialog
           user={user}
           role={platformRole}
@@ -2554,6 +2790,7 @@ const loadWorkspace = async () => {
             <MarketplaceShadcnDashboard
               wallet={wallet}
               jobs={jobs}
+              myJobs={myJobs}
               milestones={milestones}
               topUps={topUps}
               canHire={canHire}
@@ -2590,10 +2827,17 @@ const loadWorkspace = async () => {
             </div>
 
             {canHire && (
-              <form className="sh-card job-form" onSubmit={submitJob}>
+              <form
+                className="sh-card job-form"
+                onSubmit={submitJob}
+                data-tour="jobs-publish-form"
+              >
                 <div className="sh-card-header">
                   <div>
-                    <h3 className="sh-card-title">{copy.publishBriefTitle}</h3>
+                    <div className="yk-help-heading-row">
+                      <h3 className="sh-card-title">{copy.publishBriefTitle}</h3>
+                      <ContextualHelpTrigger helpId="jobs-brief-publishing" />
+                    </div>
                     <p className="sh-card-desc">
                       {copy.publishBriefDesc}
                     </p>
@@ -2864,9 +3108,12 @@ const loadWorkspace = async () => {
           <section className="sh-dashboard-wrap">
             <div className="sh-card-header">
               <div>
-                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {copy.casesTitle}
-                </h2>
+                <div className="yk-help-heading-row">
+                  <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+                    {copy.casesTitle}
+                  </h2>
+                  <ContextualHelpTrigger helpId="disputes-resolution" />
+                </div>
                 <p className="sh-card-desc">
                   {copy.casesDesc}
                 </p>
@@ -2943,7 +3190,13 @@ const loadWorkspace = async () => {
                   {t.workspace.settings.desc}
                 </p>
               </div>
-              <span className="sh-kbd">{user.ucid ?? "YEK-USER"}</span>
+              <div
+                style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}
+                data-tour="settings-layout-customizer"
+              >
+                <LayoutCustomizerTrigger />
+                <span className="sh-kbd">{user.ucid ?? "YEK-USER"}</span>
+              </div>
             </div>
             <SettingsWorkspace
               user={user}
@@ -2999,6 +3252,8 @@ const loadWorkspace = async () => {
           <small>{t.workspace.nav.menu}</small>
         </button>
       </nav>
+      <ProductTourOverlay />
     </div>
+    </GuideProvider>
   );
 }

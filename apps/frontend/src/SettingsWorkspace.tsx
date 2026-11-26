@@ -18,7 +18,10 @@ import {
   Unlink,
   ChevronRight,
   UserX,
+  Volume2,
   X,
+  Compass,
+  RotateCcw,
   type LucideIcon,
 } from "lucide-react";
 import { TbAlertTriangle, TbAlertCircle } from "react-icons/tb";
@@ -37,6 +40,17 @@ import {
   googleClientId,
 } from "@/lib/googleIdentity";
 import { GlassCard } from "./components/ui-v2/GlassCard";
+import { useOptionalGuide } from "./components/guide/GuideContext";
+import { MODULE_TOURS } from "./components/guide/guideConfig";
+import { GUIDE_MODULE_IDS } from "./components/guide/guideTypes";
+import {
+  playSound,
+  setSoundCategoryEnabled,
+  setSoundEnabled,
+  setSoundVolume,
+  useSoundSettings,
+  type SoundEffectName,
+} from "./lib/soundEffects";
 import "./SettingsWorkspace.css";
 
 /**
@@ -90,6 +104,8 @@ export function SettingsWorkspace({
   onLogout,
 }: SettingsWorkspaceProps) {
   const { language, setLanguage } = useI18n();
+  const soundSettings = useSoundSettings();
+  const guide = useOptionalGuide();
   const [activeTab, setActiveTab] = useState<SettingsTab>("security");
   const activeTabMeta =
     SETTINGS_TABS.find((tab) => tab.id === activeTab) ?? SETTINGS_TABS[0];
@@ -554,7 +570,12 @@ export function SettingsWorkspace({
 
       {/* Section navigation — landing-page header indicator treatment. */}
       <GlassCard className="settings-nav-card" noPadding>
-        <div className="settings-tabbar" role="tablist" aria-label="Settings sections">
+        <div
+          className="settings-tabbar"
+          role="tablist"
+          aria-label="Settings sections"
+          data-tour="settings-tabs"
+        >
           {SETTINGS_TABS.map(({ id, label, Icon }, index) => {
             const isActive = activeTab === id;
             return (
@@ -583,6 +604,7 @@ export function SettingsWorkspace({
           role="tabpanel"
           id="settings-panel-security"
           aria-labelledby="settings-tab-security"
+          data-tour="settings-active-panel"
           style={{ display: "grid", gap: 16 }}
         >
           {/* Change Password Card */}
@@ -1292,6 +1314,7 @@ export function SettingsWorkspace({
           role="tabpanel"
           id="settings-panel-general"
           aria-labelledby="settings-tab-general"
+          data-tour="settings-active-panel"
           style={{ display: "grid", gap: 16 }}
         >
           {prefSuccess && (
@@ -1416,6 +1439,69 @@ export function SettingsWorkspace({
               </button>
             </div>
           </GlassCard>
+
+          {guide && (
+            <GlassCard>
+              <div className="sh-card-header">
+                <div>
+                  <h3 className="sh-card-title">Yekis Guide &amp; Onboarding Tours</h3>
+                  <p className="sh-card-desc">
+                    Track module walkthrough progress for this account, restart any interactive tour, or reset all onboarding prompts.
+                  </p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    className="sh-btn sh-btn-secondary"
+                    onClick={() => guide.openDocs("overview")}
+                  >
+                    <Compass size={14} /> Help Documentation
+                  </button>
+                  <button
+                    type="button"
+                    className="sh-btn sh-btn-secondary"
+                    onClick={() => {
+                      void guide.resetAllProgress();
+                      setPrefSuccess("All Yekis Guide onboarding progress has been reset for this account.");
+                    }}
+                  >
+                    <RotateCcw size={14} /> Reset Onboarding Progress
+                  </button>
+                </div>
+              </div>
+
+              <div className="yk-guide-settings-grid">
+                {GUIDE_MODULE_IDS.map((modId) => {
+                  const cfg = MODULE_TOURS[modId];
+                  const completed = guide.isTourCompleted(modId);
+                  const skipped = !completed && guide.isTourSkipped(modId);
+                  return (
+                    <div key={modId} className="yk-guide-settings-item">
+                      <div className="yk-guide-settings-item-meta">
+                        <span className="yk-guide-settings-item-title">{cfg.shortLabel}</span>
+                        <span
+                          className={cn(
+                            "yk-guide-settings-status",
+                            completed && "is-done",
+                            skipped && "is-skipped",
+                          )}
+                        >
+                          {completed ? "Completed" : skipped ? "Skipped" : "Not started"}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-secondary"
+                        onClick={() => guide.startTour(modId)}
+                      >
+                        {completed || skipped ? "Restart" : "Start"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </GlassCard>
+          )}
         </div>
       )}
 
@@ -1425,6 +1511,7 @@ export function SettingsWorkspace({
           role="tabpanel"
           id="settings-panel-notifications"
           aria-labelledby="settings-tab-notifications"
+          data-tour="settings-active-panel"
           style={{ display: "grid", gap: 16 }}
         >
           {notifSaved && (
@@ -1524,6 +1611,144 @@ export function SettingsWorkspace({
               </label>
             </div>
           </GlassCard>
+
+          <GlassCard>
+            <div className="sh-card-header">
+              <div>
+                <h3 className="sh-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Volume2 size={17} />
+                  Sound Effects & Audio Feedback
+                </h3>
+                <p className="sh-card-desc">
+                  Subtle Web Audio chimes for live messages, escrow milestones, and platform notifications. Syncs with Telegram Mini App haptics on mobile.
+                </p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gap: 16 }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  style={{ marginTop: 3 }}
+                  checked={soundSettings.enabled}
+                  onChange={(e) => {
+                    const next = e.target.checked;
+                    setSoundEnabled(next);
+                    if (next) {
+                      playSound("click", { forceCategory: true });
+                    }
+                  }}
+                />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>Enable Platform Sound Effects</div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--color-text-secondary)" }}>
+                    Master switch for all synthesized audio cues across the workspace, chat, and notifications.
+                  </div>
+                </div>
+              </label>
+
+              <div style={{ display: "grid", gap: 6, maxWidth: 420 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <label
+                    htmlFor="settings-sound-volume"
+                    style={{ fontWeight: 700, fontSize: "0.88rem" }}
+                  >
+                    Output Volume
+                  </label>
+                  <span style={{ fontSize: "0.82rem", color: "var(--color-text-secondary)", fontWeight: 600 }}>
+                    {Math.round(soundSettings.volume * 100)}%
+                  </span>
+                </div>
+                <input
+                  id="settings-sound-volume"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  value={Math.round(soundSettings.volume * 100)}
+                  disabled={!soundSettings.enabled}
+                  onChange={(e) => setSoundVolume(Number(e.target.value) / 100)}
+                  style={{ width: "100%", cursor: soundSettings.enabled ? "pointer" : "not-allowed" }}
+                />
+              </div>
+
+              <div style={{ display: "grid", gap: 12, paddingTop: 4 }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: soundSettings.enabled ? "pointer" : "not-allowed", opacity: soundSettings.enabled ? 1 : 0.6 }}>
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: 3 }}
+                    checked={soundSettings.categories.notifications}
+                    disabled={!soundSettings.enabled}
+                    onChange={(e) => setSoundCategoryEnabled("notifications", e.target.checked)}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>Notifications & Escrow Alerts</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      Bell chimes for incoming notifications, escrow releases, and dispute warnings.
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: soundSettings.enabled ? "pointer" : "not-allowed", opacity: soundSettings.enabled ? 1 : 0.6 }}>
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: 3 }}
+                    checked={soundSettings.categories.messages}
+                    disabled={!soundSettings.enabled}
+                    onChange={(e) => setSoundCategoryEnabled("messages", e.target.checked)}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>Direct Messages & Support Chat</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      Soft send pop and incoming message chimes in Workspace Chat and Support Chat.
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: soundSettings.enabled ? "pointer" : "not-allowed", opacity: soundSettings.enabled ? 1 : 0.6 }}>
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: 3 }}
+                    checked={soundSettings.categories.interactions}
+                    disabled={!soundSettings.enabled}
+                    onChange={(e) => setSoundCategoryEnabled("interactions", e.target.checked)}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: "0.88rem" }}>Confirmations & Interactive Cues</div>
+                    <div style={{ fontSize: "0.78rem", color: "var(--color-text-secondary)" }}>
+                      Subtle confirmation chords for completed payments, approvals, and action feedback.
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <div style={{ display: "grid", gap: 8, paddingTop: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: "0.85rem" }}>Preview Sounds</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {(
+                    [
+                      { id: "notification", label: "Notification Chime" },
+                      { id: "payment", label: "Payment / Escrow" },
+                      { id: "messageReceived", label: "Message Received" },
+                      { id: "success", label: "Success Chord" },
+                    ] as { id: SoundEffectName; label: string }[]
+                  ).map((sample) => (
+                    <button
+                      key={sample.id}
+                      type="button"
+                      className="sh-btn sh-btn-secondary rounded-lg"
+                      onClick={() =>
+                        playSound(sample.id, { forceMaster: true, forceCategory: true })
+                      }
+                    >
+                      <Volume2 size={14} />
+                      {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </GlassCard>
         </div>
       )}
 
@@ -1533,6 +1758,7 @@ export function SettingsWorkspace({
           role="tabpanel"
           id="settings-panel-privacy"
           aria-labelledby="settings-tab-privacy"
+          data-tour="settings-active-panel"
           style={{ display: "grid", gap: 16 }}
         >
           {privacySuccess && (
@@ -1652,6 +1878,7 @@ export function SettingsWorkspace({
           role="tabpanel"
           id="settings-panel-data"
           aria-labelledby="settings-tab-data"
+          data-tour="settings-active-panel"
           style={{ display: "grid", gap: 16 }}
         >
           {exportSuccess && (

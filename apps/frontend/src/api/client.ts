@@ -1,4 +1,8 @@
 import type { Language } from "../i18n";
+import type {
+  GuideProgressMutation,
+  GuideProgressState,
+} from "../components/guide/guideTypes";
 import { mockStore } from "./mockData";
 
 // === INTERFACES & TYPES ===
@@ -199,6 +203,25 @@ export interface Milestone {
   submittedAt: string | null;
   autoReleaseAt: string | null;
   releasedAt: string | null;
+  /** The contract this milestone belongs to, as the API reports it. */
+  contract?: {
+    id: string;
+    jobId?: string;
+    status?: string;
+    title?: string;
+    category?: string;
+  } | null;
+  /** The other party on the contract — the counterparty, not the caller. */
+  counterparty?: {
+    id: string;
+    role: "CLIENT" | "FREELANCER";
+    name: string;
+    email: string;
+  } | null;
+  /** The rail the money moved on; null when it came from the wallet balance. */
+  paymentRail?: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "CHAPA" | null;
+  /** When the escrow was funded; null while the milestone is unfunded. */
+  fundedAt?: string | null;
 }
 
 export interface TransactionMovement {
@@ -1219,24 +1242,36 @@ class ApiClient {
   }
 
   async loginWithGoogleOAuth(idToken: string, role?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/oauth/google", {
-      method: "POST",
-      body: JSON.stringify({ idToken, role }),
-    });
+    return this.request(
+      "/api/v1/auth/oauth/google",
+      {
+        method: "POST",
+        body: JSON.stringify({ idToken, role }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async loginWithAppleOAuth(idToken: string, firstName?: string, lastName?: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/oauth/apple", {
-      method: "POST",
-      body: JSON.stringify({ idToken, firstName, lastName }),
-    });
+    return this.request(
+      "/api/v1/auth/oauth/apple",
+      {
+        method: "POST",
+        body: JSON.stringify({ idToken, firstName, lastName }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   async loginWithFacebookOAuth(accessToken: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
-    return this.request("/api/v1/auth/oauth/facebook", {
-      method: "POST",
-      body: JSON.stringify({ accessToken }),
-    });
+    return this.request(
+      "/api/v1/auth/oauth/facebook",
+      {
+        method: "POST",
+        body: JSON.stringify({ accessToken }),
+      },
+      { strictHttpErrors: true },
+    );
   }
 
   // ---------- Linked credentials (the signed-in account) ----------
@@ -1982,6 +2017,31 @@ class ApiClient {
     };
   }
 
+  /** Personalised open-brief feed: skill matches first, then the rest for high-completeness freelancers. */
+  async getJobFeed(params?: { page?: number; pageSize?: number }): Promise<{ jobs: Job[]; total: number; page: number; pageSize: number; matchingAvailable: boolean }> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.set("page", String(params.page));
+    if (params?.pageSize) searchParams.set("pageSize", String(params.pageSize));
+
+    const response = await this.request<{
+      items: Array<Job & { _count?: { proposals?: number } }>;
+      total: number;
+      page: number;
+      pageSize: number;
+      matchingAvailable: boolean;
+    }>(`/api/v1/jobs/feed?${searchParams.toString()}`);
+
+    return {
+      jobs: Array.isArray(response.items)
+        ? response.items.map(({ _count, ...job }) => ({ ...job, proposalsCount: _count?.proposals ?? 0 }))
+        : [],
+      total: response.total ?? 0,
+      page: response.page ?? 1,
+      pageSize: response.pageSize ?? 20,
+      matchingAvailable: response.matchingAvailable ?? false,
+    };
+  }
+
   async getJobById(jobId: string): Promise<Job> {
     return this.request(`/api/v1/jobs/${jobId}`);
   }
@@ -2220,6 +2280,22 @@ class ApiClient {
   }
   async getProfileCompleteness(): Promise<{ profileCompleteness: number }> {
     return this.request(`/api/v1/users/me/profile/completeness`);
+  }
+  async getGuideProgress(): Promise<GuideProgressState> {
+    return this.request(`/api/v1/users/me/guide-progress`);
+  }
+  async updateGuideProgress(
+    mutation: GuideProgressMutation,
+  ): Promise<GuideProgressState> {
+    return this.request(`/api/v1/users/me/guide-progress`, {
+      method: "PATCH",
+      body: JSON.stringify(mutation),
+    });
+  }
+  async resetGuideProgress(): Promise<GuideProgressState> {
+    return this.request(`/api/v1/users/me/guide-progress`, {
+      method: "DELETE",
+    });
   }
   async reportProfile(userId: string, reason: string, details: string): Promise<unknown> {
     return this.request(`/api/v1/users/${userId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });

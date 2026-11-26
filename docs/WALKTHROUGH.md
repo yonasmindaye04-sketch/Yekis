@@ -1,6 +1,17 @@
 # Yekis Jobs Functional Walkthrough
 
-Last validated: 2026-11-25
+Last validated: 2026-11-26
+
+> **Operations Console Visual Parity, Native Dialogs & Honest Workbenches (`OpsConsole.tsx`, `Overview.tsx`, `CommandPalette.tsx`, `ui.tsx`, `ops-console.css`, `shadcn-dashboard.css`, Ops Pages) (2026-11-26):**
+> - **Why**: The staff & admin console (`OpsConsole`) lagged behind the Client & Freelancer workspace shell (`MarketplaceShadcnDashboard.tsx`) in layout framing (fixed sidebar math conflicting with `.sh-variant-inset`/`.sh-variant-floating`), `ShadcnLayoutContext` sync, KPI interactivity, dialog accessibility (`9` `window.prompt()`/`window.confirm()` calls), design rule compliance (`ShinyBadge`, `GlassCard`, `StatCard` icon tiles, translucent `.pill` badges), and data honesty (hardcoded `14.2%`/`21.8%` KPI deltas, synthetic chart multipliers/fallback arrays in `Overview.tsx`/`Reports.tsx`, hardcoded contractor WHT schedules in `WithholdingReports.tsx`, and 404/400-guaranteed unimplemented admin action controls).
+> - **Workspace Shell & Command Center Parity (`ops-console.css`, `shadcn-dashboard.css`, `OpsConsole.tsx`, `Overview.tsx`, `CommandPalette.tsx`)**:
+>   - Moved to a unified CSS Grid shell (`256px minmax(0, 1fr)`) with clean `inset`, `floating`, and `sh-collapsed` variants synced directly to `ShadcnLayoutContext` (`sidebarVariant`, `sidebarCollapsed`, `dashboardVariant`, `opsSubTab`, `commandPaletteOpen`).
+>   - Added `YekisAvatar` in sidebar/topbar, topbar history back navigation, `.ops-cmd-trigger` button replacing the fake blurred `<input>`, and rebuilt `CommandPalette` on native `<dialog>` indexing Dashboard Views and Appearance & Layout quick actions.
+>   - Extended `OverviewBundle` (`opsTypes.ts`, `opsApi.ts`) with real `payments` records and rebuilt `Overview.tsx` with interactive expandable `.sh-kpi-card` drawers, `.sh-subnav-bar` / `.sh-segmented` mode switches, and real date-bucketed `7d`/`30d`/`90d`/`12m` cashflow & payout series showing `.sh-chart-empty` when idle.
+> - **Rule Compliance, Native Dialogs & Verified APIs (`ui.tsx`, `EvidenceViewer.tsx`, Ops Subpages)**:
+>   - Replaced `GlassCard`, `ShinyBadge`, and translucent status pills across all 23 console pages and `EvidenceViewer.tsx` with flat hairline `<Card>` and bold colored text `<Pill>`.
+>   - Replaced all 9 `window.prompt()`/`window.confirm()` calls (`Risk`, `Receipts`, `DisputeQueue`, `Staff`, `BotOperations`) with native `<dialog>` `OpsActionModal` (`showModal()`, `closedby="any"` + pointer-bounds fallback, `overscroll-behavior: contain`).
+>   - Removed the five unimplemented generic `/admin/*` endpoint callers (`Contracts`, `Payments`, `Escrow`, `Reconciliation`, `Ledger`), removed unsupported payout settlement outcomes (`SWITCH_RAIL`, `RETRY`, `HOLD` in `Payouts`), removed synthetic multipliers/mock cohorts/mock WHT splits (`Reports`, `WithholdingReports`), and linked inspection tabs directly to authoritative execution workbenches (`Escrow`, `Dispute Mediation`, `Ledger`).
 
 > **Public Marketplace Profile Board-Native Redesign, Masthead Action Alignment & Mock Session Auth Fix (`ProfilePage.tsx`, `ProfilePage.css`, `FullPlatformApp.tsx`, `shadcn-dashboard.css`, `api/client.ts`, `api/socket.ts`, `api/mockData.ts`) (2026-11-25):**
 > - **Why**: `ProfilePage.tsx` previously rendered inside centered `1080px` boxed `.panel` cards below an empty `.hero-banner` spacer slab, used a bordered pill+dot `.availability-badge` (`RULE.md` §2 violation), showed a redundant `"ETB Earned"` label next to `"ETB 450,000+"`, rendered full portfolio/review sections blindly without handling `canViewFullProfile === false`, and submitted human-readable report labels instead of the backend `reportProfileSchema` enum values. On tablet/medium viewports (`<= 1024px`), `Edit Profile` and `Back to Profile` stretched full width inside `.sh-card-header` above the profile instead of aligning with the identity row, and clicking `Edit Profile` under a mock session (`"mock-jwt-access-token"`) sent `Bearer mock-jwt-access-token` to `/api/v1/auth/me`, failing with `"Missing or malformed Authorization header"`.
@@ -1185,11 +1196,11 @@ When implementation changes, update this walkthrough if the user journey, state 
     - **Bottom Section**: `StaffCompliancePanel` (Transaction Monitoring & AML Queue) now occupies full width, giving `QueueControls` (search, status, flag type, refresh, pagination) ample room to display without clipping.
   - Implemented responsive two-pane grid styling for `.dispute-queue-container` (`360px minmax(0, 1fr)` on desktop, single column on smaller viewports) and styled `.staff-queue-card` and `.staff-queue-list`.
   - Added `overflow-x: hidden;` to `.staff-shell` and `.staff-main` to permanently prevent horizontal overflow.
-- **Auth Screen Professional Visual Treatment**: Redesigned the left-panel auth visual with a professional, indicator-rich layout:
-  - **3 Key Metrics Row**: Contracts signed (2,400+), escrow volume (ETB 12M+), payout success rate (98%) — separated by vertical dividers, staggered fade-in on load.
-  - **Live Activity Feed**: 3 activity items (milestone delivered, contract signed, escrow funded) with colored status dots, descriptions, and relative timestamps — slide in sequentially.
-  - **Trust Badges**: "Escrow protected", "KYC verified", "Telebirr & CBE" with inline SVG icons — anchored to the bottom right.
-  - Background: subtle dot grid texture and a soft brand-green radial gradient glow. All elements use a single `authFadeUp` keyframe (one-shot, no looping).
+- **Auth Screen Interactive Pixel Field**: Replaced the indicator-card treatment on the left-panel auth visual with a continuous, irregularly distributed real-pixel composition:
+  - **Status cards removed**: The three-number metrics row, the "Milestone delivered / Contract signed / Escrow funded" activity feed and the trust badges are removed, along with their `authVis` copy keys in all four language dictionaries. The headline, subtitle and the two `01` / `02` proof lines remain the foreground content.
+  - **Continuous irregular real-pixel canopy**: A unified, crisp-edged SVG pixel matrix (`70 × 43` grid with `shapeRendering="crispEdges"`, zero border radius, no fractional scale distortion) spans continuously across the upper and upper-right zone — sloping diagonally below the "Back to Home" control, clearing the Yekis logo and headline, and curving beneath the orbital centerpiece. Two octaves of deterministic 2D value noise create organic clusters, stepped ridges, and scattered frontier pixels that never reshuffle between renders.
+  - **Pointer parallax**: A single passive, rAF-throttled `pointermove` listener writes normalized `--auth-px` / `--auth-py` values onto the art stage. The pixel field, orbit, and cursor glow translate via compositor-friendly transforms at different depths.
+  - **Orbit, reduced motion, and scroll enhancement**: A slow orbit (rings, rotating arc, satellites and core), two aurora blobs, a masked grid mesh, and a sweep replace the old dot texture. On short viewports where `.platform-auth` becomes the scroll container, `@supports (animation-timeline: scroll())` ties the orbit and pixel field to `scroll(nearest block)`. Continuous animations are opted into only under `@media (prefers-reduced-motion: no-preference)`, and layout geometry remains theme-invariant.
 - **Proper Google Login Button**: Restored the Google, Apple, and Facebook social sign-in buttons to a compact, single-row layout of small circular icons (`type: "icon"`, `shape: "circle"`) to save vertical space and maintain a clean login form aesthetic.
 - **Chat System Fix & Role-Based Redesign**:
   - **Layout & Horizontal Clipping Fix**:
@@ -1234,8 +1245,8 @@ The staff dashboard was rebuilt as a single console at `apps/frontend/src/pages/
 **Entry point.** `if (user?.staffRole) return <OpsConsole user={user} onExit={logout} />;`
 
 ### Navigation and gating
-- **Collapsible sidebar**: the 3-bar button in the sidebar brand row hides the sidebar for full-width tables and charts. The choice persists in `localStorage` (`yekis-ops-nav`). At <=860px the same button opens the overlay drawer instead, so the two layouts never conflict.
-- Sidebar groups: **Overview** (Command Center) - **Cases** (Support Desk, Dispute Mediation, Risk and Fraud) - **Review Queues** (KYC Reviews, Profile Reports, Receipts) - **Financial** (Contracts, Payments, Payouts, Escrow, Reconciliation, Ledger, Reports) - **Administration** (Users, Staff and Roles, Audit Logs, System Health).
+- **Unified CSS Grid shell & collapsible sidebar**: desktop sidebar (`256px minmax(0, 1fr)`), collapse toggle in the sidebar brand row (persisted via `ShadcnLayoutContext`), and overlay drawer below `1024px`, plus a mobile bottom nav carrying the first four permitted items.
+- Sidebar groups: **Overview** (Command Center) - **Cases** (Support Desk, Dispute Mediation, Risk and Fraud) - **Review Queues** (KYC Reviews, Profile Reports, Gig Moderation, Receipts) - **Financial** (Contracts, Payments, Payouts, Escrow, Reconciliation, Tax Reports, Ledger, Reports) - **Administration** (Users, Staff and Roles, Featured Talent, Telegram Bot, Audit Logs, System Health) - **Account** (My Profile).
 - Entries are filtered by `opsPerms.ts`, which fetches `GET /admin/permissions/matrix` and resolves the signed-in `staffRole` against it. The backend still enforces every route (`requirePermission` on `/admin/*`, `requireStaffRole` elsewhere) - the console only hides links a reviewer cannot open. A deep link into a forbidden page falls back to the first permitted page.
 - Sidebar badges count open work per queue. The header also carries a working notifications popover (`GET /notifications`, mark-read via `POST /notifications/:id/read`) and the light/dark toggle.
 
@@ -1354,3 +1365,14 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
   - Avatar badge corners aligned to matching `rounded-[5px]`.
 - **System-Wide Application**:
   - Applied across `apps/frontend/src/components/ui/alert.tsx`, `WorkflowWorkspace.tsx`, `SettingsWorkspace.tsx`, `BrowserWallet.tsx`, `ChatWorkspace.tsx`, `PhoneVerification.tsx`, and ops monitoring pages.
+
+---
+
+### Yekis Guide: Contextual User Navigation & Product Tour System
+- **Global Help Menu & Welcome Bar (`FullPlatformApp.tsx`, `GlobalHelpMenu.tsx`, `GuideContext.tsx`)**:
+  - Added a Help (`?`) entry point in the topbar (`Shift+?` shortcut support) presenting **Take a Product Tour / Restart**, **Explain This Page**, **Browse Help Documentation**, **Keyboard Shortcuts**, and **Contact Support**, plus a non-intrusive dismissible first-visit welcome bar (`FirstVisitWelcomeBar`).
+- **12-Module Interactive Product Tours & Contextual Help (`ProductTourOverlay.tsx`, `ContextualHelpTrigger.tsx`, `guideConfig.ts`)**:
+  - Added viewport-clamped spotlight tours keyed by stable `data-tour` attributes across Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Messages, Profile, Disputes, KYC Verification, and Settings, with cross-view switching (`Analytics <-> Pipeline Table`) and graceful handling of role-gated or unmounted targets.
+  - Added inline `?` contextual triggers on Dashboard KPIs, Escrow Inflow & Released Payouts, Payment Rail Settlement Mix, Pipeline stages, Kanban board, Operations Data Table, Calendar, Wallet financial actions, Escrow actions, Contract management, Job publishing, Proposal pipeline, Disputes, and Fayda KYC.
+- **Per-User Backend Persistence & Tenant Isolation (`guideProgress.service.ts`, `profile.routes.ts`, `guideStorage.ts`, `SettingsWorkspace.tsx`)**:
+  - Persisted guide progress per user (`User.guideProgress` JSONB) via authenticated `GET/PATCH/DELETE /api/v1/users/me/guide-progress` endpoints, included it in PDPP export/erasure (`privacy.service.ts`), scoped browser storage by `(tenantId, userId)`, and added per-module tour restarts and full reset controls in Settings -> Preferences.

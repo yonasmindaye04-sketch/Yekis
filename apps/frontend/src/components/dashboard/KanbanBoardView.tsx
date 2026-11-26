@@ -12,6 +12,10 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { KanbanColumnId, KanbanTask } from "./dashboardData";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
+import { railLabel } from "./dashboardData";
+import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 
 interface KanbanBoardViewProps {
@@ -54,6 +58,8 @@ const COLUMNS: {
 const COLUMN_ORDER: KanbanColumnId[] = COLUMNS.map((c) => c.id);
 
 export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) {
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).kanban;
   const [search, setSearch] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<
     "ALL" | "HIGH" | "MEDIUM" | "LOW"
@@ -130,12 +136,15 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
   };
 
   return (
-    <div className="sh-card">
+    <div className="sh-card" data-tour="dashboard-kanban">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Milestone & Deliverable Kanban Pipeline</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{copy.title}</h3>
+            <ContextualHelpTrigger helpId="dashboard-kanban" />
+          </div>
           <p className="sh-card-desc">
-            Drag cards across columns or use stage controls to update escrow workflow state
+            {copy.subtitle}
           </p>
         </div>
 
@@ -144,7 +153,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
           className="sh-btn sh-btn-primary"
           onClick={() => setCreateOpen(true)}
         >
-          <Plus size={14} /> Add Milestone Task
+          <Plus size={14} /> {copy.addTaskBtn}
         </button>
       </div>
 
@@ -156,18 +165,18 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tasks by title, code, or freelancer..."
-            aria-label="Search Kanban tasks"
+            placeholder={copy.searchPlaceholder}
+            aria-label={copy.searchAria}
           />
         </div>
 
-        <div className="sh-segmented" role="group" aria-label="Filter by priority">
+        <div className="sh-segmented" role="group" aria-label={copy.priorityAria}>
           {(
             [
-              ["ALL", "All Priorities"],
-              ["HIGH", "High Priority"],
-              ["MEDIUM", "Medium"],
-              ["LOW", "Low"],
+              ["ALL", copy.priorityAll],
+              ["HIGH", copy.priorityHighFilter],
+              ["MEDIUM", copy.priorityMediumFilter],
+              ["LOW", copy.priorityLowFilter],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -186,7 +195,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
       <div
         className="sh-kanban-mobile-tabs"
         role="tablist"
-        aria-label="Kanban workflow stages"
+        aria-label={copy.mobileTabsAria}
       >
         {COLUMNS.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.column === col.id);
@@ -200,7 +209,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
               className={`sh-kanban-mobile-tab ${isActive ? "active" : ""}`}
               onClick={() => setActiveMobileColumn(col.id)}
             >
-              <span>{col.title}</span>
+              <span>{copy.columns[col.id].title}</span>
               <span className="sh-mono sh-kanban-mobile-tab-count">
                 {colTasks.length}
               </span>
@@ -238,11 +247,11 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
               <div className="sh-kanban-col-head">
                 <div>
                   <div className="sh-kanban-col-title-row">
-                    <h4>{col.title}</h4>
+                    <h4>{copy.columns[col.id].title}</h4>
                     <span className="sh-mono sh-kanban-count">{colTasks.length}</span>
                   </div>
                   <p className="sh-kanban-col-sub">
-                    {col.subtitle} ·{" "}
+                    {copy.columns[col.id].subtitle} ·{" "}
                     <span className="sh-mono">
                       ETB {(colTotalMinor / 100).toLocaleString()}
                     </span>
@@ -253,7 +262,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
               <div className="sh-kanban-cards">
                 {colTasks.length === 0 ? (
                   <div className="sh-kanban-empty">
-                    No milestones in this stage
+                    {copy.emptyCol}
                   </div>
                 ) : (
                   colTasks.map((task) => {
@@ -273,7 +282,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                           <span className="sh-cell-meta">
                             <span className="sh-mono">{task.code}</span>
                             <span aria-hidden="true">·</span>
-                            <span>{task.rail.replace("_", " ")}</span>
+                            <span>{railLabel(task.rail)}</span>
                             <span aria-hidden="true">·</span>
                             <span
                               className={`sh-priority-inline ${task.priority.toLowerCase()}`}
@@ -281,7 +290,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                               {task.priority === "HIGH" && <AlertCircle size={11} />}
                               {task.priority === "MEDIUM" && <Clock size={11} />}
                               {task.priority === "LOW" && <CheckCircle2 size={11} />}
-                              {task.priority}
+                              {copy.priorityLabels[task.priority]}
                             </span>
                           </span>
                           <GripVertical
@@ -305,7 +314,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                               ETB {(task.amountMinor / 100).toLocaleString()}
                             </strong>
                             <span className="sh-cell-meta sh-mono" style={{ display: "block" }}>
-                              Due {task.dueDate}
+                              {copy.duePrefix(task.dueDate)}
                             </span>
                           </div>
 
@@ -315,8 +324,8 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                               className="sh-icon-only-btn compact"
                               disabled={colIdx <= 0}
                               onClick={() => stepTask(task.id, -1)}
-                              title="Move to previous stage"
-                              aria-label="Move to previous stage"
+                              title={copy.prevStageTitle}
+                              aria-label={copy.prevStageTitle}
                             >
                               <ChevronLeft size={13} />
                             </button>
@@ -325,8 +334,8 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                               className="sh-icon-only-btn compact"
                               disabled={colIdx >= COLUMN_ORDER.length - 1}
                               onClick={() => stepTask(task.id, 1)}
-                              title="Advance to next stage"
-                              aria-label="Advance to next stage"
+                              title={copy.nextStageTitle}
+                              aria-label={copy.nextStageTitle}
                             >
                               <ChevronRight size={13} />
                             </button>
@@ -349,7 +358,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
           onClick={() => setCreateOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="Add milestone task"
+          aria-label={copy.modalAria}
         >
           <aside
             className="sh-sheet-panel"
@@ -357,16 +366,16 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
           >
             <div className="sh-sheet-header">
               <div>
-                <h3 className="sh-sheet-title">Add Milestone Task</h3>
+                <h3 className="sh-sheet-title">{copy.modalTitle}</h3>
                 <p className="sh-sheet-subtitle">
-                  Create a new deliverable card in the escrow workflow board
+                  {copy.modalSubtitle}
                 </p>
               </div>
               <button
                 type="button"
                 className="sh-icon-only-btn"
                 onClick={() => setCreateOpen(false)}
-                aria-label="Close"
+                aria-label={copy.closeAria}
               >
                 <X size={16} />
               </button>
@@ -374,18 +383,18 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
 
             <form className="sh-sheet-body" onSubmit={handleCreateTask}>
               <label className="sh-form-field">
-                <span>Milestone Deliverable Title</span>
+                <span>{copy.fieldTitle}</span>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g., Phase 3: Telebirr Webhook Load Testing"
+                  placeholder={copy.fieldTitlePlaceholder}
                 />
               </label>
 
               <label className="sh-form-field">
-                <span>Contract Name</span>
+                <span>{copy.fieldContract}</span>
                 <input
                   type="text"
                   required
@@ -395,7 +404,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
               </label>
 
               <label className="sh-form-field">
-                <span>Counterparty / Assignee</span>
+                <span>{copy.fieldCounterparty}</span>
                 <input
                   type="text"
                   required
@@ -406,7 +415,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
 
               <div className="sh-customizer-grid-2">
                 <label className="sh-form-field">
-                  <span>Amount (ETB)</span>
+                  <span>{copy.fieldAmount}</span>
                   <input
                     type="number"
                     min={100}
@@ -417,7 +426,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                 </label>
 
                 <label className="sh-form-field">
-                  <span>Due Date</span>
+                  <span>{copy.fieldDueDate}</span>
                   <input
                     type="date"
                     required
@@ -429,7 +438,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
 
               <div className="sh-customizer-grid-2">
                 <label className="sh-form-field">
-                  <span>Payment Rail</span>
+                  <span>{copy.fieldRail}</span>
                   <select
                     className="sh-select"
                     value={newRail}
@@ -446,7 +455,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                 </label>
 
                 <label className="sh-form-field">
-                  <span>Priority</span>
+                  <span>{copy.fieldPriority}</span>
                   <select
                     className="sh-select"
                     value={newPriority}
@@ -456,15 +465,15 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                       )
                     }
                   >
-                    <option value="HIGH">High</option>
-                    <option value="MEDIUM">Medium</option>
-                    <option value="LOW">Low</option>
+                    <option value="HIGH">{copy.priorityLabels.HIGH}</option>
+                    <option value="MEDIUM">{copy.priorityLabels.MEDIUM}</option>
+                    <option value="LOW">{copy.priorityLabels.LOW}</option>
                   </select>
                 </label>
               </div>
 
               <label className="sh-form-field">
-                <span>Initial Workflow Stage</span>
+                <span>{copy.fieldStage}</span>
                 <select
                   className="sh-select"
                   value={newColumn}
@@ -474,7 +483,7 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                 >
                   {COLUMNS.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.title}
+                      {copy.columns[c.id].title}
                     </option>
                   ))}
                 </select>
@@ -486,14 +495,14 @@ export function KanbanBoardView({ tasks, onTasksChange }: KanbanBoardViewProps) 
                   className="sh-btn sh-btn-primary"
                   style={{ flex: 1, justifyContent: "center" }}
                 >
-                  <ShieldCheck size={14} /> Create Milestone Task
+                  <ShieldCheck size={14} /> {copy.submitTaskBtn}
                 </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
                   onClick={() => setCreateOpen(false)}
                 >
-                  Cancel
+                  {copy.cancelBtn}
                 </button>
               </div>
             </form>

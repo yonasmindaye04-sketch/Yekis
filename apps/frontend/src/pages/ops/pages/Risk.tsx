@@ -20,35 +20,33 @@ import { RISK_LEVEL } from "../opsTypes";
 import type { RiskFlag } from "../opsTypes";
 import {
   Banner,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
   Kv,
   LoadingBox,
+  OpsActionModal,
   OpsTable,
   PageHead,
   Pager,
-  formatStatusLabel,
+  Pill,
   useToast,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("LOW")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("CRITICAL") || u.includes("HIGH") || u.includes("FRAUD")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("DISMISSED")) return "neutral";
-  return "info";
-}
+type RiskDialogState =
+  | { kind: "str"; flag: RiskFlag }
+  | { kind: "dismiss"; flag: RiskFlag }
+  | { kind: "lift"; flag: RiskFlag }
+  | null;
 
 export default function Risk() {
   const toast = useToast();
   const [flagType, setFlagType] = useState("");
   const [status, setStatus] = useState("PENDING_REVIEW");
   const [openId, setOpenId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<RiskDialogState>(null);
+  const [busy, setBusy] = useState(false);
 
   const list = useListPage<RiskFlag>(
     (p) => opsListApi.riskFlags({ ...p, flagType, status }),
@@ -57,56 +55,33 @@ export default function Risk() {
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
-  const fileStr = async (f: RiskFlag) => {
-    const notes = window.prompt("Review notes (min 10 characters) — recorded on the flag:") ?? "";
-    if (notes.trim().length < 10) {
-      toast("Review notes of at least 10 characters are required.");
-      return;
-    }
-    const ref = window.prompt("STR reference number (1–200 characters):") ?? "";
-    if (ref.trim().length < 1) {
-      toast("An STR reference number is required.");
-      return;
-    }
-    const suspend = window.confirm(
-      "Also suspend this account as part of the STR filing?\n\n" +
-        "Suspending blocks the user immediately on every authenticated request.",
-    );
+  const handleConfirm = async ({
+    values,
+    checked,
+  }: {
+    values: Record<string, string>;
+    checked: boolean;
+  }) => {
+    if (!dialog) return;
+    setBusy(true);
     try {
-      await opsApi.fileStr(f.id, notes.trim(), ref.trim(), suspend);
-      toast(suspend ? "STR filed and account suspended." : "STR filed.");
+      if (dialog.kind === "str") {
+        await opsApi.fileStr(dialog.flag.id, values.notes, values.ref, checked);
+        toast(checked ? "STR filed and account suspended." : "STR filed.");
+      } else if (dialog.kind === "dismiss") {
+        await opsApi.dismissFlag(dialog.flag.id, values.notes);
+        toast("Flag dismissed.");
+      } else {
+        await opsApi.liftHold(dialog.flag.user.id, values.reason || undefined);
+        toast("Compliance hold lifted.");
+      }
+      setDialog(null);
       setOpenId(null);
       reload();
     } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not file STR");
-    }
-  };
-
-  const dismiss = async (f: RiskFlag) => {
-    const notes = window.prompt("Dismissal reason (min 10 characters):") ?? "";
-    if (notes.trim().length < 10) {
-      toast("A dismissal reason of at least 10 characters is required.");
-      return;
-    }
-    try {
-      await opsApi.dismissFlag(f.id, notes.trim());
-      toast("Flag dismissed.");
-      setOpenId(null);
-      reload();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not dismiss flag");
-    }
-  };
-
-  const liftHold = async (f: RiskFlag) => {
-    const reason = window.prompt("Reason for lifting the compliance hold (optional):") ?? "";
-    try {
-      await opsApi.liftHold(f.user.id, reason.trim() || undefined);
-      toast("Compliance hold lifted.");
-      setOpenId(null);
-      reload();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Could not lift hold");
+      toast(e instanceof Error ? e.message : "Compliance action failed");
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -122,7 +97,7 @@ export default function Risk() {
         title="Risk & Fraud"
         sub="Transaction-monitoring alerts from the compliance queue"
         right={
-          <button className="btn btn-ghost" onClick={reload}>
+          <button type="button" className="btn btn-ghost" onClick={reload}>
             <RefreshCw size={14} /> Refresh
           </button>
         }
@@ -142,9 +117,11 @@ export default function Risk() {
           k="Awaiting review"
           v={String(open.length)}
           warn={open.length > 0}
-          active={status === "OPEN"}
+          active={status === "PENDING_REVIEW"}
           title="Filter to open risk flags"
-          onClick={() => setStatus((s) => (s === "OPEN" ? "" : "OPEN"))}
+          onClick={() =>
+            setStatus((s) => (s === "PENDING_REVIEW" ? "" : "PENDING_REVIEW"))
+          }
         />
         <Kv
           k="Critical (on page)"
@@ -159,9 +136,9 @@ export default function Risk() {
         <Kv
           k="STR filed"
           v={String(rows.filter((f) => f.status === "REVIEWING").length)}
-          active={status === "REVIEWING"}
+          active={status === "STR_FILED"}
           title="Filter to flags under STR review"
-          onClick={() => setStatus((s) => (s === "REVIEWING" ? "" : "REVIEWING"))}
+          onClick={() => setStatus((s) => (s === "STR_FILED" ? "" : "STR_FILED"))}
         />
       </div>
       {open.length ? (
@@ -173,7 +150,7 @@ export default function Risk() {
         />
       ) : null}
 
-      <GlassCard className="filters" style={{ marginTop: 16 }}>
+      <div className="filters" style={{ marginTop: 12 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -182,40 +159,72 @@ export default function Risk() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <FilterSelect value={flagType} onChange={setFlagType} options={FLAG_TYPES} allLabel="All rule types" label="Flag type" />
-        <FilterSelect value={status} onChange={setStatus} options={FLAG_STATUSES} allLabel="All statuses" label="Flag status" />
-        <button className="btn btn-ghost" onClick={reload}>
+        <FilterSelect
+          value={flagType}
+          onChange={setFlagType}
+          options={FLAG_TYPES}
+          allLabel="All rule types"
+          label="Flag type"
+        />
+        <FilterSelect
+          value={status}
+          onChange={setStatus}
+          options={FLAG_STATUSES}
+          allLabel="All statuses"
+          label="Flag status"
+        />
+        <button type="button" className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </GlassCard>
+      </div>
 
       <OpsTable
         heads={["Rule", "Risk", "Status", "User", "KYC", "Wallet", "Detected", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="flags" />}
       >
         {rows.length === 0 ? (
-          <tr><td colSpan={8}><Empty icon={ShieldAlert}>No flags match these filters.</Empty></td></tr>
+          <tr>
+            <td colSpan={8}>
+              <Empty icon={ShieldAlert}>No flags match these filters.</Empty>
+            </td>
+          </tr>
         ) : (
           rows.map((f) => {
             const lv = RISK_LEVEL[f.type] ?? "LOW";
             return (
               <Fragment key={f.id}>
-                <tr className="clickable" onClick={() => setOpenId(openId === f.id ? null : f.id)}>
+                <tr
+                  className="clickable"
+                  onClick={() => setOpenId(openId === f.id ? null : f.id)}
+                >
                   <td>
                     <div className="cell-main">{f.type.replace(/_/g, " ")}</div>
                     <div className="cell-sub mono">{f.id}</div>
                   </td>
-                  <td><ShinyBadge variant={statusToVariant(lv)}>{lv}</ShinyBadge></td>
-                  <td><ShinyBadge variant={statusToVariant(f.status)}>{formatStatusLabel(f.status)}</ShinyBadge></td>
                   <td>
-                    <div className="cell-main" style={{ fontWeight: 600 }}>{f.user.email}</div>
+                    <Pill s={lv} />
+                  </td>
+                  <td>
+                    <Pill s={f.status} />
+                  </td>
+                  <td>
+                    <div className="cell-main" style={{ fontWeight: 600 }}>
+                      {f.user.email}
+                    </div>
                     <div className="cell-sub mono">{f.user.ucid}</div>
                   </td>
-                  <td style={{ fontSize: 12.5 }}>{f.user.kycTier ? `${f.user.kycTier.replace("_", " ")} · ${f.user.kycStatus}` : "—"}</td>
-                  <td className="amount">{f.user.walletMinor != null ? fmt(f.user.walletMinor) : "—"}</td>
-                  <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>{dts(f.created)}</td>
+                  <td style={{ fontSize: 12.5 }}>
+                    {f.user.kycTier ? `${f.user.kycTier.replace("_", " ")} · ${f.user.kycStatus}` : "—"}
+                  </td>
+                  <td className="amount">
+                    {f.user.walletMinor != null ? fmt(f.user.walletMinor) : "—"}
+                  </td>
+                  <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>
+                    {dts(f.created)}
+                  </td>
                   <td>
                     <button
+                      type="button"
                       className="btn btn-ghost btn-sm"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -229,11 +238,14 @@ export default function Risk() {
                 {openId === f.id ? (
                   <tr className="expand-row">
                     <td colSpan={8}>
-                      <GlassCard className="card-pad" style={{ margin: 0 }}>
+                      <Card className="card-pad" style={{ margin: 0 }}>
                         <div className="sec-title">Rule detail</div>
                         <div className="kv" style={{ marginTop: 10 }}>
                           <div className="kv-k">Trigger payload</div>
-                          <div className="kv-v mono" style={{ fontSize: 11.5, whiteSpace: "pre-wrap" }}>
+                          <div
+                            className="kv-v mono"
+                            style={{ fontSize: 11.5, whiteSpace: "pre-wrap" }}
+                          >
                             {JSON.stringify(f.details, null, 2)}
                           </div>
                         </div>
@@ -244,17 +256,29 @@ export default function Risk() {
                           <Kv k="KYC status" v={f.user.kycStatus ?? "—"} />
                         </div>
                         <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                          <button className="btn btn-red btn-sm" onClick={() => void fileStr(f)}>
+                          <button
+                            type="button"
+                            className="btn btn-red btn-sm"
+                            onClick={() => setDialog({ kind: "str", flag: f })}
+                          >
                             <TriangleAlert size={13} /> File STR
                           </button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => void dismiss(f)}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setDialog({ kind: "dismiss", flag: f })}
+                          >
                             Dismiss flag
                           </button>
-                          <button className="btn btn-ghost btn-sm" onClick={() => void liftHold(f)}>
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => setDialog({ kind: "lift", flag: f })}
+                          >
                             <Unlock size={13} /> Lift hold
                           </button>
                         </div>
-                      </GlassCard>
+                      </Card>
                     </td>
                   </tr>
                 ) : null}
@@ -263,6 +287,93 @@ export default function Risk() {
           })
         )}
       </OpsTable>
+
+      <OpsActionModal
+        open={dialog?.kind === "str"}
+        title="File Suspicious Transaction Report (STR)"
+        description={
+          dialog?.kind === "str"
+            ? `Record compliance investigation notes and the FIU/STR reference number for ${dialog.flag.user.email}.`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel="Submit STR Filing"
+        busy={busy}
+        fields={[
+          {
+            name: "ref",
+            label: "STR Reference Number",
+            placeholder: "e.g. FIU-STR-2026-00419",
+            required: true,
+            minLength: 1,
+            maxLength: 200,
+          },
+          {
+            name: "notes",
+            label: "Compliance Review Notes",
+            placeholder: "Summarize suspicious pattern, linked accounts, and evidence…",
+            multiline: true,
+            required: true,
+            minLength: 10,
+            maxLength: 1000,
+          },
+        ]}
+        checkbox={{
+          label: "Also suspend this user account",
+          hint: "Suspending blocks the user immediately on every authenticated request.",
+          defaultChecked: false,
+        }}
+        onConfirm={handleConfirm}
+        onCancel={() => !busy && setDialog(null)}
+      />
+
+      <OpsActionModal
+        open={dialog?.kind === "dismiss"}
+        title="Dismiss Compliance Flag"
+        description={
+          dialog?.kind === "dismiss"
+            ? `Document why ${dialog.flag.type.replace(/_/g, " ")} for ${dialog.flag.user.email} is cleared.`
+            : undefined
+        }
+        confirmLabel="Dismiss Flag"
+        busy={busy}
+        fields={[
+          {
+            name: "notes",
+            label: "Dismissal Reason",
+            placeholder: "Explain verification checks confirming legitimate activity…",
+            multiline: true,
+            required: true,
+            minLength: 10,
+            maxLength: 1000,
+          },
+        ]}
+        onConfirm={handleConfirm}
+        onCancel={() => !busy && setDialog(null)}
+      />
+
+      <OpsActionModal
+        open={dialog?.kind === "lift"}
+        title="Lift Compliance Hold"
+        description={
+          dialog?.kind === "lift"
+            ? `Remove the TMS compliance hold on ${dialog.flag.user.email} (${dialog.flag.user.ucid}).`
+            : undefined
+        }
+        confirmLabel="Lift Compliance Hold"
+        busy={busy}
+        fields={[
+          {
+            name: "reason",
+            label: "Audit Note (optional)",
+            placeholder: "Optional note recorded in the audit log…",
+            multiline: true,
+            maxLength: 500,
+          },
+        ]}
+        onConfirm={handleConfirm}
+        onCancel={() => !busy && setDialog(null)}
+      />
     </div>
   );
 }

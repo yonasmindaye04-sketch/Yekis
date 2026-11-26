@@ -1370,6 +1370,11 @@ export function App() {
               onVerified={() => {
                 void completeEmailSignup();
               }}
+              onAlreadyRegistered={(msg) => {
+                setMiniSignupEmail(null);
+                setTelegramAuthStatus("error");
+                setTelegramAuthError(msg);
+              }}
               onBack={() => {
                 setMiniSignupEmail(null);
                 setTelegramAuthStatus("idle");

@@ -49,6 +49,8 @@
    - 8.9 [Multilingual Translation Framework](#89-multilingual-translation-framework)
    - 8.10 [Real-Time WebSocket Infrastructure](#810-real-time-websocket-infrastructure)
    - 8.11 [The Workspace Schedule Calendar (Gregorian & Ethiopian Fiscal)](#811-the-workspace-schedule-calendar-gregorian--ethiopian-fiscal)
+   - 8.12 [The Workspace Dashboard: Only the Account's Own Records](#812-the-workspace-dashboard-only-the-accounts-own-records)
+   - 8.13 [Yekis Guide: Contextual Help, Interactive Tours & Progress Isolation](#813-yekis-guide-contextual-help-interactive-tours--progress-isolation)
 9. [Platform Section-by-Section Functional Reference](#9-platform-section-by-section-functional-reference)
    - 9.15 [Gig Marketplace](#915-gig-marketplace)
    - 9.16 [Operations Console](#916-operations-console)
@@ -724,7 +726,7 @@ The proof is raised **before** the account exists, which is why both OTP routes 
 
 | The collision | What the person is told | Why |
 |---|---|---|
-| The **address** is on file | `202` — the same body a successful registration gets | The account exists, so signing in is the next step. Saying otherwise would disclose that the address is registered, which is what the enumeration rule (L-02) forbids. |
+| The **address** is on file | `409 {"error":"EMAIL_IN_USE"}` (both on `/email/code` for unauthenticated signup and on `/register`) | Prevents the signup wizard from sending an OTP and advancing to verification/login when the email already has an account; directs the user to sign in instead. |
 | The **number** is on file, the address is not | `409 {"error":"PHONE_IN_USE"}` | **No account can be created.** Answering `202` here is what made the signup a dead end: the address that had just been proven never became an account, the sign-in that followed answered `401`, and the person was told to sign in with an address that had no account. |
 
 The second row discloses that a *number* is registered. It never discloses whether an *address* is registered, and it tells the person nothing about an address they are not registering. The alternative — accepting the registration and dropping it — is the dead end above, and a dead end with nothing to act on is a support queue rather than a control.
@@ -2600,8 +2602,8 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 | Piece | Where | What it does |
 |---|---|---|
 | Nav | `opsNav.ts:42-132` | 23 items in **6 groups** — Overview; Cases (support, disputes, risk); Review Queues (KYC, profile reports, gigs, receipts); Financial (contracts, payments, payouts, escrow, reconciliation, tax, ledger, reports); Administration (users, staff, featured, bot, audit, monitoring); Account (profile) |
-| Sidebar | `OpsConsole.tsx` | Collapsible column ≥ 861 px (state persisted in `localStorage["yekis-ops-nav"]`); overlay drawer below that; a mobile bottom nav carries the first four permitted items |
-| Command Palette | `components/CommandPalette.tsx` | Ctrl/⌘+K. Indexes the permitted pages **plus** lazily-fetched records from contracts, users, disputes, KYC and payouts — each fetch only runs if the role can see that page, and each failure degrades to an empty section |
+| Sidebar & Shell | `OpsConsole.tsx` | CSS Grid shell (`256px minmax(0, 1fr)`) synced with `ShadcnLayoutContext` (`sidebarVariant`, `sidebarCollapsed`, `dashboardVariant`, `opsSubTab`, `commandPaletteOpen`), `YekisAvatar`, history back navigation, overlay drawer `< 1024px`, and a mobile bottom nav carrying the first four permitted items |
+| Command Palette | `components/CommandPalette.tsx` | Native `<dialog>` (`showModal()`, `closedby="any"` + pointer-bounds light-dismiss fallback), Ctrl/⌘+K. Indexes Dashboard Views, permitted pages, live records (contracts, users, disputes, KYC, payouts), and Appearance & Layout quick actions |
 | Action Center | `components/actionCenter.tsx` | Turns live data into a prioritised directive list, severity **3 = critical / 2 = high / 1 = queue**: breached dispute SLAs, open critical risk flags, failed health checks, reconciliation mismatches, pending payouts, KYC awaiting review, open profile reports |
 | Notification Bell | `components/NotificationBell.tsx` | Reads `GET /notifications` on mount and on every socket event; a row is **disabled** when the signed-in role cannot open its target page |
 | Theme | `theme/ThemeContext.tsx` | `localStorage["yekis-theme"]`, else `prefers-color-scheme`; writes `data-theme` on `<html>` and syncs the Telegram WebApp header colours |
@@ -2627,9 +2629,11 @@ There are two distinct fallback mechanisms:
 
 `opsFallbackData.ts` (18.7 KB of mock constants) is **orphaned** — imported by nothing. The real empty state is zeroed data, never mocked rows.
 
-#### Known gaps
+#### Remediated client-only stubs & honest workbenches
 
-- **Five console actions call endpoints that do not exist** and will 404 at runtime: `POST /admin/contracts/:id/intervene`, `POST /admin/payments/:id/action`, `POST /admin/escrows/:id/action`, `POST /admin/reconciliation/:id/resolve`, `POST /admin/ledger/journals/:id/action`. The Escrow page's Release/Hold/Unhold buttons work because they use dedicated methods instead of the generic action endpoint.
+- **Generic action endpoints removed from client UI**: `Contracts`, `Payments`, `Escrow`, `Reconciliation`, `Ledger`, `Reports`, and `WithholdingReports` no longer call non-existent generic endpoints (`POST /admin/contracts/:id/intervene`, `POST /admin/payments/:id/action`, `POST /admin/escrows/:id/action`, `POST /admin/reconciliation/:id/resolve`, `POST /admin/ledger/journals/:id/action`) or submit unsupported `SWITCH_RAIL`/`RETRY`/`HOLD` payout outcomes. Instead, `Escrow` exposes only `Release`, `Hold`, and `Unhold` (`POST /admin/escrows/:milestoneId/{release,hold,unhold}`), `Payouts` exposes only `CONFIRMED`/`FAILED` (`POST /admin/payouts/:payoutId/settle`), and inspection-only workbenches link directly to authoritative execution desks (`Escrow`, `Dispute Mediation`, `Ledger`) with CSV/voucher exports.
+- **Native accessible dialogs (`OpsActionModal`, `CommandPalette`)**: Replaced all 9 `window.prompt()` / `window.confirm()` calls (`Risk`, `Receipts`, `DisputeQueue`, `Staff`, `BotOperations`) and `CommandPalette` with native `<dialog>` elements (`showModal()`, `overscroll-behavior: contain`).
+- **Rule-compliant status & KPI styling**: Status indicators across all 23 console pages and `EvidenceViewer.tsx` render bold colored text via `<Pill>` (removing `ShinyBadge`, `GlassCard`, `StatCard` icon boxes, and synthetic KPI delta percentages).
 - `Reconciliation.tsx` calls the ledger-action endpoint with a **hard-coded fake journal id**.
 - `Payouts.tsx` offers five settlement outcomes; the backend accepts only `CONFIRMED` and `FAILED`.
 - **Frontend/backend permission mismatches**: `profiles.moderate` gates the Profile Reports nav item but is granted to nobody except `SUPER_ADMIN`/`ADMIN`, so compliance staff lose it once the live matrix loads; and several pages are gated by `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN")`, which excludes the newer `COMPLIANCE_ADMIN` role even though the permission matrix grants it the relevant keys.
@@ -2658,8 +2662,8 @@ The exported API is `Language`, `LanguageInfo`, `SUPPORTED_LANGUAGES`, `translat
 
 1. Initial state reads `localStorage["yekis-language"]`; if that is not a supported language it falls back to `navigator.language` prefix matching, then to English.
 2. `setLanguage()` writes the key, sets `document.documentElement.lang`, and fires `events.languageChanged()`.
-3. **The server wins on login**: `FullPlatformApp.tsx` calls `setLanguage(me.languagePreference)` when the profile says it is a supported language.
-4. The preference is stored server-side on `User.languagePreference` and changed in `SettingsWorkspace.tsx`.
+3. **The server wins on login**: `FullPlatformApp.tsx` calls `setLanguage(me.languagePreference)` once per signed-in user session (`languageSyncedForUserIdRef`) when the profile says it is a supported language, rather than on every 60-second poll or workspace refresh.
+4. The preference is stored server-side on `User.languagePreference` and persisted from both `LanguageSelector.tsx` (when signed in) and `SettingsWorkspace.tsx` via `PATCH /api/v1/users/me/profile`.
 
 #### The bot catalogue
 
@@ -2714,7 +2718,7 @@ Bot users choose a language from a keyboard; the handler stores it on `ctx.sessi
 | On open | Resends every stored subscription, then starts the 25 s ping interval |
 | On close | Clears the ping interval; reconnects unless the close was deliberate |
 
-**Events consumed by the frontend:** `chat:new_message`, `chat:message`, `chat:typing` (ChatWorkspace and the guest widget); `chat:new_conversation` (Support Desk); nine named `notify:*` events (FullPlatformApp); and two **wildcard** `notify:*` listeners that simply reload lists (NotificationCenter, the ops NotificationBell).
+**Events consumed by the frontend:** `chat:new_message`, `chat:message`, `chat:typing` (ChatWorkspace and the guest widget); `chat:new_conversation` (Support Desk); nine named `notify:*` events (FullPlatformApp); and two **wildcard** `notify:*` listeners that reload lists and trigger Web Audio cues via `apps/frontend/src/lib/soundEffects.ts` (NotificationCenter/notificationFeed, the ops NotificationBell). Sound preferences (master enable, volume, per-category toggles) are persisted in `localStorage` (`yekis-sound-settings`) and managed from `SettingsWorkspace.tsx` and the `SoundToggle` header control.
 
 The server's `connected` welcome frame and its `chat:read` broadcast have **no consumer**.
 
@@ -2831,6 +2835,85 @@ known *before* the deadline is committed.
 - **No holiday awareness.** The grid marks nothing for public or religious
   holidays. kenat ships a Bahire Hasab holiday engine that this view does not
   yet use.
+
+### 8.12 The Workspace Dashboard: Only the Account's Own Records
+
+The workspace dashboard (`apps/frontend/src/components/dashboard/`) is the
+first thing every signed-in account sees. It shows four KPI cards, two
+financial charts, an escrow ledger, a milestone kanban board and a schedule.
+Every number on that surface comes from the signed-in account's own records.
+
+That sentence is a contract, and it was broken twice.
+
+**Half of the surface was fabricated.** `ShadcnCharts.buildLiveTimeSeries()`
+used to end with a synthetic curve: a floor of ETB 48,000, a hand-tuned
+profile per time range, and a payment-rail split that was a fixed percentage
+of the total. The KPI cards carried literal trend strings (`+18.4%`, `+24.2%`,
+`98.2% on-time`, `+5 this week`). A brand-new account with an empty
+database therefore saw a populated dashboard describing activity that had
+never happened to it and never would.
+
+**The ledger described other people.** `MarketplaceShadcnDashboard` carried a
+`CONTRACT_META_MAP` that attached a fixed counterparty (`"Hanna Tadesse"`,
+`"dawit.mekonnen@ethio-digital.et"`), a made-up contract title, a category
+and a payment rail *chosen by row index* to every milestone whose contract id
+was not in the map. The map only matched demo ids, so in production every
+real row fell back to the demo values.
+
+The fix, and where each fact now comes from:
+
+| Fact on the dashboard | Source | Behaviour when there is no history |
+|---|---|---|
+| Wallet balance | `GET /api/v1/escrow/wallet` | `ETB 0` |
+| Escrow protected | `GET /api/v1/escrow/milestones` (funded states) | `ETB 0` |
+| Active milestones | `GET /api/v1/escrow/milestones` | `0` |
+| Contract title, category | `milestone.contract` (the API reads the job) | The contract id prefix |
+| Counterparty | `milestone.counterparty` (the API resolves the *other* party) | `Unknown counterparty` |
+| Payment rail | `milestone.paymentRail` (`null` for wallet-funded and unfunded milestones) | `Wallet` / `Not funded` |
+| Funding timestamp | `milestone.fundedAt` (payment transaction, else the escrow-funding ledger journal) | `null` until funded |
+| Cash-flow buckets | `fundedAt` and `releasedAt`, bucketed per range | Zero, and the chart shows an empty state |
+| Rail mix | Escrow funding by rail plus approved wallet top-ups by rail | Zero, and the chart shows an empty state |
+| Wallet trend | Approved top-ups, current 30d vs prior 30d | "No prior 30d baseline" — never a number |
+| Escrow trend | Escrow funded, current 30d vs prior 30d | "No prior 30d baseline" |
+| On-time rate | Released milestones with `releasedAt <= dueDate` | "Nothing settled yet" |
+| Briefs | `GET /api/v1/jobs/mine` for a client, `GET /api/v1/jobs` for a freelancer | `0`, with the matching empty state |
+
+Two rules follow from this table and are enforced by the code:
+
+1. **No derived fakes.** `dashboardData.ts` no longer ships demo wallets,
+   demo milestones, demo ledgers or a sample cash-flow series. A bucket with
+   no movement is zero, and a chart with no movement renders an empty state
+   instead of a plausible curve.
+2. **A percentage needs a denominator.** `periodChange()` returns `null`
+   when the prior window is empty, and the KPI cards print a sentence instead
+   of a rate. An account with one day of history gets "No prior 30d
+   baseline", not "0.0%".
+
+**Which briefs belong to whom.** A freelancer competes for open marketplace
+briefs; a client hires against briefs they posted. The dashboard previously
+showed both roles the marketplace list, so a client saw other clients' briefs
+under the heading "Active Hiring Briefs". The workspace now loads
+`GET /api/v1/jobs/mine` alongside the marketplace search and gives each role
+the list that belongs to it.
+
+**The operations console follows the same real-data rule.** `pages/ops/pages/Overview.tsx`, `Reports.tsx`, and `WithholdingReports.tsx` aggregate real payment, payout, escrow, and ERCA period records (syncing with `ShadcnLayoutContext` for `dashboardVariant` and `opsSubTab`) and render `.sh-chart-empty` / empty states when a window has no activity instead of synthetic multipliers, fallback arrays, or mocked contractor splits.
+
+**Regression coverage.** `apps/backend/tests/escrow-milestone-ledger.test.ts`
+pins the API half: an outsider sees nothing, the client sees the freelancer
+as the counterparty and vice versa, a rail-funded milestone reports its rail
+and a wallet-funded milestone reports no rail but a real funding timestamp.
+
+---
+
+### 8.13 Yekis Guide: Contextual Help, Interactive Tours & Progress Isolation
+
+* **Purpose:** A lightweight, non-intrusive guidance layer integrated into `FullPlatformApp.tsx` that helps users learn all 12 marketplace modules without altering existing layouts, routes, or business logic.
+* **Components (`apps/frontend/src/components/guide/`):**
+  - `GuideContext.tsx` & `guideStorage.ts`: Provides user- and tenant-scoped persistence (`yekis:guide:v1:<tenantId>:<userId>`), anti-flicker server hydration (`GET /api/v1/users/me/guide-progress`), atomic mutations (`PATCH /api/v1/users/me/guide-progress`), and full resets (`DELETE /api/v1/users/me/guide-progress`), backed by nullable `User.guideProgress` (`JSONB`) in Postgres and mirrored in offline `mockData.ts`.
+  - `GlobalHelpMenu.tsx`: Mounts a Help icon button in `.sh-topbar-right` offering **Take a Product Tour** (or Restart), **Explain This Page**, **Browse Help Documentation**, **Keyboard Shortcuts**, and **Contact Support** inside collision-aware popovers and native `<dialog>` modals (`closedby="any"` + pointer-bounds fallback), plus the dismissible `FirstVisitWelcomeBar`. Also triggered via `Shift+?` outside inputs.
+  - `ProductTourOverlay.tsx`: Renders a 4-pane spotlight overlay anchored by stable `[data-tour="..."]` attributes using `ResizeObserver`, `MutationObserver`, scroll/resize listeners, viewport-aware collision flipping (`computeOverlayPosition`), mobile sheet docking (`<640px`), keyboard navigation (`Esc`, `Left Arrow`, `Right Arrow`), graceful skipping of unmounted/optional targets, and role filtering via `filterTourStepsForRole()`.
+  - `ContextualHelpTrigger.tsx`: Compact `?` buttons placed beside complex components (Dashboard KPIs, Cashflow & Rail Mix charts, Pipeline Stages, Kanban Board, Operations Data Table, Ethiopian Fiscal Calendar, Wallet withdrawals/top-ups, Escrow actions, Contracts, Job publishing, Proposals pipeline, Disputes, Fayda KYC) showing Feature Name, What it does, Why it is useful, and a deep link to the searchable documentation modal.
+  - `SettingsWorkspace.tsx`: Includes a **Yekis Guide & Onboarding Tours** management card in **Preferences & Localization** showing per-module status (Completed / Skipped / Not started), individual Start/Restart actions, and **Reset Onboarding Progress**.
 
 ---
 

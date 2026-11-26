@@ -713,172 +713,296 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .platform-auth-art { position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; padding: 5vw 7vw; background: var(--color-bg-subtle); border-right: 1px solid var(--color-border); }
 .platform-auth-art > *:not(.auth-vis) { position: relative; z-index: 2; }
 
+/* Sign-in art field: continuous, irregularly distributed real pixel matrix
+   across the upper/right canopy, a slow orbit, and a cursor-following glow.
+   The art is decorative; the headline stays above it at z-index 2.
+   AuthVisualAnimation writes --auth-px/--auth-py (pointer) for compositor-only
+   parallax, and scroll timelines move the same layers on short viewports. */
 .auth-vis {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
   z-index: 1;
+  perspective: 900px;
+  --auth-px: 0;
+  --auth-py: 0;
 }
 
-.auth-vis-glow {
+.auth-vis-aurora {
   position: absolute;
-  width: 520px;
-  height: 520px;
-  top: -8%;
-  right: -14%;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(34, 197, 94, 0.1) 0%, transparent 60%);
-  filter: blur(50px);
+  filter: blur(64px);
+  pointer-events: none;
 }
 
-.auth-vis-dots {
+.auth-vis-aurora-a {
+  width: min(46vw, 620px);
+  aspect-ratio: 1;
+  top: -16%;
+  right: -12%;
+  background: radial-gradient(circle, rgba(22, 163, 74, 0.24), transparent 68%);
+}
+
+.auth-vis-aurora-b {
+  width: min(36vw, 480px);
+  aspect-ratio: 1;
+  bottom: -18%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(13, 148, 136, 0.18), transparent 70%);
+}
+
+.auth-vis-mesh {
   position: absolute;
-  top: 6%;
-  right: 3%;
-  width: 260px;
-  height: 260px;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  opacity: 0.32;
+  -webkit-mask-image: radial-gradient(ellipse at 66% 50%, #000 0%, transparent 74%);
+  mask-image: radial-gradient(ellipse at 66% 50%, #000 0%, transparent 74%);
 }
 
-/* Metrics row */
-.auth-vis-metrics {
+.auth-vis-sweep {
   position: absolute;
-  top: 6%;
-  right: 6%;
-  display: flex;
-  align-items: center;
-  gap: 0;
+  inset-inline: 0;
+  top: -32%;
+  height: 40%;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(22, 163, 74, 0.05) 42%,
+    rgba(22, 163, 74, 0.12) 50%,
+    rgba(22, 163, 74, 0.05) 58%,
+    transparent 100%
+  );
 }
 
-.auth-vis-metric {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 0 20px;
-  animation: authFadeUp 0.5s ease-out both;
-}
-
-.auth-vis-metric-num {
-  font-size: 1.4rem;
-  font-weight: 800;
-  letter-spacing: -0.03em;
-  color: var(--color-text);
-  line-height: 1;
-}
-
-.auth-vis-metric-label {
-  font-size: 0.68rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  margin-top: 3px;
-  white-space: nowrap;
-}
-
-.auth-vis-metric-divider {
-  width: 1px;
-  height: 30px;
-  background: var(--color-border);
-  flex-shrink: 0;
-}
-
-/* Activity feed */
-.auth-vis-feed {
+.auth-vis-orbit {
   position: absolute;
-  top: 26%;
+  top: 28%;
   right: 4%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  width: min(310px, 44vw);
+  width: clamp(190px, 22vw, 340px);
+  aspect-ratio: 1;
+  translate: 0 -50%;
+  transform: translate3d(
+      calc(var(--auth-px) * -14px),
+      calc(var(--auth-py) * -10px),
+      0
+    )
+    rotateX(calc(var(--auth-py) * -7deg))
+    rotateY(calc(var(--auth-px) * 9deg));
+  transform-style: preserve-3d;
 }
 
-.auth-vis-feed-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  animation: authFadeUp 0.45s ease-out both;
-}
-
-.auth-vis-feed-icon {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.auth-vis-feed-icon.green { background: #22c55e; }
-.auth-vis-feed-icon.blue { background: #3b82f6; }
-
-.auth-vis-feed-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.auth-vis-feed-body strong {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-text);
-  line-height: 1.3;
-}
-
-.auth-vis-feed-body span {
-  display: block;
-  font-size: 0.68rem;
-  color: var(--color-text-secondary);
-  margin-top: 1px;
-}
-
-.auth-vis-feed-time {
-  font-size: 0.65rem;
-  color: var(--color-text-tertiary, var(--color-text-secondary));
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-/* Trust badges */
-.auth-vis-trust {
+.auth-vis-orbit-ring {
   position: absolute;
-  bottom: 8%;
-  right: 6%;
-  display: flex;
-  gap: 10px;
+  inset: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  opacity: 0.38;
 }
 
-.auth-vis-trust-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-border);
-  animation: authFadeUp 0.45s ease-out both;
+.auth-vis-orbit-ring-inner {
+  inset: 17%;
+  border-style: dashed;
+  opacity: 0.6;
 }
 
-.auth-vis-trust-badge svg {
-  color: var(--color-primary);
+.auth-vis-orbit-arc {
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-top-color: var(--color-primary);
+  border-right-color: var(--color-teal);
+  border-radius: 50%;
+  opacity: 0.72;
 }
 
-@keyframes authFadeUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+.auth-vis-orbit-spin {
+  position: absolute;
+  inset: 0;
+}
+
+.auth-vis-orbit-spin-inner {
+  inset: 17%;
+}
+
+.auth-vis-orbit-satellite {
+  position: absolute;
+  top: -5px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow:
+    0 0 0 4px rgba(22, 163, 74, 0.14),
+    0 0 18px var(--color-primary);
+}
+
+.auth-vis-orbit-satellite-small {
+  width: 7px;
+  height: 7px;
+  margin-left: -3.5px;
+  background: var(--color-teal);
+  box-shadow:
+    0 0 0 3px rgba(13, 148, 136, 0.14),
+    0 0 14px var(--color-teal);
+}
+
+.auth-vis-orbit-core {
+  position: absolute;
+  inset: 36%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 34% 28%,
+    var(--color-primary-light),
+    var(--color-primary) 58%,
+    var(--color-teal) 100%
+  );
+  box-shadow: 0 0 64px rgba(22, 163, 74, 0.32);
+  opacity: 0.3;
+}
+
+/* Continuous irregular real-pixel canvas anchored across the upper canopy */
+.auth-vis-pixel-field {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  transform: translate3d(
+    calc(var(--auth-px) * 10px),
+    calc(var(--auth-py) * 8px),
+    0
+  );
+}
+
+.auth-vis-pixel {
+  fill: var(--color-primary);
+  opacity: 0.34;
+}
+
+.auth-vis-pixel-tone-1 { fill: var(--color-teal); }
+.auth-vis-pixel-tone-2 { fill: var(--color-info); }
+
+.auth-vis-pixel-dim { --auth-pixel-base: 0.2; --auth-pixel-peak: 0.48; opacity: 0.2; }
+.auth-vis-pixel-mid { --auth-pixel-base: 0.44; --auth-pixel-peak: 0.78; opacity: 0.44; }
+.auth-vis-pixel-bright { --auth-pixel-base: 0.72; --auth-pixel-peak: 0.96; opacity: 0.72; }
+
+.auth-vis-cursor {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(22, 163, 74, 0.12), transparent 66%);
+  transform: translate3d(
+    calc(-50% + var(--auth-px) * 28vw),
+    calc(-50% + var(--auth-py) * 38vh),
+    0
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .auth-vis-aurora-a {
+    animation: authAurora 17s ease-in-out infinite alternate;
+  }
+  .auth-vis-aurora-b {
+    animation: authAurora 22s ease-in-out infinite alternate-reverse;
+  }
+  .auth-vis-sweep {
+    animation: authSweep 13s linear infinite;
+  }
+  .auth-vis-orbit {
+    transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .auth-vis-orbit-arc {
+    animation: authSpin 11s linear infinite;
+  }
+  .auth-vis-orbit-spin {
+    animation: authSpin 22s linear infinite;
+  }
+  .auth-vis-orbit-spin-inner {
+    animation-duration: 15s;
+    animation-direction: reverse;
+  }
+  .auth-vis-orbit-core {
+    animation: authCorePulse 6s ease-in-out infinite;
+  }
+  .auth-vis-pixel-field {
+    transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .auth-vis-pixel.is-animated {
+    animation: authPixelShimmer 8s ease-in-out infinite;
+    animation-delay: var(--auth-delay, 0s);
+  }
+  .auth-vis-cursor {
+    display: block;
+    transition: transform 0.3s ease-out;
+  }
+}
+
+@keyframes authAurora {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-4%, 5%, 0) scale(1.12); }
+}
+
+@keyframes authSweep {
+  from { transform: translateY(0); }
+  to { transform: translateY(340%); }
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes authCorePulse {
+  0%, 100% { opacity: 0.22; transform: scale(0.94); }
+  50% { opacity: 0.4; transform: scale(1.04); }
+}
+
+@keyframes authPixelShimmer {
+  0%, 100% { opacity: var(--auth-pixel-base, 0.34); }
+  50% { opacity: var(--auth-pixel-peak, 0.82); }
+}
+
+/* Progressive enhancement: on short viewports the auth panel becomes the
+   scroll container, so the pixel field and orbit drift with scroll.
+   Scoped to max-height: 650px where --auth-scroll is actually defined;
+   taller viewports keep the zero-offset static anchor. */
+@media (max-height: 650px) and (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .auth-vis-orbit {
+      animation: authOrbitScroll linear both;
+      animation-timeline: --auth-scroll;
+    }
+    .auth-vis-pixel-field {
+      animation: authPixelsScroll linear both;
+      animation-timeline: --auth-scroll;
+    }
+  }
+}
+
+@keyframes authOrbitScroll {
+  from { translate: 0 calc(-50% + 24px); }
+  to { translate: 0 calc(-50% - 24px); }
+}
+
+@keyframes authPixelsScroll {
+  from { translate: 0 18px; }
+  to { translate: 0 -18px; }
 }
 
 @media (max-width: 1280px) {
-  .auth-vis-metrics { gap: 0; }
-  .auth-vis-metric { padding: 0 14px; }
-  .auth-vis-metric-num { font-size: 1.2rem; }
-  .auth-vis-feed { width: 260px; }
-  .auth-vis-trust { gap: 6px; }
-  .auth-vis-trust-badge { padding: 5px 9px; font-size: 0.68rem; }
+  .auth-vis-orbit { right: 2%; }
 }
 
 .platform-logo { display: block; width: 68px; height: 68px; border-radius: 17px; object-fit: cover; }
@@ -904,7 +1028,7 @@ input:focus, select:focus, textarea:focus { border-color: var(--color-primary); 
 .auth-verify-hint { margin: 10px 0 0; font-size: 0.78rem; line-height: 1.5; color: var(--color-text-secondary); text-align: left; }
 .auth-footnote { margin-top: 16px; color: var(--color-text-tertiary); font-size: 0.82rem; text-align: center; }
 .form-error { padding: 8px 12px; margin-top: 8px; border: 1px solid var(--color-error); border-radius: 8px; background: var(--color-error-light); color: var(--color-error-text); font-size: 0.84rem; }
-@media (max-height: 650px) { .platform-auth { overflow-y: auto; height: auto; min-height: 100vh; } }
+@media (max-height: 650px) { .platform-auth { overflow-y: auto; height: auto; min-height: 100vh; scroll-timeline: --auth-scroll block; } }
 /* ── Platform Shell: browser-tab layout ───────────────────────── */
 .platform-shell {
   display: grid;

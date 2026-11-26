@@ -23,32 +23,22 @@ import { DISPUTE_STAGES } from "../opsConst";
 import type { DisputeItem, DisputeOutcome } from "../opsTypes";
 import {
   Banner,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
   Kv,
   LoadingBox,
+  OpsActionModal,
   PageHead,
   Pager,
+  Pill,
   SlaBadge,
-  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("RESOLV")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("ARBITRAT")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS") || u.includes("MEDIAT") || u.includes("NEGOTIAT")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { TbFileAlert } from "react-icons/tb";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
@@ -70,6 +60,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   const [split, setSplit] = useState(50);
   const [rec, setRec] = useState("");
   const [busy, setBusy] = useState(false);
+  const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
 
   const list = useListPage<DisputeItem>(
     (p) => opsListApi.disputes({ ...p, status: stage }),
@@ -128,21 +119,13 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
 
   /* Non-terminal case actions. Each maps to a real backend route; the server
      rejects stage transitions that do not apply and says why. */
-  const workflow = async (kind: "claim" | "evidence" | "escalate" | "arbitration") => {
+  const workflow = async (kind: "claim" | "escalate" | "arbitration") => {
     if (!sel) return;
     setBusy(true);
     try {
       if (kind === "claim") {
         await opsApi.claimDispute(sel.id);
         toast("Case claimed and assigned to you.");
-      } else if (kind === "evidence") {
-        const statement = window.prompt("Evidence statement to attach (min 10 characters):") ?? "";
-        if (statement.trim().length < 10) {
-          toast("An evidence statement of at least 10 characters is required.");
-          return;
-        }
-        await opsApi.submitDisputeEvidence(sel.id, statement.trim());
-        toast("Evidence statement attached to the case.");
       } else if (kind === "escalate") {
         await opsApi.escalateDispute(sel.id);
         toast("Dispute escalated to the next stage.");
@@ -150,6 +133,21 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         await opsApi.escalateToArbitration(sel.id);
         toast("Dispute moved to stage 4 arbitration.");
       }
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitEvidenceNote = async ({ values }: { values: Record<string, string> }) => {
+    if (!sel) return;
+    setBusy(true);
+    try {
+      await opsApi.submitDisputeEvidence(sel.id, values.statement);
+      toast("Evidence statement attached to the case.");
+      setEvidenceModalOpen(false);
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Action failed");
@@ -180,11 +178,11 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     <div className="fade">
       <PageHead
         title="Dispute Mediation Queue"
-        sub="Stage 3 mediation — review scope, evidence and settle escrow outcomes"
+        sub={`Stage 3 mediation — ${rows.filter((d) => d.stage === "STAGE_3_MEDIATION").length} awaiting mediation on this page`}
         right={
-          <ShinyBadge variant="warning">
-            {rows.filter((d) => d.stage === "STAGE_3_MEDIATION").length} awaiting mediation
-          </ShinyBadge>
+          <Button variant="outline" onClick={reload}>
+            Refresh
+          </Button>
         }
       />
       <div className="grid g4" style={{ marginBottom: 12 }}>
@@ -235,7 +233,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         <Banner tone="b-red" icon={Clock} strong="SLA breach detected." rest="At least one dispute exceeded its mediation deadline — resolve it first." />
       ) : null}
 
-      <GlassCard className="filters" style={{ marginBottom: 14 }}>
+      <div className="filters" style={{ marginBottom: 14 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -255,14 +253,14 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
           label="Dispute stage"
         />
         <Button variant="outline" onClick={reload}>Refresh</Button>
-      </GlassCard>
+      </div>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {visibleRows.length === 0 ? (
-            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
+            <Card className="card-pad" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={Scale}>No active disputes in this view.</Empty>
-            </GlassCard>
+            </Card>
           ) : (
             visibleRows.map((d) => (
               <button
@@ -276,7 +274,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 </div>
                 <div className="q-sub">
                   <span className="subject">{d.job}</span>
-                  <ShinyBadge variant={statusToVariant(d.stage)}>{formatStatusLabel(d.stage)}</ShinyBadge>
+                  <Pill s={d.stage} />
                 </div>
                 <div style={{ marginTop: 7 }}>
                   <SlaBadge h={d.slaH} sla={d.sla} />
@@ -288,7 +286,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         </div>
 
         {sel ? (
-          <GlassCard className="queue-detail">
+          <Card className="queue-detail">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <h3>{sel.job}</h3>
@@ -296,7 +294,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
               </div>
               <div className="qd-meta">
                 Dispute category: <b style={{ color: "var(--ops-text)" }}>{sel.cat.replace(/_/g, " ")}</b> ·{" "}
-                <ShinyBadge variant={statusToVariant(sel.stage)}>{formatStatusLabel(sel.stage)}</ShinyBadge> · opened {dt(sel.created)}
+                <Pill s={sel.stage} /> · opened {dt(sel.created)}
               </div>
             </div>
             <div className="qd-body">
@@ -453,14 +451,16 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                   <HandHelping size={13} /> Claim case
                 </button>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={busy}
-                  onClick={() => void workflow("evidence")}
+                  onClick={() => setEvidenceModalOpen(true)}
                   title="Attach a mediator evidence statement to the case record"
                 >
                   <FileText size={13} /> Add evidence note
                 </button>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={busy}
                   onClick={() => void workflow("escalate")}
@@ -469,6 +469,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                   <TrendingUp size={13} /> Escalate stage
                 </button>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
                   disabled={busy}
                   onClick={() => void workflow("arbitration")}
@@ -478,9 +479,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 </button>
               </div>
             </div>
-          </GlassCard>
+          </Card>
         ) : (
-          <GlassCard className="queue-detail">
+          <Card className="queue-detail">
             <div className="empty-detail">
               <Scale size={40} style={{ color: "var(--ops-text-3)" }} />
               <p>Select a dispute to mediate.</p>
@@ -488,9 +489,30 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 Tip: use <span className="kbd">↑</span> <span className="kbd">↓</span> arrows to navigate
               </span>
             </div>
-          </GlassCard>
+          </Card>
         )}
       </div>
+
+      <OpsActionModal
+        open={evidenceModalOpen}
+        title="Attach Mediator Evidence Statement"
+        description={sel ? `Case: ${sel.job} (${sel.ms})` : undefined}
+        confirmLabel="Attach Evidence Statement"
+        busy={busy}
+        fields={[
+          {
+            name: "statement",
+            label: "Evidence Statement",
+            placeholder: "Record mediator findings, deliverable inspection notes, or log references…",
+            multiline: true,
+            required: true,
+            minLength: 10,
+            maxLength: 2000,
+          },
+        ]}
+        onConfirm={submitEvidenceNote}
+        onCancel={() => !busy && setEvidenceModalOpen(false)}
+      />
     </div>
   );
 }

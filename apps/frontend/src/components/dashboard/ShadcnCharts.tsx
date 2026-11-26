@@ -1,11 +1,64 @@
 import { useMemo, useState, useId } from "react";
 import type { Milestone, TopUpRequest } from "../../api/client";
 import type { TimeRangeKey, TimeSeriesPoint } from "./dashboardData";
+import { FUNDED_ESCROW_STATES } from "./dashboardData";
 import { GlassCard } from "../ui-v2/GlassCard";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
+import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 
 const DAY_MS = 86_400_000;
 
+type RailBucket = "telebirrETB" | "cbeBirrETB" | "mpesaETB";
+
+/**
+ * Maps a stored rail onto the three rails the platform settles on.
+ *
+ * Only TELEBIRR, CBE Birr and M-Pesa are ever written to a payment record:
+ * the escrow funding service has clients for exactly those three. Anything
+ * else (including a null rail, which means the money came from the caller's
+ * own wallet balance) has no rail to report and is returned as null so it is
+ * never attributed to a rail it did not travel over.
+ */
+function railBucket(
+  rail: string | null | undefined,
+): RailBucket | null {
+  switch ((rail || "").toUpperCase()) {
+    case "TELEBIRR":
+      return "telebirrETB";
+    case "CBE_BIRR":
+    case "CBE":
+    case "BANK":
+    case "CBE_BANK":
+      return "cbeBirrETB";
+    case "M_PESA":
+    case "MPESA":
+    case "SAFARICOM":
+      return "mpesaETB";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Builds the workspace cash-flow / settlement series from the caller's own
+ * records.
+ *
+ * This used to end with a "realistic" synthetic curve: a floor of ETB 48,000,
+ * a hand-tuned profile per range and a rail split that was a fixed
+ * percentage of the total. A brand-new account therefore saw a populated
+ * chart describing activity that never happened to them.
+ *
+ * Now every bucket is the sum of real movements inside that bucket and
+ * nothing else:
+ *   - escrow inflow  = milestones whose escrow was funded (`fundedAt`)
+ *   - payout released = milestones that were released (`releasedAt`)
+ *   - rail volume    = escrow funding by rail + approved wallet top-ups by rail
+ *
+ * A bucket with no activity is zero. The chart renders an empty state instead
+ * of a curve.
+ */
 export function buildLiveTimeSeries(
   range: TimeRangeKey,
   milestones: Milestone[] = [],
@@ -16,13 +69,13 @@ export function buildLiveTimeSeries(
     return overrideSeries;
   }
 
-  const now = new Date();
+  const now = Date.now();
   const bucketCount =
     range === "7d" ? 7 : range === "30d" ? 8 : range === "90d" ? 9 : 12;
   const spanDays =
     range === "7d" ? 7 : range === "30d" ? 30 : range === "90d" ? 90 : 365;
   const stepMs = (spanDays * DAY_MS) / bucketCount;
-  const startMs = now.getTime() - spanDays * DAY_MS;
+  const startMs = now - spanDays * DAY_MS;
 
   const buckets: TimeSeriesPoint[] = Array.from({ length: bucketCount }, (_, i) => {
     const bucketDate = new Date(startMs + (i + 1) * stepMs);
@@ -43,96 +96,61 @@ export function buildLiveTimeSeries(
     };
   });
 
-  const placeInBucket = (isoDate: string | undefined) => {
-    if (!isoDate) return bucketCount - 1;
+  /** -1 when the timestamp is missing or falls outside the window. */
+  const placeInBucket = (isoDate: string | null | undefined): number => {
+    if (!isoDate) return -1;
     const ts = new Date(isoDate).getTime();
-    if (!Number.isFinite(ts)) return bucketCount - 1;
-    if (ts <= startMs) return 0;
+    if (!Number.isFinite(ts)) return -1;
+    if (ts < startMs || ts > now) return -1;
     const idx = Math.floor((ts - startMs) / stepMs);
     return Math.max(0, Math.min(bucketCount - 1, idx));
   };
 
   for (const ms of milestones) {
-    const idx = placeInBucket(ms.dueDate);
     const etb = Math.round((ms.amountMinor || 0) / 100);
-    if (ms.escrowState !== "UNFUNDED" && ms.escrowState !== "REFUNDED") {
-      buckets[idx].escrowInflowETB += etb;
+
+    if (FUNDED_ESCROW_STATES.has(ms.escrowState)) {
+      const idx = placeInBucket(ms.fundedAt);
+      if (idx >= 0) {
+        buckets[idx].escrowInflowETB += etb;
+        const bucket = railBucket(ms.paymentRail);
+        if (bucket) buckets[idx][bucket] += etb;
+      }
     }
+
     if (ms.escrowState === "RELEASED") {
-      buckets[idx].payoutReleasedETB += etb;
-      buckets[idx].milestonesCompleted += 1;
+      const idx = placeInBucket(ms.releasedAt);
+      if (idx >= 0) {
+        buckets[idx].payoutReleasedETB += etb;
+        buckets[idx].milestonesCompleted += 1;
+      }
     }
   }
 
   for (const t of topUps) {
+    if (t.status !== "APPROVED") continue;
     const idx = placeInBucket(t.createdAt);
+    if (idx < 0) continue;
     const etb = Math.round((t.amountMinor || 0) / 100);
-    if (t.status === "APPROVED") {
-      buckets[idx].escrowInflowETB += etb;
-    }
-    const method = (t.paymentMethod || "").toUpperCase();
-    if (method.includes("TELEBIRR")) {
-      buckets[idx].telebirrETB += etb;
-    } else if (method.includes("CBE") || method.includes("BANK")) {
-      buckets[idx].cbeBirrETB += etb;
-    } else {
-      buckets[idx].mpesaETB += etb;
-    }
+    const bucket = railBucket(t.provider ?? t.paymentMethod);
+    if (bucket) buckets[idx][bucket] += etb;
   }
 
-  // Ensure every bucket across 7D / 30D / 90D / 12M reflects realistic historical
-  // activity anchored to the user's real milestone & wallet volume rather than flat zeros.
-  const baseMsTotal = Math.max(
-    48_000,
-    milestones.reduce((acc, m) => acc + Math.round((m.amountMinor || 0) / 100), 0),
+  return buckets;
+}
+
+/** True when the window holds at least one real escrow movement. */
+export function hasCashflowActivity(points: TimeSeriesPoint[]): boolean {
+  return points.some(
+    (p) => p.escrowInflowETB > 0 || p.payoutReleasedETB > 0,
   );
-  const rangeScale =
-    range === "7d" ? 0.35 : range === "30d" ? 1.0 : range === "90d" ? 2.4 : 6.2;
-  const profileCurve =
-    range === "7d"
-      ? [0.62, 0.84, 0.76, 1.08, 1.22, 0.71, 0.96]
-      : range === "30d"
-        ? [0.74, 0.88, 0.82, 0.96, 1.12, 1.04, 1.26, 1.34]
-        : range === "90d"
-          ? [0.68, 0.79, 0.85, 0.94, 1.06, 1.01, 1.18, 1.29, 1.42]
-          : [0.58, 0.66, 0.62, 0.75, 0.84, 0.92, 0.89, 1.05, 1.18, 1.12, 1.28, 1.45];
+}
 
-  const teleShareByRange =
-    range === "7d" ? 0.67 : range === "30d" ? 0.62 : range === "90d" ? 0.58 : 0.54;
-  const cbeShareByRange =
-    range === "7d" ? 0.23 : range === "30d" ? 0.27 : range === "90d" ? 0.30 : 0.33;
-
-  return buckets.map((b, i) => {
-    const curve = profileCurve[i % profileCurve.length];
-    const baselineInflow = Math.round(
-      (baseMsTotal * rangeScale * curve) / bucketCount,
-    );
-    const inflow = b.escrowInflowETB > 0 ? b.escrowInflowETB + Math.round(baselineInflow * 0.35) : baselineInflow;
-    const releaseRatio = 0.64 + ((i % 3) * 0.07);
-    const released =
-      b.payoutReleasedETB > 0
-        ? b.payoutReleasedETB + Math.round(baselineInflow * 0.25)
-        : Math.round(inflow * releaseRatio);
-
-    const teleShare = teleShareByRange + ((i % 3) - 1) * 0.03;
-    const cbeShare = cbeShareByRange - ((i % 2) * 0.02);
-    const telebirr = b.telebirrETB > 0 ? b.telebirrETB : Math.round(inflow * teleShare);
-    const cbe = b.cbeBirrETB > 0 ? b.cbeBirrETB : Math.round(inflow * cbeShare);
-    const mpesa =
-      b.mpesaETB > 0
-        ? b.mpesaETB
-        : Math.max(1500, inflow - telebirr - cbe);
-
-    return {
-      label: b.label,
-      escrowInflowETB: inflow,
-      payoutReleasedETB: released,
-      telebirrETB: telebirr,
-      cbeBirrETB: cbe,
-      mpesaETB: mpesa,
-      milestonesCompleted: Math.max(1, b.milestonesCompleted || Math.round(curve * (range === "12m" ? 4 : range === "90d" ? 3 : 2))),
-    };
-  });
+/** True when the window holds at least one real rail movement. */
+export function hasRailActivity(points: TimeSeriesPoint[]): boolean {
+  return points.some(
+    (p) => p.telebirrETB > 0 || p.cbeBirrETB > 0 || p.mpesaETB > 0,
+  );
 }
 
 interface CashflowChartProps {
@@ -158,6 +176,10 @@ export function InteractiveCashflowAreaChart({
   const [showInflow, setShowInflow] = useState(true);
   const [showReleased, setShowReleased] = useState(true);
   const uid = useId().replace(/:/g, "");
+  const { t, language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).charts;
+  const dChart = t.workspace.dashboard;
+  const isEmpty = !hasCashflowActivity(points);
 
   const width = 680;
   const height = 228;
@@ -216,15 +238,18 @@ export function InteractiveCashflowAreaChart({
   const activePoint = hoverIdx !== null ? points[hoverIdx] : points[points.length - 1];
 
   return (
-    <GlassCard className="sh-card">
+    <GlassCard className="sh-card" data-tour="dashboard-cashflow-chart">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Escrow Inflow & Released Payouts</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{copy.cashflowTitle}</h3>
+            <ContextualHelpTrigger helpId="dashboard-cashflow" />
+          </div>
           <p className="sh-card-desc">
-            Gross ETB funded into milestone escrow vs settled freelancer disbursements
+            {copy.cashflowDesc}
           </p>
         </div>
-        <div className="sh-segmented" role="group" aria-label="Select chart time window">
+        <div className="sh-segmented" role="group" aria-label={copy.windowAria}>
           {(["7d", "30d", "90d", "12m"] as const).map((r) => (
             <button
               key={r}
@@ -238,6 +263,13 @@ export function InteractiveCashflowAreaChart({
         </div>
       </div>
 
+      {isEmpty ? (
+        <div className="sh-chart-empty" role="status">
+          <strong>{dChart.chartEmptyTitle}</strong>
+          <span>{dChart.chartEmptyDesc}</span>
+        </div>
+      ) : (
+        <>
       {/* Summary & interactive series toggles */}
       <div className="sh-chart-summary-bar">
         <button
@@ -250,7 +282,7 @@ export function InteractiveCashflowAreaChart({
         >
           <span className="sh-series-swatch emerald" />
           <span className="sh-series-meta">
-            <small>Escrow Funded ({range.toUpperCase()})</small>
+            <small>{copy.escrowFunded(range.toUpperCase())}</small>
             <strong className="sh-mono">ETB {totalInflow.toLocaleString()}</strong>
           </span>
         </button>
@@ -265,15 +297,15 @@ export function InteractiveCashflowAreaChart({
         >
           <span className="sh-series-swatch teal" />
           <span className="sh-series-meta">
-            <small>Released to Talent ({range.toUpperCase()})</small>
+            <small>{copy.releasedToTalent(range.toUpperCase())}</small>
             <strong className="sh-mono">ETB {totalReleased.toLocaleString()}</strong>
           </span>
         </button>
 
         <div className="sh-chart-live-readout">
-          <small>{hoverIdx !== null ? `Period: ${activePoint.label}` : `Latest (${activePoint.label})`}</small>
+          <small>{hoverIdx !== null ? copy.periodLabel(activePoint.label) : copy.latestLabel(activePoint.label)}</small>
           <span className="sh-mono">
-            In: ETB {activePoint.escrowInflowETB.toLocaleString()} · Out: ETB{" "}
+            {copy.inPrefix} ETB {activePoint.escrowInflowETB.toLocaleString()} · {copy.outPrefix} ETB{" "}
             {activePoint.payoutReleasedETB.toLocaleString()}
           </span>
         </div>
@@ -284,7 +316,7 @@ export function InteractiveCashflowAreaChart({
           viewBox={`0 0 ${width} ${height}`}
           className="sh-chart-svg"
           role="img"
-          aria-label="Escrow inflow and payout velocity area chart"
+          aria-label={copy.cashflowSvgAria}
           onMouseLeave={() => setHoverIdx(null)}
         >
           <defs>
@@ -418,6 +450,8 @@ export function InteractiveCashflowAreaChart({
           })}
         </svg>
       </div>
+        </>
+      )}
     </GlassCard>
   );
 }
@@ -441,6 +475,10 @@ export function InteractiveRailVelocityBarChart({
     [series, range, milestones, topUps],
   );
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+  const { t, language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).charts;
+  const dChart = t.workspace.dashboard;
+  const isEmpty = !hasRailActivity(points);
 
   const width = 440;
   const height = 228;
@@ -459,19 +497,29 @@ export function InteractiveRailVelocityBarChart({
   const active = hoverIdx !== null ? points[hoverIdx] : points[points.length - 1];
 
   return (
-    <GlassCard className="sh-card">
+    <GlassCard className="sh-card" data-tour="dashboard-rail-mix">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Payment Rail Settlement Mix</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{copy.railMixTitle}</h3>
+            <ContextualHelpTrigger helpId="dashboard-rail-mix" />
+          </div>
           <p className="sh-card-desc">
-            Telebirr · CBE Birr · M-Pesa volume ({range.toUpperCase()})
+            {copy.railMixDesc(range.toUpperCase())}
           </p>
         </div>
         <span className="sh-mono sh-text-muted" style={{ fontSize: "0.76rem" }}>
-          {active.milestonesCompleted} milestones settled
+          {copy.milestonesSettled(active.milestonesCompleted)}
         </span>
       </div>
 
+      {isEmpty ? (
+        <div className="sh-chart-empty" role="status">
+          <strong>{dChart.chartEmptyTitle}</strong>
+          <span>{dChart.chartRailEmptyDesc}</span>
+        </div>
+      ) : (
+        <>
       <div className="sh-rail-legend-row">
         <span className="sh-rail-legend-item">
           <i style={{ background: "#16a34a" }} /> Telebirr:{" "}
@@ -492,7 +540,7 @@ export function InteractiveRailVelocityBarChart({
           viewBox={`0 0 ${width} ${height}`}
           className="sh-chart-svg"
           role="img"
-          aria-label="Payment rail settlement stacked bar chart"
+          aria-label={copy.railSvgAria}
           onMouseLeave={() => setHoverIdx(null)}
         >
           {[0, 0.5, 1].map((step) => {
@@ -577,6 +625,8 @@ export function InteractiveRailVelocityBarChart({
           })}
         </svg>
       </div>
+        </>
+      )}
     </GlassCard>
   );
 }

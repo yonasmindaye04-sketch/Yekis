@@ -10,6 +10,10 @@ import {
   X,
 } from "lucide-react";
 import type { ScheduleEvent, ScheduleEventType } from "./dashboardData";
+import { useI18n } from "../../i18n";
+import { DASHBOARD_COPY } from "./dashboardCopy";
+import { railLabel } from "./dashboardData";
+import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 import {
   formatEthiopianDate,
@@ -35,15 +39,6 @@ interface CalendarScheduleViewProps {
   events: ScheduleEvent[];
   onEventsChange: (next: ScheduleEvent[]) => void;
 }
-
-const TYPE_LABELS: Record<ScheduleEventType, string> = {
-  MILESTONE_DUE: "Milestone Due",
-  PAYOUT_RELEASE: "Payout Release",
-  PROPOSAL_DEADLINE: "Proposal Deadline",
-  COMPLIANCE_KYC: "Compliance SLA",
-};
-
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const DEMO_DATE = "2026-10-21";
 const DEMO_YEAR = 2026;
@@ -91,6 +86,8 @@ export function CalendarScheduleView({
   events,
   onEventsChange,
 }: CalendarScheduleViewProps) {
+  const { language } = useI18n();
+  const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).calendar;
   const initialEthiopian = gregorianToEthiopian(DEMO_DATE);
   const [mode, setMode] = useState<CalendarMode>("gregorian");
   const [year, setYear] = useState(DEMO_YEAR);
@@ -307,14 +304,16 @@ export function CalendarScheduleView({
     const created: ScheduleEvent = {
       id: `ev-${Date.now()}`,
       title: newTitle.trim(),
-      contractRef: newContractRef.trim() || "CNT-809",
+      contractRef: newContractRef.trim(),
       date: newDate,
       time: newTime,
       type: newType,
       amountMinor: Math.max(0, Math.round(Number(newAmountETB || 0) * 100)),
-      rail: "TELEBIRR",
+      // A hand-made reminder has no payment rail until someone funds it, so
+      // it is recorded without one rather than with a plausible default.
+      rail: null,
       status: "SCHEDULED",
-      counterparty: newCounterparty.trim() || "Marketplace Counterparty",
+      counterparty: newCounterparty.trim(),
     };
     onEventsChange([...events, created]);
     selectDate(newDate);
@@ -328,14 +327,15 @@ export function CalendarScheduleView({
   };
 
   return (
-    <div className="sh-card">
+    <div className="sh-card" data-tour="dashboard-calendar">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">Milestone, Payout & SLA Schedule</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{copy.title}</h3>
+            <ContextualHelpTrigger helpId="dashboard-calendar" />
+          </div>
           <p className="sh-card-desc">
-            Track upcoming contract deadlines, auto-release windows, and
-            compliance checkpoints across the Gregorian and Ethiopian fiscal
-            calendars
+            {copy.subtitle}
           </p>
         </div>
 
@@ -344,7 +344,7 @@ export function CalendarScheduleView({
           className="sh-btn sh-btn-primary"
           onClick={openCreateForSelectedDate}
         >
-          <Plus size={14} /> Schedule Deadline
+          <Plus size={14} /> {copy.scheduleBtn}
         </button>
       </div>
 
@@ -356,7 +356,7 @@ export function CalendarScheduleView({
             className="sh-icon-only-btn"
             onClick={() => stepMonth(-1)}
             aria-label={
-              isFiscal ? "Previous Ethiopian month" : "Previous month"
+              isFiscal ? copy.prevEthMonthAria : copy.prevMonthAria
             }
           >
             <ChevronLeft size={15} />
@@ -371,7 +371,7 @@ export function CalendarScheduleView({
             type="button"
             className="sh-icon-only-btn"
             onClick={() => stepMonth(1)}
-            aria-label={isFiscal ? "Next Ethiopian month" : "Next month"}
+            aria-label={isFiscal ? copy.nextEthMonthAria : copy.nextMonthAria}
           >
             <ChevronRight size={15} />
           </button>
@@ -381,13 +381,13 @@ export function CalendarScheduleView({
             onClick={jumpToDemoWeek}
             style={{ marginLeft: 6 }}
           >
-            Oct 2026
+            {copy.jumpDemoBtn}
           </button>
 
           <div
             className="sh-segmented sh-cal-mode-toggle"
             role="group"
-            aria-label="Calendar system"
+            aria-label={copy.calendarSystemAria}
           >
             <button
               type="button"
@@ -395,7 +395,7 @@ export function CalendarScheduleView({
               aria-pressed={mode === "gregorian"}
               onClick={() => switchMode("gregorian")}
             >
-              Gregorian
+              {copy.modeGregorian}
             </button>
             <button
               type="button"
@@ -403,7 +403,7 @@ export function CalendarScheduleView({
               aria-pressed={mode === "fiscal"}
               onClick={() => switchMode("fiscal")}
             >
-              Ethiopian Fiscal
+              {copy.modeFiscal}
             </button>
           </div>
         </div>
@@ -411,15 +411,15 @@ export function CalendarScheduleView({
         <div
           className="sh-segmented"
           role="group"
-          aria-label="Filter calendar by event type"
+          aria-label={copy.filterTypeAria}
         >
           {(
             [
-              ["ALL", "All Events"],
-              ["MILESTONE_DUE", "Milestone Due"],
-              ["PAYOUT_RELEASE", "Payout Release"],
-              ["PROPOSAL_DEADLINE", "Proposals"],
-              ["COMPLIANCE_KYC", "Compliance SLA"],
+              ["ALL", copy.filterAllEvents],
+              ["MILESTONE_DUE", copy.typeLabels.MILESTONE_DUE],
+              ["PAYOUT_RELEASE", copy.typeLabels.PAYOUT_RELEASE],
+              ["PROPOSAL_DEADLINE", copy.filterProposals],
+              ["COMPLIANCE_KYC", copy.typeLabels.COMPLIANCE_KYC],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -439,7 +439,7 @@ export function CalendarScheduleView({
       {fiscalView && (
         <div className="sh-fiscal-bar">
           <div className="sh-fiscal-summary">
-            <span className="sh-fiscal-eyebrow">Ethiopian Fiscal Year</span>
+            <span className="sh-fiscal-eyebrow">{copy.fiscalYearEyebrow}</span>
             <div className="sh-fiscal-title-row">
               <strong>{fiscalView.info.label}</strong>
               <span className="sh-fiscal-year-greg">
@@ -457,7 +457,7 @@ export function CalendarScheduleView({
           <div
             className="sh-fiscal-quarters"
             role="group"
-            aria-label={`Fiscal quarters for ${fiscalView.info.label}`}
+            aria-label={copy.fiscalQuartersAria(fiscalView.info.label)}
           >
             {fiscalView.quarters.map((quarter) => {
               const isActive = fiscalView.activeQuarter === quarter.quarter;
@@ -482,8 +482,7 @@ export function CalendarScheduleView({
                     {quarter.monthLabel}
                   </span>
                   <span className="sh-fiscal-quarter-meta">
-                    {quarter.eventCount}{" "}
-                    {quarter.eventCount === 1 ? "item" : "items"}
+                    {copy.itemsCount(quarter.eventCount)}
                     {quarter.totalMinor > 0
                       ? ` · ETB ${(quarter.totalMinor / 100).toLocaleString()}`
                       : ""}
@@ -499,7 +498,7 @@ export function CalendarScheduleView({
       <div
         className="sh-cal-mobile-strip"
         role="region"
-        aria-label="Scheduled dates in the visible month"
+        aria-label={copy.mobileDatesAria}
       >
         {mobileDates.map(([dateStr, list]) => {
           const isSelected = selectedDate === dateStr;
@@ -528,7 +527,7 @@ export function CalendarScheduleView({
       <div className="sh-cal-split">
         <div className="sh-cal-grid-wrap">
           <div className="sh-cal-weekdays">
-            {WEEKDAYS.map((w) => (
+            {copy.weekdays.map((w) => (
               <div key={w} className="sh-cal-weekday">
                 {w}
               </div>
@@ -548,8 +547,8 @@ export function CalendarScheduleView({
               );
               const itemLabel =
                 dayEvents.length === 0
-                  ? "no scheduled items"
-                  : `${dayEvents.length} ${dayEvents.length === 1 ? "item" : "items"}`;
+                  ? copy.noScheduledItems
+                  : copy.itemsCount(dayEvents.length);
 
               return (
                 <button
@@ -574,8 +573,7 @@ export function CalendarScheduleView({
                     </span>
                     {dayEvents.length > 0 && (
                       <span className="sh-mono sh-cal-day-count">
-                        {dayEvents.length}{" "}
-                        {dayEvents.length === 1 ? "item" : "items"}
+                        {copy.itemsCount(dayEvents.length)}
                       </span>
                     )}
                   </div>
@@ -609,7 +607,7 @@ export function CalendarScheduleView({
                 className="sh-mono sh-text-muted"
                 style={{ fontSize: "0.75rem" }}
               >
-                Selected Date
+                {copy.selectedDateLabel}
               </span>
               <h4>{formatGregorianDate(selectedDate, "long")}</h4>
               <p className="sh-cal-dual-date">
@@ -623,7 +621,7 @@ export function CalendarScheduleView({
           </div>
 
           <div className="sh-cal-fiscal-context">
-            <span className="sh-cal-fiscal-context-label">Fiscal period</span>
+            <span className="sh-cal-fiscal-context-label">{copy.fiscalPeriodLabel}</span>
             <strong>
               EFY {selectedFiscal.fiscalYear} E.C. · Q
               {selectedFiscal.quarter}
@@ -643,16 +641,14 @@ export function CalendarScheduleView({
             {eventsByDate.get(selectedDate)?.length ? null : (
               <div className="sh-kanban-empty">
                 <p style={{ margin: "0 0 8px" }}>
-                  No scheduled milestones or payouts on{" "}
-                  {formatGregorianDate(selectedDate, "long")}.
+                  {copy.noItemsOnDate(formatGregorianDate(selectedDate, "long"))}
                 </p>
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
                   onClick={openCreateForSelectedDate}
                 >
-                  <Plus size={13} /> Add Item for{" "}
-                  {formatGregorianDate(selectedDate, "medium")}
+                  <Plus size={13} /> {copy.addItemForDate(formatGregorianDate(selectedDate, "medium"))}
                 </button>
               </div>
             )}
@@ -662,7 +658,7 @@ export function CalendarScheduleView({
                 <div className="sh-cell-meta">
                   <span className="sh-mono">{ev.time}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{TYPE_LABELS[ev.type]}</span>
+                  <span>{copy.typeLabels[ev.type]}</span>
                   <span aria-hidden="true">·</span>
                   <span className="sh-mono">{ev.contractRef}</span>
                 </div>
@@ -672,7 +668,7 @@ export function CalendarScheduleView({
                 <div className="sh-cell-meta" style={{ marginTop: 4 }}>
                   <span>{ev.counterparty}</span>
                   <span aria-hidden="true">·</span>
-                  <span>{ev.rail.replace("_", " ")}</span>
+                  <span>{railLabel(ev.rail)}</span>
                 </div>
 
                 <div className="sh-agenda-foot">
@@ -687,15 +683,15 @@ export function CalendarScheduleView({
                   >
                     {ev.status === "COMPLETED" ? (
                       <>
-                        <CheckCircle2 size={12} /> Completed
+                        <CheckCircle2 size={12} /> {copy.statusCompleted}
                       </>
                     ) : ev.status === "AT_RISK" ? (
                       <>
-                        <AlertTriangle size={12} /> SLA At Risk
+                        <AlertTriangle size={12} /> {copy.statusAtRisk}
                       </>
                     ) : (
                       <>
-                        <Clock size={12} /> Mark Complete
+                        <Clock size={12} /> {copy.markCompleteBtn}
                       </>
                     )}
                   </button>
@@ -706,10 +702,10 @@ export function CalendarScheduleView({
 
           {/* Upcoming Summary across Month */}
           <div className="sh-cal-upcoming-summary">
-            <div className="sh-dropdown-title">Upcoming Month Highlights</div>
+            <div className="sh-dropdown-title">{copy.upcomingTitle}</div>
             {upcomingEvents.length === 0 && (
               <span className="sh-cal-upcoming-empty">
-                No items match this filter.
+                {copy.upcomingEmpty}
               </span>
             )}
             {upcomingEvents.map((ev) => (
@@ -747,7 +743,7 @@ export function CalendarScheduleView({
           onClick={() => setCreateOpen(false)}
           role="dialog"
           aria-modal="true"
-          aria-label="Schedule deadline"
+          aria-label={copy.modalAria}
         >
           <aside
             className="sh-sheet-panel"
@@ -755,17 +751,16 @@ export function CalendarScheduleView({
           >
             <div className="sh-sheet-header">
               <div>
-                <h3 className="sh-sheet-title">Schedule Milestone or Payout</h3>
+                <h3 className="sh-sheet-title">{copy.modalTitle}</h3>
                 <p className="sh-sheet-subtitle">
-                  Add a deadline or escrow release checkpoint to your workspace
-                  calendar
+                  {copy.modalSubtitle}
                 </p>
               </div>
               <button
                 type="button"
                 className="sh-icon-only-btn"
                 onClick={() => setCreateOpen(false)}
-                aria-label="Close"
+                aria-label={copy.closeAria}
               >
                 <X size={16} />
               </button>
@@ -773,19 +768,19 @@ export function CalendarScheduleView({
 
             <form className="sh-sheet-body" onSubmit={handleCreateEvent}>
               <label className="sh-form-field">
-                <span>Event Title</span>
+                <span>{copy.fieldEventTitle}</span>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder="e.g., Phase 2 Acceptance Sign-Off"
+                  placeholder={copy.fieldEventTitlePlaceholder}
                 />
               </label>
 
               <div className="sh-customizer-grid-2">
                 <label className="sh-form-field">
-                  <span>Date</span>
+                  <span>{copy.fieldDate}</span>
                   <input
                     type="date"
                     required
@@ -802,7 +797,7 @@ export function CalendarScheduleView({
                 </label>
 
                 <label className="sh-form-field">
-                  <span>Time (EAT)</span>
+                  <span>{copy.fieldTime}</span>
                   <input
                     type="text"
                     required
@@ -814,7 +809,7 @@ export function CalendarScheduleView({
 
               <div className="sh-customizer-grid-2">
                 <label className="sh-form-field">
-                  <span>Event Type</span>
+                  <span>{copy.fieldType}</span>
                   <select
                     className="sh-select"
                     value={newType}
@@ -822,15 +817,15 @@ export function CalendarScheduleView({
                       setNewType(e.target.value as ScheduleEventType)
                     }
                   >
-                    <option value="MILESTONE_DUE">Milestone Due</option>
-                    <option value="PAYOUT_RELEASE">Payout Release</option>
-                    <option value="PROPOSAL_DEADLINE">Proposal Deadline</option>
-                    <option value="COMPLIANCE_KYC">Compliance SLA</option>
+                    <option value="MILESTONE_DUE">{copy.typeLabels.MILESTONE_DUE}</option>
+                    <option value="PAYOUT_RELEASE">{copy.typeLabels.PAYOUT_RELEASE}</option>
+                    <option value="PROPOSAL_DEADLINE">{copy.typeLabels.PROPOSAL_DEADLINE}</option>
+                    <option value="COMPLIANCE_KYC">{copy.typeLabels.COMPLIANCE_KYC}</option>
                   </select>
                 </label>
 
                 <label className="sh-form-field">
-                  <span>Amount (ETB)</span>
+                  <span>{copy.fieldAmount}</span>
                   <input
                     type="number"
                     required
@@ -842,7 +837,7 @@ export function CalendarScheduleView({
 
               <div className="sh-customizer-grid-2">
                 <label className="sh-form-field">
-                  <span>Contract Reference</span>
+                  <span>{copy.fieldContractRef}</span>
                   <input
                     type="text"
                     required
@@ -852,7 +847,7 @@ export function CalendarScheduleView({
                 </label>
 
                 <label className="sh-form-field">
-                  <span>Counterparty</span>
+                  <span>{copy.fieldCounterparty}</span>
                   <input
                     type="text"
                     required
@@ -868,14 +863,14 @@ export function CalendarScheduleView({
                   className="sh-btn sh-btn-primary"
                   style={{ flex: 1, justifyContent: "center" }}
                 >
-                  Save to Schedule
+                  {copy.saveScheduleBtn}
                 </button>
                 <button
                   type="button"
                   className="sh-btn sh-btn-secondary"
                   onClick={() => setCreateOpen(false)}
                 >
-                  Cancel
+                  {copy.cancelBtn}
                 </button>
               </div>
             </form>

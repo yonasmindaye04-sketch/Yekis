@@ -33,6 +33,7 @@ import { TbAlertTriangle } from "react-icons/tb";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { FileUploader } from "@/components/ui/file-upload-1";
+import { ContextualHelpTrigger } from "./components/guide/ContextualHelpTrigger";
 
 // === INTERFACES & TYPES ===
 type MarketplaceRole = "CLIENT" | "FREELANCER" | "BOTH";
@@ -263,7 +264,7 @@ export function JobsWorkspace({
    * interest each brief has drawn.
    */
   const myBriefsPanel = isHiring(role) ? (
-    <div className="sh-card">
+    <div className="sh-card" data-tour="jobs-my-briefs">
       <div className="sh-card-header">
         <div>
           <h3 className="sh-card-title">{jf.tabMyBriefs}</h3>
@@ -312,10 +313,13 @@ export function JobsWorkspace({
    * because this is the tab that a proposal notification points at.
    */
   const hiringPanel = isHiring(role) ? (
-    <div className="sh-card">
+    <div className="sh-card" data-tour="proposals-hiring-pipeline">
       <div className="sh-card-header">
         <div>
-          <h3 className="sh-card-title">{jf.pipelineTitle}</h3>
+          <div className="yk-help-heading-row">
+            <h3 className="sh-card-title">{jf.pipelineTitle}</h3>
+            <ContextualHelpTrigger helpId="proposals-pipeline" />
+          </div>
           <p className="sh-card-desc">{jf.pipelineDesc}</p>
         </div>
         <span className="sh-kbd">{copy.jobs.activeBriefsCount(ownedJobs.length)}</span>
@@ -583,10 +587,13 @@ export function JobsWorkspace({
       {showProposals ? hiringPanel : myBriefsPanel}
 
       {isWorking(role) && showProposals && (
-        <section className="sh-card">
+        <section className="sh-card" data-tour="proposals-my-list">
           <div className="sh-card-header">
             <div>
-              <h3 className="sh-card-title">{jf.tabMyProposals}</h3>
+              <div className="yk-help-heading-row">
+                <h3 className="sh-card-title">{jf.tabMyProposals}</h3>
+                <ContextualHelpTrigger helpId="proposals-pipeline" />
+              </div>
               <p className="sh-card-desc">{copy.jobs.myProposalsDesc}</p>
             </div>
             <span className="sh-kbd sh-mono">
@@ -656,7 +663,7 @@ export function JobsWorkspace({
       )}
 
       {!showProposals && (
-        <div className="sh-card">
+        <div className="sh-card" data-tour="jobs-board-list">
           <div className="sh-card-header">
             <div>
               <h3 className="sh-card-title">{jf.tabBrowseBriefs}</h3>
@@ -675,6 +682,7 @@ export function JobsWorkspace({
             className="sh-table-toolbar"
             role="region"
             aria-label={copy.jobs.filterOpenBriefsAria}
+            data-tour="jobs-filters"
             style={{
               paddingBottom: 12,
               borderBottom: "1px solid var(--color-border)",
@@ -1327,7 +1335,7 @@ export function ContractsWorkspace({
 
   return (
     <div className="workflow-stack">
-      <div className="sh-kpi-grid" style={{ marginBottom: 4 }}>
+      <div className="sh-kpi-grid" style={{ marginBottom: 4 }} data-tour="contracts-kpis">
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">Total Contracts</span>
@@ -1362,7 +1370,7 @@ export function ContractsWorkspace({
         </div>
       </div>
 
-      <div className="sh-card sh-filter-card">
+      <div className="sh-card sh-filter-card" data-tour="contracts-filters">
         <div className="sh-segmented" role="tablist" aria-label="Filter contracts by status">
           <button
             type="button"
@@ -1403,6 +1411,7 @@ export function ContractsWorkspace({
         </div>
 
         <div className="sh-filter-card-actions">
+          <ContextualHelpTrigger helpId="contracts-management" />
           {hasActiveContractFilters && (
             <span className="sh-cell-meta sh-mono" style={{ whiteSpace: "nowrap" }}>
               {totalVisibleMilestones}{" "}
@@ -1465,7 +1474,11 @@ export function ContractsWorkspace({
         </Alert>
       )}
       {filteredContractEntries.length === 0 ? (
-        <div className="sh-card" style={{ textAlign: "center", padding: "28px 16px" }}>
+        <div
+          className="sh-card"
+          data-tour="contracts-list"
+          style={{ textAlign: "center", padding: "28px 16px" }}
+        >
           <p className="empty-state" style={{ marginBottom: hasActiveContractFilters ? 12 : 0 }}>
             {contracts.length === 0
               ? "No contracts yet. Accepting a proposal creates one here."
@@ -1483,7 +1496,7 @@ export function ContractsWorkspace({
         </div>
       ) : (
         filteredContractEntries.map(
-          ({ contract, visibleMilestones, matchedByMilestoneOnly }) => {
+          ({ contract, visibleMilestones, matchedByMilestoneOnly }, contractIdx) => {
             const viewerIsClient =
               contract.clientId === userId || userId === "usr-both-addis-03";
             const viewerIsFreelancer =
@@ -1505,6 +1518,7 @@ export function ContractsWorkspace({
               <article
                 className="sh-card"
                 key={contract.id}
+                data-tour={contractIdx === 0 ? "contracts-list" : undefined}
                 style={
                   isFocused
                     ? {
@@ -2086,7 +2100,7 @@ export function EscrowWorkspace({
 
   return (
     <div className="workflow-stack">
-      <div className="sh-kpi-grid" style={{ marginBottom: 4 }}>
+      <div className="sh-kpi-grid" style={{ marginBottom: 4 }} data-tour="escrow-kpis">
         <div className="sh-card sh-kpi-card">
           <div className="sh-kpi-top">
             <span className="sh-kpi-label">{t.escrow.heldTotal}</span>
@@ -2121,7 +2135,7 @@ export function EscrowWorkspace({
         </div>
       </div>
 
-      <div className="sh-card sh-filter-card">
+      <div className="sh-card sh-filter-card" data-tour="escrow-filters">
         <div className="sh-segmented" role="tablist" aria-label="Filter escrow milestones">
           <button
             type="button"
@@ -2180,6 +2194,7 @@ export function EscrowWorkspace({
         </div>
 
         <div className="sh-filter-card-actions">
+          <ContextualHelpTrigger helpId="escrow-financial-actions" />
           {hasActiveEscrowFilters && (
             <span className="sh-cell-meta sh-mono" style={{ whiteSpace: "nowrap" }}>
               Showing {filteredMilestones.length} of {allMilestones.length}
@@ -2249,7 +2264,11 @@ export function EscrowWorkspace({
       )}
 
       {filteredMilestones.length === 0 ? (
-        <div className="sh-card" style={{ textAlign: "center", padding: "28px 16px" }}>
+        <div
+          className="sh-card"
+          data-tour="escrow-milestones-list"
+          style={{ textAlign: "center", padding: "28px 16px" }}
+        >
           <p className="empty-state" style={{ marginBottom: hasActiveEscrowFilters ? 12 : 0 }}>
             {allMilestones.length === 0
               ? "No escrow milestones yet."
@@ -2266,7 +2285,11 @@ export function EscrowWorkspace({
           )}
         </div>
       ) : (
-        <div className="sh-card" style={{ padding: 0, overflow: "hidden" }}>
+        <div
+          className="sh-card"
+          data-tour="escrow-milestones-list"
+          style={{ padding: 0, overflow: "hidden" }}
+        >
           <div className="milestone-list" style={{ margin: 0 }}>
             {filteredMilestones.map((item) => {
               const { contract } = item;
@@ -2525,7 +2548,7 @@ export function DisputesWorkspace() {
   };
 
   return (
-    <div className="workflow-stack">
+    <div className="workflow-stack" data-tour="disputes-workspace">
       {message && (
         <Alert variant="success" className="flex items-center gap-2.5 mb-2.5">
           <Avatar className="size-6 rounded-[5px] shrink-0">

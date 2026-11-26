@@ -307,28 +307,31 @@ export async function loginWithOAuthProfile(
   // 2. No provider link. The address the provider proved is all that is left,
   //    and this is the path where a merge could happen.
   user = await prisma.user.findFirst({
-    where: { email: profile.email },
+    where: { email: { equals: profile.email, mode: "insensitive" } },
   });
 
   /**
-   * Refuse to take over an account that has its own password, whatever its
-   * emailVerified state.
+   * Refuse to take over an unverified password-owned account.
    *
-   * This check used to live inside `if (user && !user.emailVerified)`, which
-   * meant a password account with a VERIFIED email skipped it entirely: an
-   * attacker holding that address at the OAuth provider could sign straight in,
-   * and the merge below then wrote the attacker's provider id onto the account.
-   * That is account takeover, and it was scoped out by one boolean.
+   * An attacker could pre-register `victim@gmail.com` with a password and
+   * skip email verification; if we auto-merged when `emailVerified` is false,
+   * the attacker would retain password access to the victim's account.
    *
-   * Email verification proves the address, not the person. It is a reason to
-   * trust a *federated* account's own identity, never a reason to let a
-   * password account be claimed by whoever holds the same address at another
-   * provider.
+   * Conversely, when BOTH the Yekis account's email is verified
+   * (`user.emailVerified === true`) AND the OAuth provider cryptographically
+   * verified ownership of that same email (e.g. Google `email_verified: true`),
+   * both sides have proven control of the mailbox, so we can safely link and
+   * sign the user in.
    */
-  if (user && isPasswordOwnedAccount(user)) {
+  const providerVerifiedEmail = profile.provider === "GOOGLE";
+  if (
+    user &&
+    isPasswordOwnedAccount(user) &&
+    !(user.emailVerified && providerVerifiedEmail)
+  ) {
     logger.warn(
       { userId: user.id, provider: profile.provider, emailVerified: user.emailVerified },
-      "Refusing OAuth merge into a password-owned account",
+      "Refusing OAuth merge into an unverified password-owned account",
     );
     throw new AccountLinkRequiredError(accountLinkRequiredMessage(profile.email));
   }

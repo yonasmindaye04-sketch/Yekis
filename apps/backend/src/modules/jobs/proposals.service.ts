@@ -96,11 +96,22 @@ export async function listProposalsForJob(params: {
     );
   }
 
-  return prisma.proposal.findMany({
+  const proposals = await prisma.proposal.findMany({
     where: { jobId: params.jobId },
     orderBy: { createdAt: "asc" },
-    include: { freelancer: { select: { id: true, ucid: true, email: true } } },
+    include: {
+      freelancer: {
+        select: { id: true, ucid: true, email: true, profileCompleteness: true },
+      },
+    },
   });
+
+  // Higher profile completeness is shown first; ties keep submission order.
+  return proposals.sort(
+    (a, b) =>
+      (b.freelancer.profileCompleteness ?? 0) -
+      (a.freelancer.profileCompleteness ?? 0),
+  );
 }
 
 /**

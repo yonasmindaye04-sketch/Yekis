@@ -331,10 +331,21 @@ export async function loginUser(input: LoginInput) {
   const rawId = input.identifier || input.email || input.phone || "";
   const normalized = normalizeLoginIdentifier(rawId);
 
-  const orConditions: Array<{ email?: string; phone?: string }> = [];
-  if (input.email) orConditions.push({ email: input.email.toLowerCase() });
+  const orConditions: Array<
+    | { email: { equals: string; mode: "insensitive" } }
+    | { phone: string }
+  > = [];
+  if (input.email) {
+    orConditions.push({
+      email: { equals: input.email.trim().toLowerCase(), mode: "insensitive" },
+    });
+  }
   if (input.phone) orConditions.push({ phone: input.phone });
-  if (normalized.email) orConditions.push({ email: normalized.email });
+  if (normalized.email) {
+    orConditions.push({
+      email: { equals: normalized.email, mode: "insensitive" },
+    });
+  }
   if (normalized.phone) orConditions.push({ phone: normalized.phone });
 
   const user = await prisma.user.findFirst({

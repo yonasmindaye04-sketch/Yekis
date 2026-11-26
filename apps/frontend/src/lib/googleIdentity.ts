@@ -57,6 +57,9 @@ declare global {
 const GIS_SRC = "https://accounts.google.com/gsi/client";
 const GIS_SCRIPT_ID = "google-gsi-client";
 
+let initializedClientId: string | null = null;
+let activeCredentialCallback: ((credential: string) => void) | null = null;
+
 /** The client id the bundle was built with, or undefined when unset. */
 export function googleClientId(): string | undefined {
   return import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
@@ -122,13 +125,19 @@ export function renderGoogleIdentityButton(
   const clientId = googleClientId();
   if (!clientId || !window.google?.accounts?.id) return;
 
-  window.google.accounts.id.initialize({
-    client_id: clientId,
-    callback: (response) => {
-      if (response?.credential) onCredential(response.credential);
-    },
-  });
+  activeCredentialCallback = onCredential;
 
+  if (initializedClientId !== clientId) {
+    window.google.accounts.id.initialize({
+      client_id: clientId,
+      callback: (response) => {
+        if (response?.credential) activeCredentialCallback?.(response.credential);
+      },
+    });
+    initializedClientId = clientId;
+  }
+
+  element.innerHTML = "";
   window.google.accounts.id.renderButton(element, {
     theme: options.theme ?? "outline",
     type: options.type ?? "icon",

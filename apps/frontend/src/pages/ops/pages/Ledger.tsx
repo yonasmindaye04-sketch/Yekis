@@ -8,15 +8,12 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  Check,
   CheckCircle2,
   Download,
   ExternalLink,
   Eye,
   FileText,
-  PlusCircle,
   RefreshCw,
-  RotateCcw,
   Search,
   ShieldCheck,
 } from "lucide-react";
@@ -32,23 +29,11 @@ import {
   Kv,
   LoadingBox,
   PageHead,
+  Card,
   Pager,
-  formatStatusLabel,
-  useToast,
+  Pill,
   Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("BALANCED") || u.includes("CONFIRM")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("MISMATCH")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
 
@@ -92,15 +77,10 @@ const deriveLegs = (j: JournalEntry): LedgerLeg[] => {
 
 export default function Ledger() {
   const ui = useOpsUi();
-  const toast = useToast();
 
   const summary = useApi<LedgerBundle>(opsApi.ledger);
   const [refType, setRefType] = useState("");
   const [selId, setSelId] = useState<string | null>(null);
-  const [adjDesc, setAdjDesc] = useState("");
-  const [adjAmountEtb, setAdjAmountEtb] = useState("450");
-  const [verifiedMap, setVerifiedMap] = useState<Record<string, boolean>>({});
-  const [busy, setBusy] = useState(false);
 
   const journals = useListPage<JournalEntry>(
     (p) => opsListApi.ledgerJournals({ ...p, referenceType: refType }),
@@ -119,48 +99,6 @@ export default function Ledger() {
 
   const sel = useMemo(() => rows.find((r) => r.id === selId) ?? null, [rows, selId]);
   const legs = useMemo(() => (sel ? deriveLegs(sel) : []), [sel]);
-
-  const handleJournalTask = async (action: "VERIFY" | "REVERSE" | "ADJUSTMENT") => {
-    if (!sel || busy) return;
-    if (action === "VERIFY") {
-      setVerifiedMap((prev) => ({ ...prev, [sel.id]: true }));
-      toast(`Journal ${sel.id} cryptographically verified and signed off by Finance Admin.`);
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const amountMinor =
-        action === "REVERSE"
-          ? sel.dr
-          : Math.max(100, Math.round((Number(adjAmountEtb) || 450) * 100));
-      const description =
-        action === "REVERSE"
-          ? `Contra-Reversal of ${sel.id}: ${sel.desc}`
-          : adjDesc.trim() || `Manual Adjustment Entry — Ref ${sel.id}`;
-
-      await opsApi.actOnJournal(sel.id, {
-        action,
-        amountMinor,
-        description,
-        referenceType: action === "REVERSE" ? sel.ref : "MANUAL_ADJUSTMENT",
-        referenceId: sel.refId ?? sel.id,
-      });
-
-      toast(
-        action === "REVERSE"
-          ? `Posted reversing contra-entry (${fmt(sel.dr)}) for ${sel.id}.`
-          : `Posted balanced manual adjustment journal (${fmt(amountMinor)}).`,
-      );
-      setAdjDesc("");
-      reload();
-      summary.reload();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Ledger journal operation failed");
-    } finally {
-      setBusy(false);
-    }
-  };
 
   if (loading && rows.length === 0) return <LoadingBox />;
   if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
@@ -213,14 +151,14 @@ export default function Ledger() {
         <>
           <div className="grid g6" style={{ marginBottom: 16 }}>
             {bundle.accounts.slice(0, 12).map((a) => (
-              <GlassCard className="acct-card" key={a.code}>
+              <Card className="acct-card" key={a.code}>
                 <div className="acct-type" style={{ color: a.c }}>
                   {a.type}
                 </div>
                 <div className="acct-name">{a.name}</div>
                 <div className="acct-bal">{fmt(a.bal)}</div>
                 <div className="acct-code mono">{a.code}</div>
-              </GlassCard>
+              </Card>
             ))}
           </div>
           {bundle.integrity.bal ? (
@@ -251,7 +189,7 @@ export default function Ledger() {
         <LoadingBox />
       )}
 
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -270,12 +208,12 @@ export default function Ledger() {
         <button className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={BookOpen}>No journal entries match.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -294,7 +232,7 @@ export default function Ledger() {
                         {j.id} {j.refId ? `· Entity: ${j.refId}` : ""}
                       </div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(j.ref)}>{formatStatusLabel(j.ref)}</ShinyBadge>
+                    <Pill s={j.ref} />
                   </div>
                   <div className="qi-foot">
                     <span className="mono" style={{ fontWeight: 700 }}>
@@ -310,7 +248,7 @@ export default function Ledger() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -322,11 +260,8 @@ export default function Ledger() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <ShinyBadge variant={statusToVariant(sel.ref)}>{formatStatusLabel(sel.ref)}</ShinyBadge>
-                    <ShinyBadge variant="success">Balanced (DR = CR)</ShinyBadge>
-                    {verifiedMap[sel.id] ? (
-                      <ShinyBadge variant="info">Signed Off by Admin</ShinyBadge>
-                    ) : null}
+                    <Pill s={sel.ref} />
+                    <Pill s="BALANCED" />
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -430,7 +365,7 @@ export default function Ledger() {
                           </td>
                           <td className="cell-main">{leg.name}</td>
                           <td>
-                            <ShinyBadge variant={statusToVariant(leg.type)}>{formatStatusLabel(leg.type)}</ShinyBadge>
+                            <Pill s={leg.type} />
                           </td>
                           <td className="amount">{leg.dr > 0 ? fmt(leg.dr) : "—"}</td>
                           <td className="amount">{leg.cr > 0 ? fmt(leg.cr) : "—"}</td>
@@ -466,55 +401,40 @@ export default function Ledger() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Multi-Task Ledger & Journal Execution
+                  Voucher Verification &amp; Audit Export
                 </div>
-
-                <div className="grid g2" style={{ gap: 10, marginBottom: 12 }}>
-                  <div className="fld">
-                    <label className="lbl">Manual Adjustment Description</label>
-                    <input
-                      className="inp"
-                      placeholder="e.g. Reclassify CBE gateway settlement fee"
-                      value={adjDesc}
-                      onChange={(e) => setAdjDesc(e.target.value)}
-                    />
-                  </div>
-                  <div className="fld">
-                    <label className="lbl">Adjustment Amount (ETB)</label>
-                    <input
-                      className="inp mono"
-                      type="number"
-                      value={adjAmountEtb}
-                      onChange={(e) => setAdjAmountEtb(e.target.value)}
-                    />
-                  </div>
-                </div>
+                <p style={{ fontSize: 12.5, color: "var(--ops-text-2)", margin: "0 0 12px" }}>
+                  General ledger entries are immutable, append-only double-entry records (DR = CR). Inspect the voucher breakdown or export the journal lines for external audit.
+                </p>
 
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
-                  <button
-                    className="btn btn-success"
-                    disabled={busy}
-                    onClick={() => void handleJournalTask("VERIFY")}
+                  <Button variant="outline" onClick={openVoucher}>
+                    <Eye size={14} /> Inspect Accounting Voucher
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `ledger-journal-${sel.id}`,
+                        toCsv(
+                          ["Journal ID", "Account Code", "Account Name", "Type", "Debit Minor", "Credit Minor"],
+                          legs.map((l) => [sel.id, l.code, l.name, l.type, l.dr, l.cr]),
+                        ),
+                      )
+                    }
                   >
-                    <Check size={14} /> Verify & Sign-Off Entry
-                  </button>
+                    <Download size={14} /> Export Journal Legs CSV
+                  </Button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void handleJournalTask("ADJUSTMENT")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("reconciliation")}
                   >
-                    <PlusCircle size={14} /> Post Balanced Adjustment Journal
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void handleJournalTask("REVERSE")}
-                  >
-                    <RotateCcw size={14} /> Post Contra-Reversing Entry
+                    <ExternalLink size={14} /> Open Reconciliation Queue
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

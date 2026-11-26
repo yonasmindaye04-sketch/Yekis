@@ -24,6 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MessageCircle, Paperclip, Send } from "lucide-react";
 import { api, type ChatMessage } from "../api/client";
 import { RealtimeSocketManager } from "../api/socket";
+import { playSound } from "../lib/soundEffects";
 import { type Language, useI18n } from "../i18n";
 import { OPEN_SUPPORT_CHAT_EVENT } from "./supportChatEvents";
 import { SecureAttachment } from "./SecureAttachment";
@@ -283,6 +284,7 @@ export function LandingSupportChat() {
         "chat:new_message",
         (data) => {
           if (data.conversationId === conversationId) {
+            playSound("messageReceived");
             void syncThread(conversationId, token).catch(() => {
               /* fall through to the poll */
             });
@@ -361,6 +363,7 @@ export function LandingSupportChat() {
         // supplying an email. The backend creates a scoped guest identity;
         // they can continue receiving staff replies in this same window.
         const result = await api.createGuestSupport(undefined, text);
+        playSound("messageSent");
         if (result?.id) setGuestConversationId(result.id);
         if (result?.accessToken) setGuestToken(result.accessToken);
         if (result?.accessToken) {
@@ -453,6 +456,7 @@ export function LandingSupportChat() {
           text,
           attachmentUrl,
         );
+        playSound("messageSent");
         await syncThread(guestConversationId, guestToken);
       } catch (err) {
         setMessages((prev) => prev.filter((message) => message.id !== optimisticId));

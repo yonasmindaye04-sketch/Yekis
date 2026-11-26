@@ -556,6 +556,7 @@ export function GigMarketplace() {
       <nav
         className="afro-category-header-shell"
         aria-label={copy.navAria}
+        data-tour="gigs-search-controls"
       >
         {/* Tier 1: Breadcrumb Trail & Quick Meta Controls */}
         <div className="afro-cat-header-top">
@@ -797,7 +798,7 @@ export function GigMarketplace() {
           )}
         </div>
       ) : (
-        <div className="afro-gigs-grid">
+        <div className="afro-gigs-grid" data-tour="gigs-catalog-grid">
           {sortedGigs.map((gig) => {
             const cheapest = (gig.packages ?? [])[0];
             const conf = categoryConfig[gig.category];

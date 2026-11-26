@@ -23,9 +23,7 @@ import {
 import { api } from "../../../api/client";
 import type { SelfProfile, UpdateProfilePayload } from "../../../api/client";
 import { useOpsUi } from "../opsUiContext";
-import { Banner, ErrorBox, Kv, LoadingBox, PageHead, SecTitle } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
+import { Banner, Card, ErrorBox, Kv, LoadingBox, PageHead, Pill, SecTitle } from "../components/ui";
 import { Alert, AlertTitle } from "@/components/base-ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 
@@ -202,7 +200,7 @@ export default function ProfilePage() {
 
       <div className="grid g2" style={{ alignItems: "start" }}>
         {/* ── identity summary ── */}
-        <GlassCard className="card-pad">
+        <Card className="card-pad">
           <SecTitle icon={UserRound}>Account</SecTitle>
           <div className="prof-id">
             <div className="avatar-lg" aria-hidden>
@@ -216,9 +214,7 @@ export default function ProfilePage() {
               </div>
               <div className="prof-mail">{account?.email}</div>
               <div style={{ marginTop: 6 }}>
-                <ShinyBadge variant="info">
-                  {account?.roleLabel ?? "Staff"}
-                </ShinyBadge>
+                <Pill s={account?.staffRole ?? "STAFF"} dict={{ [account?.staffRole ?? "STAFF"]: account?.roleLabel ?? "Staff" }} />
               </div>
             </div>
           </div>
@@ -236,10 +232,10 @@ export default function ProfilePage() {
               ? "Your profile is complete."
               : "Add a name and bio to reach 100% — clients filter on this."}
           </p>
-        </GlassCard>
+        </Card>
 
         {/* ── the form ── */}
-        <GlassCard className="card-pad">
+        <Card className="card-pad">
           <SecTitle icon={BadgeCheck}>Public details</SecTitle>
 
           {fieldError ? (
@@ -354,11 +350,11 @@ export default function ProfilePage() {
             >
               Discard
             </button>
-            <button className="btn btn-primary" onClick={() => void save()} disabled={saving || !dirty}>
+            <button type="button" className="btn btn-primary" onClick={() => void save()} disabled={saving || !dirty}>
               <Save size={14} /> {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
-        </GlassCard>
+        </Card>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@
    All class names are scoped under .ops-root by ops-console.css.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import type {
   ButtonHTMLAttributes,
   ComponentProps,
@@ -16,6 +16,7 @@ import {
   TriangleAlert,
   CheckCircle2,
   Clock,
+  X,
   XCircle,
   LayoutList,
   Table2,
@@ -26,7 +27,6 @@ import type { Rail as RailT } from "../opsTypes";
 import { Sparkline } from "./charts";
 import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button as ShadcnButton } from "@/components/ui/button";
 import { Card as ShadcnCard } from "@/components/ui/card";
 import {
@@ -187,15 +187,15 @@ export function isUrgentStatus(s: string | null | undefined): boolean {
 
 export function Pill({ s, dict }: { s: string; dict?: Record<string, string> }) {
   // Normalise before lookup: some endpoints hand back "stage 1 negotiation"
-  // or "pending" rather than the SCREAMING_SNAKE enum, and an unnormalised
-  // lookup silently rendered every such status as neutral grey.
+  // or "pending" rather than the SCREAMING_SNAKE enum.
+  // Renders as bold colored text only — no background, border, or dot (docs/rule.md §2).
   const key = (s || "").toUpperCase().replace(/\s+/g, "_");
   const urgent = isUrgentStatus(key);
   return (
-    <Badge variant="outline" className={cn("pill", PILL[key] ?? PILL[s] ?? "p-gray")}>
-      <span className={cn("pdot", urgent && "urgent")} />
+    <span className={cn("pill", PILL[key] ?? PILL[s] ?? "p-gray")}>
+      {urgent ? <TriangleAlert size={12} aria-hidden="true" /> : null}
       {formatStatusLabel(s, dict)}
-    </Badge>
+    </span>
   );
 }
 
@@ -862,6 +862,257 @@ export function EscrowFeeBreakdown({
         </p>
       )}
     </div>
+  );
+}
+
+/* ── Native <dialog> modal replacing window.prompt / window.confirm ── */
+export interface OpsActionField {
+  name: string;
+  label: string;
+  placeholder?: string;
+  multiline?: boolean;
+  required?: boolean;
+  minLength?: number;
+  maxLength?: number;
+  initialValue?: string;
+}
+
+export interface OpsActionModalProps {
+  open: boolean;
+  title: string;
+  description?: string;
+  fields?: OpsActionField[];
+  checkbox?: {
+    label: string;
+    hint?: string;
+    defaultChecked?: boolean;
+  };
+  confirmLabel: string;
+  cancelLabel?: string;
+  tone?: "primary" | "danger";
+  busy?: boolean;
+  onConfirm: (result: { values: Record<string, string>; checked: boolean }) => void | Promise<void>;
+  onCancel: () => void;
+}
+
+export function OpsActionModal({
+  open,
+  title,
+  description,
+  fields = [],
+  checkbox,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  tone = "primary",
+  busy = false,
+  onConfirm,
+  onCancel,
+}: OpsActionModalProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const [values, setValues] = useState<Record<string, string>>(() =>
+    Object.fromEntries(fields.map((f) => [f.name, f.initialValue ?? ""])),
+  );
+  const [checked, setChecked] = useState(Boolean(checkbox?.defaultChecked));
+  const [validationErr, setValidationErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!dlg) return;
+    if (open) {
+      setValues(Object.fromEntries(fields.map((f) => [f.name, f.initialValue ?? ""])));
+      setChecked(Boolean(checkbox?.defaultChecked));
+      setValidationErr(null);
+      if (!dlg.open) dlg.showModal();
+    } else if (dlg.open) {
+      dlg.close();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useEffect(() => {
+    const dlg = dialogRef.current;
+    if (!dlg) return;
+    const handleClose = () => {
+      dlg.returnValue = "";
+      onCancel();
+    };
+    dlg.addEventListener("close", handleClose);
+
+    if (!("closedBy" in HTMLDialogElement.prototype)) {
+      let pressedOutside = false;
+      const outside = (e: PointerEvent) => {
+        const r = dlg.getBoundingClientRect();
+        return e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom;
+      };
+      const onDown = (e: PointerEvent) => {
+        pressedOutside = outside(e);
+      };
+      const onUp = (e: PointerEvent) => {
+        if (pressedOutside && outside(e) && !busy) dlg.close();
+        pressedOutside = false;
+      };
+      dlg.addEventListener("pointerdown", onDown);
+      dlg.addEventListener("pointerup", onUp);
+      return () => {
+        dlg.removeEventListener("close", handleClose);
+        dlg.removeEventListener("pointerdown", onDown);
+        dlg.removeEventListener("pointerup", onUp);
+      };
+    }
+
+    return () => dlg.removeEventListener("close", handleClose);
+  }, [onCancel, busy]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    for (const f of fields) {
+      const val = (values[f.name] ?? "").trim();
+      if (f.required && !val) {
+        setValidationErr(`${f.label} is required.`);
+        return;
+      }
+      if (f.minLength && val.length < f.minLength) {
+        setValidationErr(`${f.label} must be at least ${f.minLength} characters.`);
+        return;
+      }
+      if (f.maxLength && val.length > f.maxLength) {
+        setValidationErr(`${f.label} cannot exceed ${f.maxLength} characters.`);
+        return;
+      }
+    }
+    setValidationErr(null);
+    const trimmed = Object.fromEntries(
+      Object.entries(values).map(([k, v]) => [k, v.trim()]),
+    );
+    void onConfirm({ values: trimmed, checked });
+  };
+
+  const isDestructiveConfirmOnly = tone === "danger" && fields.length === 0;
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="ops-native-dialog"
+      aria-labelledby={titleId}
+      {...({ closedby: busy ? "none" : "any" } as Record<string, string>)}
+    >
+      <div className="ops-dlg-head">
+        <div>
+          <h1 id={titleId} className="ops-dlg-title">
+            {title}
+          </h1>
+          {description ? <p className="ops-dlg-sub">{description}</p> : null}
+        </div>
+        <button
+          type="button"
+          className="icon-btn"
+          disabled={busy}
+          onClick={onCancel}
+          aria-label="Close dialog"
+        >
+          <X size={15} />
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit}>
+        {(fields.length > 0 || checkbox || validationErr) && (
+          <div className="ops-dlg-body">
+            {fields.map((f, idx) => {
+              const val = values[f.name] ?? "";
+              const trimmedLen = val.trim().length;
+              return (
+                <div className="field" key={f.name}>
+                  <label className="field-l" htmlFor={`ops-dlg-${f.name}`}>
+                    <span>{f.label}</span>
+                    {f.minLength ? (
+                      <em className={trimmedLen < f.minLength ? "over" : undefined}>
+                        {trimmedLen}/{f.minLength} min
+                      </em>
+                    ) : null}
+                  </label>
+                  {f.multiline ? (
+                    <textarea
+                      id={`ops-dlg-${f.name}`}
+                      className="inp-t"
+                      rows={3}
+                      placeholder={f.placeholder}
+                      value={val}
+                      autoFocus={idx === 0}
+                      onChange={(e) => {
+                        setValidationErr(null);
+                        setValues((prev) => ({ ...prev, [f.name]: e.target.value }));
+                      }}
+                    />
+                  ) : (
+                    <input
+                      id={`ops-dlg-${f.name}`}
+                      className="inp"
+                      placeholder={f.placeholder}
+                      value={val}
+                      autoFocus={idx === 0}
+                      onChange={(e) => {
+                        setValidationErr(null);
+                        setValues((prev) => ({ ...prev, [f.name]: e.target.value }));
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+
+            {checkbox ? (
+              <label
+                className="chat-internal-toggle"
+                style={{ alignItems: "flex-start", gap: 10 }}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={(e) => setChecked(e.target.checked)}
+                  style={{ marginTop: 3 }}
+                />
+                <span>
+                  <strong style={{ display: "block", color: "var(--ops-text)" }}>
+                    {checkbox.label}
+                  </strong>
+                  {checkbox.hint ? (
+                    <span className="hint" style={{ display: "block" }}>
+                      {checkbox.hint}
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            ) : null}
+
+            {validationErr ? (
+              <div className="ops-dlg-err" role="alert">
+                {validationErr}
+              </div>
+            ) : null}
+          </div>
+        )}
+
+        <div className="ops-dlg-foot">
+          <button
+            type="button"
+            className="btn btn-ghost"
+            disabled={busy}
+            autoFocus={isDestructiveConfirmOnly}
+            onClick={onCancel}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="submit"
+            className={`btn ${tone === "danger" ? "btn-red" : "btn-primary"}`}
+            disabled={busy}
+          >
+            {busy ? "Processing…" : confirmLabel}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 

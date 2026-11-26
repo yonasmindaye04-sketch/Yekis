@@ -10,7 +10,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  Check,
   CheckCircle2,
   Download,
   ExternalLink,
@@ -22,12 +21,14 @@ import {
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
-import { dts, fmt, opsApi, opsListApi } from "../opsApi";
+import { dts, fmt, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { RECON_STATUSES, RAILS } from "../opsConst";
 import type { ReconRow } from "../opsTypes";
 import {
   Banner,
+  Button,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -35,46 +36,20 @@ import {
   LoadingBox,
   PageHead,
   Pager,
+  Pill,
   Rail,
-  formatStatusLabel,
   isTyping,
   useHotkeys,
-  useToast,
-  Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("RESOLV")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("MISMATCH") || u.includes("VARIANCE")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
 
-const RECON_TEMPLATES = [
-  "Variance explained by unrecorded provider bank/gateway fee; posting adjustment entry to 5010.",
-  "Duplicate webhook callback confirmed; internal ledger entry force-matched to primary settlement.",
-  "Delayed settlement batch cleared on Telebirr / CBE Birr T+1 manifest; marked MATCHED.",
-  "Escalated to provider merchant operations desk due to unexplained rail settlement shortfall.",
-];
-
 export default function Reconciliation() {
   const ui = useOpsUi();
-  const toast = useToast();
 
   const [recStatus, setRecStatus] = useState("");
   const [provider, setProvider] = useState("");
   const [selId, setSelId] = useState<string | null>(null);
-  const [templateNote, setTemplateNote] = useState("");
-  const [customNote, setCustomNote] = useState("");
-  const [adjAmountEtb, setAdjAmountEtb] = useState("");
-  const [busy, setBusy] = useState(false);
 
   const list = useListPage<ReconRow>(
     (p) => opsListApi.reconciliation({ ...p, recStatus, provider }),
@@ -92,68 +67,6 @@ export default function Reconciliation() {
   }, [rows, selId]);
 
   const sel = useMemo(() => rows.find((r) => r.id === selId) ?? null, [rows, selId]);
-
-  useEffect(() => {
-    if (sel) {
-      setAdjAmountEtb(sel.diff ? String(Math.abs(sel.diff) / 100) : "0");
-    }
-  }, [sel]);
-
-  const executeResolution = useCallback(
-    async (action: "FORCE_MATCH" | "POST_ADJUSTMENT" | "FLAG_FAILED" | "RESOLVE") => {
-      if (!sel || busy) return;
-      const reason =
-        templateNote === "custom"
-          ? customNote.trim()
-          : templateNote.trim() || RECON_TEMPLATES[0];
-
-      if (reason.length < 5) {
-        toast("Please select or enter a reconciliation resolution note.");
-        return;
-      }
-
-      setBusy(true);
-      try {
-        const adjustedAmountMinor = Math.round((Number(adjAmountEtb) || 0) * 100);
-        await opsApi.resolveReconciliation(sel.id, {
-          action,
-          adjustedAmountMinor,
-          reason,
-        });
-
-        if (action === "POST_ADJUSTMENT" && adjustedAmountMinor > 0) {
-          try {
-            await opsApi.actOnJournal("jrn-adj", {
-              action: "ADJUSTMENT",
-              amountMinor: adjustedAmountMinor,
-              description: `Recon Variance Adjustment (${sel.txId}) — ${reason}`,
-              referenceType: "RECON_ADJUSTMENT",
-              referenceId: sel.id,
-            });
-          } catch {
-            /* supplementary journal hook */
-          }
-        }
-
-        const msgMap: Record<typeof action, string> = {
-          FORCE_MATCH: `Transaction ${sel.txId} force-matched to internal ledger.`,
-          POST_ADJUSTMENT: `Variance adjustment journal posted & ${sel.txId} reconciled.`,
-          FLAG_FAILED: `Transaction ${sel.txId} flagged as FAILED for provider dispute.`,
-          RESOLVE: `Reconciliation item ${sel.txId} marked resolved.`,
-        };
-        toast(msgMap[action]);
-        setTemplateNote("");
-        setCustomNote("");
-        reload();
-        ui.refreshBadges();
-      } catch (e) {
-        toast(e instanceof Error ? e.message : "Reconciliation action failed");
-      } finally {
-        setBusy(false);
-      }
-    },
-    [sel, busy, templateNote, customNote, adjAmountEtb, reload, toast, ui],
-  );
 
   useHotkeys(
     useCallback(
@@ -283,7 +196,7 @@ export default function Reconciliation() {
         />
       ) : null}
 
-      <GlassCard className="filters" style={{ marginTop: 16 }}>
+      <div className="filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -310,12 +223,12 @@ export default function Reconciliation() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={Scale}>No provider transactions match this filter.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -334,7 +247,7 @@ export default function Reconciliation() {
                         Internal: {fmt(r.amt)} · {r.esc.replace(/_/g, " ")}
                       </div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(r.rec)}>{formatStatusLabel(r.rec)}</ShinyBadge>
+                    <Pill s={r.rec} />
                   </div>
                   <div className="qi-foot">
                     <Rail p={r.provider} />
@@ -354,7 +267,7 @@ export default function Reconciliation() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -367,8 +280,8 @@ export default function Reconciliation() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Rail p={sel.provider} />
-                    <ShinyBadge variant={statusToVariant(sel.rec)}>{formatStatusLabel(sel.rec)}</ShinyBadge>
-                    <ShinyBadge variant={statusToVariant(sel.esc)}>{formatStatusLabel(sel.esc)}</ShinyBadge>
+                    <Pill s={sel.rec} />
+                    <Pill s={sel.esc} />
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -495,83 +408,52 @@ export default function Reconciliation() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Variance Resolution & Ledger Adjustment Execution
+                  Settlement Investigation &amp; Export
                 </div>
-
-                <div className="grid g2" style={{ gap: 10, marginBottom: 10 }}>
-                  <div className="fld">
-                    <label className="lbl">Adjustment Journal Amount (ETB)</label>
-                    <input
-                      className="inp mono"
-                      type="number"
-                      placeholder="e.g. 450"
-                      value={adjAmountEtb}
-                      onChange={(e) => setAdjAmountEtb(e.target.value)}
-                    />
-                  </div>
-                  <div className="fld">
-                    <label className="lbl">Preset Variance Resolution Note</label>
-                    <select
-                      className="sel"
-                      style={{ width: "100%" }}
-                      value={templateNote}
-                      onChange={(e) => setTemplateNote(e.target.value)}
-                    >
-                      <option value="">Select standard reconciliation note…</option>
-                      {RECON_TEMPLATES.map((tpl) => (
-                        <option key={tpl} value={tpl}>
-                          {tpl}
-                        </option>
-                      ))}
-                      <option value="custom">Custom variance explanation…</option>
-                    </select>
-                  </div>
-                </div>
-
-                {templateNote === "custom" ? (
-                  <div className="fld" style={{ marginBottom: 10 }}>
-                    <label className="lbl">Custom Reconciliation Note</label>
-                    <input
-                      className="inp"
-                      placeholder="Explain variance root cause and accounting treatment…"
-                      value={customNote}
-                      onChange={(e) => setCustomNote(e.target.value)}
-                    />
-                  </div>
-                ) : null}
+                <p style={{ fontSize: 12.5, color: "var(--ops-text-2)", margin: "0 0 12px" }}>
+                  Automated reconciliation compares Telebirr/CBE/M-Pesa manifests against internal custody ledger postings. Export the exception record or inspect the linked escrow and ledger entries below:
+                </p>
 
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
                   <button
-                    className="btn btn-success"
-                    disabled={busy}
-                    onClick={() => void executeResolution("FORCE_MATCH")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `recon-${sel.txId}`,
+                        toCsv(
+                          ["Recon ID", "Provider TX ID", "Provider", "Internal Minor", "Diff Minor", "Escrow State", "Status"],
+                          [[sel.id, sel.txId, sel.provider, sel.amt, sel.diff ?? 0, sel.esc, sel.rec]],
+                        ),
+                      )
+                    }
                   >
-                    <Check size={14} /> Force-Match to Ledger
+                    <Download size={14} /> Export Exception CSV
                   </button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void executeResolution("POST_ADJUSTMENT")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("ledger")}
                   >
-                    <BookOpen size={14} /> Post Variance Adjustment Journal
+                    <BookOpen size={14} /> Inspect Ledger Journal
                   </button>
                   <button
-                    className="btn btn-ghost"
-                    disabled={busy}
-                    onClick={() => void executeResolution("RESOLVE")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("escrow")}
                   >
-                    <CheckCircle2 size={14} /> Mark Resolved
+                    <ExternalLink size={14} /> Hold / Inspect Escrow
                   </button>
                   <button
-                    className="btn btn-danger"
-                    disabled={busy}
-                    onClick={() => void executeResolution("FLAG_FAILED")}
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => ui.navigate("payments")}
                   >
-                    <TriangleAlert size={14} /> Escalate Provider Dispute
+                    <ExternalLink size={14} /> Inbound Payments
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

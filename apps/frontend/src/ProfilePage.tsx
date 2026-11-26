@@ -673,7 +673,7 @@ export const ProfilePage = ({
   return (
     <div className="profile-view-page">
       {/* ── Top Board Identity Masthead (Directly on Website Background Board) ── */}
-      <header className="pv-masthead">
+      <header className="pv-masthead" data-tour="profile-masthead">
         <div className="pv-identity">
           <YekisAvatar
             userId={profile.id || userId}
@@ -791,7 +791,7 @@ export const ProfilePage = ({
       {/* ── Two-Column Board Content Grid (Aligned with ProfileEditPage) ── */}
       <div className="pv-board">
         {/* Left Column: Skills & Trust Metadata */}
-        <aside className="pv-rail" aria-label={copy.skillsRailAria}>
+        <aside className="pv-rail" aria-label={copy.skillsRailAria} data-tour="profile-skills-rail">
           <section className="pv-rail-section" aria-labelledby={`${uid}-skills`}>
             <div className="pv-section-head">
               <h2 id={`${uid}-skills`} className="pv-rail-heading">
@@ -877,7 +877,7 @@ export const ProfilePage = ({
         </aside>
 
         {/* Right Column: Bio, Portfolio Showcase, and Client Reviews */}
-        <div className="pv-canvas">
+        <div className="pv-canvas" data-tour="profile-canvas">
           {!profile.canViewFullProfile ? (
             <section className="pv-section">
               <div className="pv-restricted-notice">

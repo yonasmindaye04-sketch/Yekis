@@ -10,9 +10,11 @@ import {
 } from "../../middleware/auth.js";
 import * as profileService from "./profile.service.js";
 import * as avatarService from "./avatar.service.js";
+import * as guideProgressService from "./guideProgress.service.js";
 import {
   updateProfileSchema,
   reportProfileSchema,
+  guideProgressUpdateSchema,
 } from "./profile.validation.js";
 import {
   buildUserDataExport,
@@ -128,6 +130,75 @@ profileRouter.get(
       return res.send(avatar.data);
     } catch (error) {
       logger.error({ err: error }, "Error serving avatar");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// GET /me/guide-progress
+// Returns the authenticated user's persisted Yekis Guide onboarding and tour state.
+profileRouter.get(
+  "/me/guide-progress",
+  requireAuth,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const progress = await guideProgressService.getUserGuideProgress(
+        req.user!.id,
+      );
+      return res.json(progress);
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error fetching guide progress");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// PATCH /me/guide-progress
+// Atomically updates tour completion, skipped tours, dismissed prompts, or resets.
+profileRouter.patch(
+  "/me/guide-progress",
+  requireAuth,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const parsed = guideProgressUpdateSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: "VALIDATION_FAILED",
+          message:
+            parsed.error.errors[0]?.message ??
+            "Invalid guide progress update payload.",
+          details: parsed.error.errors,
+        });
+      }
+
+      const updated = await guideProgressService.updateUserGuideProgress(
+        req.user!.id,
+        parsed.data,
+      );
+      return res.json(updated);
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error updating guide progress");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+// DELETE /me/guide-progress
+// Resets all onboarding and product tour progress for the signed-in user.
+profileRouter.delete(
+  "/me/guide-progress",
+  requireAuth,
+  async (req: AuthedRequest, res: Response) => {
+    try {
+      const reset = await guideProgressService.resetUserGuideProgress(
+        req.user!.id,
+      );
+      return res.json(reset);
+    } catch (error: any) {
+      if (handleKnownErrors(error, res)) return;
+      logger.error({ err: error }, "Error resetting guide progress");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

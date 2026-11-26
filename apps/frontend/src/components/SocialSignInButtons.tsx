@@ -310,6 +310,11 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
     [copy, finish],
   );
 
+  const handleRef = useRef(handle);
+  const roleRef = useRef(role);
+  handleRef.current = handle;
+  roleRef.current = role;
+
   // ---- Google GIS setup ----
   useEffect(() => {
     if (!providers.google) return;
@@ -325,8 +330,8 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
           renderGoogleIdentityButton(
             googleBtnRef.current,
             (credential) =>
-              void handle("GOOGLE", async () => {
-                return api.loginWithGoogleOAuth(credential, role);
+              void handleRef.current("GOOGLE", async () => {
+                return api.loginWithGoogleOAuth(credential, roleRef.current);
               }),
             { theme: "outline", type: "icon", shape: "circle", size: "large" },
           );
@@ -339,7 +344,7 @@ export function SocialSignInButtons({ onAuthed, role }: SocialSignInButtonsProps
     return () => {
       cancelled = true;
     };
-  }, [providers.google, handle, role]);
+  }, [providers.google]);
 
   const startGoogle = () => {
     if (busy) return;

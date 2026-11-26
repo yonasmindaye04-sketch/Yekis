@@ -430,4 +430,16 @@ describe("Telegram bot inline keyboard URLs", () => {
       }
     }
   });
+
+  it("provisions a brand-new Telegram user on /start and issues a login code instead of rejecting them", async () => {
+    await removeMember();
+    const { texts } = await captureReplies("https://app.yekis.et", ["/start"]);
+    const joined = texts.join(" ");
+    expect(joined).not.toContain("You are not registered");
+    expect(joined).toMatch(/[23456789A-Z]{8}/);
+    const created = await prisma.user.findUnique({
+      where: { telegramUserId: BigInt(TG_ID) },
+    });
+    expect(created).not.toBeNull();
+  });
 });

@@ -22,6 +22,15 @@ import type {
   Proposal,
   NotificationItem,
 } from "./client";
+import {
+  applyGuideProgressMutation,
+  createEmptyGuideProgress,
+  normalizeGuideProgress,
+} from "../components/guide/guideStorage";
+import type {
+  GuideProgressMutation,
+  GuideProgressState,
+} from "../components/guide/guideTypes";
 
 const DAY = 86_400_000;
 const isoDaysAgo = (days: number) => new Date(Date.now() - days * DAY).toISOString();
@@ -2255,8 +2264,8 @@ class MockStore {
       this.proposals = this.proposals.filter((p) => p.id !== proposalId);
       return found ?? { id: proposalId, status: "WITHDRAWN" };
     }
-    if (cleanPath === "/jobs" && method === "GET") {
-      return { items: this.jobs, total: this.jobs.length, page: 1, pageSize: 20 };
+    if ((cleanPath === "/jobs" || cleanPath === "/jobs/feed") && method === "GET") {
+      return { items: this.jobs, total: this.jobs.length, page: 1, pageSize: 20, matchingAvailable: false };
     }
     if (cleanPath.match(/^\/jobs\/[^/]+$/) && method === "GET") {
       const jobId = cleanPath.split("/")[2];
@@ -2495,6 +2504,31 @@ class MockStore {
     if (cleanPath === "/users/me/profile/completeness") {
       const u = this.getCurrentUser();
       return { profileCompleteness: u.profileCompleteness ?? 75 };
+    }
+    if (cleanPath === "/users/me/guide-progress") {
+      const u = this.getCurrentUser();
+      const mapKey = `mockGuideProgress_${u.id}`;
+      const store = this as unknown as Record<
+        string,
+        GuideProgressState | undefined
+      >;
+      const existing = normalizeGuideProgress(
+        store[mapKey] ?? createEmptyGuideProgress(),
+      );
+      if (method === "DELETE") {
+        const reset = applyGuideProgressMutation(existing, { resetAll: true });
+        store[mapKey] = reset;
+        return reset;
+      }
+      if (method === "PATCH") {
+        const updated = applyGuideProgressMutation(
+          existing,
+          (parsedBody ?? {}) as GuideProgressMutation,
+        );
+        store[mapKey] = updated;
+        return updated;
+      }
+      return existing;
     }
     if (cleanPath === "/users/me/export") {
       const u = this.getCurrentUser();

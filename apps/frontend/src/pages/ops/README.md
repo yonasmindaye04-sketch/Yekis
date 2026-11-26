@@ -40,13 +40,13 @@ src/pages/ops/
   opsUiContext.ts       navigate / openViewer / toast / refreshBadges
   components/
     charts.tsx          <AreaChart/> <BarChart/> <Donut/> <Sparkline/> <HBars/> + tooltip ctx
-    ui.tsx              Pill, Banner, StatCard, OpsTable, Pager, FilterSelect, Kv, hotkeys…
+    ui.tsx              Pill (bold text only), Banner, Card, OpsActionModal (<dialog>), OpsTable, Pager, FilterSelect, Kv, hotkeys…
     actionCenter.tsx    buildActionItems() + <ActionCenter/>
-    CommandPalette.tsx  Ctrl/⌘K jump-to-anything (permission-filtered)
+    CommandPalette.tsx  Ctrl/⌘K native <dialog> palette (views, pages, live records, layout quick actions)
     EvidenceViewer.tsx  zoom/rotate/drag lightbox over REAL signed document URLs
     NotificationBell.tsx GET /notifications + mark-read, console-styled popover
   pages/
-    Overview.tsx        Command Center: stat cards, Action Center, charts, activity
+    Overview.tsx        Dual-mode Command Center (Executive Command + Operations Console synced with ShadcnLayoutContext)
     SupportDesk.tsx     support inbox (two-pane queue pattern, like KYC/Disputes)
     DisputeQueue.tsx    mediation, settlement preview, claim/evidence/escalate/arbitrate
     Risk.tsx            TMS flags: file STR, dismiss, lift hold, rule detail
@@ -186,7 +186,9 @@ endpoints the backend actually serves, through the shared `api` client
 | KYC | view signed documents, decision history, verify / reject / request clearer |
 | Disputes | claim, add evidence, escalate stage, send to arbitration, resolve |
 | Risk | inspect rule payload, file STR (optional account suspension), dismiss, lift hold |
-| Payouts | confirm / fail settlement with provider ref or failure reason |
+| Payouts | confirm (`CONFIRMED`) or fail (`FAILED`) settlement with provider ref or failure reason |
+| Escrow | release full escrow, place admin hold, or remove admin hold |
+| Withholding | record ERCA filing reference and export period summary CSV |
 | Receipts | approve, reject, flag as suspicious |
 | Staff | change role, remove console access |
 | Profile reports | no-action / hide / ban, refresh featured carousel |

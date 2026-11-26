@@ -399,11 +399,21 @@ describe("registration adopts the proof", () => {
   });
 
   it("knows whether an address was proven recently", async () => {
-    const challenge = await requestEmailCode({ email: A });
-    expect(await hasRecentVerifiedEmailCode(A)).toBe(false);
-    await verifyEmailCode({ email: A, code: challenge.devCode! });
-    expect(await hasRecentVerifiedEmailCode(A)).toBe(true);
+    const fresh = `fresh-${STAMP}@test.et`;
+    const challenge = await requestEmailCode({ email: fresh });
+    expect(await hasRecentVerifiedEmailCode(fresh)).toBe(false);
+    await verifyEmailCode({ email: fresh, code: challenge.devCode! });
+    expect(await hasRecentVerifiedEmailCode(fresh)).toBe(true);
     expect(await hasRecentVerifiedEmailCode(B)).toBe(false);
+  });
+
+  it("refuses to issue an unauthenticated signup code for an already-registered email", async () => {
+    const { EmailAlreadyRegisteredError } = await import(
+      "../src/modules/auth/email-verification.service.js"
+    );
+    await expect(requestEmailCode({ email: A })).rejects.toThrow(
+      EmailAlreadyRegisteredError,
+    );
   });
 });
 

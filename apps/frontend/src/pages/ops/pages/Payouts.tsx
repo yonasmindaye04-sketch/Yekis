@@ -7,7 +7,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeftRight,
   Check,
   CheckCircle2,
   Clock,
@@ -15,7 +14,6 @@ import {
   ExternalLink,
   Eye,
   FileText,
-  PauseCircle,
   RefreshCw,
   Search,
   ShieldCheck,
@@ -26,9 +24,10 @@ import {
 import { dts, fmt, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { PAYOUT_STATUSES, RAILS } from "../opsConst";
-import type { Payout, Rail as RailType } from "../opsTypes";
+import type { Payout } from "../opsTypes";
 import {
   Banner,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -36,32 +35,18 @@ import {
   LoadingBox,
   PageHead,
   Pager,
+  Pill,
   Rail,
-  formatStatusLabel,
   isTyping,
   useHotkeys,
   useToast,
   Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH") || u.includes("SETTLED") || u.includes("PAID")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("HOLD")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
 
 const PAYOUT_NOTES = [
   "Disbursement confirmed on provider rail; bank/mobile money reference recorded.",
-  "Switched payout rail and queued automated retry after destination account verification.",
-  "Placed temporary compliance hold pending TIN / beneficiary name match check.",
   "Transfer rejected by provider rail (dormant/invalid account) — freelancer wallet re-credited.",
 ];
 
@@ -74,8 +59,6 @@ export default function Payouts() {
   const [selId, setSelId] = useState<string | null>(null);
 
   const [ref, setRef] = useState("");
-  const [targetRail, setTargetRail] = useState<RailType>("TELEBIRR");
-  const [targetAcct, setTargetAcct] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -98,43 +81,48 @@ export default function Payouts() {
 
   useEffect(() => {
     if (sel) {
-      setTargetRail(sel.provider);
-      setTargetAcct(sel.acct);
       setRef(sel.ref ?? "");
     }
   }, [sel]);
 
   const executeSettle = useCallback(
-    async (outcome: "CONFIRMED" | "FAILED" | "RETRY" | "SWITCH_RAIL" | "HOLD") => {
+    async (outcome: "CONFIRMED" | "FAILED") => {
       if (!sel || busy) return;
+      const trimmedRef = ref.trim();
+      const trimmedReason = reason.trim();
+
+      if (outcome === "CONFIRMED" && trimmedRef && trimmedRef.length < 4) {
+        toast("Provider settlement reference must be at least 4 characters.");
+        return;
+      }
+      if (outcome === "FAILED" && trimmedReason.length < 5) {
+        toast("Failure reason must be at least 5 characters so the freelancer sees why.");
+        return;
+      }
+
       setBusy(true);
       try {
         await opsApi.settlePayout(sel.id, {
           outcome,
-          provider: outcome === "SWITCH_RAIL" ? targetRail : undefined,
-          acct: outcome === "SWITCH_RAIL" ? targetAcct.trim() || sel.acct : undefined,
-          ref: ref.trim() || undefined,
-          reason: reason.trim() || PAYOUT_NOTES[0],
+          ref: outcome === "CONFIRMED" ? trimmedRef || undefined : undefined,
+          reason: outcome === "FAILED" ? trimmedReason : trimmedReason || PAYOUT_NOTES[0],
         });
 
-        const msgMap: Record<typeof outcome, string> = {
-          CONFIRMED: `Payout ${sel.id} confirmed on ${sel.provider}.`,
-          SWITCH_RAIL: `Payout ${sel.id} rerouted to ${targetRail} and queued for processing.`,
-          RETRY: `Payout ${sel.id} re-queued for automated rail execution.`,
-          HOLD: `Compliance hold placed on payout ${sel.id}.`,
-          FAILED: `Payout ${sel.id} marked failed — freelancer wallet re-credited.`,
-        };
-        toast(msgMap[outcome]);
+        toast(
+          outcome === "CONFIRMED"
+            ? `Payout ${sel.id} confirmed on ${sel.provider}.`
+            : `Payout ${sel.id} marked failed — freelancer wallet re-credited.`,
+        );
         setReason("");
         reload();
         ui.refreshBadges();
       } catch (e) {
-        toast(e instanceof Error ? e.message : "Payout action failed");
+        toast(e instanceof Error ? e.message : "Payout settlement failed");
       } finally {
         setBusy(false);
       }
     },
-    [sel, busy, targetRail, targetAcct, ref, reason, reload, toast, ui],
+    [sel, busy, ref, reason, reload, toast, ui],
   );
 
   useHotkeys(
@@ -274,7 +262,7 @@ export default function Payouts() {
         />
       ) : null}
 
-      <GlassCard className="filters" style={{ marginTop: 14 }}>
+      <div className="filters" style={{ marginTop: 14 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -301,12 +289,12 @@ export default function Payouts() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={Wallet}>No payouts match this filter.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -323,7 +311,7 @@ export default function Payouts() {
                       <div className="qi-name">{p.user.displayName}</div>
                       <div className="qi-sub mono">{p.acct}</div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(p.status)}>{formatStatusLabel(p.status)}</ShinyBadge>
+                    <Pill s={p.status} />
                   </div>
                   <div className="qi-foot">
                     <Rail p={p.provider} />
@@ -345,7 +333,7 @@ export default function Payouts() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -358,7 +346,7 @@ export default function Payouts() {
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <Rail p={sel.provider} />
-                    <ShinyBadge variant={statusToVariant(sel.status)}>{formatStatusLabel(sel.status)}</ShinyBadge>
+                    <Pill s={sel.status} />
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -488,12 +476,12 @@ export default function Payouts() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Multi-Task Disbursement & Rail Execution
+                  Rail Settlement Decision
                 </div>
 
-                <div className="grid g3" style={{ gap: 10, marginBottom: 10 }}>
+                <div className="grid g2" style={{ gap: 10, marginBottom: 10 }}>
                   <div className="fld">
-                    <label className="lbl">Provider Reference / Bank Slip ID</label>
+                    <label className="lbl">Provider Reference / Bank Slip ID (min 4 chars)</label>
                     <input
                       className="inp mono"
                       placeholder="e.g. TB-OUT-99412"
@@ -502,79 +490,34 @@ export default function Payouts() {
                     />
                   </div>
                   <div className="fld">
-                    <label className="lbl">Target Rail (for Rail Switch)</label>
-                    <select
-                      className="sel"
-                      style={{ width: "100%" }}
-                      value={targetRail}
-                      onChange={(e) => setTargetRail(e.target.value as RailType)}
-                    >
-                      {RAILS.map((r) => (
-                        <option key={r} value={r}>
-                          {r}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="fld">
-                    <label className="lbl">Destination Account / MSISDN</label>
+                    <label className="lbl">Failure Reason (required min 5 chars if failing)</label>
                     <input
-                      className="inp mono"
-                      value={targetAcct}
-                      onChange={(e) => setTargetAcct(e.target.value)}
+                      className="inp"
+                      placeholder="Enter reason if failing transfer back to wallet…"
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
                     />
                   </div>
-                </div>
-
-                <div className="fld" style={{ marginBottom: 12 }}>
-                  <label className="lbl">Settlement / Failure / Hold Note</label>
-                  <input
-                    className="inp"
-                    placeholder="Enter settlement note or reason for rail switch / failure…"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                  />
                 </div>
 
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
                   <button
                     className="btn btn-success"
-                    disabled={busy}
+                    disabled={busy || sel.status === "CONFIRMED"}
                     onClick={() => void executeSettle("CONFIRMED")}
                   >
                     <Check size={14} /> Confirm Disbursement
                   </button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy}
-                    onClick={() => void executeSettle("SWITCH_RAIL")}
-                  >
-                    <ArrowLeftRight size={14} /> Switch Rail & Retry
-                  </button>
-                  <button
-                    className="btn btn-ghost"
-                    disabled={busy}
-                    onClick={() => void executeSettle("RETRY")}
-                  >
-                    <RefreshCw size={14} /> Auto-Retry Transfer
-                  </button>
-                  <button
-                    className="btn btn-warn"
-                    disabled={busy}
-                    onClick={() => void executeSettle("HOLD")}
-                  >
-                    <PauseCircle size={14} /> Place Compliance Hold
-                  </button>
-                  <button
                     className="btn btn-danger"
-                    disabled={busy}
+                    disabled={busy || sel.status === "CONFIRMED" || sel.status === "FAILED"}
                     onClick={() => void executeSettle("FAILED")}
                   >
                     <X size={14} /> Fail & Re-Credit Wallet
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

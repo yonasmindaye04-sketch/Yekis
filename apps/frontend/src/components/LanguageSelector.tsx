@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Languages, Check, ChevronDown } from "lucide-react";
 import { useI18n, SUPPORTED_LANGUAGES, type Language } from "../i18n";
+import { api } from "../api/client";
 import "./LanguageSelector.css";
 
 interface LanguageSelectorProps {
@@ -42,6 +43,15 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
 
   const currentLang = SUPPORTED_LANGUAGES.find((l) => l.code === language) || SUPPORTED_LANGUAGES[0];
 
+  const handleSelectLanguage = (nextLang: Language) => {
+    setLanguage(nextLang);
+    if (api.getToken()) {
+      void api.updateProfile({ languagePreference: nextLang }).catch(() => {
+        // Local preference remains active in i18n even if profile sync fails
+      });
+    }
+  };
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -71,7 +81,7 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
               key={lang.code}
               type="button"
               className={`yk-lang-segmented-btn ${isActive ? "is-active" : ""}`}
-              onClick={() => setLanguage(lang.code)}
+              onClick={() => handleSelectLanguage(lang.code)}
               aria-pressed={isActive}
               title={`${lang.name} (${lang.nativeName})`}
             >
@@ -108,7 +118,7 @@ export function LanguageSelector({ variant = "dropdown", className = "" }: Langu
                   type="button"
                   className={`yk-lang-option ${isSelected ? "is-selected" : ""}`}
                   onClick={() => {
-                    setLanguage(lang.code);
+                    handleSelectLanguage(lang.code);
                     setIsOpen(false);
                   }}
                 >

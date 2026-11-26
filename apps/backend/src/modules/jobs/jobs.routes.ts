@@ -15,6 +15,7 @@ import multer from "multer";
 import {
   createJob,
   searchJobs,
+  getFreelancerFeed,
   getJobById,
   cancelJob,
   ForbiddenRoleError,
@@ -119,6 +120,21 @@ jobsRouter.get("/mine", requireAuth, async (req: AuthedRequest, res) => {
     orderBy: { createdAt: "desc" },
   });
   return res.json(jobs);
+});
+
+jobsRouter.get("/feed", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = JobSearchQuery.pick({ page: true, pageSize: true }).safeParse(req.query);
+  if (!parsed.success)
+    return res
+      .status(400)
+      .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+
+  const result = await getFreelancerFeed({
+    userId: req.user!.id,
+    page: parsed.data.page,
+    pageSize: parsed.data.pageSize,
+  });
+  return res.json(result);
 });
 
 jobsRouter.get("/:jobId", requireAuth, async (req, res) => {

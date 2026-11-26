@@ -423,6 +423,7 @@ export const FALLBACK_OPS_OVERVIEW: OverviewBundle = {
   ],
   health: FALLBACK_OPS_HEALTH,
   escrows: FALLBACK_OPS_ESCROWS,
+  payments: [],
   recon: FALLBACK_OPS_RECON,
   riskFlags: FALLBACK_OPS_RISK_FLAGS,
   queues: {

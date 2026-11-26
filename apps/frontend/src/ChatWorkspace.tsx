@@ -37,6 +37,7 @@ import {
   type SmartReplyItem,
 } from "./api/client";
 import { realtimeSocket } from "./api/socket";
+import { playSound } from "./lib/soundEffects";
 import { useI18n } from "./i18n";
 import { CHAT_WORKSPACE_COPY } from "./chatWorkspaceCopy";
 import "./ChatWorkspace.css";
@@ -265,6 +266,9 @@ export function ChatWorkspace({
       if (msg.conversationId === activeConversationId) {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
+          if (msg.senderId !== currentUserId) {
+            playSound("messageReceived");
+          }
           return [...prev, msg];
         });
         if (msg.senderId !== currentUserId) {
@@ -513,6 +517,7 @@ export function ChatWorkspace({
         textToSend,
         finalAttachmentUrl || undefined
       );
+      playSound("messageSent");
 
       const nextMessages = messages.some((message) => message.id === newMsg.id)
         ? messages
@@ -619,6 +624,7 @@ export function ChatWorkspace({
     <div className="chat-workspace">
       {/* ── LEFT SIDEBAR: THREADS LIST ── */}
       <aside
+        data-tour="chat-sidebar"
         className={`chat-sidebar ${
           showMobileChatView ? "chat-sidebar-hidden-mobile" : ""
         }`}
@@ -661,7 +667,7 @@ export function ChatWorkspace({
             )}
           </div>
 
-          <div className="chat-filter-tabs">
+          <div className="chat-filter-tabs" data-tour="chat-filter-tabs">
             <button
               className={`filter-tab ${activeFilter === "ALL" ? "active" : ""}`}
               onClick={() => setActiveFilter("ALL")}
@@ -783,6 +789,7 @@ export function ChatWorkspace({
 
       {/* ── RIGHT MAIN: ACTIVE CONVERSATION ── */}
       <main
+        data-tour="chat-main-pane"
         className={`chat-window ${
           !showMobileChatView ? "chat-window-hidden-mobile" : ""
         }`}

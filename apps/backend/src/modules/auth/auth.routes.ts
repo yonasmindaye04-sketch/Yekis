@@ -167,11 +167,11 @@ authRouter.post("/register", registrationLimiter, async (req, res) => {
         .json({ error: "AGE_RESTRICTED", message: err.message });
     }
     if (err instanceof DuplicateUserError) {
-      // The address is already on file. The account exists, so signing in is
-      // the next step, and saying so would disclose that the address is
-      // registered — which is what the enumeration rule (L-02) forbids. The
-      // answer is the same one a successful registration gets.
-      return res.status(202).json(accepted);
+      return res.status(409).json({
+        error: "EMAIL_IN_USE",
+        message:
+          "An account with this email already exists. Please sign in instead.",
+      });
     }
     if (err instanceof PhoneInUseError) {
       // The number is on file and the address is not, so no account can be
@@ -203,7 +203,10 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
     return res.json(result);
   } catch (err) {
     if (err instanceof InvalidCredentialsError) {
-      return res.status(401).json({ error: "INVALID_CREDENTIALS" });
+      return res.status(401).json({
+        error: "INVALID_CREDENTIALS",
+        message: "Invalid email/phone or password. Please check your credentials and try again.",
+      });
     }
     logger.error({ err }, "Unexpected error during login");
     return res.status(500).json({ error: "INTERNAL_ERROR" });

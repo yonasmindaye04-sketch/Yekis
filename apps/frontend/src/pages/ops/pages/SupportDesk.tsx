@@ -27,6 +27,7 @@ import { getAttachmentLabel, isImageAttachment } from "../../../components/attac
 import { useListPage } from "../opsList";
 import type { RawChatMessage, RawConversation } from "../opsBackend";
 import {
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -34,21 +35,9 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  formatStatusLabel,
+  Pill,
   useToast,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
 
 /**
  * SLA is computed server-side (see modules/sla/sla.service.ts) and attached to
@@ -271,7 +260,7 @@ export default function SupportDesk() {
         />
       </div>
 
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -301,17 +290,17 @@ export default function SupportDesk() {
           allLabel="Sort by"
           label="Conversation sort"
         />
-        <button className="btn btn-ghost" onClick={reload}>
+        <button type="button" className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </GlassCard>
+      </div>
 
       <div className="queue-wrap">
         <div className="queue-list">
           {rows.length === 0 ? (
-            <GlassCard style={{ padding: "36px 16px", textAlign: "center" }}>
+            <Card className="card-pad" style={{ padding: "36px 16px", textAlign: "center" }}>
               <Empty icon={MessageSquare}>No conversations in this queue.</Empty>
-            </GlassCard>
+            </Card>
           ) : (
             rows.map((c) => {
               const last = c.messages[0];
@@ -323,7 +312,7 @@ export default function SupportDesk() {
                 >
                   <div className="q-head">
                     <strong>{c.subject}</strong>
-                    <ShinyBadge variant={statusToVariant(c.status)}>{formatStatusLabel(c.status)}</ShinyBadge>
+                    <Pill s={c.status} />
                   </div>
                   <div className="q-sub">
                     <span className="subject">{c.creator.email}</span>
@@ -358,7 +347,7 @@ export default function SupportDesk() {
         </div>
 
         {active ? (
-          <GlassCard className="queue-detail chat-panel">
+          <Card className="queue-detail chat-panel">
             <div className="qd-head">
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10, flexWrap: "wrap" }}>
                 <div>
@@ -484,13 +473,13 @@ export default function SupportDesk() {
                 ) : null}
               </div>
             </div>
-          </GlassCard>
+          </Card>
         ) : (
-          <GlassCard className="queue-detail chat-panel">
+          <Card className="queue-detail chat-panel">
             <div className="empty-detail">
               <Empty icon={MessageSquare}>Select a conversation to read and reply.</Empty>
             </div>
-          </GlassCard>
+          </Card>
         )}
       </div>
     </div>

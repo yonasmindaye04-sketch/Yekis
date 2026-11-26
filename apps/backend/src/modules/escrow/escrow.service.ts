@@ -1379,6 +1379,167 @@ export function getProviderClient(
   return PROVIDER_CLIENTS[provider];
 }
 
+/**
+ * A milestone as the workspace needs it: the real counterparty, the real
+ * contract title and the real payment rail.
+ *
+ * These three facts used to be invented on the client (a fixed demo
+ * counterparty, a made-up contract name and a rail picked by row index), so a
+ * brand-new account saw a populated ledger that belonged to nobody. The API
+ * now returns the facts it actually holds, and the dashboard renders them.
+ */
+export interface UserMilestoneDto {
+  id: string;
+  contractId: string;
+  title: string;
+  amountMinor: number;
+  dueDate: string;
+  escrowState: string;
+  deliverableUrl: string | null;
+  submittedAt: string | null;
+  autoReleaseAt: string | null;
+  releasedAt: string | null;
+  contract: {
+    id: string;
+    jobId: string;
+    status: string;
+    title: string;
+    category: string;
+  };
+  counterparty: {
+    id: string;
+    role: "CLIENT" | "FREELANCER";
+    name: string;
+    email: string;
+  };
+  /** The rail the money actually moved on, or null when it came from the
+   *  caller's wallet balance (an internal transfer, not a rail payment). */
+  paymentRail: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "CHAPA" | null;
+  /** When the escrow was funded. Null until the milestone is funded. */
+  fundedAt: string | null;
+}
+
+function displayNameOf(user: {
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string;
+}): string {
+  const full = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return user.displayName?.trim() || full || user.email;
+}
+
+/**
+ * Every milestone the caller is party to, across all of their contracts, with
+ * the data the workspace ledger needs.
+ *
+ * Strictly scoped to the caller: a contract they are not a party to is never
+ * in the result set, so the ledger can only ever show their own work.
+ */
+export async function listMilestonesForUser(
+  userId: string,
+): Promise<UserMilestoneDto[]> {
+  const rows = await prisma.milestone.findMany({
+    where: {
+      contract: {
+        OR: [{ clientId: userId }, { freelancerId: userId }],
+      },
+    },
+    include: {
+      contract: {
+        select: {
+          id: true,
+          jobId: true,
+          status: true,
+          clientId: true,
+          freelancerId: true,
+          job: { select: { title: true, category: true } },
+          client: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          freelancer: {
+            select: {
+              id: true,
+              email: true,
+              displayName: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+        },
+      },
+      paymentTransactions: {
+        where: { status: "SUCCESS" },
+        orderBy: { createdAt: "asc" },
+        select: { provider: true, createdAt: true },
+      },
+    },
+    orderBy: { dueDate: "asc" },
+  });
+
+  const rowIds = rows.map((m) => m.id);
+
+  // Wallet-funded milestones never create a PaymentTransaction, so the rail
+  // is unknown -- but the escrow-funding journal still records when the money
+  // moved into the pool. Without it every in-app funding would be dated
+  // "unknown" and the cash-flow chart would be empty for wallet users.
+  const fundJournals = rowIds.length
+    ? await prisma.ledgerJournal.findMany({
+        where: {
+          referenceType: "ESCROW_FUND",
+          referenceId: { in: rowIds },
+        },
+        select: { referenceId: true, postedAt: true },
+      })
+    : [];
+  const fundedAtByMilestone = new Map(
+    fundJournals.map((j) => [j.referenceId as string, j.postedAt]),
+  );
+
+  return rows.map((m) => {
+    const callerIsClient = m.contract.clientId === userId;
+    const counterparty = callerIsClient
+      ? m.contract.freelancer
+      : m.contract.client;
+    const payment = m.paymentTransactions[0];
+    const fundedAt = payment?.createdAt ?? fundedAtByMilestone.get(m.id) ?? null;
+
+    return {
+      id: m.id,
+      contractId: m.contractId,
+      title: m.title,
+      amountMinor: m.amountMinor,
+      dueDate: m.dueDate.toISOString(),
+      escrowState: m.escrowState,
+      deliverableUrl: m.deliverableUrl,
+      submittedAt: m.submittedAt ? m.submittedAt.toISOString() : null,
+      autoReleaseAt: m.autoReleaseAt ? m.autoReleaseAt.toISOString() : null,
+      releasedAt: m.releasedAt ? m.releasedAt.toISOString() : null,
+      contract: {
+        id: m.contract.id,
+        jobId: m.contract.jobId,
+        status: m.contract.status,
+        title: m.contract.job.title,
+        category: m.contract.job.category,
+      },
+      counterparty: {
+        id: counterparty.id,
+        role: callerIsClient ? "FREELANCER" : "CLIENT",
+        name: displayNameOf(counterparty),
+        email: counterparty.email,
+      },
+      paymentRail: payment ? payment.provider : null,
+      fundedAt: fundedAt ? fundedAt.toISOString() : null,
+    };
+  });
+}
+
 export interface UserTransactionMovement {
   id: string;
   journalId?: string;

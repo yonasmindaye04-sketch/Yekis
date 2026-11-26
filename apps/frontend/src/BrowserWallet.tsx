@@ -36,6 +36,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/base-ui/alert"
 import { Avatar, AvatarFallback } from "@/components/base-ui/avatar";
 import { cn } from "@/lib/utils";
 import { FileUploader } from "@/components/ui/file-upload-1";
+import { ContextualHelpTrigger } from "./components/guide/ContextualHelpTrigger";
 
 export type PaymentRail = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
 
@@ -722,7 +723,7 @@ export function BrowserWallet({
   return (
     <div className="browser-wallet-stack">
       {/* Balance hero — shown to all */}
-      <section className="wallet-hero">
+      <section className="wallet-hero" data-tour="wallet-hero">
         <div>
           <p className="eyebrow">Available balance</p>
           <strong>ETB {(wallet.balanceMinor / 100).toLocaleString()}</strong>
@@ -771,11 +772,14 @@ export function BrowserWallet({
 
       {/* Payouts: anyone who can earn can withdraw. Dual-role accounts included */}
       {role !== "CLIENT" && (
-        <section className="panel withdraw-panel">
+        <section className="panel withdraw-panel" data-tour="wallet-withdraw">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Verified payout</p>
-              <h2>Withdraw earnings</h2>
+              <div className="yk-help-heading-row">
+                <h2>Withdraw earnings</h2>
+                <ContextualHelpTrigger helpId="wallet-financial-actions" />
+              </div>
             </div>
             <WalletCards size={22} />
           </div>
@@ -966,11 +970,14 @@ export function BrowserWallet({
       )}
 
       {/* Top-Up — shown to all roles */}
-      <section className="panel browser-topup-panel">
+      <section className="panel browser-topup-panel" data-tour="wallet-topup">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Add funds</p>
-            <h2>Top up your wallet</h2>
+            <div className="yk-help-heading-row">
+              <h2>Top up your wallet</h2>
+              <ContextualHelpTrigger helpId="wallet-financial-actions" />
+            </div>
           </div>
           <button
             className="btn-icon"
@@ -1390,7 +1397,7 @@ export function BrowserWallet({
       </section>
 
       {/* Recent top-ups with manual verification action on stalled checkouts */}
-      <section className="panel">
+      <section className="panel" data-tour="wallet-recent-topups">
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Top-up audit log</p>

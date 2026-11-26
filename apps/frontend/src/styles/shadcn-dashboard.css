@@ -179,33 +179,7 @@
   top: 12px;
 }
 
-/* Ops Console Inset / Floating support */
-.ops-root.sh-ops-shell.sh-variant-inset .app {
-  background: var(--color-bg-subtle);
-  padding: 8px;
-  gap: 8px;
-}
-
-.ops-root.sh-ops-shell.sh-variant-inset .sidebar {
-  top: 8px;
-  bottom: 8px;
-  left: 8px;
-  border: 1px solid var(--ops-border);
-  border-radius: calc(var(--sh-radius) + 4px);
-}
-
-.ops-root.sh-ops-shell.sh-variant-inset .main {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--sh-radius) + 4px);
-}
-
-.ops-root.sh-ops-shell.sh-variant-floating .sidebar {
-  margin: 10px 0 10px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: calc(var(--sh-radius) + 4px);
-  height: calc(100vh - 20px);
-}
+/* Ops Console shell variants are defined cleanly inside styles/ops-console.css */
 
 /* ── Side Panel Alignment (Expanded 256px & Collapsed 68px Icon-Rail) ───── */
 
@@ -1902,6 +1876,39 @@
 
 .sh-trend-delta.positive {
   color: var(--color-primary);
+}
+
+/* A falling trend is stated, not hidden — the colour only carries the
+   direction, the number next to it is the real one. */
+.sh-trend-delta.negative {
+  color: var(--color-destructive, #dc2626);
+}
+
+/* "No history yet" is not a positive trend and must not read as one. */
+.sh-trend-delta.neutral {
+  color: var(--color-neutral-text, #64748b);
+}
+
+/* Empty state for the workspace charts: shown when the window holds no real
+   movement, instead of a curve built out of nothing. */
+.sh-chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 150px;
+  padding: 24px 16px;
+  text-align: center;
+  font-size: 0.76rem;
+  color: var(--color-neutral-text, #64748b);
+  border: 1px dashed var(--color-border);
+  border-radius: calc(var(--sh-radius) - 2px);
+}
+
+.sh-chart-empty strong {
+  font-size: 0.82rem;
+  color: var(--color-text, #0f172a);
 }
 
 .sh-kpi-drawer {

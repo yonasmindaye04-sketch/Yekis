@@ -5,6 +5,7 @@ import { api, type KycStatusResponse } from "./api/client";
 import { type Language, useI18n } from "./i18n";
 import { formatStatusLabel, statusTone } from "./pages/ops/components/ui";
 import "./BrowserVerification.css";
+import { ContextualHelpTrigger } from "./components/guide/ContextualHelpTrigger";
 
 type BvCopy = {
   badFileFormat: string;
@@ -561,7 +562,7 @@ export function BrowserVerification() {
         <div className="idv-inner">
 
           {/* Header */}
-          <header className="idv-header">
+          <header className="idv-header" data-tour="kyc-status-header">
             <div className="idv-header-main">
               <div className="idv-emblem" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -578,7 +579,10 @@ export function BrowserVerification() {
               </div>
               <div>
                 <p className="idv-overline">{k.eyebrowFayda || "Fayda Identity Review"}</p>
-                <h1 className="idv-title" id="idv-title">{k.verifyHeading || "Verify your identity"}</h1>
+                <div className="yk-help-heading-row">
+                  <h1 className="idv-title" id="idv-title">{k.verifyHeading || "Verify your identity"}</h1>
+                  <ContextualHelpTrigger helpId="kyc-verification" />
+                </div>
                 <p className="idv-sub">{k.verifyDesc || "Upload your Fayda ID. Fayda verification completes a biometric selfie check in a secure popup and may clear Tier 1 automatically."}</p>
               </div>
             </div>
@@ -630,7 +634,7 @@ export function BrowserVerification() {
           )}
 
           {/* Form */}
-          <form id="idvForm" noValidate onSubmit={(e) => void handleFormSubmit(e)}>
+          <form id="idvForm" noValidate onSubmit={(e) => void handleFormSubmit(e)} data-tour="kyc-form-card">
             <div className="idv-grid">
 
               {/* Full name */}

@@ -17,8 +17,6 @@ import {
   FileText,
   Lock,
   RefreshCw,
-  RotateCcw,
-  Scale,
   Search,
   ShieldCheck,
   TriangleAlert,
@@ -27,6 +25,8 @@ import {
 import { dt, fmt, opsApi, opsListApi } from "../opsApi";
 import {
   Banner,
+  Button,
+  Card,
   Empty,
   ErrorBox,
   FilterSelect,
@@ -34,24 +34,11 @@ import {
   LoadingBox,
   PageHead,
   Pager,
-  formatStatusLabel,
+  Pill,
   isTyping,
   useHotkeys,
   useToast,
-  Button,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
-
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND") || u.includes("HOLD")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV") || u.includes("REFUND")) return "neutral";
-  return "info";
-}
 import { useListPage } from "../opsList";
 import { ESCROW_STATES, HELD_STATES } from "../opsConst";
 import type { Escrow } from "../opsTypes";
@@ -60,11 +47,8 @@ import { toCsv, downloadCsv, dateOnly } from "../opsExport";
 
 const ESCROW_REASON_TEMPLATES = [
   "Deliverable verified against milestone acceptance criteria; releasing full escrow to freelancer.",
-  "Mutual partial settlement agreed: releasing pro-rata share to freelancer and refunding balance.",
   "Administrative hold placed pending dispute mediation and deliverable source-code audit.",
   "Administrative hold lifted after compliance & counterparty verification.",
-  "Milestone returned to Work-in-Progress for revision per client QA feedback.",
-  "Full escrow refunded to client following contract cancellation / missed SLA deadline.",
 ];
 
 export default function EscrowPage() {
@@ -75,7 +59,6 @@ export default function EscrowPage() {
   const [selId, setSelId] = useState<string | null>(null);
   const [templateReason, setTemplateReason] = useState("");
   const [customReason, setCustomReason] = useState("");
-  const [splitPct, setSplitPct] = useState(50);
   const [busy, setBusy] = useState(false);
 
   const list = useListPage<Escrow>(
@@ -96,15 +79,7 @@ export default function EscrowPage() {
   const sel = useMemo(() => rows.find((r) => r.id === selId) ?? null, [rows, selId]);
 
   const executeEscrowTask = useCallback(
-    async (
-      action:
-        | "RELEASE"
-        | "PARTIAL_SPLIT"
-        | "HOLD"
-        | "UNHOLD"
-        | "RETURN_WIP"
-        | "REFUND_CLIENT",
-    ) => {
+    async (action: "RELEASE" | "HOLD" | "UNHOLD") => {
       if (!sel || busy) return;
       const finalReason =
         templateReason === "custom"
@@ -118,30 +93,18 @@ export default function EscrowPage() {
 
       setBusy(true);
       try {
-        const splitAmountMinor =
-          action === "PARTIAL_SPLIT" ? Math.round((sel.amt * splitPct) / 100) : undefined;
-
         if (action === "RELEASE") {
           await opsApi.releaseEscrow(sel.id, finalReason);
         } else if (action === "HOLD") {
           await opsApi.holdEscrow(sel.id, finalReason);
-        } else if (action === "UNHOLD") {
-          await opsApi.unholdEscrow(sel.id, finalReason);
         } else {
-          await opsApi.actOnEscrow(sel.id, {
-            action,
-            splitAmountMinor,
-            reason: finalReason,
-          });
+          await opsApi.unholdEscrow(sel.id, finalReason);
         }
 
         const msgMap: Record<typeof action, string> = {
           RELEASE: `Full escrow (${fmt(sel.amt)}) released to ${sel.fl} and audited.`,
-          PARTIAL_SPLIT: `Partial split (${splitPct}% / ${100 - splitPct}%) executed for ${sel.title}.`,
           HOLD: `Administrative hold placed on milestone ${sel.id}.`,
           UNHOLD: `Administrative hold removed from milestone ${sel.id}.`,
-          RETURN_WIP: `Milestone ${sel.id} returned to Work-in-Progress.`,
-          REFUND_CLIENT: `Escrow (${fmt(sel.amt)}) refunded to client wallet.`,
         };
 
         toast(msgMap[action]);
@@ -155,7 +118,7 @@ export default function EscrowPage() {
         setBusy(false);
       }
     },
-    [sel, busy, templateReason, customReason, splitPct, reload, toast, ui],
+    [sel, busy, templateReason, customReason, reload, toast, ui],
   );
 
   useHotkeys(
@@ -301,7 +264,7 @@ export default function EscrowPage() {
         />
       ) : null}
 
-      <GlassCard className="filters" style={{ marginTop: 16 }}>
+      <div className="filters" style={{ marginTop: 16 }}>
         <div className="f-search">
           <Search size={15} />
           <input
@@ -320,12 +283,12 @@ export default function EscrowPage() {
         <Button variant="outline" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </Button>
-      </GlassCard>
+      </div>
 
       {rows.length === 0 ? (
-        <GlassCard>
+        <Card>
           <Empty icon={DollarSign}>No milestone escrows match.</Empty>
-        </GlassCard>
+        </Card>
       ) : (
         <div className="queue-wrap">
           <div className="queue-list">
@@ -344,7 +307,7 @@ export default function EscrowPage() {
                         {e.job} · {e.fl}
                       </div>
                     </div>
-                    <ShinyBadge variant={statusToVariant(e.held ? "ADMIN_HOLD" : e.state)}>{formatStatusLabel(e.held ? "ADMIN_HOLD" : e.state)}</ShinyBadge>
+                    <Pill s={e.held ? "ADMIN_HOLD" : e.state} />
                   </div>
                   <div className="qi-foot">
                     <span className="mono">{e.id}</span>
@@ -362,7 +325,7 @@ export default function EscrowPage() {
           </div>
 
           {sel ? (
-            <GlassCard className="queue-detail">
+            <Card className="queue-detail">
               <div
                 style={{
                   display: "flex",
@@ -374,8 +337,10 @@ export default function EscrowPage() {
               >
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <ShinyBadge variant={statusToVariant(sel.held ? "ADMIN_HOLD" : sel.state)}>{formatStatusLabel(sel.held ? "ADMIN_HOLD" : sel.state)}</ShinyBadge>
-                    <ShinyBadge variant="info">{sel.rail}</ShinyBadge>
+                    <Pill s={sel.held ? "ADMIN_HOLD" : sel.state} />
+                    <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: "var(--ops-text-2)" }}>
+                      {sel.rail}
+                    </span>
                     <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                       {sel.id}
                     </span>
@@ -391,7 +356,8 @@ export default function EscrowPage() {
                     {sel.title}
                   </h3>
                   <div style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
-                    Contract: <b>{sel.job}</b> ({sel.contractId ?? "ctr-301"}) · Funded {dt(sel.created)}
+                    Contract: <b>{sel.job}</b>
+                    {sel.contractId ? ` (${sel.contractId})` : ""} · Funded {dt(sel.created)}
                   </div>
                 </div>
 
@@ -425,9 +391,9 @@ export default function EscrowPage() {
               <div className="info-grid">
                 <div className="info-cell">
                   <div className="k">Client Depositor</div>
-                  <div className="v">{sel.client ?? "Abebe Kebede"}</div>
+                  <div className="v">{sel.client ?? "—"}</div>
                   <div style={{ fontSize: 11.5, color: "var(--ops-text-2)", marginTop: 2 }}>
-                    {sel.clientEmail ?? "abebe.kebede@abyssinia-tech.et"}
+                    {sel.clientEmail ?? "Client account on record"}
                   </div>
                 </div>
                 <div className="info-cell">
@@ -453,7 +419,7 @@ export default function EscrowPage() {
                 </div>
                 <div className="info-cell">
                   <div className="k">Funding TX Reference</div>
-                  <div className="v mono">{sel.txId ?? "TB26101899201"}</div>
+                  <div className="v mono">{sel.txId ?? "—"}</div>
                 </div>
               </div>
 
@@ -511,42 +477,25 @@ export default function EscrowPage() {
                 }}
               >
                 <div className="sec-title" style={{ marginBottom: 8 }}>
-                  Multi-Task Escrow Execution (Audited)
+                  Custody Release &amp; Admin Hold Control (Audited)
                 </div>
 
-                <div className="grid g2" style={{ gap: 10, marginBottom: 10 }}>
-                  <div className="fld">
-                    <label className="lbl">Preset Audit Reason (Min 10 chars)</label>
-                    <select
-                      className="sel"
-                      style={{ width: "100%" }}
-                      value={templateReason}
-                      onChange={(e) => setTemplateReason(e.target.value)}
-                    >
-                      <option value="">Select standard escrow audit reason…</option>
-                      {ESCROW_REASON_TEMPLATES.map((tpl) => (
-                        <option key={tpl} value={tpl}>
-                          {tpl}
-                        </option>
-                      ))}
-                      <option value="custom">Custom administrative reason…</option>
-                    </select>
-                  </div>
-                  <div className="fld">
-                    <label className="lbl">
-                      Partial Split Allocation ({splitPct}% Freelancer: {fmt(Math.round((sel.amt * splitPct) / 100))} /{" "}
-                      {100 - splitPct}% Client: {fmt(Math.round((sel.amt * (100 - splitPct)) / 100))})
-                    </label>
-                    <input
-                      type="range"
-                      min={10}
-                      max={90}
-                      step={5}
-                      value={splitPct}
-                      onChange={(e) => setSplitPct(Number(e.target.value))}
-                      style={{ width: "100%", marginTop: 8 }}
-                    />
-                  </div>
+                <div className="fld" style={{ marginBottom: 10 }}>
+                  <label className="lbl">Preset Audit Reason (Min 10 chars)</label>
+                  <select
+                    className="sel"
+                    style={{ width: "100%" }}
+                    value={templateReason}
+                    onChange={(e) => setTemplateReason(e.target.value)}
+                  >
+                    <option value="">Select standard escrow audit reason…</option>
+                    {ESCROW_REASON_TEMPLATES.map((tpl) => (
+                      <option key={tpl} value={tpl}>
+                        {tpl}
+                      </option>
+                    ))}
+                    <option value="custom">Custom administrative reason…</option>
+                  </select>
                 </div>
 
                 {templateReason === "custom" ? (
@@ -554,7 +503,7 @@ export default function EscrowPage() {
                     <label className="lbl">Custom Audit Reason (Minimum 10 characters)</label>
                     <input
                       className="inp"
-                      placeholder="Enter detailed justification for releasing, holding, or refunding this escrow…"
+                      placeholder="Enter detailed justification for releasing or holding this escrow…"
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
                     />
@@ -564,43 +513,29 @@ export default function EscrowPage() {
                 <div className="action-bar" style={{ flexWrap: "wrap", gap: 8 }}>
                   <button
                     className="btn btn-success"
-                    disabled={busy || sel.state === "RELEASED"}
+                    disabled={busy || sel.state === "RELEASED" || sel.state === "REFUNDED"}
                     onClick={() => void executeEscrowTask("RELEASE")}
                   >
                     <Check size={14} /> Full Release to Freelancer
                   </button>
                   <button
-                    className="btn btn-primary"
-                    disabled={busy || sel.state === "RELEASED"}
-                    onClick={() => void executeEscrowTask("PARTIAL_SPLIT")}
-                  >
-                    <Scale size={14} /> Partial Split ({splitPct}/{100 - splitPct})
-                  </button>
-                  <button
                     className="btn btn-warn"
-                    disabled={busy || sel.state === "RELEASED"}
+                    disabled={busy || sel.state === "RELEASED" || sel.state === "REFUNDED"}
                     onClick={() => void executeEscrowTask(sel.held ? "UNHOLD" : "HOLD")}
                   >
                     {sel.held ? <Unlock size={14} /> : <Lock size={14} />}
                     {sel.held ? "Remove Admin Hold" : "Place Admin Hold"}
                   </button>
                   <button
-                    className="btn btn-ghost"
-                    disabled={busy || sel.state === "RELEASED"}
-                    onClick={() => void executeEscrowTask("RETURN_WIP")}
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() => ui.navigate("dispute-queue")}
                   >
-                    <RefreshCw size={14} /> Return to Work-in-Progress
-                  </button>
-                  <button
-                    className="btn btn-danger"
-                    disabled={busy || sel.state === "RELEASED"}
-                    onClick={() => void executeEscrowTask("REFUND_CLIENT")}
-                  >
-                    <RotateCcw size={14} /> Full Refund to Client
+                    <ExternalLink size={14} /> Open Dispute Mediation (Splits &amp; Refunds)
                   </button>
                 </div>
               </div>
-            </GlassCard>
+            </Card>
           ) : null}
         </div>
       )}

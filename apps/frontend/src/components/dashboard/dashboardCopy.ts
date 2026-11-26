@@ -136,8 +136,6 @@ export type DashboardCopy = {
     escrowFundedReady: string;
     milestonesCount: (n: number) => string;
     openKanbanBtn: string;
-    plusThisWeek: string;
-    verifiedClientsMeta: string;
     combinedBudgetPool: string;
     exploreBriefsBtn: string;
     duePrefix: (date: string) => string;
@@ -433,8 +431,6 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       escrowFundedReady: "Escrow Funded & Ready",
       milestonesCount: (n) => `${n} milestones`,
       openKanbanBtn: "Open Milestone Kanban Board",
-      plusThisWeek: "+5 this week",
-      verifiedClientsMeta: "Verified Ethiopian clients",
       combinedBudgetPool: "Combined Max Budget Pool",
       exploreBriefsBtn: "Explore All Briefs",
       duePrefix: (d) => `Due ${d}`,
@@ -449,6 +445,9 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         RELEASED: "Released",
         PAYMENT_PENDING: "Awaiting Funding",
         DISPUTED: "Disputed",
+        ACCEPTED: "Accepted",
+        REFUNDED: "Refunded",
+        PARTIAL_REFUND: "Partially Refunded",
       },
       title: "Contracts, Milestones & Escrow Ledger",
       subtitle: (n) => `${n} records · Total volume`,
@@ -755,8 +754,6 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       escrowFundedReady: "ኤስክሮ ተከፍሎ ዝግጁ",
       milestonesCount: (n) => `${n} ምዕራፎች`,
       openKanbanBtn: "የምዕራፍ Kanban ሰሌዳ ክፈት",
-      plusThisWeek: "+5 በዚህ ሳምንት",
-      verifiedClientsMeta: "የተረጋገጡ የኢትዮጵያ ደንበኞች",
       combinedBudgetPool: "ጠቅላላ ከፍተኛ በጀት",
       exploreBriefsBtn: "ሁሉንም ሥራዎች አስስ",
       duePrefix: (d) => `ማለቂያ ${d}`,
@@ -771,6 +768,9 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         RELEASED: "ተለቋል",
         PAYMENT_PENDING: "ክፍያ በመጠበቅ ላይ",
         DISPUTED: "አለመግባባት",
+        ACCEPTED: "ተቀብሏል",
+        REFUNDED: "ተመልሷል",
+        PARTIAL_REFUND: "በከፊል ተመልሷል",
       },
       title: "ውሎች፣ ምዕራፎች እና የኤስክሮ መዝገብ",
       subtitle: (n) => `${n} መዝገቦች · ጠቅላላ መጠን`,
@@ -1065,8 +1065,6 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       escrowFundedReady: "Escrow Guutamee Qophaa'aa",
       milestonesCount: (n) => `Boqonnaa ${n}`,
       openKanbanBtn: "Gabatee Kanban Bani",
-      plusThisWeek: "+5 torban kana",
-      verifiedClientsMeta: "Maamiltoota Itoophiyaa mirkaneeffaman",
       combinedBudgetPool: "Kuusaa Baajata Olaanaa Waliigalaa",
       exploreBriefsBtn: "Ibsa Hojii Hunda Ilaali",
       duePrefix: (d) => `Xumura ${d}`,
@@ -1081,6 +1079,9 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         RELEASED: "Gadhiifameera",
         PAYMENT_PENDING: "Kaffaltii Eega",
         DISPUTED: "Falmii Irra",
+        ACCEPTED: "Qabsiyyateera",
+        REFUNDED: "Deebi'ameera",
+        PARTIAL_REFUND: "Dhuma deebi'ameera",
       },
       title: "Waliigaltee, Boqonnaa Hojiifi Galmee Escrow",
       subtitle: (n) => `Galmee ${n} · Hanga waliigalaa`,
@@ -1371,8 +1372,6 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       escrowFundedReady: "ኤስክሮ ተኸፊሉ ድሉው",
       milestonesCount: (n) => `${n} ምዕራፋት`,
       openKanbanBtn: "ሰሌዳ Kanban ክፈት",
-      plusThisWeek: "+5 ኣብዚ ሰሙን",
-      verifiedClientsMeta: "ዝተረጋገጹ ኢትዮጵያውያን ዓማዊል",
       combinedBudgetPool: "ጠቕላላ ዝለዓለ ባጀት",
       exploreBriefsBtn: "ኩሎም ስራሕቲ ርአ",
       duePrefix: (d) => `መወዳእታ ${d}`,
@@ -1387,6 +1386,9 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         RELEASED: "ተለቂቑ",
         PAYMENT_PENDING: "ክፍሊት ይጽበ",
         DISPUTED: "ክርክር ኣሎ",
+        ACCEPTED: "ተቀብሏል",
+        REFUNDED: "ተመልሷል",
+        PARTIAL_REFUND: "በከፊል ተመልሷል",
       },
       title: "ውዕላት፣ ምዕራፋትን መዝገብ ኤስክሮን",
       subtitle: (n) => `${n} መዝገባት · ጠቕላላ መጠን`,

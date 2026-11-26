@@ -28,31 +28,26 @@ import {
   FilterSelect,
   Kv,
   LoadingBox,
+  OpsActionModal,
   OpsTable,
   PageHead,
   Pager,
+  Pill,
   Rail,
-  formatStatusLabel,
   useToast,
 } from "../components/ui";
-import { GlassCard } from "../../../components/ui-v2/GlassCard";
-import { ShinyBadge } from "../../../components/ui-v2/ShinyBadge";
 
-function statusToVariant(s: string): "success" | "warning" | "error" | "processing" | "neutral" | "info" {
-  const u = (s ?? "").toUpperCase();
-  if (u.includes("PEND") || u.includes("AWAIT") || u.includes("REVIEW")) return "warning";
-  if (u.includes("ACTIVE") || u.includes("APPROV") || u.includes("RELEASE") || u.includes("COMPLET") || u.includes("VERIF") || u.includes("MATCH")) return "success";
-  if (u.includes("DISPUT") || u.includes("FAIL") || u.includes("REJECT") || u.includes("FLAG") || u.includes("BLOCK") || u.includes("SUSPEND")) return "error";
-  if (u.includes("PROCESS") || u.includes("SUBMIT") || u.includes("PROGRESS")) return "processing";
-  if (u.includes("DRAFT") || u.includes("INACTIVE") || u.includes("CLOSE") || u.includes("ARCHIV")) return "neutral";
-  return "info";
-}
+type ReceiptDialogState =
+  | { kind: "REJECTED"; row: RawTopUpItem }
+  | { kind: "FLAG"; row: RawTopUpItem }
+  | null;
 
 export default function Receipts() {
   const toast = useToast();
   const [status, setStatus] = useState("PENDING");
   const [openId, setOpenId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<ReceiptDialogState>(null);
 
   const list = useListPage<RawTopUpItem>(
     (p) => opsListApi.topUps({ ...p, status }),
@@ -61,29 +56,32 @@ export default function Receipts() {
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
-  const act = async (row: RawTopUpItem, kind: "APPROVED" | "REJECTED" | "FLAG") => {
-    const reason =
-      kind === "REJECTED"
-        ? window.prompt("Rejection reason (min 5 characters):") ?? ""
-        : kind === "FLAG"
-          ? window.prompt("Why is this suspicious? (min 10 characters):") ?? ""
-          : "";
-    if (kind !== "APPROVED" && reason.trim().length < (kind === "FLAG" ? 10 : 5)) {
-      toast("A longer reason is required.");
-      return;
-    }
+  const approve = async (row: RawTopUpItem) => {
     setBusyId(row.id);
     try {
-      if (kind === "APPROVED") await opsApi.reviewTopUp(row.id, "APPROVED");
-      else if (kind === "REJECTED") await opsApi.reviewTopUp(row.id, "REJECTED", reason.trim());
-      else await opsApi.flagTopUp(row.id, reason.trim());
-      toast(
-        kind === "APPROVED"
-          ? "Top-up approved and wallet credited."
-          : kind === "REJECTED"
-            ? "Top-up rejected."
-            : "Flagged for AML review — see Risk & Fraud.",
-      );
+      await opsApi.reviewTopUp(row.id, "APPROVED");
+      toast("Top-up approved and wallet credited.");
+      setOpenId(null);
+      reload();
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleModalConfirm = async ({ values }: { values: Record<string, string> }) => {
+    if (!dialog) return;
+    setBusyId(dialog.row.id);
+    try {
+      if (dialog.kind === "REJECTED") {
+        await opsApi.reviewTopUp(dialog.row.id, "REJECTED", values.reason);
+        toast("Top-up rejected.");
+      } else {
+        await opsApi.flagTopUp(dialog.row.id, values.reason);
+        toast("Flagged for AML review — see Risk & Fraud.");
+      }
+      setDialog(null);
       setOpenId(null);
       reload();
     } catch (e) {
@@ -114,7 +112,7 @@ export default function Receipts() {
         title="Receipt Reviews"
         sub="Manual bank and mobile-money transfers awaiting verification"
         right={
-          <button className="btn btn-ghost" onClick={reload}>
+          <button type="button" className="btn btn-ghost" onClick={reload}>
             <RefreshCw size={14} /> Refresh
           </button>
         }
@@ -152,7 +150,7 @@ export default function Receipts() {
         />
       </div>
 
-      <GlassCard className="filters">
+      <div className="filters">
         <div className="f-search">
           <Search size={15} />
           <input
@@ -168,38 +166,55 @@ export default function Receipts() {
           allLabel="All statuses"
           label="Top-up status"
         />
-        <button className="btn btn-ghost" onClick={reload}>
+        <button type="button" className="btn btn-ghost" onClick={reload}>
           <RefreshCw size={14} /> Refresh
         </button>
-      </GlassCard>
+      </div>
 
       <OpsTable
         heads={["User", "Amount", "Rail", "Reference", "History", "Submitted", "Status", ""]}
         foot={<Pager page={page} pages={pages} total={total} onPage={setPage} unit="transfers" />}
       >
         {rows.length === 0 ? (
-          <tr><td colSpan={8}><Empty icon={WalletCards}>No top-ups in this state.</Empty></td></tr>
+          <tr>
+            <td colSpan={8}>
+              <Empty icon={WalletCards}>No top-ups in this state.</Empty>
+            </td>
+          </tr>
         ) : (
           rows.map((r) => (
             <Fragment key={r.id}>
-              <tr className="clickable" onClick={() => setOpenId(openId === r.id ? null : r.id)}>
+              <tr
+                className="clickable"
+                onClick={() => setOpenId(openId === r.id ? null : r.id)}
+              >
                 <td>
                   <div className="cell-main">{r.user.email}</div>
                   <div className="cell-sub mono">{r.user.ucid}</div>
                 </td>
                 <td className="amount">{fmt(r.amountMinor)}</td>
-                <td><Rail p={r.provider} /></td>
-                <td className="mono" style={{ fontSize: 12.5 }}>{r.referenceNumber || "—"}</td>
+                <td>
+                  <Rail p={r.provider} />
+                </td>
+                <td className="mono" style={{ fontSize: 12.5 }}>
+                  {r.referenceNumber || "—"}
+                </td>
                 <td style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
-                  {r.userHistory.approvedCount} approved · {fmt(r.userHistory.approvedTotalMinor)}
+                  {r.userHistory.approvedCount} approved ·{" "}
+                  {fmt(r.userHistory.approvedTotalMinor)}
                   {r.userHistory.rejectedCount ? ` · ${r.userHistory.rejectedCount} rejected` : ""}
                 </td>
-                <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>{dt(r.createdAt)}</td>
-                <td><ShinyBadge variant={statusToVariant(r.status)}>{formatStatusLabel(r.status)}</ShinyBadge></td>
+                <td style={{ color: "var(--ops-text-2)", fontSize: 12.5 }}>
+                  {dt(r.createdAt)}
+                </td>
+                <td>
+                  <Pill s={r.status} />
+                </td>
                 <td>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     {r.receiptImagePath ? (
                       <button
+                        type="button"
                         className="btn btn-ghost btn-sm"
                         title="Open the receipt image"
                         onClick={(e) => {
@@ -211,6 +226,7 @@ export default function Receipts() {
                       </button>
                     ) : null}
                     <button
+                      type="button"
                       className="btn btn-ghost btn-sm"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -234,31 +250,34 @@ export default function Receipts() {
                       </div>
                       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                         <button
+                          type="button"
                           className="btn btn-ghost btn-sm"
                           disabled={busyId === r.id || r.status !== "PENDING"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void act(r, "FLAG");
+                            setDialog({ kind: "FLAG", row: r });
                           }}
                         >
                           <TriangleAlert size={13} /> Flag as suspicious
                         </button>
                         <button
+                          type="button"
                           className="btn btn-red btn-sm"
                           disabled={busyId === r.id || r.status !== "PENDING"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void act(r, "REJECTED");
+                            setDialog({ kind: "REJECTED", row: r });
                           }}
                         >
                           <XCircle size={13} /> Reject
                         </button>
                         <button
+                          type="button"
                           className="btn btn-green btn-sm"
                           disabled={busyId === r.id || r.status !== "PENDING"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void act(r, "APPROVED");
+                            void approve(r);
                           }}
                         >
                           <CheckCircle2 size={13} /> Approve &amp; credit
@@ -272,6 +291,44 @@ export default function Receipts() {
           ))
         )}
       </OpsTable>
+
+      <OpsActionModal
+        open={dialog !== null}
+        title={
+          dialog?.kind === "FLAG"
+            ? "Flag Top-Up as Suspicious"
+            : "Reject Top-Up Transfer"
+        }
+        description={
+          dialog
+            ? `${dialog.row.user.email} · ${fmt(dialog.row.amountMinor)} via ${dialog.row.provider}`
+            : undefined
+        }
+        tone="danger"
+        confirmLabel={
+          dialog?.kind === "FLAG" ? "Flag for AML Review" : "Reject Top-Up"
+        }
+        busy={Boolean(dialog && busyId === dialog.row.id)}
+        fields={[
+          {
+            name: "reason",
+            label:
+              dialog?.kind === "FLAG"
+                ? "Suspicious Activity Details"
+                : "Rejection Reason",
+            placeholder:
+              dialog?.kind === "FLAG"
+                ? "Explain why this transfer requires AML escalation…"
+                : "Explain why this manual receipt cannot be verified…",
+            multiline: true,
+            required: true,
+            minLength: dialog?.kind === "FLAG" ? 10 : 5,
+            maxLength: 500,
+          },
+        ]}
+        onConfirm={handleModalConfirm}
+        onCancel={() => !busyId && setDialog(null)}
+      />
     </div>
   );
 }

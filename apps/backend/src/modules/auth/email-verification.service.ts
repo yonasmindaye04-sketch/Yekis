@@ -15,6 +15,7 @@ export class EmailCodeAttemptsExceededError extends Error {}
 export class EmailCodeRateLimitedError extends Error {}
 export class EmailCodeDeliveryFailedError extends Error {}
 export class EmailCodeInvalidError extends Error {}
+export class EmailAlreadyRegisteredError extends Error {}
 
 /**
  * What an email code proves. Each purpose has its own outstanding code, so an
@@ -117,6 +118,21 @@ export async function requestEmailCode(params: {
 
   if (!isDeliverableEmailShape(email)) {
     throw new EmailCodeInvalidError("Enter a valid email address.");
+  }
+
+  // During unauthenticated signup (no userId), stop immediately if the email
+  // is already registered so we never send a verification code or continue
+  // the registration wizard for an existing account.
+  if (!params.userId) {
+    const existingAccount = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (existingAccount) {
+      throw new EmailAlreadyRegisteredError(
+        "An account with this email already exists. Please sign in instead.",
+      );
+    }
   }
 
   // Throttle by address AND purpose. Without this, anyone can burn a target's

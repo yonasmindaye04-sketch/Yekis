@@ -14,6 +14,7 @@ import {
   acceptMilestone,
   withdrawFromWallet,
   getUserTransactionMovements,
+  listMilestonesForUser,
   MilestoneNotFoundError,
   NotContractPartyError,
   InvalidEscrowStateError,
@@ -251,24 +252,17 @@ escrowRouter.post(
 );
 
 // Milestones belonging to the caller, across every contract they are party to.
+//
+// The response carries the counterparty, the contract title and the payment
+// rail alongside the milestone itself. The workspace ledger used to invent
+// those three on the client, which is how a fresh account found an empty
+// account showing someone else's counterparty names and settlement history.
 escrowRouter.get(
   "/milestones",
   requireAuth,
   async (req: AuthedRequest, res) => {
     try {
-      const milestones = await prisma.milestone.findMany({
-        where: {
-          contract: {
-            OR: [{ clientId: req.user!.id }, { freelancerId: req.user!.id }],
-          },
-        },
-        include: {
-          contract: {
-            select: { id: true, jobId: true, status: true },
-          },
-        },
-        orderBy: { dueDate: "asc" },
-      });
+      const milestones = await listMilestonesForUser(req.user!.id);
       return res.json(milestones);
     } catch (err) {
       logger.error({ err }, "Failed to list milestones");

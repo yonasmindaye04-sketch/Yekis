@@ -54,7 +54,7 @@ erDiagram
 
 | Model | Responsibility and important invariants |
 |---|---|
-| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities. **`email` is stored lower-cased and trimmed** — the canonical form the login lookup, the OAuth path and the email-OTP proof all use — so an account is never unreachable by the sign-in that follows it, and one mailbox cannot hold two accounts spelled differently |
+| `User` | Unique email, phone, UCID, optional Fayda/Telegram/Google/Apple/Facebook IDs; marketplace and staff roles; cached KYC fields and lifetime earn/spend totals; `isGuestContact` flag for support widget identities; nullable `guideProgress` JSONB storing per-user Yekis Guide tour completion, skipped tours, dismissed prompts, and last step state (exported under PDPP Art. 13 and cleared on Art. 15 erasure). **`email` is stored lower-cased and trimmed** — the canonical form the login lookup, the OAuth path and the email-OTP proof all use — so an account is never unreachable by the sign-in that follows it, and one mailbox cannot hold two accounts spelled differently |
 | `ConsentRecord` | Purpose-specific consent history captured at registration |
 | `KycRecord` | One per user; tier/status, Fayda eSignet fields, PEP screening metadata, review metadata, `periodicReviewPending` |
 | `KycReviewEvent` | Immutable log of each staff KYC decision (VERIFIED/REJECTED) with tier at decision time |

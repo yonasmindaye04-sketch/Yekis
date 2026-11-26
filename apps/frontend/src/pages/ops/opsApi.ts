@@ -615,6 +615,7 @@ async function loadOverview(): Promise<OverviewBundle> {
     activity: (dash?.recentActivity ?? []).map(toActivity),
     health: health ? toHealth(health) : EMPTY_HEALTH,
     escrows: escrows.items.map(toEscrow),
+    payments: payments.items.map(toPayment),
     recon: recon.items.map(toRecon),
     riskFlags: flags.items.map(toRiskFlag),
     queues: {
@@ -1173,19 +1174,10 @@ export const opsApi = {
     return r ? r.items.map(toContract) : [];
   },
   contractDetail: (id: string) => api.adminGetContract(id) as Promise<RawContractDetail>,
-  interveneContract: (
-    id: string,
-    body: { action: string; milestoneId?: string; reason: string },
-  ) => api.adminInterveneContract(id, body),
-
   payments: async () => {
     const r = await soft(rPayments(), null);
     return r ? r.items.map(toPayment) : [];
   },
-  actOnPayment: (
-    id: string,
-    body: { action: "VERIFY" | "RESYNC" | "FLAG" | "REFUND"; ref?: string; reason: string },
-  ) => api.adminPaymentAction(id, body),
 
   payouts: async () => {
     const r = await soft(rPayouts(), null);
@@ -1194,31 +1186,19 @@ export const opsApi = {
   settlePayout: (
     id: string,
     body: {
-      outcome: "CONFIRMED" | "FAILED" | "RETRY" | "SWITCH_RAIL" | "HOLD";
-      provider?: string;
-      acct?: string;
+      outcome: "CONFIRMED" | "FAILED";
       ref?: string;
       reason?: string;
     },
   ) =>
     api.adminSettlePayout(id, {
       decision: body.outcome,
-      provider: body.provider,
-      payoutAccountIdentifier: body.acct,
       providerPayoutId: body.ref,
       failureReason: body.reason,
     }),
   releaseEscrow: (id: string, reason: string) => api.adminReleaseEscrow(id, reason),
   holdEscrow: (id: string, reason: string) => api.adminHoldEscrow(id, reason),
   unholdEscrow: (id: string, reason: string) => api.adminUnholdEscrow(id, reason),
-  actOnEscrow: (
-    id: string,
-    body: {
-      action: "RELEASE" | "PARTIAL_SPLIT" | "HOLD" | "UNHOLD" | "RETURN_WIP" | "REFUND_CLIENT";
-      splitAmountMinor?: number;
-      reason: string;
-    },
-  ) => api.adminEscrowAction(id, body),
 
   escrows: async () => {
     const r = await soft(rEscrows(), null);
@@ -1228,26 +1208,8 @@ export const opsApi = {
     const r = await soft(rRecon(), null);
     return r ? r.items.map(toRecon) : [];
   },
-  resolveReconciliation: (
-    id: string,
-    body: {
-      action: "FORCE_MATCH" | "POST_ADJUSTMENT" | "FLAG_FAILED" | "RESOLVE";
-      adjustedAmountMinor?: number;
-      reason: string;
-    },
-  ) => api.adminResolveReconciliation(id, body),
 
   ledger: () => loadLedger(),
-  actOnJournal: (
-    id: string,
-    body: {
-      action: "VERIFY" | "REVERSE" | "ADJUSTMENT";
-      amountMinor?: number;
-      description?: string;
-      referenceType?: string;
-      referenceId?: string;
-    },
-  ) => api.adminJournalAction(id, body),
 
   users: async () => {
     const r = await soft(rUsers(), null);
