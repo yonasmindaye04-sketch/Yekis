@@ -1546,3 +1546,97 @@ deleting the database throws away the migrated schema, and the next
 deployment would have to apply all 36 migrations again. **The bucket is the
 one that bills**: delete it, or the wallet keeps paying 50 ETB a month for
 it.
+
+---
+
+## 12. Going to production — the gap list
+
+This section lists what separates the current staging deployment from a
+production one. Every item is a configuration, a credential, or a platform
+choice that only the account holder can make; none of it is a code change.
+The gap list is cross-referenced to `docs/COMPLETENESS_CHECKLIST.md`.
+
+### 12.1 Environment variables that must change
+
+| Variable | Staging value | Production value | Why |
+|---|---|---|---|
+| `NODE_ENV` | `staging` | `production` | Switches on the fail-closed boot checks in `config/env.ts` and `server.ts` |
+| `TELEGRAM_ENV` | `staging` | `prod` | Webhook mode against production traffic; long polling is refused |
+| `PEP_PROVIDER` | (unset) | `real` | The API refuses to boot with the mock in production |
+| `WITHDRAW_STEPUP_ENFORCED` | (unset) | `true` | The second factor stays on payouts |
+| `FRONTEND_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | Dedicated origin; shared-host HSTS would hit other tenants |
+| `API_PUBLIC_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | Provider callbacks are built from this origin |
+| `STAFF_CONSOLE_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | The bot's `/staff` link must point at a domain this deployment controls |
+| `HSTS_INCLUDE_SUBDOMAINS` | `false` | `true` | Safe only on a dedicated domain |
+
+All three public URLs must be `https` origins and must share one origin in this single-container deployment.
+
+### 12.2 Credentials the founder must supply (external/vendor)
+
+| Credential | Checklist reference | Production effect if missing |
+|---|---|---|
+| PEP/sanctions screening source | External Integrations #2 | `PEP_PROVIDER=real` is a declaration only; every Tier 2 screen escalates to manual review. The API still refuses to boot with `PEP_PROVIDER=mock`. |
+| SMS provider credentials/templates | External Integrations #6 | Withdrawal approval codes reach only members with a linked Telegram chat; payouts are gated for everyone else. |
+| Telebirr production credentials | External Integrations #4 | The Telebirr rail stays in mock mode; no real top-ups or payouts. |
+| Brevo verified sender on a `yekis.*` domain | External Integrations #7 (open) | Transactional mail (onboarding OTP, password reset) uses a personal Gmail sender; SPF/DKIM on a platform domain is the next improvement. |
+| Google OAuth Authorized JavaScript origins | `docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3 | `accounts.google.com/gsi/button` returns 400; the Google sign-in button loads but never issues a credential. Consent screen must be published, or the signing account added as a test user. |
+
+### 12.3 Platform choices
+
+| Choice | Staging | Production | Checklist reference |
+|---|---|---|---|
+| Plan | Solo (free) | Pro (0.5 ETB/hr, ~360 ETB/mo) | Solo has no database backups |
+| Database | `yekis-jobs` (shared, Solo, 10 connections) | A production PostgreSQL instance, separate from staging | Security #5 (least-privilege roles, pgaudit) |
+| Object storage | `yekis-test-media` (5 GB, private) | A production bucket, separate from staging | Security #6 (versioning, lock, retention, restore test) |
+| Custom domain | `*.app.aletcloud.com` (random) | A `yekis.*` domain via AletCloud DNS | TLS/CORS secure headers |
+| Backups | None (Solo DB) | Pro DB keeps 3/7/14/30 days of daily backups | Security #8 (backup/restore/drill) |
+| Central logging | AletCloud runtime log only | Sentry / metrics / alerting | Security #7 (central logging, metrics, alerting) |
+| Secret rotation | None documented | Rotation procedure for JWT, webhook, Bot token | Security #5 (secret manager and rotation) |
+
+### 12.4 What remains non-technical
+
+These are outside engineering's scope and are tracked where they belong:
+
+- **Legal approval** for contracts, privacy, consent, age, KYC, AML, tax, and retention policies — external Ethiopian counsel approval is outstanding (Launch Readiness; `docs/COMPLIANCE_BLOCKERS.md`).
+- **Go-live approval and rollback owner** — not yet recorded (Launch Readiness).
+- **Pilot acceptance test** with client, freelancer, compliance, finance, and support stakeholders — not yet completed (Launch Readiness).
+- **Penetration test and dependency/security scan** before launch (Security #9).
+- **FIC STR filing operating procedure** — the platform records but does not submit filings (External Integrations #11).
+
+### 12.5 The pre-flight validator
+
+`scripts/check-production-env.mjs --file .env.production` runs the same
+fail-closed checks that `config/env.ts` and `server.ts` enforce at boot, plus
+the deployment assumptions those checks cannot see: the staging database
+(`yekis-jobs`), the test bucket (`yekis-test-media`), the sandbox Telebirr
+host, and a personal-email sender. It prints variable names and reasons only
+— never a value — so its output can be pasted into a ticket. Run it before
+every production deploy, and again after any environment-variable change.
+
+`node scripts/check-production-env.mjs --self-test` exercises the validator
+against 18 cases (complete environment passes; staging, mock PEP, disabled
+step-up, shared secrets, HTTP URLs, localhost, the staging DB, the sandbox
+Telebirr host, the staging bucket, placeholder secrets, missing webhook
+secret, wrong webhook path, HSTS on the shared host are all rejected). The
+self-test passes 18/18.
+
+### 12.6 Production deployment record template
+
+When the production deploy is made, record it here in the same style as §11:
+
+| | |
+|---|---|
+| URL | `https://app.<your-domain>.et` |
+| Hosting project | `yekis` |
+| App | production app name and UUID |
+| Plan | Pro |
+| Database | production PostgreSQL instance name and UUID |
+| Object storage | production bucket name and UUID |
+| Telegram bot | `@ye_kis_bot` — same bot, new webhook URL on the production origin |
+| Environment | `NODE_ENV=production`, `TELEGRAM_ENV=prod`, `PEP_PROVIDER=real` |
+| Branch | `main` (deployed branch fast-forwarded to `main`) |
+
+The staging app (`yekis-test`, `d40f8eff-...`) must be **stopped** before the
+production app registers the same bot's webhook — one bot can only have one
+webhook, and the staging app's `TELEGRAM_WEBHOOK_URL` points at the staging
+origin.
