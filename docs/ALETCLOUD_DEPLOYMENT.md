@@ -1483,6 +1483,55 @@ the Google OAuth client's **Authorized JavaScript origins**
 (`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). Nothing on the platform can
 change that.
 
+### The sign-in hero becomes an interactive pixel field - 2026-11-26
+
+The commit `fc999f0` removed the three indicator cards from the left panel of
+the sign-in screen - the metrics row, the "Milestone delivered / Contract
+signed / Escrow funded" feed and the trust badges - and replaced them with a
+decorative field. `main` and `fix/code-only-compliance-gaps` were both moved to
+`fc999f0` with a fast-forward push (no force-push).
+
+**What shipped:**
+
+- Four deterministic 6 × 6 pixel constellations sit along the top edge of the
+  art panel, each square pulsing on a staggered loop. The pattern comes from
+  fixed seeds, so it is identical on every render.
+- A slow orbit (rings, rotating arc, satellites and core), two aurora blobs, a
+  masked grid mesh and a sweep replace the old dot texture.
+- One passive, rAF-throttled `pointermove` listener writes normalised
+  `--auth-px` / `--auth-py` values onto the art stage; the clusters, orbit and
+  cursor glow translate at different depths. On short viewports the orbit and
+  clusters follow `scroll(nearest block)` where scroll timelines are supported.
+- The `authVis` copy keys were deleted from the `FullPlatformCopy` type and all
+  four language dictionaries, because nothing on screen uses them any more.
+- All motion is disabled under `prefers-reduced-motion: reduce`, and the layout
+  is theme-invariant.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-26T08:12:01Z`, serving
+  `/assets/index-Dj7hs9j6.css` and `/assets/index-6l0hD2zG.js`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The live sign-in screen renders **144** pixel cells in four top-edge clusters
+  and **zero** status cards; light and dark themes both render, and the orbit
+  ends above the `Work with clarity.` headline at 1256 × 877.
+- `GET /api/v1/auth/identities` and `GET /api/v1/users/me/erasure/blockers`
+  answer **401** without a session; `/api/v1/auth/oauth/providers` answers
+  `google:true`, `telegram:true`, `telegramBotUsername:"ye_kis_bot"`.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"` and
+  `"pendingUpdateCount":0`.
+- The frontend `tsc -b` and production `vite build` are clean, and doc parity
+  and the secret scan pass.
+
+**Google sign-in is still blocked.** The live bundle requests the client
+`1040630878719-ebr17ped0975fhb3se34gqq40gn8itlc.apps.googleusercontent.com`,
+which is the same client the founder edited, and the console still logs
+`[GSI_LOGGER]: The given origin is not allowed for the given client ID.` The
+remaining possibilities are an unsaved client form, Google's propagation delay
+(the console warns it can take from a few minutes to a few hours) or a consent
+screen that is still in Testing without the signing-in account as a test user.
+
 ### Teardown
 
 ```bash
