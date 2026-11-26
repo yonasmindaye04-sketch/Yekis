@@ -59,26 +59,6 @@ export type FullPlatformCopy = {
     ADMIN: string;
     MEDIATOR: string;
   };
-  authVis: {
-    contractsSignedNum: string;
-    contractsSignedLabel: string;
-    escrowedNum: string;
-    escrowedLabel: string;
-    payoutRateNum: string;
-    payoutRateLabel: string;
-    milestoneDelivered: string;
-    milestoneDeliveredSub: string;
-    ago2m: string;
-    contractSigned: string;
-    contractSignedSub: string;
-    ago8m: string;
-    escrowFunded: string;
-    escrowFundedSub: string;
-    ago14m: string;
-    heldWhileReview: string;
-    kycVerified: string;
-    telebirrCbe: string;
-  };
   directDiscussionWith: (name: string) => string;
   directProjectDiscussion: string;
   passwordResetSent: string;
@@ -207,26 +187,6 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
       BOTH: "Client & Freelancer",
       ADMIN: "Operations",
       MEDIATOR: "Mediator",
-    },
-    authVis: {
-      contractsSignedNum: "2,400+",
-      contractsSignedLabel: "Contracts signed",
-      escrowedNum: "ETB 12M+",
-      escrowedLabel: "Secured in escrow",
-      payoutRateNum: "98%",
-      payoutRateLabel: "Payout success rate",
-      milestoneDelivered: "Milestone delivered",
-      milestoneDeliveredSub: "UI Design — ETB 18,000",
-      ago2m: "2m ago",
-      contractSigned: "Contract signed",
-      contractSignedSub: "Mobile App Development",
-      ago8m: "8m ago",
-      escrowFunded: "Escrow funded",
-      escrowFundedSub: "ETB 24,500 locked",
-      ago14m: "14m ago",
-      heldWhileReview: "Held while you review",
-      kycVerified: "KYC verified",
-      telebirrCbe: "Telebirr & CBE",
     },
     directDiscussionWith: (name) => `Direct discussion with ${name}`,
     directProjectDiscussion: "Direct Project Discussion",
@@ -394,26 +354,6 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
       ADMIN: "ኦፕሬሽንስ",
       MEDIATOR: "አሸማጋይ",
     },
-    authVis: {
-      contractsSignedNum: "2,400+",
-      contractsSignedLabel: "የተፈረሙ ውሎች",
-      escrowedNum: "12 ሚሊዮን+ ብር",
-      escrowedLabel: "በኤስክሮ የተጠበቀ",
-      payoutRateNum: "98%",
-      payoutRateLabel: "የክፍያ ስኬት መጠን",
-      milestoneDelivered: "ምዕራፍ ቀርቧል",
-      milestoneDeliveredSub: "UI ዲዛይን — 18,000 ብር",
-      ago2m: "ከ2 ደቂቃ በፊት",
-      contractSigned: "ውል ተፈርሟል",
-      contractSignedSub: "የሞባይል መተግበሪያ ልማት",
-      ago8m: "ከ8 ደቂቃ በፊት",
-      escrowFunded: "ኤስክሮ ተሞልቷል",
-      escrowFundedSub: "24,500 ብር ተቆልፏል",
-      ago14m: "ከ14 ደቂቃ በፊት",
-      heldWhileReview: "ሲገመግሙ ይያዛል",
-      kycVerified: "KYC የተረጋገጠ",
-      telebirrCbe: "ቴሌብር እና CBE",
-    },
     directDiscussionWith: (name) => `ከ${name} ጋር ቀጥታ ውይይት`,
     directProjectDiscussion: "ቀጥታ የፕሮጀክት ውይይት",
     passwordResetSent: "መለያው ካለ፣ የይለፍ ቃል መልሶ ማግኛ ኮድ ወደ ኢሜይልዎ ተልኳል።",
@@ -573,26 +513,6 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
       BOTH: "Maamila fi Ogeessa",
       ADMIN: "Hojiiwwan",
       MEDIATOR: "Jaarsa Araaraa",
-    },
-    authVis: {
-      contractsSignedNum: "2,400+",
-      contractsSignedLabel: "Waliigaltee mallattaa'e",
-      escrowedNum: "ETB 12M+",
-      escrowedLabel: "Iskuuroodhaan eegame",
-      payoutRateNum: "98%",
-      payoutRateLabel: "Milkaa'ina kaffaltii",
-      milestoneDelivered: "Boqonnaan dhiyaateera",
-      milestoneDeliveredSub: "UI Dizaayinii — ETB 18,000",
-      ago2m: "daqiiqaa 2 dura",
-      contractSigned: "Waliigalteen mallattaa'eera",
-      contractSignedSub: "Misooma Appii Mobaayilaa",
-      ago8m: "daqiiqaa 8 dura",
-      escrowFunded: "Iskuuroon guutameera",
-      escrowFundedSub: "ETB 24,500 hidhameera",
-      ago14m: "daqiiqaa 14 dura",
-      heldWhileReview: "Hanga gamaaggamtu qabama",
-      kycVerified: "KYC mirkanaa'e",
-      telebirrCbe: "Telebirr & CBE",
     },
     directDiscussionWith: (name) => `Marii kallattii ${name} waliin`,
     directProjectDiscussion: "Marii Pirojektii Kallattii",
@@ -754,26 +674,6 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
       BOTH: "ዓሚልን ክኢላን",
       ADMIN: "ኦፕሬሽንስ",
       MEDIATOR: "ሽማግለ",
-    },
-    authVis: {
-      contractsSignedNum: "2,400+",
-      contractsSignedLabel: "ዝተፈረሙ ውዕላት",
-      escrowedNum: "12 ሚልዮን+ ብር",
-      escrowedLabel: "ብኤስክሮ ዝተዓቀበ",
-      payoutRateNum: "98%",
-      payoutRateLabel: "መጠን ዕውትነት ክፍሊት",
-      milestoneDelivered: "ምዕራፍ ቀሪቡ",
-      milestoneDeliveredSub: "UI ዲዛይን — 18,000 ብር",
-      ago2m: "ቅድሚ 2 ደቒቕ",
-      contractSigned: "ውዕል ተፈሪሙ",
-      contractSignedSub: "ምዕባለ ሞባይል ኣፕ",
-      ago8m: "ቅድሚ 8 ደቒቕ",
-      escrowFunded: "ኤስክሮ ተመሊኡ",
-      escrowFundedSub: "24,500 ብር ተዓጺዉ",
-      ago14m: "ቅድሚ 14 ደቒቕ",
-      heldWhileReview: "ክሳብ እትግምግሙ ይተሓዝ",
-      kycVerified: "KYC ዝተረጋገጸ",
-      telebirrCbe: "ቴሌብርን CBEን",
     },
     directDiscussionWith: (name) => `ቀጥታዊ ዘተ ምስ ${name}`,
     directProjectDiscussion: "ቀጥታዊ ዘተ ፕሮጀክት",

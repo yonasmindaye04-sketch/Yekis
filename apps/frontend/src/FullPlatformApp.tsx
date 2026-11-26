@@ -1,6 +1,6 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { CSSProperties, FormEvent } from "react";
 import {
   api,
   type Job,
@@ -88,7 +88,6 @@ import { useI18n, isLanguage, type Language } from "./i18n";
 import {
   FULL_PLATFORM_CATEGORY_LABELS,
   FULL_PLATFORM_COPY,
-  type FullPlatformCopy,
 } from "./fullPlatformCopy";
 import { LanguageSelector } from "./components/LanguageSelector";
 import "./components/scroll.css";
@@ -234,95 +233,140 @@ const navIconMap: Record<string, React.ReactNode> = {
   profile: <UserIcon size={18} />,
 };
 
-function AuthVisualAnimation({
-  copy = FULL_PLATFORM_COPY.en.authVis,
-}: {
-  copy?: FullPlatformCopy["authVis"];
-}) {
+/* ── Auth art: pointer-reactive pixel constellations ─────────────
+   The sign-in art used to stack metric and activity cards over the
+   headline. It is now an abstract field: four top-edge pixel clusters,
+   a slow orbit, and a cursor-following glow. Every value that drives
+   the pattern is deterministic so the layout is identical on every
+   render; the only live inputs are the pointer position (parallax)
+   and the scroll timeline (progressive enhancement). */
+const AUTH_PIXEL_GRID = 6;
+
+function buildAuthPixelCluster(seed: number) {
+  let state = seed >>> 0;
+  const next = () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  return Array.from({ length: AUTH_PIXEL_GRID * AUTH_PIXEL_GRID }, (_, id) => {
+    const visible = next() > 0.46;
+    const toneRoll = next();
+    return {
+      id,
+      visible,
+      delay: -Number((next() * 9).toFixed(2)),
+      scale: Number((0.62 + next() * 0.8).toFixed(2)),
+      tone: toneRoll < 0.62 ? 0 : toneRoll < 0.88 ? 1 : 2,
+    };
+  });
+}
+
+const AUTH_PIXEL_CLUSTERS = [
+  { key: "top-left", cells: buildAuthPixelCluster(0x1f3a) },
+  { key: "top-inner-left", cells: buildAuthPixelCluster(0x7c21) },
+  { key: "top-inner-right", cells: buildAuthPixelCluster(0x2b95) },
+  { key: "top-right", cells: buildAuthPixelCluster(0x51e7) },
+] as const;
+
+function AuthVisualAnimation() {
+  const stageRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let frame = 0;
+    let px = 0;
+    let py = 0;
+
+    const paint = () => {
+      frame = 0;
+      stage.style.setProperty("--auth-px", px.toFixed(3));
+      stage.style.setProperty("--auth-py", py.toFixed(3));
+    };
+
+    const queue = () => {
+      if (!frame) frame = window.requestAnimationFrame(paint);
+    };
+
+    const onPointerMove = (event: PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      const bounds = stage.getBoundingClientRect();
+      if (!bounds.width || !bounds.height) return;
+      const inside =
+        event.clientX >= bounds.left &&
+        event.clientX <= bounds.right &&
+        event.clientY >= bounds.top &&
+        event.clientY <= bounds.bottom;
+      if (!inside) {
+        if (px === 0 && py === 0) return;
+        px = 0;
+        py = 0;
+        queue();
+        return;
+      }
+      px = Math.max(
+        -1,
+        Math.min(1, ((event.clientX - bounds.left) / bounds.width - 0.5) * 2),
+      );
+      py = Math.max(
+        -1,
+        Math.min(1, ((event.clientY - bounds.top) / bounds.height - 0.5) * 2),
+      );
+      queue();
+    };
+
+    window.addEventListener("pointermove", onPointerMove, { passive: true });
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("pointermove", onPointerMove);
+    };
+  }, []);
+
   return (
-    <div className="auth-vis" aria-hidden="true">
-      {/* Soft gradient accent */}
-      <div className="auth-vis-glow" />
+    <div className="auth-vis" aria-hidden="true" ref={stageRef}>
+      <div className="auth-vis-aurora auth-vis-aurora-a" />
+      <div className="auth-vis-aurora auth-vis-aurora-b" />
+      <div className="auth-vis-mesh" />
+      <div className="auth-vis-sweep" />
 
-      {/* Dot grid texture */}
-      <svg className="auth-vis-dots" viewBox="0 0 200 200">
-        {Array.from({ length: 100 }, (_, i) => {
-          const col = i % 10;
-          const row = Math.floor(i / 10);
-          return (
-            <circle
-              key={i}
-              cx={col * 22 + 5}
-              cy={row * 22 + 5}
-              r="1.2"
-              fill="var(--color-text-secondary)"
-              opacity="0.18"
+      <div className="auth-vis-orbit">
+        <span className="auth-vis-orbit-ring" />
+        <span className="auth-vis-orbit-ring auth-vis-orbit-ring-inner" />
+        <span className="auth-vis-orbit-arc" />
+        <span className="auth-vis-orbit-spin">
+          <span className="auth-vis-orbit-satellite" />
+        </span>
+        <span className="auth-vis-orbit-spin auth-vis-orbit-spin-inner">
+          <span className="auth-vis-orbit-satellite auth-vis-orbit-satellite-small" />
+        </span>
+        <span className="auth-vis-orbit-core" />
+      </div>
+
+      {AUTH_PIXEL_CLUSTERS.map((cluster) => (
+        <div
+          key={cluster.key}
+          className={`auth-vis-pixels auth-vis-pixels-${cluster.key}`}
+        >
+          {cluster.cells.map((cell) => (
+            <span
+              key={cell.id}
+              className={`auth-vis-pixel auth-vis-pixel-tone-${cell.tone}${
+                cell.visible ? "" : " is-off"
+              }`}
+              style={
+                {
+                  "--auth-delay": `${cell.delay}s`,
+                  "--auth-scale": cell.scale,
+                } as CSSProperties
+              }
             />
-          );
-        })}
-      </svg>
+          ))}
+        </div>
+      ))}
 
-      {/* Metrics row — 3 key indicators */}
-      <div className="auth-vis-metrics">
-        <div className="auth-vis-metric" style={{ animationDelay: "0.4s" }}>
-          <span className="auth-vis-metric-num">{copy.contractsSignedNum}</span>
-          <span className="auth-vis-metric-label">{copy.contractsSignedLabel}</span>
-        </div>
-        <div className="auth-vis-metric-divider" />
-        <div className="auth-vis-metric" style={{ animationDelay: "0.7s" }}>
-          <span className="auth-vis-metric-num">{copy.escrowedNum}</span>
-          <span className="auth-vis-metric-label">{copy.escrowedLabel}</span>
-        </div>
-        <div className="auth-vis-metric-divider" />
-        <div className="auth-vis-metric" style={{ animationDelay: "1.0s" }}>
-          <span className="auth-vis-metric-num">{copy.payoutRateNum}</span>
-          <span className="auth-vis-metric-label">{copy.payoutRateLabel}</span>
-        </div>
-      </div>
-
-      {/* Live activity feed — staggered slide-ins */}
-      <div className="auth-vis-feed">
-        <div className="auth-vis-feed-item" style={{ animationDelay: "1.2s" }}>
-          <div className="auth-vis-feed-icon green" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.milestoneDelivered}</strong>
-            <span>{copy.milestoneDeliveredSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago2m}</span>
-        </div>
-        <div className="auth-vis-feed-item" style={{ animationDelay: "1.8s" }}>
-          <div className="auth-vis-feed-icon blue" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.contractSigned}</strong>
-            <span>{copy.contractSignedSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago8m}</span>
-        </div>
-        <div className="auth-vis-feed-item" style={{ animationDelay: "2.4s" }}>
-          <div className="auth-vis-feed-icon green" />
-          <div className="auth-vis-feed-body">
-            <strong>{copy.escrowFunded}</strong>
-            <span>{copy.escrowFundedSub}</span>
-          </div>
-          <span className="auth-vis-feed-time">{copy.ago14m}</span>
-        </div>
-      </div>
-
-      {/* Trust badges row */}
-      <div className="auth-vis-trust">
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "2.8s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>{copy.heldWhileReview}</span>
-        </div>
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.1s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          <span>{copy.kycVerified}</span>
-        </div>
-        <div className="auth-vis-trust-badge" style={{ animationDelay: "3.4s" }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-          <span>{copy.telebirrCbe}</span>
-        </div>
-      </div>
+      <span className="auth-vis-cursor" />
     </div>
   );
 }
@@ -1513,7 +1557,7 @@ const loadWorkspace = async () => {
             <span>02</span>
             <strong>{copy.heroProof2}</strong>
           </div>
-          <AuthVisualAnimation copy={copy.authVis} />
+          <AuthVisualAnimation />
         </div>
         {onboardingChannel ? (
           <div className="auth-panel">

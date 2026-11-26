@@ -1185,11 +1185,11 @@ When implementation changes, update this walkthrough if the user journey, state 
     - **Bottom Section**: `StaffCompliancePanel` (Transaction Monitoring & AML Queue) now occupies full width, giving `QueueControls` (search, status, flag type, refresh, pagination) ample room to display without clipping.
   - Implemented responsive two-pane grid styling for `.dispute-queue-container` (`360px minmax(0, 1fr)` on desktop, single column on smaller viewports) and styled `.staff-queue-card` and `.staff-queue-list`.
   - Added `overflow-x: hidden;` to `.staff-shell` and `.staff-main` to permanently prevent horizontal overflow.
-- **Auth Screen Professional Visual Treatment**: Redesigned the left-panel auth visual with a professional, indicator-rich layout:
-  - **3 Key Metrics Row**: Contracts signed (2,400+), escrow volume (ETB 12M+), payout success rate (98%) — separated by vertical dividers, staggered fade-in on load.
-  - **Live Activity Feed**: 3 activity items (milestone delivered, contract signed, escrow funded) with colored status dots, descriptions, and relative timestamps — slide in sequentially.
-  - **Trust Badges**: "Escrow protected", "KYC verified", "Telebirr & CBE" with inline SVG icons — anchored to the bottom right.
-  - Background: subtle dot grid texture and a soft brand-green radial gradient glow. All elements use a single `authFadeUp` keyframe (one-shot, no looping).
+- **Auth Screen Interactive Pixel Field**: Replaced the indicator-card treatment on the left-panel auth visual with a calmer, motion-led composition:
+  - **Status cards removed**: The three-number metrics row, the "Milestone delivered / Contract signed / Escrow funded" activity feed and the trust badges are gone, along with their `authVis` copy keys in all four language dictionaries. The headline, subtitle and the two `01` / `02` proof lines are the only foreground content.
+  - **Top pixel constellations**: Four deterministic 6 × 6 pixel clusters span the top edge of the art panel. Each square pulses on a staggered 7s loop; the pattern is generated from fixed seeds so it never reshuffles between renders.
+  - **Pointer parallax**: A single passive, rAF-throttled `pointermove` listener writes normalised `--auth-px` / `--auth-py` values onto the art stage. The clusters, orbit and cursor glow translate and tilt at different depths, so moving the pointer across the hero shifts the field without any idle animation loop.
+  - **Orbit and scroll enhancement**: A slow orbit (rings, rotating arc, satellites and core), two aurora blobs, a masked grid mesh and a sweep replace the old dot texture. On short viewports where `.platform-auth` becomes the scroll container, `@supports (animation-timeline: scroll())` ties the orbit and clusters to `scroll(nearest block)`; browsers without scroll timelines keep the static composition. All motion is disabled under `prefers-reduced-motion: reduce`, and the layout geometry is theme-invariant.
 - **Proper Google Login Button**: Restored the Google, Apple, and Facebook social sign-in buttons to a compact, single-row layout of small circular icons (`type: "icon"`, `shape: "circle"`) to save vertical space and maintain a clean login form aesthetic.
 - **Chat System Fix & Role-Based Redesign**:
   - **Layout & Horizontal Clipping Fix**:
