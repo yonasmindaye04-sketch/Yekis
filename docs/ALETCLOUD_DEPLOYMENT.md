@@ -1201,6 +1201,337 @@ being cut off by the two blocks above, not a third defect.
 **No environment variable changed.** The host still carries the **55** variables
 set on 2026-11-20, including the Google client id and the Brevo key.
 
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-23T19:46:01Z`, serving
+  `/assets/index-BNkU2lOs.js` and `/assets/index-DR9okXdP.css`, with **55**
+  environment variables. The CSS hash is **identical** to the local production
+  build of the merged tree, which is what proves the host is serving the
+  merged source and not the previous build.
+- The merged work is in the served assets: the CSS carries the glass UI kit
+  (31 `glass` rules), the ops console's **7** `.ops-root .crumb` rules, the
+  Settings tab bar (`settings-tabbar`) and the landing escrow's `word-fit`;
+  the bundle carries **"Linked Accounts"**, **"Google is linked"** and both
+  new endpoint paths.
+- `GET /api/v1/auth/identities` answers **401** without a session, and
+  `POST /api/v1/auth/oauth/google/link` answers **401** without a session.
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The start-up log reports **"No pending migrations to apply."** — the merge
+  carried no schema change, as the empty backend diff predicted.
+- `/` now sends **`Cross-Origin-Opener-Policy: same-origin-allow-popups`**,
+  and the served HTML's policy now reads
+  `worker-src 'self' blob: https://accounts.google.com`.
+
+**What a real browser on the live host now shows** (Chromium, the sign-in
+card open):
+
+- The Google Identity Services script **loads**
+  (`https://accounts.google.com/gsi/client`), the button's **iframe is live**
+  (`https://accounts.google.com/gsi/button?...client_id=1040630878719-…`) and
+  it carries the Amharic label *"በGoogle አዝራር ይግቡ"*. There is **no** worker
+  error and **no** opener-policy error any more — the two console lines the
+  founder's screenshot carried are gone.
+- One policy still blocked part of it: the console carried *"Loading the
+  stylesheet 'https://accounts.google.com/gsi/style' violates the following
+  Content Security Policy directive"* — the button rendered unstyled.
+  `style-src` now names `https://accounts.google.com`, and that is fixed in
+  the commit after this one.
+- **After the `style-src` fix** (`1de9070`, the app back **LIVE** at
+  `2026-11-23T20:48:08Z`, 55 environment variables, the same bundle — the
+  policy lives in `index.html`, so the JavaScript and CSS hashes did not
+  change), the browser was driven through the sign-in card again and
+  **every CSP violation is gone**: the console carries no worker error, no
+  opener-policy error and no blocked-stylesheet error. Google's own
+  stylesheet is now in the document's stylesheet list, the button renders
+  with its own styling next to the Telegram button, and the only lines left
+  are the known cosmetic `frame-ancestors`-in-a-`<meta>` notice and the two
+  Telegram version notices.
+- **One blocker remains, and it is the founder's to clear.** The console's
+  **"[GSI_LOGGER]: The given origin is not allowed for the given client ID"**
+  and the **400** on `accounts.google.com/gsi/button` are the **same single
+  cause**: the Google Cloud OAuth client refuses the origin, because
+  `https://yekis.app.aletcloud.com` is not in its **Authorized JavaScript
+  origins**. Nothing on the platform can change that — it is a setting in the
+  founder's Google Cloud project. The runbook is
+  `docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3.
+
+### The platform-wide responsiveness work goes live - 2026-11-25
+
+**The third merge, and the first deployment of the responsiveness work.** Five
+commits landed on `feat/multi-channel-auth` after the 2026-11-23 deployment
+(`58b76d3`, `1940cd2`, `529edfe`, `37fcab1`, `7b82df6`). They are merged into
+`main` as **`b4634b5`** (a real merge, parents `c4c3fe5` and `7b82df6`) and the
+deployed branch is fast-forwarded to the same commit:
+
+```bash
+git push origin main                                  # c4c3fe5..b4634b5
+git push origin main:fix/code-only-compliance-gaps    # c4c3fe5..b4634b5
+```
+
+Both refs are at `b4634b5`, and the app is **LIVE** at
+`2026-11-25T07:17:46Z` (previous `2026-11-23T20:48:08Z`), still with **55**
+environment variables and still deploying `fix/code-only-compliance-gaps`.
+The docs commit that records this deployment triggers one more build of the
+same tree; the served assets stay identical, so `lastDeployedAt` moves a few
+minutes past the timestamp above without the code changing.
+
+**The lockfile was the one dangerous part, and it was repaired deliberately.**
+Their branch's `pnpm-lock.yaml` recorded `react-icons` in the **root** importer,
+while `main` had removed the root declaration in `f2149c0`. That mismatch is
+exactly what makes `pnpm install --frozen-lockfile` fail with
+`ERR_PNPM_OUTDATED_LOCKFILE`, before the image build starts — it was reproduced
+on the merged tree, then the lockfile was regenerated with the repository's
+pinned pnpm **9.0.0** (the version the image installs). The regeneration removed
+**exactly three lines** — the orphan root entry — and nothing else. The merged
+tree now installs cleanly, `kenat@4.0.2` is present, and
+`scripts/check-lockfile-parity.mjs` was extended to compare **both** directions
+so this class of merge damage cannot pass a gate again.
+
+**One compliance fix was restored by hand.** Their corporate-email commit put
+back the *"Escrow Protection Policy"* wording that `main` had deliberately
+replaced, claiming the platform holds funds *"securely"* in escrow — a promise
+the segregated NBE account cannot back yet. The receipt now carries `main`'s
+compliant copy (**"How this payment is held"**, the auto-release window and the
+dispute outcome) inside their HTML shell, the total row reads **"Total held"**,
+and the shell footer no longer says *"Secure Ethiopian Escrow"*. Their own test
+still asserted the compliant wording, so the merge would otherwise have shipped
+a regression.
+
+**What was verified before the push:**
+
+- Frontend type-check and production build clean, with `kenat` installed.
+- Backend type-check clean.
+- `privacy-data-rights` + `oauth-account-link` + `google-auth-and-email`
+  **26/26 pass**. (The privacy suite needs a working Redis: the local `.env`
+  password was stale and every session call waited out the 30 s timeout; a
+  throwaway Redis on `127.0.0.1:6380` proved the suite itself is green.)
+- Route audit **passed** against the **201**-route baseline.
+- Doc parity **complete alignment**; secret scan **0 findings** across 1040
+  tracked files; lockfile parity **clean** in both directions.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-25T07:17:46Z`, serving
+  `/assets/index-CMm-YkrB.js` and `/assets/index-5W81mL1d.css`.
+- The CSS hash is **identical** to the local production build. The JavaScript
+  hash is not, and that is expected: the host bakes its `VITE_*` values in at
+  build time (`VITE_GOOGLE_CLIENT_ID`, `VITE_OBJECT_STORE_ORIGIN`,
+  `VITE_TELEGRAM_BOT_USERNAME`), so the bundle content — and therefore its
+  hash — differs from a local build made without them. The CSS has no `VITE_*`
+  input, so it is the reliable fingerprint.
+- The served bundle carries the new work: `erasure/blockers` (**2**),
+  `Deactivate Account` (**3**) and `settings-tabbar` (**1**).
+- `GET /api/v1/auth/identities` → **401**;
+  `POST /api/v1/auth/oauth/google/link` → **401**;
+  `GET /api/v1/users/me/erasure/blockers` → **401**;
+  `GET /api/v1/auth/oauth/providers` →
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The start-up log reports the bundled Redis up, **40 migrations found**,
+  **"No pending migrations to apply."**, the API listening on 8080 and the bot
+  started. `GET /api/v1/telegram/health` answers **200** with
+  `"pendingUpdateCount":0`.
+
+**The Google origin blocker is unchanged.** `https://yekis.app.aletcloud.com`
+still has to be added to the OAuth client's **Authorized JavaScript origins**
+(`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). The CSP, worker and opener fixes
+from 2026-11-23 are all still in the deployed tree.
+
+### The bot answers again - 2026-11-25
+
+The founder reported that the bot "is not responding at all": a message sent to
+`@ye_kis_bot` produced nothing at all, and the web sign-in that depends on the
+bot was stuck with it. The host was healthy and the bot was "degraded", not
+down:
+
+```
+GET /api/v1/telegram/health →
+{"status":"degraded","transport":"webhook",
+ "webhook":{"pendingUpdateCount":6,
+            "lastErrorMessage":"Wrong response from the webhook: 500 Internal Server Error"}}
+```
+
+Telegram's own complaint was the whole diagnosis. Telegram had the webhook, it
+delivered the updates, and every delivery came back **500** - so Telegram
+retried the same update forever and the member never saw a reply. The runtime
+log showed why:
+
+```
+Incoming update  command=help
+GrammyError: Call to 'sendMessage' failed!
+  (400: Bad Request: can't parse entities:
+   Can't find end of the entity starting at byte offset 4)
+  payload: {"chat_id":5114851772,"text":"help_commands","parse_mode":"Markdown"}
+```
+
+**Three defects, in a row.** The text the bot tried to send was the
+translation KEY - `help_commands` - not a sentence. The dictionaries are
+runtime data, so `tsc` never emitted them, and the Docker image copies
+`apps/backend/dist` and nothing else: the loader resolved the dictionaries
+relative to the working directory, found none, and `ctx.t()` returned the key.
+An underscore is an italic delimiter in Markdown, so Telegram refused the
+message; grammY turned the refused send into an error; and because grammY's
+`bot.catch` guards the long-polling batch API only - the webhook adapter
+calls `handleUpdate()` directly - the error escaped the adapter and the route
+answered **500**. Telegram kept redelivering, and the bot looked dead.
+
+**What was changed** (`361b46b`, on `fix/code-only-compliance-gaps`):
+
+- `apps/backend/scripts/copy-locales.mjs` copies the dictionaries into
+  `dist/modules/bot/locales` as part of the build, and the loader finds them
+  next to its own compiled file (`__dirname`), so it no longer depends on the
+  working directory or on the source tree.
+- `middleware/errorBoundary.middleware.ts` is the outermost middleware: it
+  catches what escapes a handler, logs it, and answers the member in plain
+  text, so the delivery is acknowledged and the retry loop stops.
+- `markdownFallbackTransformer` sends a message Telegram refuses to FORMAT
+  again without `parse_mode`. Any other refusal still fails.
+
+**What was verified against the live instance after the redeploy:**
+
+- The app came back **LIVE** at `2026-11-25T15:46:25Z` on `361b46b`, with the
+  **55** environment variables intact.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"`,
+  `"pendingUpdateCount":0` and **no** `lastErrorMessage` (it was
+  `"degraded"` with six pending updates before).
+- Telegram's own `getWebhookInfo` answers `"pending_update_count":0` and
+  **no** `last_error_message`.
+- A `/help` update delivered to the webhook is **"Incoming update"** →
+  **"Update processed"** (262 ms) → **HTTP 200**, with no
+  "Webhook processing failed" and no `GrammyError` in the log, and the member
+  receives the English help text in Telegram.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+
+**One environment variable changed:** `TELEGRAM_WEBHOOK_SECRET` now holds the
+secret the founder generated (`I7n0bm12...`), so the live host and the local
+`.env` agree. Every other variable is byte-for-byte what it was - the map was
+read with `getAppEnv` and written back with `setAppEnv`, all **55** of them.
+The platform applies an environment change to a NEW container only, so the
+secret took effect with the redeploy, and the bot re-registered the webhook
+with it at start-up (`Bot webhook set` in the log).
+
+**The local `.env` files no longer carry the live credentials.** The bot is
+owned by the deployment; a local process that registered the production
+webhook URL would delete it at start-up, and two pollers make Telegram refuse
+one of them. `apps/backend/.env` and `.env` now run in `TELEGRAM_ENV=dev` with
+polling and with an **empty** token, webhook URL and secret. To drive the real
+bot from a laptop, use a tunnel
+(`docs/CLOUDFLARE_TUNNEL_PLAYBOOK.md`) and a bot token of your own.
+
+### The full four-language release goes live - 2026-11-25
+
+The batch that had been sitting uncommitted on `feat/multi-channel-auth` was
+committed as `6db3672`, merged into `main` as `d660b47`, and then merged with
+the deployed branch's own bot-recovery work (`4f3e810`) as `4cfe1d9`. The
+deployed branch was fast-forwarded from `4f3e810` to `4cfe1d9` - no force-push,
+and no commit on either side was dropped.
+
+**What shipped:**
+
+- The Telegram bot now speaks English, Amharic, Afaan Oromoo and Tigrigna.
+  Commands, callbacks, formatters, keyboards, scenes and middleware all read
+  from the locale catalogues, and the language is resolved from the member's
+  Telegram profile (`am*` → `am`, `om*` → `om`, `ti*` → `ti`, otherwise `en`).
+- The webhook fails closed when `TELEGRAM_WEBHOOK_SECRET` is unset, parses its
+  JSON route-locally before grammY sees it, and logs the scrubbed error instead
+  of an empty object. The founder's locale-bundle, error-boundary and
+  Markdown-fallback work from `361b46b` is in the same tree.
+- The frontend copy for the public pages, workspace, dashboard and profile
+  views moved into per-view `*Copy` modules; the public profile and profile
+  editor were rebuilt on the workspace background board; the wallet gained a
+  native checkout-instructions dialog, real multipart top-up and receipt
+  uploads, and 401 session-expiry handling; the file uploader was rebuilt on
+  the Fayda dropzone pattern; mock-session routing, the public-profile report
+  enum and the Ethiopian calendar helpers were fixed.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-25T17:04:30Z` (the bot-recovery code came up at
+  `2026-11-25T15:46:25Z`; the later docs commits rebuilt the same assets), on
+  `fix/code-only-compliance-gaps`, with **55** environment variables.
+- Served assets: `/assets/index-BY8XTnbd.css` (identical to the local
+  production build) and `/assets/index-BzX3RWd1.js` (the hash differs from the
+  local build only because the host bakes its `VITE_*` values in).
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- `GET /api/v1/auth/identities` and `GET /api/v1/users/me/erasure/blockers`
+  answer **401** without a session; the providers endpoint answers
+  `google:true`, `telegram:true`, `telegramBotUsername:"ye_kis_bot"`.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"`,
+  `"pendingUpdateCount":0`, and the webhook registered at
+  `https://yekis.app.aletcloud.com/api/v1/telegram/webhook`.
+- The log reports `40 migrations found` and `No pending migrations to apply.`,
+  and shows no "Webhook processing failed" after the new container started.
+- Gates before the push: backend `tsc --noEmit` and frontend `tsc -b` clean;
+  the production `vite build` clean; **70 of 71** backend test files pass, the
+  only failure being the known pre-existing `withdrawal-2fa` SMS-provider case;
+  the bot and webhook suites (`bot-error-resilience`, `bot-updates`,
+  `telegram-webhook-auth`, `log-redaction`) pass **4/4 files**; the route
+  audit, doc parity, secret scan and lockfile parity all pass.
+
+The docs commit that records this deployment triggers one more build of the
+same tree. The served assets stay identical, so `lastDeployedAt` moves a few
+minutes past the timestamp above without the code changing.
+
+**Still on the founder:** `https://yekis.app.aletcloud.com` must be added to
+the Google OAuth client's **Authorized JavaScript origins**
+(`docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3). Nothing on the platform can
+change that.
+
+### The sign-in hero becomes an interactive pixel field - 2026-11-26
+
+The commit `fc999f0` removed the three indicator cards from the left panel of
+the sign-in screen - the metrics row, the "Milestone delivered / Contract
+signed / Escrow funded" feed and the trust badges - and replaced them with a
+decorative field. `main` and `fix/code-only-compliance-gaps` were both moved to
+`fc999f0` with a fast-forward push (no force-push).
+
+**What shipped:**
+
+- Four deterministic 6 × 6 pixel constellations sit along the top edge of the
+  art panel, each square pulsing on a staggered loop. The pattern comes from
+  fixed seeds, so it is identical on every render.
+- A slow orbit (rings, rotating arc, satellites and core), two aurora blobs, a
+  masked grid mesh and a sweep replace the old dot texture.
+- One passive, rAF-throttled `pointermove` listener writes normalised
+  `--auth-px` / `--auth-py` values onto the art stage; the clusters, orbit and
+  cursor glow translate at different depths. On short viewports the orbit and
+  clusters follow `scroll(nearest block)` where scroll timelines are supported.
+- The `authVis` copy keys were deleted from the `FullPlatformCopy` type and all
+  four language dictionaries, because nothing on screen uses them any more.
+- All motion is disabled under `prefers-reduced-motion: reduce`, and the layout
+  is theme-invariant.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-26T08:12:01Z`, serving
+  `/assets/index-Dj7hs9j6.css` and `/assets/index-6l0hD2zG.js`.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The live sign-in screen renders **144** pixel cells in four top-edge clusters
+  and **zero** status cards; light and dark themes both render, and the orbit
+  ends above the `Work with clarity.` headline at 1256 × 877.
+- `GET /api/v1/auth/identities` and `GET /api/v1/users/me/erasure/blockers`
+  answer **401** without a session; `/api/v1/auth/oauth/providers` answers
+  `google:true`, `telegram:true`, `telegramBotUsername:"ye_kis_bot"`.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"` and
+  `"pendingUpdateCount":0`.
+- The frontend `tsc -b` and production `vite build` are clean, and doc parity
+  and the secret scan pass.
+
+**Google sign-in is still blocked.** The live bundle requests the client
+`1040630878719-ebr17ped0975fhb3se34gqq40gn8itlc.apps.googleusercontent.com`,
+which is the same client the founder edited, and the console still logs
+`[GSI_LOGGER]: The given origin is not allowed for the given client ID.` The
+remaining possibilities are an unsaved client form, Google's propagation delay
+(the console warns it can take from a few minutes to a few hours) or a consent
+screen that is still in Testing without the signing-in account as a test user.
+
 ### Teardown
 
 ```bash
@@ -1215,3 +1546,97 @@ deleting the database throws away the migrated schema, and the next
 deployment would have to apply all 36 migrations again. **The bucket is the
 one that bills**: delete it, or the wallet keeps paying 50 ETB a month for
 it.
+
+---
+
+## 12. Going to production — the gap list
+
+This section lists what separates the current staging deployment from a
+production one. Every item is a configuration, a credential, or a platform
+choice that only the account holder can make; none of it is a code change.
+The gap list is cross-referenced to `docs/COMPLETENESS_CHECKLIST.md`.
+
+### 12.1 Environment variables that must change
+
+| Variable | Staging value | Production value | Why |
+|---|---|---|---|
+| `NODE_ENV` | `staging` | `production` | Switches on the fail-closed boot checks in `config/env.ts` and `server.ts` |
+| `TELEGRAM_ENV` | `staging` | `prod` | Webhook mode against production traffic; long polling is refused |
+| `PEP_PROVIDER` | (unset) | `real` | The API refuses to boot with the mock in production |
+| `WITHDRAW_STEPUP_ENFORCED` | (unset) | `true` | The second factor stays on payouts |
+| `FRONTEND_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | Dedicated origin; shared-host HSTS would hit other tenants |
+| `API_PUBLIC_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | Provider callbacks are built from this origin |
+| `STAFF_CONSOLE_URL` | `https://yekis.app.aletcloud.com` | `https://app.<your-domain>.et` | The bot's `/staff` link must point at a domain this deployment controls |
+| `HSTS_INCLUDE_SUBDOMAINS` | `false` | `true` | Safe only on a dedicated domain |
+
+All three public URLs must be `https` origins and must share one origin in this single-container deployment.
+
+### 12.2 Credentials the founder must supply (external/vendor)
+
+| Credential | Checklist reference | Production effect if missing |
+|---|---|---|
+| PEP/sanctions screening source | External Integrations #2 | `PEP_PROVIDER=real` is a declaration only; every Tier 2 screen escalates to manual review. The API still refuses to boot with `PEP_PROVIDER=mock`. |
+| SMS provider credentials/templates | External Integrations #6 | Withdrawal approval codes reach only members with a linked Telegram chat; payouts are gated for everyone else. |
+| Telebirr production credentials | External Integrations #4 | The Telebirr rail stays in mock mode; no real top-ups or payouts. |
+| Brevo verified sender on a `yekis.*` domain | External Integrations #7 (open) | Transactional mail (onboarding OTP, password reset) uses a personal Gmail sender; SPF/DKIM on a platform domain is the next improvement. |
+| Google OAuth Authorized JavaScript origins | `docs/auth/PROVIDER_SETUP_CHECKLIST.md` §B3 | `accounts.google.com/gsi/button` returns 400; the Google sign-in button loads but never issues a credential. Consent screen must be published, or the signing account added as a test user. |
+
+### 12.3 Platform choices
+
+| Choice | Staging | Production | Checklist reference |
+|---|---|---|---|
+| Plan | Solo (free) | Pro (0.5 ETB/hr, ~360 ETB/mo) | Solo has no database backups |
+| Database | `yekis-jobs` (shared, Solo, 10 connections) | A production PostgreSQL instance, separate from staging | Security #5 (least-privilege roles, pgaudit) |
+| Object storage | `yekis-test-media` (5 GB, private) | A production bucket, separate from staging | Security #6 (versioning, lock, retention, restore test) |
+| Custom domain | `*.app.aletcloud.com` (random) | A `yekis.*` domain via AletCloud DNS | TLS/CORS secure headers |
+| Backups | None (Solo DB) | Pro DB keeps 3/7/14/30 days of daily backups | Security #8 (backup/restore/drill) |
+| Central logging | AletCloud runtime log only | Sentry / metrics / alerting | Security #7 (central logging, metrics, alerting) |
+| Secret rotation | None documented | Rotation procedure for JWT, webhook, Bot token | Security #5 (secret manager and rotation) |
+
+### 12.4 What remains non-technical
+
+These are outside engineering's scope and are tracked where they belong:
+
+- **Legal approval** for contracts, privacy, consent, age, KYC, AML, tax, and retention policies — external Ethiopian counsel approval is outstanding (Launch Readiness; `docs/COMPLIANCE_BLOCKERS.md`).
+- **Go-live approval and rollback owner** — not yet recorded (Launch Readiness).
+- **Pilot acceptance test** with client, freelancer, compliance, finance, and support stakeholders — not yet completed (Launch Readiness).
+- **Penetration test and dependency/security scan** before launch (Security #9).
+- **FIC STR filing operating procedure** — the platform records but does not submit filings (External Integrations #11).
+
+### 12.5 The pre-flight validator
+
+`scripts/check-production-env.mjs --file .env.production` runs the same
+fail-closed checks that `config/env.ts` and `server.ts` enforce at boot, plus
+the deployment assumptions those checks cannot see: the staging database
+(`yekis-jobs`), the test bucket (`yekis-test-media`), the sandbox Telebirr
+host, and a personal-email sender. It prints variable names and reasons only
+— never a value — so its output can be pasted into a ticket. Run it before
+every production deploy, and again after any environment-variable change.
+
+`node scripts/check-production-env.mjs --self-test` exercises the validator
+against 18 cases (complete environment passes; staging, mock PEP, disabled
+step-up, shared secrets, HTTP URLs, localhost, the staging DB, the sandbox
+Telebirr host, the staging bucket, placeholder secrets, missing webhook
+secret, wrong webhook path, HSTS on the shared host are all rejected). The
+self-test passes 18/18.
+
+### 12.6 Production deployment record template
+
+When the production deploy is made, record it here in the same style as §11:
+
+| | |
+|---|---|
+| URL | `https://app.<your-domain>.et` |
+| Hosting project | `yekis` |
+| App | production app name and UUID |
+| Plan | Pro |
+| Database | production PostgreSQL instance name and UUID |
+| Object storage | production bucket name and UUID |
+| Telegram bot | `@ye_kis_bot` — same bot, new webhook URL on the production origin |
+| Environment | `NODE_ENV=production`, `TELEGRAM_ENV=prod`, `PEP_PROVIDER=real` |
+| Branch | `main` (deployed branch fast-forwarded to `main`) |
+
+The staging app (`yekis-test`, `d40f8eff-...`) must be **stopped** before the
+production app registers the same bot's webhook — one bot can only have one
+webhook, and the staging app's `TELEGRAM_WEBHOOK_URL` points at the staging
+origin.

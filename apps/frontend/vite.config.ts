@@ -178,7 +178,12 @@ const PRODUCTION_CSP = [
   // working while every other origin stays blocked.
   `frame-ancestors ${FRAME_ANCESTORS}`,
   "script-src 'self' 'unsafe-inline' https://telegram.org https://www.googletagmanager.com https://*.gstatic.com https://*.google.com",
-  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  // Google Identity Services loads the button's own stylesheet from
+  // `https://accounts.google.com/gsi/style`. Without this entry the browser
+  // blocks it ("Loading the stylesheet 'https://accounts.google.com/gsi/style'
+  // violates the following Content Security Policy directive"), and the button
+  // renders unstyled. One hostname, not a wildcard.
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com",
   "font-src 'self' https://fonts.gstatic.com data:",
   `img-src ${IMG_SRC}`,
   "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com https://api.telegram.org https://*.google.com https://*.run.app",

@@ -36,6 +36,7 @@ The API is the authority for roles, KYC gates, contract signatures, state transi
 | `apps/frontend/src/pages/ops/` | Operations Console v2 — single staff console (23 page components, command palette, RBAC-driven nav) |
 | `apps/backend/src/app.ts` | Middleware order and route registration |
 | `apps/backend/src/modules` | Domain routes, services, provider adapters |
+| `apps/backend/scripts/copy-locales.mjs` | Validates and copies the Telegram bot's four JSON locale catalogues into the compiled backend |
 | `apps/backend/src/queue` | BullMQ queues and workers |
 | `apps/backend/src/lib` | Prisma, Redis, object store, audit, logging |
 | `apps/backend/prisma` | Schema and ordered migrations |
@@ -90,6 +91,10 @@ The payment webhook routes are deliberately mounted before `express.json()` so r
 | `search` | N/A (Internal service) | OpenSearch cluster integration (`searchIndex.service.ts`), indexing gigs & jobs, resilient fallback to PostgreSQL |
 | `sla` | N/A (Internal service) | SLA enforcement (`sla.service.ts`): server-computed first-response and resolution clocks for the support and dispute queues, business-day arithmetic, and the breach summary the ops console and `GET /api/v1/admin/sla/summary` read |
 | `bot` | `/api/v1/telegram` | Grammy Telegram bot webhook handler (4-language support: en/am/om/ti, 243 i18n keys, push notifications) |
+
+The Telegram bot's locale dictionaries are runtime assets rather than TypeScript output. The backend build validates their key parity and copies them into `dist/modules/bot/locales`; the compiled loader resolves that directory relative to its own module. The container-image CI check imports the compiled loader and requires real translated text, because a missing catalogue otherwise degrades into raw keys such as `help_commands`, which Telegram can reject as malformed Markdown.
+
+The webhook update pipeline has an outer error boundary. grammY's `bot.catch` does not cover the webhook adapter's direct `handleUpdate()` call, so an exception in middleware or a handler would otherwise escape as HTTP 500 and make Telegram retry the same update indefinitely. The boundary logs a redacted command/context summary, sends a plain-text apology, and acknowledges the delivery. Telegram-specific Markdown failures are handled one layer lower, in grammY's API transformer chain: only a formatting rejection is retried without `parse_mode`; unrelated Bot API failures are preserved.
 
 The secured `disputes/dispute.routes.ts` router is the mounted dispute implementation. The older `disputes.routes.ts` file is not mounted and should be treated as legacy until removed.
 
@@ -423,7 +428,7 @@ Two GitHub Actions workflows exist at `.github/workflows/`:
 
 | Workflow | What it actually does |
 |---|---|
-| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, a frontend job that runs the production build, and a `container` job that builds the deployment image and checks the entrypoint. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
+| `ci.yml` | Doc-parity check (`node scripts/check-doc-parity.mjs`), lockfile-parity check (`node scripts/check-lockfile-parity.mjs`), secret scan, backend type-check, route-audit baseline gate (`pnpm --filter backend route-audit:check`), backend `pnpm test`, fresh-database check, a frontend job that runs the production build, and a `container` job that builds the deployment image and checks the entrypoint. The frontend job runs **build only** — there is no frontend test runner, so the CI log explicitly notes that no frontend tests execute |
 | `deploy.yml` | **Placeholder only.** The workflow file exists but its deployment steps are a comment ("Deploy steps would go here"). No image is built, pushed, or deployed |
 
 > The `deploy.yml` placeholder is the reason the roadmap's Phase 0 DoD "auto-run tests on every PR" is now satisfied for **tests** but the release pipeline is still unbuilt. Documented in `docs/ROADMAP_ALIGNMENT.md`.

@@ -2669,6 +2669,10 @@ The exported API is `Language`, `LanguageInfo`, `SUPPORTED_LANGUAGES`, `translat
 
 `apps/backend/src/modules/bot/locales/{en,am,om,ti}.json` — **243 flat keys** each, an identical key set across the four. `getBotTranslation(locale, key, params)` falls back to English and then to the raw key, and substitutes `{param}` placeholders.
 
+These JSON files are runtime data, not TypeScript emit. `apps/backend/scripts/copy-locales.mjs` validates all four catalogues, their exact key parity and their string values before copying them into `dist/modules/bot/locales`; the compiled loader resolves that directory relative to its own module. The container-image CI job imports the compiled loader and requires real English help text, so a missing dictionary fails the image check instead of shipping a bot whose replies are raw keys. If no catalogue can be loaded at runtime, start-up logs the candidate paths and the missing-bundle failure mode explicitly.
+
+The update pipeline is protected at two layers. A grammY API transformer inspects raw Bot API answers and retries a malformed-Markdown rejection once without `parse_mode`; it does not mask unrelated Bot API failures. Outside that transformer, an outer middleware boundary catches handler and middleware exceptions, logs only a redacted command/context summary, sends a plain-text apology, and acknowledges the update. This is required because grammY's `bot.catch` guards polling batches but the webhook adapter calls `handleUpdate()` directly; without the boundary, one exception becomes HTTP 500 and Telegram retries the same update forever.
+
 `en.ftl` (Fluent format, 326 lines) is **dead** — only the JSON files are loaded.
 
 `Yekis_translations.csv` at the repository root is a manual parity ledger (219 rows, with real translations in all three non-English columns). No code reads it.

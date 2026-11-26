@@ -762,7 +762,7 @@ All bot management routes require `requireAuth` + `requireStaffRole("ADMIN")` un
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `POST` | `/api/v1/telegram/webhook` | Public (secret-token header auth) | Receives Telegram updates. Fails closed if `TELEGRAM_WEBHOOK_SECRET` is unset |
+| `POST` | `/api/v1/telegram/webhook` | Public (secret-token header auth) | Receives Telegram updates. Authenticates the secret-token header before parsing the route-local JSON body; fails closed if `TELEGRAM_WEBHOOK_SECRET` is unset. Handled update failures are acknowledged with a safe plain-text reply rather than returned as retryable HTTP 500 responses |
 | `GET` | `/api/v1/telegram/health` | Public | Returns bot status, transport mode (webhook/polling), pending update count, last error |
 | `GET` | `/api/v1/telegram/info` | Admin staff | Returns bot identity (id, username) |
 | `POST` | `/api/v1/telegram/set-webhook` | Admin staff + fresh session | Sets the webhook URL. Must be a public HTTPS URL pointing at this deployment's origin (`API_PUBLIC_URL`). `secretToken` from request body is refused — server-only config |

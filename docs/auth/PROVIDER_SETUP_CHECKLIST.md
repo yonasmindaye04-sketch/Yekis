@@ -133,6 +133,19 @@ the frontend **build** environment.
      redirect URI is involved.
    - Create, then copy the **Client ID** (it ends in `apps.googleusercontent.com`).
 
+> **This is the one thing still standing between the founder and a working
+> Google button (checked against the live host on 2026-11-23).** The client id
+> is already set on the host and the button now renders — the platform's own
+> policies are all in place (the Google worker, the popup opener, the frame,
+> the stylesheet and the script). What Google itself refuses is the **origin**:
+> with `https://yekis.app.aletcloud.com` missing from **Authorized JavaScript
+> origins**, the button's own request answers **400** and the console says
+> *"The given origin is not allowed for the given client ID."* No change on the
+> platform can fix that; it is one field in the Google Cloud console. **Edit
+> the existing client** (the one whose id ends `…ebr17ped0975fhb3se34gqq40gn8itlc
+> .apps.googleusercontent.com`) and add the origin, then press **Save**. It
+> takes effect within a minute — there is nothing to redeploy.
+
 ### B4. Give me the client id
 
 Paste the client id here. **No client secret is needed** for this flow: the

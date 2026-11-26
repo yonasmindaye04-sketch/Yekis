@@ -412,7 +412,7 @@ function wrapCorporateEmail({
               <td class="email-footer" style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 24px 28px; text-align: center;">
                 <p style="margin: 0; font-size: 12px; line-height: 1.6; color: #64748b;">
                   <strong style="color: #0f172a;">Yekis Technologies PLC</strong> &bull; Addis Ababa, Ethiopia<br />
-                  Secure Ethiopian Escrow &amp; Professional Digital Marketplace Infrastructure.<br />
+                  Secure Ethiopian Freelance Marketplace &amp; Professional Digital Infrastructure.<br />
                   <span style="font-size: 11px; color: #94a3b8; margin-top: 6px; display: inline-block;">
                     &copy; ${currentYear} Yekis Technologies PLC. All rights reserved. &bull; Testing &amp; Verification Environment
                   </span>
@@ -500,10 +500,10 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
   });
 
   const bodyContent = `
-    <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">Payment Confirmation &amp; Escrow Receipt</h2>
+    <h2 style="margin: 0 0 12px; font-size: 20px; font-weight: 700; color: #0f172a; letter-spacing: -0.02em;">Payment Confirmation &amp; Receipt</h2>
     <p style="margin: 0 0 14px; font-size: 15px; line-height: 1.5; color: #334155;">Hello ${recipient},</p>
     <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.5; color: #475569;">
-      This email confirms that Yekis is holding your payment in escrow for the milestone below, pending milestone completion and your formal approval:
+      This email confirms that Yekis is holding your payment for the milestone below, pending your approval:
     </p>
 
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 20px; padding: 14px 16px;">
@@ -547,7 +547,7 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
           </td>
         </tr>
         <tr style="background-color: #f8fafc;">
-          <td style="padding: 12px 14px; font-size: 14px; font-weight: 700; color: #0f172a;">Total Escrow Amount</td>
+          <td style="padding: 12px 14px; font-size: 14px; font-weight: 700; color: #0f172a;">Total held</td>
           <td align="right" style="padding: 12px 14px; font-size: 16px; font-weight: 800; color: #16a34a;">ETB ${formattedAmount}</td>
         </tr>
       </tbody>
@@ -556,7 +556,7 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #f0fdf4; border-left: 4px solid #16a34a; border-radius: 4px; padding: 12px 14px; margin-top: 18px;">
       <tr>
         <td style="font-size: 13px; line-height: 1.5; color: #166534;">
-          <strong>Escrow Protection Policy:</strong> Yekis holds this amount securely until the milestone deliverables are submitted and approved. It is released when you approve the work, or automatically after ${env.AUTO_RELEASE_WINDOW_DAYS} days if no dispute is opened. If either party raises a dispute, the funds remain protected in escrow until resolution.
+          <strong>How this payment is held:</strong> Yekis holds this amount until the milestone is delivered. It is released when you approve the delivered work, or automatically after ${env.AUTO_RELEASE_WINDOW_DAYS} days if you do not respond. If either party raises a dispute, the amount stays held until that dispute is resolved.
         </td>
       </tr>
     </table>
@@ -573,7 +573,7 @@ export async function sendInvoiceReceiptEmail(options: InvoiceEmailOptions) {
     to: options.email,
     subject: `Receipt: Escrow Payment for ${options.milestoneTitle} (ETB ${formattedAmount})`,
     html,
-    text: `Payment Receipt: ${options.milestoneTitle}\n\nInvoice: ${options.invoiceNumber}\nAmount: ETB ${formattedAmount}\nDate: ${dateStr}\nClient: ${options.payerName}\nFreelancer: ${options.payeeName}\n\nYekis holds this payment in escrow until work is delivered and approved.`,
+    text: `Payment Receipt: ${options.milestoneTitle}\n\nInvoice: ${options.invoiceNumber}\nAmount: ETB ${formattedAmount}\nDate: ${dateStr}\nClient: ${options.payerName}\nFreelancer: ${options.payeeName}\n\nYekis holds this amount until the milestone is delivered. It is released when you approve the delivered work, or automatically after ${env.AUTO_RELEASE_WINDOW_DAYS} days if you do not respond. If either party raises a dispute, the amount stays held until that dispute is resolved.`,
   });
 }
 

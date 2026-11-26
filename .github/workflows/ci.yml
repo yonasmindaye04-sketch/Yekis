@@ -68,6 +68,16 @@ jobs:
         working-directory: .
         run: node scripts/check-doc-parity.mjs
 
+      # `pnpm install --frozen-lockfile` (the install step above, and the
+      # Dockerfile's) refuses to install when a workspace manifest declares a
+      # dependency the lockfile's importer for that workspace does not record.
+      # The build then fails before it starts, and the failure reads like a
+      # platform problem rather than a manifest problem. This check says which
+      # workspace and which dependency drifted.
+      - name: Lockfile parity check
+        working-directory: .
+        run: node scripts/check-lockfile-parity.mjs
+
       # The scanner's own patterns are exercised first. It has twice reported
       # "clean" while being unable to match a shape GitGuardian matched, so a
       # green scan is only meaningful if the scanner can still fail.
@@ -208,6 +218,29 @@ jobs:
       - name: Inspect the image
         run: |
           docker image inspect yekis:test --format '{{.Config.Entrypoint}} {{.Config.Cmd}} {{.Config.ExposedPorts}}'
+      # The bot's translations are runtime data, not TypeScript. The backend
+      # build must copy them into dist and the compiled loader must find them
+      # there. If either step regresses, ctx.t() returns a raw key such as
+      # "help_commands"; Telegram then rejects that Markdown entity, the
+      # webhook returns 500, and the update is retried forever.
+      #
+      # The check reads the FILES, and never imports the compiled module:
+      # importing it would load the whole configuration module, which insists
+      # on a database URL, Redis, JWT secrets and object-store credentials.
+      - name: The compiled bot carries its locale bundle
+        run: |
+          docker run --rm --entrypoint node yekis:test -e "
+            const fs = require('fs');
+            const path = require('path');
+            const file = '/app/apps/backend/dist/modules/bot/middleware/i18n.middleware.js';
+            const src = fs.readFileSync(file, 'utf8');
+            if (!src.includes('../locales')) { console.error('the compiled loader no longer looks for a locales directory next to itself'); process.exit(1); }
+            const dir = path.resolve(path.dirname(file), '../locales');
+            const en = JSON.parse(fs.readFileSync(path.join(dir, 'en.json'), 'utf8'));
+            const help = en.help_commands;
+            if (!help || help === 'help_commands' || !help.includes('Getting Started')) { console.error('the image carries no real translations'); process.exit(1); }
+            console.log('bot-locales-ok');
+          "
       - name: The entrypoint is executable and syntactically valid
         run: |
           docker run --rm --entrypoint sh yekis:test -c 'test -x /usr/local/bin/yekis-entrypoint && sh -n /usr/local/bin/yekis-entrypoint && echo entrypoint-ok'

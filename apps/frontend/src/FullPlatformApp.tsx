@@ -457,7 +457,6 @@ function AuthVisualAnimation() {
       <div className="auth-vis-aurora auth-vis-aurora-b" />
       <div className="auth-vis-mesh" />
       <div className="auth-vis-sweep" />
-
       <div className="auth-vis-orbit">
         <span className="auth-vis-orbit-ring" />
         <span className="auth-vis-orbit-ring auth-vis-orbit-ring-inner" />

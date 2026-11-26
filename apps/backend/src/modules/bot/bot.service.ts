@@ -14,6 +14,7 @@ import { rateLimitMiddleware } from "./middleware/rateLimit.middleware.js";
 import { sceneTimeoutMiddleware } from "./middleware/sceneTimeout.middleware.js";
 import { loggingMiddleware, safeCommandName, hashUserId } from "./middleware/logging.middleware.js";
 import { i18nMiddleware } from "./middleware/i18n.middleware.js";
+import { errorBoundaryMiddleware } from "./middleware/errorBoundary.middleware.js";
 import { BotContext } from "./types.js";
 import { registerCommands } from "./handlers/commands.js";
 import { registerCallbacks } from "./handlers/callbacks.js";
@@ -140,6 +141,109 @@ function applyApiTimeout(bot: Bot<BotContext>) {
   });
 }
 
+/**
+ * Telegram's answer when a message's formatting cannot be parsed.
+ *
+ * Legacy Markdown treats `_` as an italic delimiter, so a reply that is a raw
+ * translation key ("help_commands") is rejected with "can't find end of the
+ * entity". The same class of error covers an unbalanced `*` or a stray `[`.
+ */
+const MARKDOWN_PARSE_ERROR =
+  /can't parse entities|can't find end of the entity|unsupported start tag|unclosed/i;
+
+/** The shape of a Bot API answer inside the transformer chain. */
+type BotApiResponse =
+  | { ok: true; result?: unknown }
+  | { ok: false; error_code?: number; description?: string };
+
+/**
+ * Whether a rejected answer is a FORMATTING rejection of a message that was
+ * sent with `parse_mode`.
+ *
+ * Only then may the same text be sent again — as plain text. Any other
+ * failure (a blocked bot, a deleted chat, a rate limit) must keep failing.
+ */
+export function isFormattingRejection(
+  response: unknown,
+  payload: unknown,
+): response is { ok: false; error_code: number; description: string } {
+  const body = response as BotApiResponse | undefined;
+  if (!body || body.ok !== false) return false;
+  if (body.error_code !== 400) return false;
+  if (!MARKDOWN_PARSE_ERROR.test(String(body.description ?? ""))) return false;
+  const parseMode = (payload as { parse_mode?: unknown } | undefined)?.parse_mode;
+  return typeof parseMode === "string" && parseMode.length > 0;
+}
+
+/** The same payload without its formatting instruction. */
+function withoutParseMode(payload: unknown): Record<string, unknown> {
+  const { parse_mode: _dropped, ...rest } = (payload ?? {}) as Record<
+    string,
+    unknown
+  >;
+  return rest;
+}
+
+/**
+ * Retries a message Telegram refused to format, without `parse_mode`.
+ *
+ * A member must never be left without an answer because of a formatting
+ * mistake in our own template. Telegram answers 400 "can't parse entities"
+ * and the text itself is perfectly readable — it is only the markup that is
+ * wrong. So the same text is sent again as plain text.
+ *
+ * This lives at the API layer, not at the call sites, because the reply
+ * helpers are spread over the command handlers, the callback handlers, the
+ * scenes and the notification sender, and every one of them would otherwise
+ * need the same fallback.
+ *
+ * WHY A TRANSFORMER, AND WHY IT SEES THE RAW ANSWER
+ *
+ * grammY builds a FRESH API object for every update (`Bot.handleUpdate`)
+ * and copies the registered transformers into it — so a transformer is the
+ * only hook that survives per update; wrapping `bot.api` itself would not.
+ *
+ * A transformer is also the only place that can see the failure. grammY
+ * converts an `ok: false` answer into a thrown error AFTER the transformer
+ * chain has returned, so the chain sees the answer, not the exception.
+ */
+export function markdownFallbackTransformer(
+  prev: (
+    method: string,
+    payload: unknown,
+    signal?: AbortSignal,
+  ) => Promise<unknown>,
+  method: string,
+  payload: unknown,
+  signal?: AbortSignal,
+): Promise<unknown> {
+  return (async () => {
+    const response = await prev(method, payload, signal);
+    if (!isFormattingRejection(response, payload)) return response;
+
+    logger.warn(
+      {
+        method,
+        parseMode: (payload as { parse_mode?: string } | undefined)?.parse_mode,
+        error: (response as { description?: string }).description,
+      },
+      "Telegram rejected the message formatting — resending without parse_mode",
+    );
+
+    return await prev(method, withoutParseMode(payload), signal);
+  })();
+}
+
+function applyMarkdownFallback(bot: Bot<BotContext>) {
+  // grammY types the method name as its own `Methods<RawApi>` union; the
+  // transformer only ever forwards it, so the wider signature is safe.
+  bot.api.config.use(
+    markdownFallbackTransformer as unknown as Parameters<
+      typeof bot.api.config.use
+    >[0],
+  );
+}
+
 export function createBot(): Bot<BotContext> {
   if (!env.TELEGRAM_BOT_TOKEN) {
     throw new Error("TELEGRAM_BOT_TOKEN is not configured");
@@ -147,6 +251,18 @@ export function createBot(): Bot<BotContext> {
 
   const bot = new Bot<BotContext>(env.TELEGRAM_BOT_TOKEN);
   applyApiTimeout(bot);
+  applyMarkdownFallback(bot);
+
+  // The error boundary is the OUTERMOST middleware: grammY runs middleware in
+  // registration order, so this one wraps every plugin, every middleware and
+  // every handler below it.
+  //
+  // It has to be first because `bot.catch` does NOT cover the webhook path:
+  // the webhook adapter calls `bot.handleUpdate()` directly, and an error
+  // there escapes the adapter entirely and turns the delivery into an HTTP
+  // 500 — which Telegram retries indefinitely while the member receives
+  // nothing. See the middleware's own comment for the full story.
+  bot.use(errorBoundaryMiddleware());
 
   // Session storage (Redis with versioning)
   const sessionStorage = createRedisSessionStorage();

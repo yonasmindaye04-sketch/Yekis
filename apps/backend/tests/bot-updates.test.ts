@@ -239,6 +239,17 @@ describe("Telegram bot update handling", () => {
     }
   });
 
+  it("sends the localized help text instead of the raw translation key", async () => {
+    const bot = buildBot();
+    const cap = instrument(bot);
+
+    await run(bot, messageUpdate("/help", nextId()));
+
+    expect(cap.errors).toEqual([]);
+    expect(cap.replies.join(" ")).toContain("I can help you manage your freelance jobs");
+    expect(cap.replies.join(" ")).not.toBe("help_commands");
+  });
+
   it("does not throw on any callback the keyboards can emit", async () => {
     const bot = buildBot();
     const cap = instrument(bot);

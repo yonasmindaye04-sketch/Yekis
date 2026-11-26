@@ -40,6 +40,7 @@ Run these before claiming a change is done. They mirror `.github/workflows/ci.ym
 
 ```powershell
 node scripts/check-doc-parity.mjs                    # docs match the code
+node scripts/check-lockfile-parity.mjs              # manifests match pnpm-lock.yaml
 node scripts/scan-secrets.js                         # no committed credentials
 pnpm --filter backend type-check                     # tsc --noEmit
 pnpm --filter backend route-audit:check              # route baseline gate
@@ -82,6 +83,11 @@ docker build -t yekis:check .                        # the deployment image
 - `node scripts/check-doc-parity.mjs` fails CI when the docs drift from the
   code. Run it after touching anything user-visible. If a check fails, fix the
   **document** — never weaken the check.
+- `node scripts/check-lockfile-parity.mjs` fails CI when a workspace
+  `package.json` declares a dependency the lockfile's importer for that
+  workspace does not record. The image installs with
+  `pnpm install --frozen-lockfile`, so such a drift fails the **build**, before
+  a line of code runs. Run it after touching any `package.json`.
 
 ## Modern Web Guidance (mandatory for HTML/CSS/client-side JS)
 

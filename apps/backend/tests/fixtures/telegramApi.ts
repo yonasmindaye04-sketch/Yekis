@@ -85,10 +85,13 @@ export function installFakeTelegramApi(
       // branch, which is what a test asserting "no webhook call" wants.
       case "getWebhookInfo":
         return {
-          url: "",
-          has_custom_certificate: false,
-          pending_update_count: 0,
-          last_error_message: "",
+          ok: true,
+          result: {
+            url: "",
+            has_custom_certificate: false,
+            pending_update_count: 0,
+            last_error_message: "",
+          },
         } as never;
       case "sendMessage":
         return {
