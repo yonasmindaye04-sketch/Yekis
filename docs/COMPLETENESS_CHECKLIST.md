@@ -26,7 +26,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 - [x] **Breach response chain implemented** — opening an incident contains it (revoking every affected user's sessions), notifies staff in-app/SMS/Telegram, notifies each affected user, records the incident in the audit log, starts the 72-hour clock and prepares an ECA filing template. **The ECA filing itself remains a human step** and detection is staff-confirmed — see `docs/COMPLIANCE_BLOCKERS.md` #6
 - [x] **Two-factor approval on withdrawals** — a withdrawal requires an SMS code that approves that one payout; the approval is consumed on completion, and a phone-verification code cannot substitute for it. Covered by `apps/backend/tests/withdrawal-2fa.test.ts`
 - [ ] **M-Pesa divergence** — Master Design `PAY-003` marks it removed; the code still ships the stub, enum value, schema union member, and top-up route support
-- [ ] **No frontend automated tests** — zero frontend test files and no test runner; the CI frontend job runs build only
+- [ ] **Frontend automated tests are still thin** — a runner now exists and is wired into CI (`apps/backend/vitest.unit.config.ts`, run by `pnpm --filter backend test:unit` and the "Unit tests (backend unit + frontend)" CI step), and the Yekis Guide suites are covered by `apps/frontend/tests/yekis-guide.test.tsx` (**14** tests) plus `apps/backend/tests/guide-progress.unit.test.ts` (**4** tests). Everything else in the frontend is still uncovered: there is no component-level test for the workspace, the wallet, the ops console, or any auth flow, and the CI frontend job still runs the build only.
 - [ ] **Deploy pipeline is a placeholder** — `.github/workflows/deploy.yml` exists but contains no deploy steps
 - [ ] **UCID is not the transactional join key** — `User.ucid` is assigned at KYC completion and is resolvable (the direct-chat lookup finds a user by it), but the transaction tables link to `User.id`, not to the UCID that the Roadmap requires
 - [ ] **No KYC state-change notifications** — the in-app ledger records the transition, but no user notification fires on `VERIFIED` / `REJECTED` (`docs/hardening/UX-AUDIT.md` F-11)
@@ -279,7 +279,7 @@ Re-verified every documented count, constant, queue, port, and enum against the 
 | 2 | **10-year retention + purge job + WORM** — add retention columns to `AuditLog` / `TransactionFlag` / `Dispute`, an archival worker, object lock, and a restore test | M |
 | 3 | **PDPP data-subject rights** — export route, erasure admin tool, hold-preserving deletes, 30-day confirmation | M |
 | 4 | **Wire the breach-notification dispatch** — uncomment the `notificationQueue` call and add a user-notification path | S |
-| 5 | **Frontend automated tests** — introduce a runner (Vitest) and cover the critical flows | L |
+| 5 | **Frontend automated tests** — the runner and the first suites now exist (the Yekis Guide), but the workspace, wallet, ops console and auth flows are still uncovered | M |
 | 6 | **Deploy pipeline** — replace the `deploy.yml` placeholder with a real image build/push/deploy | M |
 | 7 | **CI hardening** — add frontend lint, migration validation, and a dependency scan as required checks | S |
 | 8 | **Extend `check-doc-parity.mjs`** to cover frontend counts (i18n keys, ops pages), queue names, and financial constants — the CI gate that would have caught most of the drift this checklist had to record by hand | M |

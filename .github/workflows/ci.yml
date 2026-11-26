@@ -167,6 +167,14 @@ jobs:
           FRONTEND_URL: http://localhost:5173
           GUEST_SUPPORT_JWT_SECRET: ci-guest-support-secret-distinct-32-chars
 
+      # The suites that need neither Postgres nor Redis: the backend's own
+      # `*.unit.test.ts` files and the frontend's guide tests, which live
+      # outside apps/backend and are therefore invisible to `pnpm test`.
+      # They had a config but no script that ran it, so they were never
+      # executed by anything.
+      - name: Unit tests (backend unit + frontend)
+        run: pnpm run test:unit
+
       # `prisma migrate deploy` succeeding does not mean the schema is correct:
       # a migration can omit an object schema.prisma declares, and that is
       # invisible until something queries the missing table. LedgerAccount,
@@ -194,8 +202,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # `tsc -b` is the type-check; `vite build` is the bundling check. The
-      # frontend has no test runner yet (Phase 6 / T6.5 territory), so this job
-      # deliberately does not pretend to have test coverage.
+      # frontend's own test suites run in the backend job under "Unit tests
+      # (backend unit + frontend)" — they live in apps/frontend/tests and are
+      # collected by apps/backend/vitest.unit.config.ts, so they are not run
+      # from this working directory.
       - run: pnpm run build
 
   # The container image is what a deployment actually runs, and it is built

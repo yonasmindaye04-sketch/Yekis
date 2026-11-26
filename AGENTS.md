@@ -45,6 +45,7 @@ node scripts/scan-secrets.js                         # no committed credentials
 pnpm --filter backend type-check                     # tsc --noEmit
 pnpm --filter backend route-audit:check              # route baseline gate
 pnpm --filter backend test                           # vitest (needs Postgres + Redis)
+pnpm --filter backend test:unit                     # vitest, no database (backend unit + frontend)
 pnpm --filter frontend build                         # tsc -b && vite build
 docker build -t yekis:check .                        # the deployment image
 ```

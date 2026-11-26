@@ -115,6 +115,7 @@ Staff means `COMPLIANCE_OFFICER` or `ADMIN`.
 | Method | Path | Access | Purpose |
 |---|---|---|---|
 | `GET` | `/api/v1/jobs` | Authenticated | Search/list jobs using `category`, `q`, `page`, `pageSize` |
+| `GET` | `/api/v1/jobs/feed` | Authenticated | Personalised open-brief feed for the signed-in freelancer, using `page` and `pageSize` |
 | `GET` | `/api/v1/jobs/mine` | Authenticated | List jobs posted by the current user |
 | `GET` | `/api/v1/jobs/:jobId` | Authenticated | Get job details |
 | `POST` | `/api/v1/jobs` | Client/Both, Tier 1 verified | Create a job |
@@ -124,6 +125,40 @@ Staff means `COMPLIANCE_OFFICER` or `ADMIN`.
 | `GET` | `/api/v1/jobs/:jobId/proposals` | Posting client | List proposals for that job |
 | `POST` | `/api/v1/jobs/proposals/:proposalId/decision` | Posting client | `SHORTLISTED`, `ACCEPTED`, or `REJECTED` |
 | `POST` | `/api/v1/jobs/proposals/:proposalId/withdraw` | Proposal owner | Withdraw submitted/shortlisted proposal |
+
+### `GET /api/v1/jobs/feed` response
+
+The freelancer's personalised feed of open briefs. Ranking, in order:
+briefs whose category matches the freelancer's skills come first (the primary
+skill's category counts double, and the skill strength is capped at 10 per
+brief), then profile completeness, then recency over a ten-day window.
+A freelancer whose profile completeness is **80 or above** also sees the
+remaining open briefs after the matches; a freelancer with no skills at all
+sees the plain recent list.
+
+```json
+{
+  "items": [
+    {
+      "id": "…",
+      "title": "Build an inventory dashboard",
+      "category": "WEB_APP_DEVELOPMENT",
+      "matchScore": 128,
+      "matchedSkills": true
+    }
+  ],
+  "total": 37,
+  "page": 1,
+  "pageSize": 20,
+  "matchingAvailable": true
+}
+```
+
+`matchingAvailable` is `false` when the account has no skills recorded, which
+is the signal for the UI to prompt the member to add them — the feed is then
+the plain recent list, not a personalised one. The ranking is computed over
+the **200 most recent open briefs** and then paginated, so `total` is the
+size of that ranked set, not the size of the whole jobs table.
 
 Create job body:
 

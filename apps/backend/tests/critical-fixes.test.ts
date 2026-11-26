@@ -291,8 +291,15 @@ describe("LOCK (source text) — OAuth cannot claim a password account", () => {
     // whose first occurrence in the file is the helper's declaration rather
     // than the call site. An earlier version of this test compared two
     // character offsets and passed/failed for reasons unrelated to the bug.
+    //
+    // The message was reworded on 2026-11-26 when the guard's scope changed:
+    // it now refuses an *unverified* password-owned account and lets a
+    // Google-verified address sign in to a verified password account
+    // (see docs/CHANGELOG.md -> "Verified-Email Google Auto-Linking"). The
+    // structural invariants this test locks are unchanged by that decision,
+    // and the two added below lock the new escape hatch shut.
     const guardAt = OAUTH_SRC.indexOf(
-      "Refusing OAuth merge into a password-owned account",
+      "Refusing OAuth merge into an unverified password-owned account",
     );
     const unverifiedBranch = OAUTH_SRC.indexOf(
       "if (user && !user.emailVerified) {",
@@ -306,8 +313,28 @@ describe("LOCK (source text) — OAuth cannot claim a password account", () => {
     // And there must be exactly one occurrence of the guard, so a future edit
     // cannot reintroduce a second, narrower one.
     expect(
-      OAUTH_SRC.split("Refusing OAuth merge into a password-owned account").length -
-        1,
+      OAUTH_SRC.split(
+        "Refusing OAuth merge into an unverified password-owned account",
+      ).length - 1,
     ).toBe(1);
+  });
+
+  it("the only way past the guard needs BOTH sides to have verified the address", () => {
+    // The guard refuses a password-owned account unless the Yekis account's
+    // own address is verified AND the provider cryptographically verified the
+    // same address. Whitespace-tolerant so a reformat cannot break it, and
+    // written as a conjunction so a future edit that widens it to `||` — which
+    // would let a single proof of the address open the account — fails here.
+    expect(OAUTH_SRC).toMatch(
+      /!\(\s*user\.emailVerified\s*&&\s*providerVerifiedEmail\s*\)/,
+    );
+
+    // And the provider half of that proof is Google only: Google is the one
+    // provider whose credential verification refuses an unverified mailbox
+    // (`payload.email_verified !== true` throws in verifyGoogleIdToken).
+    // Apple and Facebook must stay on the refusal path.
+    expect(OAUTH_SRC).toMatch(
+      /providerVerifiedEmail\s*=\s*profile\.provider\s*===\s*"GOOGLE"/,
+    );
   });
 });
