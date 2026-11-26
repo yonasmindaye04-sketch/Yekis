@@ -424,6 +424,7 @@
 .yk-v2 .v2-hero {
   position: relative;
   min-height: 100svh;
+  min-height: 100dvh;
   padding-top: 72px;
   display: grid;
   place-items: center;
@@ -474,6 +475,7 @@
 
 /* hero content */
 .yk-v2 .v2-hero-inner {
+  container-type: inline-size;
   position: relative;
   z-index: 2;
   text-align: center;
@@ -519,10 +521,9 @@
 /* Grounded subheadline */
 .yk-v2 .v2-hero-sub {
   max-width: 680px;
-  /* The title is very large and its descenders come close to the line
-     below it. The gap is what tells the eye that the sentence is a
-     sentence and not part of the headline. */
-  margin: clamp(20px, 4svh, 52px) auto 0;
+  /* Generous clearance below the display headline so the promise and CTAs
+     read as a distinct lower group rather than crowding the title. */
+  margin: clamp(2.5rem, 8.5dvh, 5.75rem) auto 0;
   font-size: clamp(1rem, 1.35vw, 1.2rem);
   line-height: 1.58;
   color: var(--v2-text2);
@@ -534,14 +535,20 @@
 /* Hero actions */
 .yk-v2 .v2-hero-actions {
   display: flex;
-  gap: 14px;
+  gap: clamp(1.25rem, 2.5vw, 2rem);
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   /* The buttons sit clear of the sentence above them, so the eye reads
      the heading, then the promise, then the way to act on it. */
-  margin-top: clamp(20px, 3.5svh, 42px);
+  margin-top: clamp(1.5rem, 4dvh, 2.75rem);
   animation: v2-fp-up 0.35s ease 0.15s both;
+}
+
+@supports (gap: 1cqi) {
+  .yk-v2 .v2-hero-actions {
+    gap: clamp(1.25rem, 2.5cqi, 2rem);
+  }
 }
 
 /* ── stats: skewed cascade cards ── */
@@ -2500,7 +2507,8 @@
   .yk-v2 .v2-testi-marquee { height: clamp(340px, 50svh, 440px); }
   .yk-v2 .v2-testi-card { padding: 16px 18px; }
   .yk-v2 .v2-testi-hint { font-size: 10px; letter-spacing: 0.14em; }
-  .yk-v2 .v2-hero-actions { flex-direction: column; align-items: stretch; }
+  .yk-v2 .v2-hero-sub { margin-top: clamp(2rem, 6dvh, 3.25rem); }
+  .yk-v2 .v2-hero-actions { flex-direction: column; align-items: stretch; gap: 1rem; }
   .yk-v2 .v2-hero-actions .v2-btn { justify-content: center; }
 }
 
