@@ -1532,6 +1532,120 @@ remaining possibilities are an unsaved client form, Google's propagation delay
 (the console warns it can take from a few minutes to a few hours) or a consent
 screen that is still in Testing without the signing-in account as a test user.
 
+### The operations-console parity, guide and sound release - 2026-11-26
+
+The batch that had been sitting on `feat/multi-channel-auth` was committed as
+`e323bd3`, merged with `main` as `7580d4d`, followed by `fea06b3` (a secret-scan
+fix) and `2a83920` (the three gate fixes below). **104 files, +14,472 / -5,650.**
+The deployed branch was fast-forwarded from `a22239b` to `2a83920` - no
+force-push, and no commit on either side was dropped.
+
+**What shipped:**
+
+- **The Operations Console was rebuilt against the workspace shell.** A CSS
+  Grid shell replaces the broken fixed-sidebar geometry, `CommandPalette` is a
+  native `<dialog>`, every `window.prompt()` / `window.confirm()` is gone
+  (**9** of them), the rule violations are gone (`GlassCard` / `ShinyBadge`
+  backgrounds replaced with flat hairlines and bold coloured text), and the
+  financial pages no longer call five endpoints that always answered 404.
+- **The dashboard stopped inventing data.** `ShadcnCharts.buildLiveTimeSeries()`
+  used to end with a synthetic curve with an ETB 48,000 floor, and
+  `MarketplaceShadcnDashboard` attached a demo counterparty, a made-up contract
+  title and a rail picked by row index to every real milestone. The API now
+  carries the facts - `GET /api/v1/escrow/milestones` returns the real
+  counterparty, the contract title and category, the actual payment rail and
+  the funding timestamp - and the charts are pure sums of real movements with
+  an empty state instead of a plausible curve.
+- **The Yekis Guide.** A contextual help system (`?` on 14 surfaces, a
+  `Shift+?` menu, a 12-module product tour) with per-user progress persisted
+  in a new nullable `User.guideProgress` JSONB column and three new
+  authenticated endpoints.
+- **Platform sound effects** (a zero-asset Web Audio synthesizer), full
+  four-language dashboard wiring, and a fix for the language selector
+  reverting to English on every background poll.
+- **A new authenticated route**: `GET /api/v1/jobs/feed`, the freelancer's
+  personalised open-brief feed.
+
+**Three gates were red against that batch, and two of the three were real.**
+Both are fixed in `2a83920`:
+
+- **The committed route inventory had drifted.** The batch added
+  `GET /api/v1/jobs/feed` but `docs/hardening/route-baseline.json` still listed
+  **204** routes against a live inventory of **205**. The route-audit *script*
+  passed, because its gate only fails on a **removed** route; the
+  `route-inventory` **test** failed, because it compares the committed file to
+  the live inventory for exact equality. The baseline has been regenerated with
+  the script's own documented command and now holds **205** routes.
+- **The OAuth source-text lock still anchored on the guard's old wording**, so
+  it could not find its anchor after the scope changed. The structural
+  invariants it locks were **re-verified as still holding** - the guard still
+  runs before the `if (user && !user.emailVerified)` branch (offset **11323**
+  against **11490**) and there is still exactly **one** occurrence of it - so
+  the lock was **re-anchored, not weakened**. Two further invariants were
+  added: the escape past the guard requires **both** `user.emailVerified` and a
+  provider proof, written as a conjunction so a future edit that widens it to
+  `||` fails the lock, and the provider proof is **GOOGLE only**, so Apple and
+  Facebook stay on the refusal path.
+- **The new unit-test config had no script that ran it.**
+  `apps/backend/vitest.unit.config.ts` collects the frontend's Yekis Guide
+  tests, but the frontend lives outside `apps/backend`, so its **14** tests
+  were invisible to `pnpm test` and nothing in the repository executed them.
+  A `test:unit` script now exists at the root and in `apps/backend`, and CI
+  runs it as **"Unit tests (backend unit + frontend)"**.
+
+**One security-posture change is in this release, and it is deliberate.** The
+CHANGELOG records it as *Verified-Email Google Auto-Linking*: a Google
+credential whose address is cryptographically verified by Google now signs in
+to an existing password-owned Yekis account **when that account's own address
+is also verified**, instead of being refused. Unverified password accounts are
+still refused with `409 ACCOUNT_LINK_REQUIRED`, a different `googleId` is
+never overwritten, and the Telegram path still refuses to claim a
+password-owned account. The behaviour is covered by `oauth-account-link.test.ts`
+and locked by the source-text test above.
+
+**Verified against the live instance:**
+
+- **LIVE** at `2026-11-26T12:07:46Z` on `2a83920`, with **55** environment
+  variables. The container came up at `12:07:22Z`.
+- Served assets: `/assets/index-CNLYPcKo.css` and `/assets/index-x8JWx0Lb.js`.
+  The **CSS** hash is identical to the local production build **and** to the
+  one the container image produces, which is the reliable fingerprint - the
+  JavaScript hash differs from the image build because the host bakes its own
+  `VITE_*` values in at build time.
+- `node scripts/check-deployment.mjs https://yekis.app.aletcloud.com` passes
+  **11/11**.
+- The start-up log reports the bundled Redis up, **41 migrations found**, and
+  **`Applying migration 20261126120000_user_guide_progress`** followed by
+  *"All migrations have been successfully applied"*. The API then listens on
+  8080, the database connects, the object store bucket is ready, and the bot
+  registers its webhook.
+- `GET /api/v1/auth/oauth/providers` answers
+  `{"google":true,…,"telegram":true,"telegramBotUsername":"ye_kis_bot"}`.
+- `GET /api/v1/auth/identities` and `GET /api/v1/users/me/erasure/blockers`
+  answer **401** without a session.
+- **Both new routes answer 401 rather than 404** - `GET /api/v1/jobs/feed` and
+  `GET /api/v1/users/me/guide-progress` - which is how a mounted authenticated
+  route refuses an anonymous caller.
+- `GET /api/v1/telegram/health` answers **200** with `"status":"ok"`,
+  `"pendingUpdateCount":0` and the webhook registered at
+  `https://yekis.app.aletcloud.com/api/v1/telegram/webhook`.
+- The **deployment image builds**: `docker build -t yekis:check .` completes the
+  whole image, and its bundle's CSS hash matches the host's byte for byte. The
+  first attempt was killed at fifty minutes on the cold
+  `pnpm install --frozen-lockfile` step; with the layer cache warm the same
+  build takes about six minutes.
+- Gates before the push: backend `tsc` and frontend `tsc -b` clean, the
+  production `vite build` clean, the backend suite **730/731** across **73** of
+  **74** files (the only failure being the known pre-existing
+  `withdrawal-2fa` SMS-provider case, which fails identically on the previous
+  commit), the unit suite **18/18**, and the route audit, doc parity, secret
+  scan and lockfile parity gates all passing.
+
+**Google sign-in remains blocked** for the reason given above: the OAuth
+client still does not list `https://yekis.app.aletcloud.com` under
+**Authorized JavaScript origins**. The verified-email auto-linking change in
+this release is therefore not yet observable through the Google button.
+
 ### Teardown
 
 ```bash
