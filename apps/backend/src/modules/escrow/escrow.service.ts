@@ -8,7 +8,10 @@ import type { Prisma } from "@prisma/client";
 import { telebirrClient } from "./providers/telebirr.client.js";
 import { cbeClient } from "./providers/cbe.client.js";
 import { mpesaClient } from "./providers/mpesa.client.js";
-import type { PaymentProviderClient } from "./providers/paymentProvider.interface.js";
+import {
+  PaymentProviderUnavailableError,
+  type PaymentProviderClient,
+} from "./providers/paymentProvider.interface.js";
 import { env } from "../../config/env.js";
 import { logger } from "../../lib/logger.js";
 import { sendInvoiceReceiptEmail } from "../../lib/email/email.service.js";
@@ -44,6 +47,10 @@ export class ActiveContractWithdrawalBlockedError extends Error {}
 export class EscrowAdminHoldError extends Error {}
 /** The payout destination (user.phone) has never been proven by SMS. */
 export class PhoneNotVerifiedError extends Error {}
+/** Payout rail is not available or does not support automated disbursement. */
+export class PayoutRailUnavailableError extends Error {}
+/** Payout rail rejected the disbursement after wallet rollback. */
+export class PayoutRailRejectedError extends Error {}
 /** Thrown when a concurrent release path (explicit accept / auto-release /
  * dispute resolution) already claimed the milestone. Treated as a benign no-op. */
 export class MilestoneReleaseClaimLostError extends Error {
@@ -1177,23 +1184,24 @@ export async function withdrawFromWallet(params: {
     });
   });
 
+  const rollbackFailedWithdrawal = async (reason: string) => {
+    await prisma.$transaction(async (tx) => {
+      await tx.wallet.update({
+        where: { userId: params.userId },
+        data: { balanceMinor: { increment: params.amountMinor } },
+      });
+      await tx.payoutTransaction.update({
+        where: { id: payout.id },
+        data: { status: "FAILED", errorMessage: reason },
+      });
+    });
+  };
+
   const providerClient = getProviderClient(params.provider);
   if (!providerClient.initiateDisbursement) {
-    // Provider does not support automated disbursements â€” roll back wallet
-    await prisma.wallet.update({
-      where: { userId: params.userId },
-      data: { balanceMinor: { increment: params.amountMinor } },
-    });
-    await prisma.payoutTransaction.update({
-      where: { id: payout.id },
-      data: {
-        status: "FAILED",
-        errorMessage: `Provider ${params.provider} does not support automated disbursements.`,
-      },
-    });
-    throw new Error(
-      `Provider ${params.provider} does not support automated disbursements.`,
-    );
+    const reason = `Provider ${params.provider} does not support automated disbursements.`;
+    await rollbackFailedWithdrawal(reason);
+    throw new PayoutRailUnavailableError(reason);
   }
 
   let disbursementResult;
@@ -1205,6 +1213,10 @@ export async function withdrawFromWallet(params: {
       referenceId: payout.id,
     });
   } catch (err) {
+    if (err instanceof PaymentProviderUnavailableError) {
+      await rollbackFailedWithdrawal(err.message);
+      throw new PayoutRailUnavailableError(err.message);
+    }
     logger.error(
       { err, payoutId: payout.id },
       "Disbursement request threw unhandled error",
@@ -1217,19 +1229,9 @@ export async function withdrawFromWallet(params: {
   }
 
   if (disbursementResult.status === "FAILED") {
-    // Roll back the wallet debit immediately on provider rejection
-    await prisma.wallet.update({
-      where: { userId: params.userId },
-      data: { balanceMinor: { increment: params.amountMinor } },
-    });
-    await prisma.payoutTransaction.update({
-      where: { id: payout.id },
-      data: {
-        status: "FAILED",
-        errorMessage:
-          disbursementResult.errorMessage || "Provider rejected disbursement",
-      },
-    });
+    const reason =
+      disbursementResult.errorMessage || "Provider rejected disbursement";
+    await rollbackFailedWithdrawal(reason);
     await recordAuditEvent({
       userId: params.userId,
       eventType: "WALLET_WITHDRAWAL_FAILED",
@@ -1237,9 +1239,7 @@ export async function withdrawFromWallet(params: {
       entityId: payout.id,
       metadata: { reason: disbursementResult.errorMessage },
     });
-    throw new Error(
-      `Withdrawal failed: ${disbursementResult.errorMessage || "Provider rejected disbursement"}`,
-    );
+    throw new PayoutRailRejectedError(`Withdrawal failed: ${reason}`);
   }
 
   if (disbursementResult.status === "CONFIRMED") {

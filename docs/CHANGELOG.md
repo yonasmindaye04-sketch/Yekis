@@ -4,6 +4,12 @@ All notable implementation and documentation changes are recorded here.
 
 ## Unreleased
 
+### Fixed
+- **OPS-15 — Client dashboard TDZ crash, signed-in phone verification, and withdrawal payout-rail errors (`MarketplaceShadcnDashboard.tsx`, `phone-verification.routes.ts`, `escrow.service.ts`, `escrow.routes.ts`, `telebirr.client.ts`) (2026-11-27)**:
+  - **Client dashboard initialization crash**: `attentionItems` (`useMemo`) invoked `metaFor(m)` before `const metaFor` was initialized (introduced in `39133b3f79ec48fa27ae5e63a50205263027c53d`), throwing `ReferenceError: Cannot access 'metaFor' before initialization` for signed-in client views. Moved `metaFor` above `attentionItems` and added `apps/frontend/tests/client-dashboard-render.test.tsx` mounting `MarketplaceShadcnDashboard` for `CLIENT`, `FREELANCER`, and dual-role (`BOTH`) accounts.
+  - **Signed-in SMS phone verification**: Added `optionalAuth` middleware to `POST /api/v1/auth/phone/code` and `POST /api/v1/auth/phone/verify` so `req.user.id` is populated when an authenticated member verifies their account phone number, stamping `User.phoneVerifiedAt`.
+  - **Wallet withdrawal rail errors & dev stub**: Replaced generic `Error` throws in `withdrawFromWallet()` with `PayoutRailUnavailableError` (`503 PAYOUT_RAIL_UNAVAILABLE`) and `PayoutRailRejectedError` (`502 PAYOUT_RAIL_REJECTED`) mapped in `escrow.routes.ts` while preserving atomic wallet rollback and `FAILED` payout status. In `telebirr.client.ts`, `NODE_ENV=development` uses the simulated sandbox disbursement stub even when C2B sandbox credentials exist locally, preventing live HTTP 404 failures during local withdrawals.
+
 ### Added
 - **Admin Telegram Broadcast Center (`schema.prisma`, `broadcast.message.ts`, `broadcast.service.ts`, `broadcast.routes.ts`, `broadcast.worker.ts`, `queues.ts`, `BroadcastCenter.tsx`, `BotOperations.tsx`, `ops-console.css`) (2026-12-01)**:
   - **What was missing**: the Telegram Bot page in the Ops Console could only start polling, stop the bot and delete the webhook. `/broadcast` in the bot was answered by a stub that told staff the feature was coming, and the `staff:broadcast` callback opened a dead end, so there was no way to announce a payout change, a maintenance window or a policy update to the members who actually use Telegram. More importantly, there was no record of who was messaged, no reachable-recipient count, no preview, no test send and no way to stop a run that was going wrong.

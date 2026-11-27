@@ -23,6 +23,8 @@ import {
   ActiveContractWithdrawalBlockedError,
   EscrowAdminHoldError,
   PhoneNotVerifiedError,
+  PayoutRailUnavailableError,
+  PayoutRailRejectedError,
 } from "./escrow.service.js";
 import { getEscrowFeeConfig } from "./fees.js";
 import { WithdrawalHeldForReviewError } from "../tms/tms.service.js";
@@ -126,6 +128,20 @@ function handleKnownErrors(
   }
   if (err instanceof WithdrawalHeldForReviewError) {
     res.status(202).json({ error: "HELD_FOR_REVIEW", message: err.message });
+    return true;
+  }
+  if (err instanceof PayoutRailUnavailableError) {
+    res.status(503).json({
+      error: "PAYOUT_RAIL_UNAVAILABLE",
+      message: err.message,
+    });
+    return true;
+  }
+  if (err instanceof PayoutRailRejectedError) {
+    res.status(502).json({
+      error: "PAYOUT_RAIL_REJECTED",
+      message: err.message,
+    });
     return true;
   }
   return false;

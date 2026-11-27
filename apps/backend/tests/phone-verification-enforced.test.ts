@@ -309,4 +309,33 @@ describe("the gate answers with an actionable status", () => {
     expect(res.status).toBe(403);
     expect(res.body.error).toBe("PHONE_NOT_VERIFIED");
   });
+
+  it("sets phoneVerifiedAt when a signed-in user requests and verifies a code over HTTP", async () => {
+    const user = await makeUser({ phoneVerified: false });
+    expect(await verifiedAtFor(user.id)).toBeNull();
+    const { createAuthTokens } = await import("../src/modules/auth/auth.service.js");
+    const session = await createAuthTokens(
+      { id: user.id, role: "FREELANCER", ucid: null },
+      ["pwd"],
+    );
+
+    const codeRes = await request(app)
+      .post("/api/v1/auth/phone/code")
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .send({ phone: user.phone });
+    expect(codeRes.status).toBe(200);
+    expect(codeRes.body.devCode).toMatch(/^\d{6}$/);
+
+    const verifyRes = await request(app)
+      .post("/api/v1/auth/phone/verify")
+      .set("Authorization", `Bearer ${session.accessToken}`)
+      .send({ phone: user.phone, code: codeRes.body.devCode });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.verified).toBe(true);
+
+    expect(
+      await verifiedAtFor(user.id),
+      "optionalAuth must attach req.user so verifying a phone marks the signed-in user verified",
+    ).toBeInstanceOf(Date);
+  });
 });

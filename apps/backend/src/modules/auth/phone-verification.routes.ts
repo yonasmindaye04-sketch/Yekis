@@ -2,7 +2,7 @@
 import type { Response, Router } from "express";
 import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";
-import type { AuthedRequest } from "../../middleware/auth.js";
+import { optionalAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { logger } from "../../lib/logger.js";
 import { isDevCodeDisclosureAllowed } from "../../config/env.js";
 import {
@@ -90,6 +90,7 @@ export function handlePhoneVerificationError(
 export function registerPhoneVerificationRoutes(router: Router): void {
   router.post(
     "/phone/code",
+    optionalAuth,
     phoneSendLimiter,
     async (req: AuthedRequest, res: Response) => {
       const parsed = PhoneRequest.safeParse(req.body);
@@ -126,6 +127,7 @@ export function registerPhoneVerificationRoutes(router: Router): void {
 
   router.post(
     "/phone/verify",
+    optionalAuth,
     phoneCheckLimiter,
     async (req: AuthedRequest, res: Response) => {
       const parsed = PhoneVerify.safeParse(req.body);

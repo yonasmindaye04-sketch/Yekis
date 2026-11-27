@@ -479,17 +479,17 @@ export const telebirrClient: PaymentProviderClient = {
     recipientPhone: string;
     referenceId: string;
   }) {
-    if (!hasCredentials()) {
+    if (!hasCredentials() || env.NODE_ENV === "development") {
       if (env.NODE_ENV === "production") {
         throw new PaymentProviderUnavailableError("Telebirr disbursement is disabled in production until merchant credentials are configured.");
       }
       logger.warn(
-        { recipientPhone: params.recipientPhone, amountMinor: params.amountMinor },
-        "Telebirr credentials not configured — using simulated sandbox disbursement.",
+        { recipientPhone: params.recipientPhone, amountMinor: params.amountMinor, nodeEnv: env.NODE_ENV },
+        "Using simulated Telebirr sandbox disbursement.",
       );
 
-      // Deterministic simulation: phone ending with 999 fails, all others succeed
-      if (params.recipientPhone.endsWith("999")) {
+      // Deterministic failure simulation applies outside development mode only.
+      if (env.NODE_ENV !== "development" && params.recipientPhone.endsWith("999")) {
         return {
           providerPayoutId: `mock-disburse-${randomUUID()}`,
           status: "FAILED" as const,

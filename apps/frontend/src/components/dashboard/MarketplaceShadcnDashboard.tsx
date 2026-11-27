@@ -227,6 +227,41 @@ export function MarketplaceShadcnDashboard({
     [],
   );
 
+  /**
+   * The facts the ledger, kanban and schedule need for one milestone.
+   *
+   * Every value comes from the milestone payload the API returns for the
+   * signed-in account. Nothing is looked up in a fixture table and nothing is
+   * derived from the row's position in a list, so a row can only ever show
+   * the contract, the counterparty and the rail that actually belong to it.
+   */
+  const metaFor = (m: Milestone) => {
+    const funded = FUNDED_ESCROW_STATES.has(m.escrowState);
+    const rail: PaymentRail = m.paymentRail
+      ? (m.paymentRail as PaymentRail)
+      : funded
+        ? "INTERNAL_WALLET"
+        : "UNFUNDED";
+    const counterparty =
+      m.counterparty?.name?.trim() || m.counterparty?.email || "Unknown counterparty";
+    const client =
+      m.contract?.clientName?.trim() ||
+      (m.counterparty?.role === "CLIENT" ? counterparty : "Account Client");
+    const freelancer =
+      m.contract?.freelancerName?.trim() ||
+      (m.counterparty?.role === "FREELANCER" ? counterparty : "Account Freelancer");
+    return {
+      contractTitle: m.contract?.title?.trim() || `Contract ${m.contractId.slice(0, 8)}`,
+      counterparty,
+      counterpartyEmail: m.counterparty?.email ?? "",
+      client,
+      freelancer,
+      category:
+        m.contract?.category?.replaceAll("_", " ").toLowerCase() || "Uncategorised",
+      rail,
+    };
+  };
+
   const attentionItems = useMemo(() => {
     return effectiveMilestones
       .map((m) => {
@@ -320,41 +355,6 @@ export function MarketplaceShadcnDashboard({
     [canWork, jobs, myJobs],
   );
   const briefScope = canWork ? "marketplace" : "own";
-
-  /**
-   * The facts the ledger, kanban and schedule need for one milestone.
-   *
-   * Every value comes from the milestone payload the API returns for the
-   * signed-in account. Nothing is looked up in a fixture table and nothing is
-   * derived from the row's position in a list, so a row can only ever show
-   * the contract, the counterparty and the rail that actually belong to it.
-   */
-  const metaFor = (m: Milestone) => {
-    const funded = FUNDED_ESCROW_STATES.has(m.escrowState);
-    const rail: PaymentRail = m.paymentRail
-      ? (m.paymentRail as PaymentRail)
-      : funded
-        ? "INTERNAL_WALLET"
-        : "UNFUNDED";
-    const counterparty =
-      m.counterparty?.name?.trim() || m.counterparty?.email || "Unknown counterparty";
-    const client =
-      m.contract?.clientName?.trim() ||
-      (m.counterparty?.role === "CLIENT" ? counterparty : "Account Client");
-    const freelancer =
-      m.contract?.freelancerName?.trim() ||
-      (m.counterparty?.role === "FREELANCER" ? counterparty : "Account Freelancer");
-    return {
-      contractTitle: m.contract?.title?.trim() || `Contract ${m.contractId.slice(0, 8)}`,
-      counterparty,
-      counterpartyEmail: m.counterparty?.email ?? "",
-      client,
-      freelancer,
-      category:
-        m.contract?.category?.replaceAll("_", " ").toLowerCase() || "Uncategorised",
-      rail,
-    };
-  };
 
   const ledgerRecords = useMemo<LedgerContractRecord[]>(
     () =>

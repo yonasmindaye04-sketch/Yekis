@@ -283,3 +283,80 @@ describe("a code proves one thing only", () => {
     ).resolves.toEqual({ verified: true });
   });
 });
+
+describe("OPS-15: withdrawal rail failures map cleanly and preserve wallet rollback", () => {
+  it("returns 502 PAYOUT_RAIL_REJECTED with a clear message and rolls back the wallet when the payout rail rejects", async () => {
+    const user = await makeUser();
+    const before = await balanceOf(user.id);
+    const { telebirrClient } = await import(
+      "../src/modules/escrow/providers/telebirr.client.js"
+    );
+
+    const otp = await request(app)
+      .post("/api/v1/escrow/wallet/withdraw/otp")
+      .set("Authorization", await authHeader(user.id))
+      .send({});
+    expect(otp.status).toBe(200);
+
+    const spy = vi
+      .spyOn(telebirrClient, "initiateDisbursement")
+      .mockResolvedValueOnce({
+        providerPayoutId: "fail-ref",
+        status: "FAILED",
+        errorMessage: "Telebirr rejected disbursement: HTTP 404",
+      });
+
+    try {
+      const res = await request(app)
+        .post("/api/v1/escrow/wallet/withdraw")
+        .set("Authorization", await authHeader(user.id))
+        .send({
+          amountMinor: 100_000,
+          provider: "TELEBIRR",
+          payoutAccountIdentifier: user.phone,
+          otpCode: otp.body.devCode,
+        });
+
+      expect(res.status).toBe(502);
+      expect(res.body.error).toBe("PAYOUT_RAIL_REJECTED");
+      expect(res.body.message).toContain("HTTP 404");
+      expect(await balanceOf(user.id)).toBe(before);
+      const payout = await prisma.payoutTransaction.findFirstOrThrow({
+        where: { userId: user.id },
+      });
+      expect(payout.status).toBe("FAILED");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("returns 503 PAYOUT_RAIL_UNAVAILABLE and rolls back the wallet when the provider lacks disbursement support", async () => {
+    const user = await makeUser();
+    const before = await balanceOf(user.id);
+
+    const otp = await request(app)
+      .post("/api/v1/escrow/wallet/withdraw/otp")
+      .set("Authorization", await authHeader(user.id))
+      .send({});
+    expect(otp.status).toBe(200);
+
+    const res = await request(app)
+      .post("/api/v1/escrow/wallet/withdraw")
+      .set("Authorization", await authHeader(user.id))
+      .send({
+        amountMinor: 100_000,
+        provider: "CBE_BIRR",
+        payoutAccountIdentifier: user.phone,
+        otpCode: otp.body.devCode,
+      });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toBe("PAYOUT_RAIL_UNAVAILABLE");
+    expect(res.body.message).toContain("CBE_BIRR");
+    expect(await balanceOf(user.id)).toBe(before);
+    const payout = await prisma.payoutTransaction.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+    expect(payout.status).toBe("FAILED");
+  });
+});
