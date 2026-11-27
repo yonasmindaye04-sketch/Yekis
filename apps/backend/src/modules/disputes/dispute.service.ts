@@ -470,7 +470,52 @@ export async function compileEvidenceBundle(disputeId: string): Promise<void> {
   logger.info({ disputeId, storageKey }, "Evidence bundle compiled and stored");
 }
 
-/** Compliance Officer / mediator dashboard â€” everything awaiting a decision. */
+/**
+ * OPS-02: Compute disputed milestone metadata & amount from the milestone(s)
+ * actually under dispute — never summing unrelated RELEASED or WIP milestones
+ * on the contract.
+ */
+export function extractDisputedMilestoneContext<
+  M extends {
+    id: string;
+    title: string;
+    amountMinor: number;
+    escrowState: string;
+    deliverableUrl: string | null;
+  },
+>(dispute: { milestoneId: string | null; contract: { milestones: M[] } | null }) {
+  const milestones = dispute.contract?.milestones ?? [];
+  const linked = dispute.milestoneId
+    ? milestones.find((m) => m.id === dispute.milestoneId) ?? null
+    : null;
+  const disputedSet = linked
+    ? [linked]
+    : milestones.filter((m) => m.escrowState === "DISPUTED");
+  const disputedAmountMinor = disputedSet.reduce(
+    (sum, m) => sum + m.amountMinor,
+    0,
+  );
+  const disputedMilestone = linked
+    ? {
+        id: linked.id,
+        title: linked.title,
+        amountMinor: linked.amountMinor,
+        escrowState: linked.escrowState,
+        deliverableUrl: linked.deliverableUrl,
+      }
+    : disputedSet[0]
+      ? {
+          id: disputedSet[0].id,
+          title: disputedSet[0].title,
+          amountMinor: disputedSet[0].amountMinor,
+          escrowState: disputedSet[0].escrowState,
+          deliverableUrl: disputedSet[0].deliverableUrl,
+        }
+      : null;
+  return { disputedAmountMinor, disputedMilestone };
+}
+
+/** Compliance Officer / mediator dashboard — everything awaiting a decision. */
 export async function getMediationQueue(params?: {
   page?: number;
   limit?: number;
@@ -526,6 +571,7 @@ export async function getMediationQueue(params?: {
   return {
     items: items.map((d) => ({
       ...d,
+      ...extractDisputedMilestoneContext(d),
       // SLA is computed and attached server-side, so the console does not
       // have to redraw the clock and a breach is the same fact everywhere.
       sla: disputeSla(d),

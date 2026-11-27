@@ -412,12 +412,21 @@ export interface RawKycHistory {
 /* ── disputes ── */
 export interface RawDisputeItem {
   id: string;
+  milestoneId?: string | null;
   category: string;
   stage: PrismaDisputeStage;
   description: string;
   negotiationDeadlineAt: string | null;
   mediationDeadlineAt: string | null;
   createdAt: string;
+  disputedAmountMinor?: number;
+  disputedMilestone?: {
+    id: string;
+    title: string;
+    amountMinor: number;
+    escrowState: PrismaEscrowState;
+    deliverableUrl: string | null;
+  } | null;
   /**
    * SLA state, computed server-side (see modules/sla/sla.service.ts). The
    * Roadmap's "disputes within 3 business days" is the FIRST RESPONSE clock
@@ -443,6 +452,7 @@ export interface RawDisputeItem {
       id: string;
       title: string;
       amountMinor: number;
+      escrowState?: PrismaEscrowState;
       deliverableUrl: string | null;
     }>;
   } | null;

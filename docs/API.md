@@ -430,7 +430,7 @@ The secured mounted API uses these paths; legacy `/raise`, `/contract/:id`, and 
 | `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party | Move negotiation to evidence |
 | `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party | Add evidence statement and progress when ready |
 | `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party | Escalate mediation to arbitration |
-| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries an `sla` object (first-response and resolution clocks, computed server-side); response includes `partialSplitEnabled` |
+| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries `disputedAmountMinor`, `disputedMilestone`, and an `sla` object (all computed server-side); response includes `partialSplitEnabled` |
 | `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split (when `PARTIAL_SPLIT_ENABLED=true`, accepts unambiguous `freelancerSharePct` or `freelancerShareMinor`) |
 
 Raise body:

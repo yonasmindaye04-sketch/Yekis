@@ -5,6 +5,9 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Fixed
+- **OPS-02 — Server-computed disputed milestone amounts across dispute queue & overview (`dispute.service.ts`, `opsBackend.ts`, `opsApi.ts`) (2026-11-27)**:
+  - **Root cause**: `toDispute()` summed all `contract.milestones` instead of the disputed milestone (`ETB 64,000` on `seed-contract-brand` instead of `ETB 22,000` + `ETB 9,000` = `ETB 31,000`).
+  - **Fix**: Added `extractDisputedMilestoneContext()` in `dispute.service.ts` returning `disputedAmountMinor` and `disputedMilestone` on every `getMediationQueue()` item, and updated `toDispute()` to read `disputedAmountMinor` (falling back only to `milestoneId` / `DISPUTED` milestones) so Dispute Mediation, Action Center, SLA Schedule, Workboard, and Reports all display the exact disputed amount.
 - **OPS-01 — Server-side Partial Split calculation, preview endpoint, and containment flag (`packages/schemas`, `env.ts`, `dispute.service.ts`, `dispute.routes.ts`, `admin.routes.ts`, `client.ts`, `opsApi.ts`, `DisputeQueue.tsx`) (2026-11-27)**:
   - **Root causes**: `opsApi.ts` sent the `PARTIAL_SPLIT` slider percentage (e.g. `50`) directly as `freelancerShareMinor`, crediting `ETB 0.46` net on a `1,000 ETB` milestone instead of `ETB 462.50`, while `DisputeQueue.tsx` previewed fees locally off `sel.amt`.
   - **Server single source of truth**: Added `computeDisputeSplit()` in `dispute.service.ts` (shared by `resolveDispute()` and new `previewDisputeSplit()`) deriving integer minor amounts directly from the disputed milestone, validating `freelancerGrossMinor + clientRefundMinor === disputedAmountMinor`, and applying `calculateFees()` rounding once. `SplitPreviewInput`, `MediatorResolutionInput`, and `ArbitrationAwardInput` accept `freelancerSharePct` (`0..100` integer) XOR `freelancerShareMinor` (`>=0` integer) on `PARTIAL_SPLIT`.

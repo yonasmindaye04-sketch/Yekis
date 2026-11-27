@@ -481,9 +481,21 @@ const toKyc = (r: RawKycItem): KycItem => ({
   history: [],
 });
 
-const toDispute = (r: RawDisputeItem): DisputeItem => {
-  const ms = r.contract?.milestones ?? [];
-  const deliverable = ms.find((m) => Boolean(m.deliverableUrl)) ?? null;
+export const toDispute = (r: RawDisputeItem): DisputeItem => {
+  const allMs = r.contract?.milestones ?? [];
+  const linkedMs =
+    r.disputedMilestone ??
+    (r.milestoneId ? allMs.find((m) => m.id === r.milestoneId) ?? null : null);
+  const disputedList = linkedMs
+    ? [linkedMs]
+    : allMs.filter((m) => m.escrowState === "DISPUTED");
+  const amt =
+    typeof r.disputedAmountMinor === "number"
+      ? r.disputedAmountMinor
+      : disputedList.reduce((s, m) => s + m.amountMinor, 0);
+  const deliverable = linkedMs?.deliverableUrl
+    ? linkedMs
+    : disputedList.find((m) => Boolean(m.deliverableUrl)) ?? null;
   return {
     id: r.id,
     cat: r.category,
@@ -491,9 +503,9 @@ const toDispute = (r: RawDisputeItem): DisputeItem => {
     job: r.contract?.job.title ?? "—",
     clientId: r.contract?.client.id ?? "—",
     scope: r.description,
-    ms: ms.map((m) => m.title).join(", ") || "—",
-    amt: ms.reduce((s, m) => s + m.amountMinor, 0),
-    hasDel: ms.some((m) => Boolean(m.deliverableUrl)),
+    ms: linkedMs?.title || disputedList.map((m) => m.title).join(", ") || "—",
+    amt,
+    hasDel: Boolean(deliverable?.deliverableUrl),
     deliverableUrl: deliverable?.deliverableUrl ?? null,
     // The server computes the SLA (the Roadmap's "disputes within 3 business
     // days" first-response clock). The mediation deadline is a different,

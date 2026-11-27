@@ -317,6 +317,15 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
     expect(previewRes.body.totalFeeMinor).toBe(3_750);
     expect(previewRes.body.freelancerNetMinor).toBe(46_250);
 
+    const queueRes = await request(app)
+      .get(`/api/v1/disputes/staff/queue?search=ops01-client-${seq}`)
+      .set("Authorization", f.authHeader);
+    expect(queueRes.status).toBe(200);
+    const queued = queueRes.body.items.find((d: { id: string }) => d.id === f.disputeId);
+    expect(queued).toBeTruthy();
+    expect(queued.disputedAmountMinor).toBe(100_000);
+    expect(queued.disputedMilestone?.id).toBe(f.disputedMsId);
+
     const resolveRes = await request(app)
       .post(`/api/v1/disputes/${f.disputeId}/resolve`)
       .set("Authorization", f.authHeader)
