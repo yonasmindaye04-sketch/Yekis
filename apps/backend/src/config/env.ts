@@ -188,6 +188,16 @@ const EnvSchema = z.object({
   ADMIN_BOOTSTRAP_ALLOW_ADDITIONAL: z.enum(["true", "false"]).optional(),
   ADMIN_BOOTSTRAP_RESET: z.enum(["true", "false"]).optional(),
 
+  // ── Demo / test data cleanup ──────────────────────────────────────────
+  // See apps/backend/src/bootstrap/demoCleanup.ts and docs/ADMIN_ACCESS.md.
+  //
+  // One-off, operator-driven removal of the seeded demo world and the
+  // RFC 2606 `@example.com` verification accounts. "dry-run" reports the
+  // plan and deletes nothing; "confirm" performs the delete. The engine
+  // refuses any row shared with an account that is not a target, and never
+  // touches admin@yekis.et. Unset the variable once the data is gone.
+  DEMO_CLEANUP: z.enum(["dry-run", "confirm"]).optional(),
+
   TELEGRAM_BOT_TOKEN: z
     .string()
     .transform((val) =>

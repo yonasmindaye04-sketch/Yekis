@@ -25,6 +25,7 @@ import { prisma } from "./lib/prisma.js";
 import { initWebSocketServer } from "./lib/socket.js";
 import { ensureObjectStoreReady } from "./lib/objectStore.js";
 import { bootstrapAdminFromEnv } from "./bootstrap/admin.js";
+import { purgeDemoDataFromEnv } from "./bootstrap/demoCleanup.js";
 import { startBotDetailed, stopBot } from "./modules/bot/bot.service.js";
 // Importing the worker file starts it listening on the queue as a side effect.
 // In production, run workers as a separate process/container from the API
@@ -117,6 +118,17 @@ const server = app.listen(env.PORT, async () => {
   ensureObjectStoreReady().catch((err) =>
     logger.error({ err }, "Failed to initialize object store bucket"),
   );
+
+  // Demo / test data purge (apps/backend/src/bootstrap/demoCleanup.ts).
+  //
+  // The managed database on AletCloud is not reachable from an operator's
+  // machine, so this one-off cleanup runs here, in the one process that holds
+  // a connection. It is inert unless DEMO_CLEANUP is "dry-run" or "confirm",
+  // and it refuses to delete any row shared with an account that is not a
+  // target. Awaited so the plan is resolved before the rest of start-up.
+  await purgeDemoDataFromEnv().catch((err) => {
+    logger.error({ err }, "Demo cleanup failed; the run stopped and can be repeated");
+  });
 
   // Staff provisioning (apps/backend/src/bootstrap/admin.ts).
   //

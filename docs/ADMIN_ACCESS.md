@@ -155,6 +155,82 @@ change the role from the Operations Console's **Admins & Permissions** page.
 
 ---
 
+## Removing the seeded demo world and automated test accounts
+
+A host that was seeded for a demonstration still contains the demo staff, seller and clients from
+`prisma/seed.ts` / `prisma/demoActivity.ts`, plus the accounts the end-to-end scripts created under
+`@example.com` (reserved for testing by RFC 2606). Neither belongs on a platform real members use.
+
+`apps/backend/src/bootstrap/demoCleanup.ts` removes them from inside the API process — the same way
+the administrator bootstrap works, because the managed database on AletCloud is not reachable from a
+database client. It is inert unless `DEMO_CLEANUP` is set.
+
+| Variable | Meaning |
+|---|---|
+| `DEMO_CLEANUP=dry-run` | Reports the plan and deletes nothing. |
+| `DEMO_CLEANUP=confirm` | Performs the delete. |
+
+**Run the dry run first.** Set `DEMO_CLEANUP=dry-run` before the deployment that carries the
+feature, deploy, and read the start-up log:
+
+```
+Demo cleanup dry run: nothing was deleted
+```
+
+The structured fields on that line are the plan: `targetCount`, `targets`, `userCountBefore`,
+`totalRows`, `counts` (per table) and `blockers`. A non-empty `blockers` list means a row in the set
+is shared with an account that is not a target; the run refuses and deletes nothing. Resolve that
+row by hand (or narrow the target list) before continuing.
+
+Then set `DEMO_CLEANUP=confirm` and deploy again. The log line is:
+
+```
+Demo cleanup finished: the seeded demo and automated test data are gone
+```
+
+with `deleted` (per table), `totalDeleted`, `totalRowsPlanned`, `cascaded` and `userCountAfter`.
+**Remove `DEMO_CLEANUP` and deploy once more**; the cleanup is a one-off, not a standing
+configuration.
+
+### What is deleted, and what is not
+
+Targets are the six seeded demo addresses (`compliance@`, `support@`, `seller@`, `client@`,
+`freelancer@` and `newbie@yekis.et`) and every `@example.com` address. The purge reads the live
+foreign-key graph and removes the rows those accounts own: contracts, milestones, payments,
+payouts, wallets, top-ups, gigs and their packages, orders, jobs, proposals, reviews, disputes and
+their evidence, conversations and messages, KYC records and documents, notifications, consent
+records, verification codes, profile views, skills, avatars and portfolio items.
+
+Three things are deliberately kept:
+
+- **`admin@yekis.et`** is excluded in SQL, checked again in TypeScript and asserted before any
+  delete. The run also refuses any *other* staff account except the two seeded demo identities
+  (`compliance@` and `support@`).
+- **Audit history.** `AuditLog.userId` is `ON DELETE SET NULL`, so audit rows survive with a null
+  actor. Deleting them would destroy the compliance trail. For the same reason, a support
+  conversation that a demo agent was merely *assigned* to is kept and unassigned; only
+  conversations the demo account created are removed.
+- **Real-member domains.** `@guest.invalid`, `@erased.invalid` and `@yekis.local` (Telegram) never
+  match the selector. The two GDPR erasure tombstones are evidence and stay.
+
+If any contract, review, gig order, job, proposal, conversation participant or direct thread in the
+set names a member who is not a target, the run refuses **before writing anything** and reports the
+table. That is the guard against a demo account that once transacted with a real member.
+
+The delete is deliberately not one transaction: a foreign-key violation aborts a transaction, and
+the engine instead retries each row in dependency order. A partial run is safe to repeat — the plan
+is recomputed from what is left. After the deletes it re-queries every planned id, asserts the
+administrator still exists, and asserts the user count fell by exactly the number of targets.
+
+On a machine that *can* reach the database, the same engine has a manual runner:
+
+```bash
+pnpm --filter backend exec tsx scripts/purge-demo-data.ts            # dry run
+pnpm --filter backend exec tsx scripts/purge-demo-data.ts --confirm  # delete
+```
+
+---
+
 ## Step 2 — Log In
 
 1. Open the Yekis web app (default local: `http://localhost:3000`)
