@@ -40,6 +40,11 @@
 //     a target. If a demo client ever signed a contract with a real
 //     freelancer, the run refuses and reports the table instead of deleting
 //     the real member's contract. Nothing is written until that check passes.
+//     Chat is the one exception, and it turns on who owns the thread: a
+//     support ticket a demo or automated-test account opened is dummy data in
+//     full, so a staff member who was auto-assigned to it — or who replied in
+//     it — loses nothing of their own. A ticket a real member opened is their
+//     data and is never deleted; only the demo accounts' rows inside it are.
 //   * **The administrator is never a target.** The address is excluded in
 //     SQL, checked again in TypeScript, and asserted before any delete runs.
 //     The two seeded staff accounts are allowed through; any *other* staff
@@ -144,6 +149,50 @@ export type PurgeBlocker = {
   table: string;
   columns: string[];
   rows: number;
+  /** Human-readable names for the blocked rows, when they are known. */
+  detail?: string[];
+};
+
+/**
+ * A row in a chat table that names an account the purge may not delete.
+ *
+ * Chat rows need their own rule because a support thread is owned by whoever
+ * opened it. A thread a demo or automated-test account opened is dummy data
+ * in full — its participants and its messages go with it. A thread a real
+ * member opened is real data and is never deleted; only the demo accounts'
+ * rows inside it are removed.
+ */
+export type SharedChatRow = {
+  /** Primary key of the `ConversationParticipant` / `ChatMessage` row. */
+  rowId: string;
+  /** Which kind of row this is, for the report. */
+  kind: "membership" | "message";
+  memberUserId: string;
+  memberEmail: string;
+  conversationId: string;
+  conversationSubject: string;
+  conversationCreatorId: string;
+  /** How many messages that member wrote in the thread. */
+  memberMessages: number;
+};
+
+export type SharedChatVerdict = {
+  /** Rows removed together with the demo thread. */
+  absorbed: SharedChatRow[];
+  /** Rows that stop the run before anything is written. */
+  blocked: SharedChatRow[];
+};
+
+/**
+ * The chat tables whose shared rows are decided by thread ownership rather
+ * than by the generic "every member must be a target" rule.
+ */
+const CHAT_TABLES: Record<
+  string,
+  { column: string; kind: "membership" | "message" }
+> = {
+  ConversationParticipant: { column: "userId", kind: "membership" },
+  ChatMessage: { column: "senderId", kind: "message" },
 };
 
 export type DemoPurgePlan = {
@@ -154,6 +203,12 @@ export type DemoPurgePlan = {
   counts: Record<string, number>;
   totalRows: number;
   blockers: PurgeBlocker[];
+  /**
+   * Chat rows of real members that go with a demo thread, because the thread
+   * was opened by a demo or automated-test account. Reported so the operator
+   * can see exactly what was absorbed.
+   */
+  absorbedChatRows: SharedChatRow[];
 };
 
 export type DemoPurgeResult = {
@@ -193,6 +248,46 @@ function isForeignKeyViolation(err: unknown): boolean {
  */
 export function readCleanupMode(env: NodeJS.ProcessEnv): string {
   return env[DEMO_CLEANUP_ENV]?.trim().toLowerCase() ?? "";
+}
+
+/**
+ * Decides what happens to a chat row that names an account the purge is not
+ * allowed to delete.
+ *
+ * The rule is ownership of the thread:
+ *
+ *   * A thread a demo or automated-test account opened is dummy data in full.
+ *     Everything in it — the participants, the messages — goes with it. A real
+ *     member who was auto-assigned to such a ticket, or who replied in it,
+ *     loses nothing of their own: the ticket itself was never theirs.
+ *   * A thread a real member opened is their data. It is never deleted, and a
+ *     demo account's membership or message inside it is removed without the
+ *     thread going with it.
+ *
+ * A non-chat row is never absorbed this way: a contract, a payment or a
+ * review that names a real member is shared data, and the run refuses.
+ *
+ * Pure, so the rule is unit-tested without a database.
+ */
+export function classifySharedChatRows(
+  rows: readonly SharedChatRow[],
+  targetIds: ReadonlySet<string>,
+): SharedChatVerdict {
+  const absorbed: SharedChatRow[] = [];
+  const blocked: SharedChatRow[] = [];
+
+  for (const row of rows) {
+    // A row that names a target is not shared at all.
+    if (targetIds.has(row.memberUserId)) continue;
+
+    if (targetIds.has(row.conversationCreatorId)) {
+      absorbed.push(row);
+    } else {
+      blocked.push(row);
+    }
+  }
+
+  return { absorbed, blocked };
 }
 
 /**
@@ -324,6 +419,46 @@ async function selectTargetUsers(): Promise<TargetUser[]> {
 }
 
 /**
+ * Loads the context the shared-chat rule needs: who opened the thread, who the
+ * member is, and how many messages that member wrote in it.
+ */
+async function loadSharedChatRows(
+  table: string,
+  kind: "membership" | "message",
+  rowIds: readonly string[],
+): Promise<SharedChatRow[]> {
+  if (rowIds.length === 0) return [];
+
+  const memberColumn = kind === "membership" ? "userId" : "senderId";
+  const memberMessages =
+    kind === "membership"
+      ? `(SELECT count(*)::int
+            FROM "ChatMessage" m
+           WHERE m."conversationId" = cp."conversationId"
+             AND m."senderId" = cp."userId")`
+      : `1`;
+  // The literal is bound as a parameter so the value comes from the code, not
+  // from the row: a row cannot choose how it is classified.
+  const kindLiteral = `'${kind}'`;
+
+  return prisma.$queryRawUnsafe<SharedChatRow[]>(
+    `SELECT cp."id"::text          AS "rowId",
+            ${kindLiteral}         AS "kind",
+            cp."${memberColumn}"::text AS "memberUserId",
+            u."email"             AS "memberEmail",
+            cp."conversationId"::text AS "conversationId",
+            c."subject"           AS "conversationSubject",
+            c."creatorId"::text   AS "conversationCreatorId",
+            ${memberMessages}      AS "memberMessages"
+       FROM ${quoteIdent(table)} cp
+       JOIN "Conversation" c ON c."id" = cp."conversationId"
+       JOIN "User" u ON u."id" = cp."${memberColumn}"
+      WHERE cp."id"::text = ANY($1::text[])`,
+    [...rowIds],
+  );
+}
+
+/**
  * Works out exactly which rows belong to the target users, and whether any of
  * them is shared with a member who is not a target. Reads only — no writes.
  */
@@ -414,6 +549,7 @@ export async function planDemoPurge(): Promise<DemoPurgePlan> {
 
   // Safety: no row in the closure may name a member who is not a target.
   const blockers: PurgeBlocker[] = [];
+  const absorbedChatRows: SharedChatRow[] = [];
   const userEdges = edges.filter(
     (edge) => edge.parent === "User" && BLOCKING_RULES.has(edge.deleteRule),
   );
@@ -448,13 +584,38 @@ export async function planDemoPurge(): Promise<DemoPurgePlan> {
       }
     }
 
-    if (offenders.size > 0) {
-      blockers.push({
-        table,
-        columns: tableEdges.map((edge) => edge.childCol),
-        rows: offenders.size,
-      });
+    if (offenders.size === 0) continue;
+
+    // A chat row is shared only when the thread belongs to somebody else. The
+    // thread's ownership decides, so a demo ticket goes with everything in it
+    // while a real member's thread stays.
+    const chatTable = CHAT_TABLES[table];
+    if (chatTable) {
+      const shared = await loadSharedChatRows(table, chatTable.kind, [...offenders]);
+      const verdict = classifySharedChatRows(shared, userSet);
+      for (const row of verdict.absorbed) {
+        absorbedChatRows.push(row);
+        offenders.delete(row.rowId);
+      }
+      if (verdict.blocked.length > 0) {
+        blockers.push({
+          table,
+          columns: tableEdges.map((edge) => edge.childCol),
+          rows: verdict.blocked.length,
+          detail: verdict.blocked.map(
+            (row) =>
+              `${row.kind} of ${row.memberEmail} in "${row.conversationSubject}" (${row.memberMessages} message(s) written)`,
+          ),
+        });
+      }
+      continue;
     }
+
+    blockers.push({
+      table,
+      columns: tableEdges.map((edge) => edge.childCol),
+      rows: offenders.size,
+    });
   }
 
   const planRows: Record<string, string[]> = {};
@@ -467,7 +628,15 @@ export async function planDemoPurge(): Promise<DemoPurgePlan> {
     totalRows += ids.size;
   }
 
-  return { targets, userCountBefore, rows: planRows, counts, totalRows, blockers };
+  return {
+    targets,
+    userCountBefore,
+    rows: planRows,
+    counts,
+    totalRows,
+    blockers,
+    absorbedChatRows,
+  };
 }
 
 async function deleteIds(table: string, pk: string, ids: string[]): Promise<number> {
@@ -650,6 +819,11 @@ export async function purgeDemoDataFromEnv(
     totalRows: plan.totalRows,
     counts: plan.counts,
     blockers: plan.blockers,
+    absorbedChatRows: plan.absorbedChatRows.map((row) => ({
+      kind: row.kind,
+      member: row.memberEmail,
+      conversation: row.conversationSubject,
+    })),
   };
 
   if (plan.blockers.length > 0) {

@@ -30,12 +30,22 @@ async function main(): Promise<void> {
     console.log(`  ${table.padEnd(28)} ${count}`);
   }
 
+  if (plan.absorbedChatRows.length > 0) {
+    console.log("\nChat rows absorbed with a demo thread (the account itself is kept):");
+    for (const row of plan.absorbedChatRows) {
+      console.log(
+        `  ${row.kind} of ${row.memberEmail} in "${row.conversationSubject}" (${row.memberMessages} message(s) written)`,
+      );
+    }
+  }
+
   if (plan.blockers.length > 0) {
     console.log("\nBLOCKERS — rows shared with an account that is not a target:");
     for (const blocker of plan.blockers) {
       console.log(
         `  ${blocker.table}.${blocker.columns.join("+")}: ${blocker.rows} rows`,
       );
+      for (const detail of blocker.detail ?? []) console.log(`    - ${detail}`);
     }
     console.log("\nRefusing to continue. Nothing was deleted.");
     process.exitCode = 1;

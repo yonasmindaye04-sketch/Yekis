@@ -209,15 +209,29 @@ Three things are deliberately kept:
 - **Audit history.** `AuditLog.userId` is `ON DELETE SET NULL`, so audit rows survive with a null
   actor. Deleting them would destroy the compliance trail. The per-record `KycReviewEvent` rows that
   belong to a demo KYC record are removed with that record (the foreign key is `RESTRICT`); the
-  `AuditLog` entry for the same decision remains. For the same reason, a support conversation that a
-  demo agent was merely *assigned* to is kept and unassigned; only conversations the demo account
-  created are removed.
+  `AuditLog` entry for the same decision remains. For the same reason, a support ticket that a real
+  member opened and a demo agent was merely *assigned* to is kept and unassigned; only tickets the
+  demo account opened are removed.
 - **Real-member domains.** `@guest.invalid`, `@erased.invalid` and `@yekis.local` (Telegram) never
   match the selector. The two GDPR erasure tombstones are evidence and stay.
 
-If any contract, review, gig order, job, proposal, conversation participant or direct thread in the
-set names a member who is not a target, the run refuses **before writing anything** and reports the
-table. That is the guard against a demo account that once transacted with a real member.
+If any contract, review, gig order, job or proposal in the set names a member who is not a target,
+the run refuses **before writing anything** and reports the table. That is the guard against a demo
+account that once transacted with a real member.
+
+**Chat is decided by who owns the thread.** A support ticket belongs to whoever opened it:
+
+- A ticket a demo or automated-test account opened is dummy data in full, so it goes with
+  everything in it — including a staff member who was auto-assigned to it, and including a reply
+  that staff member wrote in it. The staff account itself keeps everything else it owns. The
+  start-up log lists each absorbed row under `absorbedChatRows`, so the operator can see exactly
+  what went.
+- A ticket a **real member** opened is their data and is never deleted. If a demo account
+  participated in it, only that demo account's participant row and messages are removed; the
+  thread and the member's own messages stay.
+
+So a real member never loses a conversation they started, and a demo ticket never survives
+because a staff member happened to be assigned to it.
 
 The delete is deliberately not one transaction: a foreign-key violation aborts a transaction, and
 the engine instead retries each row in dependency order. A partial run is safe to repeat — the plan

@@ -9,9 +9,15 @@ vi.mock("../src/lib/logger.js", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-const { readCleanupMode, validateTargets, SEEDED_DEMO_EMAILS, PROTECTED_EMAILS } =
-  await import("../src/bootstrap/demoCleanup.js");
+const {
+  readCleanupMode,
+  validateTargets,
+  classifySharedChatRows,
+  SEEDED_DEMO_EMAILS,
+  PROTECTED_EMAILS,
+} = await import("../src/bootstrap/demoCleanup.js");
 type TargetUser = import("../src/bootstrap/demoCleanup.js").TargetUser;
+type SharedChatRow = import("../src/bootstrap/demoCleanup.js").SharedChatRow;
 
 function target(email: string, staffRole: string | null = null): TargetUser {
   return { id: `id-${email}`, email, staffRole };
@@ -95,5 +101,78 @@ describe("validateTargets", () => {
   it("keeps the administrator out of the seeded demo list", () => {
     expect(SEEDED_DEMO_EMAILS).not.toContain("admin@yekis.et");
     expect(SEEDED_DEMO_EMAILS).toHaveLength(6);
+  });
+});
+
+describe("classifySharedChatRows", () => {
+  const targetIds = new Set(["id-demo", "id-test"]);
+
+  function shared(overrides: Partial<SharedChatRow> = {}): SharedChatRow {
+    return {
+      rowId: "row-1",
+      kind: "membership",
+      memberUserId: "id-admin",
+      memberEmail: "admin@yekis.et",
+      conversationId: "conversation-1",
+      conversationSubject: "AletCloud object-store check",
+      conversationCreatorId: "id-test",
+      memberMessages: 0,
+      ...overrides,
+    };
+  }
+
+  it("absorbs a membership in a demo thread when the member wrote nothing", () => {
+    const verdict = classifySharedChatRows([shared()], targetIds);
+    expect(verdict.absorbed).toHaveLength(1);
+    expect(verdict.blocked).toHaveLength(0);
+  });
+
+  it("absorbs a membership in a demo thread even when the member replied in it", () => {
+    // The ticket was opened by an automated test account, so the whole thread
+    // is dummy data. The member's account keeps everything else.
+    const verdict = classifySharedChatRows(
+      [shared({ memberMessages: 2 })],
+      targetIds,
+    );
+    expect(verdict.absorbed).toHaveLength(1);
+    expect(verdict.blocked).toHaveLength(0);
+  });
+
+  it("absorbs a message written by a member in a demo thread", () => {
+    const verdict = classifySharedChatRows(
+      [shared({ kind: "message", memberMessages: 1 })],
+      targetIds,
+    );
+    expect(verdict.absorbed).toHaveLength(1);
+  });
+
+  it("blocks a row in a thread a real member opened", () => {
+    const verdict = classifySharedChatRows(
+      [shared({ conversationCreatorId: "id-real" })],
+      targetIds,
+    );
+    expect(verdict.absorbed).toHaveLength(0);
+    expect(verdict.blocked).toHaveLength(1);
+  });
+
+  it("ignores a row that names a target — it is not shared at all", () => {
+    const verdict = classifySharedChatRows(
+      [shared({ memberUserId: "id-demo", conversationCreatorId: "id-real" })],
+      targetIds,
+    );
+    expect(verdict.absorbed).toHaveLength(0);
+    expect(verdict.blocked).toHaveLength(0);
+  });
+
+  it("never treats the administrator's account as a target", () => {
+    const verdict = classifySharedChatRows(
+      [shared({ memberUserId: "id-admin" })],
+      targetIds,
+    );
+    // The chat row goes with the demo thread; the account is not a target and
+    // is never deleted — only the row that links it to a demo thread.
+    expect(verdict.absorbed).toHaveLength(1);
+    expect(verdict.absorbed[0]?.memberEmail).toBe("admin@yekis.et");
+    expect(targetIds.has(verdict.absorbed[0]!.memberUserId)).toBe(false);
   });
 });
