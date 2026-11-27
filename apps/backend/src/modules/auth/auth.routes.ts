@@ -19,6 +19,8 @@ import {
   switchUserRole,
   createAuthTokens,
   PasswordMismatchError,
+  reauthenticateUser,
+  NoPasswordSetError,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
@@ -794,6 +796,43 @@ authRouter.post("/logout", requireAuth, async (req: AuthedRequest, res) => {
   await logoutSession(req.user!.id);
   return res.status(200).json({ success: true });
 });
+
+authRouter.post(
+  "/reauth",
+  requireAuth,
+  loginLimiter,
+  async (req: AuthedRequest, res) => {
+    const parsed = z
+      .object({ password: z.string().min(1) })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const result = await reauthenticateUser(
+        req.user!.id,
+        parsed.data.password,
+      );
+      return res.json(result);
+    } catch (err) {
+      if (err instanceof NoPasswordSetError) {
+        return res
+          .status(403)
+          .json({ error: "STEP_UP_REQUIRED", message: err.message });
+      }
+      if (err instanceof InvalidCredentialsError) {
+        return res.status(401).json({
+          error: "INVALID_CREDENTIALS",
+          message: "Incorrect password. Your current session remains active.",
+        });
+      }
+      logger.error({ err }, "Unexpected error during reauthentication");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 authRouter.get("/me", requireAuth, async (req: AuthedRequest, res) => {
   const user = await prisma.user.findUnique({

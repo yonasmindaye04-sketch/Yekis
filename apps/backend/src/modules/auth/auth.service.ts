@@ -446,6 +446,41 @@ export async function loginUser(input: LoginInput) {
   return result;
 }
 
+export class NoPasswordSetError extends Error {}
+
+/**
+ * Re-verifies an already-authenticated user's password to refresh `auth_time`
+ * and `amr` for `requireFreshAuth(...)` step-up routes without signing them out.
+ */
+export async function reauthenticateUser(userId: string, password: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.isSuspended) throw new InvalidCredentialsError();
+  if (!user.passwordHash) {
+    throw new NoPasswordSetError(
+      "This account does not have a password configured. Sign in with password authentication to continue.",
+    );
+  }
+
+  let valid = false;
+  try {
+    valid = await verifyPassword(user.passwordHash, password);
+  } catch {
+    valid = false;
+  }
+  if (!valid) throw new InvalidCredentialsError();
+
+  const result = await createAuthTokens(user, ["pwd"]);
+  await recordAuditEvent({
+    userId: user.id,
+    actorRole: user.staffRole ?? null,
+    eventType: "USER_REAUTHENTICATED",
+    entityType: "User",
+    entityId: user.id,
+  });
+
+  return result;
+}
+
 /**
  * Session refresh â€” exchanges a still-valid refresh token for a fresh
  * access/refresh pair. Added because the refresh token was previously issued

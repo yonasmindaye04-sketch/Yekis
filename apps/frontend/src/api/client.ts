@@ -653,10 +653,12 @@ export interface StaffProfileReportPage {
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
 
 // === MAIN FUNCTIONS ===
-class ApiClient {
+export class ApiClient {
   private accessToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-api-token") : null;
   private refreshToken: string | null = typeof window !== "undefined" ? window.localStorage.getItem("yekis-refresh-token") : null;
   private refreshPromise: Promise<void> | null = null;
+  private reauthHandler: (() => Promise<boolean>) | null = null;
+  private reauthPromise: Promise<boolean> | null = null;
   private unauthorizedListeners = new Set<() => void>();
 
   onUnauthorized(listener: () => void): () => void {
@@ -664,6 +666,40 @@ class ApiClient {
     return () => {
       this.unauthorizedListeners.delete(listener);
     };
+  }
+
+  /**
+   * Registers an interactive step-up password prompt invoked when an endpoint
+   * responds `401 REAUTH_REQUIRED`, keeping session tokens and in-progress form
+   * inputs intact instead of signing the user out.
+   */
+  setReauthHandler(handler: (() => Promise<boolean>) | null): () => void {
+    this.reauthHandler = handler;
+    return () => {
+      if (this.reauthHandler === handler) {
+        this.reauthHandler = null;
+      }
+    };
+  }
+
+  private async isReauthRequiredResponse(res: Response): Promise<boolean> {
+    if (res.status !== 401) return false;
+    try {
+      const body = (await res.clone().json()) as { error?: string; code?: string };
+      return body?.error === "REAUTH_REQUIRED" || body?.code === "REAUTH_REQUIRED";
+    } catch {
+      return false;
+    }
+  }
+
+  private promptReauth(): Promise<boolean> {
+    if (!this.reauthHandler) return Promise.resolve(false);
+    if (!this.reauthPromise) {
+      this.reauthPromise = this.reauthHandler().finally(() => {
+        this.reauthPromise = null;
+      });
+    }
+    return this.reauthPromise;
   }
 
   private canRefreshAuthForPath(path: string): boolean {
@@ -855,9 +891,20 @@ class ApiClient {
       ) as T;
     }
 
-    // Access token expired -> attempt a silent refresh, then retry the request
-    // once. Refresh itself never goes through this branch to avoid a loop.
+    // Step-up freshness failure (`401 REAUTH_REQUIRED`): prompt for password
+    // re-authentication and retry without clearing the session or form state.
     if (
+      response.status === 401 &&
+      path !== "/api/v1/auth/reauth" &&
+      (await this.isReauthRequiredResponse(response))
+    ) {
+      const reauthenticated = await this.promptReauth();
+      if (reauthenticated) {
+        response = await performRequest(this.accessToken);
+      }
+    } else if (
+      // Access token expired -> attempt a silent refresh, then retry the request
+      // once. Refresh itself never goes through this branch to avoid a loop.
       response.status === 401 &&
       this.refreshToken &&
       this.canRefreshAuthForPath(path)
@@ -872,7 +919,10 @@ class ApiClient {
     }
 
     if (response.status === 401) {
-      this.handleUnauthorized(path);
+      const isReauth = await this.isReauthRequiredResponse(response);
+      if (!isReauth && path !== "/api/v1/auth/reauth") {
+        this.handleUnauthorized(path);
+      }
     }
 
     if (response.headers.get("x-yekis-offline") === "1") {
@@ -937,8 +987,18 @@ class ApiClient {
           options.body,
         ) as T;
       }
+      const friendlyStepUp =
+        response.status === 403 &&
+        (error.error === "STEP_UP_REQUIRED" || (error as { code?: string }).code === "STEP_UP_REQUIRED")
+          ? error.message ||
+            "Password verification is required for this sensitive action. Sign in with password authentication to continue."
+          : response.status === 401 &&
+              (error.error === "REAUTH_REQUIRED" || (error as { code?: string }).code === "REAUTH_REQUIRED")
+            ? error.message ||
+              "Password confirmation cancelled or expired. Your session and entered details remain intact."
+            : undefined;
       const thrown = new Error(
-        error.message || error.error || `HTTP ${response.status}`,
+        friendlyStepUp || error.message || error.error || `HTTP ${response.status}`,
       ) as Error & {
         code?: string;
         status?: number;
@@ -1141,6 +1201,15 @@ class ApiClient {
       return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
     }
 
+    if (response.status === 401 && await this.isReauthRequiredResponse(response)) {
+      const reauthenticated = await this.promptReauth();
+      if (reauthenticated) {
+        response = await performUpload(this.accessToken);
+      } else {
+        throw new Error('Re-authentication required. Your session and form input were preserved.');
+      }
+    }
+
     if (response.status === 401 && this.refreshToken && this.canRefreshAuthForPath(path)) {
       try {
         await this.tryRefresh();
@@ -1175,8 +1244,18 @@ class ApiClient {
       } catch {
         return mockStore.handleApiFallback(path, "POST", fallbackBody) as T;
       }
+      const friendlyStepUp =
+        response.status === 403 &&
+        (error.error === "STEP_UP_REQUIRED" || (error as { code?: string }).code === "STEP_UP_REQUIRED")
+          ? error.message ||
+            "Password verification is required for this sensitive action. Sign in with password authentication to continue."
+          : response.status === 401 &&
+              (error.error === "REAUTH_REQUIRED" || (error as { code?: string }).code === "REAUTH_REQUIRED")
+            ? error.message ||
+              "Password confirmation cancelled or expired. Your session and entered details remain intact."
+            : undefined;
       const thrown = new Error(
-        error.message || error.error || `HTTP ${response.status}`,
+        friendlyStepUp || error.message || error.error || `HTTP ${response.status}`,
       ) as Error & { code?: string; status?: number };
       thrown.code = error.error;
       thrown.status = response.status;
@@ -1872,6 +1951,22 @@ class ApiClient {
   }
   async getTmsActivity(): Promise<Array<AuditLogRow & { user: { id: string; email: string; staffRole: string | null } }>> {
     return this.request("/api/v1/tms/activity");
+  }
+
+  async reauthenticate(password: string): Promise<AuthResponse> {
+    const res = await this.request<AuthResponse>(
+      "/api/v1/auth/reauth",
+      {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      },
+      { strictHttpErrors: true },
+    );
+    this.setSession({
+      accessToken: res.accessToken,
+      refreshToken: res.refreshToken,
+    });
+    return res;
   }
 
   /**

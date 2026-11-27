@@ -31,7 +31,7 @@ import {
   Sun,
   X,
 } from "lucide-react";
-import type { MeResponse } from "../../api/client";
+import { api, type MeResponse } from "../../api/client";
 import { useTheme } from "../../theme/ThemeContext";
 import "../../styles/shadcn-dashboard.css";
 import "../../styles/ops-console.css";
@@ -131,6 +131,59 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimer = useRef<number | undefined>(undefined);
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const [reauthPassword, setReauthPassword] = useState("");
+  const [reauthError, setReauthError] = useState<string | null>(null);
+  const [reauthBusy, setReauthBusy] = useState(false);
+  const reauthDialogRef = useRef<HTMLDialogElement>(null);
+  const reauthResolverRef = useRef<((ok: boolean) => void) | null>(null);
+
+  const settleReauth = useCallback((ok: boolean) => {
+    const resolver = reauthResolverRef.current;
+    reauthResolverRef.current = null;
+    setReauthOpen(false);
+    setReauthPassword("");
+    setReauthError(null);
+    setReauthBusy(false);
+    resolver?.(ok);
+  }, []);
+
+  useEffect(() => {
+    return api.setReauthHandler(
+      () =>
+        new Promise<boolean>((resolve) => {
+          reauthResolverRef.current = resolve;
+          setReauthPassword("");
+          setReauthError(null);
+          setReauthBusy(false);
+          setReauthOpen(true);
+        }),
+    );
+  }, []);
+
+  useEffect(() => {
+    const dlg = reauthDialogRef.current;
+    if (!dlg) return;
+    if (reauthOpen) {
+      if (!dlg.open) dlg.showModal();
+    } else if (dlg.open) {
+      dlg.close();
+    }
+  }, [reauthOpen]);
+
+  useEffect(() => {
+    const dlg = reauthDialogRef.current;
+    if (!dlg) return;
+    const onCancelEvent = (e: Event) => {
+      if (reauthBusy) {
+        e.preventDefault();
+        return;
+      }
+      settleReauth(false);
+    };
+    dlg.addEventListener("cancel", onCancelEvent);
+    return () => dlg.removeEventListener("cancel", onCancelEvent);
+  }, [reauthBusy, settleReauth]);
 
   const badges = useApi<OpsBadges>(opsApi.badges);
 
@@ -587,6 +640,94 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                 {toastMsg}
               </div>
             ) : null}
+
+            <dialog
+              ref={reauthDialogRef}
+              className="ops-native-dialog"
+              aria-labelledby="ops-reauth-title"
+              aria-describedby="ops-reauth-desc"
+            >
+              <div className="ops-dlg-head">
+                <div>
+                  <h2 id="ops-reauth-title" className="ops-dlg-title">
+                    Confirm Your Password
+                  </h2>
+                  <p id="ops-reauth-desc" className="ops-dlg-sub">
+                    Sensitive operations require a fresh credential check. Confirm your password to retry without losing your entered changes.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  disabled={reauthBusy}
+                  onClick={() => settleReauth(false)}
+                  aria-label="Close re-authentication dialog"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!reauthPassword) {
+                    setReauthError("Password is required.");
+                    return;
+                  }
+                  setReauthBusy(true);
+                  setReauthError(null);
+                  try {
+                    await api.reauthenticate(reauthPassword);
+                    settleReauth(true);
+                  } catch (err) {
+                    setReauthError(
+                      err instanceof Error
+                        ? err.message
+                        : "Could not verify password. Please try again.",
+                    );
+                    setReauthBusy(false);
+                  }
+                }}
+              >
+                <div className="ops-dlg-body">
+                  <div className="field">
+                    <label className="field-l" htmlFor="ops-reauth-password">
+                      <span>Password for {email}</span>
+                    </label>
+                    <input
+                      id="ops-reauth-password"
+                      type="password"
+                      className="inp"
+                      autoComplete="current-password"
+                      required
+                      autoFocus
+                      value={reauthPassword}
+                      onChange={(e) => {
+                        setReauthError(null);
+                        setReauthPassword(e.target.value);
+                      }}
+                    />
+                  </div>
+                  {reauthError ? (
+                    <div className="ops-dlg-err" role="alert">
+                      {reauthError}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="ops-dlg-foot">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    disabled={reauthBusy}
+                    onClick={() => settleReauth(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn btn-primary" disabled={reauthBusy}>
+                    {reauthBusy ? "Verifying…" : "Confirm & Continue"}
+                  </button>
+                </div>
+              </form>
+            </dialog>
 
             <div
               className="ops-tip"
