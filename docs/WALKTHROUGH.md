@@ -1383,3 +1383,14 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
   - Added inline `?` contextual triggers on Dashboard KPIs, Escrow Inflow & Released Payouts, Payment Rail Settlement Mix, Pipeline stages, Kanban board, Operations Data Table, Calendar, Wallet financial actions, Escrow actions, Contract management, Job publishing, Proposal pipeline, Disputes, and Fayda KYC.
 - **Per-User Backend Persistence & Tenant Isolation (`guideProgress.service.ts`, `profile.routes.ts`, `guideStorage.ts`, `SettingsWorkspace.tsx`)**:
   - Persisted guide progress per user (`User.guideProgress` JSONB) via authenticated `GET/PATCH/DELETE /api/v1/users/me/guide-progress` endpoints, included it in PDPP export/erasure (`privacy.service.ts`), scoped browser storage by `(tenantId, userId)`, and added per-module tour restarts and full reset controls in Settings -> Preferences.
+
+---
+
+### Milestone & Deliverable Kanban Pipeline Enhancements
+- **Consistent Column Geometry, Collapsible Stages & Intentional Horizontal Scrolling (`KanbanBoardView.tsx`, `shadcn-dashboard.css`)**:
+  - Fixed desktop expanded column width (`284px`) with `scroll-snap-type: x proximity`, scroll-driven edge fade masks (`animation-timeline: scroll(self inline)` with `IntersectionObserver` sentinel fallback), explicit horizontal scroll left/right controls, and per-column collapse/expand rails (`56px` wide vertical stage strip with task & overdue counts, plus **Collapse empty** / **Expand all** actions).
+- **Multi-Dimensional Filtering, Meaningful Counts & Overdue Indicators (`KanbanBoardView.tsx`, `MarketplaceShadcnDashboard.tsx`, `escrow.service.ts`)**:
+  - Extended `GET /api/v1/escrow/milestones` (`contract.clientName`, `contract.freelancerName`, server-computed fee fields, and contract signature flags) so the Kanban board projects live server escrow state with filters for **Client**, **Freelancer**, **Contract**, **Priority**, **Overdue only**, and free-text search.
+  - Displays visible vs. total board counts, per-column task counts (including filtered `X of Y` counts), bold crimson overdue indicators (`Overdue Nd` / column overdue totals, `Due today`, `Due in Nd`) computed in `Africa/Addis_Ababa`, and actionable empty-stage guidance linking to **Open Contracts**, **Open Escrow Center**, or **Clear filters**.
+- **Inline Task Details Dialog (`KanbanBoardView.tsx`)**:
+  - Clicking any milestone card or its view button opens a native `<dialog>` (`showModal()`, `closedby="any"` with pointer fallback, `overscroll-behavior: contain`) to inspect contract/client/freelancer/rail metadata, role-appropriate server fee breakdowns, escrow timestamps, deliverable links, and real role-gated actions (**Fund Milestone**, **Review & Release**, **Submit Delivery**, **Dispute**, **Open in Escrow Center**, **Open Contracts Workspace**) without leaving the board.

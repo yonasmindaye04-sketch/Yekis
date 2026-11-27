@@ -66,14 +66,29 @@ export interface KanbanTask {
   id: string;
   code: string;
   title: string;
+  contractId?: string;
   contractTitle: string;
   counterparty: string;
+  client: string;
+  freelancer: string;
   rail: PaymentRail;
   amountMinor: number;
+  platformFeeMinor: number;
+  providerFeeMinor: number;
+  clientFeeMinor: number;
+  clientTotalChargeMinor: number;
+  netPayoutMinor: number;
   dueDate: string;
   priority: "HIGH" | "MEDIUM" | "LOW";
   column: KanbanColumnId;
   category: string;
+  escrowState?: string;
+  contractFullyExecuted?: boolean;
+  deliverableUrl?: string | null;
+  submittedAt?: string | null;
+  autoReleaseAt?: string | null;
+  releasedAt?: string | null;
+  fundedAt?: string | null;
 }
 
 export type ScheduleEventType =
@@ -84,6 +99,8 @@ export type ScheduleEventType =
 
 export interface ScheduleEvent {
   id: string;
+  milestoneId?: string;
+  contractId?: string;
   title: string;
   contractRef: string;
   date: string; // YYYY-MM-DD
@@ -97,6 +114,7 @@ export interface ScheduleEvent {
 
 export interface LedgerContractRecord {
   id: string;
+  contractId?: string;
   code: string;
   title: string;
   contractTitle: string;
@@ -115,9 +133,14 @@ export interface LedgerContractRecord {
     | "REFUNDED"
     | "PARTIAL_REFUND";
   amountMinor: number;
-  feeMinor: number;
+  platformFeeMinor: number;
+  providerFeeMinor: number;
+  clientFeeMinor: number;
+  clientTotalChargeMinor: number;
+  netPayoutMinor: number;
   dueDate: string;
   updatedAt: string;
+  contractFullyExecuted?: boolean;
 }
 
 /**

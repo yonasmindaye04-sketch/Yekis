@@ -18,6 +18,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import type {
+  EscrowFeeConfig,
   Job,
   Milestone,
   TopUpRequest,
@@ -50,12 +51,13 @@ import { CalendarScheduleView } from "./CalendarScheduleView";
 import { FeaturedCarousel } from "../../FeaturedCarousel";
 import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
-import { formatStatusLabel } from "../../pages/ops/components/ui";
+import { ConfirmActionModal, formatStatusLabel } from "../../pages/ops/components/ui";
 import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 interface MarketplaceShadcnDashboardProps {
   canHire: boolean;
   canWork: boolean;
+  viewerRole?: "CLIENT" | "FREELANCER" | "ADMIN";
   wallet: WalletResponse;
   /** Open marketplace briefs — what a freelancer competes for. */
   jobs: Job[];
@@ -63,9 +65,13 @@ interface MarketplaceShadcnDashboardProps {
   myJobs?: Job[];
   milestones: Milestone[];
   topUps: TopUpRequest[];
+  feeConfig?: EscrowFeeConfig | null;
   isRefreshing: boolean;
   onRefresh: () => void;
   onNavigateView: (view: string) => void;
+  onOpenEscrow?: (milestoneId?: string) => void;
+  onOpenContract?: (contractId?: string) => void;
+  onFundMilestone?: (milestoneId: string) => Promise<void> | void;
   onSelectProfile?: (userId: string) => void;
   onOpenChat?: (userId: string, userName?: string) => void;
 }
@@ -113,14 +119,19 @@ function toLedgerState(
 export function MarketplaceShadcnDashboard({
   canHire,
   canWork,
+  viewerRole: explicitViewerRole,
   wallet,
   jobs,
   myJobs,
   milestones,
   topUps,
+  feeConfig,
   isRefreshing,
   onRefresh,
   onNavigateView,
+  onOpenEscrow,
+  onOpenContract,
+  onFundMilestone,
   onSelectProfile,
   onOpenChat,
 }: MarketplaceShadcnDashboardProps) {
@@ -134,11 +145,21 @@ export function MarketplaceShadcnDashboard({
   const { t, language } = useI18n();
   const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).overview;
   const d = t.workspace.dashboard;
+  const viewerRole = explicitViewerRole ?? (canWork ? "FREELANCER" : "CLIENT");
 
   const [timeRange, setTimeRange] = useState<TimeRangeKey>("30d");
   const [expandedKpi, setExpandedKpi] = useState<
     "wallet" | "escrow" | "milestones" | "jobs" | null
   >(null);
+  const [fundTarget, setFundTarget] = useState<{
+    id: string;
+    title: string;
+    counterparty: string;
+    amountMinor: number;
+    clientFeeMinor: number;
+    clientTotalChargeMinor: number;
+  } | null>(null);
+  const [fundLoading, setFundLoading] = useState(false);
 
   const effectiveWallet = wallet;
   const effectiveMilestones = milestones;
@@ -156,13 +177,6 @@ export function MarketplaceShadcnDashboard({
   );
   const briefScope = canWork ? "marketplace" : "own";
 
-  // Track user-driven local overrides/additions on top of live API records
-  const [stateOverrides, setStateOverrides] = useState<
-    Record<string, LedgerContractRecord["escrowState"]>
-  >({});
-  const [customTasks, setCustomTasks] = useState<KanbanTask[] | null>(null);
-  const [customEvents, setCustomEvents] = useState<ScheduleEvent[] | null>(null);
-
   /**
    * The facts the ledger, kanban and schedule need for one milestone.
    *
@@ -178,10 +192,20 @@ export function MarketplaceShadcnDashboard({
       : funded
         ? "INTERNAL_WALLET"
         : "UNFUNDED";
+    const counterparty =
+      m.counterparty?.name?.trim() || m.counterparty?.email || "Unknown counterparty";
+    const client =
+      m.contract?.clientName?.trim() ||
+      (m.counterparty?.role === "CLIENT" ? counterparty : "Account Client");
+    const freelancer =
+      m.contract?.freelancerName?.trim() ||
+      (m.counterparty?.role === "FREELANCER" ? counterparty : "Account Freelancer");
     return {
       contractTitle: m.contract?.title?.trim() || `Contract ${m.contractId.slice(0, 8)}`,
-      counterparty: m.counterparty?.name?.trim() || m.counterparty?.email || "Unknown counterparty",
+      counterparty,
       counterpartyEmail: m.counterparty?.email ?? "",
+      client,
+      freelancer,
       category:
         m.contract?.category?.replaceAll("_", " ").toLowerCase() || "Uncategorised",
       rail,
@@ -192,8 +216,15 @@ export function MarketplaceShadcnDashboard({
     () =>
       effectiveMilestones.map((m, idx) => {
         const meta = metaFor(m);
+        const platformFeeMinor = m.platformFeeMinor ?? 0;
+        const providerFeeMinor = m.providerFeeMinor ?? 0;
+        const clientFeeMinor = m.clientFeeMinor ?? 0;
+        const clientTotalChargeMinor = m.clientTotalChargeMinor ?? m.amountMinor + clientFeeMinor;
+        const netPayoutMinor =
+          m.netPayoutMinor ?? Math.max(0, m.amountMinor - platformFeeMinor - providerFeeMinor);
         return {
           id: m.id,
+          contractId: m.contractId,
           code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
           title: m.title,
           contractTitle: meta.contractTitle,
@@ -201,39 +232,65 @@ export function MarketplaceShadcnDashboard({
           counterpartyEmail: meta.counterpartyEmail,
           category: meta.category,
           rail: meta.rail,
-          escrowState: stateOverrides[m.id] ?? toLedgerState(m.escrowState),
+          escrowState: toLedgerState(m.escrowState),
           amountMinor: m.amountMinor,
-          feeMinor: Math.round(m.amountMinor * 0.1),
+          platformFeeMinor,
+          providerFeeMinor,
+          clientFeeMinor,
+          clientTotalChargeMinor,
+          netPayoutMinor,
           dueDate: (m.dueDate || "").slice(0, 10),
           updatedAt: (m.releasedAt || m.submittedAt || m.dueDate || "").slice(0, 10),
+          contractFullyExecuted: m.contract?.fullyExecuted,
         };
       }),
-    [effectiveMilestones, stateOverrides],
+    [effectiveMilestones],
   );
 
-  const derivedKanbanTasks = useMemo<KanbanTask[]>(
+  const kanbanTasks = useMemo<KanbanTask[]>(
     () =>
       effectiveMilestones.map((m, idx) => {
         const meta = metaFor(m);
-        const state = stateOverrides[m.id] ?? m.escrowState;
+        const state = m.escrowState;
+        const platformFeeMinor = m.platformFeeMinor ?? 0;
+        const providerFeeMinor = m.providerFeeMinor ?? 0;
+        const clientFeeMinor = m.clientFeeMinor ?? 0;
+        const clientTotalChargeMinor = m.clientTotalChargeMinor ?? m.amountMinor + clientFeeMinor;
+        const netPayoutMinor =
+          m.netPayoutMinor ?? Math.max(0, m.amountMinor - platformFeeMinor - providerFeeMinor);
         return {
           id: m.id,
           code: `MS-${m.id.replace(/^ms-/, "") || 200 + idx}`,
           title: m.title,
+          contractId: m.contractId,
           contractTitle: meta.contractTitle,
           counterparty: meta.counterparty,
+          client: meta.client,
+          freelancer: meta.freelancer,
           rail: meta.rail,
           amountMinor: m.amountMinor,
+          platformFeeMinor,
+          providerFeeMinor,
+          clientFeeMinor,
+          clientTotalChargeMinor,
+          netPayoutMinor,
           dueDate: (m.dueDate || "").slice(0, 10),
           priority: m.amountMinor >= 5_000_000 ? "HIGH" : m.amountMinor >= 3_500_000 ? "MEDIUM" : "LOW",
           column: toKanbanCol(state),
           category: meta.category,
+          escrowState: state,
+          contractFullyExecuted: m.contract?.fullyExecuted,
+          deliverableUrl: m.deliverableUrl ?? null,
+          submittedAt: m.submittedAt ?? null,
+          autoReleaseAt: m.autoReleaseAt ?? null,
+          releasedAt: m.releasedAt ?? null,
+          fundedAt: m.fundedAt ?? null,
         };
       }),
-    [effectiveMilestones, stateOverrides],
+    [effectiveMilestones],
   );
 
-  const derivedScheduleEvents = useMemo<ScheduleEvent[]>(() => {
+  const scheduleEvents = useMemo<ScheduleEvent[]>(() => {
     const milestoneEvents: ScheduleEvent[] = effectiveMilestones.map((m) => {
       const meta = metaFor(m);
       const due = m.dueDate ? new Date(m.dueDate) : null;
@@ -247,6 +304,8 @@ export function MarketplaceShadcnDashboard({
           : "";
       return {
         id: `ms-${m.id}`,
+        milestoneId: m.id,
+        contractId: m.contractId,
         title: m.title,
         contractRef: `${meta.contractTitle} · ${m.id.replace(/^ms-/, "").toUpperCase()}`,
         date: (m.dueDate || new Date().toISOString()).slice(0, 10),
@@ -295,9 +354,6 @@ export function MarketplaceShadcnDashboard({
     });
     return [...milestoneEvents, ...jobEvents];
   }, [effectiveMilestones, effectiveJobs]);
-
-  const kanbanTasks = customTasks ?? derivedKanbanTasks;
-  const scheduleEvents = customEvents ?? derivedScheduleEvents;
 
   // Derived KPI metrics
   const escrowSecuredMinor = useMemo(
@@ -386,13 +442,6 @@ export function MarketplaceShadcnDashboard({
     if (change === null) return null;
     const sign = change > 0 ? "+" : "";
     return `${sign}${change.toFixed(1)}${suffix}`;
-  };
-
-  const handleStatusUpdate = (
-    id: string,
-    nextState: LedgerContractRecord["escrowState"],
-  ) => {
-    setStateOverrides((prev) => ({ ...prev, [id]: nextState }));
   };
 
   return (
@@ -960,6 +1009,7 @@ export function MarketplaceShadcnDashboard({
               <FeaturedCarousel
                 onProfileClick={onSelectProfile}
                 onOpenChat={onOpenChat}
+                onBrowseGigs={() => onNavigateView("gigs")}
               />
             </div>
           )}
@@ -974,26 +1024,120 @@ export function MarketplaceShadcnDashboard({
           {opsSubTab === "table" && (
             <AdvancedDataTable
               records={ledgerRecords}
-              onOpenContracts={() => onNavigateView("contracts")}
-              onStatusUpdate={handleStatusUpdate}
+              viewerRole={viewerRole}
+              feeConfig={feeConfig}
+              onOpenContracts={(contractId) =>
+                onOpenContract ? onOpenContract(contractId) : onNavigateView("contracts")
+              }
+              onOpenEscrow={(milestoneId) =>
+                onOpenEscrow ? onOpenEscrow(milestoneId) : onNavigateView("escrow")
+              }
+              onRequestFundMilestone={
+                onFundMilestone
+                  ? (rec) =>
+                      setFundTarget({
+                        id: rec.id,
+                        title: rec.title,
+                        counterparty: rec.counterparty,
+                        amountMinor: rec.amountMinor,
+                        clientFeeMinor: rec.clientFeeMinor,
+                        clientTotalChargeMinor: rec.clientTotalChargeMinor,
+                      })
+                  : undefined
+              }
             />
           )}
 
           {opsSubTab === "kanban" && (
             <KanbanBoardView
               tasks={kanbanTasks}
-              onTasksChange={setCustomTasks}
+              viewerRole={viewerRole}
+              feeConfig={feeConfig}
+              onNavigateView={onNavigateView}
+              onOpenContracts={(contractId) =>
+                onOpenContract ? onOpenContract(contractId) : onNavigateView("contracts")
+              }
+              onOpenEscrow={(milestoneId) =>
+                onOpenEscrow ? onOpenEscrow(milestoneId) : onNavigateView("escrow")
+              }
+              onRequestFundMilestone={
+                onFundMilestone
+                  ? (task) =>
+                      setFundTarget({
+                        id: task.id,
+                        title: task.title,
+                        counterparty: task.freelancer || task.counterparty,
+                        amountMinor: task.amountMinor,
+                        clientFeeMinor: task.clientFeeMinor,
+                        clientTotalChargeMinor: task.clientTotalChargeMinor,
+                      })
+                  : undefined
+              }
             />
           )}
 
           {opsSubTab === "calendar" && (
             <CalendarScheduleView
               events={scheduleEvents}
-              onEventsChange={setCustomEvents}
+              onOpenEscrow={(milestoneId) =>
+                onOpenEscrow ? onOpenEscrow(milestoneId) : onNavigateView("escrow")
+              }
             />
           )}
         </div>
       )}
+
+      <ConfirmActionModal
+        open={fundTarget !== null}
+        title="Fund Milestone into Escrow"
+        description={
+          fundTarget
+            ? `Funding moves ETB ${(fundTarget.clientTotalChargeMinor / 100).toLocaleString()} from your available wallet balance into protected escrow for "${fundTarget.title}". Funds stay locked until you approve the deliverable.`
+            : undefined
+        }
+        amountEtb={
+          fundTarget
+            ? `ETB ${(fundTarget.clientTotalChargeMinor / 100).toLocaleString()}`
+            : undefined
+        }
+        summaryRows={
+          fundTarget
+            ? [
+                { label: "Milestone", value: fundTarget.title },
+                { label: "Counterparty", value: fundTarget.counterparty },
+                {
+                  label: "Gross Escrow Amount",
+                  value: `ETB ${(fundTarget.amountMinor / 100).toLocaleString()}`,
+                },
+                {
+                  label: "Client Fee",
+                  value: `ETB ${(fundTarget.clientFeeMinor / 100).toLocaleString()}`,
+                },
+                {
+                  label: "Total Wallet Debit",
+                  value: `ETB ${(fundTarget.clientTotalChargeMinor / 100).toLocaleString()}`,
+                },
+              ]
+            : undefined
+        }
+        confirmLabel="Confirm & Fund Escrow"
+        cancelLabel="Cancel"
+        tone="primary"
+        loading={fundLoading}
+        onCancel={() => {
+          if (!fundLoading) setFundTarget(null);
+        }}
+        onConfirm={async () => {
+          if (!fundTarget || !onFundMilestone) return;
+          setFundLoading(true);
+          try {
+            await onFundMilestone(fundTarget.id);
+            setFundTarget(null);
+          } finally {
+            setFundLoading(false);
+          }
+        }}
+      />
     </section>
   );
 }

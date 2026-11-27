@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import {
   api,
+  type EscrowFeeConfig,
   type Job,
   type MeResponse,
   type Milestone,
@@ -719,6 +720,7 @@ function FullPlatformAppInner() {
   /** The caller's own posted briefs — the hiring side of the workspace. */
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [feeConfig, setFeeConfig] = useState<EscrowFeeConfig | null>(null);
   const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
   const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -974,6 +976,7 @@ const loadWorkspace = async () => {
       milestonesResult,
       topUpsResult,
       completenessResult,
+      feeConfigResult,
     ] = await Promise.allSettled([
       api.getMe(),
       api.getWallet(),
@@ -982,6 +985,7 @@ const loadWorkspace = async () => {
       api.getMilestones(),
       api.getTopUpRequests(),
       api.getProfileCompleteness(),
+      api.getEscrowFeeConfig(),
     ]);
     if (meResult.status === "rejected") throw meResult.reason;
     const me = meResult.value;
@@ -1000,6 +1004,7 @@ const loadWorkspace = async () => {
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
     if (completenessResult.status === "fulfilled")
     setProfileCompleteness(completenessResult.value.profileCompleteness);
+    if (feeConfigResult.status === "fulfilled") setFeeConfig(feeConfigResult.value);
     setLastUpdatedAt(new Date());
   };
 
@@ -2792,11 +2797,36 @@ const loadWorkspace = async () => {
               myJobs={myJobs}
               milestones={milestones}
               topUps={topUps}
+              feeConfig={feeConfig}
               canHire={canHire}
               canWork={canWork}
+              viewerRole={
+                platformRole === "ADMIN"
+                  ? "ADMIN"
+                  : canHire && !canWork
+                    ? "CLIENT"
+                    : "FREELANCER"
+              }
               isRefreshing={isRefreshing}
               onRefresh={() => void refreshDashboard()}
               onNavigateView={(v) => navigateToView(v as View)}
+              onOpenEscrow={(milestoneId) => {
+                if (milestoneId) {
+                  const found = milestones.find((m) => m.id === milestoneId);
+                  setFocusContractId(found?.contractId ?? null);
+                } else {
+                  setFocusContractId(null);
+                }
+                setView("escrow");
+              }}
+              onOpenContract={(contractId) => {
+                setFocusContractId(contractId || null);
+                setView("contracts");
+              }}
+              onFundMilestone={async (milestoneId) => {
+                await api.fundMilestoneFromWallet(milestoneId);
+                await loadWorkspace();
+              }}
               onSelectProfile={(id) => openProfileOf(id)}
               onOpenChat={(id, name) => void openChatWithUser(id, name)}
             />
@@ -3005,6 +3035,7 @@ const loadWorkspace = async () => {
               userId={user.id}
               onChanged={loadWorkspace}
               focusContractId={focusContractId}
+              feeConfig={feeConfig}
               onOpenEscrow={(contractId) => {
                 setFocusContractId(contractId || null);
                 setView("escrow");
@@ -3034,6 +3065,7 @@ const loadWorkspace = async () => {
               userId={user.id}
               onChanged={loadWorkspace}
               focusContractId={focusContractId}
+              feeConfig={feeConfig}
               onOpenContract={(contractId) => {
                 if (!contractId) {
                   setFocusContractId(null);

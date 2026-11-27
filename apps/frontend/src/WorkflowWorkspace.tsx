@@ -17,6 +17,7 @@ import {
   api,
   type Contract,
   type Dispute,
+  type EscrowFeeConfig,
   type Job,
   type Proposal,
 } from "./api/client";
@@ -1118,12 +1119,14 @@ export function ContractsWorkspace({
   focusContractId,
   onOpenEscrow,
   onOpenChat,
+  feeConfig: _feeConfig,
 }: {
   userId: string;
   onChanged: () => Promise<void>;
   focusContractId?: string | null;
   onOpenEscrow?: (contractId: string) => void;
   onOpenChat?: (conversationId: string) => void;
+  feeConfig?: EscrowFeeConfig | null;
 }) {
   const { language, t } = useI18n();
   const copy = WORKFLOW_WORKSPACE_COPY[language] ?? WORKFLOW_WORKSPACE_COPY.en;
@@ -1136,11 +1139,10 @@ export function ContractsWorkspace({
     "ALL" | "AWAITING_SIGNATURES" | "EXECUTED" | "CANCELLED"
   >("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [disputeMilestoneId, setDisputeMilestoneId] = useState<string | null>(
-    null,
-  );
-  const [category, setCategory] = useState("QUALITY_ISSUE");
-  const [description, setDescription] = useState("");
+  const [acceptConfirmContract, setAcceptConfirmContract] =
+    useState<Contract | null>(null);
+  const [justAcceptedReadyContractId, setJustAcceptedReadyContractId] =
+    useState<string | null>(null);
 
   const handleOpenContractChat = async (contract: Contract) => {
     const isClient = userId === contract.clientId;
@@ -1182,7 +1184,7 @@ export function ContractsWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    fallbackUpdate: () => void,
+    _fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
@@ -1193,13 +1195,9 @@ export function ContractsWorkspace({
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : copy.common.actionFailed;
-      try {
-        fallbackUpdate();
-        setMessage(success);
-      } catch {
-        setErrorMessage(msg);
-      }
+      setErrorMessage(
+        err instanceof Error ? err.message : copy.common.actionFailed,
+      );
     } finally {
       setBusy(false);
     }
@@ -1216,39 +1214,6 @@ export function ContractsWorkspace({
         copy.contracts.generatedPreviewNotice(contractId.slice(0, 8)),
       );
     }
-  };
-
-  const raise = async (contract: Contract, milestoneId: string) => {
-    if (description.trim().length < 20) {
-      setErrorMessage(copy.contracts.disputeDescMinLength);
-      return;
-    }
-    await act(
-      () =>
-        api.raiseDispute({
-          contractId: contract.id,
-          milestoneId,
-          category,
-          description: description.trim(),
-        }),
-      () => {
-        setContracts((prev) =>
-          prev.map((c) =>
-            c.id === contract.id
-              ? {
-                  ...c,
-                  milestones: c.milestones.map((m) =>
-                    m.id === milestoneId ? { ...m, escrowState: "DISPUTED" } : m,
-                  ),
-                }
-              : c,
-          ),
-        );
-      },
-      copy.contracts.disputeOpenedSuccess,
-    );
-    setDescription("");
-    setDisputeMilestoneId(null);
   };
 
   const totalContracts = contracts.length;
@@ -1624,43 +1589,55 @@ export function ContractsWorkspace({
                     )}
                     {!isCancelled && !acceptedByMe && (
                       <button
+                        type="button"
                         className="sh-btn sh-btn-primary"
                         disabled={busy}
-                        onClick={() =>
-                          void act(
-                            async () => {
-                              await api.acceptContract(contract.id);
-                              events.contractSigned(
-                                viewerIsClient ? "client" : "freelancer",
-                              );
-                            },
-                            () => {
-                              setContracts((prev) =>
-                                prev.map((c) =>
-                                  c.id === contract.id
-                                    ? {
-                                        ...c,
-                                        clientAcceptedAt:
-                                          c.clientAcceptedAt ??
-                                          new Date().toISOString(),
-                                        freelancerAcceptedAt:
-                                          c.freelancerAcceptedAt ??
-                                          new Date().toISOString(),
-                                        fullyExecuted: true,
-                                      }
-                                    : c,
-                                ),
-                              );
-                            },
-                            "Agreement signed and executed.",
-                          )
-                        }
+                        onClick={() => setAcceptConfirmContract(contract)}
                       >
                         Accept Agreement
                       </button>
                     )}
+                    {!isCancelled &&
+                      acceptedByMe &&
+                      viewerIsClient &&
+                      contract.fullyExecuted &&
+                      contract.milestones.some(
+                        (m) => m.escrowState === "PAYMENT_PENDING",
+                      ) &&
+                      onOpenEscrow && (
+                        <button
+                          type="button"
+                          className="sh-btn sh-btn-primary"
+                          onClick={() => onOpenEscrow(contract.id)}
+                        >
+                          <WalletCards size={14} /> Fund first milestone
+                        </button>
+                      )}
                   </div>
                 </div>
+
+                {!isCancelled &&
+                  acceptedByMe &&
+                  justAcceptedReadyContractId === contract.id &&
+                  viewerIsClient &&
+                  contract.fullyExecuted &&
+                  onOpenEscrow && (
+                    <Alert
+                      variant="success"
+                      className="flex items-center justify-between gap-3 mb-2.5"
+                    >
+                      <AlertTitle>
+                        Agreement signed by both parties. Fund the first milestone in Escrow Center to begin work.
+                      </AlertTitle>
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-primary sh-btn-compact"
+                        onClick={() => onOpenEscrow(contract.id)}
+                      >
+                        Fund first milestone
+                      </button>
+                    </Alert>
+                  )}
 
                 <div className="signature-grid">
                   <span className={contract.clientAcceptedAt ? "done" : ""}>
@@ -1680,242 +1657,121 @@ export function ContractsWorkspace({
                 </div>
 
                 <div className="milestone-list">
-                  {visibleMilestones.map((milestone) => {
-                    const canDispute =
-                      !isCancelled &&
-                      (viewerIsClient || viewerIsFreelancer) &&
-                      [
-                        "ESCROW_HELD",
-                        "WORK_IN_PROGRESS",
-                        "SUBMITTED_FOR_REVIEW",
-                      ].includes(milestone.escrowState);
-                    return (
-                      <div className="milestone-row" key={milestone.id}>
-                        <div>
-                          <strong className="sh-cell-primary">
-                            {milestone.title}
-                          </strong>
-                          <span className="sh-cell-meta">
-                            <strong
-                              className="sh-mono"
-                              style={{ color: "var(--color-text)" }}
-                            >
-                              {money(milestone.amountMinor)}
-                            </strong>{" "}
-                            · Due{" "}
-                            <span className="sh-mono">
-                              {date(milestone.dueDate)}
-                            </span>{" "}
-                            ·{" "}
-                            <span className="sh-mono">
-                              #{contract.id.toUpperCase()}
-                            </span>
+                  {visibleMilestones.map((milestone) => (
+                    <div className="milestone-row" key={milestone.id}>
+                      <div>
+                        <strong className="sh-cell-primary">
+                          {milestone.title}
+                        </strong>
+                        <span className="sh-cell-meta">
+                          <strong
+                            className="sh-mono"
+                            style={{ color: "var(--color-text)" }}
+                          >
+                            {money(milestone.amountMinor)}
+                          </strong>{" "}
+                          · Due{" "}
+                          <span className="sh-mono">
+                            {date(milestone.dueDate)}
+                          </span>{" "}
+                          ·{" "}
+                          <span className="sh-mono">
+                            #{contract.id.toUpperCase()}
                           </span>
-                        </div>
-                        <span
-                          className={`sh-status-inline ${
-                            milestone.escrowState === "RELEASED"
-                              ? "emerald"
-                              : milestone.escrowState === "DISPUTED"
-                                ? "crimson"
-                                : "amber"
-                          }`}
-                        >
-                          {label(milestone.escrowState, statuses)}
                         </span>
-                        <div className="workflow-actions">
-                          {!isCancelled &&
-                            viewerIsClient &&
-                            contract.fullyExecuted &&
-                            milestone.escrowState === "PAYMENT_PENDING" && (
-                              <button
-                                className="sh-btn sh-btn-primary"
-                                disabled={busy}
-                                onClick={() =>
-                                  void act(
-                                    async () => {
-                                      await api.fundMilestoneFromWallet(
-                                        milestone.id,
-                                      );
-                                      events.escrowFunded("contract_milestone");
-                                    },
-                                    () => {
-                                      setContracts((prev) =>
-                                        prev.map((c) =>
-                                          c.id === contract.id
-                                            ? {
-                                                ...c,
-                                                milestones: c.milestones.map(
-                                                  (m) =>
-                                                    m.id === milestone.id
-                                                      ? {
-                                                          ...m,
-                                                          escrowState:
-                                                            "ESCROW_HELD",
-                                                        }
-                                                      : m,
-                                                ),
-                                              }
-                                            : c,
-                                        ),
-                                      );
-                                    },
-                                    "Escrow funded from your wallet. Work can begin!",
-                                  )
-                                }
-                              >
-                                <WalletCards size={14} /> Fund Escrow
-                              </button>
-                            )}
-                          {viewerIsFreelancer &&
-                            ["ESCROW_HELD", "WORK_IN_PROGRESS"].includes(
-                              milestone.escrowState,
-                            ) && (
-                              <button
-                                className="sh-btn sh-btn-primary"
-                                disabled={busy}
-                                onClick={() =>
-                                  void act(
-                                    async () => {
-                                      await api.submitMilestone(milestone.id);
-                                      events.milestoneDelivered();
-                                    },
-                                    () => {
-                                      setContracts((prev) =>
-                                        prev.map((c) =>
-                                          c.id === contract.id
-                                            ? {
-                                                ...c,
-                                                milestones: c.milestones.map(
-                                                  (m) =>
-                                                    m.id === milestone.id
-                                                      ? {
-                                                          ...m,
-                                                          escrowState:
-                                                            "SUBMITTED_FOR_REVIEW",
-                                                        }
-                                                      : m,
-                                                ),
-                                              }
-                                            : c,
-                                        ),
-                                      );
-                                    },
-                                    "Milestone submitted for client QA review.",
-                                  )
-                                }
-                              >
-                                Submit Delivery
-                              </button>
-                            )}
-                          {viewerIsClient &&
-                            ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"].includes(milestone.escrowState) && (
-                              <button
-                                className="sh-btn sh-btn-primary"
-                                disabled={busy}
-                                onClick={() =>
-                                  void act(
-                                    async () => {
-                                      await api.acceptMilestone(milestone.id);
-                                      events.milestoneAccepted();
-                                    },
-                                    () => {
-                                      setContracts((prev) =>
-                                        prev.map((c) =>
-                                          c.id === contract.id
-                                            ? {
-                                                ...c,
-                                                milestones: c.milestones.map(
-                                                  (m) =>
-                                                    m.id === milestone.id
-                                                      ? {
-                                                          ...m,
-                                                          escrowState:
-                                                            "RELEASED",
-                                                        }
-                                                      : m,
-                                                ),
-                                              }
-                                            : c,
-                                        ),
-                                      );
-                                    },
-                                    "Milestone accepted and escrow released.",
-                                  )
-                                }
-                              >
-                                Accept & Release Funds
-                              </button>
-                            )}
-                          {canDispute && (
-                            <button
-                              className="sh-row-action-btn"
-                              onClick={() =>
-                                setDisputeMilestoneId(
-                                  disputeMilestoneId === milestone.id
-                                    ? null
-                                    : milestone.id,
-                                )
-                              }
-                            >
-                              <AlertTriangle size={13} /> Dispute
-                            </button>
-                          )}
-                        </div>
-                        {disputeMilestoneId === milestone.id && (
-                          <div className="inline-workflow-form dispute-form">
-                            <label>
-                              Category
-                              <select
-                                value={category}
-                                onChange={(event) =>
-                                  setCategory(event.target.value)
-                                }
-                              >
-                                <option value="NON_DELIVERY">Non-delivery</option>
-                                <option value="LATE_DELIVERY">
-                                  Late delivery
-                                </option>
-                                <option value="QUALITY_ISSUE">
-                                  Quality issue
-                                </option>
-                                <option value="SCOPE_CREEP">Scope creep</option>
-                                <option value="NON_PAYMENT">Non-payment</option>
-                                <option value="COMMUNICATION_BREAKDOWN">
-                                  Communication breakdown
-                                </option>
-                              </select>
-                            </label>
-                            <label className="form-wide">
-                              What happened?
-                              <textarea
-                                value={description}
-                                onChange={(event) =>
-                                  setDescription(event.target.value)
-                                }
-                                minLength={20}
-                                placeholder="Provide factual context and deliverable references..."
-                              />
-                            </label>
-                            <button
-                              type="button"
-                              className="sh-btn sh-btn-primary"
-                              disabled={busy}
-                              onClick={() => void raise(contract, milestone.id)}
-                            >
-                              Open Dispute Case
-                            </button>
-                          </div>
+                      </div>
+                      <span
+                        className={`sh-status-inline ${
+                          milestone.escrowState === "RELEASED"
+                            ? "emerald"
+                            : milestone.escrowState === "DISPUTED"
+                              ? "crimson"
+                              : "amber"
+                        }`}
+                      >
+                        {label(milestone.escrowState, statuses)}
+                      </span>
+                      <div className="workflow-actions">
+                        {onOpenEscrow && (
+                          <button
+                            type="button"
+                            className="sh-row-action-btn"
+                            onClick={() => onOpenEscrow(contract.id)}
+                          >
+                            <WalletCards size={13} /> Manage in Escrow Center
+                          </button>
                         )}
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </article>
             );
           },
         )
       )}
+
+      <ConfirmActionModal
+        open={acceptConfirmContract !== null}
+        title="Accept & Sign Agreement"
+        description="Signing does not move money. You'll fund each milestone separately."
+        summaryRows={
+          acceptConfirmContract
+            ? [
+                {
+                  label: "Contract",
+                  value:
+                    acceptConfirmContract.job?.title ||
+                    `Contract #${acceptConfirmContract.id.slice(0, 8)}`,
+                },
+                {
+                  label: "Agreed Total",
+                  value: money(
+                    acceptConfirmContract.milestones.reduce(
+                      (sum, m) => sum + m.amountMinor,
+                      0,
+                    ),
+                  ),
+                },
+                {
+                  label: "Milestones",
+                  value: `${acceptConfirmContract.milestones.length}`,
+                },
+              ]
+            : undefined
+        }
+        confirmLabel="Accept & Sign"
+        cancelLabel="Cancel"
+        tone="primary"
+        loading={busy}
+        onCancel={() => {
+          if (!busy) setAcceptConfirmContract(null);
+        }}
+        onConfirm={() => {
+          const target = acceptConfirmContract;
+          if (!target) return;
+          const viewerIsClient =
+            target.clientId === userId || userId === "usr-both-addis-03";
+          const willBeFullyExecuted = Boolean(
+            (viewerIsClient ? target.freelancerAcceptedAt : target.clientAcceptedAt) ||
+              target.fullyExecuted,
+          );
+          setAcceptConfirmContract(null);
+          void act(
+            async () => {
+              await api.acceptContract(target.id);
+              events.contractSigned(viewerIsClient ? "client" : "freelancer");
+              if (willBeFullyExecuted) {
+                setJustAcceptedReadyContractId(target.id);
+              }
+            },
+            () => {},
+            willBeFullyExecuted
+              ? "Agreement signed by both parties. Fund the first milestone in Escrow Center when ready."
+              : "Agreement signed. Waiting for counterparty e-signature.",
+          );
+        }}
+      />
     </div>
   );
 }
@@ -1925,11 +1781,13 @@ export function EscrowWorkspace({
   onChanged,
   focusContractId,
   onOpenContract,
+  feeConfig,
 }: {
   userId: string;
   onChanged: () => Promise<void>;
   focusContractId?: string | null;
   onOpenContract?: (contractId: string) => void;
+  feeConfig?: EscrowFeeConfig | null;
 }) {
   const { t } = useI18n();
   const statuses = t.workspace.statuses;
@@ -1953,6 +1811,15 @@ export function EscrowWorkspace({
   const [disputeMilestoneId, setDisputeMilestoneId] = useState<string | null>(
     null,
   );
+  const [pendingAction, setPendingAction] = useState<{
+    kind: "FUND" | "RELEASE";
+    milestoneId: string;
+    title: string;
+    counterparty: string;
+    amountMinor: number;
+    clientFeeMinor: number;
+    clientTotalChargeMinor: number;
+  } | null>(null);
   const [category, setCategory] = useState("QUALITY_ISSUE");
   const [description, setDescription] = useState("");
 
@@ -1971,7 +1838,7 @@ export function EscrowWorkspace({
 
   const act = async (
     operation: () => Promise<unknown>,
-    fallbackUpdate: () => void,
+    _fallbackUpdate: () => void,
     success: string,
   ) => {
     setBusy(true);
@@ -1982,13 +1849,7 @@ export function EscrowWorkspace({
       setMessage(success);
       await Promise.all([refresh(), onChanged().catch(() => {})]);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Action failed.";
-      try {
-        fallbackUpdate();
-        setMessage(success);
-      } catch {
-        setErrorMessage(msg);
-      }
+      setErrorMessage(err instanceof Error ? err.message : "Action failed.");
     } finally {
       setBusy(false);
     }
@@ -2378,17 +2239,21 @@ export function EscrowWorkspace({
                       contract.fullyExecuted &&
                       item.escrowState === "PAYMENT_PENDING" && (
                         <button
+                          type="button"
                           className="sh-btn sh-btn-primary"
                           disabled={busy}
                           onClick={() =>
-                            void act(
-                              async () => {
-                                await api.fundMilestoneFromWallet(item.id);
-                                events.escrowFunded("contract_milestone");
-                              },
-                              () => {},
-                              "Escrow funded from your wallet. Work can begin!",
-                            )
+                            setPendingAction({
+                              kind: "FUND",
+                              milestoneId: item.id,
+                              title: item.title,
+                              counterparty:
+                                contract.job?.title || `#${contract.id.slice(0, 8)}`,
+                              amountMinor: item.amountMinor,
+                              clientFeeMinor: item.clientFeeMinor ?? 0,
+                              clientTotalChargeMinor:
+                                item.clientTotalChargeMinor ?? item.amountMinor,
+                            })
                           }
                         >
                           <WalletCards size={14} /> {t.escrow.fundMilestone}
@@ -2399,6 +2264,7 @@ export function EscrowWorkspace({
                         item.escrowState,
                       ) && (
                         <button
+                          type="button"
                           className="sh-btn sh-btn-primary"
                           disabled={busy}
                           onClick={() =>
@@ -2418,17 +2284,21 @@ export function EscrowWorkspace({
                     {viewerIsClient &&
                       ["SUBMITTED_FOR_REVIEW", "ESCROW_HELD", "WORK_IN_PROGRESS"].includes(item.escrowState) && (
                         <button
+                          type="button"
                           className="sh-btn sh-btn-primary"
                           disabled={busy}
                           onClick={() =>
-                            void act(
-                              async () => {
-                                await api.acceptMilestone(item.id);
-                                events.milestoneAccepted();
-                              },
-                              () => {},
-                              "Milestone accepted and escrow released.",
-                            )
+                            setPendingAction({
+                              kind: "RELEASE",
+                              milestoneId: item.id,
+                              title: item.title,
+                              counterparty:
+                                contract.job?.title || `#${contract.id.slice(0, 8)}`,
+                              amountMinor: item.amountMinor,
+                              clientFeeMinor: item.clientFeeMinor ?? 0,
+                              clientTotalChargeMinor:
+                                item.clientTotalChargeMinor ?? item.amountMinor,
+                            })
                           }
                         >
                           {t.escrow.releaseFunds}
@@ -2452,6 +2322,13 @@ export function EscrowWorkspace({
                     <div style={{ gridColumn: "1 / -1", marginTop: 10 }}>
                       <EscrowFeeBreakdown
                         grossEtb={Math.round(item.amountMinor / 100)}
+                        viewerRole={
+                          viewerIsClient && !viewerIsFreelancer
+                            ? "CLIENT"
+                            : "FREELANCER"
+                        }
+                        feeRate={feeConfig?.freelancerPlatformFeeRate}
+                        providerFeeRate={feeConfig?.paymentProviderFeeRate}
                         labels={fb}
                       />
                     </div>
@@ -2502,6 +2379,85 @@ export function EscrowWorkspace({
           </div>
         </div>
       )}
+
+      <ConfirmActionModal
+        open={pendingAction !== null}
+        title={
+          pendingAction?.kind === "RELEASE"
+            ? "Accept Delivery & Release Funds"
+            : "Fund Milestone into Escrow"
+        }
+        description={
+          pendingAction?.kind === "RELEASE"
+            ? "Releasing is final. Disputes can only be opened before release."
+            : pendingAction
+              ? `Funding moves ${money(pendingAction.clientTotalChargeMinor)} from your available wallet into protected escrow until you approve delivery.`
+              : undefined
+        }
+        amountEtb={
+          pendingAction
+            ? pendingAction.kind === "RELEASE"
+              ? money(pendingAction.amountMinor)
+              : money(pendingAction.clientTotalChargeMinor)
+            : undefined
+        }
+        summaryRows={
+          pendingAction
+            ? pendingAction.kind === "RELEASE"
+              ? [
+                  { label: "Milestone", value: pendingAction.title },
+                  { label: "Contract", value: pendingAction.counterparty },
+                  { label: "Release Amount", value: money(pendingAction.amountMinor) },
+                  { label: "Destination", value: "Freelancer wallet" },
+                ]
+              : [
+                  { label: "Milestone", value: pendingAction.title },
+                  { label: "Contract", value: pendingAction.counterparty },
+                  { label: "Gross Escrow", value: money(pendingAction.amountMinor) },
+                  { label: "Client Fee", value: money(pendingAction.clientFeeMinor) },
+                  {
+                    label: "Total Wallet Debit",
+                    value: money(pendingAction.clientTotalChargeMinor),
+                  },
+                ]
+            : undefined
+        }
+        confirmLabel={
+          pendingAction?.kind === "RELEASE"
+            ? "Confirm & Release Funds"
+            : "Confirm & Fund Escrow"
+        }
+        cancelLabel="Cancel"
+        tone={pendingAction?.kind === "RELEASE" ? "danger" : "primary"}
+        loading={busy}
+        onCancel={() => {
+          if (!busy) setPendingAction(null);
+        }}
+        onConfirm={() => {
+          const action = pendingAction;
+          if (!action) return;
+          setPendingAction(null);
+          if (action.kind === "FUND") {
+            void act(
+              async () => {
+                await api.fundMilestoneFromWallet(action.milestoneId);
+                events.escrowFunded("contract_milestone");
+              },
+              () => {},
+              "Escrow funded from your wallet. Work can begin!",
+            );
+          } else {
+            void act(
+              async () => {
+                await api.acceptMilestone(action.milestoneId);
+                events.milestoneAccepted();
+              },
+              () => {},
+              "Milestone accepted and escrow released.",
+            );
+          }
+        }}
+      />
     </div>
   );
 }

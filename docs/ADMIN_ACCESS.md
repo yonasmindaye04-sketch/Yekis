@@ -207,9 +207,11 @@ Three things are deliberately kept:
   delete. The run also refuses any *other* staff account except the two seeded demo identities
   (`compliance@` and `support@`).
 - **Audit history.** `AuditLog.userId` is `ON DELETE SET NULL`, so audit rows survive with a null
-  actor. Deleting them would destroy the compliance trail. For the same reason, a support
-  conversation that a demo agent was merely *assigned* to is kept and unassigned; only
-  conversations the demo account created are removed.
+  actor. Deleting them would destroy the compliance trail. The per-record `KycReviewEvent` rows that
+  belong to a demo KYC record are removed with that record (the foreign key is `RESTRICT`); the
+  `AuditLog` entry for the same decision remains. For the same reason, a support conversation that a
+  demo agent was merely *assigned* to is kept and unassigned; only conversations the demo account
+  created are removed.
 - **Real-member domains.** `@guest.invalid`, `@erased.invalid` and `@yekis.local` (Telegram) never
   match the selector. The two GDPR erasure tombstones are evidence and stay.
 

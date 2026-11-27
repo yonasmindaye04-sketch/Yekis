@@ -179,8 +179,14 @@ export type DashboardCopy = {
     thState: string;
     thDueDate: string;
     thEscrowEtb: string;
-    thFee10: string;
+    thFee: string;
+    thProviderFee: string;
+    thClientFee: string;
+    thClientTotal: string;
+    thNetPayout: string;
     thActions: string;
+    clientFeeZeroTitle: string;
+    clientFeeZeroNote: string;
     selectedFooter: (selected: number, total: number) => string;
     rowsPerPage: string;
     pageOf: (page: number, totalPages: number) => string;
@@ -193,47 +199,101 @@ export type DashboardCopy = {
     detailCategory: string;
     detailGross: string;
     detailFee: string;
+    detailProviderFee: string;
+    detailClientFee: string;
+    detailClientTotal: string;
     detailNet: string;
     detailDueDate: string;
     detailState: string;
-    updateStageLabel: string;
-    stageReleasePayout: string;
+    actionsLabel: string;
+    fundMilestoneBtn: string;
+    reviewReleaseBtn: string;
+    submitDeliveryBtn: string;
+    disputeBtn: string;
+    openEscrowBtn: string;
+    awaitingSignatureNote: string;
     openContractRoomBtn: string;
     closeBtn: string;
   };
   kanban: {
     columns: Record<KanbanColumnId, { title: string; subtitle: string }>;
+    emptyStageActions: Record<
+      KanbanColumnId,
+      { hint: string; ctaLabel: string }
+    >;
     title: string;
     subtitle: string;
-    addTaskBtn: string;
     searchPlaceholder: string;
     searchAria: string;
+    clientFilterAria: string;
+    allClients: string;
+    freelancerFilterAria: string;
+    allFreelancers: string;
+    contractFilterAria: string;
+    allContracts: string;
     priorityAria: string;
     priorityAll: string;
     priorityHighFilter: string;
     priorityMediumFilter: string;
     priorityLowFilter: string;
+    overdueOnlyBtn: string;
+    clearFiltersBtn: string;
     priorityLabels: Record<"HIGH" | "MEDIUM" | "LOW", string>;
     mobileTabsAria: string;
     emptyCol: string;
+    filteredEmptyCol: (hiddenCount: number) => string;
+    openContractsCta: string;
+    openWalletCta: string;
+    boardSummary: (shown: number, total: number, overdue: number) => string;
+    taskCountLabel: (shown: number, total: number, filtered: boolean) => string;
+    overdueColCount: (n: number) => string;
+    overdueDaysLabel: (days: number) => string;
+    dueTodayLabel: string;
+    dueSoonLabel: (days: number) => string;
+    settledLabel: string;
+    onTrackLabel: string;
+    collapseColumnAria: (title: string) => string;
+    expandColumnAria: (title: string) => string;
+    collapseEmptyBtn: string;
+    expandAllBtn: string;
+    scrollLeftAria: string;
+    scrollRightAria: string;
+    scrollHint: string;
     duePrefix: (date: string) => string;
-    prevStageTitle: string;
-    nextStageTitle: string;
-    modalAria: string;
-    modalTitle: string;
-    modalSubtitle: string;
+    viewDetailsAria: (title: string) => string;
+    detailsAria: string;
+    detailContract: string;
+    detailClient: string;
+    detailFreelancer: string;
+    detailCategory: string;
+    detailRail: string;
+    detailAmount: string;
+    detailPlatformFee: string;
+    detailProviderFee: string;
+    detailClientFee: string;
+    detailClientTotal: string;
+    detailNetPayout: string;
+    clientFeeZeroNote: string;
+    detailDueDate: string;
+    detailScheduleStatus: string;
+    detailPriority: string;
+    detailStage: string;
+    detailDeliverable: string;
+    openDeliverableBtn: string;
+    detailFundedAt: string;
+    detailSubmittedAt: string;
+    detailAutoReleaseAt: string;
+    detailReleasedAt: string;
+    actionsLabel: string;
+    fundMilestoneBtn: string;
+    reviewReleaseBtn: string;
+    submitDeliveryBtn: string;
+    disputeBtn: string;
+    openEscrowBtn: string;
+    awaitingSignatureNote: string;
+    openContractRoomBtn: string;
+    closeBtn: string;
     closeAria: string;
-    fieldTitle: string;
-    fieldTitlePlaceholder: string;
-    fieldContract: string;
-    fieldCounterparty: string;
-    fieldAmount: string;
-    fieldDueDate: string;
-    fieldRail: string;
-    fieldPriority: string;
-    fieldStage: string;
-    submitTaskBtn: string;
-    cancelBtn: string;
   };
   calendar: {
     typeLabels: {
@@ -245,12 +305,14 @@ export type DashboardCopy = {
     weekdays: [string, string, string, string, string, string, string];
     title: string;
     subtitle: string;
-    scheduleBtn: string;
     prevEthMonthAria: string;
     prevMonthAria: string;
     nextEthMonthAria: string;
     nextMonthAria: string;
-    jumpDemoBtn: string;
+    todayBtn: string;
+    todayBadge: string;
+    selectedBadge: string;
+    openEscrowBtn: string;
     calendarSystemAria: string;
     modeGregorian: string;
     modeFiscal: string;
@@ -265,26 +327,10 @@ export type DashboardCopy = {
     selectedDateLabel: string;
     fiscalPeriodLabel: string;
     noItemsOnDate: (dateLabel: string) => string;
-    addItemForDate: (dateLabel: string) => string;
     statusCompleted: string;
     statusAtRisk: string;
-    markCompleteBtn: string;
     upcomingTitle: string;
     upcomingEmpty: string;
-    modalAria: string;
-    modalTitle: string;
-    modalSubtitle: string;
-    closeAria: string;
-    fieldEventTitle: string;
-    fieldEventTitlePlaceholder: string;
-    fieldDate: string;
-    fieldTime: string;
-    fieldType: string;
-    fieldAmount: string;
-    fieldContractRef: string;
-    fieldCounterparty: string;
-    saveScheduleBtn: string;
-    cancelBtn: string;
   };
 };
 
@@ -485,8 +531,14 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       thState: "State",
       thDueDate: "Due Date",
       thEscrowEtb: "Escrow (ETB)",
-      thFee10: "Fee (10%)",
+      thFee: "Platform fee",
+      thProviderFee: "Provider fee",
+      thClientFee: "Client fee",
+      thClientTotal: "Total",
+      thNetPayout: "Net payout",
       thActions: "Actions",
+      clientFeeZeroTitle: "Client fee: ETB 0",
+      clientFeeZeroNote: "Platform fees are paid by the freelancer. You pay ETB 0 in fees.",
       selectedFooter: (s, t) => `${s} of ${t} row(s) selected`,
       rowsPerPage: "Rows per page",
       pageOf: (p, tp) => `Page ${p} of ${tp}`,
@@ -498,12 +550,20 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       detailCounterparty: "Counterparty",
       detailCategory: "Category",
       detailGross: "Gross Escrow Amount",
-      detailFee: "Platform Commission (10%)",
+      detailFee: "Platform fee",
+      detailProviderFee: "Provider fee",
+      detailClientFee: "Client fee",
+      detailClientTotal: "Total charge",
       detailNet: "Net Freelancer Payout",
       detailDueDate: "Due Date",
       detailState: "Current Escrow State",
-      updateStageLabel: "Update Milestone Workflow Stage",
-      stageReleasePayout: "Release Payout",
+      actionsLabel: "Escrow & Contract Actions",
+      fundMilestoneBtn: "Fund Milestone",
+      reviewReleaseBtn: "Review & Release",
+      submitDeliveryBtn: "Submit Delivery",
+      disputeBtn: "Dispute",
+      openEscrowBtn: "Open in Escrow Center",
+      awaitingSignatureNote: "Waiting for both parties to accept the contract agreement before funding.",
       openContractRoomBtn: "Open Full Contract Room",
       closeBtn: "Close",
     },
@@ -530,39 +590,109 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
           subtitle: "Disbursed to wallet",
         },
       },
+      emptyStageActions: {
+        BACKLOG: {
+          hint: "Accepted proposal milestones awaiting funding appear here automatically.",
+          ctaLabel: "Open Contracts",
+        },
+        ESCROW_HELD: {
+          hint: "Milestones funded into escrow appear here ready for delivery.",
+          ctaLabel: "Open Escrow Center",
+        },
+        WORK_IN_PROGRESS: {
+          hint: "Funded milestones appear here once the freelancer starts work.",
+          ctaLabel: "Open Contracts",
+        },
+        SUBMITTED_FOR_REVIEW: {
+          hint: "Submitted deliverables awaiting client review and release appear here.",
+          ctaLabel: "Open Escrow Center",
+        },
+        RELEASED: {
+          hint: "Released milestones disbursed to the freelancer wallet appear here.",
+          ctaLabel: "Open Escrow Center",
+        },
+      },
       title: "Milestone & Deliverable Kanban Pipeline",
       subtitle:
-        "Drag cards across columns or use stage controls to update escrow workflow state",
-      addTaskBtn: "Add Milestone Task",
-      searchPlaceholder: "Search tasks by title, code, or freelancer...",
-      searchAria: "Search Kanban tasks",
+        "Live read-only projection of server escrow state. Open a milestone card to fund, review, or open the contract.",
+      searchPlaceholder: "Search milestones by title, code, contract, or party...",
+      searchAria: "Search Kanban milestones",
+      clientFilterAria: "Filter by client",
+      allClients: "All Clients",
+      freelancerFilterAria: "Filter by freelancer",
+      allFreelancers: "All Freelancers",
+      contractFilterAria: "Filter by contract",
+      allContracts: "All Contracts",
       priorityAria: "Filter by priority",
       priorityAll: "All Priorities",
       priorityHighFilter: "High Priority",
       priorityMediumFilter: "Medium",
       priorityLowFilter: "Low",
+      overdueOnlyBtn: "Overdue only",
+      clearFiltersBtn: "Clear filters",
       priorityLabels: { HIGH: "HIGH", MEDIUM: "MEDIUM", LOW: "LOW" },
       mobileTabsAria: "Kanban workflow stages",
       emptyCol: "No milestones in this stage",
+      filteredEmptyCol: (n) =>
+        n > 0
+          ? `${n} ${n === 1 ? "milestone" : "milestones"} hidden by active filters`
+          : "No milestones match the active filters",
+      openContractsCta: "Open Contracts",
+      openWalletCta: "Open Wallet",
+      boardSummary: (shown, total, overdue) =>
+        `${shown} of ${total} ${total === 1 ? "milestone" : "milestones"}${overdue > 0 ? ` · ${overdue} overdue` : ""}`,
+      taskCountLabel: (shown, total, filtered) =>
+        filtered && shown !== total
+          ? `${shown} of ${total}`
+          : `${shown} ${shown === 1 ? "task" : "tasks"}`,
+      overdueColCount: (n) => `${n} overdue`,
+      overdueDaysLabel: (d) => `Overdue ${d}d`,
+      dueTodayLabel: "Due today",
+      dueSoonLabel: (d) => `Due in ${d}d`,
+      settledLabel: "Settled",
+      onTrackLabel: "On track",
+      collapseColumnAria: (title) => `Collapse ${title} column`,
+      expandColumnAria: (title) => `Expand ${title} column`,
+      collapseEmptyBtn: "Collapse empty",
+      expandAllBtn: "Expand all",
+      scrollLeftAria: "Scroll stages left",
+      scrollRightAria: "Scroll stages right",
+      scrollHint: "Scroll horizontally or use arrows to browse all 5 stages",
       duePrefix: (d) => `Due ${d}`,
-      prevStageTitle: "Move to previous stage",
-      nextStageTitle: "Advance to next stage",
-      modalAria: "Add milestone task",
-      modalTitle: "Add Milestone Task",
-      modalSubtitle:
-        "Create a new deliverable card in the escrow workflow board",
+      viewDetailsAria: (title) => `View details for ${title}`,
+      detailsAria: "Milestone details",
+      detailContract: "Contract",
+      detailClient: "Client",
+      detailFreelancer: "Freelancer",
+      detailCategory: "Category",
+      detailRail: "Payment Rail",
+      detailAmount: "Gross Escrow Amount",
+      detailPlatformFee: "Platform fee",
+      detailProviderFee: "Provider fee",
+      detailClientFee: "Client fee",
+      detailClientTotal: "Total charge",
+      detailNetPayout: "Net Freelancer Payout",
+      clientFeeZeroNote: "Platform fees are paid by the freelancer. You pay ETB 0 in fees.",
+      detailDueDate: "Due Date",
+      detailScheduleStatus: "Schedule Status",
+      detailPriority: "Priority",
+      detailStage: "Workflow Stage",
+      detailDeliverable: "Deliverable Link",
+      openDeliverableBtn: "Open deliverable",
+      detailFundedAt: "Escrow Funded",
+      detailSubmittedAt: "Submitted",
+      detailAutoReleaseAt: "Auto-Release",
+      detailReleasedAt: "Released",
+      actionsLabel: "Escrow & Contract Actions",
+      fundMilestoneBtn: "Fund Milestone",
+      reviewReleaseBtn: "Review & Release",
+      submitDeliveryBtn: "Submit Delivery",
+      disputeBtn: "Dispute",
+      openEscrowBtn: "Open in Escrow Center",
+      awaitingSignatureNote: "Waiting for both parties to sign the agreement before funding.",
+      openContractRoomBtn: "Open Contracts Workspace",
+      closeBtn: "Close",
       closeAria: "Close",
-      fieldTitle: "Milestone Deliverable Title",
-      fieldTitlePlaceholder: "e.g., Phase 3: Telebirr Webhook Load Testing",
-      fieldContract: "Contract Name",
-      fieldCounterparty: "Counterparty / Assignee",
-      fieldAmount: "Amount (ETB)",
-      fieldDueDate: "Due Date",
-      fieldRail: "Payment Rail",
-      fieldPriority: "Priority",
-      fieldStage: "Initial Workflow Stage",
-      submitTaskBtn: "Create Milestone Task",
-      cancelBtn: "Cancel",
     },
     calendar: {
       typeLabels: {
@@ -574,13 +704,15 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       title: "Milestone, Payout & SLA Schedule",
       subtitle:
-        "Track upcoming contract deadlines, auto-release windows, and compliance checkpoints across the Gregorian and Ethiopian fiscal calendars",
-      scheduleBtn: "Schedule Deadline",
+        "Track live contract deadlines, release windows, and Ethiopian fiscal calendar quarters",
       prevEthMonthAria: "Previous Ethiopian month",
       prevMonthAria: "Previous month",
       nextEthMonthAria: "Next Ethiopian month",
       nextMonthAria: "Next month",
-      jumpDemoBtn: "Oct 2026",
+      todayBtn: "Today",
+      todayBadge: "Today",
+      selectedBadge: "Selected",
+      openEscrowBtn: "Open in Escrow Center",
       calendarSystemAria: "Calendar system",
       modeGregorian: "Gregorian",
       modeFiscal: "Ethiopian Fiscal",
@@ -595,27 +727,10 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       selectedDateLabel: "Selected Date",
       fiscalPeriodLabel: "Fiscal period",
       noItemsOnDate: (d) => `No scheduled milestones or payouts on ${d}.`,
-      addItemForDate: (d) => `Add Item for ${d}`,
       statusCompleted: "Completed",
       statusAtRisk: "SLA At Risk",
-      markCompleteBtn: "Mark Complete",
       upcomingTitle: "Upcoming Month Highlights",
       upcomingEmpty: "No items match this filter.",
-      modalAria: "Schedule deadline",
-      modalTitle: "Schedule Milestone or Payout",
-      modalSubtitle:
-        "Add a deadline or escrow release checkpoint to your workspace calendar",
-      closeAria: "Close",
-      fieldEventTitle: "Event Title",
-      fieldEventTitlePlaceholder: "e.g., Phase 2 Acceptance Sign-Off",
-      fieldDate: "Date",
-      fieldTime: "Time (EAT)",
-      fieldType: "Event Type",
-      fieldAmount: "Amount (ETB)",
-      fieldContractRef: "Contract Reference",
-      fieldCounterparty: "Counterparty",
-      saveScheduleBtn: "Save to Schedule",
-      cancelBtn: "Cancel",
     },
   },
   am: {
@@ -807,8 +922,14 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       thState: "ሁኔታ",
       thDueDate: "የመጨረሻ ቀን",
       thEscrowEtb: "ኤስክሮ (ETB)",
-      thFee10: "ክፍያ (10%)",
+      thFee: "የመድረክ ክፍያ",
+      thProviderFee: "የአገልግሎት ክፍያ",
+      thClientFee: "የደንበኛ ክፍያ",
+      thClientTotal: "ጠቅላላ",
+      thNetPayout: "የተጣራ ክፍያ",
       thActions: "ድርጊቶች",
+      clientFeeZeroTitle: "የደንበኛ ክፍያ፡ ETB 0",
+      clientFeeZeroNote: "የመድረክ ክፍያዎች የሚከፈሉት በባለሙያ ነው። እርስዎ ETB 0 ክፍያ ይከፍላሉ።",
       selectedFooter: (s, t) => `ከ${t} ውስጥ ${s} ተመርጧል`,
       rowsPerPage: "በገጽ ረድፎች",
       pageOf: (p, tp) => `ገጽ ${p} ከ ${tp}`,
@@ -820,12 +941,20 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       detailCounterparty: "ተዋዋይ ወገን",
       detailCategory: "ምድብ",
       detailGross: "ጠቅላላ የኤስክሮ መጠን",
-      detailFee: "የመድረክ ኮሚሽን (10%)",
+      detailFee: "የመድረክ ክፍያ",
+      detailProviderFee: "የክፍያ አገልግሎት ክፍያ",
+      detailClientFee: "የደንበኛ ክፍያ",
+      detailClientTotal: "ጠቅላላ ክፍያ",
       detailNet: "ለባለሙያ የሚከፈል የተጣራ",
       detailDueDate: "የመጨረሻ ቀን",
       detailState: "የአሁኑ የኤስክሮ ሁኔታ",
-      updateStageLabel: "የምዕራፍ ሂደት ደረጃን አዘምን",
-      stageReleasePayout: "ክፍያ ልቀቅ",
+      actionsLabel: "የኤስክሮ እና ውል ድርጊቶች",
+      fundMilestoneBtn: "ምዕራፍ ክፈል",
+      reviewReleaseBtn: "ገምግም እና ልቀቅ",
+      submitDeliveryBtn: "አቅርቦት አስገባ",
+      disputeBtn: "አለመግባባት",
+      openEscrowBtn: "በኤስክሮ ማዕከል ክፈት",
+      awaitingSignatureNote: "ገንዘብ ከመክፈልዎ በፊት ሁለቱም ወገኖች ውሉን እስኪፈርሙ በመጠበቅ ላይ።",
       openContractRoomBtn: "ሙሉ የውል ክፍል ክፈት",
       closeBtn: "ዝጋ",
     },
@@ -840,37 +969,106 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         },
         RELEASED: { title: "ተለቋል እና ተከፍሏል", subtitle: "ወደ ቦርሳ ተላልፏል" },
       },
+      emptyStageActions: {
+        BACKLOG: {
+          hint: "ክፍያ የሚጠብቁ የጸደቁ ምዕራፎች እዚህ በራስ-ሰር ይታያሉ።",
+          ctaLabel: "ውሎችን ክፈት",
+        },
+        ESCROW_HELD: {
+          hint: "በኤስክሮ የተያዙ እና ለመጀመር ዝግጁ የሆኑ ምዕራፎች እዚህ ይታያሉ።",
+          ctaLabel: "የኤስክሮ ማዕከል ክፈት",
+        },
+        WORK_IN_PROGRESS: {
+          hint: "ባለሙያው ሥራ ሲጀምር የተከፈሉ ምዕራፎች እዚህ ይታያሉ።",
+          ctaLabel: "ውሎችን ክፈት",
+        },
+        SUBMITTED_FOR_REVIEW: {
+          hint: "የደንበኛ ማረጋገጫ እና ክፍያ መልቀቂያ የሚጠብቁ አቅርቦቶች እዚህ ይገባሉ።",
+          ctaLabel: "የኤስክሮ ማዕከል ክፈት",
+        },
+        RELEASED: {
+          hint: "ወደ ባለሙያ ቦርሳ የተለቀቁ ምዕራፎች እዚህ ይታያሉ።",
+          ctaLabel: "የኤስክሮ ማዕከል ክፈት",
+        },
+      },
       title: "የምዕራፍ እና አቅርቦት Kanban ሰሌዳ",
-      subtitle: "የኤስክሮ ሁኔታን ለማዘመን ካርዶችን ይጎትቱ ወይም የደረጃ አዝራሮችን ይጠቀሙ",
-      addTaskBtn: "የምዕራፍ ተግባር አክል",
-      searchPlaceholder: "ተግባራትን በርዕስ፣ በኮድ ወይም በባለሙያ ፈልግ...",
+      subtitle: "የአገልጋይ ኤስክሮ ሁኔታ የንባብ-ብቻ ትንበያ። እርምጃ ለመውሰድ ካርድ ይክፈቱ።",
+      searchPlaceholder: "ተግባራትን በርዕስ፣ በኮድ፣ በውል ወይም በተዋዋይ ፈልግ...",
       searchAria: "የKanban ተግባራትን ፈልግ",
+      clientFilterAria: "በደንበኛ አጣራ",
+      allClients: "ሁሉም ደንበኞች",
+      freelancerFilterAria: "በባለሙያ አጣራ",
+      allFreelancers: "ሁሉም ባለሙያዎች",
+      contractFilterAria: "በውል አጣራ",
+      allContracts: "ሁሉም ውሎች",
       priorityAria: "በቅድሚያ አጣራ",
       priorityAll: "ሁሉም ቅድሚያዎች",
       priorityHighFilter: "ከፍተኛ ቅድሚያ",
       priorityMediumFilter: "መካከለኛ",
       priorityLowFilter: "ዝቅተኛ",
+      overdueOnlyBtn: "ጊዜያቸው ያለፈባቸው ብቻ",
+      clearFiltersBtn: "ማጣሪያዎችን አጽዳ",
       priorityLabels: { HIGH: "ከፍተኛ", MEDIUM: "መካከለኛ", LOW: "ዝቅተኛ" },
       mobileTabsAria: "የKanban ሂደት ደረጃዎች",
       emptyCol: "በዚህ ደረጃ ምንም ምዕራፎች የሉም",
+      filteredEmptyCol: (n) =>
+        n > 0
+          ? `${n} ምዕራፎች በንቁ ማጣሪያዎች ተደብቀዋል`
+          : "ከንቁ ማጣሪያዎች ጋር የሚዛመድ ምዕራፍ የለም",
+      openContractsCta: "ውሎችን ክፈት",
+      openWalletCta: "ቦርሳ ክፈት",
+      boardSummary: (shown, total, overdue) =>
+        `ከ${total} ምዕራፎች ${shown}${overdue > 0 ? ` · ${overdue} ጊዜያቸው ያለፈ` : ""}`,
+      taskCountLabel: (shown, total, filtered) =>
+        filtered && shown !== total ? `${shown} / ${total}` : `${shown} ተግባራት`,
+      overdueColCount: (n) => `${n} ጊዜው ያለፈ`,
+      overdueDaysLabel: (d) => `${d} ቀን አልፏል`,
+      dueTodayLabel: "ዛሬ ማለቂያ",
+      dueSoonLabel: (d) => `በ${d} ቀን`,
+      settledLabel: "ተከፍሏል",
+      onTrackLabel: "በጊዜው",
+      collapseColumnAria: (title) => `${title} አምድን ሰብስብ`,
+      expandColumnAria: (title) => `${title} አምድን ዘርጋ`,
+      collapseEmptyBtn: "ባዶዎችን ሰብስብ",
+      expandAllBtn: "ሁሉንም ዘርጋ",
+      scrollLeftAria: "ወደ ግራ ሸብልል",
+      scrollRightAria: "ወደ ቀኝ ሸብልል",
+      scrollHint: "ሁሉንም 5 ደረጃዎች ለማየት በአግድም ይሸብልሉ ወይም ቀስቶችን ይጠቀሙ",
       duePrefix: (d) => `ማለቂያ ${d}`,
-      prevStageTitle: "ወደ ቀዳሚው ደረጃ ውሰድ",
-      nextStageTitle: "ወደ ቀጣዩ ደረጃ አሳድግ",
-      modalAria: "የምዕራፍ ተግባር አክል",
-      modalTitle: "የምዕራፍ ተግባር አክል",
-      modalSubtitle: "በኤስክሮ ሰሌዳ ውስጥ አዲስ የአቅርቦት ካርድ ይፍጠሩ",
+      viewDetailsAria: (title) => `የ${title} ዝርዝሮችን ይመልከቱ`,
+      detailsAria: "የምዕራፍ ተግባር ዝርዝሮች",
+      detailContract: "ውል",
+      detailClient: "ደንበኛ",
+      detailFreelancer: "ባለሙያ",
+      detailCategory: "ምድብ",
+      detailRail: "የክፍያ መንገድ",
+      detailAmount: "ጠቅላላ የኤስክሮ መጠን",
+      detailPlatformFee: "የመድረክ ክፍያ",
+      detailProviderFee: "የክፍያ አገልግሎት ክፍያ",
+      detailClientFee: "የደንበኛ ክፍያ",
+      detailClientTotal: "ጠቅላላ ክፍያ",
+      detailNetPayout: "ለባለሙያ የሚከፈል የተጣራ",
+      clientFeeZeroNote: "የመድረክ ክፍያዎች የሚከፈሉት በባለሙያ ነው። እርስዎ ETB 0 ክፍያ ይከፍላሉ።",
+      detailDueDate: "የመጨረሻ ቀን",
+      detailScheduleStatus: "የጊዜ ሰሌዳ ሁኔታ",
+      detailPriority: "ቅድሚያ",
+      detailStage: "የሂደት ደረጃ",
+      detailDeliverable: "የአቅርቦት አገናኝ",
+      openDeliverableBtn: "አቅርቦቱን ክፈት",
+      detailFundedAt: "ኤስክሮ የተያዘበት",
+      detailSubmittedAt: "የቀረበበት",
+      detailAutoReleaseAt: "ራስ-ሰር መልቀቂያ",
+      detailReleasedAt: "የተለቀቀበት",
+      actionsLabel: "የኤስክሮ እና ውል ድርጊቶች",
+      fundMilestoneBtn: "ምዕራፍ ክፈል",
+      reviewReleaseBtn: "ገምግም እና ልቀቅ",
+      submitDeliveryBtn: "አቅርቦት አስገባ",
+      disputeBtn: "አለመግባባት",
+      openEscrowBtn: "በኤስክሮ ማዕከል ክፈት",
+      awaitingSignatureNote: "ገንዘብ ከመክፈልዎ በፊት ሁለቱም ወገኖች ውሉን እስኪፈርሙ በመጠበቅ ላይ።",
+      openContractRoomBtn: "የውሎች መስሪያ ክፈት",
+      closeBtn: "ዝጋ",
       closeAria: "ዝጋ",
-      fieldTitle: "የምዕራፍ አቅርቦት ርዕስ",
-      fieldTitlePlaceholder: "ለምሳሌ ምዕራፍ 3፡ የቴሌብር Webhook ሙከራ",
-      fieldContract: "የውል ስም",
-      fieldCounterparty: "ተዋዋይ ወገን / ተመዳቢ",
-      fieldAmount: "መጠን (ETB)",
-      fieldDueDate: "የመጨረሻ ቀን",
-      fieldRail: "የክፍያ መንገድ",
-      fieldPriority: "ቅድሚያ",
-      fieldStage: "መጀመሪያ የሂደት ደረጃ",
-      submitTaskBtn: "የምዕራፍ ተግባር ፍጠር",
-      cancelBtn: "ሰርዝ",
     },
     calendar: {
       typeLabels: {
@@ -882,13 +1080,15 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       weekdays: ["ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "ዓርብ", "ቅዳሜ", "እሑድ"],
       title: "የምዕራፍ፣ ክፍያ እና SLA መርሐ ግብር",
       subtitle:
-        "የውል ቀነ-ገደቦችን፣ ራስ-ሰር ክፍያ መልቀቂያዎችን እና የኢትዮጵያ በጀት ዓመት ጊዜያትን ይከታተሉ",
-      scheduleBtn: "ቀነ-ገደብ መዝግብ",
+        "የውል ቀነ-ገደቦችን፣ የክፍያ መልቀቂያዎችን እና የኢትዮጵያ በጀት ዓመት ጊዜያትን ይከታተሉ",
       prevEthMonthAria: "ቀዳሚ የኢትዮጵያ ወር",
       prevMonthAria: "ቀዳሚ ወር",
       nextEthMonthAria: "ቀጣይ የኢትዮጵያ ወር",
       nextMonthAria: "ቀጣይ ወር",
-      jumpDemoBtn: "ጥቅምት 2026",
+      todayBtn: "ዛሬ",
+      todayBadge: "ዛሬ",
+      selectedBadge: "የተመረጠ",
+      openEscrowBtn: "በኤስክሮ ማዕከል ክፈት",
       calendarSystemAria: "የቀን መቁጠሪያ ስርዓት",
       modeGregorian: "ግሪጎሪያን",
       modeFiscal: "የኢትዮጵያ በጀት ዓመት",
@@ -903,26 +1103,10 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       selectedDateLabel: "የተመረጠ ቀን",
       fiscalPeriodLabel: "የበጀት ወቅት",
       noItemsOnDate: (d) => `በ${d} የታቀዱ ምዕራፎች ወይም ክፍያዎች የሉም።`,
-      addItemForDate: (d) => `ለ${d} ንጥል አክል`,
       statusCompleted: "ተጠናቅቋል",
       statusAtRisk: "SLA በስጋት ላይ",
-      markCompleteBtn: "እንደተጠናቀቀ ምልክት አድርግ",
       upcomingTitle: "የሚመጣው ወር ዋና ዋና ጉዳዮች",
       upcomingEmpty: "ከዚህ ማጣሪያ ጋር የሚዛመድ የለም።",
-      modalAria: "ቀነ-ገደብ መዝግብ",
-      modalTitle: "ምዕራፍ ወይም ክፍያ መዝግብ",
-      modalSubtitle: "በሥራ ቦታ ቀን መቁጠሪያዎ ላይ ቀነ-ገደብ ወይም የኤስክሮ መልቀቂያ ያክሉ",
-      closeAria: "ዝጋ",
-      fieldEventTitle: "የክስተት ርዕስ",
-      fieldEventTitlePlaceholder: "ለምሳሌ ምዕራፍ 2 ማጽደቂያ",
-      fieldDate: "ቀን",
-      fieldTime: "ሰዓት (EAT)",
-      fieldType: "የክስተት አይነት",
-      fieldAmount: "መጠን (ETB)",
-      fieldContractRef: "የውል ማጣቀሻ",
-      fieldCounterparty: "ተዋዋይ ወገን",
-      saveScheduleBtn: "በመርሐ ግብር አስቀምጥ",
-      cancelBtn: "ሰርዝ",
     },
   },
   om: {
@@ -1119,8 +1303,14 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       thState: "Haala",
       thDueDate: "Guyyaa Xumuraa",
       thEscrowEtb: "Escrow (ETB)",
-      thFee10: "Kaffaltii (10%)",
+      thFee: "Kaffaltii waltajjii",
+      thProviderFee: "Kaffaltii dhiyeessaa",
+      thClientFee: "Kaffaltii maamilaa",
+      thClientTotal: "Waliigala",
+      thNetPayout: "Kaffaltii qulqulluu",
       thActions: "Gochaawwan",
+      clientFeeZeroTitle: "Kaffaltii maamilaa: ETB 0",
+      clientFeeZeroNote: "Kaffaltiin waltajjii ogeessaan kaffalama. Isin kaffaltii ETB 0 kaffaltu.",
       selectedFooter: (s, t) => `${t} keessaa ${s} filatame`,
       rowsPerPage: "Tarree fuula tokkoon",
       pageOf: (p, tp) => `Fuula ${p} / ${tp}`,
@@ -1132,12 +1322,20 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       detailCounterparty: "Gama Biraa",
       detailCategory: "Ramaddii",
       detailGross: "Hanga Escrow Waliigalaa",
-      detailFee: "Koomishinii Waltajjii (10%)",
+      detailFee: "Kaffaltii waltajjii",
+      detailProviderFee: "Kaffaltii tajaajila kaffaltii",
+      detailClientFee: "Kaffaltii maamilaa",
+      detailClientTotal: "Kaffaltii waliigalaa",
       detailNet: "Kaffaltii Qulqulluu Ogeessaa",
       detailDueDate: "Guyyaa Xumuraa",
       detailState: "Haala Escrow Ammaa",
-      updateStageLabel: "Sadarkaa Adeemsa Boqonnaa Hojii Haaromsi",
-      stageReleasePayout: "Kaffaltii Gadhiisi",
+      actionsLabel: "Gochaalee Escrow fi Waliigaltee",
+      fundMilestoneBtn: "Boqonnaa Kaffali",
+      reviewReleaseBtn: "Gamaaggamii Gadhiisi",
+      submitDeliveryBtn: "Bu'aa Dhiyeessi",
+      disputeBtn: "Falmii Dhiyeessi",
+      openEscrowBtn: "Giddugala Escrow keessatti Bani",
+      awaitingSignatureNote: "Kaffaltii dura gareen lamaan waliigaltee akka mallatteessan eegamaa jira.",
       openContractRoomBtn: "Kutaa Waliigaltee Guutuu Bani",
       closeBtn: "Cufi",
     },
@@ -1149,38 +1347,107 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         SUBMITTED_FOR_REVIEW: { title: "Gamaaggamaaf Dhiyaate", subtitle: "Yeroo QA maamilaa" },
         RELEASED: { title: "Gadhiifame & Kaffalame", subtitle: "Gara boorsaatti darbe" },
       },
+      emptyStageActions: {
+        BACKLOG: {
+          hint: "Boqonnaawwan mirkanaa'an kaffaltii eegan asitti ofumaan mul'atu.",
+          ctaLabel: "Waliigaltee Bani",
+        },
+        ESCROW_HELD: {
+          hint: "Boqonnaawwan escrow keessatti qabaman jalqabuuf qophaa'anii asitti mul'atu.",
+          ctaLabel: "Giddugala Escrow Bani",
+        },
+        WORK_IN_PROGRESS: {
+          hint: "Yeroo ogeessi hojii jalqabu boqonnaawwan kaffalaman asitti mul'atu.",
+          ctaLabel: "Waliigaltee Bani",
+        },
+        SUBMITTED_FOR_REVIEW: {
+          hint: "Bu'aawwan mirkaneessa maamilaafi gadhiisa kaffaltii eegan asitti galu.",
+          ctaLabel: "Giddugala Escrow Bani",
+        },
+        RELEASED: {
+          hint: "Boqonnaawwan mirkanaa'anii gara boorsaa ogeessaatti gadhiifaman asitti mul'atu.",
+          ctaLabel: "Giddugala Escrow Bani",
+        },
+      },
       title: "Sarara Kanban Boqonnaa Hojiifi Bu'aa",
       subtitle:
-        "Haala escrow haaromsuuf kaardiiwwan harkisaa ykn to'annoo sadarkaa fayyadamaa",
-      addTaskBtn: "Hojii Boqonnaa Dabali",
-      searchPlaceholder: "Hojiiwwan mata duree, koodii ykn ogeessaan barbaadi...",
+        "Mul'ata dubbisaa qofa kan haala escrow sarvara irra jiru. Kaffaluuf, gamaaggamuuf ykn waliigaltee banuuf kaardii bani.",
+      searchPlaceholder: "Hojiiwwan mata duree, koodii, waliigaltee ykn qaamaan barbaadi...",
       searchAria: "Hojiiwwan Kanban barbaadi",
+      clientFilterAria: "Maamilaan calali",
+      allClients: "Maamiltoota Hunda",
+      freelancerFilterAria: "Ogeessaan calali",
+      allFreelancers: "Ogeessota Hunda",
+      contractFilterAria: "Waliigalteedhaan calali",
+      allContracts: "Waliigaltee Hunda",
       priorityAria: "Sadarkaa dursaatiin calali",
       priorityAll: "Dursa Hunda",
       priorityHighFilter: "Dursa Olaanaa",
       priorityMediumFilter: "Giddugaleessa",
       priorityLowFilter: "Gadi aanaa",
+      overdueOnlyBtn: "Yeroon darbe qofa",
+      clearFiltersBtn: "Calaltuu haqi",
       priorityLabels: { HIGH: "OLAANAA", MEDIUM: "GIDDUGALEESSA", LOW: "GADI AANAA" },
       mobileTabsAria: "Sadarkaalee hojii Kanban",
       emptyCol: "Sadarkaa kana keessa boqonnaan hojii hin jiru",
+      filteredEmptyCol: (n) =>
+        n > 0
+          ? `Boqonnaan ${n} calaltuuwwaniin dhokfameera`
+          : "Boqonnaan calaltuuwwan kanaan walsimu hin jiru",
+      openContractsCta: "Waliigaltee Bani",
+      openWalletCta: "Boorsaa Bani",
+      boardSummary: (shown, total, overdue) =>
+        `Boqonnaa ${total} keessaa ${shown}${overdue > 0 ? ` · ${overdue} yeroon darbe` : ""}`,
+      taskCountLabel: (shown, total, filtered) =>
+        filtered && shown !== total ? `${shown} / ${total}` : `Hojii ${shown}`,
+      overdueColCount: (n) => `${n} yeroon darbe`,
+      overdueDaysLabel: (d) => `Guyyaa ${d} darbe`,
+      dueTodayLabel: "Har'a xumurama",
+      dueSoonLabel: (d) => `Guyyaa ${d} keessatti`,
+      settledLabel: "Kaffalameera",
+      onTrackLabel: "Yeroo irra",
+      collapseColumnAria: (title) => `Tarjaa ${title} dachaasi`,
+      expandColumnAria: (title) => `Tarjaa ${title} diriirsi`,
+      collapseEmptyBtn: "Duwwaa dachaasi",
+      expandAllBtn: "Hunda diriirsi",
+      scrollLeftAria: "Gara bitaatti sochoosi",
+      scrollRightAria: "Gara mirgaatti sochoosi",
+      scrollHint: "Sadarkaalee 5 hunda ilaaluuf dalga sochoosi ykn xiyyoota fayyadami",
       duePrefix: (d) => `Xumura ${d}`,
-      prevStageTitle: "Gara sadarkaa duraatti deebisi",
-      nextStageTitle: "Gara sadarkaa itti aanuutti dabarsi",
-      modalAria: "Hojii boqonnaa dabali",
-      modalTitle: "Hojii Boqonnaa Dabali",
-      modalSubtitle: "Gabatee adeemsa escrow keessatti kaardii haaraa uumi",
+      viewDetailsAria: (title) => `Bal'ina ${title} ilaali`,
+      detailsAria: "Bal'ina hojii boqonnaa",
+      detailContract: "Waliigaltee",
+      detailClient: "Maamila",
+      detailFreelancer: "Ogeessa",
+      detailCategory: "Ramaddii",
+      detailRail: "Karaa Kaffaltii",
+      detailAmount: "Hanga Escrow Waliigalaa",
+      detailPlatformFee: "Kaffaltii waltajjii",
+      detailProviderFee: "Kaffaltii tajaajila kaffaltii",
+      detailClientFee: "Kaffaltii maamilaa",
+      detailClientTotal: "Kaffaltii waliigalaa",
+      detailNetPayout: "Kaffaltii Qulqulluu Ogeessaa",
+      clientFeeZeroNote: "Kaffaltiin waltajjii ogeessaan kaffalama. Isin kaffaltii ETB 0 kaffaltu.",
+      detailDueDate: "Guyyaa Xumuraa",
+      detailScheduleStatus: "Haala Yeroo",
+      detailPriority: "Sadarkaa Dursaa",
+      detailStage: "Sadarkaa Adeemsaa",
+      detailDeliverable: "Geessituu Bu'aa",
+      openDeliverableBtn: "Bu'aa bani",
+      detailFundedAt: "Yeroo Escrow",
+      detailSubmittedAt: "Kan Dhiyaate",
+      detailAutoReleaseAt: "Gadhiisa Ofumaa",
+      detailReleasedAt: "Kan Gadhiifame",
+      actionsLabel: "Gochaalee Escrow fi Waliigaltee",
+      fundMilestoneBtn: "Boqonnaa Kaffali",
+      reviewReleaseBtn: "Gamaaggamii Gadhiisi",
+      submitDeliveryBtn: "Bu'aa Dhiyeessi",
+      disputeBtn: "Falmii Dhiyeessi",
+      openEscrowBtn: "Giddugala Escrow keessatti Bani",
+      awaitingSignatureNote: "Kaffaltii dura gareen lamaan waliigaltee akka mallatteessan eegamaa jira.",
+      openContractRoomBtn: "Bakka Waliigaltee Bani",
+      closeBtn: "Cufi",
       closeAria: "Cufi",
-      fieldTitle: "Mata Duree Boqonnaa Hojii",
-      fieldTitlePlaceholder: "fkn. Boqonnaa 3: Qormaata Telebirr Webhook",
-      fieldContract: "Maqaa Waliigaltee",
-      fieldCounterparty: "Gama Biraa / Ogeessa",
-      fieldAmount: "Hanga (ETB)",
-      fieldDueDate: "Guyyaa Xumuraa",
-      fieldRail: "Karaa Kaffaltii",
-      fieldPriority: "Sadarkaa Dursaa",
-      fieldStage: "Sadarkaa Jalqabaa",
-      submitTaskBtn: "Hojii Boqonnaa Uumi",
-      cancelBtn: "Haqi",
     },
     calendar: {
       typeLabels: {
@@ -1193,12 +1460,14 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       title: "Sagantaa Boqonnaa, Kaffaltiifi SLA",
       subtitle:
         "Daangaa yeroo waliigaltee, gadhiisa kaffaltiifi bara baajataa Itoophiyaa hordofaa",
-      scheduleBtn: "Daangaa Saganteessi",
       prevEthMonthAria: "Ji'a Itoophiyaa duraa",
       prevMonthAria: "Ji'a duraa",
       nextEthMonthAria: "Ji'a Itoophiyaa itti aanu",
       nextMonthAria: "Ji'a itti aanu",
-      jumpDemoBtn: "Onk 2026",
+      todayBtn: "Har'a",
+      todayBadge: "Har'a",
+      selectedBadge: "Filatame",
+      openEscrowBtn: "Giddugala Escrow keessatti Bani",
       calendarSystemAria: "Sirna kalaandarii",
       modeGregorian: "Giriigooriyaan",
       modeFiscal: "Bara Baajataa Itoophiyaa",
@@ -1213,27 +1482,10 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       selectedDateLabel: "Guyyaa Filatame",
       fiscalPeriodLabel: "Yeroo baajataa",
       noItemsOnDate: (d) => `${d} irratti boqonnaan ykn kaffaltiin saganteessame hin jiru.`,
-      addItemForDate: (d) => `${d}f Wanta Dabali`,
       statusCompleted: "Xumurameera",
       statusAtRisk: "SLA Balaa Irra",
-      markCompleteBtn: "Xumurame Jedhi",
       upcomingTitle: "Ijoowwan Ji'a Dhufuu",
       upcomingEmpty: "Wanti calaltuu kana wajjin walsimu hin jiru.",
-      modalAria: "Daangaa saganteessi",
-      modalTitle: "Boqonnaa ykn Kaffaltii Saganteessi",
-      modalSubtitle:
-        "Kalaandarii bakka hojii keessanitti daangaa yeroo ykn gadhiisa escrow dabalaa",
-      closeAria: "Cufi",
-      fieldEventTitle: "Mata Duree Taatee",
-      fieldEventTitlePlaceholder: "fkn. Mallattoo Boqonnaa 2",
-      fieldDate: "Guyyaa",
-      fieldTime: "Sa'aatii (EAT)",
-      fieldType: "Gosa Taatee",
-      fieldAmount: "Hanga (ETB)",
-      fieldContractRef: "Wabii Waliigaltee",
-      fieldCounterparty: "Gama Biraa",
-      saveScheduleBtn: "Sagantaatti Olkaa'i",
-      cancelBtn: "Haqi",
     },
   },
   ti: {
@@ -1425,8 +1677,14 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       thState: "ኩነታት",
       thDueDate: "መወዳእታ ዕለት",
       thEscrowEtb: "ኤስክሮ (ETB)",
-      thFee10: "ክፍሊት (10%)",
+      thFee: "ክፍሊት መድረኽ",
+      thProviderFee: "ክፍሊት ኣገልግሎት",
+      thClientFee: "ክፍሊት ዓሚል",
+      thClientTotal: "ጠቕላላ",
+      thNetPayout: "ጽሩይ ክፍሊት",
       thActions: "ተግባራት",
+      clientFeeZeroTitle: "ክፍሊት ዓሚል፡ ETB 0",
+      clientFeeZeroNote: "ክፍሊት መድረኽ ብክኢላ ይኽፈል። ንስኹም ETB 0 ክፍሊት ትኸፍሉ።",
       selectedFooter: (s, t) => `ካብ ${t} እቶም ${s} ተመሪጾም`,
       rowsPerPage: "መስመራት ኣብ ገጽ",
       pageOf: (p, tp) => `ገጽ ${p} ካብ ${tp}`,
@@ -1438,12 +1696,20 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       detailCounterparty: "ተዋዓዓሊ ወገን",
       detailCategory: "ምድብ",
       detailGross: "ጠቕላላ መጠን ኤስክሮ",
-      detailFee: "ኮሚሽን መድረኽ (10%)",
+      detailFee: "ክፍሊት መድረኽ",
+      detailProviderFee: "ክፍሊት ኣገልግሎት ክፍሊት",
+      detailClientFee: "ክፍሊት ዓሚል",
+      detailClientTotal: "ጠቕላላ ክፍሊት",
       detailNet: "ጽሩይ ክፍሊት ክኢላ",
       detailDueDate: "መወዳእታ ዕለት",
       detailState: "ናይ ሕጂ ኩነታት ኤስክሮ",
-      updateStageLabel: "ብርኪ መስርሕ ምዕራፍ ኣሐድስ",
-      stageReleasePayout: "ክፍሊት ልቀቕ",
+      actionsLabel: "ተግባራት ኤስክሮን ውዕልን",
+      fundMilestoneBtn: "ምዕራፍ ክፈል",
+      reviewReleaseBtn: "ገምግምን ልቀቕን",
+      submitDeliveryBtn: "ኣቕርቦት ኣእቱ",
+      disputeBtn: "ክርክር",
+      openEscrowBtn: "ኣብ ማእከል ኤስክሮ ክፈት",
+      awaitingSignatureNote: "ቅድሚ ምኽፋል ክልቲኦም ወገናት ነቲ ውዕል ክፍርሙ ይጽበዩ ኣለዉ።",
       openContractRoomBtn: "ምሉእ ክፍሊ ውዕል ክፈት",
       closeBtn: "ዕጸው",
     },
@@ -1455,38 +1721,107 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         SUBMITTED_FOR_REVIEW: { title: "ንግምገማ ቀሪቡ", subtitle: "ግዜ QA ዓሚል" },
         RELEASED: { title: "ተለቂቑን ተኸፊሉን", subtitle: "ናብ ቦርሳ ተላኢኹ" },
       },
+      emptyStageActions: {
+        BACKLOG: {
+          hint: "ክፍሊት ዝጽበዩ ዝጸደቑ ምዕራፋት ኣብዚ ብርእሶም ይርኣዩ።",
+          ctaLabel: "ውዕላት ክፈት",
+        },
+        ESCROW_HELD: {
+          hint: "ኣብ ኤስክሮ ዝተዓቀቡን ንምጅማር ድሉዋት ዝኾኑን ምዕራፋት ኣብዚ ይርኣዩ።",
+          ctaLabel: "ማእከል ኤስክሮ ክፈት",
+        },
+        WORK_IN_PROGRESS: {
+          hint: "ክኢላ ስራሕ ምስ ጀመረ ዝተኸፈሉ ምዕራፋት ኣብዚ ይርኣዩ።",
+          ctaLabel: "ውዕላት ክፈት",
+        },
+        SUBMITTED_FOR_REVIEW: {
+          hint: "ምርግጋጽ ዓሚልን ምልቃቕ ክፍሊትን ዝጽበዩ ኣቕርቦታት ኣብዚ ይኣትዉ።",
+          ctaLabel: "ማእከል ኤስክሮ ክፈት",
+        },
+        RELEASED: {
+          hint: "ናብ ቦርሳ ክኢላ ዝተለቀቁ ምዕራፋት ኣብዚ ይርኣዩ።",
+          ctaLabel: "ማእከል ኤስክሮ ክፈት",
+        },
+      },
       title: "መስመር Kanban ምዕራፍን ኣቕርቦትን",
       subtitle:
-        "ኩነታት ኤስክሮ ንምሕዳስ ካርድታት ስሓቡ ወይ መቆጻጸሪ ብርኪ ተጠቐሙ",
-      addTaskBtn: "ዕዮ ምዕራፍ ወስኽ",
-      searchPlaceholder: "ዕዮታት ብኣርእስቲ፣ ኮድ ወይ ክኢላ ድለ...",
+        "ናይ ንባብ ጥራይ ትንቢት ኩነታት ኤስክሮ ሰርቨር። ንምኽፋል፣ ንምግምጋም ወይ ውዕል ንምኽፋት ካርድ ክፈቱ።",
+      searchPlaceholder: "ዕዮታት ብኣርእስቲ፣ ኮድ፣ ውዕል ወይ ወገን ድለ...",
       searchAria: "ዕዮታት Kanban ድለ",
+      clientFilterAria: "ብዓሚል ኣጻሪ",
+      allClients: "ኩሎም ዓማዊል",
+      freelancerFilterAria: "ብክኢላ ኣጻሪ",
+      allFreelancers: "ኩሎም ክኢላታት",
+      contractFilterAria: "ብውዕል ኣጻሪ",
+      allContracts: "ኩሎም ውዕላት",
       priorityAria: "ብቀዳምነት ኣጻሪ",
       priorityAll: "ኩሉ ቀዳምነት",
       priorityHighFilter: "ልዑል ቀዳምነት",
       priorityMediumFilter: "ማእከላይ",
       priorityLowFilter: "ትሑት",
+      overdueOnlyBtn: "ግዜኦም ዝሓለፎም ጥራይ",
+      clearFiltersBtn: "መጻረዪ ኣጽሪ",
       priorityLabels: { HIGH: "ልዑል", MEDIUM: "ማእከላይ", LOW: "ትሑት" },
       mobileTabsAria: "ብርክታት መስርሕ Kanban",
       emptyCol: "ኣብዚ ብርኪ ምዕራፋት የለዉን",
+      filteredEmptyCol: (n) =>
+        n > 0
+          ? `${n} ምዕራፋት ብንጡፋት መጻረዪታት ተሓቢኦም`
+          : "ምስ ንጡፋት መጻረዪታት ዝሰማማዕ የለን",
+      openContractsCta: "ውዕላት ክፈት",
+      openWalletCta: "ቦርሳ ክፈት",
+      boardSummary: (shown, total, overdue) =>
+        `ካብ ${total} ምዕራፋት ${shown}${overdue > 0 ? ` · ${overdue} ግዜኦም ዝሓለፎም` : ""}`,
+      taskCountLabel: (shown, total, filtered) =>
+        filtered && shown !== total ? `${shown} / ${total}` : `${shown} ዕዮታት`,
+      overdueColCount: (n) => `${n} ግዜኡ ዝሓለፎ`,
+      overdueDaysLabel: (d) => `${d} መዓልቲ ሓሊፉ`,
+      dueTodayLabel: "ሎሚ መወዳእታ",
+      dueSoonLabel: (d) => `ኣብ ${d} መዓልቲ`,
+      settledLabel: "ተኸፊሉ",
+      onTrackLabel: "ኣብ ግዜኡ",
+      collapseColumnAria: (title) => `ዓምዲ ${title} ኣክብ`,
+      expandColumnAria: (title) => `ዓምዲ ${title} ዘርግሕ`,
+      collapseEmptyBtn: "ባዶታት ኣክብ",
+      expandAllBtn: "ኩሉ ዘርግሕ",
+      scrollLeftAria: "ንጸጋም ሸብልል",
+      scrollRightAria: "ንየማን ሸብልል",
+      scrollHint: "ኩሎም 5 ብርክታት ንምርኣይ ብጋድም ሸብልሉ ወይ ቀስትታት ተጠቐሙ",
       duePrefix: (d) => `መወዳእታ ${d}`,
-      prevStageTitle: "ናብ ዝሓለፈ ብርኪ ምለስ",
-      nextStageTitle: "ናብ ዝቕጽል ብርኪ ኣሕልፍ",
-      modalAria: "ዕዮ ምዕራፍ ወስኽ",
-      modalTitle: "ዕዮ ምዕራፍ ወስኽ",
-      modalSubtitle: "ኣብ ሰሌዳ መስርሕ ኤስክሮ ሓድሽ ካርድ ኣቕርቦት ፍጠር",
+      viewDetailsAria: (title) => `ዝርዝር ${title} ርኣይ`,
+      detailsAria: "ዝርዝር ዕዮ ምዕራፍ",
+      detailContract: "ውዕል",
+      detailClient: "ዓሚል",
+      detailFreelancer: "ክኢላ",
+      detailCategory: "ምድብ",
+      detailRail: "መንገዲ ክፍሊት",
+      detailAmount: "ጠቕላላ መጠን ኤስክሮ",
+      detailPlatformFee: "ክፍሊት መድረኽ",
+      detailProviderFee: "ክፍሊት ኣገልግሎት ክፍሊት",
+      detailClientFee: "ክፍሊት ዓሚል",
+      detailClientTotal: "ጠቕላላ ክፍሊት",
+      detailNetPayout: "ጽሩይ ክፍሊት ክኢላ",
+      clientFeeZeroNote: "ክፍሊት መድረኽ ብክኢላ ይኽፈል። ንስኹም ETB 0 ክፍሊት ትኸፍሉ።",
+      detailDueDate: "መወዳእታ ዕለት",
+      detailScheduleStatus: "ኩነታት ግዜ",
+      detailPriority: "ቀዳምነት",
+      detailStage: "ብርኪ መስርሕ",
+      detailDeliverable: "መላግቦ ኣቕርቦት",
+      openDeliverableBtn: "ኣቕርቦት ክፈት",
+      detailFundedAt: "ኤስክሮ ዝተታሕዘሉ",
+      detailSubmittedAt: "ዝቀረበሉ",
+      detailAutoReleaseAt: "ርእሰ-ምልቃቕ",
+      detailReleasedAt: "ዝተለቀቀሉ",
+      actionsLabel: "ተግባራት ኤስክሮን ውዕልን",
+      fundMilestoneBtn: "ምዕራፍ ክፈል",
+      reviewReleaseBtn: "ገምግምን ልቀቕን",
+      submitDeliveryBtn: "ኣቕርቦት ኣእቱ",
+      disputeBtn: "ክርክር",
+      openEscrowBtn: "ኣብ ማእከል ኤስክሮ ክፈት",
+      awaitingSignatureNote: "ቅድሚ ምኽፋል ክልቲኦም ወገናት ነቲ ውዕል ክፍርሙ ይጽበዩ ኣለዉ።",
+      openContractRoomBtn: "ክፍሊ ውዕላት ክፈት",
+      closeBtn: "ዕጸው",
       closeAria: "ዕጸው",
-      fieldTitle: "ኣርእስቲ ኣቕርቦት ምዕራፍ",
-      fieldTitlePlaceholder: "ንኣብነት ምዕራፍ 3፡ ፈተነ ቴሌብር Webhook",
-      fieldContract: "ስም ውዕል",
-      fieldCounterparty: "ተዋዓዓሊ ወገን / ተመዳቢ",
-      fieldAmount: "መጠን (ETB)",
-      fieldDueDate: "መወዳእታ ዕለት",
-      fieldRail: "መንገዲ ክፍሊት",
-      fieldPriority: "ቀዳምነት",
-      fieldStage: "መጀመርያ ብርኪ መስርሕ",
-      submitTaskBtn: "ዕዮ ምዕራፍ ፍጠር",
-      cancelBtn: "ስርዝ",
     },
     calendar: {
       typeLabels: {
@@ -1498,13 +1833,15 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       weekdays: ["ሰኑይ", "ሰሉስ", "ረቡዕ", "ሓሙስ", "ዓርቢ", "ቀዳም", "ሰንበት"],
       title: "መደብ ምዕራፍ፣ ክፍሊትን SLAን",
       subtitle:
-        "ደረት ግዜ ውዕላት፣ ርእሰ-ምልቃቕ ክፍሊትን ዓመት ባጀት ኢትዮጵያን ተኸታተሉ",
-      scheduleBtn: "ደረት ግዜ መድብ",
+        "ደረት ግዜ ውዕላት፣ ምልቃቕ ክፍሊትን ዓመት ባጀት ኢትዮጵያን ተኸታተሉ",
       prevEthMonthAria: "ዝሓለፈ ወርሒ ኢትዮጵያ",
       prevMonthAria: "ዝሓለፈ ወርሒ",
       nextEthMonthAria: "ዝቕጽል ወርሒ ኢትዮጵያ",
       nextMonthAria: "ዝቕጽል ወርሒ",
-      jumpDemoBtn: "ጥቅምቲ 2026",
+      todayBtn: "ሎሚ",
+      todayBadge: "ሎሚ",
+      selectedBadge: "ዝተመርጸ",
+      openEscrowBtn: "ኣብ ማእከል ኤስክሮ ክፈት",
       calendarSystemAria: "ስርዓት ዓውደ-ኣዋርሕ",
       modeGregorian: "ግሪጎርያን",
       modeFiscal: "ዓመት ባጀት ኢትዮጵያ",
@@ -1519,26 +1856,10 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
       selectedDateLabel: "ዝተመርጸ ዕለት",
       fiscalPeriodLabel: "እዋን ባጀት",
       noItemsOnDate: (d) => `ኣብ ${d} ዝተመደቡ ምዕራፋት ወይ ክፍሊታት የለዉን።`,
-      addItemForDate: (d) => `ን${d} ነገር ወስኽ`,
       statusCompleted: "ተዛዚሙ",
       statusAtRisk: "SLA ኣብ ስግኣት",
-      markCompleteBtn: "ከም ዝተዛዘመ ምልክት ግበር",
       upcomingTitle: "ቀንዲ ፍጻመታት ዝመጽእ ወርሒ",
       upcomingEmpty: "ምስዚ መጻረዪ ዝሰማማዕ የለን።",
-      modalAria: "ደረት ግዜ መድብ",
-      modalTitle: "ምዕራፍ ወይ ክፍሊት መድብ",
-      modalSubtitle: "ኣብ ዓውደ-ኣዋርሕ ቦታ ስራሕኩም ደረት ግዜ ወይ ምልቃቕ ኤስክሮ ወስኹ",
-      closeAria: "ዕጸው",
-      fieldEventTitle: "ኣርእስቲ ፍጻመ",
-      fieldEventTitlePlaceholder: "ንኣብነት ምዕራፍ 2 ምጽዳቕ",
-      fieldDate: "ዕለት",
-      fieldTime: "ሰዓት (EAT)",
-      fieldType: "ዓይነት ፍጻመ",
-      fieldAmount: "መጠን (ETB)",
-      fieldContractRef: "መወከሲ ውዕል",
-      fieldCounterparty: "ተዋዓዓሊ ወገን",
-      saveScheduleBtn: "ኣብ መደብ ዓቅብ",
-      cancelBtn: "ስርዝ",
     },
   },
 };

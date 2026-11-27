@@ -1,19 +1,19 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
-  Plus,
   Calendar as CalendarIcon,
   CheckCircle2,
   Clock,
   AlertTriangle,
-  X,
+  ExternalLink,
 } from "lucide-react";
 import type { ScheduleEvent, ScheduleEventType } from "./dashboardData";
 import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
 import { railLabel } from "./dashboardData";
 import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
+import { getTodayAddisIso } from "./KanbanBoardView";
 
 import {
   formatEthiopianDate,
@@ -26,23 +26,17 @@ import {
   getFiscalQuarter,
   getFiscalQuarterForMonth,
   getFiscalQuarters,
-  getFiscalYear,
   getFiscalYearForEthiopianMonth,
   getFiscalYearInfo,
   getGregorianDateParts,
   gregorianToEthiopian,
-  isValidIsoDate,
   stepEthiopianMonth,
 } from "../../lib/ethiopianCalendar";
 
 interface CalendarScheduleViewProps {
   events: ScheduleEvent[];
-  onEventsChange: (next: ScheduleEvent[]) => void;
+  onOpenEscrow?: (milestoneId?: string) => void;
 }
-
-const DEMO_DATE = "2026-10-21";
-const DEMO_YEAR = 2026;
-const DEMO_GREGORIAN_MONTH = 9; // 0-indexed: 9 = October 2026
 
 type CalendarMode = "gregorian" | "fiscal";
 
@@ -84,28 +78,21 @@ function gregorianCells(year: number, month: number): Array<CalendarCell | null>
 
 export function CalendarScheduleView({
   events,
-  onEventsChange,
+  onOpenEscrow,
 }: CalendarScheduleViewProps) {
   const { language } = useI18n();
   const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).calendar;
-  const initialEthiopian = gregorianToEthiopian(DEMO_DATE);
+  const todayIso = useMemo(() => getTodayAddisIso(), []);
+  const initialGregorian = useMemo(() => getGregorianDateParts(todayIso), [todayIso]);
+  const initialEthiopian = useMemo(() => gregorianToEthiopian(todayIso), [todayIso]);
+
   const [mode, setMode] = useState<CalendarMode>("gregorian");
-  const [year, setYear] = useState(DEMO_YEAR);
-  const [month, setMonth] = useState(DEMO_GREGORIAN_MONTH);
+  const [year, setYear] = useState(initialGregorian.year);
+  const [month, setMonth] = useState(initialGregorian.month - 1);
   const [ethYear, setEthYear] = useState(initialEthiopian.year);
   const [ethMonth, setEthMonth] = useState(initialEthiopian.month);
-  const [selectedDate, setSelectedDate] = useState(DEMO_DATE);
+  const [selectedDate, setSelectedDate] = useState(todayIso);
   const [typeFilter, setTypeFilter] = useState<"ALL" | ScheduleEventType>("ALL");
-  const [createOpen, setCreateOpen] = useState(false);
-
-  // New event form state
-  const [newTitle, setNewTitle] = useState("");
-  const [newContractRef, setNewContractRef] = useState("CNT-801 · MS-03");
-  const [newDate, setNewDate] = useState("2026-10-24");
-  const [newTime, setNewTime] = useState("15:00 EAT");
-  const [newType, setNewType] = useState<ScheduleEventType>("MILESTONE_DUE");
-  const [newAmountETB, setNewAmountETB] = useState("52000");
-  const [newCounterparty, setNewCounterparty] = useState("Hanna Tadesse");
 
   const isFiscal = mode === "fiscal";
 
@@ -262,13 +249,15 @@ export function CalendarScheduleView({
     }
   };
 
-  const jumpToDemoWeek = () => {
-    const eth = gregorianToEthiopian(DEMO_DATE);
-    setYear(DEMO_YEAR);
-    setMonth(DEMO_GREGORIAN_MONTH);
+  const jumpToToday = () => {
+    const today = getTodayAddisIso();
+    const greg = getGregorianDateParts(today);
+    const eth = gregorianToEthiopian(today);
+    setYear(greg.year);
+    setMonth(greg.month - 1);
     setEthYear(eth.year);
     setEthMonth(eth.month);
-    setSelectedDate(DEMO_DATE);
+    setSelectedDate(today);
   };
 
   const switchMode = (nextMode: CalendarMode) => {
@@ -285,47 +274,6 @@ export function CalendarScheduleView({
     setMonth(gregorian.month - 1);
   };
 
-  const toggleEventStatus = (id: string) => {
-    onEventsChange(
-      events.map((ev) =>
-        ev.id === id
-          ? {
-              ...ev,
-              status: ev.status === "COMPLETED" ? "SCHEDULED" : "COMPLETED",
-            }
-          : ev,
-      ),
-    );
-  };
-
-  const handleCreateEvent = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim()) return;
-    const created: ScheduleEvent = {
-      id: `ev-${Date.now()}`,
-      title: newTitle.trim(),
-      contractRef: newContractRef.trim(),
-      date: newDate,
-      time: newTime,
-      type: newType,
-      amountMinor: Math.max(0, Math.round(Number(newAmountETB || 0) * 100)),
-      // A hand-made reminder has no payment rail until someone funds it, so
-      // it is recorded without one rather than with a plausible default.
-      rail: null,
-      status: "SCHEDULED",
-      counterparty: newCounterparty.trim(),
-    };
-    onEventsChange([...events, created]);
-    selectDate(newDate);
-    setNewTitle("");
-    setCreateOpen(false);
-  };
-
-  const openCreateForSelectedDate = () => {
-    setNewDate(selectedDate);
-    setCreateOpen(true);
-  };
-
   return (
     <div className="sh-card" data-tour="dashboard-calendar">
       <div className="sh-card-header">
@@ -338,14 +286,6 @@ export function CalendarScheduleView({
             {copy.subtitle}
           </p>
         </div>
-
-        <button
-          type="button"
-          className="sh-btn sh-btn-primary"
-          onClick={openCreateForSelectedDate}
-        >
-          <Plus size={14} /> {copy.scheduleBtn}
-        </button>
       </div>
 
       {/* Filter & Month Navigation Bar */}
@@ -378,10 +318,10 @@ export function CalendarScheduleView({
           <button
             type="button"
             className="sh-btn sh-btn-secondary"
-            onClick={jumpToDemoWeek}
+            onClick={jumpToToday}
             style={{ marginLeft: 6 }}
           >
-            {copy.jumpDemoBtn}
+            {copy.todayBtn}
           </button>
 
           <div
@@ -541,6 +481,7 @@ export function CalendarScheduleView({
               }
               const dayEvents = eventsByDate.get(cell.dateStr) ?? [];
               const isSelected = selectedDate === cell.dateStr;
+              const isToday = todayIso === cell.dateStr;
               const dayTotalMinor = dayEvents.reduce(
                 (sum, ev) => sum + ev.amountMinor,
                 0,
@@ -554,8 +495,8 @@ export function CalendarScheduleView({
                 <button
                   key={cell.dateStr}
                   type="button"
-                  className={`sh-cal-cell ${isSelected ? "selected" : ""} ${dayEvents.length > 0 ? "has-events" : ""}`}
-                  aria-current={isSelected ? "date" : undefined}
+                  className={`sh-cal-cell ${isSelected ? "selected" : ""} ${isToday ? "today" : ""} ${dayEvents.length > 0 ? "has-events" : ""}`}
+                  aria-current={isToday ? "date" : undefined}
                   aria-label={`${formatGregorianDate(cell.dateStr, "long")}, ${formatEthiopianDate(
                     cell.dateStr,
                     "long",
@@ -565,6 +506,9 @@ export function CalendarScheduleView({
                   <div className="sh-cal-cell-head">
                     <span className="sh-cal-day-stack">
                       <span className="sh-mono sh-cal-day-num">{cell.day}</span>
+                      {isToday && (
+                        <span className="sh-cal-today-tag">{copy.todayBadge}</span>
+                      )}
                       {isFiscal && cell.altLabel && (
                         <span className="sh-mono sh-cal-alt-date">
                           {cell.altLabel}
@@ -608,6 +552,7 @@ export function CalendarScheduleView({
                 style={{ fontSize: "0.75rem" }}
               >
                 {copy.selectedDateLabel}
+                {selectedDate === todayIso ? ` · ${copy.todayBadge}` : ""}
               </span>
               <h4>{formatGregorianDate(selectedDate, "long")}</h4>
               <p className="sh-cal-dual-date">
@@ -640,16 +585,9 @@ export function CalendarScheduleView({
           <div className="sh-cal-agenda-list">
             {eventsByDate.get(selectedDate)?.length ? null : (
               <div className="sh-kanban-empty">
-                <p style={{ margin: "0 0 8px" }}>
+                <p style={{ margin: 0 }}>
                   {copy.noItemsOnDate(formatGregorianDate(selectedDate, "long"))}
                 </p>
-                <button
-                  type="button"
-                  className="sh-btn sh-btn-secondary"
-                  onClick={openCreateForSelectedDate}
-                >
-                  <Plus size={13} /> {copy.addItemForDate(formatGregorianDate(selectedDate, "medium"))}
-                </button>
               </div>
             )}
 
@@ -676,25 +614,34 @@ export function CalendarScheduleView({
                     ETB {(ev.amountMinor / 100).toLocaleString()}
                   </strong>
 
-                  <button
-                    type="button"
-                    className="sh-row-action-btn"
-                    onClick={() => toggleEventStatus(ev.id)}
-                  >
-                    {ev.status === "COMPLETED" ? (
-                      <>
-                        <CheckCircle2 size={12} /> {copy.statusCompleted}
-                      </>
-                    ) : ev.status === "AT_RISK" ? (
-                      <>
-                        <AlertTriangle size={12} /> {copy.statusAtRisk}
-                      </>
-                    ) : (
-                      <>
-                        <Clock size={12} /> {copy.markCompleteBtn}
-                      </>
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                    <span
+                      className={`sh-status-inline ${ev.status === "AT_RISK" ? "crimson" : ev.status === "COMPLETED" ? "emerald" : "amber"}`}
+                    >
+                      {ev.status === "COMPLETED" ? (
+                        <>
+                          <CheckCircle2 size={12} /> <span>{copy.statusCompleted}</span>
+                        </>
+                      ) : ev.status === "AT_RISK" ? (
+                        <>
+                          <AlertTriangle size={12} /> <span>{copy.statusAtRisk}</span>
+                        </>
+                      ) : (
+                        <>
+                          <Clock size={12} /> <span>{copy.typeLabels[ev.type]}</span>
+                        </>
+                      )}
+                    </span>
+                    {ev.milestoneId && onOpenEscrow && (
+                      <button
+                        type="button"
+                        className="sh-row-action-btn"
+                        onClick={() => onOpenEscrow(ev.milestoneId)}
+                      >
+                        {copy.openEscrowBtn} <ExternalLink size={11} />
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               </article>
             ))}
@@ -735,148 +682,6 @@ export function CalendarScheduleView({
           </div>
         </aside>
       </div>
-
-      {/* Schedule Event Modal */}
-      {createOpen && (
-        <div
-          className="sh-sheet-backdrop"
-          onClick={() => setCreateOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={copy.modalAria}
-        >
-          <aside
-            className="sh-sheet-panel"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sh-sheet-header">
-              <div>
-                <h3 className="sh-sheet-title">{copy.modalTitle}</h3>
-                <p className="sh-sheet-subtitle">
-                  {copy.modalSubtitle}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="sh-icon-only-btn"
-                onClick={() => setCreateOpen(false)}
-                aria-label={copy.closeAria}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form className="sh-sheet-body" onSubmit={handleCreateEvent}>
-              <label className="sh-form-field">
-                <span>{copy.fieldEventTitle}</span>
-                <input
-                  type="text"
-                  required
-                  value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
-                  placeholder={copy.fieldEventTitlePlaceholder}
-                />
-              </label>
-
-              <div className="sh-customizer-grid-2">
-                <label className="sh-form-field">
-                  <span>{copy.fieldDate}</span>
-                  <input
-                    type="date"
-                    required
-                    value={newDate}
-                    onChange={(e) => setNewDate(e.target.value)}
-                  />
-                  {isValidIsoDate(newDate) && (
-                    <small className="sh-form-hint">
-                      {formatEthiopianDate(newDate, "long")} · EFY{" "}
-                      {getFiscalYear(newDate)} E.C. · Q
-                      {getFiscalQuarter(newDate).quarter}
-                    </small>
-                  )}
-                </label>
-
-                <label className="sh-form-field">
-                  <span>{copy.fieldTime}</span>
-                  <input
-                    type="text"
-                    required
-                    value={newTime}
-                    onChange={(e) => setNewTime(e.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div className="sh-customizer-grid-2">
-                <label className="sh-form-field">
-                  <span>{copy.fieldType}</span>
-                  <select
-                    className="sh-select"
-                    value={newType}
-                    onChange={(e) =>
-                      setNewType(e.target.value as ScheduleEventType)
-                    }
-                  >
-                    <option value="MILESTONE_DUE">{copy.typeLabels.MILESTONE_DUE}</option>
-                    <option value="PAYOUT_RELEASE">{copy.typeLabels.PAYOUT_RELEASE}</option>
-                    <option value="PROPOSAL_DEADLINE">{copy.typeLabels.PROPOSAL_DEADLINE}</option>
-                    <option value="COMPLIANCE_KYC">{copy.typeLabels.COMPLIANCE_KYC}</option>
-                  </select>
-                </label>
-
-                <label className="sh-form-field">
-                  <span>{copy.fieldAmount}</span>
-                  <input
-                    type="number"
-                    required
-                    value={newAmountETB}
-                    onChange={(e) => setNewAmountETB(e.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div className="sh-customizer-grid-2">
-                <label className="sh-form-field">
-                  <span>{copy.fieldContractRef}</span>
-                  <input
-                    type="text"
-                    required
-                    value={newContractRef}
-                    onChange={(e) => setNewContractRef(e.target.value)}
-                  />
-                </label>
-
-                <label className="sh-form-field">
-                  <span>{copy.fieldCounterparty}</span>
-                  <input
-                    type="text"
-                    required
-                    value={newCounterparty}
-                    onChange={(e) => setNewCounterparty(e.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div style={{ display: "flex", gap: 8, marginTop: 18 }}>
-                <button
-                  type="submit"
-                  className="sh-btn sh-btn-primary"
-                  style={{ flex: 1, justifyContent: "center" }}
-                >
-                  {copy.saveScheduleBtn}
-                </button>
-                <button
-                  type="button"
-                  className="sh-btn sh-btn-secondary"
-                  onClick={() => setCreateOpen(false)}
-                >
-                  {copy.cancelBtn}
-                </button>
-              </div>
-            </form>
-          </aside>
-        </div>
-      )}
     </div>
   );
 }

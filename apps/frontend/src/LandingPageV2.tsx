@@ -26,8 +26,6 @@ import {
   ArrowUpRight,
   Award,
   WalletCards,
-  Star,
-  BadgeCheck,
 } from "lucide-react";
 import { LandingSupportChat } from "./components/LandingSupportChat";
 import { HandWrittenTitle } from "./components/HandWrittenTitle";
@@ -37,9 +35,7 @@ import { useI18n } from "./i18n";
 import { FooterV2 } from "./MarketingFooter";
 import {
   ESCROW_STEP_ROWS_BY_LANG,
-  getLandingReviews,
   LANDING_V2_EXTRA,
-  type MemberReview,
 } from "./landingV2Copy";
 import "./landing-v2.css";
 
@@ -55,15 +51,6 @@ type LandingPageV2Props = {
    Constants
 ───────────────────────────────────────────────── */
 const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1];
-
-/* avatar gradient pairs, drawn from the V2 palette */
-const REVIEW_TONES: Record<MemberReview["tone"], [string, string]> = {
-  1: ["var(--v2-primary)", "var(--v2-teal)"],
-  2: ["var(--v2-teal)", "var(--v2-primary)"],
-  3: ["var(--v2-violet)", "var(--v2-primary)"],
-  4: ["var(--v2-primary)", "var(--v2-violet)"],
-  5: ["var(--v2-teal)", "var(--v2-violet)"],
-};
 
 /* ─────────────────────────────────────────────────
    Helpers
@@ -216,59 +203,6 @@ function SpringTitle({
       className={className}
       stageRef={stageRef}
     />
-  );
-}
-
-
-/* Avatar */
-function V2Avatar({
-  name,
-  size = 62,
-  h1 = "var(--v2-primary)",
-  h2 = "var(--v2-teal)",
-  radius = 18,
-}: {
-  name: string;
-  size?: number;
-  h1?: string;
-  h2?: string;
-  radius?: number;
-}) {
-  const initials = name
-    .split(" ")
-    .map((n) => n.charAt(0))
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  return (
-    <div
-      className="v2-avatar"
-      style={
-        {
-          width: size,
-          height: size,
-          borderRadius: radius,
-          fontSize: size * 0.36,
-          "--v2-a1": h1,
-          "--v2-a2": h2,
-        } as React.CSSProperties
-      }
-    >
-      <span>{initials}</span>
-    </div>
-  );
-}
-
-/* Stars */
-function V2Stars({ rating, s = 13 }: { rating: number; s?: number }) {
-  const { language } = useI18n();
-  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
-  return (
-    <span style={{ display: "flex", gap: 3, color: "var(--v2-primary)" }} aria-label={extra.ratingAria(rating)}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Star key={i} size={s} style={{ opacity: i < Math.round(rating) ? 1 : 0.26 }} fill="currentColor" stroke="none" />
-      ))}
-    </span>
   );
 }
 
@@ -780,6 +714,18 @@ function EscrowSection() {
                         <use href={`#${s.iconId}`} />
                       </svg>
                     </span>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "var(--v2-muted)",
+                      marginBottom: 8,
+                    }}
+                  >
+                    {extra.exampleLabel}
                   </div>
                   <ul className="rows">
                     {s.rows.map((r, ri) => {
@@ -1502,130 +1448,6 @@ function CategoriesSection({ onStart }: { onStart: (m: "login" | "register") => 
 
 
 /* ─────────────────────────────────────────────────
-   Testimonials — vertical review marquee
-───────────────────────────────────────────────── */
-const MARQUEE_DURATIONS = ["22s", "26s", "20s"];
-
-function GoogleMark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.19-2.27H12v4.51h6.47c-.29 1.48-1.14 2.73-2.4 3.58v3h3.86c2.26-2.09 3.56-5.17 3.56-8.82z" />
-      <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.86-3c-1.08.72-2.45 1.16-4.07 1.16-3.13 0-5.78-2.11-6.73-4.96H1.29v3.09C3.26 21.3 7.31 24 12 24z" />
-      <path fill="#FBBC05" d="M5.27 14.29c-.25-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.98-3.09z" />
-      <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.98 3.09C6.22 6.86 8.87 4.75 12 4.75z" />
-    </svg>
-  );
-}
-
-function TrustpilotMark() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <rect width="24" height="24" rx="6" fill="#00b67a" />
-      <path
-        fill="#fff"
-        d="M12 5.1l1.99 4.46 4.79.41-3.65 3.13 1.09 4.71L12 15.52l-4.22 2.29 1.09-4.71-3.65-3.13 4.79-.41L12 5.1z"
-      />
-    </svg>
-  );
-}
-
-function ReviewCard({ review }: { review: MemberReview }) {
-  const { language } = useI18n();
-  const extra = LANDING_V2_EXTRA[language] ?? LANDING_V2_EXTRA.en;
-  const [a1, a2] = REVIEW_TONES[review.tone];
-  return (
-    <article className="v2-testi-card">
-      <span className="v2-testi-sheen" aria-hidden="true" />
-      <div className="v2-testi-top">
-        <V2Stars rating={review.rating} s={14} />
-        <span className="v2-testi-src">
-          {review.source === "google" ? <GoogleMark /> : <TrustpilotMark />}
-          {review.source === "google" ? "Google" : "Trustpilot"}
-        </span>
-      </div>
-      <blockquote className="v2-testi-text">&ldquo;{review.quote}&rdquo;</blockquote>
-      <div className="v2-testi-who">
-        <V2Avatar name={review.name} size={40} radius={12} h1={a1} h2={a2} />
-        <div className="v2-testi-id">
-          <span className="v2-testi-name">
-            {review.name}
-            <BadgeCheck size={13} aria-label={extra.verifiedMemberAria} />
-          </span>
-          <span className="v2-testi-meta">
-            {review.meta} · {review.when}
-          </span>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function TestimonialsSection() {
-  const { t, language } = useI18n();
-  const sectionRef = useRef<HTMLElement>(null);
-  const inView = useSectionVisible(sectionRef, "180px 0px");
-  const columns = useMemo(() => {
-    const reviews = getLandingReviews(language);
-    const cols: MemberReview[][] = [[], [], []];
-    reviews.forEach((r, i) => cols[i % cols.length].push(r));
-    return cols;
-  }, [language]);
-
-  return (
-    <section
-      ref={sectionRef}
-      className={`v2-section v2-testi${inView ? " v2-inview" : ""}`}
-      aria-labelledby="v2-testi-title"
-    >
-      <div className="v2-testi-aurora" aria-hidden="true" />
-      <div className="v2-container">
-        <div className="v2-center">
-          <Reveal delay={0.04}>
-            <h2 className="v2-sec-title" id="v2-testi-title">
-              {t.marketing.testimonials.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="v2-sec-sub v2-testi-sub">
-              {t.marketing.testimonials.subtitle}
-            </p>
-          </Reveal>
-        </div>
-
-        <Reveal dir="up" amount={0.08} delay={0.08}>
-          <div className="v2-testi-marquee">
-            {columns.map((col, i) => (
-              <div
-                className={`v2-testi-col c${i + 1}${i === 1 ? " rev" : ""}`}
-                key={`col-${i}`}
-                style={{ "--v2-dur": MARQUEE_DURATIONS[i] } as React.CSSProperties}
-              >
-                <div className="v2-testi-track">
-                  <div className="v2-testi-copy">
-                    {col.map((r) => (
-                      <ReviewCard key={r.name} review={r} />
-                    ))}
-                  </div>
-                  <div className="v2-testi-copy" aria-hidden="true">
-                    {col.map((r) => (
-                      <ReviewCard key={`${r.name}-loop`} review={r} />
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.06}>
-          <p className="v2-testi-hint">{t.marketing.testimonials.hint}</p>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ─────────────────────────────────────────────────
    About / Studio — editorial split layout
 ───────────────────────────────────────────────── */
 function AboutSection({ onNavigate }: { onNavigate: (p: string) => void }) {
@@ -2222,9 +2044,6 @@ export function LandingPageV2({ onStart, onNavigate }: LandingPageV2Props) {
 
       {/* Categories */}
       <CategoriesSection onStart={onStart} />
-
-      {/* Testimonials */}
-      <TestimonialsSection />
 
       {/* About / Studio split */}
       <AboutSection onNavigate={onNavigate} />

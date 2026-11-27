@@ -2,6 +2,20 @@
 import { env } from "../../config/env.js";
 
 // === INTERFACES & TYPES ===
+export interface EscrowFeeConfig {
+  clientPlatformFeeRate: number;
+  freelancerPlatformFeeRate: number;
+  paymentProviderFeeRate: number;
+}
+
+export function getEscrowFeeConfig(): EscrowFeeConfig {
+  return {
+    clientPlatformFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
+    freelancerPlatformFeeRate: env.PLATFORM_FEE_RATE_FREELANCER,
+    paymentProviderFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
+  };
+}
+
 export interface FeeBreakdown {
   grossAmountMinor: number;
   platformFeeFromFreelancerMinor: number;

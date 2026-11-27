@@ -8,6 +8,12 @@ export type FeaturedCarouselCopy = {
   tabAll: string;
   tabSaved: string;
   emptySaved: string;
+  loadingLabel: string;
+  emptyTalentsTitle: string;
+  emptyTalentsDesc: string;
+  browseGigsBtn: string;
+  errorTitle: string;
+  retryBtn: string;
   gridAria: string;
   verifiedFreelancerFallback: string;
   professionalFreelancerFallback: string;
@@ -79,6 +85,12 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
     tabSaved: "Saved",
     emptySaved:
       "No saved professionals yet. Use the bookmark icon to save a profile.",
+    loadingLabel: "Loading verified freelancers...",
+    emptyTalentsTitle: "No verified freelancers listed yet",
+    emptyTalentsDesc: "Verified freelancers will appear here as they join.",
+    browseGigsBtn: "Browse Gigs",
+    errorTitle: "Could not load featured talent right now.",
+    retryBtn: "Retry",
     gridAria: "Featured professionals",
     verifiedFreelancerFallback: "Verified Freelancer",
     professionalFreelancerFallback: "Professional Freelancer",
@@ -152,6 +164,12 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
     tabAll: "ሁሉም",
     tabSaved: "የተቀመጡ",
     emptySaved: "እስካሁን የተቀመጡ ባለሙያዎች የሉም። መገለጫ ለማስቀመጥ የዕልባት አዶውን ይጠቀሙ።",
+    loadingLabel: "የተረጋገጡ ባለሙያዎችን በመጫን ላይ...",
+    emptyTalentsTitle: "ገና የተረጋገጡ ባለሙያዎች አልተዘረዘሩም",
+    emptyTalentsDesc: "የተረጋገጡ ባለሙያዎች ሲቀላቀሉ እዚህ ይታያሉ።",
+    browseGigsBtn: "አገልግሎቶችን ያስሱ",
+    errorTitle: "ባለሙያዎችን መጫን አልተቻለም።",
+    retryBtn: "እንደገና ሞክር",
     gridAria: "ተለይተው የቀረቡ ባለሙያዎች",
     verifiedFreelancerFallback: "የተረጋገጠ ባለሙያ",
     professionalFreelancerFallback: "ሙያዊ ባለሙያ",
@@ -224,6 +242,12 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
     tabSaved: "Olkaa'aman",
     emptySaved:
       "Ammatti ogeeyyiin olkaa'aman hin jiran. Piroofaayila olkaa'uuf mallattoo bookmark fayyadamaa.",
+    loadingLabel: "Ogeeyyii mirkaneeffaman fe'aa jira...",
+    emptyTalentsTitle: "Ammatti ogeessi mirkaneeffame hin tarreeffamne",
+    emptyTalentsDesc: "Ogeeyyiin mirkaneeffaman yeroo dabalaman asitti mul'atu.",
+    browseGigsBtn: "Tajaajiloota Ilaali",
+    errorTitle: "Yeroo ammaa ogeeyyii filatamoo fe'uun hin danda'amne.",
+    retryBtn: "Irra deebi'ii yaali",
     gridAria: "Ogeeyyii filatamoo",
     verifiedFreelancerFallback: "Ogeessa Mirkaneeffame",
     professionalFreelancerFallback: "Ogeessa Ogummaa",
@@ -297,6 +321,12 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
     tabSaved: "ዝተዓቀቡ",
     emptySaved:
       "ገና ዝተዓቀቡ ክኢላታት የለዉን። መግለጺ ንምዕቃብ ምልክት ዕልባት ተጠቐሙ።",
+    loadingLabel: "ዝተረጋገጹ ክኢላታት ይጽዕን ኣሎ...",
+    emptyTalentsTitle: "ገና ዝተረጋገጹ ክኢላታት ኣይተዘርዘሩን",
+    emptyTalentsDesc: "ዝተረጋገጹ ክኢላታት ክጽንበሩ ከለዉ ኣብዚ ክርኣዩ እዮም።",
+    browseGigsBtn: "ኣገልግሎታት ዳህስስ",
+    errorTitle: "ሕጂ ፍሉያት ክኢላታት ምጽዓን ኣይተኻእለን።",
+    retryBtn: "ዳግማይ ፈትን",
     gridAria: "ፍሉያት ክኢላታት",
     verifiedFreelancerFallback: "ዝተረጋገጸ ክኢላ",
     professionalFreelancerFallback: "ሞያዊ ክኢላ",

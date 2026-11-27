@@ -76,219 +76,14 @@ function persistSavedTalentIds(ids: Set<string>): void {
   }
 }
 
-// Built-in verified talent profiles (Ethiopian talent showcase matching prototype)
-export const DEMO_TALENTS: TalentItem[] = [
-  {
-    id: "demo-selam",
-    displayName: "Selam Tadesse",
-    roleTitle: "Content & Translation Specialist",
-    hue: 160,
-    avatarUrl: null,
-    primarySkill: { id: "sk-writing", nameEn: "Content Writing" },
-    skills: ["Content Writing", "Translation", "Virtual Assistance"],
-    portfolioUrl: "selam.myportfolio.com",
-    isNew: true,
-    kycBadge: "shield",
-    kycTier: 1,
-    ratingAverage: null,
-    ratingCount: 0,
-    totalJobsCompleted: 0,
-    onTimePercent: null,
-    hourlyRateETB: 850,
-    isAvailableForWork: true,
-    responseTime: "~1 hr",
-    location: "Addis Ababa",
-    languages: "Amharic, English",
-    memberSince: "Nov 2026",
-    verifiedOn: "Nov 12, 2026",
-    about:
-      "Detail-oriented freelancer focused on clear communication and on-time delivery. I help clients with content creation, English-Amharic translation, and day-to-day business administration. Ready for my first contracts on Yekis.",
-    reviews: [],
-  },
-  {
-    id: "demo-dawit",
-    displayName: "Dawit Tesfaye",
-    roleTitle: "Full-stack Web Developer",
-    hue: 210,
-    avatarUrl: null,
-    primarySkill: { id: "sk-react", nameEn: "React & Node.js" },
-    skills: ["React", "Node.js", "REST APIs"],
-    portfolioUrl: "dawit.dev",
-    isNew: true,
-    kycBadge: "shield",
-    kycTier: 1,
-    ratingAverage: null,
-    ratingCount: 0,
-    totalJobsCompleted: 0,
-    onTimePercent: null,
-    hourlyRateETB: 1200,
-    isAvailableForWork: true,
-    responseTime: "~2 hrs",
-    location: "Addis Ababa",
-    languages: "Amharic, English",
-    memberSince: "Nov 2026",
-    verifiedOn: "Nov 10, 2026",
-    about:
-      "Web developer helping small businesses and startups build fast, modern websites and dashboards. Comfortable across the entire stack — from responsive front-ends to APIs, database design, and cloud deployment.",
-    reviews: [],
-  },
-  {
-    id: "demo-hanna",
-    displayName: "Hanna Bekele",
-    roleTitle: "Senior UI/UX Designer",
-    hue: 265,
-    avatarUrl: null,
-    primarySkill: { id: "sk-design", nameEn: "UI/UX Design" },
-    skills: ["Figma", "Design Systems", "Prototyping"],
-    portfolioUrl: "hannabekele.design",
-    isNew: false,
-    kycBadge: "shield",
-    kycTier: 2,
-    ratingAverage: 4.9,
-    ratingCount: 31,
-    totalJobsCompleted: 34,
-    onTimePercent: "98%",
-    hourlyRateETB: 1650,
-    isAvailableForWork: true,
-    responseTime: "~1 hr",
-    location: "Addis Ababa",
-    languages: "Amharic, English, French",
-    memberSince: "Mar 2025",
-    verifiedOn: "Mar 3, 2025",
-    about:
-      "Product designer with 6+ years of experience shipping fintech and marketplace products. I specialise in design systems and end-to-end user flows — from discovery research to polished, developer-ready Figma handoff.",
-    reviews: [
-      {
-        name: "Liya G.",
-        stars: 5,
-        date: "Oct 2026",
-        text: "Hanna redesigned our entire client dashboard in three weeks. Clear communication, thoughtful questions, and a handoff our developers genuinely enjoyed working from.",
-      },
-      {
-        name: "Samuel K.",
-        stars: 5,
-        date: "Sep 2026",
-        text: "Pixel-perfect work and great product instincts. She suggested several user flow improvements that reduced drop-off.",
-      },
-    ],
-  },
-  {
-    id: "demo-yonas",
-    displayName: "Yonas Alemu",
-    roleTitle: "Full-stack Cloud Engineer",
-    hue: 25,
-    avatarUrl: null,
-    primarySkill: { id: "sk-cloud", nameEn: "Cloud & Backend" },
-    skills: ["TypeScript", "Next.js", "PostgreSQL"],
-    portfolioUrl: "yonasalemu.dev",
-    isNew: false,
-    kycBadge: "shield",
-    kycTier: 2,
-    ratingAverage: 4.8,
-    ratingCount: 24,
-    totalJobsCompleted: 27,
-    onTimePercent: "96%",
-    hourlyRateETB: 1950,
-    isAvailableForWork: true,
-    responseTime: "~3 hrs",
-    location: "Bahir Dar",
-    languages: "Amharic, English",
-    memberSince: "Jun 2025",
-    verifiedOn: "Jun 14, 2025",
-    about:
-      "Full-stack engineer building reliable web applications for startups and enterprise teams. I value clean architecture, automated testing, and transparent delivery milestones.",
-    reviews: [
-      {
-        name: "Ruth A.",
-        stars: 5,
-        date: "Oct 2026",
-        text: "Rebuilt our booking engine without a single hour of unexpected downtime. Yonas documents everything and communicates proactively.",
-      },
-      {
-        name: "Michael T.",
-        stars: 4,
-        date: "Aug 2026",
-        text: "Strong engineering skills and fair pricing. Delivered robust database migrations and clear API documentation.",
-      },
-    ],
-  },
-];
-
-const EXTRA_DEMO_TALENTS: TalentItem[] = [
-  {
-    id: "demo-meron",
-    displayName: "Meron Haile",
-    roleTitle: "Video Editor & Motion Designer",
-    hue: 330,
-    avatarUrl: null,
-    primarySkill: { id: "sk-video", nameEn: "Video Production" },
-    skills: ["Premiere Pro", "After Effects", "Motion Graphics"],
-    portfolioUrl: "meronhaile.studio",
-    isNew: false,
-    kycBadge: "shield",
-    kycTier: 1,
-    ratingAverage: 4.7,
-    ratingCount: 18,
-    totalJobsCompleted: 19,
-    onTimePercent: "95%",
-    hourlyRateETB: 1400,
-    isAvailableForWork: true,
-    responseTime: "~4 hrs",
-    location: "Addis Ababa",
-    languages: "Amharic, English",
-    memberSince: "Jan 2026",
-    verifiedOn: "Jan 8, 2026",
-    about:
-      "Video editor for commercial brands, event producers, and creators. Short-form reels, product teasers, and high-production company overviews with crisp pacing, clear audio, and cinematic color grading.",
-    reviews: [],
-  },
-  {
-    id: "demo-abel",
-    displayName: "Abel Girma",
-    roleTitle: "Data Analyst & BI Specialist",
-    hue: 190,
-    avatarUrl: null,
-    primarySkill: { id: "sk-data", nameEn: "Data Analytics" },
-    skills: ["Python", "SQL", "Power BI"],
-    portfolioUrl: "abelgirma.data",
-    isNew: false,
-    kycBadge: "shield",
-    kycTier: 2,
-    ratingAverage: 5.0,
-    ratingCount: 36,
-    totalJobsCompleted: 41,
-    onTimePercent: "100%",
-    hourlyRateETB: 1550,
-    isAvailableForWork: true,
-    responseTime: "~1 hr",
-    location: "Hawassa",
-    languages: "Amharic, English",
-    memberSince: "Feb 2025",
-    verifiedOn: "Feb 20, 2025",
-    about:
-      "I turn complex spreadsheets and operational databases into clear visual decisions. Custom dashboards, automated reporting pipelines, and KPI tracking that non-technical leadership teams can easily act upon.",
-    reviews: [],
-  },
-];
-
-export function getDemoTalentById(id: string): TalentItem | undefined {
-  return DEMO_TALENTS.find((t) => t.id === id) || EXTRA_DEMO_TALENTS.find((t) => t.id === id);
-}
-
 function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/);
-  if (parts.length === 0) return "ST";
+  if (parts.length === 0) return "YK";
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 function getAvatarColor(talent: TalentItem): string {
-  if (talent.id === "demo-selam" || talent.displayName.includes("Selam")) return "#6366f1";
-  if (talent.id === "demo-dawit" || talent.displayName.includes("Dawit")) return "#84cc16";
-  if (talent.id === "demo-hanna" || talent.displayName.includes("Hanna")) return "#8b5cf6";
-  if (talent.id === "demo-yonas" || talent.displayName.includes("Yonas")) return "#65a30d";
-  if (talent.id === "demo-meron" || talent.displayName.includes("Meron")) return "#ec4899";
-  if (talent.id === "demo-abel" || talent.displayName.includes("Abel")) return "#06b6d4";
   if (talent.hue) return `hsl(${talent.hue}, 65%, 45%)`;
   return "#6366f1";
 }
@@ -317,13 +112,20 @@ export const EthiopianFlagIcon = () => (
 export const FeaturedCarousel = ({
   onProfileClick,
   onOpenChat,
+  onBrowseGigs,
+  compact = false,
 }: {
   onProfileClick?: (id: string) => void;
   onOpenChat?: (userId: string, userName?: string) => void;
+  onBrowseGigs?: () => void;
+  compact?: boolean;
 }) => {
   const { language } = useI18n();
   const copy = FEATURED_CAROUSEL_COPY[language] ?? FEATURED_CAROUSEL_COPY.en;
-  const [talents, setTalents] = useState<TalentItem[]>(DEMO_TALENTS);
+  const [talents, setTalents] = useState<TalentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [activeFilter, setActiveFilter] = useState<"all" | "saved">("all");
   const [savedIds, setSavedIds] = useState<Set<string>>(() => getSavedTalentIds());
   const [selectedTalent, setSelectedTalent] = useState<TalentItem | null>(null);
@@ -339,69 +141,77 @@ export const FeaturedCarousel = ({
     }, 2800);
   };
 
-  // Fetch real featured talent from backend API
+  // Fetch real featured talent from backend API (no fake fallback)
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setError(null);
+
     api
       .getFeaturedTalent()
       .then((res) => {
         if (cancelled) return;
         const items = ((res as { items?: any[] })?.items ?? res ?? []) as any[];
-        if (Array.isArray(items) && items.length > 0) {
-          const mapped: TalentItem[] = items.map((t, idx) => {
-            const hues = [160, 210, 265, 25, 330, 190];
-            const hue = hues[idx % hues.length];
-            const isNew = !t.ratingAverage || t.totalJobsCompleted === 0;
-            const primarySkillName =
-              t.roleTitle ||
-              t.primarySkill?.nameEn ||
-              t.primarySkill?.nameAm ||
-              "Professional Freelancer";
-
-            return {
-              id: t.id || t.userId || `featured-${idx}`,
-              displayName: t.displayName || "Verified Freelancer",
-              avatarUrl: t.avatarUrl || null,
-              primarySkill: t.primarySkill || { id: "primary", nameEn: primarySkillName },
-              roleTitle: primarySkillName,
-              skills:
-                Array.isArray(t.skills) && t.skills.length > 0
-                  ? t.skills
-                  : [primarySkillName, "Verified Talent"],
-              ratingAverage: t.ratingAverage ? Number(t.ratingAverage) : null,
-              ratingCount: t.ratingCount || 0,
-              totalJobsCompleted: t.totalJobsCompleted || 0,
-              onTimePercent: t.totalJobsCompleted > 0 ? "98%" : null,
-              hourlyRateETB: t.hourlyRateETB || 950 + (idx % 5) * 250,
-              location: t.location || "Addis Ababa",
-              languages: t.languages || "Amharic, English",
-              memberSince: t.memberSince || "2025",
-              verifiedOn: t.verifiedOn || "Verified",
-              kycBadge: t.kycBadge || "shield",
-              kycTier: t.kycTier || 1,
-              isAvailableForWork: t.isAvailableForWork !== false,
-              responseTime: t.responseTime || "~1 hr",
-              portfolioUrl: t.portfolioUrl || null,
-              about:
-                t.bio ||
-                t.about ||
-                "Verified Ethiopian professional with proven domain expertise. Dedicated to reliable delivery and transparent communication on Yekis.",
-              reviews: t.reviews || [],
-              hue: t.hue || hue,
-              isNew,
-            };
-          });
-          setTalents(mapped);
+        if (!Array.isArray(items) || items.length === 0) {
+          setTalents([]);
+          setLoading(false);
+          return;
         }
+        const mapped: TalentItem[] = items.map((t, idx) => {
+          const hues = [160, 210, 265, 25, 330, 190];
+          const hue = hues[idx % hues.length];
+          const jobsCount = typeof t.totalJobsCompleted === "number" ? t.totalJobsCompleted : 0;
+          const isNew = !t.ratingAverage || jobsCount === 0;
+          const primarySkillName =
+            t.roleTitle ||
+            t.primarySkill?.nameEn ||
+            t.primarySkill?.nameAm ||
+            copy.professionalFreelancerFallback;
+
+          return {
+            id: t.id || t.userId,
+            displayName: t.displayName || copy.verifiedFreelancerFallback,
+            avatarUrl: t.avatarUrl || null,
+            primarySkill: t.primarySkill || { id: "primary", nameEn: primarySkillName },
+            roleTitle: primarySkillName,
+            skills:
+              Array.isArray(t.skills) && t.skills.length > 0
+                ? t.skills
+                : [primarySkillName],
+            ratingAverage: t.ratingAverage != null ? Number(t.ratingAverage) : null,
+            ratingCount: typeof t.ratingCount === "number" ? t.ratingCount : 0,
+            totalJobsCompleted: jobsCount,
+            onTimePercent: t.onTimePercent ?? null,
+            hourlyRateETB: typeof t.hourlyRateETB === "number" ? t.hourlyRateETB : undefined,
+            location: t.location || undefined,
+            languages: t.languages || undefined,
+            memberSince: t.memberSince || undefined,
+            verifiedOn: t.verifiedOn || undefined,
+            kycBadge: t.kycBadge || undefined,
+            kycTier: typeof t.kycTier === "number" ? t.kycTier : undefined,
+            isAvailableForWork: t.isAvailableForWork !== false,
+            responseTime: t.responseTime || undefined,
+            portfolioUrl: t.portfolioUrl || null,
+            about: t.bio || t.about || undefined,
+            reviews: Array.isArray(t.reviews) ? t.reviews : [],
+            hue: t.hue || hue,
+            isNew,
+          };
+        });
+        setTalents(mapped);
+        setLoading(false);
       })
-      .catch(() => {
-        // Fall back to DEMO_TALENTS on API failure or empty response
+      .catch((err) => {
+        if (cancelled) return;
+        setTalents([]);
+        setError(err instanceof Error && err.message ? err.message : copy.errorTitle);
+        setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [reloadNonce, copy.errorTitle, copy.professionalFreelancerFallback, copy.verifiedFreelancerFallback]);
 
   // Toggle Shortlist Bookmark
   const toggleSaveTalent = (e: React.MouseEvent, talent: TalentItem) => {
@@ -436,11 +246,12 @@ export const FeaturedCarousel = ({
 
   // Filtered talent list
   const displayedTalents = useMemo(() => {
-    if (activeFilter === "saved") {
-      return talents.filter((t) => savedIds.has(t.id));
-    }
-    return talents;
-  }, [talents, activeFilter, savedIds]);
+    const base =
+      activeFilter === "saved"
+        ? talents.filter((t) => savedIds.has(t.id))
+        : talents;
+    return compact ? base.slice(0, 4) : base;
+  }, [talents, activeFilter, savedIds, compact]);
 
   // Open modal or full profile
   const handleCardClick = (talent: TalentItem) => {
@@ -495,8 +306,39 @@ export const FeaturedCarousel = ({
         </div>
       </div>
 
-      {/* Grid */}
-      {displayedTalents.length === 0 ? (
+      {/* Grid / Loading / Error / Empty */}
+      {loading ? (
+        <div className="ft-empty" role="status" aria-live="polite">
+          {copy.loadingLabel}
+        </div>
+      ) : error ? (
+        <div className="ft-empty" role="alert">
+          <p style={{ margin: "0 0 10px" }}>{copy.errorTitle}</p>
+          <button
+            type="button"
+            className="ft-btn-primary"
+            onClick={() => setReloadNonce((n) => n + 1)}
+          >
+            {copy.retryBtn}
+          </button>
+        </div>
+      ) : talents.length === 0 ? (
+        <div className="ft-empty">
+          <strong style={{ display: "block", marginBottom: 4 }}>
+            {copy.emptyTalentsTitle}
+          </strong>
+          <p style={{ margin: "0 0 12px" }}>{copy.emptyTalentsDesc}</p>
+          {onBrowseGigs && (
+            <button
+              type="button"
+              className="ft-btn-primary"
+              onClick={onBrowseGigs}
+            >
+              {copy.browseGigsBtn}
+            </button>
+          )}
+        </div>
+      ) : displayedTalents.length === 0 ? (
         <div className="ft-empty">{copy.emptySaved}</div>
       ) : (
         <section className="ft-grid" aria-label={copy.gridAria}>
@@ -682,15 +524,21 @@ export const FeaturedCarousel = ({
               </p>
 
               <div className="ft-modal-meta">
-                <span>
-                  <MapPin size={14} /> {selectedTalent.location || copy.locationDefault}
-                </span>
-                <span>
-                  <Globe size={14} /> {selectedTalent.languages || copy.languagesDefault}
-                </span>
-                <span>
-                  <Calendar size={14} /> {copy.sincePrefix(selectedTalent.memberSince || "2025")}
-                </span>
+                {selectedTalent.location && (
+                  <span>
+                    <MapPin size={14} /> {selectedTalent.location}
+                  </span>
+                )}
+                {selectedTalent.languages && (
+                  <span>
+                    <Globe size={14} /> {selectedTalent.languages}
+                  </span>
+                )}
+                {selectedTalent.memberSince && (
+                  <span>
+                    <Calendar size={14} /> {copy.sincePrefix(selectedTalent.memberSince)}
+                  </span>
+                )}
               </div>
 
               {/* Action Buttons */}
@@ -763,11 +611,11 @@ export const FeaturedCarousel = ({
                   <span>{copy.statJobsDone}</span>
                 </div>
                 <div className="ft-stat-box">
-                  <b>{selectedTalent.onTimePercent || "100%"}</b>
+                  <b>{selectedTalent.onTimePercent ?? "—"}</b>
                   <span>{copy.statOnTime}</span>
                 </div>
                 <div className="ft-stat-box">
-                  <b>{selectedTalent.responseTime || "~1 hr"}</b>
+                  <b>{selectedTalent.responseTime ?? "—"}</b>
                   <span>{copy.statResponse}</span>
                 </div>
               </div>
@@ -777,12 +625,12 @@ export const FeaturedCarousel = ({
             <div className="ft-modal-grid">
               {/* Main Column */}
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <section className="ft-card-box">
-                  <h3 className="ft-box-label">{copy.aboutHeading}</h3>
-                  <p className="ft-about-text">
-                    {selectedTalent.about || copy.aboutFallback}
-                  </p>
-                </section>
+                {selectedTalent.about && (
+                  <section className="ft-card-box">
+                    <h3 className="ft-box-label">{copy.aboutHeading}</h3>
+                    <p className="ft-about-text">{selectedTalent.about}</p>
+                  </section>
+                )}
 
                 <section className="ft-card-box">
                   <h3 className="ft-box-label">{copy.skillsHeading}</h3>
@@ -857,12 +705,14 @@ export const FeaturedCarousel = ({
               <aside style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <section className="ft-card-box">
                   <h3 className="ft-box-label">{copy.engagementHeading}</h3>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 }}>
-                    <span className="ft-rate-lg">
-                      ETB {(selectedTalent.hourlyRateETB || 950).toLocaleString()}
-                    </span>
-                    <span className="ft-rate-unit">{copy.perHourUnit}</span>
-                  </div>
+                  {typeof selectedTalent.hourlyRateETB === "number" && (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 }}>
+                      <span className="ft-rate-lg">
+                        ETB {selectedTalent.hourlyRateETB.toLocaleString()}
+                      </span>
+                      <span className="ft-rate-unit">{copy.perHourUnit}</span>
+                    </div>
+                  )}
 
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", fontWeight: 600, color: "var(--color-primary)", marginBottom: 14 }}>
                     <span className="carousel-live-dot" />
@@ -876,11 +726,11 @@ export const FeaturedCarousel = ({
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
                       <span style={{ color: "var(--color-text-tertiary)" }}>{copy.onTimeRateLabel}</span>
-                      <strong style={{ color: "var(--color-text)" }}>{selectedTalent.onTimePercent || "100%"}</strong>
+                      <strong style={{ color: "var(--color-text)" }}>{selectedTalent.onTimePercent ?? "—"}</strong>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0" }}>
                       <span style={{ color: "var(--color-text-tertiary)" }}>{copy.responseTimeLabel}</span>
-                      <strong style={{ color: "var(--color-text)" }}>{selectedTalent.responseTime || "~1 hr"}</strong>
+                      <strong style={{ color: "var(--color-text)" }}>{selectedTalent.responseTime ?? "—"}</strong>
                     </div>
                   </div>
 

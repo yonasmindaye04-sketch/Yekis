@@ -1370,6 +1370,8 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
   * **Portfolio (`apps/backend/src/modules/portfolio/`):** Freelancer work showcase items.
 * **Owns Models:** `Skill`, `UserSkill`, `Review`, `PortfolioItem`, `UserAvatar`, `FeaturedLog`, `ProfileReport`, `ProfileView`.
 
+> For code-verified answers to recurring user questions on profile impact, client vs. freelancer setup, Featured Talent criteria, rating/review gaps, and unpersisted quick-view fields (such as engagement rate), see [docs/USER_FAQ.md](./USER_FAQ.md).
+
 #### Double-Blind Review Mechanism
 1. Client and freelancer can review each other only after contract completion (`isEligible: true`).
 2. Reviews are created with `isBlind: true` and are hidden from the target user.
@@ -2436,6 +2438,8 @@ the only one that scrolled.
 
 #### Role-Based Navigation (FullPlatformApp)
 
+> For the complete per-item breakdown of what every sidebar view shows and executes for Clients, Freelancers, and Dual-Role accounts, see [docs/SIDEBAR_FEATURES_REFERENCE.md](./SIDEBAR_FEATURES_REFERENCE.md).
+
 | Role | Nav Items Shown |
 |---|---|
 | `CLIENT` | Overview, Jobs, Proposals, Gigs, Contracts, Escrow, Wallet, Chat, Verification, Profile |
@@ -2842,6 +2846,8 @@ known *before* the deadline is committed.
 
 ### 8.12 The Workspace Dashboard: Only the Account's Own Records
 
+> For the complete widget-by-widget reference of everything the Dashboard shows and executes across Executive Analytics, Work Pipeline (Table, Kanban, Calendar), Featured Talent, and Quick Jump for Clients, Freelancers, and Dual-Role accounts, see [docs/DASHBOARD_CONTENTS_REFERENCE.md](./DASHBOARD_CONTENTS_REFERENCE.md).
+
 The workspace dashboard (`apps/frontend/src/components/dashboard/`) is the
 first thing every signed-in account sees. It shows four KPI cards, two
 financial charts, an escrow ledger, a milestone kanban board and a schedule.
@@ -2871,7 +2877,7 @@ The fix, and where each fact now comes from:
 | Wallet balance | `GET /api/v1/escrow/wallet` | `ETB 0` |
 | Escrow protected | `GET /api/v1/escrow/milestones` (funded states) | `ETB 0` |
 | Active milestones | `GET /api/v1/escrow/milestones` | `0` |
-| Contract title, category | `milestone.contract` (the API reads the job) | The contract id prefix |
+| Contract title, category, parties | `milestone.contract` (title, category, `clientName`, `freelancerName`) | The contract id prefix |
 | Counterparty | `milestone.counterparty` (the API resolves the *other* party) | `Unknown counterparty` |
 | Payment rail | `milestone.paymentRail` (`null` for wallet-funded and unfunded milestones) | `Wallet` / `Not funded` |
 | Funding timestamp | `milestone.fundedAt` (payment transaction, else the escrow-funding ledger journal) | `null` until funded |

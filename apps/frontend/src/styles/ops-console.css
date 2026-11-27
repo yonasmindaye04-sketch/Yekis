@@ -1947,9 +1947,91 @@
 .ops-root .ops-view-btn.active { background: var(--ops-primary-soft); color: var(--ops-primary); }
 
 /* ── Responsive Breakpoints ────────────────────────────────────────────── */
+@media (min-width: 1025px) {
+  .ops-root {
+    --ops-sidebar-w: 230px;
+    --ops-header-h: 54px;
+    font-size: 12.6px;
+  }
+
+  .ops-root.sh-variant-inset .app {
+    padding: 9px;
+    gap: 9px;
+  }
+
+  .ops-root.sh-variant-inset .sidebar {
+    height: calc(100vh - 18px);
+    top: 9px;
+  }
+
+  .ops-root.sh-variant-floating .app {
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .ops-root.sh-variant-floating .sidebar {
+    height: calc(100vh - 20px);
+    top: 10px;
+  }
+
+  .ops-root .sidebar {
+    padding: 10px;
+  }
+
+  .ops-root .header {
+    padding: 9px 22px;
+  }
+
+  .ops-root .content {
+    padding: 18px 22px 32px;
+    max-width: 1600px;
+  }
+
+  .ops-root .nav-item {
+    min-height: 32px;
+    padding: 6px 9px;
+    gap: 9px;
+    font-size: 12px;
+  }
+
+  .ops-root .btn,
+  .ops-root .ui-button,
+  .ops-root .ops-cmd-trigger,
+  .ops-root .f-search,
+  .ops-root .f-search input,
+  .ops-root .sel,
+  .ops-root select.sel,
+  .ops-root .filters select,
+  .ops-root .filters [data-slot="select-trigger"] {
+    height: 31px;
+    font-size: 11.5px;
+  }
+
+  .ops-root .ui-card-header {
+    padding: 16px 18px 0;
+  }
+
+  .ops-root .ui-card-content {
+    padding: 16px 18px;
+  }
+
+  .ops-root .stat {
+    padding: 10px 12px;
+  }
+
+  .ops-root .stat-v {
+    font-size: 15.5px;
+  }
+
+  .ops-root .tbl th,
+  .ops-root .tbl td {
+    padding: 9px 14px;
+  }
+}
+
 @media (min-width: 1441px) {
   .ops-root .content {
-    max-width: 1560px;
+    max-width: 1730px;
   }
 }
 

@@ -1393,6 +1393,12 @@ export interface UserMilestoneDto {
   contractId: string;
   title: string;
   amountMinor: number;
+  /** Server-computed fee breakdown using the same calculateFees() engine used for real payouts. */
+  platformFeeMinor: number;
+  providerFeeMinor: number;
+  clientFeeMinor: number;
+  clientTotalChargeMinor: number;
+  netPayoutMinor: number;
   dueDate: string;
   escrowState: string;
   deliverableUrl: string | null;
@@ -1405,6 +1411,11 @@ export interface UserMilestoneDto {
     status: string;
     title: string;
     category: string;
+    clientName: string;
+    freelancerName: string;
+    clientAcceptedAt: string | null;
+    freelancerAcceptedAt: string | null;
+    fullyExecuted: boolean;
   };
   counterparty: {
     id: string;
@@ -1453,6 +1464,8 @@ export async function listMilestonesForUser(
           status: true,
           clientId: true,
           freelancerId: true,
+          clientAcceptedAt: true,
+          freelancerAcceptedAt: true,
           job: { select: { title: true, category: true } },
           client: {
             select: {
@@ -1509,12 +1522,21 @@ export async function listMilestonesForUser(
       : m.contract.client;
     const payment = m.paymentTransactions[0];
     const fundedAt = payment?.createdAt ?? fundedAtByMilestone.get(m.id) ?? null;
+    const fees = calculateFees({ milestoneAmountMinor: m.amountMinor });
+    const fullyExecuted =
+      Boolean(m.contract.clientAcceptedAt) &&
+      Boolean(m.contract.freelancerAcceptedAt);
 
     return {
       id: m.id,
       contractId: m.contractId,
       title: m.title,
       amountMinor: m.amountMinor,
+      platformFeeMinor: fees.platformFeeFromFreelancerMinor,
+      providerFeeMinor: fees.paymentProviderFeeMinor,
+      clientFeeMinor: fees.platformFeeFromClientMinor,
+      clientTotalChargeMinor: fees.clientTotalChargeMinor,
+      netPayoutMinor: fees.freelancerNetMinor,
       dueDate: m.dueDate.toISOString(),
       escrowState: m.escrowState,
       deliverableUrl: m.deliverableUrl,
@@ -1527,6 +1549,15 @@ export async function listMilestonesForUser(
         status: m.contract.status,
         title: m.contract.job.title,
         category: m.contract.job.category,
+        clientName: displayNameOf(m.contract.client),
+        freelancerName: displayNameOf(m.contract.freelancer),
+        clientAcceptedAt: m.contract.clientAcceptedAt
+          ? m.contract.clientAcceptedAt.toISOString()
+          : null,
+        freelancerAcceptedAt: m.contract.freelancerAcceptedAt
+          ? m.contract.freelancerAcceptedAt.toISOString()
+          : null,
+        fullyExecuted,
       },
       counterparty: {
         id: counterparty.id,

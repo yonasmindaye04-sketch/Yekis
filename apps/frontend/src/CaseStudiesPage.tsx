@@ -23,7 +23,6 @@ import {
   type CaseStudyItem,
 } from "./caseStudiesData";
 import {
-  AnimatedCountUpStrip,
   ScrollIlluminatedHeadline,
   StickyScrollServicesStage,
   StudioBreadcrumb,
@@ -260,7 +259,6 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
   );
   const [activeCategory, setActiveCategory] = useState<CaseCategory>("ALL");
   const [activeDiscipline, setActiveDiscipline] = useState<Exclude<CaseCategory, "ALL">>("ENGINEERING");
-  const [activeTestimonialIdx, setActiveTestimonialIdx] = useState(0);
   const [selectedStudyId, setSelectedStudyId] = useState<string | null>(null);
   const [activeSpread, setActiveSpread] = useState<"all" | "1" | "2" | "3" | "4">("all");
 
@@ -281,8 +279,6 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
     if (activeCategory === "ALL") return CASE_STUDIES;
     return CASE_STUDIES.filter((item) => item.category === activeCategory);
   }, [activeCategory, CASE_STUDIES]);
-
-  const activeTestimonial = CASE_STUDIES[activeTestimonialIdx] ?? CASE_STUDIES[0];
 
   /* Lock background scroll when the Editorial Dossier modal is open */
   useEffect(() => {
@@ -580,28 +576,24 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                                 fontSize: 24,
                               }}
                             >
-                              {selectedStudy.quoteAuthor
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .slice(0, 2)}
+                              SAMPLE
                             </div>
                           </div>
                           <div className="cs-gold-box" style={{ padding: "12px 14px" }}>
                             <div style={{ fontWeight: 800, fontSize: 13.5, lineHeight: 1.2 }}>
-                              {selectedStudy.quoteAuthor}
+                              Sample workflow
                             </div>
                             <div style={{ fontSize: 11, marginTop: 4, opacity: 0.85, lineHeight: 1.35 }}>
-                              {selectedStudy.client} &middot; {selectedStudy.city}
+                              {selectedStudy.quoteRole}
                             </div>
                           </div>
                         </div>
 
-                        {/* Highlighted Quote & Words From Client Lead */}
+                        {/* Highlighted Workflow Summary */}
                         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                           <p style={{ fontSize: 14, lineHeight: 1.55, margin: 0 }}>
                             <span className="cs-gold-strip">
-                              &ldquo;{selectedStudy.quote}&rdquo;
+                              Sample escrow workflow — {selectedStudy.methodologyNote}
                             </span>
                           </p>
                           <div>
@@ -1190,7 +1182,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                           {selectedStudy.quote}
                         </p>
                         <div style={{ fontSize: 11, marginTop: 6, fontFamily: "var(--v2-font-mono)" }}>
-                          — {selectedStudy.quoteAuthor}, {selectedStudy.quoteRole}
+                          Sample workflow · {selectedStudy.quoteRole}
                         </div>
                       </div>
 
@@ -1553,14 +1545,6 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
 
             <div>
               <ScrollIlluminatedHeadline segments={copy.proofSegments} />
-
-              <AnimatedCountUpStrip
-                metrics={[
-                  { value: 394, suffix: copy.kpiVolumeSuffix, label: copy.kpiVolumeLabel },
-                  { value: 21, suffix: copy.kpiPhasesSuffix, label: copy.kpiPhasesLabel },
-                  { value: 100, suffix: "%", label: copy.kpiReleaseLabel },
-                ]}
-              />
             </div>
           </motion.div>
         </div>
@@ -1638,7 +1622,7 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
                             backdropFilter: "blur(6px)",
                           }}
                         >
-                          {study.outcomeMetric}
+                          {study.milestoneCount} {copy.milestonesLabel} · {study.rail}
                         </span>
                         <span
                           style={{
@@ -1717,66 +1701,6 @@ export function CaseStudiesPage({ onNavigate, onStart }: CaseStudiesPageProps) {
             };
           })}
         />
-      </section>
-
-      {/* ── SECTION 5: Vibrant Studio Green { TESTIMONIALS } Band (Image 2 Fifth Band) ── */}
-      <section className="cs-testi-band" aria-label={copy.testimonialsAria}>
-        <div className="cs-band-inner">
-          <motion.div
-            className="cs-testi-grid"
-            variants={sectionRevealVariants}
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.25 }}
-          >
-            <div className="cs-testi-left">
-              <span className="cs-kicker" style={{ color: "#0c1409" }}>
-                {copy.testimonialsKicker}
-              </span>
-
-              <div className="cs-testi-authors" role="tablist" aria-label={copy.chooseTestimonialAria}>
-                {CASE_STUDIES.map((study, idx) => (
-                  <button
-                    key={study.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={idx === activeTestimonialIdx}
-                    className={`cs-testi-author-btn ${idx === activeTestimonialIdx ? "is-active" : ""}`}
-                    onClick={() => setActiveTestimonialIdx(idx)}
-                  >
-                    <div style={{ fontWeight: 800, fontSize: 13 }}>{study.quoteAuthor}</div>
-                    <div style={{ fontSize: 11.5, opacity: 0.78 }}>{study.clientShort} &middot; {study.city}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTestimonial.id}
-                initial={{ opacity: 0, x: 18 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -18 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-              >
-                <blockquote className="cs-testi-quote">
-                  &ldquo;{activeTestimonial.quote}&rdquo;
-                </blockquote>
-
-                <button
-                  type="button"
-                  className="cs-testi-link"
-                  onClick={() => openStudyDossier(activeTestimonial)}
-                >
-                  <span>
-                    {copy.readDossierPrefix} {activeTestimonial.clientShort} {copy.readDossierSuffix}
-                  </span>
-                  <ArrowUpRight size={15} />
-                </button>
-              </motion.div>
-            </AnimatePresence>
-          </motion.div>
-        </div>
       </section>
 
       {/* ── SECTION 6: Dark Obsidian Studio CTA Band (Image 2 Bottom Band) ── */}

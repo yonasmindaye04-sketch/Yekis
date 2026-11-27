@@ -724,28 +724,88 @@ export function ConfirmActionModal({
   onConfirm,
   onCancel,
 }: ConfirmActionModalProps) {
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
+  const titleId = useId();
+
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !loading) onCancel();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open) {
+      if (!dialog.open && typeof dialog.showModal === "function") {
+        dialog.showModal();
+      }
+    } else if (dialog.open && typeof dialog.close === "function") {
+      dialog.close();
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const handleCancel = (e: Event) => {
+      if (loading) {
+        e.preventDefault();
+      }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, loading, onCancel]);
+    const handleClose = () => {
+      dialog.returnValue = "";
+      if (!loading) onCancel();
+    };
+    dialog.addEventListener("cancel", handleCancel);
+    dialog.addEventListener("close", handleClose);
+
+    const supportsClosedBy =
+      typeof HTMLDialogElement !== "undefined" &&
+      "closedBy" in HTMLDialogElement.prototype;
+    if (supportsClosedBy) {
+      return () => {
+        dialog.removeEventListener("cancel", handleCancel);
+        dialog.removeEventListener("close", handleClose);
+      };
+    }
+
+    let pressedOutside = false;
+    const isOutside = (e: PointerEvent) => {
+      const r = dialog.getBoundingClientRect();
+      return (
+        e.clientX < r.left ||
+        e.clientX > r.right ||
+        e.clientY < r.top ||
+        e.clientY > r.bottom
+      );
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      pressedOutside = isOutside(e);
+    };
+    const onPointerUp = (e: PointerEvent) => {
+      if (pressedOutside && isOutside(e) && dialog.open && !loading) {
+        dialog.close();
+      }
+      pressedOutside = false;
+    };
+    dialog.addEventListener("pointerdown", onPointerDown);
+    dialog.addEventListener("pointerup", onPointerUp);
+    return () => {
+      dialog.removeEventListener("cancel", handleCancel);
+      dialog.removeEventListener("close", handleClose);
+      dialog.removeEventListener("pointerdown", onPointerDown);
+      dialog.removeEventListener("pointerup", onPointerUp);
+    };
+  }, [loading, onCancel]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="yk-confirm-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="yk-confirm-title"
-      onClick={() => !loading && onCancel()}
+    <dialog
+      ref={dialogRef}
+      className="yk-confirm-native-dialog"
+      aria-labelledby={titleId}
+      {...(!loading ? ({ closedby: "any" } as Record<string, string>) : {})}
     >
-      <div className="yk-confirm-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="yk-confirm-dialog">
         <div className="yk-confirm-head">
-          <h3 id="yk-confirm-title">{title}</h3>
+          <h3 id={titleId}>{title}</h3>
           {amountEtb && <span className="yk-confirm-amount sh-mono">{amountEtb}</span>}
         </div>
         {description && <p className="yk-confirm-desc">{description}</p>}
@@ -763,6 +823,7 @@ export function ConfirmActionModal({
           <button
             type="button"
             className="btn-secondary"
+            autoFocus={tone === "danger" || tone === "warning"}
             disabled={loading}
             onClick={onCancel}
           >
@@ -778,12 +839,13 @@ export function ConfirmActionModal({
           </button>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
 export interface EscrowFeeBreakdownProps {
   grossEtb: number;
+  viewerRole?: "CLIENT" | "FREELANCER" | "ADMIN";
   /** Platform commission. Defaults to the backend's PLATFORM_FEE_RATE_FREELANCER. */
   feeRate?: number;
   /** Payment/disbursement provider fee. Defaults to PAYMENT_PROVIDER_FEE_RATE. */
@@ -794,6 +856,9 @@ export interface EscrowFeeBreakdownProps {
     grossLabel?: string;
     platformFeeLabel?: string;
     providerFeeLabel?: string;
+    clientFeeLabel?: string;
+    clientTotalLabel?: string;
+    clientFeeNote?: string;
     tinTaxLabel?: string;
     unverifiedTaxLabel?: string;
     netPayoutLabel?: string;
@@ -802,24 +867,21 @@ export interface EscrowFeeBreakdownProps {
 }
 
 /**
- * The two components the fee engine takes on a transaction: the platform
- * commission and the payment/disbursement provider fee. Together they are
- * the platform's overall take (7.5% by default), and what is left is the
- * freelancer's net payout.
+ * Role-aware escrow & fee split.
  *
- * The provider fee used to be charged at cash-out instead, so a user saw
- * 93% in their wallet and then a further deduction when they withdrew.
- * It is shown here alongside the commission so the take is one number the
- * user can see before they accept.
+ * Clients pay ETB 0 in platform fees; platform commission and provider fees
+ * are deducted from the freelancer payout on release.
  */
 export function EscrowFeeBreakdown({
   grossEtb,
+  viewerRole = "FREELANCER",
   feeRate = 0.07,
   providerFeeRate = 0.005,
   compact = false,
   labels,
 }: EscrowFeeBreakdownProps) {
   const safeGross = Number.isFinite(grossEtb) && grossEtb > 0 ? grossEtb : 0;
+  const isClientView = viewerRole === "CLIENT";
   const platformFee = Math.round(safeGross * feeRate * 100) / 100;
   const providerFee = Math.round(safeGross * providerFeeRate * 100) / 100;
   const totalFee = platformFee + providerFee;
@@ -828,32 +890,54 @@ export function EscrowFeeBreakdown({
   return (
     <div className={`yk-fee-breakdown ${compact ? "compact" : ""}`}>
       <div className="yk-fee-breakdown-head">
-        <strong>{labels?.title ?? "Escrow & Net Payout Breakdown"}</strong>
-        <span className="status-pill info">Escrow Protected</span>
+        <strong>{labels?.title ?? "Escrow & Fee Breakdown"}</strong>
+        <span className="sh-status-inline emerald">
+          <CheckCircle2 size={13} />
+          <span>Escrow Protected</span>
+        </span>
       </div>
       <div className="yk-fee-breakdown-rows">
         <div className="yk-fee-row">
           <span>{labels?.grossLabel ?? "Gross Amount"}</span>
           <strong className="sh-mono">{formatEtbMajor(safeGross)}</strong>
         </div>
-        <div className="yk-fee-row">
-          <span>
-            {labels?.platformFeeLabel ??
-              `Yekis Fee (${Math.round(feeRate * 100)}%)`}
-          </span>
-          <span className="sh-mono">− {formatEtbMajor(platformFee)}</span>
-        </div>
-        <div className="yk-fee-row">
-          <span>
-            {labels?.providerFeeLabel ??
-              `Payment Fee (${(providerFeeRate * 100).toFixed(1).replace(/\.0$/, "")}%)`}
-          </span>
-          <span className="sh-mono">− {formatEtbMajor(providerFee)}</span>
-        </div>
-        <div className="yk-fee-row total">
-          <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout"}</strong>
-          <strong className="sh-mono yk-fee-net">{formatEtbMajor(netPayout)}</strong>
-        </div>
+        {isClientView ? (
+          <>
+            <div className="yk-fee-row">
+              <span>{labels?.clientFeeLabel ?? "Client Fee"}</span>
+              <span className="sh-mono">{formatEtbMajor(0)}</span>
+            </div>
+            <div className="yk-fee-row total">
+              <strong>{labels?.clientTotalLabel ?? "Total Client Charge"}</strong>
+              <strong className="sh-mono yk-fee-net">{formatEtbMajor(safeGross)}</strong>
+            </div>
+            <p className="sh-cell-meta" style={{ margin: "6px 0 0" }}>
+              {labels?.clientFeeNote ??
+                "Platform fees are paid by the freelancer. You pay ETB 0 in fees."}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="yk-fee-row">
+              <span>
+                {labels?.platformFeeLabel ??
+                  `Yekis Fee (${Math.round(feeRate * 100)}%)`}
+              </span>
+              <span className="sh-mono">− {formatEtbMajor(platformFee)}</span>
+            </div>
+            <div className="yk-fee-row">
+              <span>
+                {labels?.providerFeeLabel ??
+                  `Payment Fee (${(providerFeeRate * 100).toFixed(1).replace(/\.0$/, "")}%)`}
+              </span>
+              <span className="sh-mono">− {formatEtbMajor(providerFee)}</span>
+            </div>
+            <div className="yk-fee-row total">
+              <strong>{labels?.netPayoutLabel ?? "Estimated Net Payout"}</strong>
+              <strong className="sh-mono yk-fee-net">{formatEtbMajor(netPayout)}</strong>
+            </div>
+          </>
+        )}
       </div>
       {!compact && (
         <p className="yk-fee-guarantee">

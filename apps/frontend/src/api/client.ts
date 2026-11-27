@@ -189,6 +189,12 @@ export interface Proposal {
   job?: { id: string; title: string; status: string; clientId: string; contract?: { id: string } | null };
 }
 
+export interface EscrowFeeConfig {
+  clientPlatformFeeRate: number;
+  freelancerPlatformFeeRate: number;
+  paymentProviderFeeRate: number;
+}
+
 export interface Milestone {
   id: string;
   contractId: string;
@@ -196,6 +202,11 @@ export interface Milestone {
   title: string;
   description?: string;
   amountMinor: number;
+  platformFeeMinor?: number;
+  providerFeeMinor?: number;
+  clientFeeMinor?: number;
+  clientTotalChargeMinor?: number;
+  netPayoutMinor?: number;
   dueDate: string;
   escrowState: string;
   deliverablePath?: string | null;
@@ -210,6 +221,11 @@ export interface Milestone {
     status?: string;
     title?: string;
     category?: string;
+    clientName?: string;
+    freelancerName?: string;
+    clientAcceptedAt?: string | null;
+    freelancerAcceptedAt?: string | null;
+    fullyExecuted?: boolean;
   } | null;
   /** The other party on the contract — the counterparty, not the caller. */
   counterparty?: {
@@ -2125,6 +2141,10 @@ class ApiClient {
   }
   async getContractDocumentUrl(contractId: string): Promise<{ url: string }> {
     return this.request(`/api/v1/contracts/${contractId}/document`);
+  }
+
+  async getEscrowFeeConfig(): Promise<EscrowFeeConfig> {
+    return this.request("/api/v1/escrow/fee-config");
   }
 
   async getMilestones(): Promise<Milestone[]> {

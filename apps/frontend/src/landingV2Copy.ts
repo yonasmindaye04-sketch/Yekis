@@ -480,6 +480,7 @@ export const ESCROW_STEP_ROWS_BY_LANG: Record<Language, EscrowRowCopy[][]> = {
 export type LandingV2ExtraCopy = {
   ratingAria: (rating: number) => string;
   escrowAria: string;
+  exampleLabel: string;
   feesEyebrow: string;
   feesTitle: string;
   feesSubtitle: string;
@@ -498,6 +499,7 @@ export const LANDING_V2_EXTRA: Record<Language, LandingV2ExtraCopy> = {
   en: {
     ratingAria: (r) => `${r} out of 5`,
     escrowAria: "How YEKIS works, step by step",
+    exampleLabel: "Example",
     feesEyebrow: "Yekis Jobs",
     feesTitle: "Make ideas visible.",
     feesSubtitle: "Where verified Ethiopian talent and ambitious teams build together.",
@@ -514,6 +516,7 @@ export const LANDING_V2_EXTRA: Record<Language, LandingV2ExtraCopy> = {
   am: {
     ratingAria: (r) => `ከ5 ${r} ደረጃ`,
     escrowAria: "YeKis እንዴት እንደሚሠራ፣ ደረጃ በደረጃ",
+    exampleLabel: "ምሳሌ",
     feesEyebrow: "YeKis ሥራዎች",
     feesTitle: "ሐሳቦችን እውን ያድርጉ።",
     feesSubtitle: "የተረጋገጡ የኢትዮጵያ ባለሙያዎች እና ታላቅ ቡድኖች በጋራ የሚገነቡበት መድረክ።",
@@ -530,6 +533,7 @@ export const LANDING_V2_EXTRA: Record<Language, LandingV2ExtraCopy> = {
   om: {
     ratingAria: (r) => `5 keessaa ${r}`,
     escrowAria: "Akkaataa YeKis itti hojjetu, sadarkaa sadarkaan",
+    exampleLabel: "Fakkeenya",
     feesEyebrow: "Hojiiwwan Yekis",
     feesTitle: "Yaada kee ifatti mul'isi.",
     feesSubtitle: "Bakka ogeeyyiin Itoophiyaa mirkanaa'anii fi gareen ciccimoon waliin ijaaran.",
@@ -546,6 +550,7 @@ export const LANDING_V2_EXTRA: Record<Language, LandingV2ExtraCopy> = {
   ti: {
     ratingAria: (r) => `ካብ 5 ${r}`,
     escrowAria: "YeKis ከመይ ከም ዝሰርሕ፣ ደረጃ ብደረጃ",
+    exampleLabel: "ኣብነት",
     feesEyebrow: "ስራሕቲ YeKis",
     feesTitle: "ሓሳባት ናብ ግብሪ ቀይር።",
     feesSubtitle: "ዝተረጋገጹ ኢትዮጵያውያን ክኢላታትን ዕላማ ዘለወን ጉጅለታትን ብሓባር ዝሃንጹሉ መድረኽ።",

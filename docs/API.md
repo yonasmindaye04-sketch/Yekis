@@ -277,6 +277,13 @@ Withdrawal body:
 
 Providers are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`. Wallet mismatch returns `202` with `HELD_FOR_REVIEW` and does not debit the wallet. A passing request creates a `PayoutTransaction`, initiates automated B2C disbursement via the provider (with deterministic sandbox simulation when credentials are not configured), posts double-entry ledger entries upon confirmation, and rolls back the wallet balance if the provider rejects the payout.
 
+### `GET /api/v1/escrow/fee-config`
+
+Authenticated endpoint returning the platform's active server fee rates from
+`getEscrowFeeConfig()` (`clientPlatformFeeRate`, `freelancerPlatformFeeRate`,
+and `paymentProviderFeeRate`) so dashboard views render accurate
+zero-client-fee vs. freelancer-deduction breakdowns without hardcoding percentages.
+
 ### `GET /api/v1/escrow/milestones` response
 
 Every row describes one milestone of the caller's own contract. The response
@@ -289,6 +296,11 @@ invent a counterparty, a contract name or a payment rail:
   "contractId": "ctr...",
   "title": "Phase 1: Telebirr H5 Checkout",
   "amountMinor": 6500000,
+  "platformFeeMinor": 650000,
+  "providerFeeMinor": 130000,
+  "clientFeeMinor": 0,
+  "clientTotalChargeMinor": 6500000,
+  "netPayoutMinor": 5720000,
   "dueDate": "2026-10-24T00:00:00.000Z",
   "escrowState": "WORK_IN_PROGRESS",
   "deliverableUrl": null,
@@ -300,7 +312,12 @@ invent a counterparty, a contract name or a payment rail:
     "jobId": "job...",
     "status": "ACTIVE",
     "title": "Telebirr SuperApp Mini-Program",
-    "category": "WEB_APP_DEVELOPMENT"
+    "category": "WEB_APP_DEVELOPMENT",
+    "clientName": "Dawit Mekonnen",
+    "freelancerName": "Hanna Tadesse",
+    "clientAcceptedAt": "2026-10-18T10:00:00.000Z",
+    "freelancerAcceptedAt": "2026-10-18T11:30:00.000Z",
+    "fullyExecuted": true
   },
   "counterparty": {
     "id": "usr...",

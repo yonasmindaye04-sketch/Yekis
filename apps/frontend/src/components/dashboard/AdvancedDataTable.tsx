@@ -16,7 +16,9 @@ import {
   X,
   LayoutList,
   Table2,
+  Info,
 } from "lucide-react";
+import type { EscrowFeeConfig } from "../../api/client";
 import type { LedgerContractRecord } from "./dashboardData";
 import { railLabel } from "./dashboardData";
 import { useShadcnLayout } from "./ShadcnLayoutContext";
@@ -27,8 +29,11 @@ import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 interface AdvancedDataTableProps {
   records: LedgerContractRecord[];
-  onOpenContracts?: () => void;
-  onStatusUpdate?: (id: string, nextState: LedgerContractRecord["escrowState"]) => void;
+  viewerRole?: "CLIENT" | "FREELANCER" | "ADMIN";
+  feeConfig?: EscrowFeeConfig | null;
+  onOpenContracts?: (contractId?: string) => void;
+  onOpenEscrow?: (milestoneId?: string) => void;
+  onRequestFundMilestone?: (record: LedgerContractRecord) => void;
 }
 
 type SortField = "title" | "counterparty" | "amountMinor" | "dueDate" | "escrowState";
@@ -59,12 +64,16 @@ const STATUS_META: Record<
 
 export function AdvancedDataTable({
   records,
+  viewerRole = "CLIENT",
+  feeConfig,
   onOpenContracts,
-  onStatusUpdate,
+  onOpenEscrow,
+  onRequestFundMilestone,
 }: AdvancedDataTableProps) {
   const { density } = useShadcnLayout();
   const { language } = useI18n();
   const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).table;
+  const isClientView = viewerRole === "CLIENT";
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [railFilter, setRailFilter] = useState<string>("ALL");
@@ -74,6 +83,7 @@ export function AdvancedDataTable({
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState<number>(1);
   const [colMenuOpen, setColMenuOpen] = useState(false);
+  const [feePopoverOpen, setFeePopoverOpen] = useState(false);
   const [inspectedRecord, setInspectedRecord] = useState<LedgerContractRecord | null>(null);
   const [mobileViewMode, setMobileViewMode] = useState<"cards" | "table">("cards");
 
@@ -84,6 +94,15 @@ export function AdvancedDataTable({
     dueDate: true,
     fee: true,
   });
+
+  const clientFeeNote = useMemo(() => {
+    if (!feeConfig) return copy.clientFeeZeroNote;
+    const totalPct = (
+      (feeConfig.freelancerPlatformFeeRate + feeConfig.paymentProviderFeeRate) *
+      100
+    ).toFixed(1).replace(/\.0$/, "");
+    return `${copy.clientFeeZeroNote} (${totalPct}%)`;
+  }, [copy.clientFeeZeroNote, feeConfig]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -152,31 +171,64 @@ export function AdvancedDataTable({
 
   const exportCsv = (subset?: LedgerContractRecord[]) => {
     const target = subset ?? filtered;
-    const headers = [
-      "Reference",
-      "Milestone Title",
-      "Contract",
-      "Counterparty",
-      "Category",
-      "Payment Rail",
-      "Escrow State",
-      "Amount (ETB)",
-      "Fee (ETB)",
-      "Due Date",
-    ];
+    const headers = isClientView
+      ? [
+          "Reference",
+          "Milestone Title",
+          "Contract",
+          "Counterparty",
+          "Category",
+          "Payment Rail",
+          "Escrow State",
+          "Gross Amount (ETB)",
+          "Client Fee (ETB)",
+          "Total Charge (ETB)",
+          "Due Date",
+        ]
+      : [
+          "Reference",
+          "Milestone Title",
+          "Contract",
+          "Counterparty",
+          "Category",
+          "Payment Rail",
+          "Escrow State",
+          "Gross Amount (ETB)",
+          "Platform Fee (ETB)",
+          "Provider Fee (ETB)",
+          "Net Payout (ETB)",
+          "Due Date",
+        ];
     const lines = target.map((r) =>
-      [
-        r.code,
-        `"${r.title.replace(/"/g, '""')}"`,
-        `"${r.contractTitle.replace(/"/g, '""')}"`,
-        `"${r.counterparty}"`,
-        `"${r.category}"`,
-        r.rail,
-        r.escrowState,
-        (r.amountMinor / 100).toFixed(2),
-        (r.feeMinor / 100).toFixed(2),
-        r.dueDate,
-      ].join(","),
+      (isClientView
+        ? [
+            r.code,
+            `"${r.title.replace(/"/g, '""')}"`,
+            `"${r.contractTitle.replace(/"/g, '""')}"`,
+            `"${r.counterparty}"`,
+            `"${r.category}"`,
+            r.rail,
+            r.escrowState,
+            (r.amountMinor / 100).toFixed(2),
+            (r.clientFeeMinor / 100).toFixed(2),
+            (r.clientTotalChargeMinor / 100).toFixed(2),
+            r.dueDate,
+          ]
+        : [
+            r.code,
+            `"${r.title.replace(/"/g, '""')}"`,
+            `"${r.contractTitle.replace(/"/g, '""')}"`,
+            `"${r.counterparty}"`,
+            `"${r.category}"`,
+            r.rail,
+            r.escrowState,
+            (r.amountMinor / 100).toFixed(2),
+            (r.platformFeeMinor / 100).toFixed(2),
+            (r.providerFeeMinor / 100).toFixed(2),
+            (r.netPayoutMinor / 100).toFixed(2),
+            r.dueDate,
+          ]
+      ).join(","),
     );
     const csv = [headers.join(","), ...lines].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -243,7 +295,7 @@ export function AdvancedDataTable({
                     ["category", copy.colCategory],
                     ["rail", copy.colRail],
                     ["dueDate", copy.colDueDate],
-                    ["fee", copy.colFee],
+                    ["fee", isClientView ? copy.thClientFee : copy.colFee],
                   ] as const
                 ).map(([key, label]) => (
                   <label key={key} className="sh-dropdown-check">
@@ -370,6 +422,7 @@ export function AdvancedDataTable({
           pagedRows.map((row) => {
             const statusInfo = STATUS_META[row.escrowState];
             const isSelected = selectedIds.has(row.id);
+            const totalFeeMinor = row.platformFeeMinor + row.providerFeeMinor;
             return (
               <article
                 key={row.id}
@@ -419,8 +472,9 @@ export function AdvancedDataTable({
                       })}
                     </strong>
                     <span className="sh-cell-meta sh-mono" style={{ display: "block" }}>
-                      {copy.duePrefix(row.dueDate)} · {copy.feePrefix}{" "}
-                      {(row.feeMinor / 100).toLocaleString()}
+                      {isClientView
+                        ? `${copy.duePrefix(row.dueDate)} · ${copy.thClientFee}: ETB ${(row.clientFeeMinor / 100).toLocaleString()}`
+                        : `${copy.duePrefix(row.dueDate)} · ${copy.feePrefix} ${(totalFeeMinor / 100).toLocaleString()} · ${copy.thNetPayout} ${(row.netPayoutMinor / 100).toLocaleString()}`}
                     </span>
                   </div>
                   <button
@@ -536,14 +590,50 @@ export function AdvancedDataTable({
                   )}
                 </button>
               </th>
-              {visibleCols.fee && <th className="sh-num-col">{copy.thFee10}</th>}
+              {visibleCols.fee && isClientView && (
+                <>
+                  <th className="sh-num-col" style={{ position: "relative" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span>{copy.thClientFee}</span>
+                      <button
+                        type="button"
+                        className="sh-icon-only-btn compact"
+                        aria-label={copy.clientFeeZeroTitle}
+                        aria-expanded={feePopoverOpen}
+                        title={clientFeeNote}
+                        onClick={() => setFeePopoverOpen((o) => !o)}
+                      >
+                        <Info size={12} />
+                      </button>
+                    </span>
+                    {feePopoverOpen && (
+                      <div
+                        className="sh-dropdown-menu"
+                        role="note"
+                        style={{ right: 0, width: 240, whiteSpace: "normal", textAlign: "left", fontWeight: 400 }}
+                      >
+                        <div className="sh-dropdown-title">{copy.clientFeeZeroTitle}</div>
+                        <p className="sh-cell-meta" style={{ margin: 0 }}>{clientFeeNote}</p>
+                      </div>
+                    )}
+                  </th>
+                  <th className="sh-num-col">{copy.thClientTotal}</th>
+                </>
+              )}
+              {visibleCols.fee && !isClientView && (
+                <>
+                  <th className="sh-num-col">{copy.thFee}</th>
+                  <th className="sh-num-col">{copy.thProviderFee}</th>
+                  <th className="sh-num-col">{copy.thNetPayout}</th>
+                </>
+              )}
               <th className="sh-num-col">{copy.thActions}</th>
             </tr>
           </thead>
           <tbody>
             {pagedRows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="sh-table-empty">
+                <td colSpan={11} className="sh-table-empty">
                   {copy.emptyMsg}
                 </td>
               </tr>
@@ -611,25 +701,92 @@ export function AdvancedDataTable({
                         maximumFractionDigits: 2,
                       })}
                     </td>
-                    {visibleCols.fee && (
-                      <td className="sh-num-col sh-mono sh-text-muted">
-                        {(row.feeMinor / 100).toLocaleString(undefined, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}
-                      </td>
+                    {visibleCols.fee && isClientView && (
+                      <>
+                        <td className="sh-num-col sh-mono sh-text-muted">
+                          {(row.clientFeeMinor / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="sh-num-col sh-mono sh-font-semibold">
+                          {(row.clientTotalChargeMinor / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                      </>
+                    )}
+                    {visibleCols.fee && !isClientView && (
+                      <>
+                        <td className="sh-num-col sh-mono sh-text-muted">
+                          {(row.platformFeeMinor / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="sh-num-col sh-mono sh-text-muted">
+                          {(row.providerFeeMinor / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                        <td className="sh-num-col sh-mono sh-font-semibold">
+                          {(row.netPayoutMinor / 100).toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                          })}
+                        </td>
+                      </>
                     )}
                     <td
                       className="sh-num-col"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      <button
-                        type="button"
-                        className="sh-row-action-btn"
-                        onClick={() => setInspectedRecord(row)}
-                      >
-                        {copy.inspectBtn} <ExternalLink size={12} />
-                      </button>
+                      <div style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                        {isClientView &&
+                          row.escrowState === "PAYMENT_PENDING" &&
+                          row.contractFullyExecuted !== false &&
+                          onRequestFundMilestone && (
+                            <button
+                              type="button"
+                              className="sh-btn sh-btn-primary sh-btn-compact"
+                              onClick={() => onRequestFundMilestone(row)}
+                            >
+                              {copy.fundMilestoneBtn}
+                            </button>
+                          )}
+                        {isClientView &&
+                          row.escrowState === "SUBMITTED_FOR_REVIEW" &&
+                          onOpenEscrow && (
+                            <button
+                              type="button"
+                              className="sh-row-action-btn"
+                              onClick={() => onOpenEscrow(row.id)}
+                            >
+                              {copy.reviewReleaseBtn}
+                            </button>
+                          )}
+                        {!isClientView &&
+                          (row.escrowState === "ESCROW_HELD" ||
+                            row.escrowState === "WORK_IN_PROGRESS") &&
+                          onOpenEscrow && (
+                            <button
+                              type="button"
+                              className="sh-row-action-btn"
+                              onClick={() => onOpenEscrow(row.id)}
+                            >
+                              {copy.submitDeliveryBtn}
+                            </button>
+                          )}
+                        <button
+                          type="button"
+                          className="sh-row-action-btn"
+                          onClick={() => setInspectedRecord(row)}
+                        >
+                          {copy.inspectBtn} <ExternalLink size={12} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -727,7 +884,10 @@ export function AdvancedDataTable({
                 <div className="sh-kv-row">
                   <span>{copy.detailCounterparty}</span>
                   <strong>
-                    {inspectedRecord.counterparty} ({inspectedRecord.counterpartyEmail})
+                    {inspectedRecord.counterparty}
+                    {inspectedRecord.counterpartyEmail
+                      ? ` (${inspectedRecord.counterpartyEmail})`
+                      : ""}
                   </strong>
                 </div>
                 <div className="sh-kv-row">
@@ -740,22 +900,46 @@ export function AdvancedDataTable({
                     ETB {(inspectedRecord.amountMinor / 100).toLocaleString()}
                   </strong>
                 </div>
-                <div className="sh-kv-row">
-                  <span>{copy.detailFee}</span>
-                  <strong className="sh-mono">
-                    ETB {(inspectedRecord.feeMinor / 100).toLocaleString()}
-                  </strong>
-                </div>
-                <div className="sh-kv-row">
-                  <span>{copy.detailNet}</span>
-                  <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
-                    ETB{" "}
-                    {(
-                      (inspectedRecord.amountMinor - inspectedRecord.feeMinor) /
-                      100
-                    ).toLocaleString()}
-                  </strong>
-                </div>
+                {isClientView ? (
+                  <>
+                    <div className="sh-kv-row">
+                      <span>{copy.detailClientFee}</span>
+                      <strong className="sh-mono">
+                        ETB {(inspectedRecord.clientFeeMinor / 100).toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="sh-kv-row">
+                      <span>{copy.detailClientTotal}</span>
+                      <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                        ETB {(inspectedRecord.clientTotalChargeMinor / 100).toLocaleString()}
+                      </strong>
+                    </div>
+                    <p className="sh-cell-meta" style={{ margin: "6px 0 0" }}>
+                      {clientFeeNote}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="sh-kv-row">
+                      <span>{copy.detailFee}</span>
+                      <strong className="sh-mono">
+                        ETB {(inspectedRecord.platformFeeMinor / 100).toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="sh-kv-row">
+                      <span>{copy.detailProviderFee}</span>
+                      <strong className="sh-mono">
+                        ETB {(inspectedRecord.providerFeeMinor / 100).toLocaleString()}
+                      </strong>
+                    </div>
+                    <div className="sh-kv-row">
+                      <span>{copy.detailNet}</span>
+                      <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                        ETB {(inspectedRecord.netPayoutMinor / 100).toLocaleString()}
+                      </strong>
+                    </div>
+                  </>
+                )}
                 <div className="sh-kv-row">
                   <span>{copy.detailDueDate}</span>
                   <strong className="sh-mono">{inspectedRecord.dueDate}</strong>
@@ -766,48 +950,105 @@ export function AdvancedDataTable({
                 </div>
               </div>
 
-              {onStatusUpdate && (
-                <div className="sh-customizer-group" style={{ marginTop: 18 }}>
-                  <label className="sh-customizer-label">{copy.updateStageLabel}</label>
-                  <div className="sh-customizer-grid-2">
-                    {(
-                      [
-                        ["ESCROW_HELD", copy.statuses.ESCROW_HELD],
-                        ["WORK_IN_PROGRESS", copy.statuses.WORK_IN_PROGRESS],
-                        ["SUBMITTED_FOR_REVIEW", copy.statuses.SUBMITTED_FOR_REVIEW],
-                        ["RELEASED", copy.stageReleasePayout],
-                      ] as const
-                    ).map(([st, lbl]) => (
+              <div className="sh-customizer-group" style={{ marginTop: 18 }}>
+                <span className="sh-customizer-label">{copy.actionsLabel}</span>
+                {isClientView &&
+                  inspectedRecord.escrowState === "PAYMENT_PENDING" &&
+                  inspectedRecord.contractFullyExecuted === false && (
+                    <p className="sh-cell-meta" style={{ margin: "0 0 10px" }}>
+                      {copy.awaitingSignatureNote}
+                    </p>
+                  )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {isClientView &&
+                    inspectedRecord.escrowState === "PAYMENT_PENDING" &&
+                    inspectedRecord.contractFullyExecuted !== false &&
+                    onRequestFundMilestone && (
                       <button
-                        key={st}
                         type="button"
-                        className={`sh-choice-btn ${inspectedRecord.escrowState === st ? "active" : ""}`}
+                        className="sh-btn sh-btn-primary"
                         onClick={() => {
-                          onStatusUpdate(inspectedRecord.id, st);
-                          setInspectedRecord({
-                            ...inspectedRecord,
-                            escrowState: st,
-                          });
+                          const target = inspectedRecord;
+                          setInspectedRecord(null);
+                          onRequestFundMilestone(target);
                         }}
                       >
-                        <span className="sh-choice-head">
-                          <span>{lbl}</span>
-                        </span>
+                        {copy.fundMilestoneBtn}
                       </button>
-                    ))}
-                  </div>
+                    )}
+                  {isClientView &&
+                    inspectedRecord.escrowState === "SUBMITTED_FOR_REVIEW" &&
+                    onOpenEscrow && (
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-primary"
+                        onClick={() => {
+                          const targetId = inspectedRecord.id;
+                          setInspectedRecord(null);
+                          onOpenEscrow(targetId);
+                        }}
+                      >
+                        {copy.reviewReleaseBtn}
+                      </button>
+                    )}
+                  {!isClientView &&
+                    (inspectedRecord.escrowState === "ESCROW_HELD" ||
+                      inspectedRecord.escrowState === "WORK_IN_PROGRESS") &&
+                    onOpenEscrow && (
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-primary"
+                        onClick={() => {
+                          const targetId = inspectedRecord.id;
+                          setInspectedRecord(null);
+                          onOpenEscrow(targetId);
+                        }}
+                      >
+                        {copy.submitDeliveryBtn}
+                      </button>
+                    )}
+                  {(inspectedRecord.escrowState === "ESCROW_HELD" ||
+                    inspectedRecord.escrowState === "WORK_IN_PROGRESS" ||
+                    inspectedRecord.escrowState === "SUBMITTED_FOR_REVIEW") &&
+                    onOpenEscrow && (
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn-secondary"
+                        onClick={() => {
+                          const targetId = inspectedRecord.id;
+                          setInspectedRecord(null);
+                          onOpenEscrow(targetId);
+                        }}
+                      >
+                        {copy.disputeBtn}
+                      </button>
+                    )}
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="sh-sheet-footer" style={{ display: "flex", gap: 8 }}>
+              {onOpenEscrow && (
+                <button
+                  type="button"
+                  className="sh-btn sh-btn-secondary"
+                  onClick={() => {
+                    const targetId = inspectedRecord.id;
+                    setInspectedRecord(null);
+                    onOpenEscrow(targetId);
+                  }}
+                >
+                  {copy.openEscrowBtn}
+                </button>
+              )}
               {onOpenContracts && (
                 <button
                   type="button"
                   className="sh-btn sh-btn-primary"
                   onClick={() => {
+                    const cId = inspectedRecord.contractId;
                     setInspectedRecord(null);
-                    onOpenContracts();
+                    onOpenContracts(cId);
                   }}
                   style={{ flex: 1, justifyContent: "center" }}
                 >

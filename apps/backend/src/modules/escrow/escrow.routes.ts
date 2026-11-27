@@ -24,6 +24,7 @@ import {
   EscrowAdminHoldError,
   PhoneNotVerifiedError,
 } from "./escrow.service.js";
+import { getEscrowFeeConfig } from "./fees.js";
 import { WithdrawalHeldForReviewError } from "../tms/tms.service.js";
 import {
   requestWithdrawalOtp,
@@ -248,6 +249,14 @@ escrowRouter.post(
       logger.error({ err }, "Failed to accept milestone delivery");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
+  },
+);
+
+escrowRouter.get(
+  "/fee-config",
+  requireAuth,
+  (_req: AuthedRequest, res) => {
+    return res.json(getEscrowFeeConfig());
   },
 );
 
