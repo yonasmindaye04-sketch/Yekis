@@ -243,6 +243,97 @@ function isForeignKeyViolation(err: unknown): boolean {
 }
 
 /**
+ * Prisma error codes that mean "the database could not be reached right now",
+ * as opposed to "the database said no". They are worth retrying.
+ */
+const TRANSIENT_DB_CODES = new Set([
+  "P1001", // Can't reach database server
+  "P1002", // The database server was reached but timed out
+  "P1008", // Operation timed out
+  "P1017", // The server closed the connection
+]);
+
+/**
+ * The server-side wording of a connection that was refused because the
+ * database had no free slot for it. The managed PostgreSQL on AletCloud
+ * reports this as a FATAL, and Prisma surfaces it with the message tucked
+ * into `meta.message`.
+ */
+const TRANSIENT_DB_MESSAGE =
+  /remaining connection slots|too many clients|too many connections|connection pool timeout|can't reach database server|server closed the connection|terminating connection|connection reset|econnreset/i;
+
+/**
+ * Decides whether a failure is a transient database problem worth retrying.
+ *
+ * This matters because the purge runs at start-up, and a start-up overlaps the
+ * previous deployment: for a few seconds the old process and the new one hold
+ * connection pools at the same time, and the managed database refuses new
+ * connections until the old process lets go of its pool. The run is
+ * idempotent, so waiting a few seconds and trying again is the correct
+ * response — not a failure.
+ *
+ * Exported so the rule can be unit-tested without a database.
+ */
+export function isTransientDatabaseError(err: unknown): boolean {
+  if (typeof err !== "object" || err === null) return false;
+  const candidate = err as {
+    code?: unknown;
+    message?: unknown;
+    meta?: { message?: unknown } | null;
+  };
+  if (typeof candidate.code === "string" && TRANSIENT_DB_CODES.has(candidate.code)) {
+    return true;
+  }
+  for (const text of [candidate.message, candidate.meta?.message]) {
+    if (typeof text === "string" && TRANSIENT_DB_MESSAGE.test(text)) return true;
+  }
+  return false;
+}
+
+/** How many times a transient database failure is retried. */
+const TRANSIENT_RETRY_ATTEMPTS = 8;
+/** How long to wait between attempts, in milliseconds. */
+const TRANSIENT_RETRY_DELAY_MS = 5000;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Runs `work`, retrying it when the database is momentarily unavailable.
+ *
+ * Every step of the purge is idempotent — the plan is recomputed from the
+ * rows that are still there — so a retry can only finish the job, never
+ * repeat it.
+ */
+export async function withTransientDatabaseRetry<T>(
+  label: string,
+  work: () => Promise<T>,
+  options: { attempts?: number; delayMs?: number } = {},
+): Promise<T> {
+  const attempts = options.attempts ?? TRANSIENT_RETRY_ATTEMPTS;
+  const delayMs = options.delayMs ?? TRANSIENT_RETRY_DELAY_MS;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await work();
+    } catch (err) {
+      if (!isTransientDatabaseError(err)) throw err;
+      lastError = err;
+      if (attempt === attempts) break;
+      logger.warn(
+        { attempt, label },
+        "the database was busy; the demo cleanup waits and tries again",
+      );
+      await delay(delayMs);
+    }
+  }
+  throw lastError;
+}
+
+/**
  * The normalised value of `DEMO_CLEANUP`. Empty when the feature is off.
  * Exported so the refusal behaviour can be unit-tested without a database.
  */
@@ -795,6 +886,10 @@ export async function executeDemoPurge(plan: DemoPurgePlan): Promise<DemoPurgeRe
 /**
  * The start-up hook. Inert unless `DEMO_CLEANUP` is set to `dry-run` or
  * `confirm`; the operator removes the variable once the data is gone.
+ *
+ * The whole run is retried when the database is momentarily unavailable: a
+ * start-up overlaps the deployment it replaces, and the old process may still
+ * be holding its connection pool when the new one asks for one.
  */
 export async function purgeDemoDataFromEnv(
   env: NodeJS.ProcessEnv = process.env,
@@ -810,57 +905,79 @@ export async function purgeDemoDataFromEnv(
     return { outcome: "rejected" };
   }
 
-  const plan = await planDemoPurge();
-  const summary = {
-    mode,
-    targetCount: plan.targets.length,
-    targets: plan.targets.map((target) => target.email),
-    userCountBefore: plan.userCountBefore,
-    totalRows: plan.totalRows,
-    counts: plan.counts,
-    blockers: plan.blockers,
-    absorbedChatRows: plan.absorbedChatRows.map((row) => ({
-      kind: row.kind,
-      member: row.memberEmail,
-      conversation: row.conversationSubject,
-    })),
-  };
+  // Whether any attempt found a target account. A retry that finds none may
+  // simply be the retry of a run that already did the work.
+  let sawTargets = false;
 
-  if (plan.blockers.length > 0) {
-    logger.error(
-      summary,
-      "Demo cleanup refused: rows are shared with accounts that are not targets. Nothing was deleted.",
-    );
-    return { outcome: "blocked" };
-  }
+  return withTransientDatabaseRetry(`demo cleanup (${mode})`, async () => {
+    const plan = await planDemoPurge();
+    if (plan.targets.length > 0) sawTargets = true;
+    const summary = {
+      mode,
+      targetCount: plan.targets.length,
+      targets: plan.targets.map((target) => target.email),
+      userCountBefore: plan.userCountBefore,
+      totalRows: plan.totalRows,
+      counts: plan.counts,
+      blockers: plan.blockers,
+      absorbedChatRows: plan.absorbedChatRows.map((row) => ({
+        kind: row.kind,
+        member: row.memberEmail,
+        conversation: row.conversationSubject,
+      })),
+    };
 
-  if (plan.targets.length === 0) {
+    if (plan.blockers.length > 0) {
+      logger.error(
+        summary,
+        "Demo cleanup refused: rows are shared with accounts that are not targets. Nothing was deleted.",
+      );
+      return { outcome: "blocked" as const };
+    }
+
+    if (plan.targets.length === 0) {
+      // A previous attempt may have deleted the last targets and then lost the
+      // connection while verifying it. The end state is what matters, and it
+      // is exactly the one this branch reports: no target account is left.
+      if (sawTargets) {
+        logger.warn(
+          { mode, userCountBefore: plan.userCountBefore },
+          "Demo cleanup finished: the seeded demo and automated test data are gone",
+        );
+        return { outcome: "purged" as const };
+      }
+      logger.warn(
+        { mode, userCountBefore: plan.userCountBefore },
+        "Demo cleanup: no target accounts found; nothing to do",
+      );
+      return { outcome: "nothing-to-do" as const };
+    }
+
     logger.warn(
-      { mode, userCountBefore: plan.userCountBefore },
-      "Demo cleanup: no target accounts found; nothing to do",
+      summary,
+      mode === DEMO_CLEANUP_DRY_RUN
+        ? "Demo cleanup dry run: nothing was deleted"
+        : "Demo cleanup: deleting the seeded demo and automated test data",
     );
-    return { outcome: "nothing-to-do" };
-  }
 
-  logger.warn(
-    summary,
-    mode === DEMO_CLEANUP_DRY_RUN
-      ? "Demo cleanup dry run: nothing was deleted"
-      : "Demo cleanup: deleting the seeded demo and automated test data",
-  );
+    if (mode === DEMO_CLEANUP_DRY_RUN) return { outcome: "dry-run" as const };
 
-  if (mode === DEMO_CLEANUP_DRY_RUN) return { outcome: "dry-run" };
-
-  const result = await executeDemoPurge(plan);
-  logger.warn(
-    {
-      deleted: result.deleted,
-      totalDeleted: result.totalDeleted,
-      totalRowsPlanned: result.totalRowsPlanned,
-      cascaded: result.cascaded,
-      userCountAfter: result.userCountAfter,
-    },
-    "Demo cleanup finished: the seeded demo and automated test data are gone",
-  );
-  return { outcome: "purged" };
+    // The deletes run with the plan this attempt computed. If the connection
+    // drops mid-way the same plan is replayed: the rows that are already gone
+    // simply match nothing, and the rest are deleted.
+    const result = await withTransientDatabaseRetry("demo cleanup deletes", () =>
+      executeDemoPurge(plan),
+    );
+    logger.warn(
+      {
+        deleted: result.deleted,
+        totalDeleted: result.totalDeleted,
+        totalRowsPlanned: result.totalRowsPlanned,
+        cascaded: result.cascaded,
+        userCountAfter: result.userCountAfter,
+      },
+      "Demo cleanup finished: the seeded demo and automated test data are gone",
+    );
+    return { outcome: "purged" as const };
+  });
 }

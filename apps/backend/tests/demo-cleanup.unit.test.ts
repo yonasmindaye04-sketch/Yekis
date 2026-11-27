@@ -13,6 +13,8 @@ const {
   readCleanupMode,
   validateTargets,
   classifySharedChatRows,
+  isTransientDatabaseError,
+  withTransientDatabaseRetry,
   SEEDED_DEMO_EMAILS,
   PROTECTED_EMAILS,
 } = await import("../src/bootstrap/demoCleanup.js");
@@ -174,5 +176,106 @@ describe("classifySharedChatRows", () => {
     expect(verdict.absorbed).toHaveLength(1);
     expect(verdict.absorbed[0]?.memberEmail).toBe("admin@yekis.et");
     expect(targetIds.has(verdict.absorbed[0]!.memberUserId)).toBe(false);
+  });
+});
+
+describe("isTransientDatabaseError", () => {
+  it("recognises a Prisma error code for an unreachable database", () => {
+    expect(isTransientDatabaseError({ code: "P1001" })).toBe(true);
+    expect(isTransientDatabaseError({ code: "P1002" })).toBe(true);
+    expect(isTransientDatabaseError({ code: "P1017" })).toBe(true);
+  });
+
+  it("recognises the managed database refusing a connection", () => {
+    // The exact shape the AletCloud PostgreSQL produces when a deployment
+    // overlaps the one it replaces: the FATAL text arrives in `meta.message`.
+    expect(
+      isTransientDatabaseError({
+        name: "PrismaClientKnownRequestError",
+        code: "P1001",
+        meta: {
+          modelName: "User",
+          message:
+            "FATAL: remaining connection slots are reserved for roles with the SUPERUSER attribute",
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("recognises the wording even without a Prisma error code", () => {
+    expect(
+      isTransientDatabaseError({ message: "sorry, too many clients already" }),
+    ).toBe(true);
+    expect(
+      isTransientDatabaseError({
+        meta: { message: "FATAL: remaining connection slots are reserved" },
+      }),
+    ).toBe(true);
+  });
+
+  it("does not retry a refusal that is not about connections", () => {
+    expect(isTransientDatabaseError({ code: "P2003", message: "foreign key" })).toBe(
+      false,
+    );
+    expect(isTransientDatabaseError({ message: "permission denied" })).toBe(false);
+    expect(isTransientDatabaseError(new Error("something else"))).toBe(false);
+  });
+
+  it("does not retry a value that is not an error", () => {
+    expect(isTransientDatabaseError(null)).toBe(false);
+    expect(isTransientDatabaseError(undefined)).toBe(false);
+    expect(isTransientDatabaseError("P1001")).toBe(false);
+  });
+});
+
+describe("withTransientDatabaseRetry", () => {
+  it("retries a busy database and returns the eventual result", async () => {
+    let calls = 0;
+    const result = await withTransientDatabaseRetry(
+      "test",
+      async () => {
+        calls += 1;
+        if (calls < 3) {
+          throw {
+            code: "P1001",
+            meta: { message: "FATAL: remaining connection slots are reserved" },
+          };
+        }
+        return "done";
+      },
+      { attempts: 5, delayMs: 0 },
+    );
+    expect(result).toBe("done");
+    expect(calls).toBe(3);
+  });
+
+  it("does not retry a failure that is not about connections", async () => {
+    let calls = 0;
+    await expect(
+      withTransientDatabaseRetry(
+        "test",
+        async () => {
+          calls += 1;
+          throw new Error("permission denied");
+        },
+        { attempts: 5, delayMs: 0 },
+      ),
+    ).rejects.toThrow("permission denied");
+    expect(calls).toBe(1);
+  });
+
+  it("gives up after the attempts and reports the last failure", async () => {
+    let calls = 0;
+    await expect(
+      withTransientDatabaseRetry(
+        "test",
+        async () => {
+          calls += 1;
+          throw { code: "P1001" };
+        },
+        { attempts: 3, delayMs: 0 },
+      ),
+    ).rejects.toMatchObject({ code: "P1001" });
+    expect(calls).toBe(3);
   });
 });

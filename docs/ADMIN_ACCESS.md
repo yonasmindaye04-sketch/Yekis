@@ -238,6 +238,16 @@ the engine instead retries each row in dependency order. A partial run is safe t
 is recomputed from what is left. After the deletes it re-queries every planned id, asserts the
 administrator still exists, and asserts the user count fell by exactly the number of targets.
 
+**A busy database is waited out, not treated as a failure.** The purge runs at start-up, and a
+start-up overlaps the deployment it replaces: for a few seconds the outgoing process and the
+incoming one hold connection pools at the same time, and the managed PostgreSQL refuses new
+connections until the outgoing process lets go of its pool. When that happens the run logs
+`the database was busy; the demo cleanup waits and tries again` and tries again every five seconds
+for up to eight attempts. Every step is idempotent, so a retry finishes the job rather than
+repeating it — and the end state is checked the same way whether the run took one attempt or
+several. Only a non-connection failure (a shared row, a missing primary key) stops the run
+immediately, and it stops it **before** anything is written.
+
 On a machine that *can* reach the database, the same engine has a manual runner:
 
 ```bash
