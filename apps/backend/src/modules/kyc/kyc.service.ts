@@ -401,6 +401,7 @@ export async function upgradeToTier2(params: {
  */
 export async function reviewKycRecord(params: {
   staffUserId: string;
+  staffRole?: string | null;
   targetUserId: string;
   decision: "VERIFIED" | "REJECTED";
   rejectionReason?: string;
@@ -409,6 +410,15 @@ export async function reviewKycRecord(params: {
     where: { userId: params.targetUserId },
   });
   if (!kyc) throw new KycNotFoundError();
+  const actorRole =
+    params.staffRole ||
+    (
+      await prisma.user.findUnique({
+        where: { id: params.staffUserId },
+        select: { staffRole: true },
+      })
+    )?.staffRole ||
+    null;
 
   // On rejection, `tier` reverts to the last tier that actually passed â€”
   // NOT left sitting at the rejected, never-verified tier. If this is a
@@ -472,12 +482,17 @@ export async function reviewKycRecord(params: {
   });
 
   await recordAuditEvent({
-    userId: params.targetUserId,
+    userId: params.staffUserId,
+    actorRole,
     eventType:
       params.decision === "VERIFIED" ? "KYC_MANUALLY_VERIFIED" : "KYC_REJECTED",
+    action: params.decision === "VERIFIED" ? "kyc.verify" : "kyc.reject",
     entityType: "KycRecord",
     entityId: kyc.id,
+    previousState: { status: kyc.status, tier: kyc.tier },
+    newState: { status: updated.status, tier: updated.tier },
     metadata: {
+      targetUserId: params.targetUserId,
       reviewedBy: params.staffUserId,
       reason: params.rejectionReason,
       revertedTier: params.decision === "REJECTED" ? revertedTier : undefined,

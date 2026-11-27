@@ -5,6 +5,9 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Fixed
+- **OPS-12 — Staff audit actor attribution, KYC hotkey confirmation dialogs, and badge refresh (`kyc.service.ts`, `kyc.routes.ts`, `tms.service.ts`, `KycQueue.tsx`, `Risk.tsx`) (2026-11-27)**:
+  - **Audit actor attribution**: Fixed `reviewKycRecord()` so `KYC_MANUALLY_VERIFIED` and `KYC_REJECTED` audit events record `staffUserId` and `actorRole` (with `targetUserId` in `metadata`) rather than attributing the approval/rejection to the KYC applicant. Also fixed `USER_SUSPENDED_STR` and `USER_COMPLIANCE_LIFTED` in `tms.service.ts` to record `staffUserId` as the audit actor.
+  - **Hotkey & button confirmations**: Updated `KycQueue.tsx` so `A` (`Approve`) and `R` (`Reject`) hotkeys and action buttons open an accessible `<dialog>` `OpsActionModal` confirmation (requiring a rejection reason on `Reject` and never auto-committing on keypress), and added missing `ui.refreshBadges()` calls in `Risk.tsx`.
 - **OPS-02 — Server-computed disputed milestone amounts across dispute queue & overview (`dispute.service.ts`, `opsBackend.ts`, `opsApi.ts`) (2026-11-27)**:
   - **Root cause**: `toDispute()` summed all `contract.milestones` instead of the disputed milestone (`ETB 64,000` on `seed-contract-brand` instead of `ETB 22,000` + `ETB 9,000` = `ETB 31,000`).
   - **Fix**: Added `extractDisputedMilestoneContext()` in `dispute.service.ts` returning `disputedAmountMinor` and `disputedMilestone` on every `getMediationQueue()` item, and updated `toDispute()` to read `disputedAmountMinor` (falling back only to `milestoneId` / `DISPUTED` milestones) so Dispute Mediation, Action Center, SLA Schedule, Workboard, and Reports all display the exact disputed amount.

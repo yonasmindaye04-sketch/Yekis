@@ -33,6 +33,7 @@ import {
   Pill,
   useToast,
 } from "../components/ui";
+import { useOpsUi } from "../opsUiContext";
 
 type RiskDialogState =
   | { kind: "str"; flag: RiskFlag }
@@ -41,6 +42,7 @@ type RiskDialogState =
   | null;
 
 export default function Risk() {
+  const ui = useOpsUi();
   const toast = useToast();
   const [flagType, setFlagType] = useState("");
   const [status, setStatus] = useState("PENDING_REVIEW");
@@ -78,6 +80,7 @@ export default function Risk() {
       setDialog(null);
       setOpenId(null);
       reload();
+      ui.refreshBadges();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Compliance action failed");
     } finally {

@@ -604,11 +604,15 @@ export async function fileStr(params: {
 
   if (params.suspendAccount) {
     await recordAuditEvent({
-      userId: flag.userId,
+      userId: params.staffUserId,
       eventType: "USER_SUSPENDED_STR",
       entityType: "User",
       entityId: flag.userId,
-      metadata: { flagId: flag.id, suspendedByStaffId: params.staffUserId },
+      metadata: {
+        flagId: flag.id,
+        targetUserId: flag.userId,
+        suspendedByStaffId: params.staffUserId,
+      },
     });
   }
 
@@ -667,12 +671,13 @@ export async function liftComplianceHold(params: {
   });
 
   await recordAuditEvent({
-    userId: params.userId,
+    userId: params.staffUserId,
     eventType: "USER_COMPLIANCE_LIFTED",
     entityType: "User",
     entityId: params.userId,
     metadata: {
       reason: params.reason || "Manual lift",
+      targetUserId: params.userId,
       staffUserId: params.staffUserId,
     },
   });

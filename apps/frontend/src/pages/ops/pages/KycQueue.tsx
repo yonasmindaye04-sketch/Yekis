@@ -18,6 +18,7 @@ import {
   FilterSelect,
   Kv,
   LoadingBox,
+  OpsActionModal,
   PageHead,
   Pager,
   Pill,
@@ -42,6 +43,7 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
   const [reason, setReason] = useState("");
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirmDecision, setConfirmDecision] = useState<KycDecision | null>(null);
 
   const page = useListPage<KycItem>(
     (p) => opsListApi.kycQueue({ ...p, status: status || undefined }),
@@ -147,10 +149,16 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
         const idx = rows.findIndex((k) => k.id === selId);
         if (e.key === "ArrowDown" && idx >= 0 && idx < rows.length - 1) { e.preventDefault(); setSelId(rows[idx + 1].id); }
         if (e.key === "ArrowUp" && idx > 0) { e.preventDefault(); setSelId(rows[idx - 1].id); }
-        if ((e.key === "a" || e.key === "A") && sel) { e.preventDefault(); void decide("VERIFIED"); }
-        if ((e.key === "r" || e.key === "R") && sel) { e.preventDefault(); document.getElementById("kyc-reason")?.focus(); }
+        if ((e.key === "a" || e.key === "A") && sel && !confirmDecision) {
+          e.preventDefault();
+          setConfirmDecision("VERIFIED");
+        }
+        if ((e.key === "r" || e.key === "R") && sel && !confirmDecision) {
+          e.preventDefault();
+          setConfirmDecision("REJECTED");
+        }
       },
-      [rows, selId, sel, decide, ui.viewerOpen, ui.paletteOpen],
+      [rows, selId, sel, confirmDecision, ui.viewerOpen, ui.paletteOpen],
     ),
   );
 
@@ -366,13 +374,16 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
                 {/* Was `disabled={busy || !(sel.pep || sel.dup)}`, which meant a
                     reviewer could only reject PEP and duplicate cases — a plain
                     blurry-photo rejection was impossible from the queue. */}
-                <Button variant="destructive" disabled={busy} onClick={() => void decide("REJECTED")}>
-                  Reject
+                <Button variant="destructive" disabled={busy} onClick={() => setConfirmDecision("REJECTED")}>
+                  Reject{" "}
+                  <span className="kbd" style={{ background: "rgba(255,255,255,.25)", borderColor: "rgba(255,255,255,.4)", color: "#fff" }}>
+                    R
+                  </span>
                 </Button>
-                <Button variant="outline" disabled={busy} onClick={() => void decide("CLEARER")}>
+                <Button variant="outline" disabled={busy} onClick={() => setConfirmDecision("CLEARER")}>
                   Ask for Clearer Photo
                 </Button>
-                <Button disabled={busy} title="Press A" onClick={() => void decide("VERIFIED")}>
+                <Button disabled={busy} title="Press A" onClick={() => setConfirmDecision("VERIFIED")}>
                   <Check size={15} /> Approve{" "}
                   <span className="kbd" style={{ background: "rgba(255,255,255,.25)", borderColor: "rgba(255,255,255,.4)", color: "#fff" }}>
                     A
@@ -386,8 +397,8 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
               ) : null}
               <div className="kbd-hint" style={{ marginTop: 10 }}>
                 <span className="kbd">↑</span> <span className="kbd">↓</span> navigate queue ·{" "}
-                <span className="kbd">A</span> approve · <span className="kbd">R</span> focus reason ·{" "}
-                <span className="kbd">Esc</span> close viewer
+                <span className="kbd">A</span> confirm approve · <span className="kbd">R</span> confirm reject ·{" "}
+                <span className="kbd">Esc</span> close viewer / dialog
               </div>
             </div>
           </Card>
@@ -403,6 +414,54 @@ export default function KycQueue({ focusId }: { focusId?: string }) {
           </Card>
         )}
       </div>
+
+      <OpsActionModal
+        open={Boolean(confirmDecision && detail)}
+        title={
+          confirmDecision === "VERIFIED"
+            ? "Confirm KYC Approval"
+            : confirmDecision === "CLEARER"
+              ? "Request Clearer Photo"
+              : "Confirm KYC Rejection"
+        }
+        description={
+          detail
+            ? `${detail.name || detail.email} (${detail.email}) · ${detail.tier.replace("_", " ")} · Doc ${detail.doc}`
+            : undefined
+        }
+        tone={confirmDecision === "REJECTED" ? "danger" : "primary"}
+        confirmLabel={
+          confirmDecision === "VERIFIED"
+            ? "Confirm Approval"
+            : confirmDecision === "CLEARER"
+              ? "Request Clearer Photo"
+              : "Confirm Rejection"
+        }
+        busy={busy}
+        fields={
+          confirmDecision === "REJECTED"
+            ? [
+                {
+                  name: "reason",
+                  label: "Rejection Reason",
+                  placeholder: "Explain why this KYC submission cannot be verified…",
+                  initialValue: reason === "custom" ? custom : reason,
+                  multiline: true,
+                  required: true,
+                  minLength: 5,
+                  maxLength: 500,
+                },
+              ]
+            : []
+        }
+        onConfirm={async ({ values }) => {
+          const d = confirmDecision;
+          if (!d) return;
+          await decide(d, d === "REJECTED" ? values.reason : undefined);
+          setConfirmDecision(null);
+        }}
+        onCancel={() => !busy && setConfirmDecision(null)}
+      />
     </div>
   );
 }

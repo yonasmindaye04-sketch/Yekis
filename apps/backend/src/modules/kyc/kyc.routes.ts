@@ -270,6 +270,7 @@ kycRouter.post(
     try {
       const result = await reviewKycRecord({
         staffUserId: req.user!.id,
+        staffRole: req.user!.staffRole ?? null,
         targetUserId: req.params.targetUserId as string,
         decision: parsed.data.decision,
         rejectionReason: parsed.data.rejectionReason,
