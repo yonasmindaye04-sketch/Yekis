@@ -162,8 +162,24 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     }
   };
 
-  /* Non-terminal case actions. Each maps to a real backend route; the server
-     rejects stage transitions that do not apply and says why. */
+  /* Non-terminal case actions. Each maps to a real backend route; the UI
+     disables transitions that do not apply to the active stage and the server
+     enforces the same stage & disputes.mediate rules. */
+  const staffRole = ui.account?.staffRole ?? "";
+  const hasAccount = Boolean(ui.account);
+  const canMediate =
+    !hasAccount ||
+    [
+      "SUPER_ADMIN",
+      "ADMIN",
+      "DISPUTE_MEDIATOR",
+      "COMPLIANCE_ADMIN",
+      "COMPLIANCE_OFFICER",
+    ].includes(staffRole);
+  const canResolve =
+    !hasAccount ||
+    ["SUPER_ADMIN", "ADMIN", "DISPUTE_MEDIATOR"].includes(staffRole);
+
   const workflow = async (kind: "claim" | "escalate" | "arbitration") => {
     if (!sel) return;
     setBusy(true);
@@ -179,6 +195,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
         toast("Dispute moved to stage 4 arbitration.");
       }
       reload();
+      ui.refreshBadges();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Action failed");
     } finally {
@@ -196,6 +213,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
       reload();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Action failed");
+      setEvidenceModalOpen(false);
     } finally {
       setBusy(false);
     }
@@ -497,52 +515,91 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                 onChange={(e) => setRec(e.target.value)}
               />
               <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <Button disabled={!outcome || busy} onClick={() => void resolve()}>
+                <Button
+                  disabled={!outcome || busy || !canResolve || sel.stage === "RESOLVED"}
+                  title={!canResolve ? "Resolving disputes requires DISPUTE_MEDIATOR or SUPER_ADMIN permission" : undefined}
+                  onClick={() => void resolve()}
+                >
                   Confirm Final Resolution
                 </Button>
                 <span className="kbd-hint">
-                  {outcome ? `Outcome: ${outcome.replace(/_/g, " ")}` : "Select an outcome to preview the settlement math"}
+                  {!canResolve
+                    ? "View/mediation role only — final financial resolution requires DISPUTE_MEDIATOR or SUPER_ADMIN."
+                    : outcome
+                      ? `Outcome: ${outcome.replace(/_/g, " ")}`
+                      : "Select an outcome to preview the settlement math"}
                 </span>
               </div>
 
               <div className="sec-title" style={{ marginTop: 22 }}>Case workflow</div>
               <div className="kbd-hint" style={{ marginBottom: 8 }}>
-                Claiming assigns the case to you. Escalation and arbitration move it forward a
-                stage; both are rejected by the server once a case leaves the matching stage.
+                {canMediate
+                  ? "Claiming and arbitration apply in Stage 3 (Mediation); Escalate stage applies in Stage 1 (Negotiation). Mediator evidence notes can be attached in Stages 1–3."
+                  : "View-only role (disputes.view). Mediation workflow actions require DISPUTE_MEDIATOR, COMPLIANCE_ADMIN, or SUPER_ADMIN."}
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button
+                  type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy}
+                  disabled={busy || !canMediate || sel.stage !== "STAGE_3_MEDIATION"}
                   onClick={() => void workflow("claim")}
-                  title="Assign this mediation case to yourself"
+                  title={
+                    !canMediate
+                      ? "Requires disputes.mediate permission"
+                      : sel.stage !== "STAGE_3_MEDIATION"
+                        ? `Claiming is available only in Stage 3 Mediation (current: ${sel.stage})`
+                        : "Assign this mediation case to yourself"
+                  }
                 >
                   <HandHelping size={13} /> Claim case
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy}
+                  disabled={
+                    busy ||
+                    !canMediate ||
+                    sel.stage === "STAGE_4_ARBITRATION" ||
+                    sel.stage === "RESOLVED"
+                  }
                   onClick={() => setEvidenceModalOpen(true)}
-                  title="Attach a mediator evidence statement to the case record"
+                  title={
+                    !canMediate
+                      ? "Requires disputes.mediate permission"
+                      : sel.stage === "STAGE_4_ARBITRATION" || sel.stage === "RESOLVED"
+                        ? `Evidence statements cannot be attached in stage ${sel.stage}`
+                        : "Attach a mediator evidence statement to the case record"
+                  }
                 >
                   <FileText size={13} /> Add evidence note
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy}
+                  disabled={busy || !canMediate || sel.stage !== "STAGE_1_NEGOTIATION"}
                   onClick={() => void workflow("escalate")}
-                  title="Advance the dispute to the next negotiation stage"
+                  title={
+                    !canMediate
+                      ? "Requires disputes.mediate permission"
+                      : sel.stage !== "STAGE_1_NEGOTIATION"
+                        ? `Stage escalation applies only in Stage 1 Negotiation (current: ${sel.stage})`
+                        : "Advance the dispute to Stage 2 Evidence"
+                  }
                 >
                   <TrendingUp size={13} /> Escalate stage
                 </button>
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm"
-                  disabled={busy}
+                  disabled={busy || !canMediate || sel.stage !== "STAGE_3_MEDIATION"}
                   onClick={() => void workflow("arbitration")}
-                  title="Move the dispute into stage 4 arbitration"
+                  title={
+                    !canMediate
+                      ? "Requires disputes.mediate permission"
+                      : sel.stage !== "STAGE_3_MEDIATION"
+                        ? `Arbitration escalation applies only in Stage 3 Mediation (current: ${sel.stage})`
+                        : "Move the dispute into stage 4 arbitration"
+                  }
                 >
                   <Scale size={13} /> Send to arbitration
                 </button>

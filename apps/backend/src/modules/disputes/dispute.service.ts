@@ -20,15 +20,38 @@ import { uploadEvidenceBundle } from "../../lib/objectStore.js";
 import { logger } from "../../lib/logger.js";
 import { createHash } from "node:crypto";
 import { disputeSla } from "../sla/sla.service.js";
+import { hasPermission } from "../admin/permissions.js";
 
 // === MAIN FUNCTIONS ===
-export class DisputeNotFoundError extends Error {}
-export class NotDisputePartyError extends Error {}
+export class DisputeNotFoundError extends Error {
+  constructor(message = "Dispute not found.") {
+    super(message);
+    this.name = "DisputeNotFoundError";
+  }
+}
+export class NotDisputePartyError extends Error {
+  constructor(
+    message = "Only dispute parties or authorized mediation staff can perform this action.",
+  ) {
+    super(message);
+    this.name = "NotDisputePartyError";
+  }
+}
 export class InvalidDisputeStageError extends Error {}
-export class MilestoneNotFoundError extends Error {}
+export class MilestoneNotFoundError extends Error {
+  constructor(message = "Milestone not found.") {
+    super(message);
+    this.name = "MilestoneNotFoundError";
+  }
+}
 export class InvalidEscrowStateForDisputeError extends Error {}
 export class MutualWithdrawalOutcomeMismatchError extends Error {}
-export class DisputeAlreadyClaimedError extends Error {}
+export class DisputeAlreadyClaimedError extends Error {
+  constructor(message = "Dispute has already been claimed.") {
+    super(message);
+    this.name = "DisputeAlreadyClaimedError";
+  }
+}
 /**
  * F-04 â€” the dispute was already resolved by someone else, either a concurrent
  * resolution or an earlier one. Thrown BEFORE any money moves, so a losing
@@ -210,7 +233,9 @@ export async function raiseDispute(params: {
   const isParty =
     milestone.contract.clientId === params.raisedByUserId ||
     milestone.contract.freelancerId === params.raisedByUserId;
-  if (!isParty) throw new NotDisputePartyError();
+  if (!isParty) {
+    throw new NotDisputePartyError("Only contract parties can raise a dispute.");
+  }
 
   if (
     !["ESCROW_HELD", "WORK_IN_PROGRESS", "SUBMITTED_FOR_REVIEW"].includes(
@@ -285,7 +310,11 @@ export async function escalateToEvidence(params: {
   userId: string;
   disputeId: string;
 }) {
-  const dispute = await getDisputeForParty(params.disputeId, params.userId);
+  const { dispute, isParty, isAuthorizedStaff } = await getDisputeForActor(
+    params.disputeId,
+    params.userId,
+    "disputes.mediate",
+  );
 
   if (dispute.stage !== "STAGE_1_NEGOTIATION") {
     throw new InvalidDisputeStageError(
@@ -293,6 +322,8 @@ export async function escalateToEvidence(params: {
     );
   }
   if (
+    isParty &&
+    !isAuthorizedStaff &&
     dispute.negotiationDeadlineAt &&
     dispute.negotiationDeadlineAt > new Date()
   ) {
@@ -311,27 +342,34 @@ export async function escalateToEvidence(params: {
     eventType: "DISPUTE_ESCALATED_TO_EVIDENCE",
     entityType: "Dispute",
     entityId: dispute.id,
+    metadata: { viaStaffMediation: isAuthorizedStaff && !isParty },
   });
 
   return updated;
 }
 
 /**
- * Stage 2. Either party attaches a written statement. Submitting evidence
- * auto-advances to Stage 3 and compiles the evidence bundle (contract terms,
- * all statements, message log if available).
+ * Stage 2 (or Stage 3 for authorized mediation staff). Either party attaches a
+ * written statement to advance into Stage 3, while staff with `disputes.mediate`
+ * may also append mediator evidence statements in Stage 3 without getting
+ * rejected as non-party.
  */
 export async function submitEvidence(params: {
   userId: string;
   disputeId: string;
   statement: string;
 }) {
-  const dispute = await getDisputeForParty(params.disputeId, params.userId);
+  const { dispute, isParty, isAuthorizedStaff } = await getDisputeForActor(
+    params.disputeId,
+    params.userId,
+    "disputes.mediate",
+  );
 
-  if (
-    dispute.stage !== "STAGE_2_EVIDENCE" &&
-    dispute.stage !== "STAGE_1_NEGOTIATION"
-  ) {
+  const allowedStages = isAuthorizedStaff
+    ? ["STAGE_1_NEGOTIATION", "STAGE_2_EVIDENCE", "STAGE_3_MEDIATION"]
+    : ["STAGE_1_NEGOTIATION", "STAGE_2_EVIDENCE"];
+
+  if (!allowedStages.includes(dispute.stage)) {
     throw new InvalidDisputeStageError(
       `Cannot submit evidence at stage ${dispute.stage}.`,
     );
@@ -345,7 +383,10 @@ export async function submitEvidence(params: {
     },
   });
 
-  const mediationDeadline = daysFromNow(MEDIATION_WINDOW_DAYS);
+  const alreadyMediation = dispute.stage === "STAGE_3_MEDIATION";
+  const mediationDeadline = alreadyMediation
+    ? dispute.mediationDeadlineAt ?? daysFromNow(MEDIATION_WINDOW_DAYS)
+    : daysFromNow(MEDIATION_WINDOW_DAYS);
 
   const updated = await prisma.dispute.update({
     where: { id: dispute.id },
@@ -360,6 +401,10 @@ export async function submitEvidence(params: {
     eventType: "DISPUTE_EVIDENCE_SUBMITTED",
     entityType: "Dispute",
     entityId: dispute.id,
+    metadata: {
+      staffMediationNote: isAuthorizedStaff && !isParty,
+      stage: updated.stage,
+    },
   });
 
   // T2-G: Compile evidence bundle asynchronously â€” do not block the evidence
@@ -890,8 +935,12 @@ export async function escalateToArbitration(params: {
   userId: string;
   disputeId: string;
 }) {
-  const dispute = await getDisputeForParty(params.disputeId, params.userId);
-  // F-04 â€” only a dispute that is genuinely still open may be escalated. This
+  const { dispute, isParty, isAuthorizedStaff } = await getDisputeForActor(
+    params.disputeId,
+    params.userId,
+    "disputes.mediate",
+  );
+  // F-04 — only a dispute that is genuinely still open may be escalated. This
   // edge used to accept RESOLVED, which let a settled dispute be pushed back
   // to arbitration and then resolved (and paid) a second time.
   if (dispute.stage === "RESOLVED" || dispute.resolvedAt) {
@@ -916,7 +965,8 @@ export async function escalateToArbitration(params: {
     entityType: "Dispute",
     entityId: dispute.id,
     metadata: {
-      note: "AACCSA filing is a manual, human step â€” not automated by this platform.",
+      note: "AACCSA filing is a manual, human step — not automated by this platform.",
+      escalatedByStaff: isAuthorizedStaff && !isParty,
     },
   });
 
@@ -1071,7 +1121,16 @@ export async function withdrawDisputeMutually(params: {
   proposedOutcome: DisputeResolutionOutcome;
   proposedFreelancerShareMinor?: number;
 }) {
-  const dispute = await getDisputeForParty(params.disputeId, params.userId);
+  const { dispute, isParty } = await getDisputeForActor(
+    params.disputeId,
+    params.userId,
+    "disputes.mediate",
+  );
+  if (!isParty) {
+    throw new NotDisputePartyError(
+      "Only contract or order parties can mutually withdraw a dispute.",
+    );
+  }
 
   if (
     !["STAGE_1_NEGOTIATION", "STAGE_2_EVIDENCE", "STAGE_3_MEDIATION"].includes(
@@ -1166,10 +1225,19 @@ export async function withdrawDisputeMutually(params: {
   return resolved;
 }
 
-async function getDisputeForParty(disputeId: string, userId: string) {
+async function getDisputeForActor<TIncludeEvidence extends boolean = false>(
+  disputeId: string,
+  userId: string,
+  requiredStaffPermission: "disputes.mediate" | "disputes.view" = "disputes.mediate",
+  includeEvidence = false as TIncludeEvidence,
+) {
   const dispute = await prisma.dispute.findUnique({
     where: { id: disputeId },
-    include: { contract: true, gigOrder: { include: { gig: true } } },
+    include: {
+      ...(includeEvidence ? { evidence: true } : {}),
+      contract: true,
+      gigOrder: { include: { gig: true } },
+    },
   });
   if (!dispute) throw new DisputeNotFoundError();
 
@@ -1183,36 +1251,29 @@ async function getDisputeForParty(disputeId: string, userId: string) {
     dispute.gigOrder &&
     (dispute.gigOrder.clientId === userId ||
       dispute.gigOrder.gig.freelancerId === userId);
+  const isParty = Boolean(isContractParty || isGigParty);
 
-  if (!isContractParty && !isGigParty) {
-    throw new NotDisputePartyError();
+  const actor = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { staffRole: true },
+  });
+  const isAuthorizedStaff = hasPermission(actor?.staffRole, requiredStaffPermission);
+
+  if (!isParty && !isAuthorizedStaff) {
+    throw new NotDisputePartyError(
+      `Only dispute parties or staff with ${requiredStaffPermission} permission can perform this action.`,
+    );
   }
-  return dispute;
+  return { dispute, isParty, isAuthorizedStaff };
 }
 
 export async function getDispute(userId: string, disputeId: string) {
-  const dispute = await prisma.dispute.findUnique({
-    where: { id: disputeId },
-    include: {
-      evidence: true,
-      contract: true,
-      gigOrder: { include: { gig: true } },
-    },
-  });
-  if (!dispute) throw new DisputeNotFoundError();
-
-  const isContractParty =
-    dispute.contract &&
-    (dispute.contract.clientId === userId ||
-      dispute.contract.freelancerId === userId);
-  const isGigParty =
-    dispute.gigOrder &&
-    (dispute.gigOrder.clientId === userId ||
-      dispute.gigOrder.gig.freelancerId === userId);
-
-  if (!isContractParty && !isGigParty) {
-    throw new NotDisputePartyError();
-  }
+  const { dispute } = await getDisputeForActor(
+    disputeId,
+    userId,
+    "disputes.view",
+    true,
+  );
   return dispute;
 }
 

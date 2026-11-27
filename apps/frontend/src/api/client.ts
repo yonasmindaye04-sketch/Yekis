@@ -997,8 +997,16 @@ export class ApiClient {
             ? error.message ||
               "Password confirmation cancelled or expired. Your session and entered details remain intact."
             : undefined;
+      const fallbackForbidden =
+        response.status === 403 && !error.message && error.error === "FORBIDDEN"
+          ? "You do not have permission to perform this action on this record."
+          : undefined;
       const thrown = new Error(
-        friendlyStepUp || error.message || error.error || `HTTP ${response.status}`,
+        friendlyStepUp ||
+          error.message ||
+          fallbackForbidden ||
+          error.error ||
+          `HTTP ${response.status}`,
       ) as Error & {
         code?: string;
         status?: number;
@@ -1254,8 +1262,16 @@ export class ApiClient {
             ? error.message ||
               "Password confirmation cancelled or expired. Your session and entered details remain intact."
             : undefined;
+      const fallbackForbidden =
+        response.status === 403 && !error.message && error.error === "FORBIDDEN"
+          ? "You do not have permission to perform this action on this record."
+          : undefined;
       const thrown = new Error(
-        friendlyStepUp || error.message || error.error || `HTTP ${response.status}`,
+        friendlyStepUp ||
+          error.message ||
+          fallbackForbidden ||
+          error.error ||
+          `HTTP ${response.status}`,
       ) as Error & { code?: string; status?: number };
       thrown.code = error.error;
       thrown.status = response.status;

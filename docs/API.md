@@ -427,10 +427,10 @@ The secured mounted API uses these paths; legacy `/raise`, `/contract/:id`, and 
 |---|---|---|---|
 | `GET` | `/api/v1/disputes` | Authenticated | List disputes for current user's contracts |
 | `POST` | `/api/v1/disputes` | Contract party | Raise a dispute for a submitted milestone |
-| `GET` | `/api/v1/disputes/:disputeId` | Dispute party | Get dispute and evidence |
-| `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party | Move negotiation to evidence |
-| `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party | Add evidence statement and progress when ready |
-| `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party | Escalate mediation to arbitration |
+| `GET` | `/api/v1/disputes/:disputeId` | Dispute party or staff (`disputes.view`) | Get dispute and evidence |
+| `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party or staff (`disputes.mediate`) | Move `STAGE_1_NEGOTIATION` to `STAGE_2_EVIDENCE` |
+| `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party (Stage 1–2) or staff (`disputes.mediate`, Stage 1–3) | Add evidence statement (or mediator note in Stage 3) with audit attribution |
+| `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party or staff (`disputes.mediate`) | Escalate `STAGE_3_MEDIATION` to `STAGE_4_ARBITRATION` |
 | `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries `disputedAmountMinor`, `disputedMilestone`, and an `sla` object (all computed server-side); response includes `partialSplitEnabled` |
 | `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split (when `PARTIAL_SPLIT_ENABLED=true`, accepts unambiguous `freelancerSharePct` or `freelancerShareMinor`) |
 

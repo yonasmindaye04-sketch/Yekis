@@ -41,7 +41,12 @@ function handleKnownErrors(
   res: import("express").Response,
 ): boolean {
   if (err instanceof NotDisputePartyError) {
-    res.status(403).json({ error: "FORBIDDEN", message: err.message });
+    res.status(403).json({
+      error: "FORBIDDEN",
+      message:
+        err.message ||
+        "Only dispute parties or authorized mediation staff can perform this action.",
+    });
     return true;
   }
   if (err instanceof PartialSplitDisabledError) {
