@@ -641,7 +641,7 @@ Recorded so the next person does not have to rediscover it.
 | Hosting project | `yekis` (`7d5a6ab0-1a03-4b2a-b9a8-6accf59a87fa`) |
 | App | `yekis-test` (`d40f8eff-9cd7-42f2-9c24-01b750def027`) |
 | Plan | **Solo** — free, no expiry, 250m CPU / 256 MiB, 1 replica |
-| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` — kept identical to `main` (aligned 2026-11-19) |
+| Repository | `yonasmindaye04-sketch/Yekis`, branch `fix/code-only-compliance-gaps` — kept identical to `main` (both at `6a73e47`, aligned 2026-11-27) |
 | Database | `yekis-jobs` — Managed PostgreSQL **18**, Solo, free, internal network only, 10 connections |
 | Object storage | `yekis-test-media` (bucket `t1370-yekis-test-media`) — 5 GB, private, 50 ETB/mo |
 | Telegram bot | `@ye_kis_bot` — **live** since 2026-11-14; webhook registered at `https://yekis.app.aletcloud.com/api/v1/telegram/webhook` |
@@ -747,6 +747,65 @@ What was verified against the live instance:
 - A termination signal stops the API gracefully
   (`[yekis] termination signal received; shutting down` → `exited with
   status 143`).
+
+### The demo and automated-test data was removed from this host (2026-11-27)
+
+The seeded demo world and the accounts the verification scripts created under
+`@example.com` were deleted from the live database — every row they owned, and
+nothing else. The engine is `apps/backend/src/bootstrap/demoCleanup.ts`; it is
+inert unless `DEMO_CLEANUP` is set, and the runbook is in
+`docs/ADMIN_ACCESS.md`.
+
+**The dry run** (commit `6a73e47`, `DEMO_CLEANUP=dry-run`) reported:
+
+| | |
+|---|---|
+| `targetCount` | **33** — the six seeded demo addresses and 27 `@example.com` accounts |
+| `userCountBefore` | **50** |
+| `totalRows` | **544** across 23 tables |
+| `blockers` | **none** |
+| `absorbedChatRows` | 2 — the administrator's membership in the two `@example.com` "AletCloud object-store check" threads |
+
+The two absorbed rows are the whole reason the rule had to change. A support
+ticket belongs to whoever opened it: both of those threads were opened by an
+automated test account, so the ticket is dummy data in full and the
+administrator's membership row goes with it. A ticket a **real** member opened
+is their data and is never deleted — only the demo accounts' rows inside it
+are. The administrator's own thread with a real member
+(`cmwjlszrz000cdy5dbewg5wgp`) was never in the closure and survived untouched.
+
+**The confirm run** (`DEMO_CLEANUP=confirm`) reported:
+
+```
+Demo cleanup finished: the seeded demo and automated test data are gone
+totalDeleted 535 · cascaded 9 · totalRowsPlanned 544 · userCountAfter 17
+```
+
+**What the host looks like now**, read back from `GET /api/v1/admin/users`:
+**17 users** — 9 Gmail sign-ups, 3 Telegram members (`@yekis.local`), 2 guest
+support sessions (`@guest.invalid`), 2 GDPR erasure tombstones
+(`@erased.invalid`) and `admin@yekis.et`. **Zero** `@example.com` accounts and
+**zero** seeded demo accounts. `POST /api/v1/auth/login` answers **200** for
+the administrator, `GET /api/v1/auth/me` reports `staffRole: ADMIN`,
+`GET /api/v1/admin/staff` and `GET /api/v1/admin/permissions/matrix` answer
+**200**, and `scripts/check-deployment.mjs` passes **11/11**.
+
+**`DEMO_CLEANUP` is no longer set.** The host carries **55 environment
+variables** and its start-up log has no cleanup line at all. A restart alone
+was not enough to prove that: the container came back with a stale snapshot of
+the variable, so the variable was removed and the host was **rebuilt** — the
+build is what binds the current environment map to the running container.
+
+**One thing the first attempt got wrong.** The first dry run died with
+`FATAL: remaining connection slots are reserved for roles with the SUPERUSER
+attribute`. A start-up overlaps the deployment it replaces, and for a few
+seconds the outgoing process and the incoming one hold connection pools at the
+same time — the managed PostgreSQL allows **10 connections**, and the two
+pools plus the migration process ask for more than that. Nothing was deleted.
+The engine now treats a connection failure as a busy database rather than a
+failure: it waits five seconds and tries again, up to eight times, and every
+step is idempotent. The dry run then completed on the third attempt, and the
+confirm run on the fourth.
 
 **Reading the onboarding code on this deployment.** With no SMTP credentials
 the code is written to the container log and returned as `devCode`. The log
