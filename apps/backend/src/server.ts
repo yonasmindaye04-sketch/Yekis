@@ -40,6 +40,7 @@ import "./queue/featuredRefresh.worker.js";
 import "./queue/tmsScan.worker.js";
 import "./queue/gigAutoRelease.worker.js";
 import "./queue/auditPurge.worker.js";
+import "./queue/broadcast.worker.js";
 import { scheduleRecurringJobs } from "./queue/kycRefresh.worker.js";
 import { scheduleWithholdingRemittanceJob } from "./queue/withholdingRemittance.worker.js";
 import { schedulePaymentReconcileJob } from "./queue/paymentReconcile.worker.js";

@@ -103,6 +103,8 @@ erDiagram
 | `EmailVerificationCode` | Email OTP for email address verification — the **onboarding** channel, used while the SMS provider is unconfigured. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. Only the salted SHA-256 of the code is stored; verified rows are kept as the audit trail of which address was ever proven |
 | `WorkspaceReminder` | User-scoped personal calendar reminder (`title`, UTC `dueAt`, optional `note`, optional `contractId` / `milestoneId`, `completedAt`); rendered exclusively in the Schedule Calendar (never in Kanban or KPIs), cascades on user deletion |
 | `SavedTalent` | Server-persisted freelancer bookmark shortlist with unique `(userId, talentId)` constraint and cascade delete on both owner and target user |
+| `TelegramBroadcast` | Admin-authored Telegram announcement: internal `name`, optional bold `heading`, escaped `body`, optional `imageUrl` and one `linkUrl`/`linkLabel` button, a `BroadcastAudience`, and a lifecycle (`DRAFT` → `SENDING` → `SENT`/`PARTIAL`/`FAILED`, with `SENDING` → `CANCELLED`). Carries `recipientCount` plus `deliveredCount`/`failedCount` counters, the author (`BroadcastAuthor`) and the sender (`BroadcastSender`) |
+| `TelegramBroadcastDelivery` | One row per recipient of a broadcast run: `chatId`, `SENT`/`FAILED`, the Telegram error text, and `sentAt`. Unique on `(broadcastId, userId)` so a retried batch cannot deliver the same message twice |
 
 ## Monetary Representation
 
@@ -127,6 +129,8 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 - Reviews are only visible once both parties have submitted them, or the 14-day window expires.
 - Profile completeness percentage is dynamically calculated based on skills, bio, portfolio, and verified status.
 - `LedgerJournal` entries must sum to zero (zero-sum invariant enforced by application).
+- A broadcast has at most one delivery row per recipient (unique `(broadcastId, userId)`), so a worker retry cannot message the same member twice for the same run.
+- A delivered broadcast is evidence: `SENT` and `PARTIAL` rows are refused by the delete route, and `SENDING` rows are refused so a run cannot lose its log mid-delivery.
 
 ## Important Enums
 
@@ -150,6 +154,9 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `GigPackageTier` | `BASIC`, `STANDARD`, `PREMIUM` |
 | `GigOrderStatus` | `PENDING_PAYMENT`, `ACCEPTED`, `ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `COMPLETED`, `CANCELLED`, `DISPUTED` |
 | `Visibility` | `PUBLIC`, `PROPOSERS`, `PRIVATE` |
+| `BroadcastAudience` | `ALL`, `CLIENTS`, `FREELANCERS`, `STAFF`, `KYC_VERIFIED` — each resolves through one shared filter that always excludes suspended accounts, guest-contact identities and accounts without a `telegramChatId` |
+| `BroadcastStatus` | `DRAFT`, `SENDING`, `SENT`, `PARTIAL`, `FAILED`, `CANCELLED` |
+| `BroadcastDeliveryStatus` | `SENT`, `FAILED` |
 
 ## Migration History
 
@@ -190,6 +197,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
 | `20261113120000_email_verification_otp` | Adds the `EmailVerificationCode` table (the onboarding OTP channel: lower-cased address, purpose, salted SHA-256 of the code, attempts, expiry) and `User.emailVerifiedAt`. `User.emailVerified` already existed and is also set by the OAuth path, where the provider — not the platform — proved the address |
 | `20261127112200_add_workspace_reminders_and_saved_talents` | Adds `WorkspaceReminder` (indexed on `(userId, dueAt)`) and `SavedTalent` (`@@unique([userId, talentId])`) with cascade deletes on `User` |
+| `20261201120000_telegram_broadcasts` | Adds the admin broadcast center: `BroadcastAudience`/`BroadcastStatus`/`BroadcastDeliveryStatus` enums, `TelegramBroadcast` (indexed on `(status, createdAt)` and `createdById`) and `TelegramBroadcastDelivery` (unique `(broadcastId, userId)`, indexed on `(broadcastId, status)`) with cascade deletes from the broadcast and the user |
 
 ### Re-runnable migrations
 

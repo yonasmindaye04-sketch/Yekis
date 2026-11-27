@@ -53,7 +53,7 @@ Yekis is unusually strong on **identity, escrow integrity, dispute resolution, a
 | Item | Status |
 |---|---|
 | Email/password, age gate, consent capture | **DONE** |
-| Email verification | **PARTIAL** (`emailVerified` field + social OAuth; no forced email-verify flow) |
+| Email verification | **DONE** (onboarding OTP at signup **and** a signed-in member can prove the address already on their account from **Settings → Linked Accounts**: `POST /api/v1/auth/email/verification/start` → `POST /api/v1/auth/email/verification/check`) |
 | Phone verification | **PARTIAL** (KYC tier gates; no standalone SMS OTP phone verify) |
 | Password reset | **DONE** (`PasswordResetToken`) |
 | Login throttling | **DONE** (`express-rate-limit`) |

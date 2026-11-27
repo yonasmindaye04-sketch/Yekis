@@ -16,6 +16,8 @@ import {
   logoutSession,
   changePassword,
   revokeOtherSessionsAndRefresh,
+  switchUserRole,
+  createAuthTokens,
   PasswordMismatchError,
 } from "./auth.service.js";
 import { logger } from "../../lib/logger.js";
@@ -37,7 +39,10 @@ import type { AuthMethod } from "./auth-methods.js";
 import { AccountLinkRequiredError } from "./identity.js";
 import {
   redeemTelegramLoginCode,
+  startTelegramLink,
+  getTelegramLinkStatus,
   TelegramCodeError,
+  TelegramLinkError,
 } from "./telegram-code.service.js";
 import {
   verifyGoogleIdToken,
@@ -444,6 +449,55 @@ authRouter.post("/telegram/web-login/redeem", telegramCodeLimiter, async (req, r
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Settings → "Connect Telegram" deep-link flow.
+//
+// Shape mirrors `/telegram/web-login/*`: the authed web member gets a fresh
+// session id; the bot, when it sees `/start lk_{sid}`, calls
+// `completeTelegramLink` to bind the Telegram chat to the account; the
+// dashboard polls `/telegram/link/:sid/status` until the status flips.
+//
+// The endpoints here are guarded by requireAuth (the member IS already
+// signed in to the dashboard). requireFreshAuth is intentionally NOT mounted
+// because the user's existing session is sufficient — this is a "stub a
+// second way in" action, not a destructive state change.
+// ---------------------------------------------------------------------------
+
+authRouter.post(
+  "/telegram/link/start",
+  requireAuth,
+  telegramCodeLimiter,
+  async (req: AuthedRequest, res) => {
+    try {
+      const result = await startTelegramLink(req.user!.id);
+      return res.json(result);
+    } catch (err) {
+      if (err instanceof TelegramLinkError && err.message === "TELEGRAM_NOT_CONFIGURED") {
+        return res.status(503).json({ error: "TELEGRAM_NOT_CONFIGURED" });
+      }
+      logger.error({ err }, "Error starting telegram link flow");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+authRouter.get(
+  "/telegram/link/:sid/status",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    const sid = String(req.params.sid || "");
+    if (sid.length < 10 || sid.length > 80) {
+      return res.status(400).json({ error: "INVALID_SID" });
+    }
+    try {
+      return res.json(await getTelegramLinkStatus(req.user!.id, sid));
+    } catch (err) {
+      logger.error({ err }, "Error reading telegram link status");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
 
 // NOTE: A previous "/google" endpoint accepted a bare email and issued full
 // JWTs without verifying any Google credential â€” an authentication bypass.
@@ -873,6 +927,97 @@ authRouter.post(
       });
     } catch (err) {
       logger.error({ err }, "Unexpected error in /revoke-sessions");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
+/**
+ * Switches the caller's account type (CLIENT / FREELANCER / BOTH).
+ *
+ * A member who signed up as a client because they had one job to post should not
+ * have to abandon the account to take work the next month. The same row is
+ * used; only `User.role` changes. The route is mounted behind
+ * `requireFreshAuth(180)` so a tab left open on a shared machine cannot change
+ * the account type in passing.
+ *
+ * Returns a fresh access/refresh pair stamped with the new role, so the very
+ * next request reads the right value from the JWT. Historical contracts and
+ * jobs are NOT moved between roles — they keep the role the member held when
+ * they were created.
+ */
+const switchRoleLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "TOO_MANY_ROLE_CHANGES", message: "Too many role changes. Try again later." },
+});
+
+const switchRoleSchema = z.object({
+  role: z.enum(["CLIENT", "FREELANCER", "BOTH"]),
+});
+
+authRouter.post(
+  "/role",
+  requireAuth,
+  requireFreshAuth(180),
+  switchRoleLimiter,
+  async (req: AuthedRequest, res) => {
+    try {
+      const parsed = switchRoleSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+      }
+      const { role } = parsed.data;
+
+      // One read covers both branches (no-op vs actual switch) and stamps the
+      // new role on the JWT no matter what path we took.
+      const before = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { role: true, ucid: true, staffRole: true, isSuspended: true },
+      });
+      if (!before) return res.status(404).json({ error: "USER_NOT_FOUND" });
+      if (before.isSuspended) {
+        return res.status(403).json({ error: "ACCOUNT_SUSPENDED" });
+      }
+
+      const { from, to } = await switchUserRole(req.user!.id, role);
+
+      // Re-mint tokens so the very next call already reads the new role from
+      // the JWT. No sessionVersion bump: it's the same session, just a new tag
+      // for what it is allowed to do.
+      //
+      // The credential event is CARRIED OVER, not re-created. Minting with a
+      // fresh `auth_time` and a hard-coded `["pwd"]` would hand a stolen
+      // session token a brand-new "strong, recent" window the moment the role
+      // changed — which is exactly what the step-up gate exists to prevent.
+      // Carrying `auth_time`, `amr` and the session start keeps the new token
+      // exactly as fresh (and as strong) as the one that was presented.
+      const carriedAmr = (req.auth?.amr ?? []) as AuthMethod[];
+      const tokens = await createAuthTokens(
+        {
+          id: req.user!.id,
+          role: to,
+          ucid: before.ucid,
+          staffRole: before.staffRole,
+        },
+        carriedAmr,
+        {
+          authTime: req.auth?.auth_time,
+          sessionIat: req.auth?.iat,
+        },
+      );
+      return res.json({
+        role: to,
+        from,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      });
+    } catch (err) {
+      logger.error({ err }, "Unexpected error in /role");
       return res.status(500).json({ error: "INTERNAL_ERROR" });
     }
   },

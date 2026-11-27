@@ -128,7 +128,7 @@
 | `/topup_queue` | Receipt viewer inline, approve/reject/flag |
 | `/dispute_queue` | Mediation view with contract + deliverables |
 | `/tms_queue` | STRUCTURING/VELOCITY/PASS_THROUGH/WALLET_MISMATCH flags |
-| `/broadcast` | Admin: send announcement to all/subscribed users |
+| `/broadcast` | Admin: pointer to the Operations Console broadcast center (composing moved to the web editor) |
 | `/user <ucid>` | Lookup user, view roles, KYC, wallet, flags |
 | `/analytics` | Key metrics: DAU, jobs, disputes, payout volume |
 
@@ -150,6 +150,18 @@
 | Withdrawal processed | 🏦 Withdrawal of {amount} ETB completed | Push |
 | TMS flag | 🚨 Compliance review needed | Staff only |
 | SLA breach (staff) | ⏰ Queue item overdue: {type} #{id} | Staff only |
+
+### 3.9 Admin Broadcast Center (Web Console)
+
+Announcements are composed and tracked in the Operations Console, not inside a chat scene, because composing a 4,000-character message with an image, a button and a preview needs a real editor. The bot still delivers them.
+
+* **Route surface:** `/api/v1/broadcasts` (`bot.manage`, `SUPER_ADMIN`/`ADMIN`). Send and cancel additionally require `requireFreshAuth(600)`.
+* **Audiences:** `ALL`, `CLIENTS`, `FREELANCERS`, `STAFF`, `KYC_VERIFIED`. Every one resolves through `audienceWhere()`, which excludes suspended accounts, guest-contact identities and members with no `telegramChatId`. Reachable counts are shown before sending.
+* **Message shape:** optional bold heading (platform-rendered), escaped body, optional image, and one inline URL button. Visible-text limits are 4,096 characters, or 1,024 when an image turns the message into a photo caption.
+* **Lifecycle:** `DRAFT` → `SENDING` → `SENT` / `PARTIAL` / `FAILED`; `SENDING` → `CANCELLED`. Only a draft can be edited or sent. Duplicating any row produces a new draft; sent and partial rows cannot be deleted because their delivery rows are the record of who was messaged.
+* **Delivery:** the `telegram-broadcasts` BullMQ worker sends in batches of 20 with a one-second pause, checks for cancellation between batches, retries a 429 once after Telegram’s `retry_after`, and records one `TelegramBroadcastDelivery` per recipient. The unique `(broadcastId, userId)` makes a re-run safe.
+* **Test send:** sends the saved content to the requesting admin’s own linked chat, so the exact rendering and keyboard can be checked before anyone else sees it.
+* **Commands:** `/broadcast` in the bot and the `staff:broadcast` callback now answer with a pointer to the console (permission-checked), rather than opening a removed scene.
 
 ---
 

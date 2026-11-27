@@ -331,6 +331,9 @@ circumventionAlertCount Int        @default(0)
   workspaceReminders   WorkspaceReminder[]
   savedTalents         SavedTalent[]        @relation("SavedTalentOwner")
   savedByUsers         SavedTalent[]        @relation("SavedTalentTarget")
+  broadcastsAuthored   TelegramBroadcast[]  @relation("BroadcastAuthor")
+  broadcastsSent       TelegramBroadcast[]  @relation("BroadcastSender")
+  broadcastDeliveries  TelegramBroadcastDelivery[]
 
   @@index([faydaPsut])
   @@index([isGuestContact])
@@ -1494,6 +1497,96 @@ model PayoutTransaction {
   @@index([userId, status])
   @@index([provider, status])
   @@index([createdAt])
+}
+
+// ---------- Telegram Broadcasts ----------
+//
+// Admin-composed announcements delivered through the platform's Telegram bot.
+// A broadcast is content + an audience; it is built as a DRAFT, previewed and
+// test-sent, then queued. The queue worker resolves recipients once, sends at a
+// rate the Bot API accepts, and records one delivery row per recipient so a
+// failure is attributable instead of an aggregate count nobody can act on.
+
+enum BroadcastAudience {
+  ALL
+  CLIENTS
+  FREELANCERS
+  STAFF
+  KYC_VERIFIED
+}
+
+enum BroadcastStatus {
+  DRAFT
+  SENDING
+  SENT
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum BroadcastDeliveryStatus {
+  SENT
+  FAILED
+}
+
+model TelegramBroadcast {
+  id String @id @default(cuid())
+  /// Internal label shown only in the console. Never sent to members.
+  name String @db.VarChar(120)
+  /// Optional bold first line of the delivered message.
+  heading String? @db.VarChar(200)
+  /// Message text. Sent as escaped HTML, so markup cannot break the delivery.
+  body String @db.Text
+  /// Optional HTTPS image Telegram fetches and posts with the caption.
+  imageUrl String? @db.VarChar(500)
+  /// Optional inline button. Telegram rejects an invalid button URL and the
+  /// whole message with it, so this is validated to a public HTTPS URL.
+  linkUrl String? @db.VarChar(500)
+  linkLabel String? @db.VarChar(60)
+  audience BroadcastAudience @default(ALL)
+  status BroadcastStatus @default(DRAFT)
+
+  createdById String
+  createdBy User @relation("BroadcastAuthor", fields: [createdById], references: [id])
+  sentById String?
+  sentBy User? @relation("BroadcastSender", fields: [sentById], references: [id])
+
+  queuedAt DateTime?
+  startedAt DateTime?
+  sentAt DateTime?
+
+  /// Recipients resolved at dispatch. delivered + failed should equal this.
+  recipientCount Int @default(0)
+  deliveredCount Int @default(0)
+  failedCount Int @default(0)
+  /// Aggregate reason when the run itself failed (bot offline, no recipients).
+  lastError String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries TelegramBroadcastDelivery[]
+
+  @@index([status, createdAt])
+  @@index([createdById])
+}
+
+model TelegramBroadcastDelivery {
+  id String @id @default(cuid())
+  broadcastId String
+  broadcast TelegramBroadcast @relation(fields: [broadcastId], references: [id], onDelete: Cascade)
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Chat the message was addressed to, captured at send time.
+  chatId String
+  status BroadcastDeliveryStatus
+  /// Telegram's refusal reason, or the transport error, per recipient.
+  error String? @db.Text
+  sentAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([broadcastId, userId])
+  @@index([broadcastId, status])
 }
 
 // ---------- Workspace Reminders & Saved Talent Shortlist ----------

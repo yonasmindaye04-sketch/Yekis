@@ -2,7 +2,7 @@
 import { hashPassword, verifyPassword } from "../../lib/password";
 import { SignJWT, jwtVerify } from "jose";
 import { randomBytes, createHash } from "crypto";
-import type { RegisterInput, LoginInput } from "../../schemas";
+import type { RegisterInput, LoginInput, UserRole } from "../../schemas";
 import { prisma } from "../../lib/prisma.js";
 import { Prisma } from "@prisma/client";
 import { recordAuditEvent } from "../../lib/audit.js";
@@ -73,6 +73,65 @@ export async function revokeAllSessions(userId: string): Promise<number> {
 /** Ends the caller's session. See `revokeAllSessions` for the semantics. */
 export async function logoutSession(userId: string): Promise<void> {
   await revokeAllSessions(userId);
+}
+
+/**
+ * Account-type transition handler.
+ *
+ * Members register as CLIENT, FREELANCER or BOTH. Registration is the only
+ * point at which we historically asked "what do you want to do on Yekis?", and
+ * a member who signs up as a client because they have one job to post should
+ * not have to abandon that account to take work the next month. This endpoint
+ * is the deliberate answer: the same account can move between roles without a
+ * re-registration.
+ *
+ * What it does NOT do:
+ *  - Move historical contracts/jobs between roles. A contract is recorded
+ *    against the role the user held when the contract was created; switching
+ *    role later never retroactively rebinds that data.
+ *  - Skip step-up. The route is mounted behind `requireFreshAuth` so a
+ *    shoulder-surf cannot change the role on an unattended tab.
+ *  - Bump `sessionVersion`. The current session still represents the same
+ *    account, and the new tokens re-stamp `role` so the very next request
+ *    reads the new value from the JWT.
+ */
+export async function switchUserRole(
+  userId: string,
+  newRole: UserRole,
+): Promise<{
+  from: UserRole;
+  to: UserRole;
+}> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, isSuspended: true },
+  });
+  if (!user) throw new Error("USER_NOT_FOUND");
+  if (user.isSuspended) {
+    throw new Error("ACCOUNT_SUSPENDED");
+  }
+  if (user.role === newRole) {
+    // Switching to the role you already hold is a no-op, not an error: a
+    // double-tap of the button should not write an audit row that suggests
+    // an action took place when none did.
+    return { from: user.role, to: user.role };
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { role: newRole },
+  });
+
+  await recordAuditEvent({
+    userId,
+    eventType: "USER_ROLE_SWITCHED",
+    entityType: "User",
+    entityId: userId,
+    metadata: { from: user.role, to: newRole },
+  });
+
+  logger.info({ userId, from: user.role, to: newRole }, "Member switched account type");
+  return { from: user.role, to: newRole };
 }
 
 export async function registerUser(input: RegisterInput) {

@@ -2,6 +2,11 @@
 
 Last validated: 2026-11-27
 
+> **Linked Accounts, Account-Email Verification & a Changeable Account Type (`LinkedAccountsCard.tsx`, `AccountTypeCard.tsx`, `auth.routes.ts`, `email-verification.routes.ts`, `telegram-code.service.ts`, `bot/handlers/commands.ts`, `settingsWorkspaceCopy.ts`) (2026-11-27)**:
+> - **Why**: the Linked Accounts card could connect Google and nothing else. The email row said "Verified" or "Unverified" and offered nothing — the onboarding OTP pair is unauthenticated and refuses an address that is already registered, so a member who never proved the address on their own account had no way to prove it. Telegram could only be connected from the Mini App. And the account type was whatever registration asked for: a client who wanted to take freelance work had to open a second account, splitting their identity, their ratings and their money.
+> - **What changed**: the provider rows are now produced from one registry, each provider declaring the flow it connects with, so a new provider is one entry rather than a new hand-written block. **Verify email** sends a six-digit code to the address already on the account (read server-side from the signed-in member, never from the browser) and stamps `emailVerified` on a successful check. **Connect Telegram** opens the bot deep link, and the bot confirms the chat before the dashboard updates — the Telegram id is refused if it already belongs to another account, so connecting a provider never merges two accounts. **Account Type** (Preferences & Localization) moves the same account between Client, Freelancer and Both on the same row, behind a fresh strong sign-in, moving no historic record.
+> - **Verified**: 12 backend tests over the real assembled app and 8 frontend render tests; the three flows were also driven in a browser against the local stack — the email verified end to end, the role switch moved the sidebar chip, and the Telegram link was confirmed by the bot and the card updated without a reload.
+
 > **Operations Console Real-Data Wiring, RBAC Route Parity & Workspace Visual Alignment (`OpsConsole.tsx`, `Overview.tsx`, `Reports.tsx`, `Ledger.tsx`, `Contracts.tsx`, `Escrow.tsx`, `Payments.tsx`, `Payouts.tsx`, `Reconciliation.tsx`, `ReportsQueue.tsx`, `DisputeQueue.tsx`, `WithholdingReports.tsx`, `EvidenceViewer.tsx`, `ops-console.css`, `opsApi.ts`, backend staff routers) (2026-11-27):**
 > - **Why**: Several staff modules (`tms`, `topups`, `finance`, `featured`, `bot`, `staff/reports`) still used coarse `requireStaffRole(...)` lists (403ing `COMPLIANCE_ADMIN` and `FINANCE_ADMIN` on pages their RBAC matrix permitted), live staff `ApiClient` calls could silently fall back to `mockStore`, `reconciliation` filtered `recStatus` after pagination, `Reports` / `Overview` truncated history to 100 list rows and scaled money into fixed `"M"` units (plus dividing count Donuts by 100), and financial workbenches displayed hardcoded percentages (`10%`, `3% WHT`, `15% VAT`, `0.87`), placeholder fallback strings (`4500000`, `TB26101899201`, `SHA256-OK-*`, fake deliverable file rows), and minor styling/token differences from the Client & Freelancer workspaces.
 > - **Backend Real-Data & RBAC Parity**: Aligned `tms`, `topups`, `finance`, `featured`, `bot`, and `staff/reports` onto `requirePermission(...)` and added `profiles.moderate` to `COMPLIANCE_SET`; filtered `listReconciliation` before pagination slicing; added `feeConfiguration` & `collectedFeesMinor` to `getDashboardSummary()` / `getContractDetail()`, real KYC fields to `listPayouts()` & `getContractDetail()`, joined subject/reporter/exposure/checks metadata + filters to `GET /staff/reports`, `cbeConfigured`/`mpesaConfigured` checks to `getSystemHealth()`, and real DB trailing-6-month `months`/`rails`/`categories` series + `feeConfiguration` to `getReportsSummary()`.
@@ -1294,6 +1299,7 @@ Support inbox, receipt review, audit log browser, and Admins and Permissions - t
 | Staff | change role, remove console access | `POST /admin/staff/:userId/role` |
 | Profile reports | no-action / hide / ban, refresh featured carousel | `PATCH /staff/reports/:id`, `POST /featured/staff/refresh` |
 | Support | reply, attach files, close, reopen | `POST /chat/conversations/:id/messages`, `/chat/upload`, `PATCH /chat/admin/conversations/:id/status` |
+| Telegram Bot | start polling, stop bot, delete webhook; compose, test, send and cancel broadcasts | `POST /telegram/start-polling`, `/telegram/stop`, `/telegram/delete-webhook`, `GET/POST /broadcasts`, `POST /broadcasts/:id/test`, `/send`, `/cancel` |
 
 Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-second signed URL and renders what the object store returns, and a milestone deliverable opens from its stored `deliverableUrl`. There are no mock documents anywhere in the console.
 
@@ -1407,3 +1413,25 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
 ### Client Dashboard Fix & Redesign (2026-11-27)
 - **Server Fee Truth & Safe Confirmations**: Dashboard and Pipeline surfaces read server-computed fees (`calculateFees()`, `GET /api/v1/escrow/fee-config`) and wrap contract acceptance, milestone funding, and fund release in native `<dialog>` confirmations (`ConfirmActionModal`) stating exact amounts and effects (`Contracts` only records signatures; `Escrow Center` owns fund/release/dispute actions).
 - **Onboarding, Wallet Method Discovery & Reminders**: First-run Client accounts see `FirstRunChecklist` (with a persisted Settings toggle), upfront KYC verification prompts before brief creation, `GET /api/v1/wallet/topups/methods` driving Telebirr Instant vs Manual Transfer default selection and status timelines, `Needs your attention` actionable milestones, Calendar-only `WorkspaceReminder` CRUD, server-persisted `SavedTalent` bookmarks, grouped sidebar navigation, and a 2-way `Client`/`Freelancer` switch for dual-role users.
+
+---
+
+## Telegram Broadcast Center (added 2026-12-01)
+
+Staff with `bot.manage` (SUPER_ADMIN or ADMIN) open **Administration → Telegram Bot**. The page is now two tabs. **Status** keeps the telemetry cards and the Start polling / Stop bot / Delete webhook controls. **Broadcasts** is the new composer.
+
+### Writing and checking a message
+1. The composer starts empty. The internal **name** is only for the library; members never see it. Choose an **audience** — Everyone, Clients, Freelancers, Staff or KYC verified — and the reach card shows how many linked, active accounts that resolves to right now. Members without a linked Telegram chat, suspended accounts and support-widget guest identities are never counted.
+2. Write an optional **heading** (rendered bold by the platform) and the **body**. The character counter measures visible text: 4,096 characters normally, 1,024 once an image URL is set, because Telegram treats an image message as a caption.
+3. Optionally paste an **image URL** and one **button URL/label**. The preview bubble updates as you type and shows the heading, the line breaks, the image and the button in the order Telegram will render them.
+4. **Save draft** creates the row (`DRAFT`). **Send test to me** saves pending edits first, then sends the persisted content to the signed-in admin’s own linked chat. If that account has no linked chat, the console says so and points at Settings; it does not silently send to somebody else.
+
+### Sending, watching, stopping
+- **Send** saves, then opens a confirmation naming the recipient count and stating that delivered messages cannot be recalled. Confirming claims the draft (`SENDING`), records the audience count and queues one job on the `telegram-broadcasts` worker; the worker resolves the audience again and refreshes `recipientCount` when it starts. The route requires a sign-in within the last ten minutes; a stale session is explained as “sign in again”, not as a generic failure.
+- The delivery log shows recipients, delivered, failed and remaining, plus the first failed recipients and Telegram’s reason for each. While the run is `SENDING` the panel polls every four seconds.
+- **Cancel** stops after the batch already in flight; messages already delivered stay delivered and the row ends `CANCELLED` with its counters intact. **Duplicate** turns any row into a fresh `DRAFT` for editing. **Delete** is offered only for drafts, cancelled runs and failed runs — a sent or partial broadcast is delivery evidence and is refused by the API.
+- A finished run is `SENT` when every resolved recipient accepted the message, `PARTIAL` when some failed, and `FAILED` when none succeeded or the job died. All transitions write audit events.
+
+### In the bot
+`/broadcast` and the staff **Broadcasts** button previously opened a stub. They now check `bot.manage` and reply with a pointer to the console, because composing a long message, previewing it and reading the delivery log needs the web editor. The member-facing bot is unchanged.
+

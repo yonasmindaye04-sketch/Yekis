@@ -28,6 +28,17 @@ export interface TelegramAuthResponse {
   };
 }
 
+/** Content of an admin Telegram broadcast, as the API accepts it. */
+export interface TelegramBroadcastInput {
+  name: string;
+  heading?: string | null;
+  body: string;
+  imageUrl?: string | null;
+  linkUrl?: string | null;
+  linkLabel?: string | null;
+  audience: "ALL" | "CLIENTS" | "FREELANCERS" | "STAFF" | "KYC_VERIFIED";
+}
+
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
@@ -661,7 +672,9 @@ class ApiClient {
       path.startsWith("/api/v1/auth/me") ||
       path.startsWith("/api/v1/auth/identities") ||
       path.startsWith("/api/v1/auth/telegram/link") ||
-      path.startsWith("/api/v1/auth/oauth/google/link")
+      path.startsWith("/api/v1/auth/oauth/google/link") ||
+      path.startsWith("/api/v1/auth/email/verification") ||
+      path.startsWith("/api/v1/auth/role")
     );
   }
 
@@ -748,6 +761,7 @@ class ApiClient {
       clean.startsWith("/api/v1/disputes/staff/") ||
       clean.startsWith("/api/v1/chat/admin/") ||
       clean.startsWith("/api/v1/bot/") ||
+      clean.startsWith("/api/v1/broadcasts") ||
       clean.startsWith("/api/v1/featured/staff/")
     );
   }
@@ -1379,6 +1393,88 @@ class ApiClient {
     return this.request(
       "/api/v1/auth/oauth/google/link",
       { method: "DELETE" },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Starts the Telegram deep-link handshake for the signed-in account.
+   *
+   * The member is already signed in on the web; this mints a one-time session
+   * id and returns the bot URL that carries it. Opening that URL lands the
+   * member in the bot's `/start` handler, which binds the Telegram chat to
+   * this account. The web side then polls `getTelegramLinkStatus` until the
+   * status flips to "linked".
+   *
+   * The Telegram id itself never crosses this boundary: the browser only ever
+   * holds `true`/`false`, exactly like the other providers.
+   */
+  async startTelegramLink(): Promise<{ sid: string; botUrl: string }> {
+    return this.request(
+      "/api/v1/auth/telegram/link/start",
+      { method: "POST", body: JSON.stringify({}) },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /** Polls the handshake started by `startTelegramLink`. */
+  async getTelegramLinkStatus(
+    sid: string,
+  ): Promise<{ status: "pending" | "linked" | "expired" }> {
+    return this.request(
+      `/api/v1/auth/telegram/link/${encodeURIComponent(sid)}/status`,
+      { method: "GET" },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Asks the server to send a verification code to the address already on the
+   * account. The address is read server-side from the signed-in account, so
+   * the browser cannot ask for a code to somebody else's inbox.
+   */
+  async startAccountEmailVerification(): Promise<{
+    sent: boolean;
+    email: string;
+    expiresAt: string;
+    retryAfterSec: number;
+    devCode?: string;
+  }> {
+    return this.request(
+      "/api/v1/auth/email/verification/start",
+      { method: "POST", body: JSON.stringify({}) },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /** Redeems the six-digit code sent by `startAccountEmailVerification`. */
+  async checkAccountEmailVerification(
+    code: string,
+  ): Promise<{ verified: boolean; email: string }> {
+    return this.request(
+      "/api/v1/auth/email/verification/check",
+      { method: "POST", body: JSON.stringify({ code }) },
+      { strictHttpErrors: true },
+    );
+  }
+
+  /**
+   * Changes the account type (CLIENT / FREELANCER / BOTH) for the signed-in
+   * member.
+   *
+   * The server answers with a new access/refresh pair stamped with the new
+   * role, because the role travels in the token — the caller must adopt the
+   * new tokens or the next request would still carry the old role.
+   */
+  async switchAccountRole(role: "CLIENT" | "FREELANCER" | "BOTH"): Promise<{
+    role: "CLIENT" | "FREELANCER" | "BOTH";
+    from: "CLIENT" | "FREELANCER" | "BOTH";
+    accessToken: string;
+    refreshToken: string;
+  }> {
+    return this.request(
+      "/api/v1/auth/role",
+      { method: "POST", body: JSON.stringify({ role }) },
       { strictHttpErrors: true },
     );
   }
@@ -2455,6 +2551,49 @@ class ApiClient {
   async deleteBotWebhook(): Promise<unknown> { return this.request("/api/v1/telegram/delete-webhook", { method: "POST" }); }
   async startBotPolling(): Promise<unknown> { return this.request("/api/v1/telegram/start-polling", { method: "POST" }); }
   async stopBot(): Promise<unknown> { return this.request("/api/v1/telegram/stop", { method: "POST" }); }
+
+  // --- Telegram broadcasts (admin) ---
+  async listBroadcastAudiences(): Promise<unknown> {
+    return this.request("/api/v1/broadcasts/audiences");
+  }
+  async listBroadcasts(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    q?: string;
+  }): Promise<unknown> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.q) qs.set("q", params.q);
+    const query = qs.toString();
+    return this.request("/api/v1/broadcasts" + (query ? "?" + query : ""));
+  }
+  async getBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}`);
+  }
+  async createBroadcast(input: TelegramBroadcastInput): Promise<unknown> {
+    return this.request("/api/v1/broadcasts", { method: "POST", body: JSON.stringify(input) });
+  }
+  async updateBroadcast(id: string, input: TelegramBroadcastInput): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+  }
+  async deleteBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}`, { method: "DELETE" });
+  }
+  async duplicateBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}/duplicate`, { method: "POST" });
+  }
+  async testBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}/test`, { method: "POST" });
+  }
+  async sendBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}/send`, { method: "POST" });
+  }
+  async cancelBroadcast(id: string): Promise<unknown> {
+    return this.request(`/api/v1/broadcasts/${id}/cancel`, { method: "POST" });
+  }
   
   // --- Reviews ---
   async submitReview(contractId: string, rating: number, comment: string): Promise<unknown> {

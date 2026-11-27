@@ -611,6 +611,41 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `POST` | `/api/v1/admin/incidents/breach` | `incidents.manage` | Open a data-breach incident: revokes the sessions of the affected users, alerts staff by SMS/Telegram, notifies the affected users, and returns the ECA notification template plus the 72-hour deadline |
 | `GET` | `/api/v1/admin/incidents/breaches` | `incidents.manage` | List open breach incidents with the ECA filing deadline and whether it is still inside the 72-hour window |
 
+### Telegram Broadcasts (`/api/v1/broadcasts`)
+
+Mounted at `/api/v1/broadcasts`. Every route requires `requireAuth` and the `bot.manage` permission (`SUPER_ADMIN` and `ADMIN`). `POST /:id/send` and `POST /:id/cancel` additionally call `requireFreshAuth(600)`: a session older than ten minutes is refused with `401 REAUTH_REQUIRED` (no session) or `403 STEP_UP_REQUIRED` (authenticated but stale), so a hijacked console session cannot message the whole user base.
+
+| Method | Path | Input | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/broadcasts/audiences` | — | Recipient counts for every audience (`ALL`, `CLIENTS`, `FREELANCERS`, `STAFF`, `KYC_VERIFIED`), counted against linked, active, non-guest accounts |
+| `GET` | `/api/v1/broadcasts` | `page`, `limit` (≤100), `status`, `q` | Content library: paginated broadcasts with author and sender, newest first |
+| `POST` | `/api/v1/broadcasts` | content body | Create a `DRAFT` |
+| `GET` | `/api/v1/broadcasts/:id` | — | Detail plus the first 100 delivery rows and `failureCount` |
+| `PATCH` | `/api/v1/broadcasts/:id` | content body | Edit a `DRAFT` only (`409 BROADCAST_NOT_EDITABLE` otherwise) |
+| `DELETE` | `/api/v1/broadcasts/:id` | — | Delete a draft; refused for `SENDING`, and for `SENT`/`PARTIAL` because the row is delivery evidence |
+| `POST` | `/api/v1/broadcasts/:id/duplicate` | — | Copy any broadcast into a new `DRAFT` |
+| `POST` | `/api/v1/broadcasts/:id/test` | — | Send the saved content to the caller’s own linked Telegram chat; `400 TEST_RECIPIENT_NOT_LINKED` when the admin has no chat |
+| `POST` | `/api/v1/broadcasts/:id/send` | — | Claim a `DRAFT`, record the audience count, enqueue one `telegram-broadcasts` job, return the row in `SENDING` |
+| `POST` | `/api/v1/broadcasts/:id/cancel` | — | Move `SENDING` to `CANCELLED`; batches already in flight still complete |
+
+Content body (Zod `contentSchema`):
+
+```json
+{
+  "name": "March payout notice",
+  "heading": "Payouts move to Tuesday",
+  "body": "Telebirr payouts are processed on Tuesdays from 4 March.",
+  "imageUrl": "https://cdn.yekis.com/announcements/payouts.png",
+  "linkUrl": "https://yekis.com/help/payouts",
+  "linkLabel": "Payout guide",
+  "audience": "FREELANCERS"
+}
+```
+
+`name` is internal and never delivered. `heading` (≤200) is rendered as the platform’s own `<b>` line, so no admin-supplied markup or `parse_mode` is trusted. The body is escaped for Telegram HTML; `linkLabel` is used only when `linkUrl` is also set. Limits are checked against **visible** characters — 4,096 for text, 1,024 when `imageUrl` makes the message a photo caption. The audience is resolved again when the worker starts and `recipientCount` is refreshed to that resolved set — the queue-time count is what the confirmation named, and the run records who it actually reached.
+
+Error codes: `BROADCAST_NOT_FOUND` (404), `BROADCAST_INVALID` / `BROADCAST_AUDIENCE_EMPTY` / `TEST_RECIPIENT_NOT_LINKED` (400), `BROADCAST_NOT_EDITABLE` / `BROADCAST_NOT_SENDABLE` (409), `BOT_UNAVAILABLE` / `QUEUE_UNAVAILABLE` (503). The delivery worker records `SENT`/`PARTIAL`/`FAILED`, writes `broadcast.completed` or `broadcast.failed` to the audit log, and `broadcast.queued`, `broadcast.cancel_requested` and `broadcast.test_sent` are written by the routes’ services.
+
 Staff queue and moderation routers (`kyc`, `tms`, `topups`, `finance`, `featured`, `bot`, `staff/reports`) enforce granular `requirePermission(...)` guards aligned with the RBAC matrix.
 
 Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Domain errors use a stable `error` code and may include a human-readable `message`.
@@ -759,6 +794,11 @@ The following routes are in `auth.routes.ts` and all mount under `/api/v1/auth`:
 | `POST` | `/api/v1/auth/logout` | Authenticated | Invalidates the current session |
 | `GET` | `/api/v1/auth/me` | Authenticated | Returns current user profile |
 | `GET` | `/api/v1/auth/identities` | Authenticated | What this account can sign in with — `email`, `emailVerified`, `passwordSet`, `google`, `apple`, `facebook`, `telegram`, `phoneVerified`. **Booleans only**: the provider ids are never sent to the browser, because they are the handle a member is impersonated by at the provider |
+| `POST` | `/api/v1/auth/role` | Authenticated + fresh strong session (≤180s) | Change the account type of the signed-in member (`CLIENT` \| `FREELANCER` \| `BOTH`). The same row is used — only `User.role` changes — and **no historic record is moved**: contracts, proposals and jobs keep the type the member held when they were created. Returns the new role, the previous role, and a **fresh access/refresh pair**, because the role travels inside the token: the caller must adopt the new tokens or the next request would still carry the old role. `401 REAUTH_REQUIRED` when the credential is too old, `403 STEP_UP_REQUIRED` when it is recent but weak (Telegram/OAuth only), `403 ACCOUNT_SUSPENDED`, `400 VALIDATION_ERROR` for a role the platform does not have. Switching to the type already held is a no-op and writes **no** audit row |
+| `POST` | `/api/v1/auth/email/verification/start` | Authenticated | Send a 6-digit code to the address **already on the account**, so the member can prove control of it from **Settings → Linked Accounts**. The address is read from the signed-in account and never from the request body, so the browser cannot ask for a code to somebody else's inbox. `409 EMAIL_ALREADY_VERIFIED` when the address is already proven, `409 EMAIL_NOT_USABLE` when the account carries a placeholder address (a federated or Mini App sign-up). `429` when throttled, `503` when mail cannot be delivered. **The code itself is never in the response** outside a developer machine or the test suite |
+| `POST` | `/api/v1/auth/email/verification/check` | Authenticated | Redeem the code issued by the route above and stamp `User.emailVerified` / `User.emailVerifiedAt`, with an `ACCOUNT_EMAIL_VERIFIED` audit row. The code must have been issued **for this account's own address**. `400 INVALID_CODE` for both "no such code" and "wrong code", `410 CODE_EXPIRED`, `429 TOO_MANY_ATTEMPTS` |
+| `POST` | `/api/v1/auth/telegram/link/start` | Authenticated | Start the **bot handshake** that connects a Telegram chat to the signed-in account. Mints a one-time session id (5-minute TTL, held in Redis) and returns the deep link `https://t.me/<bot>?start=lk_<sid>` that the dashboard opens. `503 TELEGRAM_NOT_CONFIGURED` when the host has no bot token or username |
+| `GET` | `/api/v1/auth/telegram/link/:sid/status` | Authenticated | Poll the handshake: `pending` → `linked` → `expired`. **Only the member who started the link may read it**; anybody else is answered `expired`, so the endpoint cannot be used to fish for another member's session id |
 | `POST` | `/api/v1/auth/telegram` | Public | Verify Telegram Mini App `initData` and authenticate/upsert. `503 TELEGRAM_NOT_CONFIGURED` when the host has no bot token — the signature cannot be checked without it |
 | `POST` | `/api/v1/auth/telegram/miniapp` | Public | Alias for Mini App login |
 | `POST` | `/api/v1/auth/telegram/miniapp/register` | Public | Register a new account via Telegram Mini App |

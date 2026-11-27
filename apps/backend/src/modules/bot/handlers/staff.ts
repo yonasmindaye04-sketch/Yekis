@@ -3,6 +3,7 @@ import { BotContext } from "../types.js";
 import { prisma } from "../../../lib/prisma.js";
 import { env } from "../../../config/env.js";
 import { startScene } from "../middleware/sceneTimeout.middleware.js";
+import { hasPermission } from "../../admin/permissions.js";
 
 // Ensures we do not rely on cached sessions for staff privileges (C4)
 async function verifyStaffAccess(ctx: BotContext): Promise<boolean> {
@@ -26,6 +27,18 @@ async function verifyStaffAccess(ctx: BotContext): Promise<boolean> {
   return true;
 }
 
+/**
+ * A link to the console's Telegram Bot page, where broadcasts are actually
+ * composed. Empty when STAFF_CONSOLE_URL is unset — the message above still
+ * explains where to go, and inventing a host is worse than no button.
+ */
+function broadcastConsoleKeyboard(): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  const webConsoleUrl = (env.STAFF_CONSOLE_URL ?? "").replace(/\/+$/, "");
+  if (webConsoleUrl) kb.url("Open Broadcasts", webConsoleUrl);
+  return kb;
+}
+
 export function registerStaffHandlers(bot: Bot<BotContext>) {
   bot.callbackQuery("menu:staff", async (ctx) => {
     if (!(await verifyStaffAccess(ctx))) return;
@@ -47,8 +60,32 @@ export function registerStaffHandlers(bot: Bot<BotContext>) {
 
   bot.callbackQuery("staff:broadcast", async (ctx) => {
     if (!(await verifyStaffAccess(ctx))) return;
-    startScene(ctx, "staff_broadcast", { step: "message" });
-    await ctx.editMessageText("Enter broadcast message (MarkdownV2 supported):");
+    // The console page is gated by bot.manage; a support or finance staff
+    // member must not be handed a link that only leads to a permission error.
+    const actor = ctx.session.userId
+      ? await prisma.user.findUnique({
+          where: { id: ctx.session.userId },
+          select: { staffRole: true },
+        })
+      : null;
+    if (!actor?.staffRole || !hasPermission(actor.staffRole, "bot.manage")) {
+      await ctx.answerCallbackQuery();
+      await ctx.reply("Only an administrator can compose broadcasts.");
+      return;
+    }
+    // This used to start a "staff_broadcast" scene that was never registered.
+    // The button therefore did nothing at all: startScene() looked up a scene
+    // that did not exist. Broadcasts are composed in the console instead, where
+    // the audience count, the preview, the test send and the delivery log live.
+    await ctx.editMessageText(
+      "Broadcasts are composed in the staff console, where you can preview the message, " +
+        "send yourself a test and choose the audience.\n\n" +
+        "Open <b>Telegram Bot → Broadcasts</b> in the console.",
+      {
+        parse_mode: "HTML",
+        reply_markup: broadcastConsoleKeyboard(),
+      },
+    );
     await ctx.answerCallbackQuery();
   });
 }

@@ -496,3 +496,83 @@ export interface OpsBadges {
   /** Wallet top-ups pending receipt review. */
   receipts: number;
 }
+
+/* ── Telegram broadcasts ─────────────────────────────────────────────── */
+
+export type BroadcastAudience =
+  | "ALL"
+  | "CLIENTS"
+  | "FREELANCERS"
+  | "STAFF"
+  | "KYC_VERIFIED";
+
+export type BroadcastStatus =
+  | "DRAFT"
+  | "SENDING"
+  | "SENT"
+  | "PARTIAL"
+  | "FAILED"
+  | "CANCELLED";
+
+export interface BroadcastAudienceOption {
+  audience: BroadcastAudience;
+  label: string;
+  description: string;
+  /** Reachable members right now: linked chat, active, not a guest. */
+  recipients: number;
+}
+
+export interface BroadcastAuthor {
+  id: string;
+  email: string;
+  displayName: string | null;
+}
+
+export interface BroadcastDeliveryRow {
+  id: string;
+  userId: string;
+  chatId: string;
+  status: "SENT" | "FAILED";
+  error: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  user?: { id: string; email: string; displayName: string | null } | null;
+}
+
+export interface BroadcastSummary {
+  id: string;
+  name: string;
+  heading: string | null;
+  body: string;
+  imageUrl: string | null;
+  linkUrl: string | null;
+  linkLabel: string | null;
+  audience: BroadcastAudience;
+  status: BroadcastStatus;
+  recipientCount: number;
+  deliveredCount: number;
+  failedCount: number;
+  lastError: string | null;
+  queuedAt: string | null;
+  startedAt: string | null;
+  sentAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: BroadcastAuthor;
+  sentBy: BroadcastAuthor | null;
+}
+
+export interface BroadcastDetail extends BroadcastSummary {
+  deliveries: BroadcastDeliveryRow[];
+  /** Total failures, even beyond the 100 delivery rows carried above. */
+  failureCount: number;
+}
+
+export interface BroadcastList {
+  items: BroadcastSummary[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+

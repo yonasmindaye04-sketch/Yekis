@@ -1,4 +1,4 @@
-﻿// === IMPORTS ===
+// === IMPORTS ===
 // Side-effect import: makes BigInt survive JSON.stringify, so a Prisma row
 // holding `telegramUserId` cannot turn into a 500 (or a silently dropped
 // response) the moment a handler returns it. Defined once in lib/json.ts.
@@ -31,6 +31,7 @@ import { financeRouter } from "./modules/finance/finance.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { remindersRouter } from "./modules/reminders/reminders.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
+import { broadcastRouter } from "./modules/bot/broadcast.routes.js";
 import { mountStaticSite } from "./lib/staticSite.js";
 import { env } from "./config/env.js";
 export function buildApp() {
@@ -189,6 +190,9 @@ export function buildApp() {
   app.use("/api/v1/staff", staffProfileRouter);
   app.use("/api/v1/finance", financeRouter);
   app.use("/api/v1/admin", adminRouter);
+  // Mounted after express.json() on purpose: unlike the bot router, every route
+  // here takes a JSON body and none of them needs the raw bytes.
+  app.use("/api/v1/broadcasts", broadcastRouter);
   app.use("/api/v1/reminders", remindersRouter);
 
   // The built frontend, when this deployment serves it. Mounted after the

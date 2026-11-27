@@ -96,6 +96,7 @@ const PILL: Record<string, string> = {
   ACCEPTED: "p-green", TIER_2: "p-green", LIVE: "p-green", FILED: "p-green",
   POSTED: "p-green", RECONCILED: "p-green", PAID: "p-green",
   ESCROW_HELD: "p-sky", WORK_IN_PROGRESS: "p-sky", WALLET_TOPUP: "p-sky",
+  SENDING: "p-sky", SENT: "p-green", PARTIAL: "p-amber",
   SHORTLISTED: "p-sky", TIER_1: "p-sky", PARTIAL_RELEASE: "p-sky", FORCE_MATCHED: "p-sky",
   PENDING: "p-amber", PROCESSING: "p-amber", SUBMITTED_FOR_REVIEW: "p-amber",
   OPEN: "p-amber", UNDER_REVIEW: "p-amber", STAGE_1_NEGOTIATION: "p-amber",

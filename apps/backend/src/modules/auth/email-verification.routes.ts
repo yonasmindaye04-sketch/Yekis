@@ -2,13 +2,17 @@
 import type { Response, Router } from "express";
 import { z } from "zod";
 import { rateLimit } from "../../lib/rateLimit.js";
-import type { AuthedRequest } from "../../middleware/auth.js";
+import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { logger } from "../../lib/logger.js";
+import { prisma } from "../../lib/prisma.js";
+import { recordAuditEvent } from "../../lib/audit.js";
 import { env, isDevCodeDisclosureAllowed } from "../../config/env.js";
 import {
   requestEmailCode,
   verifyEmailCode,
   isEmailDeliveryConfigured,
+  normalizeEmail,
+  isDeliverableEmailShape,
   EmailCodeNotFoundError,
   EmailCodeExpiredError,
   EmailCodeAttemptsExceededError,
@@ -196,6 +200,129 @@ export function registerEmailVerificationRoutes(router: Router): void {
       } catch (err) {
         if (handleEmailVerificationError(err, res)) return;
         logger.error({ err }, "Failed to verify email code");
+        return res.status(500).json({ error: "INTERNAL_ERROR" });
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // Verifying the address ALREADY on the signed-in account.
+  //
+  // WHY A SECOND PAIR OF ROUTES
+  // The two routes above are deliberately unauthenticated: they are the
+  // onboarding pair, and they run before the account exists. They therefore
+  // refuse an address that is already registered ("EMAIL_ALREADY_REGISTERED")
+  // — correct for signup, but exactly wrong for a member who is already
+  // signed in and simply has not proved the address on their own account yet.
+  //
+  // The pair below is the authenticated mirror of the same proof:
+  //
+  //   POST /auth/email/verification/start  → send a code to the account's own
+  //                                          address, the member types it in.
+  //   POST /auth/email/verification/check  → redeem the code and stamp
+  //                                          `User.emailVerified`.
+  //
+  // NOTHING ELSE CHANGES. The address being verified is read from the
+  // account, never from the request body: a member cannot ask for a code to
+  // somebody else's inbox, and cannot redeem a code that was issued for a
+  // different address. It is a proof of control of the address that is
+  // already on file — the same claim, asked of the person who now holds the
+  // account.
+  // -------------------------------------------------------------------------
+
+  router.post(
+    "/email/verification/start",
+    requireAuth,
+    emailSendLimiter,
+    async (req: AuthedRequest, res: Response) => {
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { id: true, email: true, emailVerified: true },
+      });
+      if (!user) {
+        return res.status(404).json({ error: "USER_NOT_FOUND" });
+      }
+      if (user.emailVerified) {
+        return res.status(409).json({
+          error: "EMAIL_ALREADY_VERIFIED",
+          message: "This address is already verified.",
+        });
+      }
+      const email = normalizeEmail(user.email);
+      if (!isDeliverableEmailShape(email)) {
+        // An account created from a federated sign-in or the Mini App can
+        // carry a placeholder address. There is nothing to send a code to, and
+        // saying so beats pretending a code was sent.
+        return res.status(409).json({
+          error: "EMAIL_NOT_USABLE",
+          message: "This account has no usable email address to verify.",
+        });
+      }
+      try {
+        const challenge = await requestEmailCode({
+          email,
+          userId: user.id,
+          purposeLabel: "Verify your Yekis email address",
+        });
+        return res.json({
+          sent: true,
+          email,
+          expiresAt: challenge.expiresAt,
+          retryAfterSec: challenge.retryAfterSec,
+          ...(challenge.devCode && isDevCodeDisclosureAllowed()
+            ? { devCode: challenge.devCode }
+            : {}),
+        });
+      } catch (err) {
+        if (handleEmailVerificationError(err, res)) return;
+        logger.error({ err }, "Failed to issue account email verification code");
+        return res.status(500).json({ error: "INTERNAL_ERROR" });
+      }
+    },
+  );
+
+  router.post(
+    "/email/verification/check",
+    requireAuth,
+    emailCheckLimiter,
+    async (req: AuthedRequest, res: Response) => {
+      const parsed = z
+        .object({ code: z.string().regex(/^\d{6}$/, "Enter the 6-digit code.") })
+        .safeParse(req.body);
+      if (!parsed.success) {
+        return res
+          .status(400)
+          .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+      }
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { id: true, email: true, emailVerified: true },
+      });
+      if (!user) {
+        return res.status(404).json({ error: "USER_NOT_FOUND" });
+      }
+      if (user.emailVerified) {
+        // Nothing left to prove; the answer is the same one a second attempt
+        // would have got.
+        return res.json({ verified: true, email: user.email });
+      }
+      try {
+        await verifyEmailCode({
+          email: normalizeEmail(user.email),
+          code: parsed.data.code,
+          userId: user.id,
+        });
+        await recordAuditEvent({
+          userId: user.id,
+          eventType: "ACCOUNT_EMAIL_VERIFIED",
+          entityType: "User",
+          entityId: user.id,
+          metadata: { via: "settings_linked_accounts" },
+        });
+        return res.json({ verified: true, email: user.email });
+      } catch (err) {
+        if (handleEmailVerificationError(err, res)) return;
+        logger.error({ err }, "Failed to verify the account email code");
         return res.status(500).json({ error: "INTERNAL_ERROR" });
       }
     },

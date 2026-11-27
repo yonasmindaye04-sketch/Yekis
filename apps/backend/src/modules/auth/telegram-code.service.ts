@@ -265,3 +265,158 @@ export async function redeemWebLogin(sid: string, verifier: string) {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Bot-driven linking flow.
+//
+// What it does
+// A member signed in to the web dashboard opens Linked Accounts → Connect
+// Telegram. The site calls `/auth/telegram/link/start` while still authed;
+// this creates a one-time `tg_link:{sid}` row in Redis bound to that member's
+// userId, and responds with a deep-link button to the bot.
+//
+// The bot — wired below — recognises `/start link_{sid}` (the `lk_` prefix
+// keeps it visually distinct from `wl_` and `web_auth`). For a `lk_` start it
+// looks up the row, refuses if it expired or has already been consumed, and on
+// success binds the authed member's `telegramUserId`/`telegramChatId`.
+//
+// Redis-not-Prisma on purpose
+// A web login link only lives a few minutes because Redis is faster than a
+// Prisma round-trip and TTL is native to it. The row disposable when the
+// member either completes or walks away is exactly the shape Redis is for.
+// ---------------------------------------------------------------------------
+
+const TG_LINK_TTL_SEC = 300; // 5 minutes from start to bot confirmation
+
+export type TgLinkStatus = "pending" | "linked" | "expired";
+
+export class TelegramLinkError extends Error {}
+
+interface TgLinkRow {
+  status: "pending" | "linked";
+  userId: string;
+  /** Set the moment the bot confirms the linking. */
+  telegramUserId?: string;
+  telegramChatId?: string;
+  /** Username the bot shows the user — copy for the success message. */
+  telegramUsername?: string | null;
+  createdAt: number;
+}
+
+function tgLinkKey(sid: string): string {
+  return `tg_link:${sid}`;
+}
+
+/**
+ * Mint a one-time deep-link session bound to an already-authed member.
+ *
+ * `botUrl` is the URL the dashboard puts behind a button: opening it lands
+ * the member in the bot's `/start link_{sid}` handler with our sid intact,
+ * which the handler reads back to find this row.
+ */
+export async function startTelegramLink(userId: string): Promise<{
+  sid: string;
+  botUrl: string;
+}> {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_BOT_USERNAME) {
+    // Mirror `webAuthorize` here: the bot is not in scope of this host. The
+    // dashboard falls back to "Telegram sign-in is not configured in this
+    // environment." without crashing the linked-accounts screen.
+    throw new TelegramLinkError("TELEGRAM_NOT_CONFIGURED");
+  }
+
+  const sid = randomBytes(20).toString("base64url").replace(/[^a-zA-Z0-9_-]/g, "");
+  const row: TgLinkRow = {
+    status: "pending",
+    userId,
+    createdAt: Date.now(),
+  };
+  await redis.set(tgLinkKey(sid), JSON.stringify(row), "EX", TG_LINK_TTL_SEC);
+
+  return {
+    sid,
+    botUrl: `https://t.me/${env.TELEGRAM_BOT_USERNAME}?start=lk_${sid}`,
+  };
+}
+
+/**
+ * Returns the current status of a pending link for a caller that owns it.
+ *
+ * ONLY the user who started the link may read it; anyone else gets `expired`
+ * so the route cannot be used to fish for someone else's session id.
+ */
+export async function getTelegramLinkStatus(
+  userId: string,
+  sid: string,
+): Promise<{ status: TgLinkStatus; telegramUserId?: string }> {
+  const raw = await redis.get(tgLinkKey(sid));
+  if (!raw) return { status: "expired" };
+  const parsed = JSON.parse(raw) as TgLinkRow;
+  if (parsed.userId !== userId) return { status: "expired" };
+  if (parsed.status === "linked") {
+    return { status: "linked", telegramUserId: parsed.telegramUserId };
+  }
+  return { status: "pending" };
+}
+
+/**
+ * Confirms a link from the bot.
+ *
+ * The bot calls this when it sees `/start lk_{sid}` and the user is already a
+ * known Telegram contact. The session is consumed atomically: whichever caller
+ * wins the redis GETSET is the one that completes it, and a second attempt
+ * for the same sid reads back as `linked` and is rejected.
+ */
+export async function completeTelegramLink(params: {
+  sid: string;
+  telegramUserId: bigint;
+}): Promise<{ userId: string }> {
+  const key = tgLinkKey(params.sid);
+  const raw = await redis.get(key);
+  if (!raw) throw new TelegramLinkError("LINK_EXPIRED");
+  const parsed = JSON.parse(raw) as TgLinkRow;
+  if (parsed.status !== "pending") {
+    throw new TelegramLinkError("LINK_ALREADY_PROCESSED");
+  }
+
+  // Reject if the Telegram id is already claimed by a DIFFERENT account — the
+  // linking must never silently merge two Yekis accounts together (the same
+  // constraint the existing /telegram/link POST enforces). Re-link on the same
+  // account is allowed and is explicitly part of how a member moves their
+  // chat to a new Telegram account.
+  const existing = await prisma.user.findUnique({
+    where: { telegramUserId: params.telegramUserId },
+    select: { id: true },
+  });
+  if (existing && existing.id !== parsed.userId) {
+    throw new TelegramLinkError("TELEGRAM_ALREADY_LINKED");
+  }
+
+  // The Telegram id formats `tg_link:{sid}` against another holder of it: a
+  // second bot confirmation for the same sid must not silently rebind the
+  // account to a different Telegram user.
+  parsed.status = "linked";
+  parsed.telegramUserId = params.telegramUserId.toString();
+  parsed.telegramChatId = params.telegramUserId.toString();
+  // Keep the row for at most 2 minutes — long enough for the polling client
+  // to read `linked` once, then self-evict.
+  await redis.set(key, JSON.stringify(parsed), "EX", 120);
+
+  await prisma.user.update({
+    where: { id: parsed.userId },
+    data: {
+      telegramUserId: params.telegramUserId,
+      telegramChatId: params.telegramUserId.toString(),
+    },
+  });
+
+  await recordAuditEvent({
+    userId: parsed.userId,
+    eventType: "TELEGRAM_ACCOUNT_LINKED_VIA_BOT",
+    entityType: "User",
+    entityId: parsed.userId,
+    metadata: { telegramId: params.telegramUserId.toString(), via: "settings_link" },
+  });
+
+  return { userId: parsed.userId };
+}

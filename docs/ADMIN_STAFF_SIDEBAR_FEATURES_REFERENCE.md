@@ -411,15 +411,29 @@ All 23 pages use in-console state navigation (`OpsPageId`) inside `OpsConsole.ts
 
 ### 3.20 Telegram Bot (`bot`)
 
-- **Component**: `apps/frontend/src/pages/ops/pages/BotOperations.tsx`
+- **Component**: `apps/frontend/src/pages/ops/pages/BotOperations.tsx` and `apps/frontend/src/pages/ops/pages/BroadcastCenter.tsx`
 - **Permission Gate**: `bot.manage` (**Admin-only** — `SUPER_ADMIN` and legacy `ADMIN`).
-- **What It Shows**:
+- **Layout**: The page has two accessible tabs (`role="tablist"`, roving tabindex, arrow/Home/End keys) — **Status** and **Broadcasts**. The broadcasts panel stays mounted while hidden, so switching tabs does not discard an unsaved draft.
+- **Status tab — What It Shows**:
   - **Bot Telemetry Cards**: Fetches `GET /api/v1/telegram/health` and `GET /api/v1/telegram/info` to display connection status, bot username/metadata, webhook URL state, and `Pending Updates` count.
-- **What It Executes** (backend enforces `bot.manage` + `requireFreshAuth(300)`):
+- **Status tab — What It Executes** (backend enforces `bot.manage` + `requireFreshAuth(300)`):
   - **Start Polling**: Starts long-polling worker mode.
   - **Stop Bot**: Halts running Telegram bot ingestion.
   - **Delete Webhook**: Confirms via `OpsActionModal` before clearing the active Telegram webhook URL.
   - *Backend-only route*: `POST /api/v1/telegram/set-webhook` is also available in `bot.routes.ts` (`bot.manage`, `requireFreshAuth(300)`) via API/CLI when re-registering a webhook endpoint.
+- **Broadcasts tab — What It Shows**:
+  - **Composer**: Internal name, audience (with live reachable counts from `GET /api/v1/broadcasts/audiences`), optional bold heading, escaped message body, optional image URL and one button URL/label. Character budget switches from 4,096 to 1,024 when an image is attached.
+  - **Live preview**: A Telegram-style bubble rendering the heading, line breaks and inline button exactly as `composeBroadcastHtml()` builds them, plus the selected audience’s reachable member count.
+  - **Content library**: Paginated `OpsTable` from `GET /api/v1/broadcasts` with status filter, name/body search, delivered/total counters, author, and per-row Open/Duplicate/Delete actions.
+  - **Delivery log**: For the selected broadcast — status pill, recipients/delivered/failed/remaining counters, `lastError`, the first 20 failed recipients with Telegram’s reason, and a Cancel action while `SENDING`. While a run is in progress the row is polled every four seconds.
+- **Broadcasts tab — What It Executes**:
+  - **Save draft** (`POST /api/v1/broadcasts`, `PATCH /api/v1/broadcasts/:id`): creates or updates a `DRAFT`; non-draft rows are read-only.
+  - **Send test to me** (`POST /api/v1/broadcasts/:id/test`): saves pending edits first, then sends the persisted content to the signed-in admin’s own linked Telegram chat. Surfaces `TEST_RECIPIENT_NOT_LINKED` as “link Telegram from Settings”.
+  - **Send** (`POST /api/v1/broadcasts/:id/send`): saves, opens an `OpsActionModal` naming the recipient count and the irreversibility, then queues the run. Behind `requireFreshAuth(600)`; the UI explains `REAUTH_REQUIRED` / `STEP_UP_REQUIRED` instead of showing a generic error.
+  - **Cancel** (`POST /api/v1/broadcasts/:id/cancel`): confirms, then stops after the in-flight batch; already-delivered messages remain.
+  - **Duplicate** (`POST /api/v1/broadcasts/:id/duplicate`) and **Delete** (`DELETE /api/v1/broadcasts/:id`, drafts/cancelled/failed only).
+  - Delivery itself runs on the `telegram-broadcasts` BullMQ queue (see `docs/SYSTEM_DESIGN.md` §3.12), not in the request.
+
 
 ---
 

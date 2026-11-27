@@ -45,10 +45,13 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { api } from "../../api/client";
+import { api, type TelegramBroadcastInput } from "../../api/client";
 import type { ListFetchParams } from "./opsList";
 import type {
   ActivityEvent,
+  BroadcastAudienceOption,
+  BroadcastDetail,
+  BroadcastList,
   Contract,
   DisputeItem,
   DisputeOutcome,
@@ -1352,6 +1355,25 @@ export const opsApi = {
   deleteBotWebhook: () => api.deleteBotWebhook(),
   startBotPolling: () => api.startBotPolling(),
   stopBot: () => api.stopBot(),
+
+  /* Broadcasts. The payloads are the API's own shapes (see opsTypes.ts); the
+     console renders counts and per-recipient failures directly from them. */
+  broadcastAudiences: () =>
+    api.listBroadcastAudiences() as Promise<{ audiences: BroadcastAudienceOption[] }>,
+  broadcasts: (params?: { page?: number; limit?: number; status?: string; q?: string }) =>
+    api.listBroadcasts(params) as Promise<BroadcastList>,
+  broadcast: (id: string) => api.getBroadcast(id) as Promise<BroadcastDetail>,
+  createBroadcast: (input: TelegramBroadcastInput) =>
+    api.createBroadcast(input) as Promise<BroadcastDetail>,
+  updateBroadcast: (id: string, input: TelegramBroadcastInput) =>
+    api.updateBroadcast(id, input) as Promise<BroadcastDetail>,
+  deleteBroadcast: (id: string) => api.deleteBroadcast(id),
+  duplicateBroadcast: (id: string) =>
+    api.duplicateBroadcast(id) as Promise<BroadcastDetail>,
+  testBroadcast: (id: string) =>
+    api.testBroadcast(id) as Promise<{ sent: boolean }>,
+  sendBroadcast: (id: string) => api.sendBroadcast(id) as Promise<BroadcastDetail>,
+  cancelBroadcast: (id: string) => api.cancelBroadcast(id) as Promise<BroadcastDetail>,
   withholdingReports: (params?: { page?: number; limit?: number }) => api.getWithholdingReports(params),
   fileWithholdingReport: (id: string, ref: string) => api.fileWithholdingReport(id, ref),
 };

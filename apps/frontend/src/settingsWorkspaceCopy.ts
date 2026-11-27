@@ -64,6 +64,9 @@ export type SettingsWorkspaceCopy = {
     emailNotSet: string;
     googleMethodLabel: string;
     googleNotConfigured: string;
+    googleNotConnectedDesc: string;
+    googleConnectedDesc: string;
+    telegramConnectedDesc: string;
     linkGoogleBtn: string;
     linkingGoogleBtn: string;
     unlinkGoogleBtn: string;
@@ -73,6 +76,25 @@ export type SettingsWorkspaceCopy = {
     telegramMethodLabel: string;
     telegramLinkedDesc: (usernameOrId: string) => string;
     telegramNotLinkedDesc: string;
+    emailVerifiedDesc: string;
+    emailUnverifiedDesc: string;
+    verifyEmailBtn: string;
+    emailCodeTitle: string;
+    emailCodeSentDesc: (email: string) => string;
+    emailCodeLabel: string;
+    emailCodeHint: string;
+    emailCodeSubmitBtn: string;
+    emailCodeSubmittingBtn: string;
+    resendCodeBtn: string;
+    emailVerifySuccess: string;
+    emailVerifyFailed: string;
+    connectTelegramBtn: string;
+    connectingTelegramBtn: string;
+    disconnectTelegramBtn: string;
+    telegramWaitingDesc: string;
+    telegramConnectedSuccess: string;
+    telegramDisconnectedSuccess: string;
+    telegramNotConfigured: string;
     sessionsTitle: string;
     sessionsDesc: string;
     revokeSessionsBtn: string;
@@ -84,6 +106,26 @@ export type SettingsWorkspaceCopy = {
     kycTierLabel: string;
     kycStatusLabel: string;
     mfaNote: string;
+  };
+  /**
+   * The account-type switch (client / freelancer / both).
+   *
+   * The role NAMES come from `fullPlatformCopy.ts`, which already carries them
+   * in all four languages — a member sees "ባለሙያ" in the sidebar and
+   * "ባለሙያ" here, never two words for the same thing.
+   */
+  accountType: {
+    title: string;
+    desc: string;
+    clientDesc: string;
+    freelancerDesc: string;
+    bothDesc: string;
+    currentLabel: string;
+    saveBtn: string;
+    savingBtn: string;
+    success: (role: string) => string;
+    error: string;
+    historyNote: string;
   };
   general: {
     eyebrow: string;
@@ -248,6 +290,12 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       emailNotSet: "No verified email on file",
       googleMethodLabel: "Google",
       googleNotConfigured: "Google sign-in is not configured in this environment.",
+      googleNotConnectedDesc:
+        "Not connected — sign in with your password first, then connect Google.",
+      googleConnectedDesc:
+        "Connected — the Google button signs you in.",
+      telegramConnectedDesc:
+        "Connected — your linked chat receives your codes.",
       linkGoogleBtn: "Link Google account",
       linkingGoogleBtn: "Linking Google...",
       unlinkGoogleBtn: "Unlink Google",
@@ -257,7 +305,34 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       telegramMethodLabel: "Telegram",
       telegramLinkedDesc: (id) => `Connected via Telegram (${id}).`,
       telegramNotLinkedDesc:
-        "Open the Yekis Telegram Mini App and link your account from there.",
+        "Not connected — connect your Telegram chat here and the bot confirms it for you.",
+      emailVerifiedDesc:
+        "Verified — this address receives your receipts and security notices.",
+      emailUnverifiedDesc:
+        "Not verified — verify it so password recovery and payouts reach you.",
+      verifyEmailBtn: "Verify email",
+      emailCodeTitle: "Verify this email address",
+      emailCodeSentDesc: (email) =>
+        `We sent a 6-digit code to ${email}. Enter it below.`,
+      emailCodeLabel: "6-digit code",
+      emailCodeHint:
+        "The code expires in 10 minutes. Check your inbox and the spam folder.",
+      emailCodeSubmitBtn: "Confirm code",
+      emailCodeSubmittingBtn: "Confirming...",
+      resendCodeBtn: "Send a new code",
+      emailVerifySuccess: "Email address verified.",
+      emailVerifyFailed:
+        "That code is not valid. Request a new one and try again.",
+      connectTelegramBtn: "Connect Telegram",
+      connectingTelegramBtn: "Waiting for Telegram...",
+      disconnectTelegramBtn: "Disconnect",
+      telegramWaitingDesc:
+        "Press Start in the bot chat that just opened — this page updates by itself.",
+      telegramConnectedSuccess: "Telegram is now connected to your account.",
+      telegramDisconnectedSuccess:
+        "Telegram is disconnected. Your password still signs you in.",
+      telegramNotConfigured:
+        "Telegram sign-in is not configured on this deployment.",
       sessionsTitle: "Active Sessions & Devices",
       sessionsDesc:
         "Sign out all other browser and Mini App sessions if you suspect unauthorized access.",
@@ -273,6 +348,22 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       kycStatusLabel: "KYC status",
       mfaNote:
         "Withdrawals above standard thresholds require fresh SMS or Telegram OTP confirmation.",
+    },
+    accountType: {
+      title: "Account Type",
+      desc: "How you work on Yekis. You can change this whenever your intention changes — your contracts, proposals and wallet stay exactly where they are.",
+      clientDesc:
+        "Hire talent: post jobs, review proposals, fund escrow and approve deliveries.",
+      freelancerDesc:
+        "Take work: browse jobs, submit proposals, deliver milestones and get paid.",
+      bothDesc: "Hire talent and take work on the same account.",
+      currentLabel: "Current",
+      saveBtn: "Change account type",
+      savingBtn: "Saving...",
+      success: (role) => `Your account type is now ${role}.`,
+      error: "Could not change your account type.",
+      historyNote:
+        "Contracts and jobs keep the account type you held when they were created.",
     },
     general: {
       eyebrow: "Regional preferences",
@@ -462,6 +553,12 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       emailNotSet: "የተረጋገጠ ኢሜይል የለም",
       googleMethodLabel: "Google",
       googleNotConfigured: "በዚህ አካባቢ የGoogle መግቢያ አልተዋቀረም።",
+      googleNotConnectedDesc:
+        "አልተገናኝም — በይለፍ ቃልዎ ይግቡና ከዚያ Googleን ያገናኙ።",
+      googleConnectedDesc:
+        "ተገናኝቷል — የGoogle አዝላክ እርስዎን ይግባል።",
+      telegramConnectedDesc:
+        "ተገናኝቷል — የተገናኘው የትዕግር አስገዳይ ኮዶችዎን ይቀበላል።",
       linkGoogleBtn: "የGoogle መለያ አገናኝ",
       linkingGoogleBtn: "Googleን በማገናኘት ላይ...",
       unlinkGoogleBtn: "Googleን አላቅቅ",
@@ -471,7 +568,33 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       telegramMethodLabel: "Telegram",
       telegramLinkedDesc: (id) => `በTelegram ተገናኝቷል (${id})።`,
       telegramNotLinkedDesc:
-        "የYekis Telegram Mini Appን ይክፈቱ እና መለያዎን ከዚያ ያገናኙ።",
+        "አልተገናኝም — የTelegram ውይይትዎን እዚህ ያገናኙ፤ በቦት ውስጥ ለእርስዎ ያረጋግጦታል።",
+      emailVerifiedDesc:
+        "ተረጋገጧል — ይህ አድራሻ የክፍያ ደብዳቤና የደህንነት ማስጠንቀቂያ ይቀበላል።",
+      emailUnverifiedDesc:
+        "አልተረጋገጧም — ልስጋና መልስ እንዲደርስዎና ክፍያ እንዲደርስዎ ያረጋግጡ።",
+      verifyEmailBtn: "ኢሜይልን አረጋግጥ",
+      emailCodeTitle: "ይህን ኢሜይል አድራሻ አረጋግጥ",
+      emailCodeSentDesc: (email) =>
+        `ወደ ${email} 6 አሃዝ ኮድ አላንድ። ከታች ያስገቡ።`,
+      emailCodeLabel: "6 አሃዝ ኮድ",
+      emailCodeHint:
+        "ኮዱ በ10 ደቂቃ ያበቃል። የኢሜይል ያሳውቀያዎንና የስፓም አድራሻ ይመልከቱ።",
+      emailCodeSubmitBtn: "ኮዱን አረጋግጥ",
+      emailCodeSubmittingBtn: "በማረጋገጥ ላይ...",
+      resendCodeBtn: "አዲስ ኮድ ላክ",
+      emailVerifySuccess: "የኢሜይል አድራሻ ተረጋገጧል።",
+      emailVerifyFailed: "ኮዱ ትክክል አይደለም። አዲስ ኮድ ይጠይቁ እና እንደገና ይሞክሩ።",
+      connectTelegramBtn: "Telegram አገናኝ",
+      connectingTelegramBtn: "Telegram በመጠበቅ ላይ...",
+      disconnectTelegramBtn: "አላቅቅ",
+      telegramWaitingDesc:
+        "በተከፈተው የቦት ውይይት ውስጥ Start ይጫኑ — ይህ ገጹ በራሱ ይዘምናል።",
+      telegramConnectedSuccess: "Telegram ከአሁን ወደ መለያዎ ተገናኝቷል።",
+      telegramDisconnectedSuccess:
+        "Telegram ተቋርጧል። የይለፍ ቃልዎ አሁገው ይግባል።",
+      telegramNotConfigured:
+        "በዚህ አገልግሎት ላይ የTelegram መግቢያ አልተዋቀረም።",
       sessionsTitle: "ንቁ ክፍለ ጊዜዎች እና መሣሪያዎች",
       sessionsDesc:
         "ያልተፈቀደ መዳረሻ ከጠረጠሩ ሁሉንም ሌሎች የአሳሽ እና የMini App ክፍለ ጊዜዎች ያስወጡ።",
@@ -487,6 +610,22 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       kycStatusLabel: "የKYC ሁኔታ",
       mfaNote:
         "ከመደበኛ ገደብ በላይ ገንዘብ ማውጣት አዲስ የSMS ወይም የTelegram OTP ማረጋገጫ ይጠይቃል።",
+    },
+    accountType: {
+      title: "የመለያ አይነት",
+      desc: "በYekis የሚጠቀሙት መንገድ። ይህ አመለስዎ ሲቀየር በማንኛውንም ጊዜ መቀየርዎ ይችላሉ — ግንባቶችዎ፣ ጥቆማዎችዎና ቦርሳዎ በቦት አይንረሱም።",
+      clientDesc:
+        "ባለሙያ መለማመል፦ ስራ ማውባት፣ ጥቆማ ማገምገም፣ escrow ማስደርስና ማጽደቅ ያረጋግጡ።",
+      freelancerDesc:
+        "ስራ መውራል፦ ስራዎች ማየት፣ ጥቆማ ማስገባት፣ ደረጃ ማስተላለፍና ክፍያ መቀበል።",
+      bothDesc: "በአንድ መለያ ባለሙያ መለማመልና ስራ መውራል።",
+      currentLabel: "አሁን",
+      saveBtn: "የመለያ አይነትን ቀይር",
+      savingBtn: "በመቀመር ላይ...",
+      success: (role) => `የመለያዎ አይነት አሁን ${role} ነው።`,
+      error: "የመለያ አይነቱን መቀየር አልተቻለም።",
+      historyNote:
+        "ግንባቶችና ስራዎች በተፈጠሩበት ጊዜ ያንተነውን የመለያ አይነት ይዘጋጣሉ።",
     },
     general: {
       eyebrow: "የአካባቢ ምርጫዎች",
@@ -678,6 +817,12 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       emailNotSet: "Imeeliin mirkaneeffame hin jiru",
       googleMethodLabel: "Google",
       googleNotConfigured: "Seensi Google naannoo kanatti hin qindaa'ine.",
+      googleNotConnectedDesc:
+        "Hin walqabane — jecha darbiin keessan seenuu, sana booda Google walqabsiisaa.",
+      googleConnectedDesc:
+        "Walqabateera — banoo Google keessan sii seenaa.",
+      telegramConnectedDesc:
+        "Walqabateera — karaa Telegram walqabate qabiyyee keessan ni gaafata.",
       linkGoogleBtn: "Herrega Google walqabsiisi",
       linkingGoogleBtn: "Google walqabsiisaa jira...",
       unlinkGoogleBtn: "Google addaan kuti",
@@ -687,7 +832,33 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       telegramMethodLabel: "Telegram",
       telegramLinkedDesc: (id) => `Karaa Telegram walqabateera (${id}).`,
       telegramNotLinkedDesc:
-        "Yekis Telegram Mini App banaatii achirraa herrega keessan walqabsiisaa.",
+        "Hin walqabne — karaa Telegram keessan kana walqabsiisaa; baraan keessatti mirkaneessuu ni qophaa'a.",
+      emailVerifiedDesc:
+        "Mirkaneessame — isa kanaan ragaa galmaa'aan kenneeffataa fiiqan qabeenyuu seeraa dabarsuu ni gaafataa.",
+      emailUnverifiedDesc:
+        "Hin mirkaneessne — akkuma kennuu dheebiinsuu dheebiifamuufi imeelii mirkaneessi.",
+      verifyEmailBtn: "Imeelii mirkaneessi",
+      emailCodeTitle: "Imeelii kana mirkaneessi",
+      emailCodeSentDesc: (email) =>
+        `Koodii digdii lamaatama ${email}itti ergame. Koodicha armaan gadii galmaa'i.`,
+      emailCodeLabel: "Koodii digdii lamaatama",
+      emailCodeHint:
+        "Koodichi daqiiqaa kudii keessatti xumurama. Sanduuqa koodii keessoo baafadhu.",
+      emailCodeSubmitBtn: "Koodicha mirkaneessi",
+      emailCodeSubmittingBtn: "Mirkaneessuun jira...",
+      resendCodeBtn: "Koodii haaraa erga",
+      emailVerifySuccess: "Imeelii mirkaneessame.",
+      emailVerifyFailed:
+        "Koodichi dogogora. Koodii haaraa gaafadhu irra deebi'aa.",
+      connectTelegramBtn: "Telegram walqabsi",
+      connectingTelegramBtn: "Telegram eegamaa jira...",
+      disconnectTelegramBtn: "Citee",
+      telegramWaitingDesc:
+        "Baraa Telegram keessatti Start tuqa — kaan page ofi.",
+      telegramConnectedSuccess: "Telegram amma herrega keessaa waliin walqabateera.",
+      telegramDisconnectedSuccess:
+        "Telegram citeera. Jecha darbiin keessatti darbee.",
+      telegramNotConfigured: "Seensi Telegram naannoo kanaatti hin qindaa'ine.",
       sessionsTitle: "Yeroowwan Seensaa Banaafi Meeshaalee",
       sessionsDesc:
         "Seensa hayyama hin qabne yoo shakkitan seensota browser fi Mini App biroo hunda cufaa.",
@@ -703,6 +874,22 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       kycStatusLabel: "Haala KYC",
       mfaNote:
         "Baasiin daangaa idilee ol ta'e mirkaneessa OTP SMS ykn Telegram haaraa gaafata.",
+    },
+    accountType: {
+      title: "Gosaa Herrega",
+      desc: "Yekis keessatti ati itti fayyadamuu. Yeroo kamiyyuu jijjiiruuf danda'a — galmeen keessan, proposal keessan qabiyyee keessan haaruu hin fudgnu.",
+      clientDesc:
+        "Ogeeyyoo shaaxuuf: hojii banaatii, proposali ilaalii, escrow dhaansiifi kennuu hojii raawvatii.",
+      freelancerDesc:
+        "Hojii raawvatuf: hojii dubbifadhu, proposali kennuu, marz baayyifadhu qabiyyee argadhu.",
+      bothDesc: "Ogeeyyoo shaaxuufi hojii raawvatuf herrega tokkoon.",
+      currentLabel: "Amma",
+      saveBtn: "Gosaa herregaa jijjiiri",
+      savingBtn: "Haaromsaa jira...",
+      success: (role) => `Gosaa herrega keessan amma ${role} ta'eera.`,
+      error: "Gosaa herregaa jijjiiruun hin milkoofne.",
+      historyNote:
+        "Galmeen fi hojiin gosaa herrega yoo jiraan yoo ${role} ta'eedha qophaa'e.",
     },
     general: {
       eyebrow: "Filannoo naannoo",
@@ -895,6 +1082,12 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       emailNotSet: "ዝተረጋገጸ ኢመይል የለን",
       googleMethodLabel: "Google",
       googleNotConfigured: "ኣብዚ ከባቢ መእተዊ Google ኣይተዳለወን።",
+      googleNotConnectedDesc:
+        "አልተገናኝም — በይለፍ ቃልዎ ይግቡና ከዚያ Google ያገናኙ።",
+      googleConnectedDesc:
+        "ተገናኝቷል — የGoogle አዝላክ እርስዎን ይግባል።",
+      telegramConnectedDesc:
+        "ተገናኝቷል — የተገናኘው የTelegram ውይይት ኮዶችዎን ይቀበላል።",
       linkGoogleBtn: "ሕሳብ Google ኣተኣሳስር",
       linkingGoogleBtn: "Google ይተኣሳሰር ኣሎ...",
       unlinkGoogleBtn: "Google ፍለ",
@@ -904,7 +1097,33 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       telegramMethodLabel: "Telegram",
       telegramLinkedDesc: (id) => `ብTelegram ተኣሳሲሩ (${id})።`,
       telegramNotLinkedDesc:
-        "Yekis Telegram Mini App ክፈቱ እሞ ሕሳብኩም ካብኡ ኣተኣሳስሩ።",
+        "አልተገናኝም — የTelegram ውይይትዎን እዚህ ያገናኙ፤ በቦት ውስጥ ለእርስዎ ያረጋግጦታለ።",
+      emailVerifiedDesc:
+        "ጸድቆ! — ይህ አድራሻ የክፍያ ደረሰኝና የደህንነት ማስጠንቀቂያ ይቀበላል።",
+      emailUnverifiedDesc:
+        "አልተረጋገጧም — የይለፍ ቃል ማስረጃና ክፍያ እንዲደርስዎ ያረጋግጡ።",
+      verifyEmailBtn: "ኢመይል ኣረጋግጥ",
+      emailCodeTitle: "ይህን ኢመይል አድራሻ ኣረጋግጥ",
+      emailCodeSentDesc: (email) =>
+        `ወደ ${email} 6 ቁጥር ኮድ አላንድ። ከታች ወጥም።`,
+      emailCodeLabel: "6 ቁጥር ኮድ",
+      emailCodeHint:
+        "ኮዱ በ10 ደቂቃ ያበቃል። ካሳንድና አስፖጅ ጊዜዎችዎን ይመልከቱ።",
+      emailCodeSubmitBtn: "ኮዱን ኣረጋግጥ",
+      emailCodeSubmittingBtn: "በማረጋገጥ ላይ...",
+      resendCodeBtn: "አዲስ ኮድ ላክ",
+      emailVerifySuccess: "የኢመይል አድራሻ ተረጋገጧል።",
+      emailVerifyFailed: "ኮዱ ትክክል አይደለም። አዲስ ኮድ ይጠይቁ።",
+      connectTelegramBtn: "Telegram ኣሳስር",
+      connectingTelegramBtn: "Telegram በመጠበቅ ላይ...",
+      disconnectTelegramBtn: "አላቅቅ",
+      telegramWaitingDesc:
+        "በተከፈተው የቦት ውይይት ውስጥ Start ይጫኑ — ይህ ገጹ በራሱ ይዘምናል።",
+      telegramConnectedSuccess: "Telegram ከአሁን ወደ መለያዎ ተገናኝቷል።",
+      telegramDisconnectedSuccess:
+        "Telegram ተቋርጧል። የይለፍ ቃልዎ አሁገው ይግባል።",
+      telegramNotConfigured:
+        "በዚህ አገልግሎት ላይ የTelegram መግቢያ አልተዋቀረም።",
       sessionsTitle: "ንጡፋት ክፍለ ግዜታትን መሳርሒታትን",
       sessionsDesc:
         "ዘይተፈቕደ መእተዊ እንተጠርጢርኩም ኩሎም ካልኦት ክፍለ ግዜታት መርበብን Mini Appን ኣውጽኡ።",
@@ -920,6 +1139,22 @@ export const SETTINGS_WORKSPACE_COPY: Record<Language, SettingsWorkspaceCopy> = 
       kycStatusLabel: "ኩነታት KYC",
       mfaNote:
         "ካብ ስሩዕ ደረት ንላዕሊ ምውጻእ ገንዘብ ሓድሽ መረጋገጺ OTP ብSMS ወይ Telegram ይሓትት።",
+    },
+    accountType: {
+      title: "የመለያ ዓይነት",
+      desc: "በYekis የሚጠቀሙት መንገድ። ይህን በማንኛውንም ጊዜ መቀየር ይችላሉ — ግንባቶችዎ፣ ጥቆማዎችዎና ቦርሳዎ በቦት አይንረሱም።",
+      clientDesc:
+        "ባለሙያ መለማመል፦ ስራ ማውባት፣ ጥቆማ ማገምገም፣ escrow ማስደርስና ማጽደቅ ያረጋግጡ።",
+      freelancerDesc:
+        "ስራ መውራል፦ ስራዎች ማየት፣ ጥቆማ ማስገባት፣ ደረጃ ማስተላለፍና ክፍያ መቀበል።",
+      bothDesc: "በአንድ መለያ ባለሙያ መለማመልና ስራ መውራል።",
+      currentLabel: "አሁን",
+      saveBtn: "የመለያ ዓይነት ቀይር",
+      savingBtn: "በመቀመር ላይ...",
+      success: (role) => `የመለያዎ ዓይነት አሁን ${role} ነው።`,
+      error: "የመለያ ዓይነቱን መቀየር አልተቻለም።",
+      historyNote:
+        "ግንባቶችና ስራዎች በተፈጠሩበት ጊዜ ያንተነውን የመለያ ዓይነት ይዘጋጣሉ።",
     },
     general: {
       eyebrow: "ምርጫታት ከባቢ",

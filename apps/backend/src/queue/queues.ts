@@ -37,3 +37,9 @@ export const gigAutoReleaseQueue = new Queue("gig-auto-release", {
 // The DELETE itself runs through a SECURITY DEFINER database function, because
 // the application role deliberately has no DELETE privilege on "AuditLog".
 export const auditPurgeQueue = new Queue("audit-purge", { connection: redis });
+// Admin Telegram broadcasts. Deliberately a separate queue from notifications:
+// a broadcast is a long, rate-limited fan-out that must not sit in front of a
+// payment receipt or a verification code.
+export const telegramBroadcastQueue = new Queue("telegram-broadcasts", {
+  connection: redis,
+});

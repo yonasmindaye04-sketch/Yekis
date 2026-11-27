@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { Bot, InlineKeyboard } from "grammy";
 import { BotContext } from "../types.js";
 import { env } from "../../../config/env.js";
+import { hasPermission } from "../../admin/permissions.js";
 import { logger } from "../../../lib/logger.js";
 import { mainMenuKeyboard } from "../keyboards/mainMenu.js";
 import { languageKeyboard } from "../keyboards/language.js";
@@ -26,6 +27,8 @@ import {
   denyWebLogin,
   issueTelegramLoginCode,
   TELEGRAM_CODE_TTL_SECONDS,
+  completeTelegramLink,
+  TelegramLinkError,
 } from "../../auth/telegram-code.service.js";
 import { prisma } from "../../../lib/prisma.js";
 
@@ -42,6 +45,49 @@ export function registerCommands(bot: Bot<BotContext>) {
   bot.command("start", async (ctx) => {
     const payload = ctx.match?.[0]?.trim();
     const name = ctx.from?.first_name || ctx.t("start_greeting_fallback");
+
+    // ── Settings → "Connect Telegram" deep-link ──────────────────────────
+    // The web dashboard minted a session id and embedded it as `lk_{sid}`.
+    // The bot's bot middleware has already resolved who this Telegram user
+    // is; binding that identity to the authed web account is the only thing
+    // this branch does. The session row is consumed atomically — a second
+    // /start for the same lk_ sid reads back as LINK_ALREADY_PROCESSED.
+    if (payload?.startsWith("lk_") && ctx.from?.id != null) {
+      const sid = payload.slice(3);
+      if (sid.length < 10) {
+        await ctx.reply(ctx.t("start_link_invalid"), { parse_mode: "HTML" });
+        return;
+      }
+      try {
+        await completeTelegramLink({
+          sid,
+          telegramUserId: BigInt(ctx.from.id),
+        });
+        const kb = new InlineKeyboard();
+        if (canLinkToWeb()) {
+          kb.url(ctx.t("start_link_open_btn"), env.FRONTEND_URL ?? "").row();
+        }
+        await ctx.reply(ctx.t("start_link_bind_ok", { name }), {
+          parse_mode: "HTML",
+          reply_markup: kb,
+        });
+        return;
+      } catch (err) {
+        if (err instanceof TelegramLinkError) {
+          const localized =
+            err.message === "LINK_EXPIRED"
+              ? ctx.t("start_link_expired")
+              : err.message === "TELEGRAM_ALREADY_LINKED"
+                ? ctx.t("start_link_conflict")
+                : ctx.t("start_link_invalid");
+          await ctx.reply(localized, { parse_mode: "HTML" });
+          return;
+        }
+        logger.warn({ err, sid }, "Failed to complete Telegram link from /start");
+        await ctx.reply(ctx.t("start_link_invalid"), { parse_mode: "HTML" });
+        return;
+      }
+    }
 
     // When a member arrives via the web's "Continue with Telegram" button
     // (?start=web_auth), they came explicitly to get a code. Reply immediately
@@ -398,12 +444,24 @@ export function registerCommands(bot: Bot<BotContext>) {
   });
 
   bot.command("broadcast", async (ctx) => {
-    if (ctx.session.role !== "STAFF" || ctx.session.staffRole !== "ADMIN") {
+    // Same permission the console and the broadcast API require, instead of the
+    // old "staffRole === ADMIN" check that ignored the RBAC matrix.
+    if (!hasPermission(ctx.session.staffRole, "bot.manage")) {
       await ctx.reply(ctx.t("errors_unauthorized"));
       return;
     }
 
-    await ctx.reply(ctx.t("broadcast_coming_soon"));
+    // Broadcasting is not composed in a chat: a typo cannot be recalled from a
+    // thousand inboxes. Point at the console, which has the preview, test send,
+    // audience count and delivery log that this decision needs.
+    const webConsoleUrl = (env.STAFF_CONSOLE_URL ?? "").replace(/\/+$/, "");
+    const keyboard = new InlineKeyboard();
+    if (webConsoleUrl) keyboard.url(ctx.t("staff_broadcast"), webConsoleUrl);
+
+    await ctx.reply(ctx.t("broadcast_use_console"), {
+      parse_mode: "HTML",
+      reply_markup: keyboard,
+    });
   });
 
   // Callback for "give me a fresh code" without retyping /login.

@@ -758,6 +758,92 @@ sequenceDiagram
     API-->>TMA: HTTP 200 OK
 ```
 
+
+##### Flow 1c: The account's own address, verified from Settings
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Signed-in member
+    participant UI as Linked Accounts card (LinkedAccountsCard.tsx)
+    participant API as Auth Router (email-verification.routes.ts)
+    participant Svc as Email verification service
+    participant DB as PostgreSQL (Prisma)
+
+    UI->>API: POST /api/v1/auth/email/verification/start
+    Note over API: The address comes from the SIGNED-IN account,<br/>never from the request body.
+    API->>DB: SELECT email, emailVerified FROM User
+    alt already verified
+        API-->>UI: 409 EMAIL_ALREADY_VERIFIED
+    else placeholder address
+        API-->>UI: 409 EMAIL_NOT_USABLE
+    else
+        API->>Svc: requestEmailCode(email, userId)
+        Svc->>DB: INSERT EmailVerificationCode (salted SHA-256)
+        Svc-->>UI: 6-digit code by mail, 10-minute expiry
+        UI->>API: POST /api/v1/auth/email/verification/check { code }
+        API->>Svc: verifyEmailCode(email, code, userId)
+        Svc->>DB: stamp emailVerified + emailVerifiedAt
+        Svc->>API: ACCOUNT_EMAIL_VERIFIED audit row
+        API-->>UI: { verified: true }
+    end
+```
+
+The **onboarding** pair (`/email/code`, `/email/verify`) is deliberately unauthenticated: it runs before the account exists, which is why it refuses an address that is already registered — correct for signup, and exactly wrong for a member who is already signed in and has simply never proven the address on their own account. The pair above is the authenticated mirror of the same proof, and it proves the same thing: control of the address that is already on file.
+
+The address is read from the account and never from the body, so the browser cannot ask for a code to somebody else's inbox, and a code issued to one account cannot redeem against another. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox — and every receipt, reset link and dispute notice sent to it goes there.
+
+##### Flow 1d: Connecting a provider to an account that already exists
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Signed-in member
+    participant UI as Linked Accounts card
+    participant API as Auth Router
+    participant Redis as Redis
+    participant Bot as Telegram bot (grammy)
+
+    UI->>API: POST /api/v1/auth/telegram/link/start
+    API->>Redis: SET tg_link:{sid} = { userId } EX 300
+    API-->>UI: { sid, botUrl: https://t.me/<bot>?start=lk_{sid} }
+    UI->>Bot: open the deep link (the member presses Start)
+    Bot->>Redis: GET tg_link:{sid}
+    Bot->>Bot: completeTelegramLink(sid, telegramUserId)
+    Note over Bot: Refuses when the Telegram id already belongs<br/>to ANOTHER account — two accounts are never merged.
+    Bot->>Redis: SET tg_link:{sid} = linked EX 120
+    UI->>API: GET /api/v1/auth/telegram/link/{sid}/status (every 2s)
+    API-->>UI: { status: "linked" }
+    UI->>API: GET /api/v1/auth/identities
+    API-->>UI: { telegram: true }
+```
+
+Linking adds a **way in**; it never merges two accounts into one. The session id lives in Redis rather than in Prisma because it exists for minutes, is consumed once and is disposable — TTL is native to Redis and the row is worthless the moment the member either completes or walks away. The status endpoint answers `expired` to anybody but the member who started the link, so it cannot be used to fish for another member's session id.
+
+The provider list on the screen is a **registry**, not four hand-written rows: each provider declares the flow it uses to connect (`email_code`, `google_oauth`, `telegram_link`, or none). Adding a provider is one entry plus, at most, one new flow renderer — the row, the status pill, the busy state, the error copy and the accessibility wiring are shared.
+
+##### Flow 1e: Changing the account type
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Signed-in member
+    participant UI as Account type card (AccountTypeCard.tsx)
+    participant API as Auth Router (auth.routes.ts)
+    participant Svc as Auth service (auth.service.ts)
+    participant DB as PostgreSQL (Prisma)
+
+    UI->>API: POST /api/v1/auth/role { role }
+    Note over API: requireFreshAuth(180): the credential must be<br/>recent AND strong (password, TOTP, email OTP).
+    API->>Svc: switchUserRole(userId, role)
+    Svc->>DB: UPDATE User SET role
+    Svc->>DB: USER_ROLE_SWITCHED audit row
+    API->>API: re-mint the token pair, carrying auth_time and amr over
+    API-->>UI: { role, from, accessToken, refreshToken }
+    UI->>UI: adopt the new tokens, then re-read /auth/me
+```
+
+Registration asks one question — client, freelancer, or both — and the answer is what the account is **for**. People get it wrong honestly: a student signs up as a client to post one job, and a month later the same person picks up freelance work. Forcing a second account for that is how a marketplace ends up with duplicated identities, split ratings and money stranded on an account nobody checks. So the account type is a **changeable property of the account**, not a one-time answer.
+
+Two things it deliberately does not do. It does not **move** anything: contracts, proposals, jobs and escrow keep the type the member held when they were created, because rewriting history to match a new label is how a dispute becomes unanswerable. And it does not mint a fresh credential window: the re-minted token **carries `auth_time` and `amr` over** from the presented one, so a stolen session token does not become "strong and recent" the moment the role changes.
+
 #### API Surface
 | Method | Path | Auth / Permission | Purpose |
 |---|---|---|---|
@@ -771,6 +857,11 @@ sequenceDiagram
 | `POST` | `/api/v1/auth/refresh` | Public (Refresh Token) | Rotate expired access token using valid refresh token |
 | `POST` | `/api/v1/auth/telegram` | Public (`initData`) | Validate Telegram WebApp hash and issue JWT session |
 | `GET` | `/api/v1/auth/me` | Authenticated | Return authenticated user's record and current KYC status |
+| `POST` | `/api/v1/auth/role` | Authenticated + fresh strong session | Change the account type (`CLIENT` / `FREELANCER` / `BOTH`). No historic record is moved; the token pair is re-minted with the credential carried over |
+| `POST` | `/api/v1/auth/email/verification/start` | Authenticated | Send a 6-digit code to the address already on the account, so the member can prove it from Settings |
+| `POST` | `/api/v1/auth/email/verification/check` | Authenticated | Redeem that code and stamp `emailVerified` / `emailVerifiedAt` |
+| `POST` | `/api/v1/auth/telegram/link/start` | Authenticated | Mint the one-time bot handshake and return the deep link that connects the Telegram chat |
+| `GET` | `/api/v1/auth/telegram/link/:sid/status` | Authenticated | Poll the handshake: `pending` → `linked` → `expired` |
 
 * **Depends on:** `apps/backend/src/lib/prisma.ts`, `apps/backend/src/lib/audit.ts`, `apps/backend/src/config/env.ts`.
 * **Depended on by:** `apps/backend/src/middleware/auth.ts`, `apps/backend/src/modules/bot/bot.service.ts`.
@@ -1388,6 +1479,32 @@ Defined in `notification.service.ts:CRITICAL_NOTIFICATION_TYPES`:
 * **Purpose:** Implements the official Yekis Telegram Bot via the Grammy framework. Handles `/start` deep linking, user account linking, interactive scene wizards (browse jobs, proposal bidding, wallet balance check, KYC guide), and bot webhooks.
 * **Owns:** Grammy bot instance, conversation scenes (`apps/backend/src/modules/bot/scenes/index.ts`).
 * **Webhook ingestion:** `POST /api/v1/telegram/webhook` authenticates Telegram's `X-Telegram-Bot-Api-Secret-Token` header with a constant-time comparison and fails closed when the secret is unset. Telegram authenticates the **header**, not the body, so the route parses JSON locally before handing the update to grammY's Express adapter. This route-local parser is required because the Telegram router is mounted before the application's global `express.json()` middleware; without it, `req.body` was `undefined`, every delivery failed with HTTP 500, and Telegram retried the update indefinitely while the bot remained silent.
+
+#### Broadcast Center
+
+Admins write Telegram announcements from the Operations Console (Administration → Telegram Bot → Broadcasts) and deliver them through the same grammY bot that serves members.
+
+* **Files:** `broadcast.message.ts` (audiences, HTML rendering, limits, 429 parsing — pure and unit-tested), `broadcast.service.ts` (CRUD, audience counts, dispatch, per-recipient delivery), `broadcast.routes.ts` (`/api/v1/broadcasts`), `apps/backend/src/queue/broadcast.worker.ts` (the `telegram-broadcasts` queue worker), `apps/frontend/src/pages/ops/pages/BroadcastCenter.tsx` (composer, preview, library, delivery log).
+* **Audience resolution:** `audienceWhere()` is the single filter for every audience. It always requires `isSuspended: false`, `isGuestContact: false` and `telegramChatId: { not: null }` before adding the audience clause (`role` for clients/freelancers, `staffRole: { not: null }` for staff, `cachedKycStatus: "VERIFIED"` for KYC). A member without a linked chat is unreachable by definition, and support-widget guest identities can never receive marketing.
+* **Rendering:** the message is always sent with `parse_mode: "HTML"`, but only the platform writes markup: `<b>${escapeTelegramHtml(heading)}</b>` followed by the escaped body. Admin text containing `<`, `>` or `&` therefore cannot produce Telegram’s “can not parse entities” failure. The optional button is an inline URL keyboard built only when `linkUrl` parses as an http(s) URL.
+* **Limits:** visible characters after entity parsing — 4,096 for text, 1,024 when an image makes the message a photo caption. `fitsTelegramLimits()` is checked on create/update, on send and on test, so an over-long row cannot be queued.
+
+| From | To | Trigger |
+|---|---|---|
+| (new) | `DRAFT` | `POST /broadcasts` (content validated) |
+| `DRAFT` | `SENDING` | `POST /:id/send` — conditional `updateMany` claim; records `recipientCount`, `queuedAt` and `sentById` (the worker refreshes the count when it resolves the audience) |
+| `SENDING` | `SENT` | Every resolved recipient delivered |
+| `SENDING` | `PARTIAL` | At least one failure, at least one success |
+| `SENDING` | `FAILED` | Zero deliveries or the job itself failed |
+| `SENDING` | `CANCELLED` | `POST /:id/cancel`; the worker re-checks the status before each batch |
+
+`DRAFT` is the only editable and sendable state. `SENDING`, `SENT`, `PARTIAL` and `CANCELLED` are read-only in the console; any of them can be duplicated into a fresh draft. Deleting is refused for `SENDING` (a run would lose its log), and for `SENT`/`PARTIAL` (the row is delivery evidence); `FAILED` and `CANCELLED` may be removed.
+
+The worker processes recipients in batches of 20 with a one-second pause, checks for cancellation before each batch, and writes one `TelegramBroadcastDelivery` per recipient (`@@unique([broadcastId, userId])`, `skipDuplicates`), updating `deliveredCount`/`failedCount` per batch. A Telegram 429 is retried once after `parameters.retry_after` (clamped to 1–60 s); other failures are stored as a bounded one-line reason and counted. Photo sends fall back to a text send if Telegram cannot fetch the image, unless the failure was a 429. Retries never re-send an already-recorded recipient.
+
+`POST /:id/send` and `POST /:id/cancel` are behind `requireFreshAuth(600)`; the console translates `REAUTH_REQUIRED` / `STEP_UP_REQUIRED` into a “sign in again” explanation instead of a generic failure. Every transition is audited (`broadcast.created`, `broadcast.updated`, `broadcast.duplicated`, `broadcast.deleted`, `broadcast.queued`, `broadcast.completed`, `broadcast.failed`, `broadcast.cancel_requested`, `broadcast.test_sent`).
+
+The in-bot `/broadcast` command and the `staff:broadcast` callback no longer open a dead scene: both check `bot.manage` and point staff at the console, where composing, previewing, testing and delivery history live.
 
 ---
 
