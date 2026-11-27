@@ -223,7 +223,11 @@ beforeEach(async () => {
   ids.staffId = await ensureStaff();
 });
 
+const prevPartialSplit = env.PARTIAL_SPLIT_ENABLED;
+env.PARTIAL_SPLIT_ENABLED = true;
+
 afterAll(async () => {
+  env.PARTIAL_SPLIT_ENABLED = prevPartialSplit;
   await cleanup();
   await prisma.$disconnect();
 });

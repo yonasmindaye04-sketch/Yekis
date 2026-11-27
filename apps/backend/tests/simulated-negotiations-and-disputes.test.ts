@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
+import { env } from "../src/config/env.js";
 import { createJob } from "../src/modules/jobs/jobs.service.js";
 import { submitProposal, decideProposal, withdrawProposal } from "../src/modules/jobs/proposals.service.js";
 import { acceptContract } from "../src/modules/contracts/contracts.service.js";
@@ -47,8 +48,10 @@ describe("Multi-User Simulated Negotiations & Dispute Lifecycles", () => {
   let secondMediatorStaffId: string;
 
   const testSuffix = Date.now().toString();
+  const prevPartialSplit = env.PARTIAL_SPLIT_ENABLED;
 
   beforeAll(async () => {
+    env.PARTIAL_SPLIT_ENABLED = true;
     // 1. Seed Client User with wallet balance
     const client = await prisma.user.create({
       data: {
@@ -143,6 +146,7 @@ describe("Multi-User Simulated Negotiations & Dispute Lifecycles", () => {
   });
 
   afterAll(async () => {
+    env.PARTIAL_SPLIT_ENABLED = prevPartialSplit;
     const userIds = [clientId, freelancerAId, freelancerBId, mediatorStaffId, secondMediatorStaffId].filter(Boolean) as string[];
     if (userIds.length === 0) return;
 

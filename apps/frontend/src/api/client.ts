@@ -1811,7 +1811,42 @@ class ApiClient {
     return this.request(`/api/v1/disputes/staff/queue?${searchParams.toString()}`);
   }
 
-  async resolveDispute(disputeId: string, input: { outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT"; recommendation: string; freelancerShareMinor?: number }): Promise<Dispute> {
+  async previewDisputeSplit(
+    disputeId: string,
+    input: {
+      outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT";
+      freelancerShareMinor?: number;
+      freelancerSharePct?: number;
+    },
+  ): Promise<{
+    disputedAmountMinor: number;
+    outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT";
+    freelancerSharePct: number | null;
+    freelancerGrossMinor: number;
+    clientRefundMinor: number;
+    platformFeeMinor: number;
+    providerFeeMinor: number;
+    totalFeeMinor: number;
+    withholdingTaxMinor: number;
+    freelancerNetMinor: number;
+    freelancerFeeRate: number;
+    providerFeeRate: number;
+  }> {
+    return this.request(`/api/v1/admin/disputes/${disputeId}/split-preview`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+
+  async resolveDispute(
+    disputeId: string,
+    input: {
+      outcome: "RELEASE_TO_FREELANCER" | "REFUND_TO_CLIENT" | "PARTIAL_SPLIT";
+      recommendation: string;
+      freelancerShareMinor?: number;
+      freelancerSharePct?: number;
+    },
+  ): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/resolve`, { method: "POST", body: JSON.stringify(input) });
   }
 

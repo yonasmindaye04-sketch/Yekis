@@ -114,6 +114,7 @@ export interface RawFeeConfiguration {
   clientFeeRate: number;
   providerFeeRate: number;
   withholdingEnabled: boolean;
+  partialSplitEnabled?: boolean;
 }
 export interface RawDashboardSummary {
   metrics: RawMetrics;

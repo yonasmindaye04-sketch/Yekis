@@ -42,6 +42,14 @@ import {
 } from "./payoutAdmin.service.js";
 import { moderateGigStatus, GigNotFoundError } from "../gigs/gig.service.js";
 import { EscrowAdminHoldError, releaseMilestoneFunds } from "../escrow/escrow.service.js";
+import { SplitPreviewInput } from "../../schemas";
+import {
+  previewDisputeSplit,
+  DisputeNotFoundError,
+  MilestoneNotFoundError as DisputeMilestoneNotFoundError,
+  InvalidDisputeStageError,
+  PartialSplitDisabledError,
+} from "../disputes/dispute.service.js";
 
 /**
  * Staff-only platform administration surface. Everything here requires a
@@ -909,6 +917,47 @@ adminRouter.get(
 );
 
 // ---------- Reports (Phase 4) ----------
+adminRouter.post(
+  "/disputes/:disputeId/split-preview",
+  requirePermission("disputes.view"),
+  async (req: AuthedRequest, res) => {
+    const parsed = SplitPreviewInput.safeParse(req.body);
+    if (!parsed.success) {
+      return res
+        .status(400)
+        .json({ error: "VALIDATION_ERROR", details: parsed.error.flatten() });
+    }
+    try {
+      const preview = await previewDisputeSplit({
+        disputeId: String(req.params.disputeId),
+        outcome: parsed.data.outcome,
+        freelancerSharePct: parsed.data.freelancerSharePct,
+        freelancerShareMinor: parsed.data.freelancerShareMinor,
+      });
+      return res.json(preview);
+    } catch (err) {
+      if (err instanceof PartialSplitDisabledError) {
+        return res
+          .status(403)
+          .json({ error: "FEATURE_DISABLED", message: err.message });
+      }
+      if (
+        err instanceof DisputeNotFoundError ||
+        err instanceof DisputeMilestoneNotFoundError
+      ) {
+        return res.status(404).json({ error: "NOT_FOUND" });
+      }
+      if (err instanceof InvalidDisputeStageError) {
+        return res
+          .status(409)
+          .json({ error: "INVALID_STATE", message: err.message });
+      }
+      logger.error({ err }, "Failed to compute dispute split preview");
+      return res.status(500).json({ error: "INTERNAL_ERROR" });
+    }
+  },
+);
+
 adminRouter.get(
   "/reports/summary",
   requirePermission("reports.view"),

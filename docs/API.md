@@ -430,8 +430,8 @@ The secured mounted API uses these paths; legacy `/raise`, `/contract/:id`, and 
 | `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party | Move negotiation to evidence |
 | `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party | Add evidence statement and progress when ready |
 | `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party | Escalate mediation to arbitration |
-| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries an `sla` object (first-response and resolution clocks, computed server-side) |
-| `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split |
+| `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries an `sla` object (first-response and resolution clocks, computed server-side); response includes `partialSplitEnabled` |
+| `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split (when `PARTIAL_SPLIT_ENABLED=true`, accepts unambiguous `freelancerSharePct` or `freelancerShareMinor`) |
 
 Raise body:
 
@@ -604,6 +604,7 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `GET` | `/api/v1/admin/ledger` | `ledger.view` | Chart-of-accounts balances + double-entry integrity audit |
 | `GET` | `/api/v1/admin/ledger/journals` | `ledger.view` | Paginated journal entries (referenceType, q search) |
 | `GET` | `/api/v1/admin/reconciliation` | `reconciliation.view` | Provider vs internal escrow state (MATCHED / MISMATCH / PENDING / FAILED + amounts) |
+| `POST` | `/api/v1/admin/disputes/:disputeId/split-preview` | `disputes.view` | Compute authoritative disputed-milestone split and single-rounded fee preview (`403 FEATURE_DISABLED` for `PARTIAL_SPLIT` unless `PARTIAL_SPLIT_ENABLED=true`) |
 | `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates, active `feeConfiguration`, and real trailing-6-month `series` (`months`, `rails`, `categories`) |
 | `GET` | `/api/v1/admin/sla/summary` | `reports.view` | SLA breach counts for the open support and dispute queues (server-computed; see `docs/SYSTEM_DESIGN.md` §3.19) |
 | `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics, collected fees, active `feeConfiguration`, + recent activity feed |

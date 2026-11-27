@@ -368,6 +368,13 @@ const EnvSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // Containment feature flag for Partial Split dispute settlements (OPS-01).
+  // Defaults OFF until explicitly enabled.
+  PARTIAL_SPLIT_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   // Withholding tax thresholds/rates — confirm with accountant before changing
   WITHHOLDING_THRESHOLD_MINOR: z.coerce.number().default(1000000), // 10,000 ETB in cents
   WITHHOLDING_RATE_WITH_TIN: z.coerce.number().default(0.03),

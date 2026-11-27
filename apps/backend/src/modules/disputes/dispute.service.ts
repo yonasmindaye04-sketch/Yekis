@@ -12,6 +12,8 @@ import {
   releaseMilestoneFunds,
   refundMilestoneToClient,
 } from "../escrow/escrow.service.js";
+import { calculateFees, getEscrowFeeConfig } from "../escrow/fees.js";
+import { env } from "../../config/env.js";
 import { checkAndUpdateContractCompletion } from "../contracts/contracts.service.js";
 import { recordDisputeRefundLedger } from "../finance/ledger.service.js";
 import { uploadEvidenceBundle } from "../../lib/objectStore.js";
@@ -40,6 +42,124 @@ export class DisputeAlreadyResolvedError extends Error {}
  * released to the other party.
  */
 export class MilestoneNotSettleableError extends Error {}
+/** Partial-split dispute resolution is gated behind PARTIAL_SPLIT_ENABLED. */
+export class PartialSplitDisabledError extends Error {}
+
+export interface ComputedDisputeSplit {
+  disputedAmountMinor: number;
+  outcome: DisputeResolutionOutcome;
+  freelancerSharePct: number | null;
+  freelancerGrossMinor: number;
+  clientRefundMinor: number;
+  platformFeeMinor: number;
+  providerFeeMinor: number;
+  totalFeeMinor: number;
+  withholdingTaxMinor: number;
+  freelancerNetMinor: number;
+  freelancerFeeRate: number;
+  providerFeeRate: number;
+}
+
+/**
+ * Single authoritative dispute split & fee calculator shared by
+ * `previewDisputeSplit` and `resolveDispute`. Computes integer minor units
+ * from the disputed milestone amount and applies fee rounding once.
+ */
+export function computeDisputeSplit(params: {
+  disputedAmountMinor: number;
+  outcome: DisputeResolutionOutcome;
+  freelancerSharePct?: number;
+  freelancerShareMinor?: number;
+  freelancerHasTin?: boolean;
+}): ComputedDisputeSplit {
+  const total = params.disputedAmountMinor;
+  if (!Number.isInteger(total) || total < 0) {
+    throw new InvalidDisputeStageError("Invalid disputed milestone amount.");
+  }
+
+  let freelancerGrossMinor = 0;
+  let clientRefundMinor = 0;
+  let resolvedPct: number | null = null;
+
+  if (params.outcome === "RELEASE_TO_FREELANCER") {
+    freelancerGrossMinor = total;
+    clientRefundMinor = 0;
+    resolvedPct = 100;
+  } else if (params.outcome === "REFUND_TO_CLIENT") {
+    freelancerGrossMinor = 0;
+    clientRefundMinor = total;
+    resolvedPct = 0;
+  } else {
+    const hasPct = params.freelancerSharePct !== undefined;
+    const hasMinor = params.freelancerShareMinor !== undefined;
+    if (hasPct === hasMinor) {
+      throw new InvalidDisputeStageError(
+        "A PARTIAL_SPLIT requires exactly one of freelancerSharePct or freelancerShareMinor.",
+      );
+    }
+
+    if (hasPct) {
+      const pct = params.freelancerSharePct!;
+      if (!Number.isInteger(pct) || pct < 0 || pct > 100) {
+        throw new InvalidDisputeStageError(
+          "freelancerSharePct must be an integer between 0 and 100.",
+        );
+      }
+      resolvedPct = pct;
+      freelancerGrossMinor = Math.round((total * pct) / 100);
+    } else {
+      const share = params.freelancerShareMinor!;
+      if (!Number.isInteger(share) || share < 0) {
+        throw new InvalidDisputeStageError(
+          "A PARTIAL_SPLIT resolution requires a non-negative integer freelancerShareMinor.",
+        );
+      }
+      if (share > total) {
+        throw new InvalidDisputeStageError(
+          "Freelancer share cannot exceed the milestone amount.",
+        );
+      }
+      freelancerGrossMinor = share;
+      resolvedPct = total > 0 ? Math.round((share / total) * 100) : 0;
+    }
+
+    clientRefundMinor = total - freelancerGrossMinor;
+    if (
+      freelancerGrossMinor < 0 ||
+      clientRefundMinor < 0 ||
+      freelancerGrossMinor + clientRefundMinor !== total
+    ) {
+      throw new InvalidDisputeStageError(
+        "Freelancer and client split amounts must sum to the disputed milestone amount.",
+      );
+    }
+  }
+
+  const fees = calculateFees({
+    milestoneAmountMinor: freelancerGrossMinor,
+    freelancerHasTin: params.freelancerHasTin,
+  });
+  const totalFeeMinor =
+    fees.platformFeeFromFreelancerMinor +
+    fees.paymentProviderFeeMinor +
+    fees.withholdingTaxMinor;
+  const cfg = getEscrowFeeConfig();
+
+  return {
+    disputedAmountMinor: total,
+    outcome: params.outcome,
+    freelancerSharePct: resolvedPct,
+    freelancerGrossMinor,
+    clientRefundMinor,
+    platformFeeMinor: fees.platformFeeFromFreelancerMinor,
+    providerFeeMinor: fees.paymentProviderFeeMinor,
+    totalFeeMinor,
+    withholdingTaxMinor: fees.withholdingTaxMinor,
+    freelancerNetMinor: fees.freelancerNetMinor,
+    freelancerFeeRate: cfg.freelancerPlatformFeeRate,
+    providerFeeRate: cfg.paymentProviderFeeRate,
+  };
+}
 
 /**
  * F-04 â€” escrow states from which a dispute resolution can still move money.
@@ -413,7 +533,51 @@ export async function getMediationQueue(params?: {
     total,
     page,
     pageSize: limit,
+    partialSplitEnabled: env.PARTIAL_SPLIT_ENABLED,
   };
+}
+
+/**
+ * Authoritative financial preview for resolving or splitting a dispute.
+ * Uses the exact same `computeDisputeSplit()` calculation as `resolveDispute()`.
+ */
+export async function previewDisputeSplit(params: {
+  disputeId: string;
+  outcome: DisputeResolutionOutcome;
+  freelancerSharePct?: number;
+  freelancerShareMinor?: number;
+}): Promise<ComputedDisputeSplit> {
+  if (params.outcome === "PARTIAL_SPLIT" && !env.PARTIAL_SPLIT_ENABLED) {
+    throw new PartialSplitDisabledError(
+      "Partial split dispute settlement is currently disabled.",
+    );
+  }
+  const dispute = await prisma.dispute.findUnique({
+    where: { id: params.disputeId },
+    include: { contract: true },
+  });
+  if (!dispute) throw new DisputeNotFoundError();
+  if (!dispute.contract || !dispute.milestoneId) {
+    throw new InvalidDisputeStageError(
+      "Split preview requires a milestone-backed contract dispute.",
+    );
+  }
+  const [milestone, freelancerKyc] = await Promise.all([
+    prisma.milestone.findUnique({ where: { id: dispute.milestoneId } }),
+    prisma.kycRecord.findUnique({
+      where: { userId: dispute.contract.freelancerId },
+      select: { tin: true },
+    }),
+  ]);
+  if (!milestone) throw new MilestoneNotFoundError();
+
+  return computeDisputeSplit({
+    disputedAmountMinor: milestone.amountMinor,
+    outcome: params.outcome,
+    freelancerSharePct: params.freelancerSharePct,
+    freelancerShareMinor: params.freelancerShareMinor,
+    freelancerHasTin: Boolean(freelancerKyc?.tin),
+  });
 }
 
 /**
@@ -425,7 +589,13 @@ export async function resolveDispute(params: {
   outcome: DisputeResolutionOutcome;
   recommendation: string;
   freelancerShareMinor?: number;
+  freelancerSharePct?: number;
 }) {
+  if (params.outcome === "PARTIAL_SPLIT" && !env.PARTIAL_SPLIT_ENABLED) {
+    throw new PartialSplitDisabledError(
+      "Partial split dispute settlement is currently disabled.",
+    );
+  }
   const dispute = await prisma.dispute.findUnique({
     where: { id: params.disputeId },
     include: { contract: true },
@@ -444,30 +614,27 @@ export async function resolveDispute(params: {
     );
   }
 
-  const milestone = await prisma.milestone.findUniqueOrThrow({
-    where: { id: dispute.milestoneId },
-  });
+  const [milestone, freelancerKyc] = await Promise.all([
+    prisma.milestone.findUniqueOrThrow({
+      where: { id: dispute.milestoneId },
+    }),
+    prisma.kycRecord.findUnique({
+      where: { userId: dispute.contract.freelancerId },
+      select: { tin: true },
+    }),
+  ]);
 
-  // F-05 â€” validate the PARTIAL_SPLIT share before the claim, so a malformed
-  // award is rejected while the dispute is still open and nothing has moved.
-  // Routed input is a `number | undefined`; here it must be a real integer
-  // inside the escrow amount, or the split is undefined and paying it would
-  // either lose money or create it.
-  let validatedFreelancerShare: number | undefined;
-  if (params.outcome === "PARTIAL_SPLIT") {
-    const share = params.freelancerShareMinor;
-    if (typeof share !== "number" || !Number.isInteger(share) || share < 0) {
-      throw new InvalidDisputeStageError(
-        "A PARTIAL_SPLIT resolution requires a non-negative integer freelancerShareMinor.",
-      );
-    }
-    if (share > milestone.amountMinor) {
-      throw new InvalidDisputeStageError(
-        "Freelancer share cannot exceed the milestone amount.",
-      );
-    }
-    validatedFreelancerShare = share;
-  }
+  // F-05 — derive and validate the split BEFORE the claim, so a malformed
+  // or ambiguous award is rejected while the dispute is still open.
+  const split = computeDisputeSplit({
+    disputedAmountMinor: milestone.amountMinor,
+    outcome: params.outcome,
+    freelancerSharePct: params.freelancerSharePct,
+    freelancerShareMinor: params.freelancerShareMinor,
+    freelancerHasTin: Boolean(freelancerKyc?.tin),
+  });
+  const validatedFreelancerShare =
+    params.outcome === "PARTIAL_SPLIT" ? split.freelancerGrossMinor : undefined;
 
   // Captured into a local so the non-null narrowing survives the transaction
   // callback below, which is a fresh closure scope.
@@ -514,7 +681,7 @@ try {
             resolvedByStaffId: params.staffUserId,
             resolutionOutcome: params.outcome,
             mediatorRecommendation: params.recommendation,
-            freelancerShareMinor: params.freelancerShareMinor ?? null,
+            freelancerShareMinor: validatedFreelancerShare ?? null,
             resolvedAt: new Date(),
             // The recommendation IS the mediator's answer. If the dispute was
             // never claimed, recording the recommendation is still the first
@@ -725,6 +892,7 @@ export async function applyArbitrationAward(params: {
   outcome: DisputeResolutionOutcome;
   recommendation: string;
   freelancerShareMinor?: number;
+  freelancerSharePct?: number;
 }) {
   const dispute = await prisma.dispute.findUnique({
     where: { id: params.disputeId },
@@ -766,6 +934,7 @@ export async function applyArbitrationAward(params: {
     outcome: params.outcome,
     recommendation: params.recommendation,
     freelancerShareMinor: params.freelancerShareMinor,
+    freelancerSharePct: params.freelancerSharePct,
   });
 
   const updated = await prisma.dispute.update({

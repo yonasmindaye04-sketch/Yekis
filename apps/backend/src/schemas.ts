@@ -390,17 +390,68 @@ export const DisputeResolutionOutcome = z.enum([
 ]);
 export type DisputeResolutionOutcome = z.infer<typeof DisputeResolutionOutcome>;
 
+function hasValidSplitInput(data: {
+  outcome: DisputeResolutionOutcome;
+  freelancerShareMinor?: number;
+  freelancerSharePct?: number;
+}): { ok: boolean; message: string } {
+  const hasMinor = data.freelancerShareMinor !== undefined;
+  const hasPct = data.freelancerSharePct !== undefined;
+  if (data.outcome === "PARTIAL_SPLIT") {
+    if (hasMinor && hasPct) {
+      return {
+        ok: false,
+        message: "Provide either freelancerSharePct or freelancerShareMinor, not both.",
+      };
+    }
+    if (!hasMinor && !hasPct) {
+      return {
+        ok: false,
+        message:
+          "Either freelancerSharePct or freelancerShareMinor is required when outcome is PARTIAL_SPLIT.",
+      };
+    }
+    return { ok: true, message: "" };
+  }
+  if (hasMinor || hasPct) {
+    return {
+      ok: false,
+      message: "Split share fields are only allowed when outcome is PARTIAL_SPLIT.",
+    };
+  }
+  return { ok: true, message: "" };
+}
+
 export const MediatorResolutionInput = z
   .object({
     outcome: DisputeResolutionOutcome,
     recommendation: z.string().min(10).max(2000),
-    // Required and only meaningful when outcome === "PARTIAL_SPLIT"
+    // Required and only meaningful when outcome === "PARTIAL_SPLIT". Exactly
+    // one of freelancerShareMinor or freelancerSharePct may be provided.
     freelancerShareMinor: z.number().int().nonnegative().optional(),
+    freelancerSharePct: z.number().int().min(0).max(100).optional(),
   })
-  .refine((data) => data.outcome !== "PARTIAL_SPLIT" || data.freelancerShareMinor !== undefined, {
-    message: "freelancerShareMinor is required when outcome is PARTIAL_SPLIT.",
+  .superRefine((data, ctx) => {
+    const check = hasValidSplitInput(data);
+    if (!check.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.message });
+    }
   });
 export type MediatorResolutionInput = z.infer<typeof MediatorResolutionInput>;
+
+export const SplitPreviewInput = z
+  .object({
+    outcome: DisputeResolutionOutcome.default("PARTIAL_SPLIT"),
+    freelancerShareMinor: z.number().int().nonnegative().optional(),
+    freelancerSharePct: z.number().int().min(0).max(100).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const check = hasValidSplitInput(data);
+    if (!check.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.message });
+    }
+  });
+export type SplitPreviewInput = z.infer<typeof SplitPreviewInput>;
 
 /**
  * F-05 ΓÇö applying an external arbitration award.
@@ -419,9 +470,13 @@ export const ArbitrationAwardInput = z
     outcome: DisputeResolutionOutcome,
     recommendation: z.string().min(10).max(2000),
     freelancerShareMinor: z.number().int().nonnegative().optional(),
+    freelancerSharePct: z.number().int().min(0).max(100).optional(),
   })
-  .refine((data) => data.outcome !== "PARTIAL_SPLIT" || data.freelancerShareMinor !== undefined, {
-    message: "freelancerShareMinor is required when outcome is PARTIAL_SPLIT.",
+  .superRefine((data, ctx) => {
+    const check = hasValidSplitInput(data);
+    if (!check.ok) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.message });
+    }
   });
 export type ArbitrationAwardInput = z.infer<typeof ArbitrationAwardInput>;
 

@@ -29,6 +29,7 @@ import {
   DisputeAlreadyClaimedError,
   DisputeAlreadyResolvedError,
   MilestoneNotSettleableError,
+  PartialSplitDisabledError,
 } from "./dispute.service.js";
 import { z } from "zod";
 
@@ -41,6 +42,10 @@ function handleKnownErrors(
 ): boolean {
   if (err instanceof NotDisputePartyError) {
     res.status(403).json({ error: "FORBIDDEN", message: err.message });
+    return true;
+  }
+  if (err instanceof PartialSplitDisabledError) {
+    res.status(403).json({ error: "FEATURE_DISABLED", message: err.message });
     return true;
   }
   if (
@@ -242,6 +247,7 @@ disputesRouter.post(
         outcome: parsed.data.outcome,
         recommendation: parsed.data.recommendation,
         freelancerShareMinor: parsed.data.freelancerShareMinor,
+        freelancerSharePct: parsed.data.freelancerSharePct,
       });
       return res.json(result);
     } catch (err) {

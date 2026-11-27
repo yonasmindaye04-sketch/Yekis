@@ -7,7 +7,7 @@
    Hotkeys: ↑↓ navigate.
    ──────────────────────────────────────────────────────────────────────── */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Clock,
   Eye,
@@ -20,7 +20,7 @@ import {
 import { dt, dts, fmt2, opsApi, opsListApi } from "../opsApi";
 import { useListPage } from "../opsList";
 import { DISPUTE_STAGES } from "../opsConst";
-import type { DisputeItem, DisputeOutcome } from "../opsTypes";
+import type { DisputeItem, DisputeOutcome, DisputeSplitPreview } from "../opsTypes";
 import {
   Banner,
   Card,
@@ -61,6 +61,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   const [rec, setRec] = useState("");
   const [busy, setBusy] = useState(false);
   const [evidenceModalOpen, setEvidenceModalOpen] = useState(false);
+  const [splitPreview, setSplitPreview] = useState<DisputeSplitPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
 
   const list = useListPage<DisputeItem>(
     (p) => opsListApi.disputes({ ...p, status: stage }),
@@ -68,6 +71,9 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     [stage],
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
+  const partialSplitEnabled = Boolean(
+    (list.extra as { partialSplitEnabled?: boolean } | null)?.partialSplitEnabled,
+  );
 
   // The breach flag comes from the server (either clock missed). The
   // browser-side `slaH` is only the fallback for rows that predate the
@@ -77,6 +83,45 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
       ? rows.filter((d) => d.sla?.breached ?? d.slaH < 0)
       : rows;
   const sel = visibleRows.find((d) => d.id === selId) ?? rows.find((d) => d.id === selId) ?? null;
+
+  useEffect(() => {
+    if (!sel || !outcome) {
+      setSplitPreview(null);
+      setPreviewError(null);
+      setPreviewLoading(false);
+      return;
+    }
+    if (outcome === "PARTIAL_SPLIT" && !partialSplitEnabled) {
+      setSplitPreview(null);
+      setPreviewError("Partial split settlement is currently disabled.");
+      setPreviewLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setPreviewLoading(true);
+    setPreviewError(null);
+    void opsApi
+      .splitPreview(sel.id, {
+        outcome,
+        freelancerSharePct: outcome === "PARTIAL_SPLIT" ? split : undefined,
+      })
+      .then((res) => {
+        if (!cancelled) {
+          setSplitPreview(res);
+          setPreviewLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSplitPreview(null);
+          setPreviewError(err instanceof Error ? err.message : "Failed to load preview");
+          setPreviewLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [sel?.id, outcome, split, partialSplitEnabled]);
 
   useHotkeys(
     useCallback(
@@ -103,7 +148,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     try {
       await opsApi.resolveDispute(sel.id, {
         outcome,
-        split: outcome === "PARTIAL_SPLIT" ? split : undefined,
+        splitPct: outcome === "PARTIAL_SPLIT" ? split : undefined,
         recommendation: rec.trim(),
       });
       toast(`Dispute resolved — ${outcome.replace(/_/g, " ").toLowerCase()}.`);
@@ -159,20 +204,14 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
   if (loading && rows.length === 0) return <LoadingBox />;
   if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
 
-  /* settlement preview */
-  let fGross = 0, cRefund = 0;
-  if (sel && outcome === "RELEASE_TO_FREELANCER") fGross = sel.amt;
-  else if (sel && outcome === "REFUND_TO_CLIENT") cRefund = sel.amt;
-  else if (sel && outcome === "PARTIAL_SPLIT") {
-    fGross = Math.round((sel.amt * split) / 100);
-    cRefund = sel.amt - fGross;
-  }
-  // 7% platform commission + 0.5% payment/disbursement provider fee.
-  // The provider fee used to be taken at cash-out instead; it is now
-  // collected on the transaction, so the take is one number up front.
-  const fee = Math.round(fGross * 0.075);
-  const wh = 0;
-  const net = fGross - fee;
+  const fGross = splitPreview?.freelancerGrossMinor ?? 0;
+  const cRefund = splitPreview?.clientRefundMinor ?? 0;
+  const fee = splitPreview?.totalFeeMinor ?? 0;
+  const wh = splitPreview?.withholdingTaxMinor ?? 0;
+  const net = splitPreview?.freelancerNetMinor ?? 0;
+  const feePctLabel = splitPreview
+    ? ((splitPreview.freelancerFeeRate + splitPreview.providerFeeRate) * 100).toFixed(1)
+    : "7.5";
 
   return (
     <div className="fade">
@@ -391,33 +430,63 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
 
               <div className="sec-title" style={{ marginTop: 22 }}>Mediation Resolution</div>
               <div className="outcome-row">
-                {OUTCOMES.map((o) => (
-                  <button
-                    key={o.id}
-                    className={`outcome-btn ${outcome === o.id ? "active" : ""}`}
-                    onClick={() => setOutcome(o.id)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
+                {OUTCOMES.map((o) => {
+                  const disabled = o.id === "PARTIAL_SPLIT" && !partialSplitEnabled;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      disabled={disabled}
+                      title={
+                        disabled
+                          ? "Partial split is disabled by the server feature flag."
+                          : undefined
+                      }
+                      className={`outcome-btn ${outcome === o.id ? "active" : ""}`}
+                      onClick={() => setOutcome(o.id)}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
               </div>
-              {outcome === "PARTIAL_SPLIT" ? (
+              {outcome === "PARTIAL_SPLIT" && partialSplitEnabled ? (
                 <div style={{ marginBottom: 4 }}>
                   <div className="split-lbl">
-                    <span>Freelancer share: <b style={{ color: "var(--ops-primary)" }}>{split}%</b></span>
-                    <span>{fmt2(Math.round((sel.amt * split) / 100))}</span>
+                    <label htmlFor="dispute-partial-split-range">
+                      Freelancer share: <b style={{ color: "var(--ops-primary)" }}>{split}%</b>
+                    </label>
+                    <span>{splitPreview ? fmt2(fGross) : "…"}</span>
                   </div>
-                  <input type="range" min={0} max={100} value={split} onChange={(e) => setSplit(Number(e.target.value))} />
+                  <input
+                    id="dispute-partial-split-range"
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={split}
+                    onChange={(e) => setSplit(Math.round(Number(e.target.value)))}
+                  />
                 </div>
               ) : null}
               {outcome ? (
                 <div className="calc">
                   <h5>Resolution Financial Preview</h5>
-                  <div className="calc-row"><span>Client receives (refund)</span><b>{fmt2(cRefund)}</b></div>
-                  <div className="calc-row"><span>Freelancer gross allocation</span><b>{fmt2(fGross)}</b></div>
-                  <div className="calc-row sub"><span>− Platform &amp; rail fee (7.5%)</span><span>{fmt2(fee)}</span></div>
-                  <div className="calc-row sub"><span>− Withholding tax (deferred / 0%)</span><span>{fmt2(wh)}</span></div>
-                  <div className="calc-row total"><span>Freelancer net receivable</span><b style={{ color: "var(--ops-green)" }}>{fmt2(net)}</b></div>
+                  {previewLoading ? (
+                    <div className="kbd-hint">Calculating authoritative split on server…</div>
+                  ) : previewError ? (
+                    <div className="kbd-hint" style={{ color: "var(--color-danger, #dc2626)" }}>
+                      {previewError}
+                    </div>
+                  ) : splitPreview ? (
+                    <>
+                      <div className="calc-row"><span>Client receives (refund)</span><b>{fmt2(cRefund)}</b></div>
+                      <div className="calc-row"><span>Freelancer gross allocation</span><b>{fmt2(fGross)}</b></div>
+                      <div className="calc-row sub"><span>− Platform &amp; rail fee ({feePctLabel}%)</span><span>{fmt2(fee)}</span></div>
+                      <div className="calc-row sub"><span>− Withholding tax (deferred / 0%)</span><span>{fmt2(wh)}</span></div>
+                      <div className="calc-row total"><span>Freelancer net receivable</span><b style={{ color: "var(--ops-green)" }}>{fmt2(net)}</b></div>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
               <label className="lbl" style={{ marginTop: 10 }}>Mediator recommendation &amp; rationale</label>

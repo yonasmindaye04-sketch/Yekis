@@ -365,6 +365,7 @@ export async function getReportsSummary() {
       clientFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
       providerFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
       withholdingEnabled: env.TIN_FEATURE_ENABLED,
+      partialSplitEnabled: env.PARTIAL_SPLIT_ENABLED,
     },
     months: [...monthMap.values()],
     rails: Object.values(railMap),
@@ -438,6 +439,7 @@ export async function getDashboardSummary() {
       clientFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
       providerFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
       withholdingEnabled: env.TIN_FEATURE_ENABLED,
+      partialSplitEnabled: env.PARTIAL_SPLIT_ENABLED,
     },
     recentActivity,
   };

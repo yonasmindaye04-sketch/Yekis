@@ -83,6 +83,22 @@ export interface FeeConfiguration {
   clientFeeRate: number;
   providerFeeRate: number;
   withholdingEnabled: boolean;
+  partialSplitEnabled?: boolean;
+}
+
+export interface DisputeSplitPreview {
+  disputedAmountMinor: number;
+  outcome: DisputeOutcome;
+  freelancerSharePct: number | null;
+  freelancerGrossMinor: number;
+  clientRefundMinor: number;
+  platformFeeMinor: number;
+  providerFeeMinor: number;
+  totalFeeMinor: number;
+  withholdingTaxMinor: number;
+  freelancerNetMinor: number;
+  freelancerFeeRate: number;
+  providerFeeRate: number;
 }
 
 export interface Payout {

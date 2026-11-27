@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { prisma } from "../src/lib/prisma.js";
+import { env } from "../src/config/env.js";
 import { calculateFees } from "../src/modules/escrow/fees.js";
 import {
   resolveDispute,
@@ -193,11 +194,15 @@ async function walletBalances() {
   return { client: c.balanceMinor, freelancer: f.balanceMinor };
 }
 
+const prevPartialSplit = env.PARTIAL_SPLIT_ENABLED;
+
 afterAll(async () => {
+  env.PARTIAL_SPLIT_ENABLED = prevPartialSplit;
   await cleanup();
 });
 
 beforeEach(async () => {
+  env.PARTIAL_SPLIT_ENABLED = true;
   await ensureStaff();
 });
 

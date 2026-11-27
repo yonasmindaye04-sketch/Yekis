@@ -1047,12 +1047,14 @@ export const opsListApi = {
       total: number;
       page: number;
       pageSize: number;
+      partialSplitEnabled?: boolean;
     };
     return {
       rows: r.items.map(toDispute),
       total: r.total,
       page: r.page,
       pageSize: r.pageSize,
+      extra: { partialSplitEnabled: Boolean(r.partialSplitEnabled) },
     };
   },
 
@@ -1272,14 +1274,31 @@ export const opsApi = {
     const r = await soft(rDisputes(), null);
     return r ? r.items.map(toDispute) : [];
   },
+  splitPreview: (
+    id: string,
+    body: {
+      outcome: DisputeOutcome;
+      freelancerSharePct?: number;
+      freelancerShareMinor?: number;
+    },
+  ) => api.previewDisputeSplit(id, body),
   resolveDispute: (
     id: string,
-    body: { outcome: DisputeOutcome; split?: number; recommendation: string },
+    body: {
+      outcome: DisputeOutcome;
+      splitPct?: number;
+      freelancerShareMinor?: number;
+      recommendation: string;
+    },
   ) =>
     api.resolveDispute(id, {
       outcome: body.outcome,
       recommendation: body.recommendation,
-      freelancerShareMinor: body.split,
+      ...(body.outcome === "PARTIAL_SPLIT"
+        ? body.splitPct !== undefined
+          ? { freelancerSharePct: body.splitPct }
+          : { freelancerShareMinor: body.freelancerShareMinor }
+        : {}),
     }),
 
   profileReports: async () => (await rProfileReports()).data.map(toProfileReport),
