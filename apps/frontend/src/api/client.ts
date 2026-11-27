@@ -2709,7 +2709,7 @@ class ApiClient {
     if (params?.search) qs.set("search", params.search);
     return this.request(`/api/v1/staff/reports?${qs.toString()}`);
   }
-  async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
+  async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<{ status: string; accountSuspended?: boolean }> {
     return this.request(`/api/v1/staff/reports/${reportId}`, { method: "PATCH", body: JSON.stringify({ status, staffNotes }) });
   }
 

@@ -5,6 +5,9 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Fixed
+- **OPS-06 — Transactional profile-ban suspension & real error surfacing (`staff-profile.routes.ts`, `ReportsQueue.tsx`, `client.ts`) (2026-11-27)**:
+  - **Root cause**: `COMPLIANCE_ADMIN` holds `profiles.moderate` (`PATCH /api/v1/staff/reports/:id`) but not `users.suspend` (`POST /api/v1/admin/users/:id/suspend`), and `ReportsQueue.tsx` swallowed the secondary `suspendUser` `403` inside a bare `catch {}` block while displaying `"permanently banned and account suspended."` even though `isSuspended` stayed `false`.
+  - **Fix**: Moved `RESOLVED_PROFILE_BANNED` user suspension (`isSuspended: true`, `sessionVersion` increment, and `USER_SUSPENDED` + `RESOLVE_REPORT` audit rows) into the `PATCH /api/v1/staff/reports/:reportId` Prisma transaction under `profiles.moderate`, returning explicit `accountSuspended` state and refusing staff targets (`403 CANNOT_SUSPEND_STAFF`). Removed the swallowed secondary call in `ReportsQueue.tsx`, added `OpsActionModal` confirmation for report actions, and surfaced real server responses.
 - **OPS-13 — Receipt approval confirmation, Reject rationale button gating, and EvidenceViewer lightbox (`Receipts.tsx`, `ui.tsx`) (2026-11-27)**:
   - `Approve & credit` in `Receipts.tsx` now opens a native `<dialog>` confirmation modal displaying user email, amount, provider, and reference number before crediting funds, and refreshes sidebar badges upon completion.
   - Added opt-in `disableSubmitUntilValid` to `OpsActionModal` so `Reject` and `Flag` buttons stay disabled until the minimum character length (`5` / `10`) is met.

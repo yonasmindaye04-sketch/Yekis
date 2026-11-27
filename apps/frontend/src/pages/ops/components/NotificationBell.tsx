@@ -109,14 +109,18 @@ export default function NotificationBell() {
     const targets = items.filter((i) => !i.isRead);
     setBusy(true);
     // Mark sequentially so a single failure cannot silently drop the rest.
+    let failed = 0;
     for (const t of targets) {
       try {
         await api.markNotificationRead(t.id);
       } catch {
-        /* leave the rest to retry on the next open */
+        failed += 1;
       }
     }
     setBusy(false);
+    if (failed > 0) {
+      toast(`Could not mark ${failed} notification${failed === 1 ? "" : "s"} as read.`);
+    }
     void load();
   };
 

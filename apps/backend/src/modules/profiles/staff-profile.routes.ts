@@ -167,6 +167,9 @@ const resolveReportSchema = z.object({
   staffNotes: z.string().optional(),
 });
 
+class ProfileReportNotFoundError extends Error {}
+class CannotSuspendStaffTargetError extends Error {}
+
 staffProfileRouter.patch(
   "/reports/:reportId",
   requireAuth,
@@ -175,27 +178,91 @@ staffProfileRouter.patch(
     try {
       const { reportId } = req.params;
       const data = resolveReportSchema.parse(req.body);
+      const staffActor = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        select: { staffRole: true },
+      });
+      const actorRole = staffActor?.staffRole ?? req.user.staffRole ?? null;
 
-      const report = await prisma.profileReport.update({
-        where: { id: reportId },
-        data: {
-          status: data.status,
-          staffNotes: data.staffNotes,
-          resolvedAt: new Date(),
-          reviewedByStaffId: req.user.id,
-        },
+      const result = await prisma.$transaction(async (tx) => {
+        const existing = await tx.profileReport.findUnique({
+          where: { id: reportId },
+          select: { id: true, reportedUserId: true, status: true },
+        });
+        if (!existing) throw new ProfileReportNotFoundError();
+
+        let accountSuspended = false;
+        if (data.status === "RESOLVED_PROFILE_BANNED") {
+          const target = await tx.user.findUnique({
+            where: { id: existing.reportedUserId },
+            select: { id: true, isSuspended: true, staffRole: true },
+          });
+          if (!target) throw new ProfileReportNotFoundError();
+          if (target.staffRole) {
+            throw new CannotSuspendStaffTargetError(
+              "Staff accounts cannot be suspended from profile reports.",
+            );
+          }
+
+          await tx.user.update({
+            where: { id: target.id },
+            data: {
+              isSuspended: true,
+              sessionVersion: { increment: 1 },
+            },
+          });
+          accountSuspended = true;
+
+          await recordAuditEvent({
+            userId: req.user.id,
+            actorRole,
+            eventType: "USER_SUSPENDED",
+            entityType: "User",
+            entityId: target.id,
+            previousState: { isSuspended: target.isSuspended },
+            newState: { isSuspended: true },
+            metadata: {
+              reason: data.staffNotes,
+              reportId,
+              via: "profiles.moderate",
+            },
+            tx,
+          });
+        }
+
+        const report = await tx.profileReport.update({
+          where: { id: reportId },
+          data: {
+            status: data.status,
+            staffNotes: data.staffNotes,
+            resolvedAt: new Date(),
+            reviewedByStaffId: req.user.id,
+          },
+        });
+
+        await recordAuditEvent({
+          eventType: "RESOLVE_REPORT",
+          userId: req.user.id,
+          actorRole,
+          entityType: "ProfileReport",
+          entityId: reportId,
+          previousState: { status: existing.status },
+          newState: { status: data.status, accountSuspended },
+          metadata: { status: data.status, notes: data.staffNotes, accountSuspended },
+          tx,
+        });
+
+        return { ...report, accountSuspended };
       });
 
-      await recordAuditEvent({
-        eventType: "RESOLVE_REPORT",
-        userId: req.user.id,
-        entityType: "ProfileReport",
-        entityId: reportId,
-        metadata: { status: data.status, notes: data.staffNotes },
-      });
-
-      res.json(report);
+      res.json(result);
     } catch (error) {
+      if (error instanceof ProfileReportNotFoundError) {
+        return res.status(404).json({ error: "REPORT_NOT_FOUND", message: "Profile report not found." });
+      }
+      if (error instanceof CannotSuspendStaffTargetError) {
+        return res.status(403).json({ error: "CANNOT_SUSPEND_STAFF", message: error.message });
+      }
       logger.error({ err: error }, "PATCH /staff/reports/:reportId error");
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors });

@@ -30,6 +30,7 @@ import {
   FilterSelect,
   Kv,
   LoadingBox,
+  OpsActionModal,
   PageHead,
   Pager,
   Pill,
@@ -64,6 +65,7 @@ export default function ReportsQueue() {
   const [customNote, setCustomNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyFeatured, setBusyFeatured] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ReportResolution | null>(null);
 
   const page = useListPage<ProfileReport>(
     (p) =>
@@ -103,12 +105,13 @@ export default function ReportsQueue() {
   };
 
   const applyApproach = useCallback(
-    async (action: ReportResolution) => {
+    async (action: ReportResolution, noteOverride?: string) => {
       if (!sel || busy) return;
       const finalNote =
-        templateNote === "custom"
+        (noteOverride ?? "").trim() ||
+        (templateNote === "custom"
           ? customNote.trim()
-          : templateNote.trim() || DEFAULT_NOTES_BY_ACTION[action];
+          : templateNote.trim() || DEFAULT_NOTES_BY_ACTION[action]);
 
       if (!finalNote || finalNote.length < 5) {
         toast("Please select an enforcement template or enter at least 5 characters of staff notes.");
@@ -117,24 +120,18 @@ export default function ReportsQueue() {
 
       setBusy(true);
       try {
-        await opsApi.resolveProfileReport(sel.id, action, finalNote);
-
-        // Execute secondary administrative enforcement hook on permanent ban
-        if (action === "RESOLVED_PROFILE_BANNED") {
-          try {
-            await opsApi.suspendUser(sel.reportedUserId, finalNote);
-          } catch {
-            /* supplementary hook */
-          }
-        }
+        const result = await opsApi.resolveProfileReport(sel.id, action, finalNote);
 
         const actionSummary: Record<ReportResolution, string> = {
           RESOLVED_NO_ACTION: `Report dismissed for ${sel.reported}.`,
           RESOLVED_PROFILE_HIDDEN: `${sel.reported}'s profile hidden from public marketplace.`,
-          RESOLVED_PROFILE_BANNED: `${sel.reported} permanently banned and account suspended.`,
+          RESOLVED_PROFILE_BANNED: result.accountSuspended
+            ? `${sel.reported} permanently banned and account suspended.`
+            : `${sel.reported} report marked banned.`,
         };
 
         toast(actionSummary[action]);
+        setConfirmAction(null);
         setTemplateNote("");
         setCustomNote("");
         reload();
@@ -151,7 +148,7 @@ export default function ReportsQueue() {
   useHotkeys(
     useCallback(
       (e: KeyboardEvent) => {
-        if (ui.viewerOpen || ui.paletteOpen || isTyping() || !rows.length) return;
+        if (ui.viewerOpen || ui.paletteOpen || confirmAction || isTyping() || !rows.length) return;
         const idx = rows.findIndex((r) => r.id === selId);
         if (e.key === "ArrowDown" && idx >= 0 && idx < rows.length - 1) {
           e.preventDefault();
@@ -163,22 +160,22 @@ export default function ReportsQueue() {
         }
         if ((e.key === "h" || e.key === "H") && sel) {
           e.preventDefault();
-          void applyApproach("RESOLVED_PROFILE_HIDDEN");
+          setConfirmAction("RESOLVED_PROFILE_HIDDEN");
         }
         if ((e.key === "b" || e.key === "B") && sel) {
           e.preventDefault();
-          void applyApproach("RESOLVED_PROFILE_BANNED");
+          setConfirmAction("RESOLVED_PROFILE_BANNED");
         }
         if ((e.key === "d" || e.key === "D") && sel) {
           e.preventDefault();
-          void applyApproach("RESOLVED_NO_ACTION");
+          setConfirmAction("RESOLVED_NO_ACTION");
         }
         if ((e.key === "r" || e.key === "R") && sel) {
           e.preventDefault();
           document.getElementById("report-enforcement-note")?.focus();
         }
       },
-      [rows, selId, sel, applyApproach, ui.viewerOpen, ui.paletteOpen],
+      [rows, selId, sel, confirmAction, ui.viewerOpen, ui.paletteOpen],
     ),
   );
 
@@ -598,7 +595,7 @@ export default function ReportsQueue() {
                   size="sm"
                   disabled={busy}
                   title="Dismiss report with no penalty (Press D)"
-                  onClick={() => void applyApproach("RESOLVED_NO_ACTION")}
+                  onClick={() => setConfirmAction("RESOLVED_NO_ACTION")}
                 >
                   <Check size={14} /> Dismiss (No Action)
                 </Button>
@@ -608,7 +605,7 @@ export default function ReportsQueue() {
                   size="sm"
                   disabled={busy}
                   title="Hide profile & gigs until user remediates violation (Press H)"
-                  onClick={() => void applyApproach("RESOLVED_PROFILE_HIDDEN")}
+                  onClick={() => setConfirmAction("RESOLVED_PROFILE_HIDDEN")}
                 >
                   <EyeOff size={14} /> Hide Profile
                 </Button>
@@ -618,7 +615,7 @@ export default function ReportsQueue() {
                   size="sm"
                   disabled={busy}
                   title="Permanently ban profile & suspend account (Press B)"
-                  onClick={() => void applyApproach("RESOLVED_PROFILE_BANNED")}
+                  onClick={() => setConfirmAction("RESOLVED_PROFILE_BANNED")}
                 >
                   <Ban size={14} /> Ban &amp; Suspend{" "}
                   <span
@@ -655,6 +652,55 @@ export default function ReportsQueue() {
           </Card>
         )}
       </div>
+
+      <OpsActionModal
+        open={Boolean(confirmAction && sel)}
+        title={
+          confirmAction === "RESOLVED_PROFILE_BANNED"
+            ? "Ban Profile & Suspend Account"
+            : confirmAction === "RESOLVED_PROFILE_HIDDEN"
+              ? "Hide User Profile"
+              : "Dismiss Profile Report"
+        }
+        description={
+          sel
+            ? `${sel.reported} (${sel.reportedEmail}) · ${sel.reason.replace(/_/g, " ")}`
+            : undefined
+        }
+        tone={confirmAction === "RESOLVED_PROFILE_BANNED" ? "danger" : "primary"}
+        confirmLabel={
+          confirmAction === "RESOLVED_PROFILE_BANNED"
+            ? "Confirm Ban & Suspend"
+            : confirmAction === "RESOLVED_PROFILE_HIDDEN"
+              ? "Confirm Hide Profile"
+              : "Confirm Dismiss"
+        }
+        busy={busy}
+        fields={
+          confirmAction
+            ? [
+                {
+                  name: "notes",
+                  label: "Staff Enforcement Note",
+                  placeholder: "Document rationale for audit log (min 5 characters)…",
+                  initialValue:
+                    templateNote === "custom"
+                      ? customNote
+                      : templateNote || DEFAULT_NOTES_BY_ACTION[confirmAction],
+                  multiline: true,
+                  required: true,
+                  minLength: 5,
+                  maxLength: 500,
+                },
+              ]
+            : []
+        }
+        onConfirm={async ({ values }) => {
+          if (!confirmAction) return;
+          await applyApproach(confirmAction, values.notes);
+        }}
+        onCancel={() => !busy && setConfirmAction(null)}
+      />
     </div>
   );
 }
