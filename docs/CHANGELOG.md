@@ -5,6 +5,10 @@ All notable implementation and documentation changes are recorded here.
 ## Unreleased
 
 ### Fixed
+- **OPS-13 — Receipt approval confirmation, Reject rationale button gating, and EvidenceViewer lightbox (`Receipts.tsx`, `ui.tsx`) (2026-11-27)**:
+  - `Approve & credit` in `Receipts.tsx` now opens a native `<dialog>` confirmation modal displaying user email, amount, provider, and reference number before crediting funds, and refreshes sidebar badges upon completion.
+  - Added opt-in `disableSubmitUntilValid` to `OpsActionModal` so `Reject` and `Flag` buttons stay disabled until the minimum character length (`5` / `10`) is met.
+  - Updated the receipt Eye button to open `EvidenceViewer` via `ui.openViewer()` instead of calling `window.open()` in a new tab.
 - **OPS-12 — Staff audit actor attribution, KYC hotkey confirmation dialogs, and badge refresh (`kyc.service.ts`, `kyc.routes.ts`, `tms.service.ts`, `KycQueue.tsx`, `Risk.tsx`) (2026-11-27)**:
   - **Audit actor attribution**: Fixed `reviewKycRecord()` so `KYC_MANUALLY_VERIFIED` and `KYC_REJECTED` audit events record `staffUserId` and `actorRole` (with `targetUserId` in `metadata`) rather than attributing the approval/rejection to the KYC applicant. Also fixed `USER_SUSPENDED_STR` and `USER_COMPLIANCE_LIFTED` in `tms.service.ts` to record `staffUserId` as the audit actor.
   - **Hotkey & button confirmations**: Updated `KycQueue.tsx` so `A` (`Approve`) and `R` (`Reject`) hotkeys and action buttons open an accessible `<dialog>` `OpsActionModal` confirmation (requiring a rejection reason on `Reject` and never auto-committing on keypress), and added missing `ui.refreshBadges()` calls in `Risk.tsx`.

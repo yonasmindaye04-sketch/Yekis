@@ -976,6 +976,7 @@ export interface OpsActionModalProps {
   cancelLabel?: string;
   tone?: "primary" | "danger";
   busy?: boolean;
+  disableSubmitUntilValid?: boolean;
   onConfirm: (result: { values: Record<string, string>; checked: boolean }) => void | Promise<void>;
   onCancel: () => void;
 }
@@ -990,6 +991,7 @@ export function OpsActionModal({
   cancelLabel = "Cancel",
   tone = "primary",
   busy = false,
+  disableSubmitUntilValid = false,
   onConfirm,
   onCancel,
 }: OpsActionModalProps) {
@@ -1074,6 +1076,13 @@ export function OpsActionModal({
   };
 
   const isDestructiveConfirmOnly = tone === "danger" && fields.length === 0;
+  const isFormValid = fields.every((f) => {
+    const val = (values[f.name] ?? "").trim();
+    if (f.required && !val) return false;
+    if (f.minLength && val.length < f.minLength) return false;
+    if (f.maxLength && val.length > f.maxLength) return false;
+    return true;
+  });
 
   return (
     <dialog
@@ -1191,7 +1200,7 @@ export function OpsActionModal({
           <button
             type="submit"
             className={`btn ${tone === "danger" ? "btn-red" : "btn-primary"}`}
-            disabled={busy}
+            disabled={busy || (disableSubmitUntilValid && !isFormValid)}
           >
             {busy ? "Processing…" : confirmLabel}
           </button>

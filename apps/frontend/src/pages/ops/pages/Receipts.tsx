@@ -36,13 +36,16 @@ import {
   Rail,
   useToast,
 } from "../components/ui";
+import { useOpsUi } from "../opsUiContext";
 
 type ReceiptDialogState =
+  | { kind: "APPROVED"; row: RawTopUpItem }
   | { kind: "REJECTED"; row: RawTopUpItem }
   | { kind: "FLAG"; row: RawTopUpItem }
   | null;
 
 export default function Receipts() {
+  const ui = useOpsUi();
   const toast = useToast();
   const [status, setStatus] = useState("PENDING");
   const [openId, setOpenId] = useState<string | null>(null);
@@ -56,25 +59,14 @@ export default function Receipts() {
   );
   const { rows, total, page, pages, loading, error, search, setSearch, setPage, reload } = list;
 
-  const approve = async (row: RawTopUpItem) => {
-    setBusyId(row.id);
-    try {
-      await opsApi.reviewTopUp(row.id, "APPROVED");
-      toast("Top-up approved and wallet credited.");
-      setOpenId(null);
-      reload();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : "Action failed");
-    } finally {
-      setBusyId(null);
-    }
-  };
-
   const handleModalConfirm = async ({ values }: { values: Record<string, string> }) => {
     if (!dialog) return;
     setBusyId(dialog.row.id);
     try {
-      if (dialog.kind === "REJECTED") {
+      if (dialog.kind === "APPROVED") {
+        await opsApi.reviewTopUp(dialog.row.id, "APPROVED");
+        toast("Top-up approved and wallet credited.");
+      } else if (dialog.kind === "REJECTED") {
         await opsApi.reviewTopUp(dialog.row.id, "REJECTED", values.reason);
         toast("Top-up rejected.");
       } else {
@@ -84,6 +76,7 @@ export default function Receipts() {
       setDialog(null);
       setOpenId(null);
       reload();
+      ui.refreshBadges();
     } catch (e) {
       toast(e instanceof Error ? e.message : "Action failed");
     } finally {
@@ -94,7 +87,21 @@ export default function Receipts() {
   const openReceipt = async (row: RawTopUpItem) => {
     try {
       const { url } = await opsApi.topUpReceiptUrl(row.id);
-      window.open(url, "_blank", "noopener");
+      ui.openViewer(
+        [
+          {
+            id: row.id,
+            t: `WALLET_TOPUP_RECEIPT — ${row.provider} (${row.referenceNumber || row.id})`,
+            k: "receipt",
+            url,
+            name: `${row.user.email} (${row.user.ucid})`,
+            doc: `Ref: ${row.referenceNumber || "—"}`,
+            tin: `${fmt(row.amountMinor)} · ${row.provider}`,
+            createdAt: dt(row.createdAt),
+          },
+        ],
+        0,
+      );
     } catch (e) {
       toast(e instanceof Error ? e.message : "No receipt available");
     }
@@ -216,7 +223,8 @@ export default function Receipts() {
                       <button
                         type="button"
                         className="btn btn-ghost btn-sm"
-                        title="Open the receipt image"
+                        title="Inspect the receipt image"
+                        aria-label={`Inspect receipt image for ${r.user.email}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           void openReceipt(r);
@@ -277,7 +285,7 @@ export default function Receipts() {
                           disabled={busyId === r.id || r.status !== "PENDING"}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void approve(r);
+                            setDialog({ kind: "APPROVED", row: r });
                           }}
                         >
                           <CheckCircle2 size={13} /> Approve &amp; credit
@@ -295,37 +303,48 @@ export default function Receipts() {
       <OpsActionModal
         open={dialog !== null}
         title={
-          dialog?.kind === "FLAG"
-            ? "Flag Top-Up as Suspicious"
-            : "Reject Top-Up Transfer"
+          dialog?.kind === "APPROVED"
+            ? "Confirm Top-Up Approval & Credit"
+            : dialog?.kind === "FLAG"
+              ? "Flag Top-Up as Suspicious"
+              : "Reject Top-Up Transfer"
         }
         description={
           dialog
-            ? `${dialog.row.user.email} · ${fmt(dialog.row.amountMinor)} via ${dialog.row.provider}`
+            ? `${dialog.row.user.email} · ${fmt(dialog.row.amountMinor)} via ${dialog.row.provider} · Ref: ${dialog.row.referenceNumber || "—"}`
             : undefined
         }
-        tone="danger"
+        tone={dialog?.kind === "APPROVED" ? "primary" : "danger"}
         confirmLabel={
-          dialog?.kind === "FLAG" ? "Flag for AML Review" : "Reject Top-Up"
+          dialog?.kind === "APPROVED"
+            ? "Approve & Credit"
+            : dialog?.kind === "FLAG"
+              ? "Flag for AML Review"
+              : "Reject Top-Up"
         }
         busy={Boolean(dialog && busyId === dialog.row.id)}
-        fields={[
-          {
-            name: "reason",
-            label:
-              dialog?.kind === "FLAG"
-                ? "Suspicious Activity Details"
-                : "Rejection Reason",
-            placeholder:
-              dialog?.kind === "FLAG"
-                ? "Explain why this transfer requires AML escalation…"
-                : "Explain why this manual receipt cannot be verified…",
-            multiline: true,
-            required: true,
-            minLength: dialog?.kind === "FLAG" ? 10 : 5,
-            maxLength: 500,
-          },
-        ]}
+        disableSubmitUntilValid={dialog?.kind === "REJECTED" || dialog?.kind === "FLAG"}
+        fields={
+          dialog?.kind === "APPROVED"
+            ? []
+            : [
+                {
+                  name: "reason",
+                  label:
+                    dialog?.kind === "FLAG"
+                      ? "Suspicious Activity Details"
+                      : "Rejection Reason",
+                  placeholder:
+                    dialog?.kind === "FLAG"
+                      ? "Explain why this transfer requires AML escalation…"
+                      : "Explain why this manual receipt cannot be verified…",
+                  multiline: true,
+                  required: true,
+                  minLength: dialog?.kind === "FLAG" ? 10 : 5,
+                  maxLength: 500,
+                },
+              ]
+        }
         onConfirm={handleModalConfirm}
         onCancel={() => !busyId && setDialog(null)}
       />
