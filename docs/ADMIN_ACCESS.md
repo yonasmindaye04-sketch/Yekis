@@ -286,15 +286,19 @@ pnpm --filter backend exec tsx scripts/purge-demo-data.ts --confirm  # delete
 |---|---|
 | `SUPER_ADMIN` | All 30 permissions. The founder's own account. |
 | `ADMIN` | All 30 permissions (legacy full-access). |
-| `OPERATIONS_ADMIN` | Operations, contracts, jobs, gigs, escalations. |
-| `FINANCE_ADMIN` | Escrow, payouts, ledger, reconciliation, top-ups, receipts. |
-| `COMPLIANCE_ADMIN` | KYC decisions, PEP and sanctions. |
-| `DISPUTE_MEDIATOR` | Dispute queue and mediation. |
-| `COMPLIANCE_OFFICER` | Full access to KYC, top-up, dispute, TMS, and support queues (legacy). |
-| `SUPPORT` | Support desk, reports queue, KYC queue (read-mostly). |
+| `OPERATIONS_ADMIN` | Support desk, contracts, payments, payouts settlement, users/suspensions, system health; view-only disputes and escrow. |
+| `FINANCE_ADMIN` | Payments, payouts settlement, reconciliation, ERCA withholding, ledger, reports & analytics, audit logs, view-only users and escrow. |
+| `COMPLIANCE_ADMIN` | KYC review, Risk/AML (`TMS`), profile reports moderation, top-up receipts, audit logs, system health, dispute view/claim, assigned support threads. |
+| `DISPUTE_MEDIATOR` | Dispute claiming and binding settlement, plus read-only contracts and users. |
+| `COMPLIANCE_OFFICER` | Legacy compliance permission set matching `COMPLIANCE_ADMIN`. |
+| `SUPPORT` | Full support desk queue visibility and handling, read-only user directory, own profile. |
 
 The full matrix is in `docs/SYSTEM_DESIGN.md` §3.16 and is served live at
-`GET /api/v1/admin/permissions/matrix`.
+`GET /api/v1/admin/permissions/matrix`. For the complete per-role reference of
+all 23 sidebar pages and the Overview Command Center, see
+[docs/ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md](./ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md)
+and
+[docs/ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md](./ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md).
 
 ---
 

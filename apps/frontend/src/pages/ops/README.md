@@ -122,10 +122,7 @@ stale rows never flash while the next page loads.
 Earlier revisions fetched a fixed 100 rows and filtered in the browser, which
 silently missed anything outside that window — that is gone.
 
-Endpoints that cannot filter or page honestly are labelled in the UI:
-`reconciliation` applies `recStatus` client-side because the backend filters it
-after pagination, and `audit-logs` narrows the current page because the route
-has no text search and no date filter.
+Endpoints filter and page **on the server** (including `recStatus` on `/admin/reconciliation` and status/reason/search on `/staff/reports`). Only `audit-logs` narrows the current page in the browser because that route has no text search and no date filter.
 
 ## opsApi is an adapter, not a second API client
 
@@ -154,22 +151,14 @@ endpoints the backend actually serves, through the shared `api` client
 
 ### Things worth knowing
 
-- **`overview()` degrades per section.** `/admin/*` uses `requirePermission`,
-  but kyc/tms/disputes/topups/chat/staff-reports use the coarser
-  `requireStaffRole`. A `SUPPORT` or `FINANCE_ADMIN` account gets 403 on parts
-  of the aggregate, so each section falls back to empty rather than failing
-  the whole page. Only `dashboard/summary` is fatal.
-- **No time-series endpoint exists.** The backend exposes aggregate totals
-  only. Charts that need history are derived in `opsApi` from the most recent
-  100 rows of the underlying list routes — real data, but windowed, and the
-  UI says so. Stat cards carry **no** trend percentages or sparklines for the
-  same reason.
+- **`overview()` suppresses expected `403` role denials.** Both `/admin/*` and staff routers (`kyc`, `tms`, `topups`, `finance`, `featured`, `bot`, `staff/reports`) now enforce granular `requirePermission(...)`. When a restricted role opens Overview or badges, `soft()` catches only `403 PERMISSION_DENIED`/`STAFF_ROLE_REQUIRED` errors unless `ignoreAllErrors=true`; live staff API paths also use `strictErrors: true` so failures never silently load `mockStore`.
+- **Reports series come from database aggregates.** `GET /admin/reports/summary` now returns `feeConfiguration` plus real trailing-6-month `series` (`months`, `rails`, `categories`) computed in Postgres; charts accept minor units (cents) with adaptive `ETB`/`K`/`M` formatting (and `unit="count"` for non-monetary Donors).
 - **`kycDecide` has no "CLEARER" route.** The backend accepts
   `VERIFIED | REJECTED` only, so `CLEARER` resolves as a `REJECTED` carrying a
   re-upload reason (`KYC_CLEARER_REASON`).
 - **Settlement bodies are renamed, not invented.** `settlePayout` maps
   `{outcome, ref, reason}` → `{decision, providerPayoutId, failureReason}`.
-  All money values are **minor units**; chart series are **ETB millions**.
+  All money and monetary chart values are **minor units**.
 - **Evidence is real.** `EvidenceViewer` takes either a direct `url` (a
   milestone deliverable) or a `KycDocument` id, which it exchanges for a
   300-second signed URL via `GET /kyc/documents/:documentId/url`. It renders

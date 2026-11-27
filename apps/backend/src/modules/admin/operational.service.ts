@@ -5,6 +5,27 @@ import { HeadBucketCommand } from "@aws-sdk/client-s3";
 import { objectStoreClient } from "../../lib/objectStore.js";
 import { env } from "../../config/env.js";
 
+const EAT_OFFSET_MS = 3 * 60 * 60 * 1000;
+
+function eatMonthKey(date: Date): string {
+  const eat = new Date(date.getTime() + EAT_OFFSET_MS);
+  return `${eat.getUTCFullYear()}-${String(eat.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function trailingEatMonthKeys(now: Date, count = 6): string[] {
+  const eatNow = new Date(now.getTime() + EAT_OFFSET_MS);
+  const out: string[] = [];
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const d = new Date(
+      Date.UTC(eatNow.getUTCFullYear(), eatNow.getUTCMonth() - i, 1),
+    );
+    out.push(
+      `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
+    );
+  }
+  return out;
+}
+
 // === RECONCILIATION ===
 /**
  * Reconciliation between payment-provider records (PaymentTransaction) and the
@@ -23,34 +44,62 @@ export async function listReconciliation(params: {
     where.provider = params.provider;
   }
 
-  const [items, total] = await prisma.$transaction([
-    prisma.paymentTransaction.findMany({
-      where,
-      include: {
-        milestone: {
-          select: {
-            id: true,
-            title: true,
-            escrowState: true,
-            amountMinor: true,
-            contract: {
+  const filterByRecStatus = Boolean(params.recStatus && params.recStatus !== "ALL");
+  if (params.recStatus === "FAILED") {
+    where.status = "FAILED";
+  }
+
+  const [items, total] = filterByRecStatus
+    ? await prisma.$transaction([
+        prisma.paymentTransaction.findMany({
+          where,
+          include: {
+            milestone: {
               select: {
-                job: { select: { title: true } },
-                client: { select: { email: true } },
+                id: true,
+                title: true,
+                escrowState: true,
+                amountMinor: true,
+                contract: {
+                  select: {
+                    job: { select: { title: true } },
+                    client: { select: { email: true } },
+                  },
+                },
               },
             },
           },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      skip: (page - 1) * limit,
-      take: limit,
-    }),
-    prisma.paymentTransaction.count({ where }),
-  ]);
+          orderBy: { createdAt: "desc" },
+        }),
+        prisma.paymentTransaction.count({ where }),
+      ])
+    : await prisma.$transaction([
+        prisma.paymentTransaction.findMany({
+          where,
+          include: {
+            milestone: {
+              select: {
+                id: true,
+                title: true,
+                escrowState: true,
+                amountMinor: true,
+                contract: {
+                  select: {
+                    job: { select: { title: true } },
+                    client: { select: { email: true } },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+        prisma.paymentTransaction.count({ where }),
+      ]);
 
-  let all = items;
-  const augmented = all.map((tx) => {
+  const augmented = items.map((tx) => {
     let recStatus = "PENDING";
     let internalAmountMinor: number | null = null;
     const escrow = tx.milestone?.escrowState;
@@ -66,22 +115,23 @@ export async function listReconciliation(params: {
         recStatus = "MATCHED";
         internalAmountMinor = tx.milestone?.amountMinor ?? null;
       } else {
-        // Provider said paid, internal escrow never held → investigation.
+        // Provider said paid, internal escrow never held -> investigation.
         recStatus = "MISMATCH";
       }
     }
-    const internalAmount = internalAmountMinor ?? (tx.milestone?.amountMinor ?? null);
+    const internalAmount = internalAmountMinor ?? tx.milestone?.amountMinor ?? null;
     const diff =
       internalAmount != null ? tx.amountMinor - internalAmount : null;
 
     return { ...tx, reconciliationStatus: recStatus, differenceMinor: diff };
   });
 
-  if (params.recStatus && params.recStatus !== "ALL") {
+  if (filterByRecStatus) {
     const filtered = augmented.filter(
       (r) => r.reconciliationStatus === params.recStatus,
     );
-    return { items: filtered, total: filtered.length, page, pageSize: limit };
+    const paged = filtered.slice((page - 1) * limit, page * limit);
+    return { items: paged, total: filtered.length, page, pageSize: limit };
   }
 
   return { items: augmented, total, page, pageSize: limit };
@@ -89,6 +139,12 @@ export async function listReconciliation(params: {
 
 // === REPORTS SUMMARY ===
 export async function getReportsSummary() {
+  const now = new Date();
+  const monthKeys = trailingEatMonthKeys(now, 6);
+  const firstMonth = monthKeys[0] ?? "2026-01";
+  const [startY = 2026, startM = 1] = firstMonth.split("-").map(Number);
+  const windowStart = new Date(Date.UTC(startY, startM - 1, 1) - EAT_OFFSET_MS);
+
   const [
     paymentsAgg,
     milestonesAgg,
@@ -100,6 +156,16 @@ export async function getReportsSummary() {
     contractAgg,
     disputeAgg,
     flagCount,
+    failedPayments,
+    failedPayouts,
+    windowPayments,
+    windowPayouts,
+    windowRefundedMilestones,
+    windowFeeCredits,
+    paymentByRail,
+    payoutByRail,
+    completedContracts,
+    completedGigOrders,
   ] = await Promise.all([
     prisma.paymentTransaction.aggregate({
       _sum: { amountMinor: true },
@@ -126,17 +192,154 @@ export async function getReportsSummary() {
     }),
     prisma.dispute.count({ where: { stage: { not: "RESOLVED" } } }),
     prisma.transactionFlag.count({ where: { status: "PENDING_REVIEW" } }),
+    prisma.paymentTransaction.count({ where: { status: "FAILED" } }),
+    prisma.payoutTransaction.count({
+      where: { status: { in: ["FAILED", "REVERSED"] } },
+    }),
+    prisma.paymentTransaction.findMany({
+      where: { createdAt: { gte: windowStart } },
+      select: { provider: true, status: true, amountMinor: true, createdAt: true },
+    }),
+    prisma.payoutTransaction.findMany({
+      where: { createdAt: { gte: windowStart }, status: "CONFIRMED" },
+      select: { provider: true, netAmountMinor: true, createdAt: true },
+    }),
+    prisma.milestone.findMany({
+      where: {
+        createdAt: { gte: windowStart },
+        escrowState: { in: ["REFUNDED", "PARTIAL_REFUND"] },
+      },
+      select: { amountMinor: true, createdAt: true },
+    }),
+    prisma.platformFeeCredit.findMany({
+      where: { createdAt: { gte: windowStart } },
+      select: {
+        feeFromFreelancerMinor: true,
+        feeFromClientMinor: true,
+        createdAt: true,
+      },
+    }),
+    prisma.paymentTransaction.groupBy({
+      by: ["provider", "status"],
+      _sum: { amountMinor: true },
+      _count: { id: true },
+    }),
+    prisma.payoutTransaction.groupBy({
+      by: ["provider", "status"],
+      _sum: { netAmountMinor: true },
+      _count: { id: true },
+    }),
+    prisma.contract.findMany({
+      where: { status: "COMPLETED" },
+      select: {
+        job: { select: { category: true } },
+        milestones: { select: { amountMinor: true, escrowState: true } },
+      },
+    }),
+    prisma.gigOrder.findMany({
+      where: { status: "COMPLETED" },
+      select: {
+        totalChargeMinor: true,
+        gig: { select: { category: true } },
+      },
+    }),
   ]);
 
   const contractCounts: Record<string, number> = {};
   for (const row of contractAgg) contractCounts[row.status] = row._count.status;
   const totalContracts = Object.values(contractCounts).reduce((a, b) => a + b, 0);
-  const failedPayments = await prisma.paymentTransaction.count({
-    where: { status: "FAILED" },
-  });
-  const failedPayouts = await prisma.payoutTransaction.count({
-    where: { status: { in: ["FAILED", "REVERSED"] } },
-  });
+
+  const monthMap = new Map(
+    monthKeys.map((month) => [
+      month,
+      {
+        month,
+        label: month.slice(2),
+        volumeMinor: 0,
+        payoutMinor: 0,
+        refundMinor: 0,
+        feeMinor: 0,
+        telebirrMinor: 0,
+        cbeBirrMinor: 0,
+        mpesaMinor: 0,
+      },
+    ]),
+  );
+
+  for (const p of windowPayments) {
+    if (p.status !== "SUCCESS") continue;
+    const bucket = monthMap.get(eatMonthKey(p.createdAt));
+    if (!bucket) continue;
+    bucket.volumeMinor += p.amountMinor;
+    if (p.provider === "TELEBIRR") bucket.telebirrMinor += p.amountMinor;
+    else if (p.provider === "CBE_BIRR") bucket.cbeBirrMinor += p.amountMinor;
+    else if (p.provider === "M_PESA") bucket.mpesaMinor += p.amountMinor;
+  }
+
+  for (const po of windowPayouts) {
+    const bucket = monthMap.get(eatMonthKey(po.createdAt));
+    if (bucket) bucket.payoutMinor += po.netAmountMinor;
+  }
+
+  for (const m of windowRefundedMilestones) {
+    const bucket = monthMap.get(eatMonthKey(m.createdAt));
+    if (bucket) bucket.refundMinor += m.amountMinor;
+  }
+
+  for (const fc of windowFeeCredits) {
+    const bucket = monthMap.get(eatMonthKey(fc.createdAt));
+    if (bucket) {
+      bucket.feeMinor += fc.feeFromFreelancerMinor + fc.feeFromClientMinor;
+    }
+  }
+
+  type RailKey = "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+  const railMap: Record<
+    RailKey,
+    { provider: RailKey; volumeMinor: number; payoutMinor: number; count: number; failedCount: number }
+  > = {
+    TELEBIRR: { provider: "TELEBIRR", volumeMinor: 0, payoutMinor: 0, count: 0, failedCount: 0 },
+    CBE_BIRR: { provider: "CBE_BIRR", volumeMinor: 0, payoutMinor: 0, count: 0, failedCount: 0 },
+    M_PESA: { provider: "M_PESA", volumeMinor: 0, payoutMinor: 0, count: 0, failedCount: 0 },
+  };
+  for (const row of paymentByRail) {
+    if (!(row.provider in railMap)) continue;
+    const target = railMap[row.provider as RailKey];
+    if (row.status === "SUCCESS") {
+      target.volumeMinor += row._sum.amountMinor ?? 0;
+      target.count += row._count.id;
+    } else if (row.status === "FAILED") {
+      target.failedCount += row._count.id;
+    }
+  }
+  for (const row of payoutByRail) {
+    if (!(row.provider in railMap)) continue;
+    const target = railMap[row.provider as RailKey];
+    if (row.status === "CONFIRMED") {
+      target.payoutMinor += row._sum.netAmountMinor ?? 0;
+    } else if (row.status === "FAILED" || row.status === "REVERSED") {
+      target.failedCount += row._count.id;
+    }
+  }
+
+  const categoryMap = new Map<string, { category: string; count: number; volumeMinor: number }>();
+  for (const c of completedContracts) {
+    const cat = c.job.category;
+    const cur = categoryMap.get(cat) ?? { category: cat, count: 0, volumeMinor: 0 };
+    cur.count += 1;
+    cur.volumeMinor += c.milestones.reduce((s, m) => s + m.amountMinor, 0);
+    categoryMap.set(cat, cur);
+  }
+  for (const o of completedGigOrders) {
+    const cat = o.gig.category;
+    const cur = categoryMap.get(cat) ?? { category: cat, count: 0, volumeMinor: 0 };
+    cur.count += 1;
+    cur.volumeMinor += o.totalChargeMinor;
+    categoryMap.set(cat, cur);
+  }
+  const categories = [...categoryMap.values()]
+    .sort((a, b) => b.count - a.count || b.volumeMinor - a.volumeMinor)
+    .slice(0, 8);
 
   return {
     financial: {
@@ -157,7 +360,16 @@ export async function getReportsSummary() {
       openDisputes: disputeAgg,
       openRiskFlags: flagCount,
     },
-    generatedAt: new Date().toISOString(),
+    feeConfiguration: {
+      freelancerFeeRate: env.PLATFORM_FEE_RATE_FREELANCER,
+      clientFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
+      providerFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
+      withholdingEnabled: env.TIN_FEATURE_ENABLED,
+    },
+    months: [...monthMap.values()],
+    rails: Object.values(railMap),
+    categories,
+    generatedAt: now.toISOString(),
   };
 }
 
@@ -221,6 +433,12 @@ export async function getDashboardSummary() {
       pendingPayments,
       pendingTopUps: pendingTopups,
     },
+    feeConfiguration: {
+      freelancerFeeRate: env.PLATFORM_FEE_RATE_FREELANCER,
+      clientFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
+      providerFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
+      withholdingEnabled: env.TIN_FEATURE_ENABLED,
+    },
     recentActivity,
   };
 }
@@ -263,6 +481,18 @@ export async function getSystemHealth() {
         env.TELEBIRR_FABRIC_APP_ID &&
         env.TELEBIRR_MERCHANT_APP_ID,
     ),
+  };
+  checks.cbeConfigured = {
+    ok: Boolean(env.CBE_BIRR_CHECKOUT_ENABLED || env.CBE_WEBHOOK_ENABLED),
+    detail: env.CBE_BIRR_CHECKOUT_ENABLED
+      ? "CBE checkout enabled"
+      : env.CBE_WEBHOOK_ENABLED
+        ? "CBE webhook enabled"
+        : "Disabled via config",
+  };
+  checks.mpesaConfigured = {
+    ok: Boolean(env.MPESA_CHECKOUT_ENABLED),
+    detail: env.MPESA_CHECKOUT_ENABLED ? "M-Pesa checkout enabled" : "Disabled via config",
   };
 
   const integrity = await prisma.ledgerEntry.aggregate({

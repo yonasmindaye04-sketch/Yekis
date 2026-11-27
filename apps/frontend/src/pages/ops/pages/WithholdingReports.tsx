@@ -191,7 +191,8 @@ export default function WithholdingReports() {
             {rows.map((r) => {
               const active = sel?.id === r.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={r.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(r.id)}
@@ -210,7 +211,7 @@ export default function WithholdingReports() {
                     <span>·</span>
                     <span className="mono">{r.eraReferenceNumber ?? "Unfiled"}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -277,8 +278,12 @@ export default function WithholdingReports() {
                   <div className="v mono">{fmt(sel.totalWithholdingMinor)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Estimated Gross Payout Base (at 3% rate)</div>
-                  <div className="v mono">{fmt(Math.round(sel.totalWithholdingMinor / 0.03))}</div>
+                  <div className="k">Withholding Tax Base</div>
+                  <div className="v mono">
+                    {sel.totalWithholdingMinor > 0
+                      ? fmt(Math.round(sel.totalWithholdingMinor / 0.03))
+                      : "ETB 0 (WHT deferred)"}
+                  </div>
                 </div>
                 <div className="info-cell">
                   <div className="k">Withheld Payout Count</div>
@@ -318,8 +323,11 @@ export default function WithholdingReports() {
 
                 {!sel.filedAt ? (
                   <div className="fld" style={{ marginBottom: 12 }}>
-                    <label className="lbl">ERA / MOR Official Filing Reference Number</label>
+                    <label className="lbl" htmlFor="era-ref-input">
+                      ERA / MOR Official Filing Reference Number
+                    </label>
                     <input
+                      id="era-ref-input"
                       className="inp mono"
                       placeholder="e.g. ERCA-WH-202610-90412"
                       value={eraRefInput}

@@ -3,7 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { getBot, webhookHandler, startBot, stopBot, withApiTimeout } from "./bot.service.js";
 import { env } from "../../config/env.js";
 import { requireAuth, requireFreshAuth } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import { logger } from "../../lib/logger.js";
 import { isPublishableWebUrl } from "./utils/deepLink.js";
 
@@ -182,7 +182,7 @@ router.get("/health", async (req: Request, res: Response) => {
 router.get(
   "/info",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requirePermission("bot.manage"),
   async (req: Request, res: Response) => {
     try {
       const bot = getBot();
@@ -214,7 +214,7 @@ router.post(
   // initData login proofs — to a host of the caller's choosing. A hijacked
   // admin session must not be able to do that silently.
   requireFreshAuth(300),
-  requireStaffRole("ADMIN"),
+  requirePermission("bot.manage"),
   // This router is mounted BEFORE express.json() (app.ts), because /webhook
   // needs the raw bytes for signature verification. That ordering means every
   // route here saw `req.body === undefined`, so the URL and secretToken this
@@ -340,7 +340,7 @@ router.post(
 router.post(
   "/delete-webhook",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requirePermission("bot.manage"),
   async (req: Request, res: Response) => {
     try {
       const bot = getBot();
@@ -362,7 +362,7 @@ router.post(
 router.post(
   "/start-polling",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requirePermission("bot.manage"),
   async (req: Request, res: Response) => {
     try {
       if (env.NODE_ENV === "production") {
@@ -389,7 +389,7 @@ router.post(
 router.post(
   "/stop",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requirePermission("bot.manage"),
   async (req: Request, res: Response) => {
     try {
       await stopBot();

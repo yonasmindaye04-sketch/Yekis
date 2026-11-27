@@ -288,7 +288,8 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                       <img src="/svgviewer-output.svg" alt="Yekis Jobs" />
                     </div>
                     <div className="brand-name">
-                      Yekis<span className="brand-tag">OPS</span>
+                      <span>Yekis</span>
+                      <span className="brand-tag">Workspace</span>
                     </div>
                   </button>
                   <button
@@ -526,7 +527,7 @@ export function OpsConsole({ user, onExit }: OpsConsoleProps) {
                   </div>
                 </header>
 
-                <main className="content">
+                <main className="content sh-workspace-view">
                   <Page key={activePage} focusId={focusId} />
                 </main>
               </div>

@@ -16,7 +16,6 @@ import {
   ExternalLink,
   RefreshCw,
   Search,
-  ShieldAlert,
   ShieldCheck,
   TriangleAlert,
   UserCheck,
@@ -42,19 +41,15 @@ import {
 import { useOpsUi } from "../opsUiContext";
 
 const ENFORCEMENT_TEMPLATES = [
-  "First offense: formal compliance warning issued; off-platform contact handle redacted.",
   "Profile hidden from public search & featured carousel until bio/portfolio is remediated.",
-  "Account restricted: payouts frozen & mandatory Fayda KYC re-review scheduled.",
   "Permanent account ban & profile takedown for severe fraud / escrow circumvention.",
   "Report dismissed: no policy violation substantiated after transcript and evidence review.",
 ];
 
 const DEFAULT_NOTES_BY_ACTION: Record<ReportResolution, string> = {
-  RESOLVED_NO_ACTION: ENFORCEMENT_TEMPLATES[4],
-  RESOLVED_WARNED: ENFORCEMENT_TEMPLATES[0],
-  RESOLVED_PROFILE_HIDDEN: ENFORCEMENT_TEMPLATES[1],
-  RESOLVED_ACCOUNT_RESTRICTED: ENFORCEMENT_TEMPLATES[2],
-  RESOLVED_PROFILE_BANNED: ENFORCEMENT_TEMPLATES[3],
+  RESOLVED_NO_ACTION: ENFORCEMENT_TEMPLATES[2],
+  RESOLVED_PROFILE_HIDDEN: ENFORCEMENT_TEMPLATES[0],
+  RESOLVED_PROFILE_BANNED: ENFORCEMENT_TEMPLATES[1],
 };
 
 export default function ReportsQueue() {
@@ -124,14 +119,8 @@ export default function ReportsQueue() {
       try {
         await opsApi.resolveProfileReport(sel.id, action, finalNote);
 
-        // Execute secondary administrative enforcement hooks when applicable
-        if (action === "RESOLVED_ACCOUNT_RESTRICTED") {
-          try {
-            await opsApi.forceKycRereview(sel.reportedUserId);
-          } catch {
-            /* supplementary hook */
-          }
-        } else if (action === "RESOLVED_PROFILE_BANNED") {
+        // Execute secondary administrative enforcement hook on permanent ban
+        if (action === "RESOLVED_PROFILE_BANNED") {
           try {
             await opsApi.suspendUser(sel.reportedUserId, finalNote);
           } catch {
@@ -141,9 +130,7 @@ export default function ReportsQueue() {
 
         const actionSummary: Record<ReportResolution, string> = {
           RESOLVED_NO_ACTION: `Report dismissed for ${sel.reported}.`,
-          RESOLVED_WARNED: `Formal warning & strike recorded for ${sel.reported}.`,
           RESOLVED_PROFILE_HIDDEN: `${sel.reported}'s profile hidden from public marketplace.`,
-          RESOLVED_ACCOUNT_RESTRICTED: `${sel.reported} restricted & routed to mandatory KYC re-review.`,
           RESOLVED_PROFILE_BANNED: `${sel.reported} permanently banned and account suspended.`,
         };
 
@@ -173,10 +160,6 @@ export default function ReportsQueue() {
         if (e.key === "ArrowUp" && idx > 0) {
           e.preventDefault();
           setSelId(rows[idx - 1].id);
-        }
-        if ((e.key === "w" || e.key === "W") && sel) {
-          e.preventDefault();
-          void applyApproach("RESOLVED_WARNED");
         }
         if ((e.key === "h" || e.key === "H") && sel) {
           e.preventDefault();
@@ -294,11 +277,10 @@ export default function ReportsQueue() {
           options={[
             "OPEN",
             "ALL",
-            "RESOLVED_WARNED",
-            "RESOLVED_PROFILE_HIDDEN",
-            "RESOLVED_ACCOUNT_RESTRICTED",
-            "RESOLVED_PROFILE_BANNED",
+            "UNDER_REVIEW",
             "RESOLVED_NO_ACTION",
+            "RESOLVED_PROFILE_HIDDEN",
+            "RESOLVED_PROFILE_BANNED",
           ]}
           allLabel="All statuses"
           label="Report status"
@@ -535,13 +517,7 @@ export default function ReportsQueue() {
                   {sel.details}
                 </div>
               </div>
-              <div
-                className="kv"
-                style={{
-                  borderLeft: "3px solid var(--ops-amber, #d97706)",
-                  background: "var(--ops-bg-subtle, rgba(217, 119, 6, 0.06))",
-                }}
-              >
+              <div className="kv">
                 <div className="kv-k">Captured Flagged Excerpt ({sel.sourceContext})</div>
                 <div
                   className="mono"
@@ -631,30 +607,10 @@ export default function ReportsQueue() {
                   variant="outline"
                   size="sm"
                   disabled={busy}
-                  title="Send formal compliance warning & record strike (Press W)"
-                  onClick={() => void applyApproach("RESOLVED_WARNED")}
-                >
-                  <TriangleAlert size={14} /> Issue Warning
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
                   title="Hide profile & gigs until user remediates violation (Press H)"
                   onClick={() => void applyApproach("RESOLVED_PROFILE_HIDDEN")}
                 >
                   <EyeOff size={14} /> Hide Profile
-                </Button>
-
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  title="Freeze payouts & force mandatory Fayda KYC re-review"
-                  onClick={() => void applyApproach("RESOLVED_ACCOUNT_RESTRICTED")}
-                >
-                  <ShieldAlert size={14} /> Restrict & Force KYC
                 </Button>
 
                 <Button
@@ -664,7 +620,7 @@ export default function ReportsQueue() {
                   title="Permanently ban profile & suspend account (Press B)"
                   onClick={() => void applyApproach("RESOLVED_PROFILE_BANNED")}
                 >
-                  <Ban size={14} /> Ban & Suspend{" "}
+                  <Ban size={14} /> Ban &amp; Suspend{" "}
                   <span
                     className="kbd"
                     style={{
@@ -680,9 +636,9 @@ export default function ReportsQueue() {
 
               <div className="kbd-hint" style={{ marginTop: 10 }}>
                 <span className="kbd">↑</span> <span className="kbd">↓</span> navigate queue ·{" "}
-                <span className="kbd">W</span> issue warning · <span className="kbd">H</span> hide
-                profile · <span className="kbd">B</span> ban & suspend ·{" "}
-                <span className="kbd">D</span> dismiss · <span className="kbd">R</span> focus note
+                <span className="kbd">H</span> hide profile · <span className="kbd">B</span> ban
+                &amp; suspend · <span className="kbd">D</span> dismiss ·{" "}
+                <span className="kbd">R</span> focus note
               </div>
             </div>
           </Card>

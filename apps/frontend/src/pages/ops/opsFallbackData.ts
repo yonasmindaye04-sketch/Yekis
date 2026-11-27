@@ -601,6 +601,7 @@ export const FALLBACK_OPS_REPORTS_BUNDLE: ReportsBundle = {
       labels: ["May", "Jun", "Jul", "Aug", "Sep", "Oct"],
       telebirr: [1.1, 1.35, 1.52, 1.78, 2.05, 2.42],
       cbe: [0.65, 0.74, 0.88, 0.95, 1.12, 1.28],
+      mpesa: [0.35, 0.42, 0.48, 0.56, 0.64, 0.72],
     },
     categoryDone: [
       { label: "WEB APP DEVELOPMENT", value: 68, color: "#16a34a" },

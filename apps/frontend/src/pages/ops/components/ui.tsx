@@ -262,8 +262,8 @@ export function PageHead({
   return (
     <div className="page-head">
       <div>
-        <div className="page-title">{title}</div>
-        <div className="page-sub">{sub}</div>
+        <h1 className="page-title">{title}</h1>
+        <p className="page-sub">{sub}</p>
       </div>
       {right}
     </div>
@@ -501,11 +501,11 @@ export function OpsTable({
         role="region"
         aria-label="Operations data table"
       >
-        <table ref={tableRef} className="tbl">
+        <table ref={tableRef} className="tbl sh-data-table">
           <thead>
             <tr>
               {heads.map((h) => (
-                <th key={h}>{h}</th>
+                <th key={h} scope="col">{h}</th>
               ))}
             </tr>
           </thead>

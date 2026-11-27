@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { FileStrInput, DismissFlagInput } from "../../schemas";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import { logger } from "../../lib/logger.js";
 import {
   getComplianceQueue,
@@ -32,9 +32,9 @@ function handleKnownErrors(
   return false;
 }
 
-// All TMS routes are Compliance Officer / Admin only â€” there is no
-// user-facing surface for this module by design.
-tmsRouter.use(requireAuth, requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"));
+// All TMS routes are scoped by the canonical `tms.review` permission —
+// there is no user-facing surface for this module by design.
+tmsRouter.use(requireAuth, requirePermission("tms.review"));
 
 tmsRouter.get("/queue", async (req: AuthedRequest, res) => {
   const page = req.query.page ? parseInt(req.query.page as string) : undefined;
@@ -107,7 +107,7 @@ tmsRouter.post("/:flagId/dismiss", async (req: AuthedRequest, res) => {
 tmsRouter.post(
   "/users/:userId/lift-hold",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("tms.review"),
   async (req: AuthedRequest, res) => {
     try {
       const user = await liftComplianceHold({

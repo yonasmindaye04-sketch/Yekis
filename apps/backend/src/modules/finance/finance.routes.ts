@@ -1,7 +1,7 @@
 // === IMPORTS ===
 import { Router } from "express";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import {
   getFinanceReconciliation,
   getFeeCreditLedger,
@@ -23,7 +23,7 @@ export const financeRouter = Router();
 financeRouter.get(
   "/reconciliation",
   requireAuth,
-  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  requirePermission("reconciliation.view"),
   async (req: AuthedRequest, res) => {
     try {
       const periodMonth = req.query.periodMonth as string | undefined;
@@ -40,7 +40,7 @@ financeRouter.get(
 financeRouter.get(
   "/ledger/fees",
   requireAuth,
-  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  requirePermission("ledger.view"),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page
@@ -62,7 +62,7 @@ financeRouter.get(
 financeRouter.get(
   "/withholding",
   requireAuth,
-  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  requirePermission("reports.view"),
   async (req: AuthedRequest, res) => {
     try {
       const page = req.query.page
@@ -88,7 +88,7 @@ const MarkFiledSchema = z.object({
 financeRouter.post(
   "/withholding/:reportId/file",
   requireAuth,
-  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  requirePermission("reports.view"),
   async (req: AuthedRequest, res) => {
     const parsed = MarkFiledSchema.safeParse(req.body);
     if (!parsed.success) {

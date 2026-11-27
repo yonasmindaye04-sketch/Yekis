@@ -730,6 +730,29 @@ class ApiClient {
   }
 
   /**
+   * Staff / ops endpoints must never silently synthesize offline mock records
+   * when an authenticated real session encounters HTTP 404/502/503/504 or a
+   * transient network error — doing so shows fake marketplace balances to ops staff.
+   */
+  private isStaffApiPath(path: string): boolean {
+    const clean = path.split("?")[0];
+    return (
+      clean.startsWith("/api/v1/admin/") ||
+      clean.startsWith("/api/v1/staff/") ||
+      clean.startsWith("/api/v1/tms/") ||
+      clean.startsWith("/api/v1/finance/") ||
+      clean.startsWith("/api/v1/wallet/topups/queue") ||
+      clean.startsWith("/api/v1/kyc/review-queue") ||
+      /^\/api\/v1\/kyc\/documents\/[^/]+\/url$/.test(clean) ||
+      /^\/api\/v1\/kyc\/[^/]+\/(history|review)$/.test(clean) ||
+      clean.startsWith("/api/v1/disputes/staff/") ||
+      clean.startsWith("/api/v1/chat/admin/") ||
+      clean.startsWith("/api/v1/bot/") ||
+      clean.startsWith("/api/v1/featured/staff/")
+    );
+  }
+
+  /**
    * Silent session refresh. Called once (deduped across concurrent requests).
    * The backend /auth/refresh route both validates the refresh token and
    * re-issues the pair, rotating the stored token so a stolen old copy can't
@@ -802,10 +825,15 @@ class ApiClient {
       });
     };
 
+    const strictErrors = Boolean(behaviour.strictHttpErrors || this.isStaffApiPath(path));
+
     let response: Response;
     try {
       response = await performRequest(this.accessToken);
-    } catch {
+    } catch (err) {
+      if (strictErrors) {
+        throw err instanceof Error ? err : new Error("Network request failed");
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -845,7 +873,7 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        !behaviour.strictHttpErrors &&
+        !strictErrors &&
         (response.status === 503 ||
           response.status === 502 ||
           response.status === 504 ||
@@ -886,12 +914,7 @@ class ApiClient {
       try {
         error = await response.json();
       } catch {
-        // The server answered, but not with anything this client can read.
-        // For a strict call that is still a failure, and it must not be
-        // turned into a fabricated success: an unreadable 401 once produced
-        // a mock session with `accessToken: "mock-jwt-access-token"`, so a
-        // rejected sign-in looked like a successful one.
-        if (behaviour.strictHttpErrors) {
+        if (strictErrors) {
           throw new Error(`HTTP ${response.status}`);
         }
         return mockStore.handleApiFallback(
@@ -921,7 +944,7 @@ class ApiClient {
     }
 
     if (!contentType.includes("application/json")) {
-      if (behaviour.strictHttpErrors) {
+      if (strictErrors) {
         throw new Error(`HTTP ${response.status}: unexpected response format`);
       }
       return mockStore.handleApiFallback(
@@ -934,6 +957,9 @@ class ApiClient {
     try {
       const data = await response.json();
       if (data && typeof data === "object" && "__backendOffline" in data) {
+        if (strictErrors) {
+          throw new Error("API service offline");
+        }
         return mockStore.handleApiFallback(
           path,
           options.method || "GET",
@@ -941,9 +967,9 @@ class ApiClient {
         ) as T;
       }
       return data as T;
-    } catch {
-      if (behaviour.strictHttpErrors) {
-        throw new Error(`HTTP ${response.status}: unreadable response`);
+    } catch (err) {
+      if (strictErrors) {
+        throw err instanceof Error ? err : new Error(`HTTP ${response.status}: unreadable response`);
       }
       return mockStore.handleApiFallback(
         path,
@@ -962,6 +988,7 @@ class ApiClient {
     options: RequestInit = {},
     behaviour: { strictHttpErrors?: boolean } = {},
   ): Promise<T> {
+    const strictErrors = Boolean(behaviour.strictHttpErrors || this.isStaffApiPath(path));
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       ...(options.headers as Record<string, string>),
@@ -971,7 +998,10 @@ class ApiClient {
     let response: Response;
     try {
       response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
-    } catch {
+    } catch (err) {
+      if (strictErrors) {
+        throw err instanceof Error ? err : new Error("Network request failed");
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -980,6 +1010,9 @@ class ApiClient {
     }
 
     if (response.headers.get("x-yekis-offline") === "1") {
+      if (strictErrors) {
+        throw new Error("Backend offline");
+      }
       return mockStore.handleApiFallback(
         path,
         options.method || "GET",
@@ -991,7 +1024,7 @@ class ApiClient {
 
     if (!response.ok) {
       if (
-        !behaviour.strictHttpErrors &&
+        !strictErrors &&
         (response.status === 503 ||
           response.status === 502 ||
           response.status === 504 ||
@@ -2487,10 +2520,19 @@ class ApiClient {
   // Reports are served by the staff-profile module (GET /api/v1/staff/reports),
   // NOT by an /admin/profile-reports route — the response envelope is
   // { data, pagination } and resolution is a PATCH on the same resource.
-  async getProfileReports(params?: { page?: number; limit?: number }): Promise<StaffProfileReportPage> {
+  async getProfileReports(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    reason?: string;
+    search?: string;
+  }): Promise<StaffProfileReportPage> {
     const qs = new URLSearchParams();
     if (params?.page) qs.set("page", String(params.page));
     if (params?.limit) qs.set("limit", String(params.limit));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.reason) qs.set("reason", params.reason);
+    if (params?.search) qs.set("search", params.search);
     return this.request(`/api/v1/staff/reports?${qs.toString()}`);
   }
   async resolveProfileReport(reportId: string, status: string, staffNotes: string): Promise<unknown> {
@@ -2611,59 +2653,12 @@ class ApiClient {
   async adminSettlePayout(
     payoutId: string,
     input: {
-      decision: "CONFIRMED" | "FAILED" | "RETRY" | "SWITCH_RAIL" | "HOLD";
-      provider?: string;
-      payoutAccountIdentifier?: string;
+      decision: "CONFIRMED" | "FAILED";
       providerPayoutId?: string;
       failureReason?: string;
     },
   ): Promise<unknown> {
     return this.request(`/api/v1/admin/payouts/${payoutId}/settle`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-  async adminInterveneContract(
-    contractId: string,
-    input: { action: string; milestoneId?: string; reason: string },
-  ): Promise<unknown> {
-    return this.request(`/api/v1/admin/contracts/${contractId}/intervene`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-  async adminPaymentAction(
-    paymentId: string,
-    input: { action: "VERIFY" | "RESYNC" | "FLAG" | "REFUND"; ref?: string; reason: string },
-  ): Promise<unknown> {
-    return this.request(`/api/v1/admin/payments/${paymentId}/action`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-  async adminEscrowAction(
-    milestoneId: string,
-    input: { action: "RELEASE" | "PARTIAL_SPLIT" | "HOLD" | "UNHOLD" | "RETURN_WIP" | "REFUND_CLIENT"; splitAmountMinor?: number; reason: string },
-  ): Promise<unknown> {
-    return this.request(`/api/v1/admin/escrows/${milestoneId}/action`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-  async adminResolveReconciliation(
-    reconId: string,
-    input: { action: "FORCE_MATCH" | "POST_ADJUSTMENT" | "FLAG_FAILED" | "RESOLVE"; adjustedAmountMinor?: number; reason: string },
-  ): Promise<unknown> {
-    return this.request(`/api/v1/admin/reconciliation/${reconId}/resolve`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-  async adminJournalAction(
-    journalId: string,
-    input: { action: "VERIFY" | "REVERSE" | "ADJUSTMENT"; amountMinor?: number; description?: string; referenceType?: string; referenceId?: string },
-  ): Promise<unknown> {
-    return this.request(`/api/v1/admin/ledger/journals/${journalId}/action`, {
       method: "POST",
       body: JSON.stringify(input),
     });

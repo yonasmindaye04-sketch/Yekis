@@ -91,9 +91,6 @@ export default function Payments() {
   const pendingCount = rows.filter((p) => p.status === "PENDING").length;
   const failedCount = rows.filter((p) => p.status === "FAILED").length;
 
-  const netBaseMinor = sel ? Math.round(sel.amount / 1.15) : 0;
-  const vatComponentMinor = sel ? sel.amount - netBaseMinor : 0;
-
   const openReceiptPreview = (idx: number) => {
     if (!sel) return;
     ui.openViewer(
@@ -108,10 +105,10 @@ export default function Payments() {
         },
         {
           id: "doc-2",
-          t: "WEBHOOK_RSA_PAYLOAD_LOG",
+          t: "GATEWAY_TRANSACTION_RECORD",
           k: "tin",
           name: `TX Reference: ${sel.txId}`,
-          doc: `Base: ${fmt(netBaseMinor)} · 15% VAT: ${fmt(vatComponentMinor)}`,
+          doc: `Milestone: ${sel.milestoneTitle ?? sel.job} · Gross: ${fmt(sel.amount)}`,
           tin: `Created: ${dts(sel.created)}`,
         },
       ],
@@ -228,7 +225,8 @@ export default function Payments() {
             {rows.map((p) => {
               const active = sel?.id === p.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={p.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(p.id)}
@@ -251,7 +249,7 @@ export default function Payments() {
                     <span>·</span>
                     <span>{dts(p.created)}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={setPage} unit="transactions" />
@@ -325,12 +323,12 @@ export default function Payments() {
                   <div className="v mono">{fmt(sel.amount)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Net Milestone Principal</div>
-                  <div className="v mono">{fmt(netBaseMinor)}</div>
+                  <div className="k">Linked Milestone</div>
+                  <div className="v">{sel.milestoneTitle ?? sel.job}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">15% VAT Component (ERCA)</div>
-                  <div className="v mono">{fmt(vatComponentMinor)}</div>
+                  <div className="k">Provider TX Reference</div>
+                  <div className="v mono">{sel.txId}</div>
                 </div>
                 <div className="info-cell">
                   <div className="k">Settlement Rail</div>
@@ -339,22 +337,28 @@ export default function Payments() {
               </div>
 
               <div className="sec-title" style={{ marginBottom: 8 }}>
-                Automated Gateway & Cryptographic Checks
+                Gateway &amp; Record Verification
               </div>
               <div className="checks-row">
-                <span className={`check ${sel.status === "FAILED" ? "fail" : "pass"}`}>
+                <span
+                  className={`check ${
+                    sel.status === "FAILED" ? "fail" : sel.status === "SUCCESS" ? "pass" : "warn"
+                  }`}
+                >
                   {sel.status === "FAILED" ? <TriangleAlert size={13} /> : <ShieldCheck size={13} />}
-                  {sel.status === "FAILED" ? "Gateway Callback Error" : "RSA-SHA256 Webhook Signed"}
+                  {sel.status === "FAILED"
+                    ? "Gateway Settlement Failed"
+                    : sel.status === "SUCCESS"
+                      ? "Gateway Settlement Confirmed"
+                      : "Awaiting Gateway Confirmation"}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Milestone Amount Exact Match
-                </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Idempotency Key Unique
-                </span>
-                <span className={`check ${sel.status === "SUCCESS" ? "pass" : "warn"}`}>
+                <span className={`check ${sel.txId ? "pass" : "warn"}`}>
                   <CheckCircle2 size={13} />{" "}
-                  {sel.status === "SUCCESS" ? "Posted to Account 1010/1020" : "Awaiting Custody Posting"}
+                  {sel.txId ? "Provider Reference Recorded" : "Missing Provider Reference"}
+                </span>
+                <span className={`check ${sel.contractId ? "pass" : "none"}`}>
+                  <CheckCircle2 size={13} />{" "}
+                  {sel.contractId ? "Linked to Active Contract" : "Milestone Record Only"}
                 </span>
               </div>
 

@@ -156,9 +156,9 @@ export default function Payouts() {
     .filter((p) => p.status === "CONFIRMED")
     .reduce((s, p) => s + p.net, 0);
 
-  const grossAmt = sel ? sel.gross ?? Math.round(sel.net / 0.87) : 0;
-  const platformFeeAmt = sel ? sel.fee ?? Math.round(grossAmt * 0.1) : 0;
-  const whtAmt = sel ? Math.max(0, grossAmt - platformFeeAmt - sel.net) || Math.round(grossAmt * 0.03) : 0;
+  const grossAmt = sel ? (sel.gross ?? sel.net) : 0;
+  const platformFeeAmt = sel ? (sel.fee ?? Math.max(0, grossAmt - sel.net)) : 0;
+  const whtAmt = sel ? Math.max(0, grossAmt - platformFeeAmt - sel.net) : 0;
 
   const openDisbursementDocs = (idx: number) => {
     if (!sel) return;
@@ -176,8 +176,11 @@ export default function Payouts() {
           id: "doc-2",
           t: "FREELANCER_WHT_RECEIPT_PREVIEW",
           k: "tin",
-          name: `${sel.user.displayName} · 3% ERCA Withholding`,
-          doc: `Withheld Tax: ${fmt(whtAmt)}`,
+          name: `${sel.user.displayName} · Fee & Tax Summary`,
+          doc:
+            whtAmt > 0
+              ? `Withheld Tax: ${fmt(whtAmt)}`
+              : `Platform Fee: ${fmt(platformFeeAmt)} · Withholding: Deferred (ETB 0)`,
           tin: `Account: ${sel.user.email}`,
         },
       ],
@@ -301,7 +304,8 @@ export default function Payouts() {
             {rows.map((p) => {
               const active = sel?.id === p.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={p.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(p.id)}
@@ -326,7 +330,7 @@ export default function Payouts() {
                       </>
                     ) : null}
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={setPage} unit="payouts" />
@@ -383,11 +387,11 @@ export default function Payouts() {
                     marginTop: 12,
                     padding: "10px 12px",
                     borderRadius: 8,
-                    background: "var(--ops-red-bg)",
-                    border: "1px solid rgba(220,38,38,.25)",
+                    background: "var(--ops-panel)",
+                    border: "1px solid var(--ops-border)",
                     color: "var(--ops-red)",
                     fontSize: 12.5,
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   Rail Notice / Error: {sel.err}
@@ -404,8 +408,8 @@ export default function Payouts() {
                   <div className="v mono">{fmt(platformFeeAmt)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">3% ERCA Withholding</div>
-                  <div className="v mono">{fmt(whtAmt)}</div>
+                  <div className="k">Withholding Deducted</div>
+                  <div className="v mono">{whtAmt > 0 ? fmt(whtAmt) : "ETB 0 (Deferred)"}</div>
                 </div>
                 <div className="info-cell">
                   <div className="k">Net Rail Disbursement</div>
@@ -424,21 +428,45 @@ export default function Payouts() {
               </div>
 
               <div className="sec-title" style={{ marginBottom: 8 }}>
-                Pre-Disbursement Compliance & Account Checks
+                Disbursement &amp; Identity Verification Status
               </div>
               <div className="checks-row">
-                <span className="check pass">
-                  <ShieldCheck size={13} /> Tier 2/3 Fayda KYC Verified
+                <span
+                  className={`check ${
+                    sel.user.kycStatus === "VERIFIED"
+                      ? "pass"
+                      : sel.user.kycStatus === "REJECTED"
+                        ? "fail"
+                        : "warn"
+                  }`}
+                >
+                  <ShieldCheck size={13} />{" "}
+                  {sel.user.kycStatus === "VERIFIED"
+                    ? `${sel.user.kycTier ?? "KYC"} Verified`
+                    : `KYC: ${(sel.user.kycStatus ?? "UNKNOWN").replace(/_/g, " ")}`}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> 10-Digit TIN Active (3% WHT)
+                <span className={`check ${whtAmt > 0 ? "pass" : "none"}`}>
+                  <CheckCircle2 size={13} />{" "}
+                  {whtAmt > 0 ? `WHT Retained (${fmt(whtAmt)})` : "Withholding Deferred (0%)"}
                 </span>
-                <span className={`check ${sel.err ? "fail" : "pass"}`}>
+                <span className={`check ${sel.err ? "fail" : sel.ref ? "pass" : "warn"}`}>
                   {sel.err ? <TriangleAlert size={13} /> : <CheckCircle2 size={13} />}
-                  {sel.err ? "Beneficiary Account Mismatch" : "Beneficiary Name Matches KYC"}
+                  {sel.err
+                    ? "Rail Error Reported"
+                    : sel.ref
+                      ? `Provider Ref: ${sel.ref}`
+                      : "Awaiting Provider Reference"}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Wallet Balance Locked in 2020
+                <span
+                  className={`check ${
+                    sel.status === "CONFIRMED"
+                      ? "pass"
+                      : sel.status === "FAILED" || sel.status === "REVERSED"
+                        ? "fail"
+                        : "warn"
+                  }`}
+                >
+                  <CheckCircle2 size={13} /> Status: {sel.status}
                 </span>
               </div>
 

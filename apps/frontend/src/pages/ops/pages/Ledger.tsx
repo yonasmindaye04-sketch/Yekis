@@ -37,44 +37,6 @@ import {
 import { useOpsUi } from "../opsUiContext";
 import { toCsv, downloadCsv } from "../opsExport";
 
-interface LedgerLeg {
-  code: string;
-  name: string;
-  type: "ASSET" | "LIABILITY" | "REVENUE";
-  dr: number;
-  cr: number;
-}
-
-const deriveLegs = (j: JournalEntry): LedgerLeg[] => {
-  if (j.ref === "PAYOUT_SETTLEMENT") {
-    const fee = Math.round(j.dr * 0.1);
-    const wht = Math.round(j.dr * 0.03);
-    const net = j.dr - fee - wht;
-    return [
-      { code: "2010", name: "Client Escrow Liability Pool", type: "LIABILITY", dr: j.dr, cr: 0 },
-      { code: "2020", name: "Freelancer Payable Clearing", type: "LIABILITY", dr: 0, cr: net },
-      { code: "4010", name: "Platform Commission Revenue", type: "REVENUE", dr: 0, cr: fee },
-      { code: "2030", name: "MOR Withholding Tax Payable", type: "LIABILITY", dr: 0, cr: wht },
-    ];
-  }
-  if (j.ref === "WITHHOLDING_TAX") {
-    return [
-      { code: "2030", name: "MOR Withholding Tax Payable", type: "LIABILITY", dr: j.dr, cr: 0 },
-      { code: "1020", name: "CBE Commercial Escrow Custody", type: "ASSET", dr: 0, cr: j.cr },
-    ];
-  }
-  if (j.ref === "PLATFORM_FEE") {
-    return [
-      { code: "2010", name: "Client Escrow Liability Pool", type: "LIABILITY", dr: j.dr, cr: 0 },
-      { code: "4010", name: "Platform Commission Revenue", type: "REVENUE", dr: 0, cr: j.cr },
-    ];
-  }
-  return [
-    { code: "1010", name: "Telebirr Trust Settlement Asset", type: "ASSET", dr: j.dr, cr: 0 },
-    { code: "2010", name: "Client Escrow Liability Pool", type: "LIABILITY", dr: 0, cr: j.cr },
-  ];
-};
-
 export default function Ledger() {
   const ui = useOpsUi();
 
@@ -98,7 +60,8 @@ export default function Ledger() {
   }, [rows, selId]);
 
   const sel = useMemo(() => rows.find((r) => r.id === selId) ?? null, [rows, selId]);
-  const legs = useMemo(() => (sel ? deriveLegs(sel) : []), [sel]);
+  const legs = sel?.entries ?? [];
+  const discrepancyMinor = sel ? Math.abs(sel.dr - sel.cr) : 0;
 
   if (loading && rows.length === 0) return <LoadingBox />;
   if (error && rows.length === 0) return <ErrorBox error={error} reload={reload} />;
@@ -220,7 +183,8 @@ export default function Ledger() {
             {rows.map((j) => {
               const active = sel?.id === j.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={j.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(j.id)}
@@ -241,7 +205,7 @@ export default function Ledger() {
                     <span>·</span>
                     <span>{dts(j.posted)}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={setPage} unit="journals" />
@@ -314,13 +278,18 @@ export default function Ledger() {
                 </div>
                 <div className="info-cell">
                   <div className="k">Discrepancy</div>
-                  <div className="v mono" style={{ color: "var(--ops-green)" }}>
-                    ETB 0.00
+                  <div
+                    className="v mono"
+                    style={{
+                      color: discrepancyMinor === 0 ? "var(--ops-green)" : "var(--ops-red)",
+                    }}
+                  >
+                    {fmt(discrepancyMinor)}
                   </div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Idempotency Seal</div>
-                  <div className="v mono">SHA256-OK-{sel.id.toUpperCase()}</div>
+                  <div className="k">Idempotency Key</div>
+                  <div className="v mono">{sel.idempotencyKey ?? "Not recorded"}</div>
                 </div>
               </div>
 
@@ -328,14 +297,19 @@ export default function Ledger() {
                 Double-Entry Invariant Checks
               </div>
               <div className="checks-row">
-                <span className="check pass">
-                  <ShieldCheck size={13} /> Zero-Sum Invariant Verified
+                <span className={`check ${discrepancyMinor === 0 ? "pass" : "fail"}`}>
+                  <ShieldCheck size={13} />{" "}
+                  {discrepancyMinor === 0
+                    ? "Zero-Sum Invariant Verified (DR = CR)"
+                    : `Journal Imbalance (${fmt(discrepancyMinor)})`}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Immutable Append-Only Log
+                <span className={`check ${sel.idempotencyKey ? "pass" : "none"}`}>
+                  <CheckCircle2 size={13} />{" "}
+                  {sel.idempotencyKey ? "Idempotency Key Present" : "System-Generated Journal"}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Custody Asset Backed
+                <span className={`check ${legs.length > 0 ? "pass" : "none"}`}>
+                  <CheckCircle2 size={13} />{" "}
+                  {legs.length > 0 ? `${legs.length} Itemized Legs Loaded` : "Summary Totals Loaded"}
                 </span>
               </div>
 
@@ -343,37 +317,51 @@ export default function Ledger() {
                 <div className="sec-title" style={{ marginBottom: 8 }}>
                   Itemized Double-Entry Journal Legs ({legs.length})
                 </div>
-                <div
-                  className="tbl-wrap"
-                  style={{ border: "1px solid var(--ops-border-soft)", borderRadius: 10 }}
-                >
-                  <table className="tbl">
-                    <thead>
-                      <tr>
-                        <th>Acct Code</th>
-                        <th>Account Name</th>
-                        <th>Type</th>
-                        <th>Debit (DR)</th>
-                        <th>Credit (CR)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {legs.map((leg, idx) => (
-                        <tr key={idx}>
-                          <td className="mono" style={{ fontWeight: 700 }}>
-                            {leg.code}
-                          </td>
-                          <td className="cell-main">{leg.name}</td>
-                          <td>
-                            <Pill s={leg.type} />
-                          </td>
-                          <td className="amount">{leg.dr > 0 ? fmt(leg.dr) : "—"}</td>
-                          <td className="amount">{leg.cr > 0 ? fmt(leg.cr) : "—"}</td>
+                {legs.length === 0 ? (
+                  <div
+                    style={{
+                      padding: "12px 14px",
+                      border: "1px solid var(--ops-border-soft)",
+                      borderRadius: 10,
+                      fontSize: 12.5,
+                      color: "var(--ops-text-2)",
+                    }}
+                  >
+                    No itemized leg rows returned for this journal summary.
+                  </div>
+                ) : (
+                  <div
+                    className="tbl-wrap"
+                    style={{ border: "1px solid var(--ops-border-soft)", borderRadius: 10 }}
+                  >
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Acct Code</th>
+                          <th>Account Name</th>
+                          <th>Type</th>
+                          <th>Debit (DR)</th>
+                          <th>Credit (CR)</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {legs.map((leg, idx) => (
+                          <tr key={idx}>
+                            <td className="mono" style={{ fontWeight: 700 }}>
+                              {leg.code}
+                            </td>
+                            <td className="cell-main">{leg.name}</td>
+                            <td>
+                              <Pill s={leg.type} />
+                            </td>
+                            <td className="amount">{leg.dr > 0 ? fmt(leg.dr) : "—"}</td>
+                            <td className="amount">{leg.cr > 0 ? fmt(leg.cr) : "—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 14 }}>

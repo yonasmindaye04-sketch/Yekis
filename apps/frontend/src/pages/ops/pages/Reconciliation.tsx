@@ -92,7 +92,7 @@ export default function Reconciliation() {
   const mism = rows.filter((r) => r.rec === "MISMATCH");
   const totalVarianceMinor = rows.reduce((s, r) => s + Math.abs(r.diff ?? 0), 0);
 
-  const railSettledMinor = sel ? sel.amt + (sel.diff ?? 0) : 0;
+  const internalExpectedMinor = sel && sel.diff != null ? sel.amt - sel.diff : null;
 
   const openReconEvidence = (idx: number) => {
     if (!sel) return;
@@ -103,8 +103,10 @@ export default function Reconciliation() {
           t: `${sel.provider}_SETTLEMENT_MANIFEST`,
           k: "tin",
           name: `Rail TX: ${sel.txId}`,
-          doc: `Internal: ${fmt(sel.amt)} · Provider Settled: ${fmt(railSettledMinor)}`,
-          tin: `Variance: ${sel.diff ? fmt(sel.diff) : "ETB 0"}`,
+          doc: `Provider Settled: ${fmt(sel.amt)} · Expected Milestone: ${
+            internalExpectedMinor != null ? fmt(internalExpectedMinor) : "—"
+          }`,
+          tin: `Variance: ${sel.diff != null ? fmt(sel.diff) : "Awaiting computation"}`,
         },
         {
           id: "doc-2",
@@ -235,7 +237,8 @@ export default function Reconciliation() {
             {rows.map((r) => {
               const active = sel?.id === r.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={r.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(r.id)}
@@ -244,7 +247,7 @@ export default function Reconciliation() {
                     <div>
                       <div className="qi-name mono">{r.txId}</div>
                       <div className="qi-sub">
-                        Internal: {fmt(r.amt)} · {r.esc.replace(/_/g, " ")}
+                        Provider: {fmt(r.amt)} · {r.esc.replace(/_/g, " ")}
                       </div>
                     </div>
                     <Pill s={r.rec} />
@@ -260,7 +263,7 @@ export default function Reconciliation() {
                       <span style={{ color: "var(--ops-green)", fontWeight: 600 }}>Zero variance</span>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={setPage} unit="transactions" />
@@ -298,8 +301,8 @@ export default function Reconciliation() {
                     {sel.txId}
                   </h3>
                   <div style={{ fontSize: 12.5, color: "var(--ops-text-2)" }}>
-                    Settlement Batch #{sel.provider.slice(0, 3)}-202610 ·{" "}
-                    {sel.created ? `Recorded ${dts(sel.created)}` : "T+0 Automated Feed"}
+                    {sel.provider.replace(/_/g, " ")} ·{" "}
+                    {sel.created ? `Recorded ${dts(sel.created)}` : "Automated ledger check"}
                   </div>
                 </div>
 
@@ -315,12 +318,14 @@ export default function Reconciliation() {
 
               <div className="info-grid">
                 <div className="info-cell">
-                  <div className="k">Internal Ledger Amount</div>
+                  <div className="k">Provider Transaction Amount</div>
                   <div className="v mono">{fmt(sel.amt)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Provider Settlement Amount</div>
-                  <div className="v mono">{fmt(railSettledMinor)}</div>
+                  <div className="k">Expected Milestone Amount</div>
+                  <div className="v mono">
+                    {internalExpectedMinor != null ? fmt(internalExpectedMinor) : "—"}
+                  </div>
                 </div>
                 <div className="info-cell">
                   <div className="k">Net Discrepancy (Variance)</div>
@@ -331,7 +336,7 @@ export default function Reconciliation() {
                     }}
                   >
                     {sel.diff == null
-                      ? "Awaiting T+1 Batch"
+                      ? "Awaiting Verification"
                       : sel.diff === 0
                         ? "ETB 0 (Exact Match)"
                         : sel.diff > 0
@@ -340,9 +345,13 @@ export default function Reconciliation() {
                   </div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Custody Account Code</div>
+                  <div className="k">Clearing Account Code</div>
                   <div className="v mono">
-                    {sel.provider === "TELEBIRR" ? "1010 · Telebirr Trust" : "1020 · CBE Custody"}
+                    {sel.provider === "TELEBIRR"
+                      ? "1010 · Telebirr Clearing"
+                      : sel.provider === "M_PESA"
+                        ? "1030 · M-Pesa Clearing"
+                        : "1020 · CBE Birr Clearing"}
                   </div>
                 </div>
                 <div className="info-cell">
@@ -356,21 +365,38 @@ export default function Reconciliation() {
               </div>
 
               <div className="sec-title" style={{ marginBottom: 8 }}>
-                Automated Variance Diagnostics
+                Reconciliation Diagnostics
               </div>
               <div className="checks-row">
-                <span className="check pass">
-                  <ShieldCheck size={13} /> TX ID Present in Provider Feed
+                <span className={`check ${sel.txId ? "pass" : "warn"}`}>
+                  <ShieldCheck size={13} />{" "}
+                  {sel.txId ? "Transaction Reference Present" : "Missing Transaction Reference"}
                 </span>
-                <span className={`check ${sel.rec === "MISMATCH" ? "fail" : "pass"}`}>
-                  {sel.rec === "MISMATCH" ? <TriangleAlert size={13} /> : <CheckCircle2 size={13} />}
+                <span
+                  className={`check ${
+                    sel.rec === "MISMATCH" || sel.rec === "FAILED"
+                      ? "fail"
+                      : sel.rec === "MATCHED"
+                        ? "pass"
+                        : "warn"
+                  }`}
+                >
+                  {sel.rec === "MISMATCH" || sel.rec === "FAILED" ? (
+                    <TriangleAlert size={13} />
+                  ) : (
+                    <CheckCircle2 size={13} />
+                  )}
                   {sel.rec === "MISMATCH"
                     ? `Variance Detected (${fmt(sel.diff ?? 0)})`
-                    : "Principal Amount Matches 1:1"}
+                    : sel.rec === "FAILED"
+                      ? "Payment Failed on Rail"
+                      : sel.rec === "MATCHED"
+                        ? "Principal Amount Matches 1:1"
+                        : "Awaiting Settlement Match"}
                 </span>
                 <span className={`check ${sel.rec === "PENDING" ? "warn" : "pass"}`}>
                   <CheckCircle2 size={13} />{" "}
-                  {sel.rec === "PENDING" ? "Pending EOD Settlement File" : "EOD Batch Closed"}
+                  {sel.rec === "PENDING" ? "Pending Final Settlement" : `Verdict: ${sel.rec}`}
                 </span>
               </div>
 

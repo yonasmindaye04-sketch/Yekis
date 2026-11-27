@@ -59,34 +59,48 @@ export function Sparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-function fmtAxisM(v: number, max: number): string {
-  if (v === 0) return "0M";
-  if (max < 8) return `${v.toFixed(1)}M`;
-  return `${v.toFixed(0)}M`;
+function formatCompactAxis(minor: number): string {
+  const etb = minor / 100;
+  if (etb === 0) return "0";
+  if (etb >= 1_000_000) return `${(etb / 1_000_000).toFixed(1)}M`;
+  if (etb >= 1_000) return `${(etb / 1_000).toFixed(etb >= 10_000 ? 0 : 1)}K`;
+  return String(Math.round(etb));
 }
 
-/* ── area / line chart ── */
+function buildSmoothCurve(points: Array<{ x: number; y: number }>): string {
+  if (points.length === 0) return "";
+  if (points.length === 1) return `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  let d = `M ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const p0 = points[i];
+    const p1 = points[i + 1];
+    const cx = ((p0.x + p1.x) / 2).toFixed(1);
+    d += ` C ${cx} ${p0.y.toFixed(1)}, ${cx} ${p1.y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+  }
+  return d;
+}
+
+/* ── area / line chart (values in integer minor units / cents) ── */
 export interface AreaChartProps {
   labels: string[];
-  values: number[]; // ETB millions
+  values: number[];
   color: string;
   unit?: string;
 }
-export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProps) {
+export function AreaChart({ labels, values, color }: AreaChartProps) {
   const tip = useChartTip();
   if (values.length < 2) {
     return <div className="empty">Not enough history to plot yet.</div>;
   }
-  const W = 580, H = 195, L = 48, R = 14, T = 14, B = 28;
+  const W = 580, H = 195, L = 52, R = 14, T = 14, B = 28;
   const rawMax = Math.max(...values, 0);
-  const max = rawMax > 0 ? rawMax * 1.16 : 4;
+  const max = rawMax > 0 ? rawMax * 1.16 : 10000;
   const X = (i: number) => L + (i * (W - L - R)) / (values.length - 1);
   const Y = (v: number) => T + (1 - v / max) * (H - T - B);
-  const line = values
-    .map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`)
-    .join(" ");
+  const pts = values.map((v, i) => ({ x: X(i), y: Y(v) }));
+  const line = buildSmoothCurve(pts);
   const area = `${line} L${X(values.length - 1).toFixed(1)} ${H - B} L${X(0).toFixed(1)} ${H - B} Z`;
-  const gid = `ops-g${color.slice(1)}`;
+  const gid = `ops-g${color.replace(/[^a-zA-Z0-9]/g, "")}`;
   const step = Math.max(1, Math.ceil(labels.length / 7));
   const grid: ReactElement[] = [];
   for (let t = 0; t <= 4; t++) {
@@ -94,18 +108,31 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
     const y = Y(v);
     grid.push(
       <g key={t}>
-        <line x1={L} y1={y} x2={W - R} y2={y} stroke="#eef1f6" className="ops-gridline" />
+        <line
+          x1={L}
+          y1={y}
+          x2={W - R}
+          y2={y}
+          stroke="var(--color-border, #e2e8f0)"
+          strokeDasharray="3 3"
+          className="ops-gridline"
+        />
         <text x={L - 8} y={y + 4} textAnchor="end" className="ax">
-          {fmtAxisM(v, max)}
+          {formatCompactAxis(v)}
         </text>
       </g>,
     );
   }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="chart"
+      role="img"
+      aria-label={`Area chart across ${labels.length} time buckets`}
+    >
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={color} stopOpacity=".22" />
+          <stop offset="0" stopColor={color} stopOpacity=".24" />
           <stop offset="1" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
@@ -135,14 +162,14 @@ export function AreaChart({ labels, values, color, unit = "ETB" }: AreaChartProp
           r={3.5}
           className="pt"
           stroke={color}
-          {...tipProps(tip, `${labels[i]} · ${unit} ${v.toFixed(2)}M`)}
+          {...tipProps(tip, `${labels[i]} · ${fmt(v)}`)}
         />
       ))}
     </svg>
   );
 }
 
-/* ── grouped bar chart ── */
+/* ── grouped bar chart (values in integer minor units / cents) ── */
 export interface BarSeries {
   name: string;
   color: string;
@@ -153,26 +180,39 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
   if (labels.length < 1 || series.every((s) => s.values.length < 1)) {
     return <div className="empty">Not enough history to plot yet.</div>;
   }
-  const W = 580, H = 195, L = 48, R = 14, T = 14, B = 28;
+  const W = 580, H = 195, L = 52, R = 14, T = 14, B = 28;
   const rawMax = Math.max(...series.flatMap((s) => s.values), 0);
-  const max = rawMax > 0 ? rawMax * 1.16 : 4;
+  const max = rawMax > 0 ? rawMax * 1.16 : 10000;
   const gw = (W - L - R) / labels.length;
-  const bw = Math.min(24, Math.max(8, (gw - 16) / series.length));
+  const bw = Math.min(24, Math.max(7, (gw - 16) / series.length));
   const grid: ReactElement[] = [];
   for (let t = 0; t <= 4; t++) {
     const v = (max * t) / 4;
     const y = T + (1 - t / 4) * (H - T - B);
     grid.push(
       <g key={t}>
-        <line x1={L} y1={y} x2={W - R} y2={y} stroke="#eef1f6" className="ops-gridline" />
+        <line
+          x1={L}
+          y1={y}
+          x2={W - R}
+          y2={y}
+          stroke="var(--color-border, #e2e8f0)"
+          strokeDasharray="3 3"
+          className="ops-gridline"
+        />
         <text x={L - 8} y={y + 4} textAnchor="end" className="ax">
-          {fmtAxisM(v, max)}
+          {formatCompactAxis(v)}
         </text>
       </g>,
     );
   }
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart">
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      className="chart"
+      role="img"
+      aria-label={`Grouped bar chart comparing ${series.map((s) => s.name).join(", ")}`}
+    >
       {grid}
       {labels.map((lb, i) => {
         const cx = L + gw * i + gw / 2;
@@ -197,7 +237,7 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
                   fill={s.color}
                   className="bar"
                   style={{ animationDelay: `${(i * series.length + si) * 45}ms` }}
-                  {...tipProps(tip, `${lb} · ${s.name}: ETB ${v.toFixed(2)}M`)}
+                  {...tipProps(tip, `${lb} · ${s.name}: ${fmt(v)}`)}
                 />
               );
             })}
@@ -208,16 +248,28 @@ export function BarChart({ labels, series }: { labels: string[]; series: BarSeri
   );
 }
 
-/* ── donut (amounts in minor units) ── */
+/* ── donut (amounts in minor units unless unit="count") ── */
 export interface DonutSeg {
   label: string;
   value: number;
   color: string;
 }
-export function Donut({ segs, centerSub }: { segs: DonutSeg[]; centerSub: string }) {
+export function Donut({
+  segs,
+  centerSub,
+  unit = "money",
+}: {
+  segs: DonutSeg[];
+  centerSub: string;
+  unit?: "money" | "count";
+}) {
   const tip = useChartTip();
   if (segs.length === 0) return <div className="empty">Nothing to split yet.</div>;
   const total = segs.reduce((s, x) => s + x.value, 0) || 1;
+  const formatVal = (v: number) =>
+    unit === "count" ? v.toLocaleString() : fmtE(v);
+  const formatTipVal = (v: number) =>
+    unit === "count" ? v.toLocaleString() : fmt(v);
   const R = 54;
   const C = 2 * Math.PI * R;
   /* Arc start offsets, computed up front so render stays side-effect free. */
@@ -227,7 +279,12 @@ export function Donut({ segs, centerSub }: { segs: DonutSeg[]; centerSub: string
   }, []);
   return (
     <div className="donut-wrap">
-      <svg viewBox="0 0 140 140" className="donut">
+      <svg
+        viewBox="0 0 140 140"
+        className="donut"
+        role="img"
+        aria-label={`${centerSub} breakdown chart`}
+      >
         {segs.map((s, i) => {
           const len = (s.value / total) * C;
           return (
@@ -245,13 +302,13 @@ export function Donut({ segs, centerSub }: { segs: DonutSeg[]; centerSub: string
               className="dseg"
               {...tipProps(
                 tip,
-                `${s.label}: ${fmt(s.value)} · ${Math.round((s.value / total) * 100)}%`,
+                `${s.label}: ${formatTipVal(s.value)} · ${Math.round((s.value / total) * 100)}%`,
               )}
             />
           );
         })}
         <text x={70} y={66} textAnchor="middle" className="d-num">
-          {fmtE(total)}
+          {formatVal(total)}
         </text>
         <text x={70} y={82} textAnchor="middle" className="ax">
           {centerSub}
@@ -262,7 +319,7 @@ export function Donut({ segs, centerSub }: { segs: DonutSeg[]; centerSub: string
           <div className="lg-row" key={s.label}>
             <span className="lg-dot" style={{ background: s.color }} />
             <span className="lg-l">{s.label}</span>
-            <b>{fmtE(s.value)}</b>
+            <b>{formatVal(s.value)}</b>
             <span className="lg-p">{Math.round((s.value / total) * 100)}%</span>
           </div>
         ))}

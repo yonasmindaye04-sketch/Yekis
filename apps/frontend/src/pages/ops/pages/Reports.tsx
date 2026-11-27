@@ -199,7 +199,10 @@ export default function Reports() {
   const hasMonthlyVolume = rep.series.volume12.values.some((v) => v > 0);
   const hasRailMonthly =
     rep.series.railMonthly.telebirr.some((v) => v > 0) ||
-    rep.series.railMonthly.cbe.some((v) => v > 0);
+    rep.series.railMonthly.cbe.some((v) => v > 0) ||
+    rep.series.railMonthly.mpesa.some((v) => v > 0);
+  const bucketMonths = rep.series.volume12.labels.length || 6;
+  const whtEnabled = Boolean(rep.feeConfiguration?.withholdingEnabled);
 
   const statusSegs = Object.entries(mk.byStatus).map(([k, v]) => ({
     label: k.charAt(0) + k.slice(1).toLowerCase().replace(/_/g, " "),
@@ -211,7 +214,7 @@ export default function Reports() {
     <div className="fade">
       <PageHead
         title="Financial & Marketplace Reports"
-        sub="Authoritative 12-month platform GMV, rail throughput, ERCA withholding totals & live operational queues"
+        sub={`Authoritative ${bucketMonths}-month platform volume, rail throughput, ledger totals & live operational queues`}
         right={
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <Button variant="outline" size="sm" onClick={reload}>
@@ -226,12 +229,18 @@ export default function Reports() {
                   toCsv(
                     ["Metric", "Value", "Notes"],
                     [
-                      ["Total Payment Volume", etb(fin.vol), `${rep.series.volume12.labels.length} monthly buckets`],
+                      ["Total Payment Volume", etb(fin.vol), `${bucketMonths} monthly buckets`],
                       ["Escrow Released", etb(fin.released), "Completed milestones settled to freelancers"],
                       ["Escrow Refunded", etb(fin.refunded), "Disputes & cancellations returned to clients"],
                       ["Confirmed Payouts", etb(fin.payouts), "Telebirr / CBE / M-Pesa disbursements"],
                       ["Platform Fee Revenue", etb(fin.fees), "Service fees earned across settlements"],
-                      ["Withholding Remitted (3%)", etb(fin.wh), "ERCA withholding liability accrued"],
+                      [
+                        "Withholding Tax Remitted",
+                        etb(fin.wh),
+                        whtEnabled
+                          ? "Accrued withholding liability"
+                          : "Deferred (0% active in current environment)",
+                      ],
                       ["Failed Payments", String(fin.failPay), "Inbound rail failures"],
                       ["Failed Payouts", String(fin.failPo), "Outbound rail failures"],
                       ["Clients", String(mk.clients), "Registered client accounts"],
@@ -255,7 +264,12 @@ export default function Reports() {
         <Kv k="Confirmed Payouts" v={fmt(fin.payouts)} title="Open payouts workbench" onClick={() => ui.navigate("payouts")} />
         <Kv k="Platform Commission Fees" v={fmt(fin.fees)} title="Inspect double-entry ledger" onClick={() => ui.navigate("ledger")} />
         <Kv k="Escrow Refunded" v={fmt(fin.refunded)} />
-        <Kv k="ERCA Withholding (3%)" v={fmt(fin.wh)} title="Open withholding filings" onClick={() => ui.navigate("withholding")} />
+        <Kv
+          k={whtEnabled ? "Withholding Remitted" : "Withholding (Deferred)"}
+          v={fmt(fin.wh)}
+          title="Open withholding filings"
+          onClick={() => ui.navigate("withholding")}
+        />
         <Kv k="Failed Inbound Payments" v={String(fin.failPay)} warn={fin.failPay > 0} onClick={() => ui.navigate("payments")} />
         <Kv k="Failed Outbound Payouts" v={String(fin.failPo)} warn={fin.failPo > 0} onClick={() => ui.navigate("payouts")} />
       </div>
@@ -264,15 +278,15 @@ export default function Reports() {
         <Card className="card-pad">
           <div className="ch-head">
             <div>
-              <div className="ch-title">Monthly Payment Volume</div>
-              <div className="ch-sub">Settled inbound payments across the trailing 12 months</div>
+              <h2 className="ch-title">Monthly Payment Volume</h2>
+              <div className="ch-sub">Settled inbound payments across the trailing {bucketMonths} months</div>
             </div>
           </div>
           {hasMonthlyVolume ? (
             <AreaChart
               labels={rep.series.volume12.labels}
               values={rep.series.volume12.values}
-              color="#2563eb"
+              color="#16a34a"
               unit="ETB"
             />
           ) : (
@@ -286,13 +300,14 @@ export default function Reports() {
         <Card className="card-pad">
           <div className="ch-head">
             <div>
-              <div className="ch-title">Monthly Throughput by Rail</div>
-              <div className="ch-sub">Telebirr vs CBE Birr (trailing 12 months)</div>
+              <h2 className="ch-title">Monthly Throughput by Rail</h2>
+              <div className="ch-sub">Telebirr, CBE Birr &amp; M-Pesa (trailing {bucketMonths} months)</div>
             </div>
             <ChartLegend
               series={[
-                { name: "Telebirr", color: "#0284c7" },
-                { name: "CBE Birr", color: "#7c3aed" },
+                { name: "Telebirr", color: "#16a34a" },
+                { name: "CBE Birr", color: "#0d9488" },
+                { name: "M-Pesa", color: "#64748b" },
               ]}
             />
           </div>
@@ -300,14 +315,15 @@ export default function Reports() {
             <BarChart
               labels={rep.series.railMonthly.labels}
               series={[
-                { name: "Telebirr", values: rep.series.railMonthly.telebirr, color: "#0284c7" },
-                { name: "CBE Birr", values: rep.series.railMonthly.cbe, color: "#7c3aed" },
+                { name: "Telebirr", values: rep.series.railMonthly.telebirr, color: "#16a34a" },
+                { name: "CBE Birr", values: rep.series.railMonthly.cbe, color: "#0d9488" },
+                { name: "M-Pesa", values: rep.series.railMonthly.mpesa, color: "#64748b" },
               ]}
             />
           ) : (
             <div className="sh-chart-empty">
               <strong>No rail breakdown available yet</strong>
-              <span>Telebirr and CBE Birr monthly totals appear once settled.</span>
+              <span>Telebirr, CBE Birr and M-Pesa monthly totals appear once settled.</span>
             </div>
           )}
         </Card>
@@ -320,7 +336,8 @@ export default function Reports() {
             {cohorts.map((c) => {
               const active = selCohort.id === c.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={c.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelectedQueueId(c.id)}
@@ -339,7 +356,7 @@ export default function Reports() {
                     <span>·</span>
                     <span>{c.count} item(s)</span>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -453,21 +470,22 @@ export default function Reports() {
           </div>
           <Donut
             centerSub="Total"
+            unit="count"
             segs={[
               { label: "Clients", value: mk.clients, color: "#2563eb" },
-              { label: "Freelancers", value: mk.freelancers, color: "#059669" },
+              { label: "Freelancers", value: mk.freelancers, color: "#16a34a" },
             ]}
           />
         </Card>
         <Card className="card-pad">
           <div className="ch-head">
             <div>
-              <div className="ch-title">Contracts by Status</div>
+              <h2 className="ch-title">Contracts by Status</h2>
               <div className="ch-sub">{mk.totalContracts} total contracts</div>
             </div>
             <Briefcase size={15} style={{ color: "var(--ops-text-3)" }} />
           </div>
-          <Donut centerSub="Contracts" segs={statusSegs} />
+          <Donut centerSub="Contracts" unit="count" segs={statusSegs} />
         </Card>
         <Card className="card-pad">
           <div className="ch-head">

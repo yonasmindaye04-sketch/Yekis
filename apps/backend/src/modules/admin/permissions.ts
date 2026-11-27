@@ -71,6 +71,7 @@ const COMPLIANCE_SET: readonly PermissionKey[] = [
   "dashboard.view",
   "users.view",
   "kyc.review",
+  "profiles.moderate",
   "tms.review",
   "support.handle",
   "disputes.view",

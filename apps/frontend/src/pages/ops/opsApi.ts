@@ -121,12 +121,31 @@ export class OpsApiError extends Error {
   }
 }
 
-/** Resolves to `fallback` when the caller lacks permission or the call fails. */
-async function soft<T>(p: Promise<T>, fallback: T): Promise<T> {
+/** Distinguishes expected role-scoped 403 refusals from real server/network errors. */
+function isForbiddenError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const e = err as { status?: number; code?: string; message?: string };
+  return (
+    e.status === 403 ||
+    e.code === "PERMISSION_DENIED" ||
+    e.code === "STAFF_ROLE_REQUIRED" ||
+    Boolean(e.message && /\b403\b|PERMISSION_DENIED|STAFF_ROLE_REQUIRED/i.test(e.message))
+  );
+}
+
+/**
+ * Resolves to `fallback` ONLY when the caller lacks permission (HTTP 403), or
+ * on secondary auxiliary feeds when allowed, while surfacing non-403 failures
+ * on primary calls.
+ */
+async function soft<T>(p: Promise<T>, fallback: T, ignoreAllErrors = false): Promise<T> {
   try {
     return await p;
-  } catch {
-    return fallback;
+  } catch (err) {
+    if (ignoreAllErrors || isForbiddenError(err)) {
+      return fallback;
+    }
+    throw err;
   }
 }
 
@@ -180,9 +199,7 @@ const KYCDOC: Record<string, KycItem["docs"][number]["k"]> = {
   SELFIE_LIVENESS: "selfie",
 };
 
-/* ── series derivation (real rows, windowed) ──────────────────────────── */
-const toMillions = (minor: number) => Number(((minor / 100) / 1e6).toFixed(4));
-
+/* ── series derivation (real rows, minor units) ──────────────────────── */
 function lastNDays(n: number): string[] {
   const out: string[] = [];
   const today = new Date();
@@ -224,7 +241,7 @@ function bucket(rows: Array<{ createdAt: string; amountMinor: number }>, keys: s
     const i = idx.get(keyOf(r.createdAt));
     if (i !== undefined) out[i] += r.amountMinor;
   }
-  return out.map(toMillions);
+  return out;
 }
 
 /** Successful payment volume, bucketed by day / week / month key. */
@@ -277,8 +294,8 @@ const rDisputes = () =>
     items: RawDisputeItem[];
   }>;
 const rFlags = () => api.getTmsQueue({ pageSize: TABLE_LIMIT }) as Promise<{ items: RawRiskFlag[] }>;
-const rProfileReports = () =>
-  api.getProfileReports({ limit: TABLE_LIMIT }) as Promise<RawProfileReportPage>;
+const rProfileReports = (params?: { status?: string; reason?: string; search?: string }) =>
+  api.getProfileReports({ limit: TABLE_LIMIT, ...params }) as Promise<RawProfileReportPage>;
 const rTopUps = (status: string) =>
   api.getTopUpReviewQueue({ pageSize: TABLE_LIMIT, status }) as Promise<RawTopUpPage>;
 const rConversations = (status: "OPEN" | "ALL") =>
@@ -296,9 +313,9 @@ const toPayment = (r: RawPayment): Payment => ({
   txId: r.providerTransactionId,
   job: r.milestone?.contract.job.title ?? "—",
   milestoneTitle: r.milestone?.title ?? "Escrow Funding Deposit",
-  contractId: r.milestone?.contract.id ?? "ctr-301",
+  contractId: r.milestone?.contract.id,
   client: nameOf(r.milestone?.contract.client),
-  clientEmail: r.milestone?.contract.client.email ?? "client@yekis.et",
+  clientEmail: r.milestone?.contract.client.email,
   freelancer: nameOf(r.milestone?.contract.freelancer),
   provider: r.provider,
   status: paymentStatus(r.status),
@@ -308,7 +325,13 @@ const toPayment = (r: RawPayment): Payment => ({
 
 const toPayout = (r: RawPayout): Payout => ({
   id: r.id,
-  user: { displayName: nameOf(r.user), email: r.user.email, id: r.user.id },
+  user: {
+    displayName: nameOf(r.user),
+    email: r.user.email,
+    id: r.user.id,
+    kycTier: r.user.cachedKycTier ?? null,
+    kycStatus: r.user.cachedKycStatus ? kycState(r.user.cachedKycStatus) : null,
+  },
   acct: r.payoutAccountIdentifier,
   provider: r.provider,
   ref: r.providerPayoutId,
@@ -331,8 +354,9 @@ const toEscrow = (r: RawEscrow): Escrow => ({
   clientEmail: r.contract.client.email,
   fl: nameOf(r.contract.freelancer),
   flEmail: r.contract.freelancer.email,
-  rail: r.paymentTransactions[0]?.provider ?? "—",
-  txId: r.paymentTransactions[0]?.providerTransactionId ?? "—",
+  rail: r.paymentTransactions[0]?.provider ?? "WALLET",
+  txId: r.paymentTransactions[0]?.providerTransactionId,
+  hasPaymentTx: r.paymentTransactions.length > 0,
   created: r.createdAt,
   held: r.escrowHolds.length > 0,
   holdReason: r.escrowHolds[0]?.reason ?? null,
@@ -370,7 +394,12 @@ const toContract = (r: RawContractRow): Contract => ({
 export const withContractDetail = (row: Contract, d: RawContractDetail): Contract => ({
   ...row,
   status: d.contract?.status ?? row.status,
+  clientKycStatus: d.parties?.client?.cachedKycStatus ? kycState(d.parties.client.cachedKycStatus) : row.clientKycStatus,
+  clientKycTier: d.parties?.client?.cachedKycTier ?? row.clientKycTier,
+  flKycStatus: d.parties?.freelancer?.cachedKycStatus ? kycState(d.parties.freelancer.cachedKycStatus) : row.flKycStatus,
+  flKycTier: d.parties?.freelancer?.cachedKycTier ?? row.flKycTier,
   escrowHeld: d.totals?.escrowHeldMinor ?? 0,
+  feeConfiguration: d.feeConfiguration ?? row.feeConfiguration,
   milestones: (d.milestones ?? []).map((m) => ({
     id: m.id,
     t: m.title,
@@ -484,14 +513,14 @@ const toProfileReport = (r: RawProfileReportPage["data"][number]): ProfileReport
   id: r.id,
   reported: r.reportedUser.displayName ?? r.reportedUser.ucid,
   reportedUserId: r.reportedUser.id,
-  reportedEmail: r.reportedUser.email ?? `${r.reportedUser.ucid.toLowerCase()}@yekis.et`,
+  reportedEmail: r.reportedUser.email ?? "—",
   reportedUcid: r.reportedUser.ucid,
   reportedRole: r.reportedUser.role ?? "FREELANCER",
-  reportedKycTier: r.reportedUser.kycTier ?? "TIER_2",
-  reportedKycStatus: kycState(r.reportedUser.kycStatus ?? "VERIFIED"),
-  reporter: r.reporter?.displayName ?? r.reporter?.email ?? "Abebe Kebede",
-  reporterEmail: r.reporter?.email ?? "abebe.kebede@abyssinia-tech.et",
-  reporterUcid: r.reporter?.ucid ?? "YEK-CL-1042",
+  reportedKycTier: r.reportedUser.kycTier ?? "TIER_1",
+  reportedKycStatus: kycState(r.reportedUser.kycStatus),
+  reporter: r.reporter?.displayName ?? r.reporter?.email ?? r.reporter?.ucid ?? "Reporter on record",
+  reporterEmail: r.reporter?.email ?? "—",
+  reporterUcid: r.reporter?.ucid ?? "—",
   reporterRole: r.reporter?.role ?? "CLIENT",
   reason: r.reason as ProfileReport["reason"],
   severity:
@@ -503,25 +532,23 @@ const toProfileReport = (r: RawProfileReportPage["data"][number]): ProfileReport
         : r.reason === "ABUSIVE_LANGUAGE"
           ? "MEDIUM"
           : "LOW"),
-  sourceContext: r.sourceContext ?? "Proposal & Direct Message Thread",
+  sourceContext: r.sourceContext ?? "User profile & marketplace interaction",
   details: r.details ?? "",
   flaggedExcerpt:
     r.flaggedExcerpt ??
     r.details ??
-    "No automatic text excerpt captured for this report.",
+    "No text excerpt submitted with report.",
   priorReportsCount: r.priorReportsCount ?? 1,
   priorWarningsCount: r.priorWarningsCount ?? 0,
   activeContractsCount: r.activeContractsCount ?? 0,
   escrowExposureMinor: r.escrowExposureMinor ?? 0,
   checks: r.checks ?? {
     regexFlagged: r.reason === "OFF_PLATFORM_CONTACT" || r.reason === "SPAM",
-    repeatOffender: (r.priorWarningsCount ?? 0) > 0,
+    repeatOffender: (r.priorReportsCount ?? 1) > 1,
     escrowAtRisk: (r.escrowExposureMinor ?? 0) > 0,
-    faydaVerified: (r.reportedUser.kycStatus ?? "VERIFIED") === "VERIFIED",
+    faydaVerified: r.reportedUser.kycStatus === "VERIFIED",
   },
-  evidence: r.evidence ?? [
-    { id: `ev-${r.id}-1`, t: "INCIDENT_TRANSCRIPT", k: "id-front" },
-  ],
+  evidence: r.evidence ?? [],
   history: r.history ?? [],
   staffNotes: r.staffNotes ?? null,
   created: r.createdAt,
@@ -581,9 +608,10 @@ const EMPTY_BADGES: OpsBadges = {
 
 /* ── aggregates ───────────────────────────────────────────────────────── */
 async function loadOverview(): Promise<OverviewBundle> {
-  const [dash, health, payments, payouts, escrows, recon, kyc, disputes, reports, flags] =
+  const [dash, reportsSummary, health, payments, payouts, escrows, recon, kyc, disputes, reports, flags] =
     await Promise.all([
       soft(rDashboard(), null),
+      soft(rReportsSummary(), null),
       soft(rHealth(), null),
       soft(rPayments(), { items: [] as RawPayment[] }),
       soft(rPayouts(), { items: [] as RawPayout[] }),
@@ -612,6 +640,8 @@ async function loadOverview(): Promise<OverviewBundle> {
 
   return {
     metrics,
+    feeConfiguration: dash?.feeConfiguration ?? reportsSummary?.feeConfiguration,
+    collectedFeesMinor: reportsSummary?.financial.platformFeesMinor,
     activity: (dash?.recentActivity ?? []).map(toActivity),
     health: health ? toHealth(health) : EMPTY_HEALTH,
     escrows: escrows.items.map(toEscrow),
@@ -640,19 +670,19 @@ async function loadOverview(): Promise<OverviewBundle> {
 }
 
 async function loadBadges(): Promise<OpsBadges> {
-  const dash = await soft(rDashboard(), null);
+  const dash = await soft(rDashboard(), null, true);
   if (!dash) return EMPTY_BADGES;
   const m = dash.metrics;
   const [flags, reports, tickets] = await Promise.all([
-    soft(rFlags(), { items: [] as RawRiskFlag[] }),
-    soft(rProfileReports(), null),
-    soft(rConversations("OPEN"), { items: [], total: 0, page: 1, pageSize: 0 }),
+    soft(rFlags(), { items: [] as RawRiskFlag[] }, true),
+    soft(rProfileReports({ status: "OPEN" }), null, true),
+    soft(rConversations("OPEN"), { items: [], total: 0, page: 1, pageSize: 0 }, true),
   ]);
   return {
     payouts: m.pendingPayouts,
     kyc: m.pendingIdentity,
     disputes: m.openDisputes,
-    reports: (reports?.data ?? []).filter((r) => reportStatus(r.status) === "OPEN").length,
+    reports: reports?.pagination?.total ?? (reports?.data ?? []).filter((r) => reportStatus(r.status) === "OPEN").length,
     risk: flags.items.filter((f) => flagStatus(f.status) === "OPEN").length,
     recon: m.pendingPayments,
     monitoring: 0,
@@ -662,58 +692,70 @@ async function loadBadges(): Promise<OpsBadges> {
 }
 
 async function loadReports(): Promise<ReportsBundle> {
-  const [raw, payments, contracts] = await Promise.all([
-    soft(rReportsSummary(), null),
-    soft(rPayments(), { items: [] as RawPayment[] }),
-    soft(rContracts(), { items: [] as RawContractRow[] }),
-  ]);
-  const w12 = lastNWeeks(12);
-  const m6 = lastNMonths(6);
-  if (!raw) {
+  const raw = await rReportsSummary();
+  const palette = ["#16a34a", "#0d9488", "#2563eb", "#d97706", "#dc2626", "#64748b"];
+
+  if (raw.months && raw.months.length > 0) {
+    const labels = raw.months.map((m) => m.label);
     return {
       financial: {
-        vol: 0,
-        released: 0,
-        refunded: 0,
-        payouts: 0,
-        fees: 0,
-        wh: 0,
-        failPay: 0,
-        failPo: 0,
+        vol: raw.financial.transactionVolumeMinor,
+        released: raw.financial.releasedFundsMinor,
+        refunded: raw.financial.refundedFundsMinor,
+        payouts: raw.financial.payoutsMinor,
+        fees: raw.financial.platformFeesMinor,
+        wh: raw.financial.withholdingMinor,
+        failPay: raw.financial.failedPaymentCount,
+        failPo: raw.financial.failedPayoutCount,
       },
       marketplace: {
-        clients: 0,
-        freelancers: 0,
-        totalContracts: 0,
-        byStatus: {},
-        disputes: 0,
-        flags: 0,
+        clients: raw.marketplace.clientCount,
+        freelancers: raw.marketplace.freelancerCount,
+        totalContracts: raw.marketplace.totalContracts,
+        byStatus: raw.marketplace.contractsByStatus ?? {},
+        disputes: raw.marketplace.openDisputes,
+        flags: raw.marketplace.openRiskFlags,
       },
+      feeConfiguration: raw.feeConfiguration,
       series: {
         volume12: {
-          labels: w12.map((d) => d.slice(5)),
-          values: new Array<number>(w12.length).fill(0),
+          labels,
+          values: raw.months.map((m) => m.volumeMinor),
         },
         railMonthly: {
-          labels: m6.map((m) => m.slice(2)),
-          telebirr: new Array<number>(m6.length).fill(0),
-          cbe: new Array<number>(m6.length).fill(0),
+          labels,
+          telebirr: raw.months.map((m) => m.telebirrMinor),
+          cbe: raw.months.map((m) => m.cbeBirrMinor),
+          mpesa: raw.months.map((m) => m.mpesaMinor),
         },
-        categoryDone: [],
+        categoryDone: (raw.categories ?? []).map((c, i) => ({
+          label: c.category.replace(/_/g, " "),
+          value: c.count,
+          volumeMinor: c.volumeMinor,
+          color: palette[i % palette.length],
+        })),
       },
     };
   }
 
+  const [payments, contracts] = await Promise.all([
+    soft(rPayments(), { items: [] as RawPayment[] }),
+    soft(rContracts(), { items: [] as RawContractRow[] }),
+  ]);
+  const m6 = lastNMonths(6);
   const telebirr = new Array<number>(m6.length).fill(0);
   const cbe = new Array<number>(m6.length).fill(0);
+  const mpesa = new Array<number>(m6.length).fill(0);
+  const monthlyVol = new Array<number>(m6.length).fill(0);
   const mIdx = new Map(m6.map((k, i) => [k, i]));
   for (const p of payments.items) {
     if (p.status !== "SUCCESS") continue;
     const i = mIdx.get(p.createdAt.slice(0, 7));
     if (i === undefined) continue;
-    // M_PESA is grouped with CBE Birr: the console charts two rails only.
+    monthlyVol[i] += p.amountMinor;
     if (p.provider === "TELEBIRR") telebirr[i] += p.amountMinor;
-    else cbe[i] += p.amountMinor;
+    else if (p.provider === "CBE_BIRR") cbe[i] += p.amountMinor;
+    else if (p.provider === "M_PESA") mpesa[i] += p.amountMinor;
   }
 
   const byCat = new Map<string, number>();
@@ -721,7 +763,6 @@ async function loadReports(): Promise<ReportsBundle> {
     if (c.status !== "COMPLETED") continue;
     byCat.set(c.job.category, (byCat.get(c.job.category) ?? 0) + 1);
   }
-  const palette = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#dc2626", "#0284c7"];
   const categoryDone = [...byCat.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8)
@@ -733,6 +774,7 @@ async function loadReports(): Promise<ReportsBundle> {
 
   const f = raw.financial;
   const mk = raw.marketplace;
+  const labels = m6.map((m) => m.slice(2));
 
   return {
     financial: {
@@ -753,16 +795,10 @@ async function loadReports(): Promise<ReportsBundle> {
       disputes: mk.openDisputes,
       flags: mk.openRiskFlags,
     },
+    feeConfiguration: raw.feeConfiguration,
     series: {
-      volume12: {
-        labels: w12.map((d) => d.slice(5)),
-        values: bucketPayments(payments.items, w12, "week"),
-      },
-      railMonthly: {
-        labels: m6.map((m) => m.slice(2)),
-        telebirr: telebirr.map(toMillions),
-        cbe: cbe.map(toMillions),
-      },
+      volume12: { labels, values: monthlyVol },
+      railMonthly: { labels, telebirr, cbe, mpesa },
       categoryDone,
     },
   };
@@ -770,16 +806,9 @@ async function loadReports(): Promise<ReportsBundle> {
 
 async function loadLedger(): Promise<LedgerBundle> {
   const [summary, journals] = await Promise.all([
-    soft(rLedger(), null),
+    rLedger(),
     soft(rJournals(), { items: [] as RawJournal[] }),
   ]);
-  if (!summary) {
-    return {
-      accounts: [],
-      journal: [],
-      integrity: { dr: 0, cr: 0, bal: true, entries: 0, journals: 0 },
-    };
-  }
   return {
     accounts: (summary.accounts ?? []).map((a) => ({
       code: a.code,
@@ -792,9 +821,18 @@ async function loadLedger(): Promise<LedgerBundle> {
       id: j.id,
       desc: j.description,
       ref: j.referenceType,
+      refId: j.referenceId,
+      idempotencyKey: j.idempotencyKey ?? null,
       dr: j.totalDebitsMinor,
       cr: j.totalCreditsMinor,
       posted: j.postedAt,
+      entries: (j.entries ?? []).map((e) => ({
+        code: e.account.code,
+        name: e.account.name,
+        type: e.account.type,
+        dr: e.debitMinor,
+        cr: e.creditMinor,
+      })),
     })),
     integrity: {
       dr: summary.integrity?.totalDebitsMinor ?? 0,
@@ -876,21 +914,17 @@ export const opsListApi = {
   },
 
   reconciliation: async ({ page, limit, q, provider, recStatus }: ListFilters) => {
-    // Errors are NOT swallowed: the page renders an ErrorBox from the
-    // rejection, so a missing or shadowed route shows up as a failure
-    // instead of looking exactly like "there is no data" — which is how
-    // the top-up queue 404 went unnoticed.
     const r = (await api.adminListReconciliation({
       page,
       limit,
       provider: provider || undefined,
+      recStatus: recStatus || undefined,
     })) as { items: RawReconRow[]; total: number; page: number; pageSize: number };
     const needle = q.trim().toLowerCase();
     const rows = r.items
       .filter((x) => !needle || x.providerTransactionId.toLowerCase().includes(needle))
-      .filter((x) => !recStatus || x.reconciliationStatus === recStatus)
       .map(toRecon);
-    return { rows, total: r.total, page: r.page, pageSize: r.pageSize };
+    return { rows, total: needle ? rows.length : r.total, page: r.page, pageSize: r.pageSize };
   },
 
   contracts: async ({ page, limit, q, status }: ListFilters) => {
@@ -1087,53 +1121,24 @@ export const opsListApi = {
     flagType,
     role,
   }: ListFilters) => {
-    // Errors are NOT swallowed: the page renders an ErrorBox from the
-    // rejection, so a missing or shadowed route shows up as a failure
-    // instead of looking exactly like "there is no data" — which is how
-    // the top-up queue 404 went unnoticed.
-    const r = (await api.getProfileReports({ page, limit })) as RawProfileReportPage;
+    const r = (await api.getProfileReports({
+      page,
+      limit,
+      status: status || undefined,
+      reason: flagType || undefined,
+      search: q || undefined,
+    })) as RawProfileReportPage;
     const mapped = (r.data ?? []).map(toProfileReport);
-    const needle = (q || "").trim().toLowerCase();
-    const filtered = mapped.filter((item) => {
-      if (status && status !== "ALL") {
-        if (status === "OPEN" && item.status !== "OPEN") return false;
-        if (status === "RESOLVED" && item.status === "OPEN") return false;
-        if (status !== "OPEN" && status !== "RESOLVED" && item.status !== status) return false;
-      }
-      if (flagType && item.reason !== flagType) return false;
-      if (role && item.severity !== role) return false;
-      if (needle) {
-        const hay = [
-          item.reported,
-          item.reportedEmail,
-          item.reportedUcid,
-          item.reporter,
-          item.reporterEmail,
-          item.reporterUcid,
-          item.reason,
-          item.sourceContext,
-          item.details,
-          item.flaggedExcerpt,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!hay.includes(needle)) return false;
-      }
-      return true;
-    });
+    const filtered = role ? mapped.filter((item) => item.severity === role) : mapped;
     return {
       rows: filtered,
-      total: filtered.length,
+      total: role ? filtered.length : (r.pagination?.total ?? filtered.length),
       page: r.pagination?.page ?? 1,
       pageSize: r.pagination?.limit ?? limit,
     };
   },
 
   ledgerJournals: async ({ page, limit, q, referenceType }: ListFilters) => {
-    // Errors are NOT swallowed: the page renders an ErrorBox from the
-    // rejection, so a missing or shadowed route shows up as a failure
-    // instead of looking exactly like "there is no data" — which is how
-    // the top-up queue 404 went unnoticed.
     const r = (await api.adminLedgerJournals({
       page,
       limit,
@@ -1146,9 +1151,17 @@ export const opsListApi = {
         desc: j.description,
         ref: j.referenceType,
         refId: j.referenceId,
+        idempotencyKey: j.idempotencyKey ?? null,
         dr: j.totalDebitsMinor,
         cr: j.totalCreditsMinor,
         posted: j.postedAt,
+        entries: (j.entries ?? []).map((e) => ({
+          code: e.account.code,
+          name: e.account.name,
+          type: e.account.type,
+          dr: e.debitMinor,
+          cr: e.creditMinor,
+        })),
       })),
       total: r.total,
       page: r.page,
@@ -1164,10 +1177,7 @@ export const opsApi = {
     const dash = await soft(rDashboard(), null);
     return dash ? (dash.recentActivity ?? []).map(toActivity) : [];
   },
-  health: async () => {
-    const h = await soft(rHealth(), null);
-    return h ? toHealth(h) : EMPTY_HEALTH;
-  },
+  health: async () => toHealth(await rHealth()),
 
   contracts: async () => {
     const r = await soft(rContracts(), null);

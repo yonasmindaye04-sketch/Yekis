@@ -1,5 +1,6 @@
 // === IMPORTS ===
 import { prisma } from "../../lib/prisma.js";
+import { env } from "../../config/env.js";
 
 // === MAIN FUNCTIONS ===
 /**
@@ -186,10 +187,24 @@ export async function getContractDetail(contractId: string) {
     where: { id: contractId },
     include: {
       client: {
-        select: { id: true, email: true, phone: true, displayName: true },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          displayName: true,
+          cachedKycTier: true,
+          cachedKycStatus: true,
+        },
       },
       freelancer: {
-        select: { id: true, email: true, phone: true, displayName: true },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          displayName: true,
+          cachedKycTier: true,
+          cachedKycStatus: true,
+        },
       },
       job: { select: { id: true, title: true, category: true, status: true, description: true } },
       milestones: true,
@@ -244,6 +259,12 @@ export async function getContractDetail(contractId: string) {
     totals: {
       escrowHeldMinor: totalEscrowMinor,
       milestoneCount: contract.milestones.length,
+    },
+    feeConfiguration: {
+      freelancerFeeRate: env.PLATFORM_FEE_RATE_FREELANCER,
+      clientFeeRate: env.PLATFORM_FEE_RATE_CLIENT,
+      providerFeeRate: env.PAYMENT_PROVIDER_FEE_RATE,
+      withholdingEnabled: env.TIN_FEATURE_ENABLED,
     },
   };
 }

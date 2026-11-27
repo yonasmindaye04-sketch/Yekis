@@ -1592,10 +1592,10 @@ Two caveats worth stating: the alert fires **at most once, ever** (the dedupe is
 
 | Method | Path | Guard |
 |---|---|---|
-| `GET` | `/api/v1/finance/reconciliation` | `requireAuth` + `requireStaffRole("ADMIN", "COMPLIANCE_OFFICER")` |
-| `GET` | `/api/v1/finance/ledger/fees` | same |
-| `GET` | `/api/v1/finance/withholding` | same |
-| `POST` | `/api/v1/finance/withholding/:reportId/file` | same + Zod body |
+| `GET` | `/api/v1/finance/reconciliation` | `requireAuth` + `requirePermission("reconciliation.view")` |
+| `GET` | `/api/v1/finance/ledger/fees` | `requireAuth` + `requirePermission("ledger.view")` |
+| `GET` | `/api/v1/finance/withholding` | `requireAuth` + `requirePermission("reports.view")` |
+| `POST` | `/api/v1/finance/withholding/:reportId/file` | `requireAuth` + `requirePermission("reports.view")` + Zod body |
 
 Ledger-reading also happens outside this module: `GET /api/v1/admin/ledger`, `/admin/ledger/journals`, `/admin/reconciliation`, `/admin/reports/summary`, `/admin/monitoring/health` (permission-gated), and `GET /api/v1/escrow/wallet/transactions` (the user's own movements).
 
@@ -1654,9 +1654,9 @@ Two further guards apply to the Telebirr handler: the webhook is **idempotent** 
 
 `PERMISSIONS` (`permissions.ts:14-48`) is a list of 30 `domain.action` keys, with a documented action ladder: **VIEW < CREATE < EDIT < APPROVE < EXECUTE < MANAGE**.
 
-`requirePermission(key)` **re-reads `staffRole` from the database on every request** and never trusts the JWT claim, which can be stale after a role change. Failure is `403 {"error":"PERMISSION_DENIED","required":"<key>"}`.
+`requirePermission(key)` **re-reads `staffRole` from the database on every request** and never trusts the JWT claim, which can be stale after a role change. Failure is `403 {"error":"PERMISSION_DENIED","required":"<key>"}`. It is enforced across `/admin/*` as well as KYC (`kyc.review`), TMS (`tms.review`), wallet top-ups (`topups.review`), finance (`reconciliation.view`, `ledger.view`, `reports.view`), staff profile reports (`profiles.moderate`), featured talent (`featured.manage`), and Telegram bot management (`bot.manage`).
 
-`requireStaffRole(...roles)` is the coarser guard, used by the modules that predate the matrix (finance, top-ups, TMS, staff reports). It also re-reads from the database, and treats `ADMIN` and `SUPER_ADMIN` as full-access exceptions even when they are not listed — so a full-access account never sees a sidebar item it will get a 403 for.
+`requireStaffRole(...roles)` is reserved for support chat administration (`/chat/admin/*`, accepting `COMPLIANCE_OFFICER`, `ADMIN`, `SUPPORT`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `COMPLIANCE_ADMIN`). It also re-reads from the database and treats `ADMIN` and `SUPER_ADMIN` as full-access exceptions.
 
 The eight roles and what they hold:
 
@@ -1667,11 +1667,11 @@ The eight roles and what they hold:
 | `OPERATIONS_ADMIN` | `dashboard.view`, `users.view`, `users.suspend`, `contracts.view`, `escrow.view`, `payments.view`, `payouts.view`, `payouts.settle`, `disputes.view`, `support.handle`, `monitoring.view`, `receipts.view` |
 | `FINANCE_ADMIN` | `dashboard.view`, `users.view`, `payments.view`, `escrow.view`, `payouts.view`, `payouts.settle`, `ledger.view`, `reconciliation.view`, `reports.view`, `receipts.view`, `audit.view` |
 | `DISPUTE_MEDIATOR` | `dashboard.view`, `users.view`, `contracts.view`, `disputes.view`, `disputes.mediate`, `disputes.resolve` |
-| `COMPLIANCE_ADMIN` | `dashboard.view`, `users.view`, `kyc.review`, `tms.review`, `support.handle`, `disputes.view`, `disputes.mediate`, `monitoring.view`, `audit.view`, `topups.review`, `incidents.manage` |
+| `COMPLIANCE_ADMIN` | `dashboard.view`, `users.view`, `kyc.review`, `tms.review`, `support.handle`, `disputes.view`, `disputes.mediate`, `monitoring.view`, `audit.view`, `topups.review`, `profiles.moderate`, `incidents.manage` |
 | `COMPLIANCE_OFFICER` | identical to `COMPLIANCE_ADMIN` (legacy) |
 | `SUPPORT` | `dashboard.view`, `users.view`, `support.handle` |
 
-Seven keys are held by **nobody except `SUPER_ADMIN`/`ADMIN`**: `profiles.moderate`, `gigs.moderate`, `featured.manage`, `bot.manage`, `escrow.freeze`, `escrow.release`, `settings.manage`. In particular **only `SUPER_ADMIN`/`ADMIN` can release or hold escrow** — `OPERATIONS_ADMIN` has `escrow.view` but not `escrow.release`.
+Six keys are held by **nobody except `SUPER_ADMIN`/`ADMIN`**: `gigs.moderate`, `featured.manage`, `bot.manage`, `escrow.freeze`, `escrow.release`, `settings.manage`. In particular **only `SUPER_ADMIN`/`ADMIN` can release or hold escrow** — `OPERATIONS_ADMIN` has `escrow.view` but not `escrow.release`.
 
 > The code comment at `permissions.ts:123-124` says financial release approval "stays with OPERATIONS_ADMIN/SUPER_ADMIN in later phases" — that is **aspirational**. Today `OPERATIONS_ADMIN` holds `payouts.settle` but cannot release escrow and has no `kyc.review`.
 
@@ -1837,7 +1837,7 @@ flowchart TD
     UserCheck -- Yes --> SusErr["HTTP 403 FORBIDDEN (ACCOUNT_SUSPENDED)"]
     UserCheck -- No --> GateRouter{"Route Gate Type"}
     
-    GateRouter -- Staff Route --> StaffMid["requireStaffRole(role)\n(Checks User.staffRole in COMPLIANCE_OFFICER, ADMIN)"]
+    GateRouter -- Staff Route --> StaffMid["requirePermission(key) / requireStaffRole(role)\n(Matrix & User.staffRole DB check)"]
     GateRouter -- KYC-Gated Route --> KycMid["requireKycVerified(tier)\n(Tier 1 for Jobs/Proposals/Withdrawal under the MVP policy)"]
     GateRouter -- Standard Authed Route --> Handler["Execute Route Handler"]
 
@@ -2608,6 +2608,8 @@ Handles the redirect URL after a Telebirr C2B external payment checkout complete
 
 ### 8.8 The Operations Console (`apps/frontend/src/pages/ops/`)
 
+> **Complete Admin & Employee References**: For the full role-by-role specification of all 23 Operations Console sidebar views and controls, see [docs/ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md](./ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md). For the widget-by-widget specification of the Overview Command Center (`Overview.tsx`), Command Palette, Notification Bell, and Layout Customizer, see [docs/ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md](./ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md).
+
 * **Purpose:** The staff workspace — 23 pages covering support, mediation, identity review, moderation, finance, reconciliation and administration.
 * **Entry point:** `FullPlatformApp.tsx:871-878` — if `user.staffRole` is set, the console **takes over the entire SPA shell**. There is no marketplace fallback for staff.
 
@@ -2638,19 +2640,17 @@ There is **no React Router** — `page` is a `useState<OpsPageId>` and `focusId`
 
 There are two distinct fallback mechanisms:
 
-- **`soft(promise, fallback)`** — swallows every error, including 403 and 404, and substitutes an empty or zeroed value. Used by the overview fan-out, the badge counters, the reports bundle and the ledger. A missing permission therefore renders as "no data", not as an error.
-- **`opsListApi.*`** — deliberately does **not** fall back. The rejection propagates so the page renders an `ErrorBox`, because "a missing or shadowed route shows up as a failure instead of looking exactly like 'there is no data'".
+- **`soft(promise, fallback)`** — suppresses expected `403 PERMISSION_DENIED` / `STAFF_ROLE_REQUIRED` errors for restricted roles when building aggregates (unless `ignoreAllErrors=true`), and lets unexpected HTTP/network errors surface cleanly instead of silently masquerading as empty queues. Live authenticated staff calls use `strictErrors: true` in `api/client.ts` so they never fall back to `mockStore`.
+- **`opsListApi.*`** — deliberately does **not** fall back. The rejection propagates so the page renders an `ErrorBox`, because a missing or shadowed route should surface as a failure rather than looking like empty data.
 
-`opsFallbackData.ts` (18.7 KB of mock constants) is **orphaned** — imported by nothing. The real empty state is zeroed data, never mocked rows.
+`opsFallbackData.ts` (18.7 KB of mock constants) is **orphaned** — imported by nothing. The real empty state is zeroed data and `.sh-chart-empty` indicators, never mocked rows or fabricated percentages.
 
-#### Remediated client-only stubs & honest workbenches
+#### Remediated client-only stubs, data accuracy & workspace parity
 
-- **Generic action endpoints removed from client UI**: `Contracts`, `Payments`, `Escrow`, `Reconciliation`, `Ledger`, `Reports`, and `WithholdingReports` no longer call non-existent generic endpoints (`POST /admin/contracts/:id/intervene`, `POST /admin/payments/:id/action`, `POST /admin/escrows/:id/action`, `POST /admin/reconciliation/:id/resolve`, `POST /admin/ledger/journals/:id/action`) or submit unsupported `SWITCH_RAIL`/`RETRY`/`HOLD` payout outcomes. Instead, `Escrow` exposes only `Release`, `Hold`, and `Unhold` (`POST /admin/escrows/:milestoneId/{release,hold,unhold}`), `Payouts` exposes only `CONFIRMED`/`FAILED` (`POST /admin/payouts/:payoutId/settle`), and inspection-only workbenches link directly to authoritative execution desks (`Escrow`, `Dispute Mediation`, `Ledger`) with CSV/voucher exports.
-- **Native accessible dialogs (`OpsActionModal`, `CommandPalette`)**: Replaced all 9 `window.prompt()` / `window.confirm()` calls (`Risk`, `Receipts`, `DisputeQueue`, `Staff`, `BotOperations`) and `CommandPalette` with native `<dialog>` elements (`showModal()`, `overscroll-behavior: contain`).
-- **Rule-compliant status & KPI styling**: Status indicators across all 23 console pages and `EvidenceViewer.tsx` render bold colored text via `<Pill>` (removing `ShinyBadge`, `GlassCard`, `StatCard` icon boxes, and synthetic KPI delta percentages).
-- `Reconciliation.tsx` calls the ledger-action endpoint with a **hard-coded fake journal id**.
-- `Payouts.tsx` offers five settlement outcomes; the backend accepts only `CONFIRMED` and `FAILED`.
-- **Frontend/backend permission mismatches**: `profiles.moderate` gates the Profile Reports nav item but is granted to nobody except `SUPER_ADMIN`/`ADMIN`, so compliance staff lose it once the live matrix loads; and several pages are gated by `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN")`, which excludes the newer `COMPLIANCE_ADMIN` role even though the permission matrix grants it the relevant keys.
+- **Generic action endpoints & synthetic calculations removed**: `Contracts`, `Payments`, `Escrow`, `Reconciliation`, `Ledger`, `Reports`, `DisputeQueue`, `ReportsQueue`, `WithholdingReports`, and `EvidenceViewer` no longer call non-existent generic `/admin/*` endpoints, compute fake fee/tax/VAT ratios (`10%`, `3% WHT`, `15% VAT`, `4500000` fallbacks, fake `deriveLegs()` GL rows, `TB26101899201`, `SHA256-OK-*` seals, hardcoded deliverable file lists, or always-passing integrity badges), or submit unsupported `RESOLVED_WARNED`/`RESOLVED_ACCOUNT_RESTRICTED` or `SWITCH_RAIL`/`RETRY`/`HOLD` outcomes. Fees read `feeConfiguration` from `dashboard/summary`, `reports/summary`, and `contracts/:contractId`; journal drawers render real `entries[]` legs & `idempotencyKey`; reports render DB-derived trailing-6-month `months` / `rails` (`TELEBIRR`, `CBE_BIRR`, `M_PESA`) / `categories`; and SVG charts use minor units with adaptive `ETB`/`K`/`M` formatting (`unit="count"` on entity-count Donuts).
+- **Staff module permission & query alignment**: Backend guards on `tms`, `topups`, `finance`, `featured`, `bot`, and `staff/reports` were aligned onto `requirePermission(...)`, `profiles.moderate` was added to `COMPLIANCE_SET`, `listReconciliation` filters `recStatus` prior to pagination slicing, `listPayouts` & `getContractDetail` return real KYC tier/status fields, and `monitoring/health` reports `cbeConfigured` & `mpesaConfigured` checks alongside Telebirr.
+- **Native accessible dialogs (`OpsActionModal`, `CommandPalette`)**: Replaced all 9 `window.prompt()` / `window.confirm()` calls (`Risk`, `Receipts`, `DisputeQueue`, `Staff`, `BotOperations`) and `CommandPalette` with native `<dialog>` elements (`showModal()`, `closedby="any"` + pointer-bounds light-dismiss fallback, `overscroll-behavior: contain`), `scrollbar-gutter: stable`, interactive `<button type="button">` queue rows, and labeled inputs.
+- **Rule-compliant styling & Workspace parity**: Status indicators across all 23 console pages and `EvidenceViewer.tsx` render bold colored text via `<Pill>` (no translucent pill backgrounds), dark-mode rules remain color-only (with `.ev-bubble.internal` dark-safe variables), and `Overview.tsx` shares the `.sh-subnav-bar`, `.sh-kpi-card`, `.sh-card`, and smooth SVG Bezier chart visual language of `MarketplaceShadcnDashboard.tsx`.
 
 ---
 
@@ -2856,7 +2856,7 @@ known *before* the deadline is committed.
 
 ### 8.12 The Workspace Dashboard: Only the Account's Own Records
 
-> For the complete widget-by-widget reference of everything the Dashboard shows and executes across Executive Analytics, Work Pipeline (Table, Kanban, Calendar), Featured Talent, and Quick Jump for Clients, Freelancers, and Dual-Role accounts, see [docs/DASHBOARD_CONTENTS_REFERENCE.md](./DASHBOARD_CONTENTS_REFERENCE.md).
+> For the complete widget-by-widget reference of everything the Dashboard shows and executes across Executive Analytics, Work Pipeline (Table, Kanban, Calendar), Featured Talent, and Quick Jump for Clients, Freelancers, and Dual-Role accounts, see [docs/DASHBOARD_CONTENTS_REFERENCE.md](./DASHBOARD_CONTENTS_REFERENCE.md). For the Staff & Admin Operations Console Command Center (`Overview.tsx`), see [docs/ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md](./ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md).
 
 The workspace dashboard (`apps/frontend/src/components/dashboard/`) is the
 first thing every signed-in account sees. It shows four KPI cards, two
@@ -3359,7 +3359,7 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 
 ### 9.16 Operations Console
 
-**What it does:** The staff workspace. Twenty-three pages, all reached from one shell that replaces the marketplace for anyone with a staff role.
+**What it does:** The staff workspace. Twenty-three pages, all reached from one shell that replaces the marketplace for anyone with a staff role. See [docs/ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md](./ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md) for all 23 sidebar pages by Admin/Employee role and [docs/ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md](./ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md) for the Overview Command Center specification.
 
 **The shape of an operator's day** is the **Action Center** on the Overview page: a prioritised list built from live data — breached dispute SLAs first, then open critical risk flags, failed health checks, reconciliation mismatches, pending payouts, KYC awaiting review, and open profile reports.
 

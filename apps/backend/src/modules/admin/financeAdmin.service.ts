@@ -131,7 +131,15 @@ export async function listPayouts(params: {
     prisma.payoutTransaction.findMany({
       where,
       include: {
-        user: { select: { id: true, email: true, displayName: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            displayName: true,
+            cachedKycTier: true,
+            cachedKycStatus: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,

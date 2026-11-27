@@ -114,11 +114,17 @@ export default function Contracts() {
   const completedCount = rows.filter((c) => c.status === "COMPLETED").length;
   const totalMilestonesOnPage = rows.reduce((s, c) => s + c.ms, 0);
 
+  const feeRate = sel?.feeConfiguration
+    ? sel.feeConfiguration.freelancerFeeRate + sel.feeConfiguration.providerFeeRate
+    : 0.075;
+  const whtEnabled = Boolean(sel?.feeConfiguration?.withholdingEnabled);
+  const feePctLabel = `${(feeRate * 100).toFixed(1).replace(/\.0$/, "")}%`;
+
   const totalContractValue = sel
-    ? sel.milestones.reduce((s, m) => s + m.a, 0) || sel.escrowHeld || 4500000
+    ? sel.milestones.reduce((s, m) => s + m.a, 0) || sel.escrowHeld
     : 0;
-  const platformFeeMinor = Math.round(totalContractValue * 0.1);
-  const whtMinor = Math.round(totalContractValue * 0.03);
+  const platformFeeMinor = Math.round(totalContractValue * feeRate);
+  const whtMinor = 0;
 
   const openContractDoc = (idx: number) => {
     if (!sel) return;
@@ -127,7 +133,7 @@ export default function Contracts() {
       title: m.t,
       state: m.s,
       amount: fmt(m.a),
-      net: fmt(Math.round(m.a * 0.87)),
+      net: fmt(m.a - Math.round(m.a * feeRate)),
     }));
     ui.openViewer(
       [
@@ -136,7 +142,7 @@ export default function Contracts() {
           t: "SIGNED_ESCROW_AGREEMENT",
           k: "license",
           name: `${sel.title} (${sel.id})`,
-          doc: `${sel.client} ↔ ${sel.fl}`,
+          doc: `${sel.client} <-> ${sel.fl}`,
           tin: fmt(totalContractValue),
           contractId: sel.id,
           status: sel.status,
@@ -150,10 +156,13 @@ export default function Contracts() {
             { label: "Category", value: sel.cat.replace(/_/g, " ") },
             { label: "Gross Contract Value", value: fmt(totalContractValue) },
             { label: "Currently Locked in Escrow", value: fmt(sel.escrowHeld) },
-            { label: "Yekis Platform Commission (10%)", value: fmt(platformFeeMinor) },
-            { label: "ERCA Withholding Tax (3% TIN)", value: fmt(whtMinor) },
+            { label: `Yekis Platform & Rail Fee (${feePctLabel})`, value: fmt(platformFeeMinor) },
             {
-              label: "Estimated Net Freelancer Payout",
+              label: "Withholding Tax",
+              value: whtEnabled ? fmt(whtMinor) : "Deferred (0% active)",
+            },
+            {
+              label: "Estimated Net Freelancer Allocation",
               value: fmt(totalContractValue - platformFeeMinor - whtMinor),
             },
           ],
@@ -162,9 +171,9 @@ export default function Contracts() {
           id: `contract-tax-${sel.id}`,
           t: "ERCA_TIN_WITHHOLDING_SCHEDULE",
           k: "tin",
-          name: `${sel.fl} · 3% WHT Schedule (${sel.id})`,
-          doc: `Platform Fee (10%): ${fmt(platformFeeMinor)}`,
-          tin: `3% Withholding Tax: ${fmt(whtMinor)}`,
+          name: `${sel.fl} · Fee & Tax Schedule (${sel.id})`,
+          doc: `Platform & Rail Fee (${feePctLabel}): ${fmt(platformFeeMinor)}`,
+          tin: whtEnabled ? `Withholding Tax: ${fmt(whtMinor)}` : "Withholding: Deferred (0% active)",
           contractId: sel.id,
           status: sel.status,
           createdAt: dt(sel.created),
@@ -174,15 +183,17 @@ export default function Contracts() {
           freelancerEmail: sel.flEmail,
           milestones: msRows,
           extraRows: [
-            { label: "Tax Authority", value: "Ethiopian Ministry of Revenues (MOR / ERCA)" },
+            { label: "Tax Authority", value: "Ethiopian Ministry of Revenues (MOR)" },
             { label: "Governing Law", value: "Federal Income Tax Proclamation No. 979/2016" },
-            { label: "Withholding Agent", value: "Yekis Marketplace Escrow PLC (TIN: 0074918263)" },
-            { label: "Gross Taxable Base", value: fmt(totalContractValue) },
-            { label: "Applicable WHT Rate (Verified TIN)", value: "3.0% (Standard Resident Rate)" },
-            { label: "Total WHT Deducted at Source", value: fmt(whtMinor) },
-            { label: "Yekis Platform Service Fee (10%)", value: fmt(platformFeeMinor) },
+            { label: "Gross Contract Base", value: fmt(totalContractValue) },
             {
-              label: "Net Disbursement to Freelancer",
+              label: "Withholding Mode",
+              value: whtEnabled ? "Active per configured rate" : "Deferred pending TIN configuration (0%)",
+            },
+            { label: "Withholding Deducted", value: fmt(whtMinor) },
+            { label: `Yekis Platform & Rail Fee (${feePctLabel})`, value: fmt(platformFeeMinor) },
+            {
+              label: "Estimated Net Disbursement to Freelancer",
               value: fmt(totalContractValue - platformFeeMinor - whtMinor),
             },
           ],
@@ -302,7 +313,8 @@ export default function Contracts() {
             {rows.map((c) => {
               const active = sel?.id === c.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={c.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(c.id)}
@@ -323,7 +335,7 @@ export default function Contracts() {
                     <span>·</span>
                     <span>{dt(c.created)}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={list.setPage} unit="contracts" />
@@ -415,24 +427,36 @@ export default function Contracts() {
                   </div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Platform Fee (10%)</div>
+                  <div className="k">Platform &amp; Rail Fee ({feePctLabel})</div>
                   <div className="v mono">{fmt(platformFeeMinor)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">ERCA Withholding (3% TIN)</div>
-                  <div className="v mono">{fmt(whtMinor)}</div>
+                  <div className="k">Withholding Tax</div>
+                  <div className="v mono">{whtEnabled ? fmt(whtMinor) : "Deferred (0%)"}</div>
                 </div>
               </div>
 
               <div className="sec-title" style={{ marginBottom: 8 }}>
-                Automated Contract & Escrow Integrity Checks
+                Contract &amp; Escrow Status Checks
               </div>
               <div className="checks-row">
-                <span className="check pass">
-                  <ShieldCheck size={13} /> Counterparties KYC Verified
+                <span
+                  className={`check ${
+                    sel.clientKycStatus === "VERIFIED" && sel.flKycStatus === "VERIFIED"
+                      ? "pass"
+                      : sel.clientKycStatus === "REJECTED" || sel.flKycStatus === "REJECTED"
+                        ? "fail"
+                        : "warn"
+                  }`}
+                >
+                  <ShieldCheck size={13} />{" "}
+                  {sel.clientKycStatus === "VERIFIED" && sel.flKycStatus === "VERIFIED"
+                    ? "Both Parties KYC Verified"
+                    : `KYC: ${sel.clientKycStatus ?? "Unknown"} / ${sel.flKycStatus ?? "Unknown"}`}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Escrow Custody Balanced
+                <span className={`check ${sel.escrowHeld > 0 ? "pass" : "none"}`}>
+                  <CheckCircle2 size={13} />{" "}
+                  {sel.escrowHeld > 0 ? `${fmt(sel.escrowHeld)} in Custody` : "ETB 0 Held in Escrow"}
                 </span>
                 <span className={`check ${sel.disputes.length > 0 ? "fail" : "pass"}`}>
                   {sel.disputes.length > 0 ? <TriangleAlert size={13} /> : <CheckCircle2 size={13} />}
@@ -440,8 +464,8 @@ export default function Contracts() {
                     ? `${sel.disputes.length} Active Dispute(s)`
                     : "Zero Open Disputes"}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> ERCA 3% TIN Rate Applied
+                <span className="check none">
+                  <CheckCircle2 size={13} /> {feePctLabel} Combined Fee · WHT {whtEnabled ? "Active" : "Deferred"}
                 </span>
               </div>
 
@@ -464,7 +488,7 @@ export default function Contracts() {
                           <th>Milestone</th>
                           <th>Escrow State</th>
                           <th>Gross Amount</th>
-                          <th>Net After Fee/WHT</th>
+                          <th>Net After Fee</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -486,7 +510,7 @@ export default function Contracts() {
                             </td>
                             <td className="amount">{fmt(ms.a)}</td>
                             <td className="amount" style={{ color: "var(--ops-text-2)" }}>
-                              {fmt(Math.round(ms.a * 0.87))}
+                              {fmt(ms.a - Math.round(ms.a * feeRate))}
                             </td>
                           </tr>
                         ))}

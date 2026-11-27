@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import {
   getFeaturedTalent,
   refreshFeaturedCarousel,
@@ -85,7 +85,7 @@ const pinUserSchema = z.object({
 featuredRouter.post(
   "/staff/pin",
   requireAuth,
-  requireStaffRole("ADMIN", "COMPLIANCE_OFFICER"),
+  requirePermission("featured.manage"),
   async (req: any, res) => {
     try {
       const data = pinUserSchema.parse(req.body);
@@ -104,7 +104,7 @@ featuredRouter.post(
 featuredRouter.post(
   "/staff/refresh",
   requireAuth,
-  requireStaffRole("ADMIN"),
+  requirePermission("featured.manage"),
   async (req, res) => {
     try {
       await refreshFeaturedCarousel();

@@ -1,6 +1,8 @@
 # Yekis_jobs Completeness Checklist
 
-Last reviewed: 2026-11-09
+Last reviewed: 2026-11-27
+
+> **2026-11-27 Operations Console Real-Data & Workspace Parity:** Replaced mock fallbacks and synthetic fee/tax/evidence placeholders across `OpsConsole`, `Overview`, `Reports`, `Ledger`, `Contracts`, `Escrow`, `Payments`, `Payouts`, `Reconciliation`, `DisputeQueue`, `ReportsQueue`, `WithholdingReports`, and `EvidenceViewer` with real API/DB aggregates (`feeConfiguration`, real GL `entries`, trailing-6-month DB report series, server-side `recStatus` filtering, and real KYC/reporter/exposure metadata); aligned `tms`, `topups`, `finance`, `featured`, `bot`, and `staff/reports` onto `requirePermission(...)`; and unified `OpsConsole` / `Overview` / chart styling and tokens with the Client & Freelancer workspace UI.
 
 `[x]` means implemented and verified locally. `[ ]` means production work, broader test coverage, or external validation is still required. This is the authoritative project checklist; `EXTENDED_COMPLETENESS_CHECKLIST.md` points here to prevent status drift.
 

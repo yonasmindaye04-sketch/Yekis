@@ -78,9 +78,22 @@ export interface HealthState {
   checkedAt: string;
 }
 
+export interface FeeConfiguration {
+  freelancerFeeRate: number;
+  clientFeeRate: number;
+  providerFeeRate: number;
+  withholdingEnabled: boolean;
+}
+
 export interface Payout {
   id: string;
-  user: { displayName: string; email: string; id?: string };
+  user: {
+    displayName: string;
+    email: string;
+    id?: string;
+    kycTier?: string | null;
+    kycStatus?: KycState | null;
+  };
   acct: string;
   provider: Rail;
   ref: string | null;
@@ -119,12 +132,17 @@ export interface Contract {
   cat: string;
   client: string;
   clientEmail: string;
+  clientKycStatus?: KycState | null;
+  clientKycTier?: string | null;
   fl: string;
   flEmail: string;
+  flKycStatus?: KycState | null;
+  flKycTier?: string | null;
   status: ContractStatus;
   ms: number;
   created: string;
   escrowHeld: number;
+  feeConfiguration?: FeeConfiguration;
   milestones: Milestone[];
   pays: { p: Rail; s: PaymentStatus; a: number; c: string }[];
   disputes: { cat: string; stage: DisputeStage }[];
@@ -143,6 +161,7 @@ export interface Escrow {
   flEmail?: string;
   rail: string;
   txId?: string;
+  hasPaymentTx?: boolean;
   created: string;
   held: boolean;
   holdReason?: string | null;
@@ -190,14 +209,23 @@ export interface Account {
   bal: number;
   c: string; // accent colour
 }
+export interface JournalLeg {
+  code: string;
+  name: string;
+  type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
+  dr: number;
+  cr: number;
+}
 export interface JournalEntry {
   id: string;
   desc: string;
   ref: string;
   refId?: string | null;
+  idempotencyKey?: string | null;
   dr: number;
   cr: number;
   posted: string;
+  entries?: JournalLeg[];
 }
 export interface LedgerBundle {
   accounts: Account[];
@@ -263,14 +291,15 @@ export interface ReportsBundle {
     disputes: number;
     flags: number;
   };
+  feeConfiguration?: FeeConfiguration;
   series: {
     volume12: Series;
-    railMonthly: { labels: string[]; telebirr: number[]; cbe: number[] };
-    categoryDone: { label: string; value: number; color: string }[];
+    railMonthly: { labels: string[]; telebirr: number[]; cbe: number[]; mpesa: number[] };
+    categoryDone: { label: string; value: number; volumeMinor?: number; color: string }[];
   };
 }
 
-/** Chart series — values are ETB millions unless the chart says otherwise. */
+/** Chart series — money series carry integer minor units (cents). */
 export interface Series {
   labels: string[];
   values: number[];
@@ -388,9 +417,7 @@ export type ReportReason =
   | "FRAUD";
 export type ReportResolution =
   | "RESOLVED_NO_ACTION"
-  | "RESOLVED_WARNED"
   | "RESOLVED_PROFILE_HIDDEN"
-  | "RESOLVED_ACCOUNT_RESTRICTED"
   | "RESOLVED_PROFILE_BANNED";
 export interface ProfileReport {
   id: string;
@@ -430,6 +457,8 @@ export interface ProfileReport {
 /* ── Aggregates ── */
 export interface OverviewBundle {
   metrics: Metrics;
+  feeConfiguration?: FeeConfiguration;
+  collectedFeesMinor?: number;
   activity: ActivityEvent[];
   health: HealthState;
   escrows: Escrow[];

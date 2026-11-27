@@ -173,8 +173,8 @@ export default function EscrowPage() {
           id: "doc-2",
           t: "CUSTODY_ESCROW_DEPOSIT_RECEIPT",
           k: "tin",
-          name: `Custody TX: ${sel.txId ?? "TB26101899201"}`,
-          doc: `Client: ${sel.client ?? "Abebe Kebede"}`,
+          name: sel.txId ? `Custody TX: ${sel.txId}` : `Milestone: ${sel.id}`,
+          doc: sel.client ? `Client: ${sel.client}` : `Job: ${sel.job}`,
           tin: `State: ${sel.state}`,
         },
       ],
@@ -295,7 +295,8 @@ export default function EscrowPage() {
             {rows.map((e) => {
               const active = sel?.id === e.id;
               return (
-                <div
+                <button
+                  type="button"
                   key={e.id}
                   className={`queue-item ${active ? "active" : ""}`}
                   onClick={() => setSelId(e.id)}
@@ -318,7 +319,7 @@ export default function EscrowPage() {
                     <span>·</span>
                     <span>{e.rail}</span>
                   </div>
-                </div>
+                </button>
               );
             })}
             <Pager page={page} pages={pages} total={total} onPage={setPage} unit="milestones" />
@@ -377,11 +378,11 @@ export default function EscrowPage() {
                     marginTop: 12,
                     padding: "10px 12px",
                     borderRadius: 8,
-                    background: "var(--ops-amber-bg)",
-                    border: "1px solid rgba(217,119,6,.28)",
+                    background: "var(--ops-panel)",
+                    border: "1px solid var(--ops-border)",
                     color: "var(--ops-amber)",
                     fontSize: 12.5,
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
                   Active Admin Hold: {sel.holdReason}
@@ -400,7 +401,7 @@ export default function EscrowPage() {
                   <div className="k">Assigned Freelancer</div>
                   <div className="v">{sel.fl}</div>
                   <div style={{ fontSize: 11.5, color: "var(--ops-text-2)", marginTop: 2 }}>
-                    {sel.flEmail ?? "Verified Freelancer"}
+                    {sel.flEmail ?? "Freelancer account on record"}
                   </div>
                 </div>
                 <div className="info-cell">
@@ -408,9 +409,9 @@ export default function EscrowPage() {
                   <div className="v mono">{fmt(sel.amt)}</div>
                 </div>
                 <div className="info-cell">
-                  <div className="k">Freelancer Net (After 10% Fee & 3% WHT)</div>
+                  <div className="k">Est. Net Release (After 7.5% Fee)</div>
                   <div className="v mono" style={{ color: "var(--ops-green)" }}>
-                    {fmt(Math.round(sel.amt * 0.87))}
+                    {fmt(Math.round(sel.amt * 0.925))}
                   </div>
                 </div>
                 <div className="info-cell">
@@ -424,11 +425,12 @@ export default function EscrowPage() {
               </div>
 
               <div className="sec-title" style={{ marginBottom: 8 }}>
-                Escrow Custody & Release Readiness Checks
+                Escrow Custody &amp; Release Readiness Checks
               </div>
               <div className="checks-row">
-                <span className="check pass">
-                  <ShieldCheck size={13} /> Inbound Rail Settlement Reconciled
+                <span className={`check ${sel.hasPaymentTx || sel.txId ? "pass" : "warn"}`}>
+                  <ShieldCheck size={13} />{" "}
+                  {sel.hasPaymentTx || sel.txId ? "Inbound Rail TX Recorded" : "No Linked Payment TX"}
                 </span>
                 <span className={`check ${sel.held ? "warn" : "pass"}`}>
                   {sel.held ? <TriangleAlert size={13} /> : <CheckCircle2 size={13} />}
@@ -438,8 +440,16 @@ export default function EscrowPage() {
                   {sel.state === "DISPUTED" ? <TriangleAlert size={13} /> : <CheckCircle2 size={13} />}
                   {sel.state === "DISPUTED" ? "Under Active Dispute" : "Clear for Settlement"}
                 </span>
-                <span className="check pass">
-                  <CheckCircle2 size={13} /> Double-Entry Liability 2010 Backed
+                <span
+                  className={`check ${
+                    ["ESCROW_HELD", "WORK_IN_PROGRESS", "SUBMITTED_FOR_REVIEW", "ACCEPTED"].includes(
+                      sel.state,
+                    )
+                      ? "pass"
+                      : "none"
+                  }`}
+                >
+                  <CheckCircle2 size={13} /> State: {sel.state.replace(/_/g, " ")}
                 </span>
               </div>
 

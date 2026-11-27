@@ -604,14 +604,14 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 | `GET` | `/api/v1/admin/ledger` | `ledger.view` | Chart-of-accounts balances + double-entry integrity audit |
 | `GET` | `/api/v1/admin/ledger/journals` | `ledger.view` | Paginated journal entries (referenceType, q search) |
 | `GET` | `/api/v1/admin/reconciliation` | `reconciliation.view` | Provider vs internal escrow state (MATCHED / MISMATCH / PENDING / FAILED + amounts) |
-| `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates (real sums/counts) |
+| `GET` | `/api/v1/admin/reports/summary` | `reports.view` | Financial + marketplace aggregates, active `feeConfiguration`, and real trailing-6-month `series` (`months`, `rails`, `categories`) |
 | `GET` | `/api/v1/admin/sla/summary` | `reports.view` | SLA breach counts for the open support and dispute queues (server-computed; see `docs/SYSTEM_DESIGN.md` §3.19) |
-| `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics + recent activity feed |
-| `GET` | `/api/v1/admin/monitoring/health` | `monitoring.view` | DB / Redis / object-store / Telebirr-config checks + ledger balance |
+| `GET` | `/api/v1/admin/dashboard/summary` | `dashboard.view` | Overview metrics, collected fees, active `feeConfiguration`, + recent activity feed |
+| `GET` | `/api/v1/admin/monitoring/health` | `monitoring.view` | DB / Redis / object-store / rail-config checks + ledger balance |
 | `POST` | `/api/v1/admin/incidents/breach` | `incidents.manage` | Open a data-breach incident: revokes the sessions of the affected users, alerts staff by SMS/Telegram, notifies the affected users, and returns the ECA notification template plus the 72-hour deadline |
 | `GET` | `/api/v1/admin/incidents/breaches` | `incidents.manage` | List open breach incidents with the ECA filing deadline and whether it is still inside the 72-hour window |
 
-Existing protected queue routes (KYC, top-ups, disputes, TMS, etc.) remain on `requireStaffRole(...)` and are unchanged by Phase 1.
+Staff queue and moderation routers (`kyc`, `tms`, `topups`, `finance`, `featured`, `bot`, `staff/reports`) enforce granular `requirePermission(...)` guards aligned with the RBAC matrix.
 
 Validation responses use `{ "error": "VALIDATION_ERROR", "details": ... }`. Domain errors use a stable `error` code and may include a human-readable `message`.
 
@@ -697,9 +697,9 @@ All administrative surfaces are protected by router-level `requireAuth` and gran
 - **Authentication:** `Bearer <JWT>` required for all routes via `adminRouter.use(requireAuth)`.
 - **Permissions:** Validated on every call via database-backed `requirePermission(key)` checks against the role matrix (`SUPER_ADMIN`, `ADMIN`, `OPERATIONS_ADMIN`, `FINANCE_ADMIN`, `COMPLIANCE_ADMIN`, `DISPUTE_MEDIATOR`, `SUPPORT`).
 - **Overview & reporting**
-  - `GET /api/v1/admin/dashboard/summary` — `dashboard.view`. Operations metrics (`totalUsers`, `activeContracts`, `fundsInEscrowMinor`, `pendingPayouts`, `openDisputes`, `pendingIdentity`, `openSupportTickets`, `pendingPayments`, `pendingTopUps`) plus 12 most recent `recentActivity` audit events.
-  - `GET /api/v1/admin/monitoring/health` — `monitoring.view`. Checks for `database`, `redis`, `objectStore`, `telebirrConfigured` plus ledger debit/credit balance and `checkedAt`.
-  - `GET /api/v1/admin/reports/summary` — `reports.view`. Financial totals (volume, released, refunded, payouts, fees, withholding, failure counts) and marketplace totals (clients, freelancers, contracts by status, open disputes, open risk flags).
+  - `GET /api/v1/admin/dashboard/summary` — `dashboard.view`. Operations metrics (`totalUsers`, `activeContracts`, `fundsInEscrowMinor`, `pendingPayouts`, `openDisputes`, `pendingIdentity`, `openSupportTickets`, `pendingPayments`, `pendingTopUps`), `collectedFeesMinor`, `feeConfiguration`, and 12 most recent `recentActivity` audit events.
+  - `GET /api/v1/admin/monitoring/health` — `monitoring.view`. Checks for `database`, `redis`, `objectStore`, `telebirrConfigured`, `cbeConfigured`, `mpesaConfigured` plus ledger debit/credit balance and `checkedAt`.
+  - `GET /api/v1/admin/reports/summary` — `reports.view`. Financial totals (volume, released, refunded, payouts, fees, withholding, failure counts), `feeConfiguration`, marketplace totals (clients, freelancers, contracts by status, open disputes, open risk flags), and real DB-derived `series` (`months`, `rails`, `categories`).
   - `GET /api/v1/admin/audit-logs` — `audit.view`. Paginated `{ items, total, page, limit }`. Query: `page`, `limit`, `eventType`, `entityType`, `entityId`, `userId`. **No date filter exists.**
 - **Identity & access**
   - `GET /api/v1/admin/permissions/matrix` — `dashboard.view`. `{ permissions: string[], roles: Record<role, string[]> }`. This is the source of truth for client-side nav gating.
@@ -711,25 +711,25 @@ All administrative surfaces are protected by router-level `requireAuth` and gran
   - `GET /api/v1/admin/users/:userId` — `users.view`. User + KYC + wallet balance + activity counters.
   - `POST /api/v1/admin/users/:id/suspend` / `/unsuspend` — `users.suspend`.
   - `POST /api/v1/admin/users/:id/force-kyc-rereview` — `kyc.review`.
-  - `GET /api/v1/admin/contracts`, `GET /api/v1/admin/contracts/:contractId` — `contracts.view`. Detail adds milestones, payments, disputes, review and per-contract audit entries.
+  - `GET /api/v1/admin/contracts`, `GET /api/v1/admin/contracts/:contractId` — `contracts.view`. Detail adds milestones, party KYC fields (`cachedKycTier`, `cachedKycStatus`), `feeConfiguration`, payments, disputes, review and per-contract audit entries.
 - **Finance**
   - `GET /api/v1/admin/payments` — `payments.view`. Query `page`, `limit`, `status`, `provider`, `q`.
   - `GET /api/v1/admin/escrows` — `escrow.view`. Query `escrowState` (a real `EscrowState` value), `q`. Also returns `escrowHeldMinor`.
-  - `GET /api/v1/admin/payouts` — `payouts.view`. Also returns `pendingPayouts`.
+  - `GET /api/v1/admin/payouts` — `payouts.view`. Includes `user.cachedKycTier` / `cachedKycStatus` and `pendingPayouts`.
   - `POST /api/v1/admin/payouts/:payoutId/settle` — `payouts.settle`. Body `{ decision: "CONFIRMED" | "FAILED", providerPayoutId?, failureReason? }`. Returns the updated payout row.
-  - `GET /api/v1/admin/ledger`, `GET /api/v1/admin/ledger/journals` — `ledger.view`. Summary carries `accounts[]` and an `integrity` block; journals carry `totalDebitsMinor`/`totalCreditsMinor`.
-  - `GET /api/v1/admin/reconciliation` — `reconciliation.view`. Adds `reconciliationStatus` and `differenceMinor` per transaction. Note: `recStatus` is filtered **after** pagination, so `total` is page-local.
+  - `GET /api/v1/admin/ledger`, `GET /api/v1/admin/ledger/journals` — `ledger.view`. Summary carries `accounts[]` and an `integrity` block; journals carry `entries[]` (account legs), `idempotencyKey`, and `totalDebitsMinor`/`totalCreditsMinor`.
+  - `GET /api/v1/admin/reconciliation` — `reconciliation.view`. Adds `reconciliationStatus` and `differenceMinor` per transaction, filtering `recStatus` prior to pagination so `total` reflects matching rows.
 
 ### Other staff surfaces (not under `/admin`)
-These use `requireStaffRole(...)` rather than `requirePermission(...)`, so a role can hold a console page's permission yet still be rejected at the route. The console degrades per-section rather than failing.
+Staff module routers enforce matching granular `requirePermission(...)` guards so roles like `COMPLIANCE_ADMIN` and `FINANCE_ADMIN` match the matrix directly (`chat/admin` retains `requireStaffRole` covering all support-capable staff roles):
 
-- **KYC** (`/api/v1/kyc`, permission `kyc.review` — no longer `requireStaffRole`, so SUPER_ADMIN and COMPLIANCE_ADMIN are included): `GET /review-queue` (envelope uses `limit`; **omitting `status` returns every status** — it does not default to `UNDER_REVIEW`), `POST /:targetUserId/review` with `{ decision: "VERIFIED" | "REJECTED", rejectionReason? }` — there is **no** "clearer photo" decision, `GET /documents/:documentId/url`, `GET /:targetUserId/history`.
+- **KYC** (`/api/v1/kyc`, permission `kyc.review`): `GET /review-queue` (envelope uses `limit`; **omitting `status` returns every status** — it does not default to `UNDER_REVIEW`), `POST /:targetUserId/review` with `{ decision: "VERIFIED" | "REJECTED", rejectionReason? }` — there is **no** "clearer photo" decision, `GET /documents/:documentId/url`, `GET /:targetUserId/history`.
 - **KYC status semantics**: `PENDING` = registered, never uploaded a document (nothing to review, so excluded from the `pendingIdentity` KPI); `UNDER_REVIEW` = document submitted, a human must decide (the only actionable status); `VERIFIED`/`REJECTED` = decided.
-- **Transaction monitoring** (`/api/v1/tms`, `COMPLIANCE_OFFICER | ADMIN`): `GET /queue`, `POST /:flagId/file-str`, `POST /:flagId/dismiss`, `GET /activity`, `POST /users/:userId/lift-hold`.
+- **Transaction monitoring** (`/api/v1/tms`, permission `tms.review`): `GET /queue`, `POST /:flagId/file-str`, `POST /:flagId/dismiss`, `GET /activity`, `POST /users/:userId/lift-hold`.
 - **Disputes** (`/api/v1/disputes`): `GET /staff/queue`, `POST /:disputeId/resolve` with `{ outcome, recommendation, freelancerShareMinor? }`, plus `/claim`, `/arbitration-award`, `/escalate`, `/evidence`.
-- **Profile reports** (`/api/v1/staff/reports`, `ADMIN | COMPLIANCE_OFFICER`): `GET /` returns `{ data, pagination }`; resolve with `PATCH /:reportId` and `{ status, staffNotes }`. *There is no `/api/v1/admin/profile-reports` route.*
-- **Wallet top-ups** (`/api/v1/wallet/topups/queue`): `approve`, `reject` (`{ rejectionReason }`), `flag` (`{ reason }`) are three separate routes; `GET /:topUpId/receipt-url` returns a 300s signed URL.
-- **Featured talent** (`/api/v1/featured`): `POST /staff/refresh` recomputes the carousel. *There is no `/api/v1/profiles/featured/refresh` route.*
+- **Profile reports** (`/api/v1/staff/reports`, permission `profiles.moderate`): `GET /` supports `status` (`OPEN`, `ALL`, enum), `reason`, and `search`, returning joined subject/reporter KYC, prior report count, active contract count, and escrow exposure `{ data, pagination }`; resolve with `PATCH /:reportId` and `{ status, staffNotes }` (`RESOLVED_NO_ACTION`, `RESOLVED_PROFILE_HIDDEN`, `RESOLVED_PROFILE_BANNED`). *There is no `/api/v1/admin/profile-reports` route.*
+- **Wallet top-ups** (`/api/v1/wallet/topups/queue`, permission `topups.review`): `approve`, `reject` (`{ rejectionReason }`), `flag` (`{ reason }`) are three separate routes; `GET /:topUpId/receipt-url` returns a 300s signed URL.
+- **Featured talent** (`/api/v1/featured`, permission `featured.manage` on `/staff/pin` & `/staff/refresh`): `POST /staff/refresh` recomputes the carousel. *There is no `/api/v1/profiles/featured/refresh` route.*
 
 ### Support Queue (`/api/v1/chat/admin/conversations`)
 - **Access:** `requireStaffRole("COMPLIANCE_OFFICER", "ADMIN", "SUPPORT", "SUPER_ADMIN", "OPERATIONS_ADMIN", "COMPLIANCE_ADMIN")`.
@@ -791,7 +791,7 @@ Additional routes not in the original table:
 
 ## Finance (Staff Only)
 
-All finance routes require `requireAuth` + `requireStaffRole("ADMIN", "COMPLIANCE_OFFICER")`.
+All finance routes require `requireAuth` + granular `requirePermission(...)` (`reconciliation.view`, `ledger.view`, `reports.view`).
 
 | Method | Path | Purpose |
 |---|---|---|
@@ -812,7 +812,7 @@ All finance routes require `requireAuth` + `requireStaffRole("ADMIN", "COMPLIANC
 
 ## Bot Management
 
-All bot management routes require `requireAuth` + `requireStaffRole("ADMIN")` unless noted. The bot webhook itself is public (authenticated by secret token header).
+All bot management routes require `requireAuth` + `requirePermission("bot.manage")` unless noted. The bot webhook itself is public (authenticated by secret token header).
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|

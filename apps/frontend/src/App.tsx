@@ -2454,7 +2454,7 @@ export function App() {
                       <strong>
                         {role === "ADMIN"
                           ? topUpRequests.filter(
-                              (item) => item.status === "PENDING_REVIEW",
+                              (item) => item.status === "PENDING_REVIEW" || item.status === "PENDING",
                             ).length
                           : milestones.filter(
                               (item) => item.escrowState !== "RELEASED",
@@ -2597,7 +2597,7 @@ export function App() {
                               <small>
                                 {
                                   topUpRequests.filter(
-                                    (item) => item.status === "PENDING_REVIEW",
+                                    (item) => item.status === "PENDING_REVIEW" || item.status === "PENDING",
                                   ).length
                                 }{" "}
                                 pending approval

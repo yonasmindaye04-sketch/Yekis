@@ -84,9 +84,7 @@ export type PrismaReportStatus =
   | "PENDING"
   | "UNDER_REVIEW"
   | "RESOLVED_NO_ACTION"
-  | "RESOLVED_WARNED"
   | "RESOLVED_PROFILE_HIDDEN"
-  | "RESOLVED_ACCOUNT_RESTRICTED"
   | "RESOLVED_PROFILE_BANNED";
 
 /* ── dashboard/summary ── */
@@ -111,8 +109,15 @@ export interface RawActivityEvent {
   actorRole: string | null;
   amountMinor: number | null;
 }
+export interface RawFeeConfiguration {
+  freelancerFeeRate: number;
+  clientFeeRate: number;
+  providerFeeRate: number;
+  withholdingEnabled: boolean;
+}
 export interface RawDashboardSummary {
   metrics: RawMetrics;
+  feeConfiguration?: RawFeeConfiguration;
   recentActivity: RawActivityEvent[];
 }
 
@@ -122,17 +127,35 @@ export interface RawHealthCheck {
   detail?: string;
 }
 export interface RawSystemHealth {
-  checks: {
-    database: RawHealthCheck;
-    redis: RawHealthCheck;
-    objectStore: RawHealthCheck;
-    telebirrConfigured: RawHealthCheck;
-  };
+  checks: Record<string, RawHealthCheck>;
   ledger: { debitsMinor: number; creditsMinor: number; isBalanced: boolean };
   checkedAt: string;
 }
 
 /* ── reports/summary ── */
+export interface RawReportMonthPoint {
+  month: string;
+  label: string;
+  volumeMinor: number;
+  payoutMinor: number;
+  refundMinor: number;
+  feeMinor: number;
+  telebirrMinor: number;
+  cbeBirrMinor: number;
+  mpesaMinor: number;
+}
+export interface RawReportRailSummary {
+  provider: PrismaProvider;
+  volumeMinor: number;
+  payoutMinor: number;
+  count: number;
+  failedCount: number;
+}
+export interface RawReportCategorySummary {
+  category: string;
+  count: number;
+  volumeMinor: number;
+}
 export interface RawReportsSummary {
   financial: {
     transactionVolumeMinor: number;
@@ -152,6 +175,10 @@ export interface RawReportsSummary {
     openDisputes: number;
     openRiskFlags: number;
   };
+  feeConfiguration?: RawFeeConfiguration;
+  months?: RawReportMonthPoint[];
+  rails?: RawReportRailSummary[];
+  categories?: RawReportCategorySummary[];
   generatedAt: string;
 }
 
@@ -175,14 +202,26 @@ export interface RawLedgerSummary {
     discrepancyMinor: number;
   };
 }
+export interface RawJournalEntryLine {
+  id: string;
+  debitMinor: number;
+  creditMinor: number;
+  account: {
+    code: string;
+    name: string;
+    type: PrismaLedgerAccountType;
+  };
+}
 export interface RawJournal {
   id: string;
   description: string;
   referenceType: string;
   referenceId: string | null;
+  idempotencyKey?: string | null;
   postedAt: string;
   totalDebitsMinor: number;
   totalCreditsMinor: number;
+  entries?: RawJournalEntryLine[];
 }
 
 /* ── payments / escrows / payouts / reconciliation ── */
@@ -190,6 +229,8 @@ export interface RawParty {
   id: string;
   email: string;
   displayName: string | null;
+  cachedKycTier?: PrismaKycTier | null;
+  cachedKycStatus?: PrismaKycStatus | null;
 }
 export interface RawPayment {
   id: string;
@@ -287,6 +328,7 @@ export interface RawContractDetail {
   }>;
   disputes: Array<{ id: string; stage: PrismaDisputeStage; category: string }>;
   totals: { escrowHeldMinor: number; milestoneCount: number };
+  feeConfiguration?: RawFeeConfiguration;
 }
 
 /* ── users / staff ── */

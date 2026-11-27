@@ -322,7 +322,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                                 id: `del-${sel.id}`,
                                 t: `MILESTONE_DELIVERABLE — ${sel.ms}`,
                                 k: "deliverable",
-                                url: sel.deliverableUrl ?? "/uploads/deliverables/milestone-release-bundle.zip",
+                                url: sel.deliverableUrl ?? undefined,
                                 name: `${sel.job} (${sel.id})`,
                                 doc: `Disputed Milestone: ${sel.ms}`,
                                 tin: `Escrow Held: ${fmt2(sel.amt)}`,
@@ -337,7 +337,7 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                                   { label: "Evidence Statements", value: `${sel.ev.length} attached` },
                                   {
                                     label: "Artifact Location",
-                                    value: sel.deliverableUrl || "/uploads/deliverables/milestone-release-bundle.zip",
+                                    value: sel.deliverableUrl ?? "Uploaded file URL not returned",
                                   },
                                   {
                                     label: "SLA Status",
@@ -415,8 +415,8 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                   <h5>Resolution Financial Preview</h5>
                   <div className="calc-row"><span>Client receives (refund)</span><b>{fmt2(cRefund)}</b></div>
                   <div className="calc-row"><span>Freelancer gross allocation</span><b>{fmt2(fGross)}</b></div>
-                  <div className="calc-row sub"><span>− Platform fee (5%)</span><span>{fmt2(fee)}</span></div>
-                  <div className="calc-row sub"><span>− Withholding tax (est. 30% over ETB 10,000)</span><span>{fmt2(wh)}</span></div>
+                  <div className="calc-row sub"><span>− Platform &amp; rail fee (7.5%)</span><span>{fmt2(fee)}</span></div>
+                  <div className="calc-row sub"><span>− Withholding tax (deferred / 0%)</span><span>{fmt2(wh)}</span></div>
                   <div className="calc-row total"><span>Freelancer net receivable</span><b style={{ color: "var(--ops-green)" }}>{fmt2(net)}</b></div>
                 </div>
               ) : null}

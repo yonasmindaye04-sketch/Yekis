@@ -40,7 +40,7 @@ import type {
 import { ActionCenter, buildActionItems } from "../components/actionCenter";
 import type { ActionItem } from "../components/actionCenter";
 import { AreaChart, BarChart, ChartLegend, Donut, HBars } from "../components/charts";
-import { Card, ErrorBox, LoadingBox, Pill } from "../components/ui";
+import { ErrorBox, LoadingBox, PageHead, Pill } from "../components/ui";
 import { useShadcnLayout } from "../../../components/dashboard/ShadcnLayoutContext";
 
 type TimeRange = "7d" | "30d" | "90d" | "12m";
@@ -137,6 +137,11 @@ export default function Overview() {
     "ALL",
   );
   const [tableSearch, setTableSearch] = useState("");
+  const [mountNowMs] = useState(() => Date.now());
+  const referenceNowMs = useMemo(() => {
+    const checked = data?.health.checkedAt ? parseTs(data.health.checkedAt) : Number.NaN;
+    return Number.isFinite(checked) ? checked : mountNowMs;
+  }, [data, mountNowMs]);
 
   const actionItems = useMemo(() => {
     if (!data) return [];
@@ -153,8 +158,7 @@ export default function Overview() {
 
   const seriesData = useMemo(() => {
     if (!data) return null;
-    const nowMs = Date.now();
-    const buckets = buildBuckets(timeRange, nowMs);
+    const buckets = buildBuckets(timeRange, referenceNowMs);
     const windowStart = buckets[0]?.startMs ?? 0;
 
     const paymentBuckets = buckets.map(() => 0);
@@ -198,20 +202,30 @@ export default function Overview() {
     const hasPayoutSeries =
       payoutSettledBuckets.some((v) => v > 0) || payoutFailedBuckets.some((v) => v > 0);
 
+    const feeRate = data.feeConfiguration
+      ? data.feeConfiguration.freelancerFeeRate + data.feeConfiguration.providerFeeRate
+      : 0.075;
+
     return {
       labels: buckets.map((b) => b.label),
       paymentValues: paymentBuckets,
       hasVolume,
       successCount,
       totalSuccessMinor,
-      estimatedFeeMinor: Math.round(totalSuccessMinor * 0.1),
+      estimatedFeeMinor:
+        typeof data.collectedFeesMinor === "number" && data.collectedFeesMinor > 0
+          ? data.collectedFeesMinor
+          : Math.round(totalSuccessMinor * feeRate),
+      feePctLabel: `${(feeRate * 100).toFixed(1).replace(/\.0$/, "")}%`,
+      usingCollectedTotal:
+        typeof data.collectedFeesMinor === "number" && data.collectedFeesMinor > 0,
       payoutSettledBuckets,
       payoutFailedBuckets,
       hasPayoutSeries,
       payoutSettledMinor,
       payoutPendingMinor,
     };
-  }, [data, timeRange]);
+  }, [data, timeRange, referenceNowMs]);
 
   const escrowSegments = useMemo(() => {
     if (!data) return [];
@@ -236,8 +250,8 @@ export default function Overview() {
       }
     });
     return [
-      { label: "Active Custody", value: groups.held, color: "#059669" },
-      { label: "In Review", value: groups.submitted, color: "#2563eb" },
+      { label: "Active Custody", value: groups.held, color: "#16a34a" },
+      { label: "In Review", value: groups.submitted, color: "#0d9488" },
       { label: "Disputed", value: groups.disputed, color: "#dc2626" },
       { label: "Admin Hold", value: groups.adminHold, color: "#d97706" },
       { label: "Released", value: groups.released, color: "#64748b" },
@@ -392,7 +406,7 @@ export default function Overview() {
 
     (data.queues.disputes as DisputeItem[]).forEach((d) => {
       const dueIso = d.sla?.resolution.dueAt;
-      const ms = dueIso ? parseTs(dueIso) : Date.now() + d.slaH * 3_600_000;
+      const ms = dueIso ? parseTs(dueIso) : referenceNowMs + d.slaH * 3_600_000;
       events.push({
         id: d.id,
         when: dueIso ? dt(dueIso) : d.slaH < 0 ? `${Math.abs(d.slaH)}h overdue` : `In ${d.slaH}h`,
@@ -438,7 +452,7 @@ export default function Overview() {
       });
 
     return events.sort((a, b) => a.sortMs - b.sortMs);
-  }, [data, ui]);
+  }, [data, referenceNowMs, ui]);
 
   if (loading && !data) return <LoadingBox />;
   if (error) return <ErrorBox error={error} reload={reload} />;
@@ -469,6 +483,11 @@ export default function Overview() {
 
   return (
     <div className="fade">
+      <PageHead
+        title="Operations Command Center"
+        sub="Live supervision across escrow custody, payouts, disputes, KYC, AML & infrastructure health"
+      />
+
       {/* Unified Sub-navigation Toolbar matching Client & Freelancer Workspace */}
       <div className="sh-subnav-bar" style={{ marginBottom: 16 }}>
         <div className="sh-subnav-left">
@@ -808,7 +827,7 @@ export default function Overview() {
                   <AreaChart
                     labels={seriesData.labels}
                     values={seriesData.paymentValues}
-                    color="#059669"
+                    color="#16a34a"
                     unit="ETB"
                   />
                   <div className="sh-chart-summary-bar">
@@ -816,7 +835,9 @@ export default function Overview() {
                       <strong>{seriesData.successCount}</strong> successful transactions
                     </span>
                     <span>
-                      Est. platform fee (10%):{" "}
+                      {seriesData.usingCollectedTotal
+                        ? "Ledger platform fees collected:"
+                        : `Est. fee (${seriesData.feePctLabel}):`}{" "}
                       <strong className="mono">{fmt(seriesData.estimatedFeeMinor)}</strong>
                     </span>
                   </div>
@@ -863,11 +884,11 @@ export default function Overview() {
 
           {/* Escrow Breakdown & Live Queue Workload */}
           <div className="grid g2" style={{ marginBottom: 16 }}>
-            <Card className="card-pad">
-              <div className="ch-head">
+            <section className="sh-card">
+              <div className="sh-card-header">
                 <div>
-                  <div className="ch-title">Escrow Custody Allocation</div>
-                  <div className="ch-sub">Milestone funds across active lifecycle states</div>
+                  <h2 className="sh-card-title">Escrow Custody Allocation</h2>
+                  <p className="sh-card-desc">Milestone funds across active lifecycle states</p>
                 </div>
                 <button
                   type="button"
@@ -885,13 +906,13 @@ export default function Overview() {
                   <span>Open Escrow Oversight to inspect historical milestones.</span>
                 </div>
               )}
-            </Card>
+            </section>
 
-            <Card className="card-pad">
-              <div className="ch-head">
+            <section className="sh-card">
+              <div className="sh-card-header">
                 <div>
-                  <div className="ch-title">Live Queue Workload</div>
-                  <div className="ch-sub">Open cases &amp; reconciliation variances by desk</div>
+                  <h2 className="sh-card-title">Live Queue Workload</h2>
+                  <p className="sh-card-desc">Open cases &amp; reconciliation variances by desk</p>
                 </div>
                 <span className="mono" style={{ fontSize: 12, color: "var(--ops-text-3)" }}>
                   {m.totalUsers.toLocaleString()} users
@@ -899,24 +920,24 @@ export default function Overview() {
               </div>
               <HBars
                 rows={[
-                  { label: "Pending KYC", value: m.pendingIdentity, color: "#2563eb" },
+                  { label: "Pending KYC", value: m.pendingIdentity, color: "#0d9488" },
                   { label: "Open Disputes", value: m.openDisputes, color: "#dc2626" },
-                  { label: "Pending Payouts", value: m.pendingPayouts, color: "#059669" },
+                  { label: "Pending Payouts", value: m.pendingPayouts, color: "#16a34a" },
                   { label: "Open AML Flags", value: openRiskCount, color: "#d97706" },
                   { label: "Recon Exceptions", value: reconExceptions, color: "#7c3aed" },
-                  { label: "Support Tickets", value: m.openSupportTickets, color: "#0284c7" },
+                  { label: "Support Tickets", value: m.openSupportTickets, color: "#2563eb" },
                 ]}
               />
-            </Card>
+            </section>
           </div>
 
           {/* System Health & Recent Audit Feed */}
           <div className="grid g2">
-            <Card className="card-pad">
-              <div className="ch-head">
+            <section className="sh-card">
+              <div className="sh-card-header">
                 <div>
-                  <div className="ch-title">Infrastructure &amp; Ledger Integrity</div>
-                  <div className="ch-sub">Checked {dts(data.health.checkedAt)}</div>
+                  <h2 className="sh-card-title">Infrastructure &amp; Ledger Integrity</h2>
+                  <p className="sh-card-desc">Checked {dts(data.health.checkedAt)}</p>
                 </div>
                 <button
                   type="button"
@@ -969,13 +990,13 @@ export default function Overview() {
                   <Pill s={data.health.ledger.bal ? "MATCHED" : "DISCREPANCY"} />
                 </div>
               </div>
-            </Card>
+            </section>
 
-            <Card className="card-pad">
-              <div className="ch-head">
+            <section className="sh-card">
+              <div className="sh-card-header">
                 <div>
-                  <div className="ch-title">Recent Audit Activity</div>
-                  <div className="ch-sub">Latest administrative &amp; automated ledger events</div>
+                  <h2 className="sh-card-title">Recent Audit Activity</h2>
+                  <p className="sh-card-desc">Latest administrative &amp; automated ledger events</p>
                 </div>
                 <button
                   type="button"
@@ -1017,7 +1038,7 @@ export default function Overview() {
                   ))}
                 </div>
               )}
-            </Card>
+            </section>
           </div>
         </>
       ) : opsSubTab === "table" ? (
@@ -1140,7 +1161,7 @@ export default function Overview() {
                         padding: "10px 12px",
                         border: "1px solid var(--ops-border-soft)",
                         borderRadius: "var(--sh-radius)",
-                        background: "var(--ops-surface-subtle, var(--color-bg-subtle))",
+                        background: "var(--ops-kv)",
                         cursor: "pointer",
                         display: "flex",
                         flexDirection: "column",
@@ -1205,7 +1226,7 @@ export default function Overview() {
                     padding: "10px 14px",
                     border: "1px solid var(--ops-border-soft)",
                     borderRadius: "var(--sh-radius)",
-                    background: "var(--ops-surface)",
+                    background: "var(--ops-panel)",
                     textAlign: "left",
                     cursor: "pointer",
                   }}

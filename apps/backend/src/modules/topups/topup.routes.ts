@@ -10,7 +10,7 @@ import {
 } from "../../schemas";
 import { z } from "zod";
 import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
-import { requireStaffRole } from "../../middleware/staffRole.js";
+import { requirePermission } from "../admin/permissions.js";
 import { logger } from "../../lib/logger.js";
 import { prisma } from "../../lib/prisma.js";
 import { env } from "../../config/env.js";
@@ -262,7 +262,7 @@ topupsRouter.post(
 topupsRouter.get(
   "/queue",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("topups.review"),
   async (req: AuthedRequest, res) => {
     const page = req.query.page
       ? parseInt(req.query.page as string)
@@ -310,7 +310,7 @@ topupsRouter.get(
 topupsRouter.get(
   "/:topUpId/receipt-url",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("topups.review"),
   async (req: AuthedRequest, res) => {
     try {
       const result = await getReceiptViewUrl(req.params.topUpId as string);
@@ -326,7 +326,7 @@ topupsRouter.get(
 topupsRouter.post(
   "/:topUpId/approve",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("topups.review"),
   async (req: AuthedRequest, res) => {
     try {
       const result = await approveTopUp({
@@ -345,7 +345,7 @@ topupsRouter.post(
 topupsRouter.post(
   "/:topUpId/reject",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("topups.review"),
   async (req: AuthedRequest, res) => {
     // The outcome of this endpoint is REJECTED by definition â€” it is decided by
     // the URL, not the body. The previous
@@ -376,7 +376,7 @@ topupsRouter.post(
 topupsRouter.post(
   "/:topUpId/flag",
   requireAuth,
-  requireStaffRole("COMPLIANCE_OFFICER", "ADMIN"),
+  requirePermission("topups.review"),
   async (req: AuthedRequest, res) => {
     const parsed = FlagTopUpInput.safeParse(req.body);
     if (!parsed.success)

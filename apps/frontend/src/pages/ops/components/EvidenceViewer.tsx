@@ -58,30 +58,17 @@ function renderDocumentSheet(d: ViewerDoc) {
       titleUpper.includes("ERCA"));
 
   if (isDeliverable) {
-    const defaultArtifacts = d.artifactFiles?.length
+    const artifactFiles = d.artifactFiles?.length
       ? d.artifactFiles
-      : [
-          {
-            path: d.url || "/uploads/deliverables/milestone-release-bundle.zip",
-            size: "14.8 MB · Archive",
-            status: "SHA-256 VERIFIED",
-          },
-          {
-            path: "src/integration/service-connector.ts",
-            size: "28.4 KB · TypeScript",
-            status: "BUILD PASSING",
-          },
-          {
-            path: "docs/QA-Acceptance-Report-and-Test-Suite.pdf",
-            size: "1.42 MB · PDF",
-            status: "ATTACHED",
-          },
-          {
-            path: "tests/e2e-settlement-and-webhook.spec.ts",
-            size: "11.2 KB · Test Suite",
-            status: "18/18 PASSED",
-          },
-        ];
+      : d.url
+        ? [
+            {
+              path: d.url,
+              size: "Attached deliverable",
+              status: (d.status ?? "SUBMITTED").replace(/_/g, " "),
+            },
+          ]
+        : [];
 
     return (
       <div
@@ -142,7 +129,7 @@ function renderDocumentSheet(d: ViewerDoc) {
               className="mono"
               style={{ fontSize: 10.5, color: "#475569", marginTop: 5, fontWeight: 700 }}
             >
-              REF: {d.contractId ?? d.id ?? "DEL-2026-884"}
+              REF: {d.contractId ?? d.id ?? "—"}
             </div>
           </div>
         </div>
@@ -178,7 +165,7 @@ function renderDocumentSheet(d: ViewerDoc) {
                 {d.tin ?? "Escrow Protected"}
               </div>
               <div className="mono" style={{ fontSize: 11, color: "#475569", marginTop: 2 }}>
-                Submitted: {d.createdAt ?? "2026-10-19 · Verified Upload"}
+                Submitted: {d.createdAt ?? "—"}
               </div>
             </div>
           </div>
@@ -248,24 +235,33 @@ function renderDocumentSheet(d: ViewerDoc) {
                 </tr>
               </thead>
               <tbody>
-                {defaultArtifacts.map((f, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                    <td className="mono" style={{ padding: "7px 10px", fontWeight: 700, color: "#0f172a" }}>
-                      {f.path}
-                    </td>
-                    <td style={{ padding: "7px 10px", color: "#475569" }}>{f.size}</td>
-                    <td
-                      style={{
-                        padding: "7px 10px",
-                        fontSize: 10.5,
-                        fontWeight: 800,
-                        color: "#0b7a4b",
-                      }}
-                    >
-                      ✓ {f.status}
+                {artifactFiles.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} style={{ padding: "10px 12px", color: "#64748b", fontStyle: "italic" }}>
+                      No external deliverable URL or file manifest attached to this milestone record.
                     </td>
                   </tr>
-                ))}
+                ) : (
+                  artifactFiles.map((f, i) => (
+                    <tr key={i} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                      <td className="mono" style={{ padding: "7px 10px", fontWeight: 700, color: "#0f172a" }}>
+                        {f.path}
+                      </td>
+                      <td style={{ padding: "7px 10px", color: "#475569" }}>{f.size}</td>
+                      <td
+                        style={{
+                          padding: "7px 10px",
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          color: "#0b7a4b",
+                        }}
+                      >
+                        <CheckCircle2 size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                        {f.status}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -512,10 +508,10 @@ function renderDocumentSheet(d: ViewerDoc) {
           ) : null}
 
           <div style={{ fontSize: 10.5, color: "#475569", lineHeight: 1.45 }}>
-            <b>3. Governing Law, Tax Withholding & Arbitration:</b> Pursuant to Ethiopian Federal Income Tax
-            Proclamation No. 979/2016, Yekis deducts 10% platform commission and 3% WHT (for TIN-verified
-            contractors) at milestone settlement. Disputes not resolved in Mediation are referred to AACCSA
-            Arbitration in Addis Ababa with final award enforcement.
+            <b>3. Governing Law, Fees &amp; Arbitration:</b> Pursuant to Ethiopian commercial law and
+            Proclamation No. 979/2016, applicable Yekis platform/rail fees and statutory taxes are settled
+            according to active configuration at milestone release. Disputes not resolved in Mediation are
+            referred to AACCSA Arbitration in Addis Ababa with final award enforcement.
           </div>
 
           <div
@@ -530,13 +526,14 @@ function renderDocumentSheet(d: ViewerDoc) {
           >
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 9.5, fontWeight: 800, color: "#0b7a4b" }}>
-                ✓ DIGITALLY SIGNED BY CLIENT
+                <CheckCircle2 size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                DIGITALLY SIGNED BY CLIENT
               </div>
               <div style={{ fontSize: 11, fontWeight: 700, color: "#0f172a", marginTop: 2 }}>
                 {d.clientName ?? "Client Signatory"}
               </div>
               <div className="mono" style={{ fontSize: 9.5, color: "#64748b" }}>
-                Executed: {d.createdAt ?? "2026-10-11"} · e-Sign Proc. 1205/2020
+                Executed: {d.createdAt ?? "—"} · e-Sign Proc. 1205/2020
               </div>
             </div>
             <div style={{ flex: 1 }}>
@@ -605,7 +602,7 @@ function renderDocumentSheet(d: ViewerDoc) {
               ETHIOPIAN MINISTRY OF REVENUES (MOR / ERCA) · የገቢዎች ሚኒስቴር
             </div>
             <div style={{ fontSize: 15.5, fontWeight: 800, color: "#0f172a", marginTop: 3 }}>
-              3% WITHHOLDING TAX SCHEDULE & CERTIFICATE (የግብር ተቀናሽ ሰነድ)
+              WITHHOLDING TAX &amp; FEE SCHEDULE (የግብር ተቀናሽ ሰነድ)
             </div>
             <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
               Form WHT-03 · Federal Income Tax Proclamation No. 979/2016
@@ -621,7 +618,7 @@ function renderDocumentSheet(d: ViewerDoc) {
               fontWeight: 800,
             }}
           >
-            <ShieldCheck size={12} /> ERCA COMPLIANT
+            <ShieldCheck size={12} /> TAX SCHEDULE RECORD
           </span>
         </div>
 
@@ -645,7 +642,7 @@ function renderDocumentSheet(d: ViewerDoc) {
                 Yekis Marketplace Escrow PLC
               </div>
               <div className="mono" style={{ fontSize: 11, color: "#475569" }}>
-                TIN: 0074918263 · Bole Medium Taxpayers
+                Platform Settlement Schedule
               </div>
             </div>
             <div>
@@ -653,10 +650,10 @@ function renderDocumentSheet(d: ViewerDoc) {
                 PAYEE / CONTRACTOR (ተከፋይ ባለሙያ)
               </div>
               <div style={{ fontSize: 12.5, fontWeight: 800, marginTop: 2 }}>
-                {d.freelancerName ?? d.name ?? "Verified Contractor"}
+                {d.freelancerName ?? d.name ?? "Contractor on Record"}
               </div>
               <div className="mono" style={{ fontSize: 11, color: "#475569" }}>
-                {d.tin ?? "TIN Verified · 3% Resident Rate"}
+                {d.tin ?? "See fee and tax breakdown below"}
               </div>
             </div>
           </div>
@@ -720,20 +717,20 @@ function renderDocumentSheet(d: ViewerDoc) {
 
           <div className="fdoc-foot">
             <div className="fdoc-sig">
-              Certified by Yekis Automated Tax Engine · Electronic ERCA E-Tax Voucher
+              Generated from Yekis Ledger &amp; Withholding Records · Electronic Schedule
             </div>
             <div className="fdoc-stamp">
               MOR / ERCA
               <br />
               WHT-03
               <br />
-              VERIFIED
+              RECORD
             </div>
           </div>
         </div>
 
         <div className="fdoc-mrz">
-          ERCA-WHT03&lt;&lt;ETH&lt;&lt;TIN0074918263&lt;&lt;{d.contractId ?? d.id ?? "202610"}&lt;&lt;3PCT
+          ERCA-WHT03&lt;&lt;ETH&lt;&lt;YEKIS&lt;&lt;{d.contractId ?? d.id ?? "TAX"}&lt;&lt;SCHEDULE
         </div>
       </div>
     );
@@ -764,15 +761,15 @@ function renderDocumentSheet(d: ViewerDoc) {
           <div className="fdoc-fields">
             <div className="fdoc-field">
               <div className="ff-k">HOLDER / SUBJECT NAME (ሙሉ ስም)</div>
-              <div className="ff-v">{d.name ?? "Verified Yekis Account Holder"}</div>
+              <div className="ff-v">{d.name ?? "Yekis Account Holder"}</div>
             </div>
             <div className="fdoc-field">
               <div className="ff-k">REFERENCE / DOCUMENT NUMBER (የሰነድ ቁጥር)</div>
-              <div className="ff-v mono">{d.doc ?? d.id ?? "FAYDA-ET-99482104"}</div>
+              <div className="ff-v mono">{d.doc ?? d.id ?? "—"}</div>
             </div>
             <div className="fdoc-field">
               <div className="ff-k">TAX / COMPLIANCE METADATA (ግብር እና ማረጋገጫ)</div>
-              <div className="ff-v mono">{d.tin ?? "TIN-0049182734 · VERIFIED"}</div>
+              <div className="ff-v mono">{d.tin ?? "On record"}</div>
             </div>
           </div>
         </div>

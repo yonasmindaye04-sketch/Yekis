@@ -2,7 +2,7 @@
 
 > **Canonical Scope**: This document specifies every item in the browser platform workspace sidebar (`apps/frontend/src/FullPlatformApp.tsx`), detailing what each view **shows** and **executes** for **Client** (`CLIENT`), **Freelancer** (`FREELANCER`), and **Dual-Role** (`BOTH`) accounts. All endpoints, UI controls, gates, and state transitions below are verified directly against the current frontend and backend source code.
 >
-> - **Staff / Admin / Mediator accounts** (`ADMIN`, `MEDIATOR`) are routed to the Operations Console (`apps/frontend/src/pages/ops/OpsConsole.tsx`) before the workspace sidebar renders.
+> - **Staff & Admin accounts** (`user.staffRole`: `SUPER_ADMIN`, `ADMIN`, `OPERATIONS_ADMIN`, `FINANCE_ADMIN`, `DISPUTE_MEDIATOR`, `COMPLIANCE_ADMIN`, `COMPLIANCE_OFFICER`, `SUPPORT`) are routed exclusively to the Operations Console (`apps/frontend/src/pages/ops/OpsConsole.tsx`) before the workspace sidebar renders; see [docs/ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md](./ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md).
 > - **Telegram Mini App** (`apps/frontend/src/App.tsx`) uses a sticky horizontal tab bar rather than this sidebar.
 
 ---
