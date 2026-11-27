@@ -1969,8 +1969,8 @@ export class ApiClient {
     return this.request("/api/v1/tms/activity");
   }
 
-  async reauthenticate(password: string): Promise<AuthResponse> {
-    const res = await this.request<AuthResponse>(
+  async reauthenticate(password: string): Promise<{ accessToken: string; refreshToken: string; user: AuthUser }> {
+    const res = await this.request<{ accessToken: string; refreshToken: string; user: AuthUser }>(
       "/api/v1/auth/reauth",
       {
         method: "POST",
