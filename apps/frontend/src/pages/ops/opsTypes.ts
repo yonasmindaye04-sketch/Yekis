@@ -337,7 +337,7 @@ export interface ViewerDoc {
   id?: string;
   url?: string;
   t: string;
-  k: "id-front" | "id-back" | "tin" | "license" | "selfie" | "deliverable";
+  k: "id-front" | "id-back" | "tin" | "license" | "selfie" | "deliverable" | "receipt";
   name?: string;
   doc?: string;
   tin?: string;

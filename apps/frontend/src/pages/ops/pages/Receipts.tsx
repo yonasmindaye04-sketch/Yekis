@@ -91,12 +91,9 @@ export default function Receipts() {
         [
           {
             id: row.id,
-            t: `WALLET_TOPUP_RECEIPT — ${row.provider} (${row.referenceNumber || row.id})`,
+            t: `Receipt — ${row.user.email} · ${fmt(row.amountMinor)} · ${row.provider} (Ref: ${row.referenceNumber || row.id})`,
             k: "receipt",
             url,
-            name: `${row.user.email} (${row.user.ucid})`,
-            doc: `Ref: ${row.referenceNumber || "—"}`,
-            tin: `${fmt(row.amountMinor)} · ${row.provider}`,
             createdAt: dt(row.createdAt),
           },
         ],
