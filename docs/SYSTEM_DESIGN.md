@@ -30,6 +30,7 @@
    - 3.17 [Module: Privacy & Data-Subject Rights](#317-module-privacy--data-subject-rights-appsbackendsrcmodulesprivacy)
    - 3.18 [Module: Search & OpenSearch Integration](#318-module-search--opensearch-integration-appsbackendsrcmodulessearch)
 - 3.19 [Module: SLA Enforcement](#319-module-sla-enforcement-appsbackendsrcmodulessla)
+   - 3.20 [Module: Workspace Personal Reminders](#320-module-workspace-personal-reminders-appsbackendsrcmodulesreminders)
 4. [Cross-Cutting Concerns](#4-cross-cutting-concerns)
    - 4.1 [Authentication & Permission Enforcement Model](#41-authentication--permission-enforcement-model)
    - 4.2 [Audit Logging & Append-Only AML Guarantee](#42-audit-logging--append-only-aml-guarantee)
@@ -1814,6 +1815,15 @@ There is **no escalation**. A breach is visible, countable and filterable, but n
 
 ---
 
+### 3.20 Module: Workspace Personal Reminders (`apps/backend/src/modules/reminders/`)
+
+* **Purpose:** Provides server-persisted personal reminders (`WorkspaceReminder`) for workspace users to attach lightweight personal calendar notes (`title`, UTC `dueAt`, optional `note`, optional `contractId` / `milestoneId`, `completedAt`) rendered exclusively inside `CalendarScheduleView`.
+* **Files:** `reminders.routes.ts`.
+* **Routes:** `GET /api/v1/reminders`, `POST /api/v1/reminders`, `PATCH /api/v1/reminders/:reminderId`, `DELETE /api/v1/reminders/:reminderId` (all authenticated via `requireAuth`, Zod-validated, and scoped strictly to `userId: req.user!.id`).
+* **Isolation Boundary:** Personal reminders are strictly personal calendar items and never enter escrow ledger calculations, Kanban columns, or KPI metrics. Push notifications for reminders are deferred out of v1.
+
+---
+
 ## 4. Cross-Cutting Concerns
 
 ### 4.1 Authentication & Permission Enforcement Model
@@ -2890,11 +2900,9 @@ The fix, and where each fact now comes from:
 
 Two rules follow from this table and are enforced by the code:
 
-1. **No derived fakes.** `dashboardData.ts` no longer ships demo wallets,
-   demo milestones, demo ledgers or a sample cash-flow series. A bucket with
-   no movement is zero, and a chart with no movement renders an empty state
-   instead of a plausible curve.
-2. **A percentage needs a denominator.** `periodChange()` returns `null`
+1. **No derived fakes or client fee math.** `dashboardData.ts` ships zero demo fixtures, `FeaturedCarousel.tsx` ships zero `DEMO_TALENTS` (rendering empty/retry states + server-persisted `SavedTalent` bookmarks), landing/case-study pages strip fabricated testimonials and client claims, and all fee rows read server-computed amounts alongside `GET /api/v1/escrow/fee-config` (`0%` client surcharge; `7% + 0.5%` freelancer deduction shown only to freelancers).
+2. **Authoritative top-up & onboarding state.** `GET /api/v1/wallet/topups/methods` reports whether Telebirr instant checkout is genuinely configured (`telebirrInstantLive`), so `BrowserWallet` defaults cleanly to Manual Transfer when offline and shows an explicit submission timeline without unverified turnaround promises. Dual-role (`BOTH`) accounts default to `CLIENT` behind a 2-way `Client`/`Freelancer` toggle (migrating stored `BOTH`), and first-run Clients follow an ordered onboarding checklist (`Verify identity → Post brief → Add funds → Review proposals → Fund milestone`) with a persistent toggle in Settings.
+3. **A percentage needs a denominator.** `periodChange()` returns `null`
    when the prior window is empty, and the KPI cards print a sentence instead
    of a rate. An account with one day of history gets "No prior 30d
    baseline", not "0.0%".

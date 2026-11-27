@@ -458,8 +458,8 @@ const ESCROW_STEPS = [
     i3: "#128a4d",
     rows: [
       {
-        bold: "ETB 96,000 released to Selam T.",
-        small: "One tap — paid straight to her Telebirr wallet",
+        bold: "ETB 96,000 released to freelancer",
+        small: "Example · one-tap payout to their Telebirr wallet",
         d: ".5s",
       },
       {

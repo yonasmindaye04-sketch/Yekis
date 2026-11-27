@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -7,7 +7,13 @@ import {
   Clock,
   AlertTriangle,
   ExternalLink,
+  Bell,
+  Plus,
+  Trash2,
+  Briefcase,
+  ShieldCheck,
 } from "lucide-react";
+import { api, type WorkspaceReminderItem } from "../../api/client";
 import type { ScheduleEvent, ScheduleEventType } from "./dashboardData";
 import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
@@ -93,13 +99,138 @@ export function CalendarScheduleView({
   const [ethMonth, setEthMonth] = useState(initialEthiopian.month);
   const [selectedDate, setSelectedDate] = useState(todayIso);
   const [typeFilter, setTypeFilter] = useState<"ALL" | ScheduleEventType>("ALL");
+  const [reminders, setReminders] = useState<WorkspaceReminderItem[]>([]);
+  const [reminderTitle, setReminderTitle] = useState("");
+  const [reminderNote, setReminderNote] = useState("");
+  const [reminderTime, setReminderTime] = useState("09:00");
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const [showReminderForm, setShowReminderForm] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getReminders()
+      .then((rows) => {
+        if (!cancelled && Array.isArray(rows)) setReminders(rows);
+      })
+      .catch(() => {
+        // Keep calendar usable even if reminders endpoint is unavailable
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const reminderEvents = useMemo<ScheduleEvent[]>(() => {
+    return reminders.map((r) => {
+      const d = new Date(r.dueAt);
+      const valid = !Number.isNaN(d.getTime());
+      const dateStr = valid
+        ? new Intl.DateTimeFormat("en-CA", {
+            timeZone: "Africa/Addis_Ababa",
+          }).format(d)
+        : todayIso;
+      const timeStr = valid
+        ? d.toLocaleTimeString("en-GB", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "Africa/Addis_Ababa",
+          })
+        : "09:00";
+      return {
+        id: `rem-${r.id}`,
+        milestoneId: r.milestoneId ?? undefined,
+        contractId: r.contractId ?? undefined,
+        title: r.title,
+        contractRef: r.note ? r.note : copy.typeLabels.PERSONAL_REMINDER,
+        date: dateStr,
+        time: timeStr,
+        type: "PERSONAL_REMINDER",
+        amountMinor: 0,
+        rail: null,
+        status: r.completedAt ? "COMPLETED" : "SCHEDULED",
+        counterparty: copy.typeLabels.PERSONAL_REMINDER,
+      };
+    });
+  }, [reminders, todayIso, copy.typeLabels.PERSONAL_REMINDER]);
+
+  const combinedEvents = useMemo(
+    () => [...events, ...reminderEvents],
+    [events, reminderEvents],
+  );
 
   const isFiscal = mode === "fiscal";
 
   const filteredEvents = useMemo(() => {
-    if (typeFilter === "ALL") return events;
-    return events.filter((ev) => ev.type === typeFilter);
-  }, [events, typeFilter]);
+    if (typeFilter === "ALL") return combinedEvents;
+    return combinedEvents.filter((ev) => ev.type === typeFilter);
+  }, [combinedEvents, typeFilter]);
+
+  const reminderByEventId = useMemo(() => {
+    const map = new Map<string, WorkspaceReminderItem>();
+    for (const r of reminders) map.set(`rem-${r.id}`, r);
+    return map;
+  }, [reminders]);
+
+  const handleAddReminder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const title = reminderTitle.trim();
+    if (!title) return;
+    setReminderSaving(true);
+    setReminderError(null);
+    try {
+      const safeTime = /^\d{2}:\d{2}$/.test(reminderTime) ? reminderTime : "09:00";
+      const dueAt = new Date(`${selectedDate}T${safeTime}:00+03:00`).toISOString();
+      const created = await api.createReminder({
+        title,
+        dueAt,
+        note: reminderNote.trim() || null,
+      });
+      setReminders((prev) => [...prev, created]);
+      setReminderTitle("");
+      setReminderNote("");
+      setShowReminderForm(false);
+    } catch (err) {
+      setReminderError(
+        err instanceof Error ? err.message : "Could not save personal reminder.",
+      );
+    } finally {
+      setReminderSaving(false);
+    }
+  };
+
+  const handleToggleReminder = async (reminder: WorkspaceReminderItem) => {
+    try {
+      const updated = await api.updateReminder(reminder.id, {
+        completed: !reminder.completedAt,
+      });
+      setReminders((prev) =>
+        prev.map((item) => (item.id === reminder.id ? updated : item)),
+      );
+    } catch {
+      // ignore transient toggle error
+    }
+  };
+
+  const handleDeleteReminder = async (reminderId: string) => {
+    try {
+      await api.deleteReminder(reminderId);
+      setReminders((prev) => prev.filter((item) => item.id !== reminderId));
+    } catch {
+      // ignore transient delete error
+    }
+  };
+
+  const eventToneClass = (ev: ScheduleEvent) => {
+    if (ev.status === "COMPLETED") return "released muted";
+    if (ev.status === "AT_RISK") return "due crimson";
+    if (ev.type === "PERSONAL_REMINDER") return "reminder";
+    if (ev.type === "PAYOUT_RELEASE") return "released emerald";
+    if (ev.type === "PROPOSAL_DEADLINE") return "proposal";
+    if (ev.type === "COMPLIANCE_KYC") return "compliance";
+    return "due";
+  };
 
   const eventsByDate = useMemo(() => {
     const map = new Map<string, ScheduleEvent[]>();
@@ -360,6 +491,7 @@ export function CalendarScheduleView({
               ["PAYOUT_RELEASE", copy.typeLabels.PAYOUT_RELEASE],
               ["PROPOSAL_DEADLINE", copy.filterProposals],
               ["COMPLIANCE_KYC", copy.typeLabels.COMPLIANCE_KYC],
+              ["PERSONAL_REMINDER", copy.typeLabels.PERSONAL_REMINDER],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -373,6 +505,25 @@ export function CalendarScheduleView({
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Event Type Color Legend */}
+      <div className="sh-cal-legend" aria-label="Schedule category legend">
+        <span className="sh-cal-legend-item is-due">
+          <Clock size={12} aria-hidden="true" /> {copy.typeLabels.MILESTONE_DUE}
+        </span>
+        <span className="sh-cal-legend-item is-released">
+          <CheckCircle2 size={12} aria-hidden="true" /> {copy.typeLabels.PAYOUT_RELEASE}
+        </span>
+        <span className="sh-cal-legend-item is-proposal">
+          <Briefcase size={12} aria-hidden="true" /> {copy.typeLabels.PROPOSAL_DEADLINE}
+        </span>
+        <span className="sh-cal-legend-item is-compliance">
+          <ShieldCheck size={12} aria-hidden="true" /> {copy.typeLabels.COMPLIANCE_KYC}
+        </span>
+        <span className="sh-cal-legend-item is-reminder">
+          <Bell size={12} aria-hidden="true" /> {copy.typeLabels.PERSONAL_REMINDER}
+        </span>
       </div>
 
       {/* Ethiopian Fiscal Year Context */}
@@ -526,7 +677,7 @@ export function CalendarScheduleView({
                     {dayEvents.slice(0, 2).map((ev) => (
                       <div
                         key={ev.id}
-                        className={`sh-cal-event-line ${ev.status === "AT_RISK" ? "crimson" : ev.status === "COMPLETED" ? "muted" : "emerald"}`}
+                        className={`sh-cal-event-line ${eventToneClass(ev)}`}
                       >
                         <span className="sh-truncate">{ev.title}</span>
                       </div>
@@ -583,6 +734,61 @@ export function CalendarScheduleView({
           </div>
 
           <div className="sh-cal-agenda-list">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <span className="sh-cell-meta">
+                {copy.typeLabels.PERSONAL_REMINDER}s stay personal and only appear on your calendar.
+              </span>
+              <button
+                type="button"
+                className="sh-row-action-btn"
+                onClick={() => setShowReminderForm((prev) => !prev)}
+              >
+                <Plus size={12} /> {showReminderForm ? "Close" : "Add Reminder"}
+              </button>
+            </div>
+
+            {showReminderForm && (
+              <form className="sh-reminder-form" onSubmit={handleAddReminder}>
+                <input
+                  type="text"
+                  value={reminderTitle}
+                  onChange={(e) => setReminderTitle(e.target.value)}
+                  placeholder="Reminder title (e.g. Check client feedback)"
+                  maxLength={160}
+                  required
+                />
+                <div className="sh-reminder-form-row">
+                  <input
+                    type="time"
+                    value={reminderTime}
+                    onChange={(e) => setReminderTime(e.target.value)}
+                    aria-label="Reminder time"
+                  />
+                  <input
+                    type="text"
+                    value={reminderNote}
+                    onChange={(e) => setReminderNote(e.target.value)}
+                    placeholder="Optional note"
+                    maxLength={500}
+                  />
+                </div>
+                {reminderError && (
+                  <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--color-error)" }}>
+                    {reminderError}
+                  </p>
+                )}
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: 6 }}>
+                  <button
+                    type="submit"
+                    className="sh-btn sh-btn-primary sh-btn-compact"
+                    disabled={reminderSaving || !reminderTitle.trim()}
+                  >
+                    {reminderSaving ? "Saving..." : "Save reminder"}
+                  </button>
+                </div>
+              </form>
+            )}
+
             {eventsByDate.get(selectedDate)?.length ? null : (
               <div className="sh-kanban-empty">
                 <p style={{ margin: 0 }}>
@@ -591,8 +797,10 @@ export function CalendarScheduleView({
               </div>
             )}
 
-            {(eventsByDate.get(selectedDate) ?? []).map((ev) => (
-              <article key={ev.id} className="sh-agenda-item">
+            {(eventsByDate.get(selectedDate) ?? []).map((ev) => {
+              const linkedReminder = reminderByEventId.get(ev.id);
+              return (
+              <article key={ev.id} className={`sh-agenda-item ${ev.type === "PERSONAL_REMINDER" ? "is-reminder" : ""}`}>
                 <div className="sh-cell-meta">
                   <span className="sh-mono">{ev.time}</span>
                   <span aria-hidden="true">·</span>
@@ -603,20 +811,26 @@ export function CalendarScheduleView({
 
                 <h5 className="sh-agenda-title">{ev.title}</h5>
 
-                <div className="sh-cell-meta" style={{ marginTop: 4 }}>
-                  <span>{ev.counterparty}</span>
-                  <span aria-hidden="true">·</span>
-                  <span>{railLabel(ev.rail)}</span>
-                </div>
+                {ev.type !== "PERSONAL_REMINDER" && (
+                  <div className="sh-cell-meta" style={{ marginTop: 4 }}>
+                    <span>{ev.counterparty}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{railLabel(ev.rail)}</span>
+                  </div>
+                )}
 
                 <div className="sh-agenda-foot">
-                  <strong className="sh-mono">
-                    ETB {(ev.amountMinor / 100).toLocaleString()}
-                  </strong>
+                  {ev.type === "PERSONAL_REMINDER" ? (
+                    <span className="sh-cell-meta">Personal reminder</span>
+                  ) : (
+                    <strong className="sh-mono">
+                      ETB {(ev.amountMinor / 100).toLocaleString()}
+                    </strong>
+                  )}
 
                   <div style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                     <span
-                      className={`sh-status-inline ${ev.status === "AT_RISK" ? "crimson" : ev.status === "COMPLETED" ? "emerald" : "amber"}`}
+                      className={`sh-status-inline ${ev.status === "AT_RISK" ? "crimson" : ev.status === "COMPLETED" ? "emerald" : ev.type === "PERSONAL_REMINDER" ? "reminder" : "amber"}`}
                     >
                       {ev.status === "COMPLETED" ? (
                         <>
@@ -626,12 +840,35 @@ export function CalendarScheduleView({
                         <>
                           <AlertTriangle size={12} /> <span>{copy.statusAtRisk}</span>
                         </>
+                      ) : ev.type === "PERSONAL_REMINDER" ? (
+                        <>
+                          <Bell size={12} /> <span>{copy.typeLabels.PERSONAL_REMINDER}</span>
+                        </>
                       ) : (
                         <>
                           <Clock size={12} /> <span>{copy.typeLabels[ev.type]}</span>
                         </>
                       )}
                     </span>
+                    {linkedReminder && (
+                      <>
+                        <button
+                          type="button"
+                          className="sh-row-action-btn"
+                          onClick={() => void handleToggleReminder(linkedReminder)}
+                        >
+                          {linkedReminder.completedAt ? "Reopen" : "Complete"}
+                        </button>
+                        <button
+                          type="button"
+                          className="sh-icon-only-btn compact"
+                          aria-label={`Delete reminder ${linkedReminder.title}`}
+                          onClick={() => void handleDeleteReminder(linkedReminder.id)}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </>
+                    )}
                     {ev.milestoneId && onOpenEscrow && (
                       <button
                         type="button"
@@ -644,7 +881,7 @@ export function CalendarScheduleView({
                   </div>
                 </div>
               </article>
-            ))}
+            );})}
           </div>
 
           {/* Upcoming Summary across Month */}
@@ -675,7 +912,9 @@ export function CalendarScheduleView({
                   {ev.title}
                 </span>
                 <strong className="sh-mono">
-                  ETB {(ev.amountMinor / 100).toLocaleString()}
+                  {ev.type === "PERSONAL_REMINDER"
+                    ? copy.typeLabels.PERSONAL_REMINDER
+                    : `ETB ${(ev.amountMinor / 100).toLocaleString()}`}
                 </strong>
               </button>
             ))}

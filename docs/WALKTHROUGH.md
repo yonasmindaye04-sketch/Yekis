@@ -1394,3 +1394,9 @@ Evidence is genuinely real: the viewer exchanges a `KycDocument` id for a 300-se
   - Displays visible vs. total board counts, per-column task counts (including filtered `X of Y` counts), bold crimson overdue indicators (`Overdue Nd` / column overdue totals, `Due today`, `Due in Nd`) computed in `Africa/Addis_Ababa`, and actionable empty-stage guidance linking to **Open Contracts**, **Open Escrow Center**, or **Clear filters**.
 - **Inline Task Details Dialog (`KanbanBoardView.tsx`)**:
   - Clicking any milestone card or its view button opens a native `<dialog>` (`showModal()`, `closedby="any"` with pointer fallback, `overscroll-behavior: contain`) to inspect contract/client/freelancer/rail metadata, role-appropriate server fee breakdowns, escrow timestamps, deliverable links, and real role-gated actions (**Fund Milestone**, **Review & Release**, **Submit Delivery**, **Dispute**, **Open in Escrow Center**, **Open Contracts Workspace**) without leaving the board.
+
+---
+
+### Client Dashboard Fix & Redesign (2026-11-27)
+- **Server Fee Truth & Safe Confirmations**: Dashboard and Pipeline surfaces read server-computed fees (`calculateFees()`, `GET /api/v1/escrow/fee-config`) and wrap contract acceptance, milestone funding, and fund release in native `<dialog>` confirmations (`ConfirmActionModal`) stating exact amounts and effects (`Contracts` only records signatures; `Escrow Center` owns fund/release/dispute actions).
+- **Onboarding, Wallet Method Discovery & Reminders**: First-run Client accounts see `FirstRunChecklist` (with a persisted Settings toggle), upfront KYC verification prompts before brief creation, `GET /api/v1/wallet/topups/methods` driving Telebirr Instant vs Manual Transfer default selection and status timelines, `Needs your attention` actionable milestones, Calendar-only `WorkspaceReminder` CRUD, server-persisted `SavedTalent` bookmarks, grouped sidebar navigation, and a 2-way `Client`/`Freelancer` switch for dual-role users.

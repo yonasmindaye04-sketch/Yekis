@@ -107,20 +107,19 @@ describe("KanbanBoardView", () => {
     expect(html).toContain("Abebe Bikila");
     expect(html).toContain("Telebirr Checkout Integration");
     expect(html).toContain("Overdue only");
-    expect(html).toContain("All Priorities");
+    expect(html).toContain("All schedules");
   });
 
   it("renders collapse controls, meaningful task counts, and empty-stage calls to action", () => {
     const html = renderKanban();
-    expect(html).toContain('aria-label="Collapse Scoping &amp; Awaiting Funding column"');
-    expect(html).toContain("Collapse empty");
+    expect(html).toContain('aria-label="Expand Scoping &amp; Awaiting Funding column"');
+    expect(html).toContain("Expand all");
     expect(html).toContain("1 task");
-    expect(html).toContain("0 tasks");
     expect(html).toContain("2 of 2 milestones");
-    // Useful stage-specific empty CTAs pointing to authoritative Contracts & Escrow workflows
+    // Useful empty columns start collapsed while populated columns render cards cleanly
     expect(html).toContain("Live read-only projection of server escrow state");
-    expect(html).toContain("Open Contracts");
-    expect(html).toContain("Open Escrow Center");
+    expect(html).toContain("Expand Submitted for Review column");
+    expect(html).toContain("Expand Escrow Funded column");
   });
 
   it("renders native dialog for inline milestone details plus horizontal scroll sentinels", () => {

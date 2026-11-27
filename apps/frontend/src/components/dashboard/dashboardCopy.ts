@@ -301,6 +301,7 @@ export type DashboardCopy = {
       PAYOUT_RELEASE: string;
       PROPOSAL_DEADLINE: string;
       COMPLIANCE_KYC: string;
+      PERSONAL_REMINDER: string;
     };
     weekdays: [string, string, string, string, string, string, string];
     title: string;
@@ -700,6 +701,7 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         PAYOUT_RELEASE: "Payout Release",
         PROPOSAL_DEADLINE: "Proposal Deadline",
         COMPLIANCE_KYC: "Compliance SLA",
+        PERSONAL_REMINDER: "Personal Reminder",
       },
       weekdays: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
       title: "Milestone, Payout & SLA Schedule",
@@ -1076,6 +1078,7 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         PAYOUT_RELEASE: "የክፍያ መልቀቂያ",
         PROPOSAL_DEADLINE: "የጨረታ ቀነ-ገደብ",
         COMPLIANCE_KYC: "የማረጋገጫ SLA",
+        PERSONAL_REMINDER: "የግል ማስታወሻ",
       },
       weekdays: ["ሰኞ", "ማክሰኞ", "ረቡዕ", "ሐሙስ", "ዓርብ", "ቅዳሜ", "እሑድ"],
       title: "የምዕራፍ፣ ክፍያ እና SLA መርሐ ግብር",
@@ -1455,6 +1458,7 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         PAYOUT_RELEASE: "Gadhiisa Kaffaltii",
         PROPOSAL_DEADLINE: "Daangaa Dorgommii",
         COMPLIANCE_KYC: "SLA Mirkaneessaa",
+        PERSONAL_REMINDER: "Yaadachiisa Dhuunfaa",
       },
       weekdays: ["Wix", "Qib", "Rob", "Kam", "Jim", "San", "Dil"],
       title: "Sagantaa Boqonnaa, Kaffaltiifi SLA",
@@ -1829,6 +1833,7 @@ export const DASHBOARD_COPY: Record<Language, DashboardCopy> = {
         PAYOUT_RELEASE: "ምልቃቕ ክፍሊት",
         PROPOSAL_DEADLINE: "ደረት ግዜ ፕሮፖዛል",
         COMPLIANCE_KYC: "SLA መረጋገጺ",
+        PERSONAL_REMINDER: "ውልቃዊ መዘኻኸሪ",
       },
       weekdays: ["ሰኑይ", "ሰሉስ", "ረቡዕ", "ሓሙስ", "ዓርቢ", "ቀዳም", "ሰንበት"],
       title: "መደብ ምዕራፍ፣ ክፍሊትን SLAን",

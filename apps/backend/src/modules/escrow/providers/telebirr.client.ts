@@ -50,6 +50,33 @@ function hasCredentials(): boolean {
 }
 
 /**
+ * True only when Telebirr is configured for genuine live checkout (merchant
+ * credentials, callback verification public key, HTTPS callback URL, and redirect URL).
+ */
+export function isTelebirrInstantLive(): boolean {
+  if (!hasCredentials() || !env.TELEBIRR_PUBLIC_KEY) return false;
+  const notifyUrl = deriveTelebirrNotifyUrl(env);
+  if (!notifyUrl) return false;
+  try {
+    const parsed = new URL(notifyUrl);
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.pathname.replace(/\/+$/, "") !== "/api/v1/webhooks/telebirr" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.search ||
+      parsed.hash ||
+      ["localhost", "127.0.0.1", "::1"].includes(parsed.hostname.toLowerCase())
+    ) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  return Boolean(deriveTelebirrRedirectUrl(env));
+}
+
+/**
  * Generates a unique merchant order ID.
  * Format: YKS<unix_timestamp><12 cryptographically-random hex chars>
  * This is stored as providerTransactionId and used as merch_order_id

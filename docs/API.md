@@ -220,7 +220,8 @@ The 7-day cooling-off cancellation right may only be exercised by the client whi
 |---|---|---|---|
 | `POST` | `/api/v1/escrow/fund` | Contract client, Tier 1 verified | (Deprecated) Old external-provider funding path |
 | `POST` | `/api/v1/escrow/fund-from-wallet` | Contract client, Tier 1 verified | Initiate milestone funding from client wallet |
-| `GET` | `/api/v1/escrow/milestones` | Authenticated party | List milestones across current user's contracts, each with its contract title, the counterparty, the payment rail and the funding timestamp |
+| `GET` | `/api/v1/escrow/fee-config` | Authenticated | Return active server fee rates (`clientPlatformFeeRate`, `freelancerPlatformFeeRate`, `paymentProviderFeeRate`) so clients/freelancers display live server truth without hardcoded rates |
+| `GET` | `/api/v1/escrow/milestones` | Authenticated party | List milestones across current user's contracts with contract title, `contract.fullyExecuted`, counterparty, payment rail, funding timestamp, and server-computed `platformFeeMinor`, `providerFeeMinor`, `clientFeeMinor`, `clientTotalChargeMinor`, `netPayoutMinor` |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/submit` | Contract freelancer | Mark funded work delivered and schedule auto-release |
 | `POST` | `/api/v1/escrow/milestones/:milestoneId/accept` | Contract client | Accept delivery and release funds |
 | `GET` | `/api/v1/escrow/wallet` | Authenticated | Return `balanceMinor` |
@@ -261,7 +262,7 @@ Funding response (`200 OK`): returns the updated milestone object with `escrowSt
 
 The wallet is the **source** of the money, not a shortcut around escrow. Funding from the wallet places the milestone in exactly the same state as an externally-paid milestone: the freelancer still has to deliver, the client still has to accept (or let the 7-day deemed-acceptance window expire), the 24-hour warning and the auto-release timer are still scheduled on submission, and either party can still raise a dispute. The freelancer's wallet is credited only at release. *(Restored 2026-11-09 under ESC-003; see `docs/DECISIONS.md`.)*
 
-*(Note: The old `/fund` route expecting `provider` is deprecated. Escrow funding is now automatically triggered when both parties accept the contract, provided the client has topped up their wallet. The `/fund-from-wallet` route is available for manual retry.)*
+*(Note: The old `/fund` route expecting `provider` is deprecated. Contract acceptance only records party signatures and does not auto-fund milestones; clients fund each milestone explicitly from Wallet/Escrow via `/fund-from-wallet` or Escrow Center.)*
 
 When `provider` is `TELEBIRR`, `initiatePayment` creates a preOrder via the Telebirr Merchant API, utilizes a Redis-cached Fabric token, and returns a real `redirectUrl` for web checkout. In mock mode (when Telebirr credentials are not configured), it falls back to returning a mock transaction ID and `redirectUrl: null`.
 
@@ -368,6 +369,7 @@ The mounted base path is `/api/v1/escrow/topups` (with wallet shortcuts at `/api
 | `POST` | `/api/v1/escrow/topups/admin/:topUpId/review` | Staff | Approve/reject; approval credits wallet |
 | `POST` | `/api/v1/wallet/topups/checkout` | Authenticated | Initiate automated checkout (`TELEBIRR`, `CBE_BIRR`, `M_PESA`) |
 | `POST` | `/api/v1/wallet/topups/:topUpId/attach-receipt` | Owner | Attach manual transfer receipt to unconfirmed/stalled checkout request |
+| `GET` | `/api/v1/wallet/topups/methods` | Authenticated | Report whether Telebirr instant checkout is genuinely live (`telebirrInstantLive`) and recommended default rail (`INSTANT` vs `MANUAL`) |
 
 Manual top-up is `multipart/form-data` with `receipt`, `amountMinor`, `provider`, and `referenceNumber`. Supported rails are `TELEBIRR`, `CBE_BIRR`, and `M_PESA`; maximum receipt size is 8 MB.
 
@@ -858,3 +860,24 @@ Mounted at `/api/v1/reviews`.
 | `GET` | `/api/v1/reviews/users/:userId/reviews` | Public / Authenticated | List published reviews for a user |
 | `POST` | `/api/v1/reviews/:reviewId/response` | Review target | Post a public response to a received review |
 | `POST` | `/api/v1/reviews/:reviewId/dispute` | Review target | Dispute an unfair review for staff mediation |
+
+## Reminders (`/api/v1/reminders`)
+
+Mounted at `/api/v1/reminders`. Strictly scoped to the authenticated owner (`userId`).
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/reminders` | Authenticated | List personal calendar reminders ordered by `dueAt` |
+| `POST` | `/api/v1/reminders` | Authenticated | Create a reminder (`title`, ISO UTC `dueAt`, optional `note`, optional `contractId`/`milestoneId`) |
+| `PATCH` | `/api/v1/reminders/:reminderId` | Owner | Update fields or toggle `completed` (`completedAt`) |
+| `DELETE` | `/api/v1/reminders/:reminderId` | Owner | Delete a personal reminder |
+
+## Featured Talent & Saved Shortlist (`/api/v1/featured`)
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| `GET` | `/api/v1/featured` | Public | Ranked featured freelancer cards (`STAFF_PINNED` followed by `totalJobsCompleted` & rating order) |
+| `GET` | `/api/v1/featured/saved` | Authenticated | Return caller's saved talent IDs (`{ talentIds }`) |
+| `POST` | `/api/v1/featured/saved` | Authenticated | Save one or bulk-import talent IDs (`{ talentId }` or `{ talentIds }`) |
+| `DELETE` | `/api/v1/featured/saved/:talentId` | Authenticated | Remove a freelancer from caller's shortlist |
+

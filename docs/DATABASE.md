@@ -101,6 +101,8 @@ erDiagram
 | `TelegramLoginCode` | Short-lived code issued during Telegram QR/web-login start, redeemed to mint a session |
 | `PhoneVerificationCode` | SMS OTP for phone number verification. `purpose` scopes the code to the proof it gives — `PHONE_VERIFICATION` (control of the number) or `WITHDRAWAL` (approval of one payout) — so there is one outstanding code per (phone, purpose) and a login code can never approve a payment |
 | `EmailVerificationCode` | Email OTP for email address verification — the **onboarding** channel, used while the SMS provider is unconfigured. `User.email` is the login identifier and the destination of every transactional mail, so an unproven address is somebody else's inbox. Only the salted SHA-256 of the code is stored; verified rows are kept as the audit trail of which address was ever proven |
+| `WorkspaceReminder` | User-scoped personal calendar reminder (`title`, UTC `dueAt`, optional `note`, optional `contractId` / `milestoneId`, `completedAt`); rendered exclusively in the Schedule Calendar (never in Kanban or KPIs), cascades on user deletion |
+| `SavedTalent` | Server-persisted freelancer bookmark shortlist with unique `(userId, talentId)` constraint and cascade delete on both owner and target user |
 
 ## Monetary Representation
 
@@ -187,6 +189,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261110120000_audit_log_retention` | Adds `AuditLog.retentionUntil` (NOT NULL, backfilled from `createdAt` + 10 years) with an index, and the `SECURITY DEFINER` function `purge_expired_audit_logs(batch_size)` that the retention worker calls. The application role gets EXECUTE only — it still holds no `DELETE` privilege on `AuditLog` |
 | `20261110130000_phone_code_purpose` | Adds `PhoneVerificationCode.purpose` (default `PHONE_VERIFICATION`) so a withdrawal-approval code and a phone-verification code cannot cancel or substitute for each other |
 | `20261113120000_email_verification_otp` | Adds the `EmailVerificationCode` table (the onboarding OTP channel: lower-cased address, purpose, salted SHA-256 of the code, attempts, expiry) and `User.emailVerifiedAt`. `User.emailVerified` already existed and is also set by the OAuth path, where the provider — not the platform — proved the address |
+| `20261127112200_add_workspace_reminders_and_saved_talents` | Adds `WorkspaceReminder` (indexed on `(userId, dueAt)`) and `SavedTalent` (`@@unique([userId, talentId])`) with cascade deletes on `User` |
 
 ### Re-runnable migrations
 

@@ -328,6 +328,9 @@ circumventionAlertCount Int        @default(0)
   telegramLoginCodes   TelegramLoginCode[]
   notificationSettings Json?
   guideProgress        Json?
+  workspaceReminders   WorkspaceReminder[]
+  savedTalents         SavedTalent[]        @relation("SavedTalentOwner")
+  savedByUsers         SavedTalent[]        @relation("SavedTalentTarget")
 
   @@index([faydaPsut])
   @@index([isGuestContact])
@@ -1492,4 +1495,35 @@ model PayoutTransaction {
   @@index([provider, status])
   @@index([createdAt])
 }
+
+// ---------- Workspace Reminders & Saved Talent Shortlist ----------
+
+model WorkspaceReminder {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String    @db.VarChar(160)
+  dueAt       DateTime
+  note        String?   @db.VarChar(500)
+  contractId  String?
+  milestoneId String?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([userId, dueAt])
+}
+
+model SavedTalent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation("SavedTalentOwner", fields: [userId], references: [id], onDelete: Cascade)
+  talentId  String
+  talent    User     @relation("SavedTalentTarget", fields: [talentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, talentId])
+  @@index([userId])
+}
+
 

@@ -1,10 +1,12 @@
 // === IMPORTS ===
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
+  AlertCircle,
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   ExternalLink,
@@ -17,6 +19,7 @@ import {
   Upload,
   WalletCards,
   X,
+  XCircle,
 } from "lucide-react";
 import {
   api,
@@ -103,6 +106,8 @@ export function BrowserWallet({
   // unable to add funds without first opening the panel.
   const [showTopUp, setShowTopUp] = useState(role !== "FREELANCER");
   const [topUpMethod, setTopUpMethod] = useState<"INSTANT" | "MANUAL">("MANUAL");
+  const [telebirrInstantLive, setTelebirrInstantLive] = useState(false);
+  const userSelectedTopUpMethodRef = useRef(false);
 
   // Active checkout session modal & live status polling
   const [activeCheckout, setActiveCheckout] = useState<ActiveCheckoutSession | null>(null);
@@ -154,6 +159,25 @@ export function BrowserWallet({
   useEffect(() => {
     void loadMovements();
   }, [loadMovements]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getTopUpMethods()
+      .then((methods) => {
+        if (cancelled) return;
+        setTelebirrInstantLive(Boolean(methods.telebirrInstantLive));
+        if (!userSelectedTopUpMethodRef.current) {
+          setTopUpMethod(methods.defaultMethod === "INSTANT" ? "INSTANT" : "MANUAL");
+        }
+      })
+      .catch(() => {
+        // Keep conservative MANUAL default when method discovery fails
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const setTopUpSuccess = (msg: string) => {
     setTopUpMessage(msg);
@@ -426,6 +450,7 @@ export function BrowserWallet({
       setCheckoutFallback(null);
       return;
     }
+    userSelectedTopUpMethodRef.current = true;
     setTopUpMethod("MANUAL");
     setTopUpRail(rail);
     setCheckoutFallback(null);
@@ -997,7 +1022,10 @@ export function BrowserWallet({
                 id="topup-tab-instant"
                 aria-selected={topUpMethod === "INSTANT"}
                 className={`tx-tab-btn ${topUpMethod === "INSTANT" ? "active" : ""}`}
-                onClick={() => setTopUpMethod("INSTANT")}
+                onClick={() => {
+                  userSelectedTopUpMethodRef.current = true;
+                  setTopUpMethod("INSTANT");
+                }}
               >
                 Instant Checkout
               </button>
@@ -1007,7 +1035,10 @@ export function BrowserWallet({
                 id="topup-tab-manual"
                 aria-selected={topUpMethod === "MANUAL"}
                 className={`tx-tab-btn ${topUpMethod === "MANUAL" ? "active" : ""}`}
-                onClick={() => setTopUpMethod("MANUAL")}
+                onClick={() => {
+                  userSelectedTopUpMethodRef.current = true;
+                  setTopUpMethod("MANUAL");
+                }}
               >
                 Manual Transfer
               </button>
@@ -1046,8 +1077,8 @@ export function BrowserWallet({
                     />
                     <div className="payment-account-text">
                       <strong>Telebirr</strong>
-                      <span>Instant C2B</span>
-                      <code>Auto checkout</code>
+                      <span>{telebirrInstantLive ? "Instant C2B" : "Checkout offline"}</span>
+                      <code>{telebirrInstantLive ? "Live checkout" : "Manual preferred"}</code>
                     </div>
                   </button>
                   <button
@@ -1110,9 +1141,15 @@ export function BrowserWallet({
                     />
                   </label>
                   <div className="bw-instant-info-card">
-                    <strong>Telebirr Instant C2B Checkout</strong>
+                    <strong>
+                      {telebirrInstantLive
+                        ? "Telebirr Instant C2B Checkout"
+                        : "Telebirr instant checkout unavailable"}
+                    </strong>
                     <span>
-                      Creates an automated payment session in ETB and credits your wallet as soon as Telebirr confirms payment.
+                      {telebirrInstantLive
+                        ? "Creates an automated payment session in ETB and credits your wallet as soon as Telebirr confirms payment."
+                        : "Live Telebirr web checkout credentials are not configured on this server. Use Manual Transfer to upload your receipt for verification."}
                     </span>
                   </div>
                 </div>
@@ -1405,12 +1442,59 @@ export function BrowserWallet({
           </div>
           <Clock size={20} />
         </div>
+        {(() => {
+          const pendingList = topUps.filter(
+            (t) => t.status === "PENDING" || t.status === "CHECKOUT_PENDING",
+          );
+          if (pendingList.length === 0) return null;
+          const pendingEtb = Math.round(
+            pendingList.reduce((sum, t) => sum + t.amountMinor, 0) / 100,
+          );
+          return (
+            <div className="sh-pending-banner" role="status" style={{ marginBottom: 14 }}>
+              <Clock size={16} />
+              <span>
+                <strong>ETB {pendingEtb.toLocaleString()} pending verification</strong> across{" "}
+                {pendingList.length} top-up request{pendingList.length > 1 ? "s" : ""}. Funds credit as soon as review completes.
+              </span>
+            </div>
+          );
+        })()}
         {topUps.length === 0 ? (
           <p className="empty-state">No top-ups submitted yet.</p>
         ) : (
           topUps.map((item) => {
             const isPendingCheckout = item.status === "CHECKOUT_PENDING";
             const isAttaching = attachingTopUpId === item.id;
+            const statusToneClass =
+              item.status === "APPROVED"
+                ? "is-success"
+                : item.status === "REJECTED"
+                  ? "is-danger"
+                  : item.status === "FLAGGED"
+                    ? "is-danger"
+                    : "is-warning";
+            const StatusIcon =
+              item.status === "APPROVED"
+                ? CheckCircle2
+                : item.status === "REJECTED"
+                  ? XCircle
+                  : item.status === "FLAGGED"
+                    ? AlertCircle
+                    : Clock;
+            const statusLabel =
+              item.status === "APPROVED"
+                ? "Credited"
+                : item.status === "REJECTED"
+                  ? "Rejected"
+                  : item.status === "FLAGGED"
+                    ? "Compliance Review"
+                    : item.status === "CHECKOUT_PENDING"
+                      ? "Awaiting Checkout"
+                      : "Pending Verification";
+            const step2Done = item.status === "APPROVED";
+            const step3Done = item.status === "APPROVED";
+            const terminalState = item.status === "REJECTED" || item.status === "FLAGGED";
 
             return (
               <div
@@ -1433,18 +1517,9 @@ export function BrowserWallet({
                     </span>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span
-                      className={`status-pill ${
-                        item.status === "APPROVED"
-                          ? "success"
-                          : item.status === "REJECTED"
-                          ? "danger"
-                          : item.status === "CHECKOUT_PENDING"
-                          ? "warning"
-                          : ""
-                      }`}
-                    >
-                      {item.status.replace("_", " ")}
+                    <span className={`bw-status-text ${statusToneClass}`}>
+                      <StatusIcon size={14} aria-hidden="true" />
+                      <span>{statusLabel}</span>
                     </span>
                     {isPendingCheckout && (
                       <>
@@ -1501,6 +1576,41 @@ export function BrowserWallet({
                     </button>
                   </div>
                 </div>
+
+                <ol className="bw-timeline" aria-label="Top-up status timeline">
+                  <li className="bw-timeline-step is-done">
+                    <span className="bw-timeline-dot" aria-hidden="true" />
+                    <span>Submitted</span>
+                  </li>
+                  <li
+                    className={`bw-timeline-step ${
+                      step2Done
+                        ? "is-done"
+                        : terminalState
+                          ? "is-danger"
+                          : "is-current"
+                    }`}
+                  >
+                    <span className="bw-timeline-dot" aria-hidden="true" />
+                    <span>
+                      {item.status === "CHECKOUT_PENDING"
+                        ? "Checkout confirmation"
+                        : item.status === "FLAGGED"
+                          ? "Compliance review"
+                          : item.status === "REJECTED"
+                            ? "Declined"
+                            : "Pending staff verification"}
+                    </span>
+                  </li>
+                  <li
+                    className={`bw-timeline-step ${
+                      step3Done ? "is-done" : terminalState ? "is-muted" : ""
+                    }`}
+                  >
+                    <span className="bw-timeline-dot" aria-hidden="true" />
+                    <span>{step3Done ? "Credited to wallet" : "Wallet credit"}</span>
+                  </li>
+                </ol>
 
                 {isAttaching && (
                   <div

@@ -95,7 +95,8 @@ export type ScheduleEventType =
   | "MILESTONE_DUE"
   | "PAYOUT_RELEASE"
   | "PROPOSAL_DEADLINE"
-  | "COMPLIANCE_KYC";
+  | "COMPLIANCE_KYC"
+  | "PERSONAL_REMINDER";
 
 export interface ScheduleEvent {
   id: string;

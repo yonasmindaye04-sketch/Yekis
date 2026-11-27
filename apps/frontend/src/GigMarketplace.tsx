@@ -13,6 +13,7 @@ import {
   Languages,
   Layers,
   Megaphone,
+  MessageSquare,
   Package,
   Palette,
   PenTool,
@@ -104,7 +105,11 @@ function formatBirr(minor: number): string {
 }
 
 // === MAIN COMPONENT ===
-export function GigMarketplace() {
+export function GigMarketplace({
+  onOpenChat,
+}: {
+  onOpenChat?: (userId: string, userName?: string) => void;
+} = {}) {
   const { language } = useI18n();
   const copy = GIG_MARKETPLACE_COPY[language] ?? GIG_MARKETPLACE_COPY.en;
   const [gigs, setGigs] = useState<Gig[]>([]);
@@ -322,6 +327,21 @@ export function GigMarketplace() {
                       copy.verifiedFreelancerFallback}
                   </strong>
                   <ShieldCheck size={16} className="afro-verified-icon" />
+                  {onOpenChat && selected.freelancerId && (
+                    <button
+                      type="button"
+                      className="sh-row-action-btn"
+                      style={{ marginLeft: "auto" }}
+                      onClick={() =>
+                        onOpenChat(
+                          selected.freelancerId,
+                          selected.freelancer?.displayName ?? undefined,
+                        )
+                      }
+                    >
+                      <MessageSquare size={13} /> Message seller
+                    </button>
+                  )}
                 </div>
                 <p className="afro-seller-detail-bio">
                   {selected.freelancer?.bio || copy.specialistBioFallback}

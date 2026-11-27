@@ -245,6 +245,7 @@ const navIconMap: Record<string, React.ReactNode> = {
   verification: <ShieldCheck size={18} />,
   cases: <Scale size={18} />,
   profile: <UserIcon size={18} />,
+  settings: <Settings size={18} />,
 };
 
 /* ── Auth art: continuous irregular pixel field ───────────────────
@@ -731,11 +732,19 @@ function FullPlatformAppInner() {
   const [jobBudgetMax, setJobBudgetMax] = useState("");
   const [jobDeadline, setJobDeadline] = useState("");
   /* Overview interactivity state */
-  const [, setLastUpdatedAt] = useState<Date | null>(null);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [, setRealtimeLive] = useState(false);
-  /* Dual-role ("BOTH") accounts can toggle between combined, client, or freelancer workspace views */
-  const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER" | "BOTH">("BOTH");
+  /* Dual-role ("BOTH") accounts switch cleanly between Client and Freelancer workspaces */
+  const [dualRoleMode, setDualRoleMode] = useState<"CLIENT" | "FREELANCER">(() => {
+    if (typeof window === "undefined") return "CLIENT";
+    const stored = window.localStorage.getItem("yekis_dual_role_mode");
+    if (stored === "BOTH") {
+      window.localStorage.setItem("yekis_dual_role_mode", "CLIENT");
+      return "CLIENT";
+    }
+    return stored === "FREELANCER" ? "FREELANCER" : "CLIENT";
+  });
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== "undefined" && window.innerWidth < 1024,
@@ -760,10 +769,13 @@ function FullPlatformAppInner() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileDrawerOpen]);
 
-  const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER" | "BOTH") => {
+  const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER") => {
     if (user?.role !== "BOTH") return;
-    if (mode === "CLIENT" || mode === "FREELANCER" || mode === "BOTH") {
+    if (mode === "CLIENT" || mode === "FREELANCER") {
       setDualRoleMode(mode);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("yekis_dual_role_mode", mode);
+      }
     }
   };
 
@@ -1290,7 +1302,7 @@ const loadWorkspace = async () => {
     setUser(null);
     setPassword("");
     setResetToken("");
-    setDualRoleMode("BOTH");
+    setDualRoleMode("CLIENT");
     setView("overview");
     // The next person to sign in on this device must not land on the
     // profile the last one was looking at.
@@ -1483,42 +1495,66 @@ const loadWorkspace = async () => {
     void markViewNotificationsRead(view, notifications);
   }, [notifications, user, view]);
 
-  const navItems = useMemo(() => {
-    const jobsLabel = canWork ? (canHire ? `${t.nav.findWork} / ${t.nav.postJob}` : t.nav.findWork) : t.nav.jobs;
-    const jobsIconKey = canWork ? "find-work" : "jobs";
-    const common = [
-      { view: "overview" as View, iconKey: "overview", label: t.nav.dashboard },
-      { view: "jobs" as View, iconKey: jobsIconKey, label: jobsLabel },
-      // Proposals are their own tab, not a sub-tab of Jobs: the bids a
-      // freelancer sends and the bids a client receives both live here, and
-      // that is where a proposal notification points.
-      { view: "proposals" as View, iconKey: "proposals", label: t.nav.proposals },
-      { view: "gigs" as View, iconKey: "gigs", label: t.workspace.nav.gigs },
-      { view: "contracts" as View, iconKey: "contracts", label: t.nav.contracts },
-      { view: "escrow" as View, iconKey: "escrow", label: t.nav.escrow },
-      { view: "wallet" as View, iconKey: "wallet", label: t.nav.wallet },
-      { view: "chat" as View, iconKey: "chat", label: t.workspace.nav.chat },
-      { view: "profile" as View, iconKey: "profile", label: t.workspace.nav.profile },
-    ];
-    // Anyone who can work can also sell, so they get a seller surface alongside
-    // the marketplace. Hiring-only accounts see the marketplace alone.
-    const sellerNav = canWork
-      ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs }]
-      : [];
+  type SidebarNavItem = {
+    view: View;
+    iconKey: string;
+    label: string;
+    group: "HIRE" | "MONEY" | "TALK" | "ACCOUNT";
+  };
 
-    return isStaff
-      ? [...common, ...sellerNav, { view: "cases" as View, iconKey: "cases", label: t.workspace.nav.cases }]
-      : [
-          ...common,
-          ...sellerNav,
-          { view: "cases" as View, iconKey: "cases", label: t.nav.disputes },
-          {
-            view: "verification" as View,
-            iconKey: "verification",
-            label: t.nav.kyc,
-          },
-        ];
-  }, [canHire, canWork, isStaff, t]);
+  const navItems = useMemo<SidebarNavItem[]>(() => {
+    const jobsLabel = canWork ? t.nav.findWork : t.nav.jobs;
+    const jobsIconKey = canWork ? "find-work" : "jobs";
+    const hireItems: SidebarNavItem[] = [
+      { view: "overview", iconKey: "overview", label: t.nav.dashboard, group: "HIRE" },
+      { view: "jobs", iconKey: jobsIconKey, label: jobsLabel, group: "HIRE" },
+      { view: "proposals", iconKey: "proposals", label: t.nav.proposals, group: "HIRE" },
+      { view: "gigs", iconKey: "gigs", label: t.workspace.nav.gigs, group: "HIRE" },
+      ...(canWork
+        ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" as const }]
+        : []),
+      { view: "contracts", iconKey: "contracts", label: t.nav.contracts, group: "HIRE" },
+    ];
+    const moneyItems: SidebarNavItem[] = [
+      { view: "escrow", iconKey: "escrow", label: t.nav.escrow, group: "MONEY" },
+      { view: "wallet", iconKey: "wallet", label: t.nav.wallet, group: "MONEY" },
+    ];
+    const talkItems: SidebarNavItem[] = [
+      { view: "chat", iconKey: "chat", label: t.workspace.nav.chat, group: "TALK" },
+      {
+        view: "cases",
+        iconKey: "cases",
+        label: isStaff ? t.workspace.nav.cases : t.nav.disputes,
+        group: "TALK",
+      },
+    ];
+    const accountItems: SidebarNavItem[] = [
+      { view: "profile", iconKey: "profile", label: t.workspace.nav.profile, group: "ACCOUNT" },
+      ...(!isStaff
+        ? [{ view: "verification" as View, iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" as const }]
+        : []),
+      { view: "settings", iconKey: "settings", label: t.nav.settings, group: "ACCOUNT" },
+    ];
+
+    return [...hireItems, ...moneyItems, ...talkItems, ...accountItems];
+  }, [canWork, isStaff, t]);
+
+  const navGroupLabels: Record<"HIRE" | "MONEY" | "TALK" | "ACCOUNT", string> = {
+    HIRE: canWork && !canHire ? "Work" : "Hire",
+    MONEY: "Money",
+    TALK: "Talk",
+    ACCOUNT: "Account",
+  };
+
+  const mobileBottomNavItems = useMemo(() => {
+    const preferred: View[] =
+      canWork && !canHire
+        ? ["overview", "jobs", "contracts", "wallet"]
+        : ["overview", "jobs", "escrow", "wallet"];
+    return preferred
+      .map((v) => navItems.find((item) => item.view === v))
+      .filter((item): item is SidebarNavItem => Boolean(item));
+  }, [canHire, canWork, navItems]);
 
   if (user?.staffRole) {
     return (
@@ -2357,9 +2393,7 @@ const loadWorkspace = async () => {
         ? "profile"
         : view;
   const activeGuideRole: GuideRole =
-    platformRole === "FREELANCER" || platformRole === "BOTH"
-      ? platformRole
-      : "CLIENT";
+    platformRole === "FREELANCER" ? "FREELANCER" : "CLIENT";
 
   const handlePrepareDashboardSubView = (action: DashboardSubViewAction) => {
     if (action === "dashboard-analytics") {
@@ -2460,86 +2494,81 @@ const loadWorkspace = async () => {
         </div>
         {isMobileViewport && basePlatformRole === "BOTH" && (
           <div className="sh-mobile-drawer-role-switch">
-            <label className="sh-customizer-label" htmlFor="mobile-role-select">
-              {copy.workspaceModeLabel}
-            </label>
-            <select
-              id="mobile-role-select"
-              className="sh-select"
-              value={dualRoleMode}
-              onChange={(e) =>
-                switchDualRoleMode(
-                  e.target.value as "CLIENT" | "FREELANCER" | "BOTH",
-                )
-              }
-              style={{ width: "100%" }}
-            >
-              <option value="BOTH">{t.workspace.roles.modeBoth}</option>
-              <option value="CLIENT">{t.workspace.roles.modeClient}</option>
-              <option value="FREELANCER">{t.workspace.roles.modeFreelancer}</option>
-            </select>
+            <span className="sh-customizer-label">{copy.workspaceModeLabel}</span>
+            <div className="sh-segmented" role="group" aria-label={copy.switchModeAria} style={{ width: "100%" }}>
+              <button
+                type="button"
+                className={`sh-seg-btn ${dualRoleMode === "CLIENT" ? "active" : ""}`}
+                aria-pressed={dualRoleMode === "CLIENT"}
+                style={{ flex: 1 }}
+                onClick={() => switchDualRoleMode("CLIENT")}
+              >
+                {t.workspace.roles.modeClient}
+              </button>
+              <button
+                type="button"
+                className={`sh-seg-btn ${dualRoleMode === "FREELANCER" ? "active" : ""}`}
+                aria-pressed={dualRoleMode === "FREELANCER"}
+                style={{ flex: 1 }}
+                onClick={() => switchDualRoleMode("FREELANCER")}
+              >
+                {t.workspace.roles.modeFreelancer}
+              </button>
+            </div>
           </div>
         )}
-        <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            // How much has happened in this tab that the person has not
-            // looked at yet. The count rides in the accessible label; the
-            // dot itself says only "there is something here".
-            const activity = navActivityCount(item.view);
-            const activityLabel =
-              activity > 0
-                ? t.workspace.nav.newActivity.replace("{count}", String(activity))
-                : "";
+        <nav className="sidebar-nav" aria-label="Workspace navigation">
+          {(["HIRE", "MONEY", "TALK", "ACCOUNT"] as const).map((groupKey) => {
+            const groupItems = navItems.filter((item) => item.group === groupKey);
+            if (groupItems.length === 0) return null;
             return (
-              <button
-                key={item.view}
-                type="button"
-                className={
-                  view === item.view &&
-                  // "My Profile" is not highlighted while somebody else's
-                  // profile is on screen — it is not my profile.
-                  !(item.view === "profile" && !viewingOwnProfile)
-                    ? "active"
-                    : ""
-                }
-                onClick={() => {
-                  // "My Profile" always means my own profile — not whichever
-                  // person was last opened.
-                  if (item.view === "profile") {
-                    openMyProfile();
-                  } else {
-                    setView(item.view);
-                  }
-                  setMobileDrawerOpen(false);
-                }}
-                title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
-                aria-label={
-                  activityLabel ? `${item.label} — ${activityLabel}` : undefined
-                }
-              >
-                <span className="nav-icon">
-                  {navIconMap[item.iconKey]}
-                  {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
-                </span>
-                <span className="nav-label">{item.label}</span>
-              </button>
+              <div key={groupKey} className="sidebar-nav-group">
+                {(!sidebarCollapsed || isMobileViewport) && (
+                  <div className="sidebar-group-label">
+                    {navGroupLabels[groupKey]}
+                  </div>
+                )}
+                {groupItems.map((item) => {
+                  const activity = navActivityCount(item.view);
+                  const activityLabel =
+                    activity > 0
+                      ? t.workspace.nav.newActivity.replace("{count}", String(activity))
+                      : "";
+                  return (
+                    <button
+                      key={item.view}
+                      type="button"
+                      className={
+                        view === item.view &&
+                        !(item.view === "profile" && !viewingOwnProfile)
+                          ? "active"
+                          : ""
+                      }
+                      onClick={() => {
+                        if (item.view === "profile") {
+                          openMyProfile();
+                        } else {
+                          setView(item.view);
+                        }
+                        setMobileDrawerOpen(false);
+                      }}
+                      title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
+                      aria-label={
+                        activityLabel ? `${item.label} — ${activityLabel}` : undefined
+                      }
+                    >
+                      <span className="nav-icon">
+                        {navIconMap[item.iconKey]}
+                        {activity > 0 && <span className="nav-dot" aria-hidden="true" />}
+                      </span>
+                      <span className="nav-label">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             );
           })}
         </nav>
-        <button
-          type="button"
-          className={`sidebar-settings ${view === "settings" ? "active" : ""}`}
-          onClick={() => {
-            setView("settings");
-            setMobileDrawerOpen(false);
-          }}
-          title={t.nav.settings}
-        >
-          <span className="nav-icon">
-            <Settings size={18} />
-          </span>
-          <span className="nav-label">{t.nav.settings}</span>
-        </button>
 
         <div className="sidebar-foot workspace-sidebar-foot">
           <div className="user-chip">
@@ -2565,8 +2594,21 @@ const loadWorkspace = async () => {
               </span>
               {(!sidebarCollapsed || isMobileViewport) && (
                 <span className="user-chip-id">
-                  <span className="nm">{roleLabel(platformRole, language)}</span>
-                  <span className="em">{user.email || "—"}</span>
+                  <span className="nm">
+                    {user.displayName?.trim() || roleLabel(platformRole, language)}
+                  </span>
+                  <span className="em">
+                    {roleLabel(platformRole, language)} ·{" "}
+                    <span
+                      className={`sh-kyc-inline ${
+                        user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
+                      }`}
+                    >
+                      {user.kyc?.status === "VERIFIED"
+                        ? "KYC: Verified"
+                        : "KYC: Required"}
+                    </span>
+                  </span>
                 </span>
               )}
             </button>
@@ -2650,19 +2692,29 @@ const loadWorkspace = async () => {
             />
 
             {basePlatformRole === "BOTH" && (
-              <select
-                className="sh-select"
-                value={dualRoleMode}
-                onChange={(e) =>
-                  switchDualRoleMode(e.target.value as "CLIENT" | "FREELANCER" | "BOTH")
-                }
+              <div
+                className="sh-segmented"
+                role="group"
                 aria-label={copy.switchModeAria}
                 title={copy.switchModeTitle}
               >
-                <option value="BOTH">{t.workspace.roles.modeBoth}</option>
-                <option value="CLIENT">{t.workspace.roles.modeClient}</option>
-                <option value="FREELANCER">{t.workspace.roles.modeFreelancer}</option>
-              </select>
+                <button
+                  type="button"
+                  className={`sh-seg-btn ${dualRoleMode === "CLIENT" ? "active" : ""}`}
+                  aria-pressed={dualRoleMode === "CLIENT"}
+                  onClick={() => switchDualRoleMode("CLIENT")}
+                >
+                  {t.workspace.roles.modeClient}
+                </button>
+                <button
+                  type="button"
+                  className={`sh-seg-btn ${dualRoleMode === "FREELANCER" ? "active" : ""}`}
+                  aria-pressed={dualRoleMode === "FREELANCER"}
+                  onClick={() => switchDualRoleMode("FREELANCER")}
+                >
+                  {t.workspace.roles.modeFreelancer}
+                </button>
+              </div>
             )}
 
             <LanguageSelector variant="dropdown" />
@@ -2683,9 +2735,28 @@ const loadWorkspace = async () => {
             <GlobalHelpMenu />
             <button
               type="button"
+              className={`sh-kyc-header-link ${
+                user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
+              }`}
+              onClick={() =>
+                setView(user.kyc?.status === "VERIFIED" ? "profile" : "verification")
+              }
+              title={
+                user.kyc?.status === "VERIFIED"
+                  ? "Identity verified"
+                  : "Complete identity verification"
+              }
+            >
+              <ShieldCheck size={14} aria-hidden="true" />
+              <span>
+                {user.kyc?.status === "VERIFIED" ? "KYC: Verified" : "KYC: Required"}
+              </span>
+            </button>
+            <button
+              type="button"
               className="user-menu"
               onClick={openMyProfile}
-              title={`${roleLabel(platformRole, language)} — ${user.email}`}
+              title={`${user.displayName?.trim() || roleLabel(platformRole, language)} — ${user.email}`}
               aria-label={copy.openProfileAria(user.email ?? "")}
             >
               <span className="avatar yk-topbar-avatar">
@@ -2792,6 +2863,12 @@ const loadWorkspace = async () => {
         {view === "overview" && (
           <div className="sh-workspace-view">
             <MarketplaceShadcnDashboard
+              userId={user.id}
+              kycVerified={user.kyc?.status === "VERIFIED"}
+              kycStatus={user.kyc?.status ?? "NOT_STARTED"}
+              proposalsCount={myJobs.reduce((sum, j) => sum + (j.proposalsCount ?? 0), 0)}
+              lastUpdatedAt={lastUpdatedAt}
+              workspaceError={error || null}
               wallet={wallet}
               jobs={jobs}
               myJobs={myJobs}
@@ -2873,6 +2950,24 @@ const loadWorkspace = async () => {
                   </div>
                   <span className="sh-kbd">{copy.escrowProtectedBadge}</span>
                 </div>
+                {user.kyc?.status !== "VERIFIED" && (
+                  <div className="sh-pending-banner" role="alert" style={{ marginBottom: 14 }}>
+                    <ShieldCheck size={16} />
+                    <span style={{ flex: 1 }}>
+                      <strong>Identity verification required before publishing a brief.</strong>{" "}
+                      {user.kyc?.status === "UNDER_REVIEW"
+                        ? "Your KYC verification is currently under staff review. Posting unlocks once approved."
+                        : "Verify your identity first so freelancers know briefs come from verified clients."}
+                    </span>
+                    <button
+                      type="button"
+                      className="sh-btn sh-btn-secondary"
+                      onClick={() => setView("verification")}
+                    >
+                      {copy.verifyIdentityBtn}
+                    </button>
+                  </div>
+                )}
                 <div className="form-grid">
                   <label className="form-span-2">
                     {copy.briefTitleLabel}
@@ -2956,9 +3051,11 @@ const loadWorkspace = async () => {
                 <div style={{ display: "flex", justifyContent: "flex-end" }}>
                   <button
                     className="sh-btn sh-btn-primary"
-                    disabled={isLoading}
+                    disabled={isLoading || user.kyc?.status !== "VERIFIED"}
                   >
-                    {copy.publishBriefBtn}
+                    {user.kyc?.status === "VERIFIED"
+                      ? copy.publishBriefBtn
+                      : "Verify identity first"}
                   </button>
                 </div>
               </form>
@@ -2971,6 +3068,7 @@ const loadWorkspace = async () => {
               categoryLabels={localizedCategoryLabels}
               section="jobs"
               onBrowseJobs={() => setView("jobs")}
+              onOpenChat={(id, name) => void openChatWithUser(id, name)}
             />
           </section>
         )}
@@ -3003,13 +3101,16 @@ const loadWorkspace = async () => {
               categoryLabels={localizedCategoryLabels}
               section="proposals"
               onBrowseJobs={() => setView("jobs")}
+              onOpenChat={(id, name) => void openChatWithUser(id, name)}
             />
           </section>
         )}
 
         {view === "gigs" && (
           <section className="sh-dashboard-wrap">
-            <GigMarketplace />
+            <GigMarketplace
+              onOpenChat={(id, name) => void openChatWithUser(id, name)}
+            />
           </section>
         )}
         {view === "my-gigs" && (
@@ -3241,7 +3342,7 @@ const loadWorkspace = async () => {
       </main>
 
       <nav className="platform-mobile-nav" aria-label={copy.mobileNavAria}>
-        {navItems.slice(0, 4).map((item) => {
+        {mobileBottomNavItems.map((item) => {
           // The same dot the sidebar shows, so the thumb-zone bar and the
           // drawer never disagree about what is waiting.
           const activity = navActivityCount(item.view);

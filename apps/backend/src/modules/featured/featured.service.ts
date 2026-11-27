@@ -149,6 +149,16 @@ export async function refreshFeaturedCarousel() {
       categoryCount++;
     }
 
+    // Rank non-pinned cards by proven track record (completed jobs desc, rating desc)
+    result.sort((a, b) => {
+      const aPinned = a.reason === "STAFF_PINNED" ? 1 : 0;
+      const bPinned = b.reason === "STAFF_PINNED" ? 1 : 0;
+      if (aPinned !== bPinned) return bPinned - aPinned;
+      const jobsDiff = (b.totalJobsCompleted ?? 0) - (a.totalJobsCompleted ?? 0);
+      if (jobsDiff !== 0) return jobsDiff;
+      return (b.ratingAverage ?? 0) - (a.ratingAverage ?? 0);
+    });
+
     // Update lastFeaturedAt and create FeaturedLog for newly featured
     const userIds = result.map((r) => r.id);
 
@@ -211,6 +221,53 @@ export async function pinUser(
     logger.error({ err: error }, "Error pinning user");
     throw new Error("Failed to pin user");
   }
+}
+
+export async function getSavedTalentIdsForUser(userId: string): Promise<string[]> {
+  const rows = await prisma.savedTalent.findMany({
+    where: { userId },
+    orderBy: { createdAt: "desc" },
+    select: { talentId: true },
+  });
+  return rows.map((r) => r.talentId);
+}
+
+export async function saveTalentsForUser(
+  userId: string,
+  candidateIds: string[],
+): Promise<string[]> {
+  const uniqueIds = Array.from(
+    new Set(candidateIds.map((id) => id.trim()).filter((id) => id && id !== userId)),
+  );
+  if (uniqueIds.length > 0) {
+    const validTargets = await prisma.user.findMany({
+      where: {
+        id: { in: uniqueIds },
+        isSuspended: false,
+      },
+      select: { id: true },
+    });
+    if (validTargets.length > 0) {
+      await prisma.savedTalent.createMany({
+        data: validTargets.map((t) => ({
+          userId,
+          talentId: t.id,
+        })),
+        skipDuplicates: true,
+      });
+    }
+  }
+  return getSavedTalentIdsForUser(userId);
+}
+
+export async function removeSavedTalentForUser(
+  userId: string,
+  talentId: string,
+): Promise<string[]> {
+  await prisma.savedTalent.deleteMany({
+    where: { userId, talentId },
+  });
+  return getSavedTalentIdsForUser(userId);
 }
 
 // === HELPERS ===

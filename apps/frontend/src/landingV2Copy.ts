@@ -399,7 +399,7 @@ export const ESCROW_STEP_ROWS_BY_LANG: Record<Language, EscrowRowCopy[][]> = {
       { bold: "48h review window", small: "Gentle reminders if a review goes quiet" },
     ],
     [
-      { bold: "ETB 96,000 released to Selam T.", small: "One tap — paid straight to her Telebirr wallet" },
+      { bold: "ETB 96,000 released to freelancer", small: "One tap — paid straight to their Telebirr wallet" },
       { bold: "Receipt issued automatically", small: "Telebirr receipt saved for both sides" },
       { bold: "0-day wait", small: "No invoices, no chasing, no awkward emails" },
     ],
@@ -421,7 +421,7 @@ export const ESCROW_STEP_ROWS_BY_LANG: Record<Language, EscrowRowCopy[][]> = {
       { bold: "የ48 ሰዓት የግምገማ ጊዜ", small: "ግምገማው ከዘገየ ረጋ ያለ ማስታወሻ ይላካል" },
     ],
     [
-      { bold: "96,000 ብር ለሰላም ተ. ተለቋል", small: "በአንድ ንክኪ — በቀጥታ ወደ ቴሌብር ዋሌቷ ገብቷል" },
+      { bold: "96,000 ብር ለባለሙያው ተለቋል", small: "በአንድ ንክኪ — በቀጥታ ወደ ቴሌብር ዋሌታቸው ገብቷል" },
       { bold: "ደረሰኝ በራስ-ሰር ተሰጥቷል", small: "የቴሌብር ደረሰኝ ለሁለቱም ወገን ተቀምጧል" },
       { bold: "ምንም መጠበቅ የለም (0 ቀን)", small: "ደረሰኝ ማሳደድም ሆነ አስቸጋሪ ኢሜይል የለም" },
     ],
@@ -443,7 +443,7 @@ export const ESCROW_STEP_ROWS_BY_LANG: Record<Language, EscrowRowCopy[][]> = {
       { bold: "Yeroo gamaaggamaa sa'aatii 48", small: "Yoo callisame yaadachiisa gaarii erga" },
     ],
     [
-      { bold: "ETB 96,000 Selam T.f gadhiifame", small: "Tuqaatii tokkoon — kallattiin wallet Telebirr ishee gale" },
+      { bold: "ETB 96,000 hojjetaa bilisaaf gadhiifame", small: "Tuqaatii tokkoon — kallattiin wallet Telebirr isaanii gale" },
       { bold: "Nagaheen ofumaan ba'e", small: "Nagaheen Telebirr garee lamaaniifuu olkaa'ama" },
       { bold: "Turtii guyyaa 0", small: "Nagahee ari'uu fi imeelii rakkisaa hin qabu" },
     ],
@@ -465,7 +465,7 @@ export const ESCROW_STEP_ROWS_BY_LANG: Record<Language, EscrowRowCopy[][]> = {
       { bold: "ናይ 48 ሰዓት መስኮት ገምጋም", small: "ገምጋም እንተደንጉዩ ህዱእ መዘኻኸሪ ይለኣኽ" },
     ],
     [
-      { bold: "96,000 ብር ንሰላም ተ. ተፈኒዩ", small: "ብሓንቲ ምጥዋቕ — ብቐጥታ ናብ ዋሌት ቴሌብር ኣትዩ" },
+      { bold: "96,000 ብር ንሰራሕተኛ ተፈኒዩ", small: "ብሓንቲ ምጥዋቕ — ብቐጥታ ናብ ዋሌት ቴሌብር ኣትዩ" },
       { bold: "ደረሰኝ ብቐጥታ ወጺኡ", small: "ደረሰኝ ቴሌብር ንኽልቲኦም ወገናት ተዓቂቡ" },
       { bold: "0 መዓልቲ ምጽባይ", small: "ደረሰኝ ምስጓግን ኣጸጋሚ ኢሜይልን የለን" },
     ],

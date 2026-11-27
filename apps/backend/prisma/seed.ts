@@ -163,6 +163,97 @@ async function main() {
 
   console.log("  ✅ Customer support user seeded");
 
+  console.log("🌱 Seeding Phase 1 staff accounts...");
+
+  const STAFF_ACCOUNTS: Array<{
+    email: string;
+    phone: string;
+    staffRole: "SUPER_ADMIN" | "OPERATIONS_ADMIN" | "FINANCE_ADMIN" | "DISPUTE_MEDIATOR" | "COMPLIANCE_ADMIN";
+    firstName: string;
+    lastName: string;
+    kycStatus: "VERIFIED" | "PENDING";
+  }> = [
+    {
+      email: "super-admin@yekis.et",
+      phone: "+251910011830",
+      staffRole: "SUPER_ADMIN",
+      firstName: "Super",
+      lastName: "Admin",
+      kycStatus: "VERIFIED",
+    },
+    {
+      email: "operations@yekis.et",
+      phone: "+251910011831",
+      staffRole: "OPERATIONS_ADMIN",
+      firstName: "Operations",
+      lastName: "Admin",
+      kycStatus: "VERIFIED",
+    },
+    {
+      email: "finance@yekis.et",
+      phone: "+251910011832",
+      staffRole: "FINANCE_ADMIN",
+      firstName: "Finance",
+      lastName: "Admin",
+      kycStatus: "VERIFIED",
+    },
+    {
+      email: "disputes@yekis.et",
+      phone: "+251910011833",
+      staffRole: "DISPUTE_MEDIATOR",
+      firstName: "Dispute",
+      lastName: "Mediator",
+      kycStatus: "VERIFIED",
+    },
+    {
+      email: "compliance-admin@yekis.et",
+      phone: "+251910011834",
+      staffRole: "COMPLIANCE_ADMIN",
+      firstName: "Compliance",
+      lastName: "Admin",
+      kycStatus: "VERIFIED",
+    },
+  ];
+
+  for (const s of STAFF_ACCOUNTS) {
+    await prisma.user.upsert({
+      where: { email: s.email },
+      update: {
+        role: "CLIENT",
+        staffRole: s.staffRole,
+        passwordHash: demoPasswordHash,
+        sessionVersion: { increment: 1 },
+        cachedKycTier: "TIER_1",
+        cachedKycStatus: s.kycStatus,
+        kyc: {
+          upsert: {
+            create: { tier: "TIER_1", status: s.kycStatus },
+            update: { tier: "TIER_1", status: s.kycStatus },
+          },
+        },
+        wallet: { upsert: { create: { balanceMinor: 0 }, update: {} } },
+      },
+      create: {
+        email: s.email,
+        phone: s.phone,
+        passwordHash: demoPasswordHash,
+        role: "CLIENT",
+        dateOfBirth: new Date("1990-01-01"),
+        staffRole: s.staffRole,
+        firstName: s.firstName,
+        lastName: s.lastName,
+        cachedKycTier: "TIER_1",
+        cachedKycStatus: s.kycStatus,
+        kyc: { create: { tier: "TIER_1", status: s.kycStatus } },
+        wallet: { create: { balanceMinor: 0 } },
+      },
+    });
+
+    console.log(`  ✅ ${s.staffRole} seeded (${s.email})`);
+  }
+
+  console.log("  ✅ Phase 1 staff accounts seeded");
+
   console.log("🌱 Seeding demo freelancer + gigs...");
 
   // Sellers need role FREELANCER (or BOTH) and TIER_1 KYC: both are enforced by

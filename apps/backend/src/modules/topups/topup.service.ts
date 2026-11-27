@@ -11,7 +11,10 @@ import { notificationQueue } from "../../queue/queues.js";
 import { recordWalletTopUpLedger } from "../finance/ledger.service.js";
 import { logger } from "../../lib/logger.js";
 import { env } from "../../config/env.js";
-import { telebirrClient } from "../escrow/providers/telebirr.client.js";
+import {
+  telebirrClient,
+  isTelebirrInstantLive,
+} from "../escrow/providers/telebirr.client.js";
 import { cbeClient } from "../escrow/providers/cbe.client.js";
 import { mpesaClient } from "../escrow/providers/mpesa.client.js";
 import type { PaymentProviderClient } from "../escrow/providers/paymentProvider.interface.js";
@@ -352,6 +355,52 @@ export const ENABLED_CHECKOUT_PROVIDERS: ReadonlySet<PaymentProvider> = new Set(
 /** True when this rail may start an automated checkout. */
 export function isCheckoutProviderEnabled(provider: string): boolean {
   return ENABLED_CHECKOUT_PROVIDERS.has(provider as PaymentProvider);
+}
+
+export interface TopUpMethodAvailability {
+  telebirrInstantLive: boolean;
+  defaultMethod: "INSTANT" | "MANUAL";
+  instantProviders: Array<{
+    provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+    enabled: boolean;
+    live: boolean;
+  }>;
+  manualProviders: Array<{
+    provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "CHAPA";
+    enabled: boolean;
+  }>;
+}
+
+/** Reports which deposit rails and instant checkout integrations are live. */
+export function getTopUpMethods(): TopUpMethodAvailability {
+  const telebirrInstantLive = isTelebirrInstantLive();
+  return {
+    telebirrInstantLive,
+    defaultMethod: telebirrInstantLive ? "INSTANT" : "MANUAL",
+    instantProviders: [
+      {
+        provider: "TELEBIRR",
+        enabled: isCheckoutProviderEnabled("TELEBIRR"),
+        live: telebirrInstantLive,
+      },
+      {
+        provider: "CBE_BIRR",
+        enabled: isCheckoutProviderEnabled("CBE_BIRR"),
+        live: false,
+      },
+      {
+        provider: "M_PESA",
+        enabled: isCheckoutProviderEnabled("M_PESA"),
+        live: false,
+      },
+    ],
+    manualProviders: [
+      { provider: "TELEBIRR", enabled: true },
+      { provider: "CBE_BIRR", enabled: true },
+      { provider: "M_PESA", enabled: true },
+      { provider: "CHAPA", enabled: true },
+    ],
+  };
 }
 
 /**

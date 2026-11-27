@@ -195,6 +195,19 @@ export interface EscrowFeeConfig {
   paymentProviderFeeRate: number;
 }
 
+export interface WorkspaceReminderItem {
+  id: string;
+  userId: string;
+  title: string;
+  dueAt: string;
+  note: string | null;
+  contractId: string | null;
+  milestoneId: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Milestone {
   id: string;
   contractId: string;
@@ -1927,6 +1940,22 @@ class ApiClient {
     return this.request("/api/v1/wallet/topups");
   }
 
+  async getTopUpMethods(): Promise<{
+    telebirrInstantLive: boolean;
+    defaultMethod: "INSTANT" | "MANUAL";
+    instantProviders: Array<{
+      provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA";
+      enabled: boolean;
+      live: boolean;
+    }>;
+    manualProviders: Array<{
+      provider: "TELEBIRR" | "CBE_BIRR" | "M_PESA" | "CHAPA";
+      enabled: boolean;
+    }>;
+  }> {
+    return this.request("/api/v1/wallet/topups/methods");
+  }
+
   async getTopUpReceiptUrl(topUpId: string): Promise<{ url: string }> {
     return this.request(`/api/v1/wallet/topups/${topUpId}/receipt-url`);
   }
@@ -2330,6 +2359,54 @@ class ApiClient {
   }
   async getFeaturedTalent(): Promise<unknown> {
     return this.request(`/api/v1/featured`);
+  }
+  async getSavedTalents(): Promise<{ talentIds: string[] }> {
+    return this.request(`/api/v1/featured/saved`);
+  }
+  async saveTalents(talentIds: string[]): Promise<{ talentIds: string[] }> {
+    return this.request(`/api/v1/featured/saved`, {
+      method: "POST",
+      body: JSON.stringify({ talentIds }),
+    });
+  }
+  async removeSavedTalent(talentId: string): Promise<{ talentIds: string[] }> {
+    return this.request(`/api/v1/featured/saved/${encodeURIComponent(talentId)}`, {
+      method: "DELETE",
+    });
+  }
+  async getReminders(): Promise<WorkspaceReminderItem[]> {
+    return this.request(`/api/v1/reminders`);
+  }
+  async createReminder(input: {
+    title: string;
+    dueAt: string;
+    note?: string | null;
+    contractId?: string | null;
+    milestoneId?: string | null;
+  }): Promise<WorkspaceReminderItem> {
+    return this.request(`/api/v1/reminders`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  }
+  async updateReminder(
+    reminderId: string,
+    input: {
+      title?: string;
+      dueAt?: string;
+      note?: string | null;
+      completed?: boolean;
+    },
+  ): Promise<WorkspaceReminderItem> {
+    return this.request(`/api/v1/reminders/${encodeURIComponent(reminderId)}`, {
+      method: "PATCH",
+      body: JSON.stringify(input),
+    });
+  }
+  async deleteReminder(reminderId: string): Promise<{ deleted: boolean }> {
+    return this.request(`/api/v1/reminders/${encodeURIComponent(reminderId)}`, {
+      method: "DELETE",
+    });
   }
   async pinFeaturedTalent(userId: string, category: string, notes: string): Promise<unknown> {
     return this.request(`/api/v1/featured/staff/pin`, { method: "POST", body: JSON.stringify({ userId, category, notes }) });

@@ -25,6 +25,7 @@ import {
   TopUpNotFoundError,
   TopUpAlreadyResolvedError,
   getUserTopUps,
+  getTopUpMethods,
   initiateCheckoutTopUp,
   isCheckoutProviderEnabled,
   handleTopUpWebhook,
@@ -64,6 +65,10 @@ topupsRouter.get("/", requireAuth, async (req: AuthedRequest, res) => {
     logger.error({ err }, "Failed to get user top-ups");
     return res.status(500).json({ error: "INTERNAL_ERROR" });
   }
+});
+
+topupsRouter.get("/methods", requireAuth, (_req: AuthedRequest, res) => {
+  return res.json(getTopUpMethods());
 });
 
 topupsRouter.post(

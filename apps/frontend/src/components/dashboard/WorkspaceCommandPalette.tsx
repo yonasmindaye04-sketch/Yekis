@@ -36,7 +36,7 @@ export interface CommandPaletteAction {
 
 interface WorkspaceCommandPaletteProps {
   onNavigateView: (view: string) => void;
-  onSwitchRoleMode?: (mode: "CLIENT" | "FREELANCER" | "BOTH") => void;
+  onSwitchRoleMode?: (mode: "CLIENT" | "FREELANCER") => void;
   currentRole?: string;
 }
 
@@ -230,14 +230,6 @@ export function WorkspaceCommandPalette({
           hint: copy.actions.roleFreelancerHint(currentRole === "FREELANCER"),
           icon: <UserIcon size={15} />,
           run: () => onSwitchRoleMode("FREELANCER"),
-        },
-        {
-          id: "role-both",
-          group: copy.groups.roleMode,
-          label: copy.actions.roleBothLabel,
-          hint: copy.actions.roleBothHint(currentRole === "BOTH"),
-          icon: <LayoutDashboard size={15} />,
-          run: () => onSwitchRoleMode("BOTH"),
         },
       );
     }

@@ -13,18 +13,12 @@
 The left sidebar (`<aside className="platform-sidebar">`) is sticky (`100vh`) on desktop (`> 900px`) and renders as a slide-in drawer (`#workspace-mobile-drawer`) on viewports `<= 900px`:
 1. **Brand Header**: Clicking the Yekis logo navigates to `overview` (Dashboard) and closes the mobile drawer. A toggle button beside it collapses/expands the sidebar on desktop (`PanelLeftClose` / `PanelLeftOpen`) or closes the drawer on mobile (`X`).
 2. **Dual-Role Mode Switcher** (`basePlatformRole === "BOTH"`):
-   - On desktop, a `<select>` in the topbar switches `dualRoleMode` between:
-     - `Mode: Client & Freelancer` (`BOTH`)
-     - `Mode: Client (Hiring)` (`CLIENT`)
-     - `Mode: Freelancer (Work)` (`FREELANCER`)
-   - On mobile (`<= 900px`), the same selector appears inside the drawer above the navigation list.
-   - Switching mode immediately recalculates `canHire` (`CLIENT` or `BOTH`) and `canWork` (`FREELANCER` or `BOTH`), updating sidebar labels, visible items, and in-view panels.
-3. **Primary Navigation (`navItems`)**: Dynamically ordered list of workspace tabs (Section 2).
-   - **Unread Activity Dots (`navActivityCount`)**: Each tab shows a small indicator dot when unread notifications route to that view (via `apps/frontend/src/api/notificationFeed.ts`), or — for **Find Work** when `canWork` is true — when open briefs exist newer than the local watermark `yekis:jobs-seen-at:<userId>` (excluding the user's own briefs). Opening a view marks its notifications read via `markViewNotificationsRead()` and advances the briefs watermark.
-4. **Bottom Controls**:
-   - **Settings** (`settings`): Always pinned below `<nav className="sidebar-nav">`.
-   - **Account Chip (`user-chip`)**: Displays `YekisAvatar`, active role label, and user email; clicking opens the user's own public profile (`openMyProfile()`). Beside it sits the **Sign out** icon button (`logout()`), which clears the auth token, disconnects `realtimeSocket`, resets workspace state, and returns to the landing/login view.
-5. **Mobile Bottom Navigation (`<= 900px`)**: Pins the first 4 `navItems` (`Dashboard`, `Jobs`/`Find Work`, `Proposals`, `Gigs`) with matching activity dots plus a **Menu** button that opens the full drawer.
+   - A 2-way `Client` / `Freelancer` segmented switch in the topbar (and inside the mobile drawer on `<= 1024px`) remembers the user's last selection in `localStorage["yekis_dual_role_mode"]`, defaults to `CLIENT`, and automatically migrates any legacy stored `"BOTH"` value to `"CLIENT"`.
+   - Switching mode immediately recalculates `canHire` and `canWork`, showing either the Client workspace or the full Freelancer workspace cleanly.
+3. **Grouped Primary Navigation (`navItems`)**: Grouped into **Hire** (or **Work** for Freelancers: `Dashboard`, `Jobs`/`Find Work`, `Proposals`, `Gigs`, `My Gigs`, `Contracts`), **Money** (`Escrow Center`, `Wallet & Payouts`), **Talk** (`Messages`, `Disputes & Mediation`), and **Account** (`My Profile`, `KYC Verification`, `Settings`).
+   - **Unread Activity Dots (`navActivityCount`)**: Action-required indicator dots only (the numeric count lives in `aria-label` / `title`).
+4. **Account Chip (`user-chip`) & Topbar KYC Status**: Displays `YekisAvatar`, user `displayName` (fallback role label), bold text+icon `KYC: Verified` / `KYC: Required` indicator (`docs/rule.md` §2 — no pills), and Sign out button.
+5. **Role-Specific Mobile Bottom Navigation (`<= 1024px`)**: Pins role-tailored actions (`Dashboard`, `Jobs`, `Escrow Center`, `Wallet` for Client; `Dashboard`, `Find Work`, `Contracts`, `Wallet` for Freelancer) plus **Menu**.
 
 ---
 
@@ -82,11 +76,11 @@ The left sidebar (`<aside className="platform-sidebar">`) is sticky (`100vh`) on
 
 ### 3.2 Jobs / Find Work (`jobs`)
 - **Components**: `FullPlatformApp.tsx` (top publish form) + `apps/frontend/src/WorkflowWorkspace.tsx` (`JobsWorkspace` with `section="jobs"`).
-- **For Client (`canHire`)**:
+- **For Client (`canHire && !canWork`)**:
   - **What It Shows**:
-    1. **Publish a Job Brief Form** (in `FullPlatformApp.tsx`): Brief Title, Category selector (10 categories), Scope & Deliverables textarea (min 20 chars), Min Budget (ETB), Max Budget (ETB), Target Deadline (`type="date"`), and inline error display (if KYC is required, displays a **Verify Identity** button routing to `verification`).
-    2. **Your Published Briefs (`myBriefsPanel`)**: List of the client's own jobs (`GET /api/v1/jobs/mine`) showing status, ETB budget range, category, deadline, and proposal count badge. (Note: reviewing/accepting incoming proposals happens on the **Proposals** tab.)
-    3. **Open Briefs Board**: Also renders the marketplace brief board below so dual-role or hiring users can inspect open listings.
+    1. **Publish a Job Brief Form** (in `FullPlatformApp.tsx`): Shows an upfront KYC verification banner when `user.kyc?.status !== "VERIFIED"` (disabling publishing until KYC is approved), plus Brief Title, Category selector (10 categories), Scope & Deliverables textarea, Min/Max Budget (ETB), and Target Deadline (`type="date"`).
+    2. **Your Published Briefs (`myBriefsPanel`)**: List of the client's own jobs (`GET /api/v1/jobs/mine`). The open marketplace briefs board is hidden for Client-only accounts (it renders only for `canWork`).
+    3. **Start Chat from Proposals & Gigs**: Incoming proposals (`Proposals` tab) and Gig Detail seller panels (`Gigs` tab) provide direct **Chat** / **Message seller** buttons wired to `openChatWithUser()`.
   - **What It Executes**:
     - Submitting the brief form validates title (`>= 5` chars), description (`>= 20` chars), positive budget range (`max >= min`), and deadline, then calls `POST /api/v1/jobs` (`api.createJob()`), creating an `OPEN` brief with an initial delivery milestone (`budgetMaxMinor`), refreshes workspace data, and surfaces KYC guidance if `nextAction.type === "KYC"` is returned.
 - **For Freelancer (`canWork`)**:

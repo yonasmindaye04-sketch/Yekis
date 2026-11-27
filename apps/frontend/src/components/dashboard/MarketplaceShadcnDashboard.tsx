@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   TrendingUp,
   TrendingDown,
@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ArrowRight,
   RefreshCw,
+  Clock,
 } from "lucide-react";
 import type {
   EscrowFeeConfig,
@@ -53,8 +54,21 @@ import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
 import { ConfirmActionModal, formatStatusLabel } from "../../pages/ops/components/ui";
 import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
+import { FirstRunChecklist } from "./FirstRunChecklist";
+import { DASHBOARD_EXTRAS_COPY } from "./dashboardExtrasCopy";
+import {
+  GETTING_STARTED_CHANGED_EVENT,
+  getShowGettingStartedGuide,
+  setShowGettingStartedGuide,
+} from "../../lib/onboardingGuidePref";
 
 interface MarketplaceShadcnDashboardProps {
+  userId?: string;
+  kycVerified?: boolean;
+  kycStatus?: string;
+  proposalsCount?: number;
+  lastUpdatedAt?: Date | null;
+  workspaceError?: string | null;
   canHire: boolean;
   canWork: boolean;
   viewerRole?: "CLIENT" | "FREELANCER" | "ADMIN";
@@ -117,6 +131,12 @@ function toLedgerState(
 }
 
 export function MarketplaceShadcnDashboard({
+  userId,
+  kycVerified = true,
+  kycStatus = "VERIFIED",
+  proposalsCount = 0,
+  lastUpdatedAt = null,
+  workspaceError = null,
   canHire,
   canWork,
   viewerRole: explicitViewerRole,
@@ -144,6 +164,7 @@ export function MarketplaceShadcnDashboard({
   } = useShadcnLayout();
   const { t, language } = useI18n();
   const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).overview;
+  const extra = DASHBOARD_EXTRAS_COPY[language] ?? DASHBOARD_EXTRAS_COPY.en;
   const d = t.workspace.dashboard;
   const viewerRole = explicitViewerRole ?? (canWork ? "FREELANCER" : "CLIENT");
 
@@ -160,10 +181,133 @@ export function MarketplaceShadcnDashboard({
     clientTotalChargeMinor: number;
   } | null>(null);
   const [fundLoading, setFundLoading] = useState(false);
+  const [showGettingStarted, setShowGettingStarted] = useState(() =>
+    getShowGettingStartedGuide(userId),
+  );
+
+  useEffect(() => {
+    setShowGettingStarted(getShowGettingStartedGuide(userId));
+    const onSync = () => setShowGettingStarted(getShowGettingStartedGuide(userId));
+    window.addEventListener(GETTING_STARTED_CHANGED_EVENT, onSync);
+    return () => window.removeEventListener(GETTING_STARTED_CHANGED_EVENT, onSync);
+  }, [userId]);
 
   const effectiveWallet = wallet;
   const effectiveMilestones = milestones;
   const effectiveTopUps = topUps;
+
+  const pendingTopUps = useMemo(
+    () =>
+      effectiveTopUps.filter(
+        (t) => t.status === "PENDING" || t.status === "CHECKOUT_PENDING",
+      ),
+    [effectiveTopUps],
+  );
+  const pendingTopUpTotalMinor = useMemo(
+    () => pendingTopUps.reduce((sum, t) => sum + t.amountMinor, 0),
+    [pendingTopUps],
+  );
+  const hasFundedMilestone = useMemo(
+    () => effectiveMilestones.some((m) => FUNDED_ESCROW_STATES.has(m.escrowState)),
+    [effectiveMilestones],
+  );
+  const isFirstRunClient =
+    viewerRole === "CLIENT" && !hasFundedMilestone && showGettingStarted;
+
+  const isApplePlatform =
+    typeof navigator !== "undefined" &&
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent);
+  const shortcutLabel = isApplePlatform ? "⌘K" : "Ctrl+K";
+
+  const todayAddisIso = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Africa/Addis_Ababa",
+      }).format(new Date()),
+    [],
+  );
+
+  const attentionItems = useMemo(() => {
+    return effectiveMilestones
+      .map((m) => {
+        const meta = metaFor(m);
+        const dueStr = (m.dueDate || "").slice(0, 10);
+        const overdue =
+          Boolean(dueStr) &&
+          dueStr < todayAddisIso &&
+          m.escrowState !== "RELEASED" &&
+          m.escrowState !== "REFUNDED";
+
+        if (viewerRole === "CLIENT") {
+          if (m.escrowState === "SUBMITTED_FOR_REVIEW") {
+            return {
+              id: m.id,
+              title: m.title,
+              counterparty: meta.counterparty,
+              amountMinor: m.amountMinor,
+              clientFeeMinor: m.clientFeeMinor ?? 0,
+              clientTotalChargeMinor: m.clientTotalChargeMinor ?? m.amountMinor,
+              kind: "REVIEW" as const,
+              reason: extra.attentionSubmittedReason,
+              actionLabel: extra.attentionReviewAction,
+            };
+          }
+          if (
+            m.escrowState === "PAYMENT_PENDING" &&
+            m.contract?.fullyExecuted !== false
+          ) {
+            return {
+              id: m.id,
+              title: m.title,
+              counterparty: meta.counterparty,
+              amountMinor: m.amountMinor,
+              clientFeeMinor: m.clientFeeMinor ?? 0,
+              clientTotalChargeMinor: m.clientTotalChargeMinor ?? m.amountMinor,
+              kind: "FUND" as const,
+              reason: overdue
+                ? extra.attentionOverdueFundingReason
+                : extra.attentionFundingReason,
+              actionLabel: extra.attentionFundAction,
+            };
+          }
+          if (overdue) {
+            return {
+              id: m.id,
+              title: m.title,
+              counterparty: meta.counterparty,
+              amountMinor: m.amountMinor,
+              clientFeeMinor: m.clientFeeMinor ?? 0,
+              clientTotalChargeMinor: m.clientTotalChargeMinor ?? m.amountMinor,
+              kind: "OVERDUE" as const,
+              reason: extra.attentionOverdueReason(dueStr),
+              actionLabel: extra.attentionInspectAction,
+            };
+          }
+        } else {
+          if (
+            m.escrowState === "ESCROW_HELD" ||
+            m.escrowState === "WORK_IN_PROGRESS"
+          ) {
+            return {
+              id: m.id,
+              title: m.title,
+              counterparty: meta.counterparty,
+              amountMinor: m.amountMinor,
+              clientFeeMinor: m.clientFeeMinor ?? 0,
+              clientTotalChargeMinor: m.clientTotalChargeMinor ?? m.amountMinor,
+              kind: "DELIVER" as const,
+              reason: overdue
+                ? extra.attentionOverdueDeliveryReason(dueStr)
+                : extra.attentionDeliveryReadyReason,
+              actionLabel: extra.attentionDeliverAction,
+            };
+          }
+        }
+        return null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+      .slice(0, 4);
+  }, [effectiveMilestones, extra, todayAddisIso, viewerRole]);
 
   /**
    * A client is hiring against their own briefs; a freelancer is competing
@@ -489,21 +633,24 @@ export function MarketplaceShadcnDashboard({
                   className={`sh-seg-btn ${opsSubTab === "table" ? "active" : ""}`}
                   onClick={() => setOpsSubTab("table")}
                 >
-                  <Table2 size={13} /> {d.subTabTable} ({ledgerRecords.length})
+                  <Table2 size={13} /> {d.subTabTable}
+                  {ledgerRecords.length > 0 ? ` (${ledgerRecords.length})` : ""}
                 </button>
                 <button
                   type="button"
                   className={`sh-seg-btn ${opsSubTab === "kanban" ? "active" : ""}`}
                   onClick={() => setOpsSubTab("kanban")}
                 >
-                  <Kanban size={13} /> {d.subTabKanban} ({kanbanTasks.length})
+                  <Kanban size={13} /> {d.subTabKanban}
+                  {kanbanTasks.length > 0 ? ` (${kanbanTasks.length})` : ""}
                 </button>
                 <button
                   type="button"
                   className={`sh-seg-btn ${opsSubTab === "calendar" ? "active" : ""}`}
                   onClick={() => setOpsSubTab("calendar")}
                 >
-                  <Calendar size={13} /> {d.subTabCalendar} ({scheduleEvents.length})
+                  <Calendar size={13} /> {d.subTabCalendar}
+                  {scheduleEvents.length > 0 ? ` (${scheduleEvents.length})` : ""}
                 </button>
               </div>
               <ContextualHelpTrigger helpId="dashboard-pipeline-stages" />
@@ -512,7 +659,6 @@ export function MarketplaceShadcnDashboard({
         </div>
 
         <div className="sh-subnav-right">
-          <ContextualHelpTrigger helpId="dashboard-kpis" />
           <button
             type="button"
             className="sh-btn sh-btn-secondary"
@@ -522,7 +668,7 @@ export function MarketplaceShadcnDashboard({
           >
             <Search size={14} />
             <span>{d.quickJump}</span>
-            <kbd className="sh-kbd">⌘K</kbd>
+            <kbd className="sh-kbd">{shortcutLabel}</kbd>
           </button>
 
           <button
@@ -530,7 +676,15 @@ export function MarketplaceShadcnDashboard({
             className="sh-icon-only-btn"
             onClick={onRefresh}
             disabled={isRefreshing}
-            title={copy.refreshTitle}
+            title={
+              lastUpdatedAt
+                ? `${extra.updatedAtPrefix} ${lastUpdatedAt.toLocaleTimeString("en-GB", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "Africa/Addis_Ababa",
+                  })}`
+                : copy.refreshTitle
+            }
             aria-label={copy.refreshAria}
           >
             <RefreshCw
@@ -538,8 +692,18 @@ export function MarketplaceShadcnDashboard({
               className={isRefreshing ? "refresh-spin" : undefined}
             />
           </button>
+          {lastUpdatedAt && (
+            <span className="sh-cell-meta sh-tabular">
+              {extra.updatedAtPrefix}{" "}
+              {lastUpdatedAt.toLocaleTimeString("en-GB", {
+                hour: "2-digit",
+                minute: "2-digit",
+                timeZone: "Africa/Addis_Ababa",
+              })}
+            </span>
+          )}
 
-          {canHire && (
+          {canHire && kycVerified && (
             <button
               type="button"
               className="sh-btn sh-btn-primary"
@@ -547,6 +711,24 @@ export function MarketplaceShadcnDashboard({
             >
               <Plus size={14} /> {d.postJobBrief}
             </button>
+          )}
+          {canHire && !kycVerified && (
+            <>
+              <button
+                type="button"
+                className="sh-btn sh-btn-secondary"
+                onClick={() => onNavigateView("gigs")}
+              >
+                {extra.browseGigsBtn}
+              </button>
+              <button
+                type="button"
+                className="sh-btn sh-btn-primary"
+                onClick={() => onNavigateView("verification")}
+              >
+                <ShieldCheck size={14} /> {extra.verifyFirstBtn}
+              </button>
+            </>
           )}
           {!canHire && canWork && (
             <button
@@ -559,6 +741,45 @@ export function MarketplaceShadcnDashboard({
           )}
         </div>
       </div>
+
+      {/* Error Retry Banner */}
+      {workspaceError && (
+        <div className="sh-pending-banner" role="alert">
+          <span style={{ flex: 1, color: "var(--color-error)" }}>
+            {workspaceError}
+          </span>
+          <button
+            type="button"
+            className="sh-btn sh-btn-secondary sh-btn-compact"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+          >
+            {extra.retryBtn}
+          </button>
+        </div>
+      )}
+
+      {/* Pending Top-Up Verification Notice (prevents ETB 0 wallet confusion) */}
+      {pendingTopUpTotalMinor > 0 && (
+        <div className="sh-pending-banner" role="status" aria-live="polite">
+          <Clock size={16} aria-hidden="true" />
+          <span style={{ flex: 1 }}>
+            <strong>
+              {extra.pendingTopUpBanner(
+                Math.round(pendingTopUpTotalMinor / 100).toLocaleString(),
+                pendingTopUps.length,
+              )}
+            </strong>
+          </span>
+          <button
+            type="button"
+            className="sh-row-action-btn"
+            onClick={() => onNavigateView("wallet")}
+          >
+            {extra.openWalletBtn} <ArrowRight size={12} aria-hidden="true" />
+          </button>
+        </div>
+      )}
 
       {/* 4-Column KPI Stat Strip (Visible in both dashboards, interactive drill-down) */}
       <div className="sh-kpi-grid" data-tour="dashboard-kpis">
@@ -688,7 +909,9 @@ export function MarketplaceShadcnDashboard({
             <span className="sh-cell-meta">
               {escrowTrend.current > 0
                 ? `ETB ${Math.round(escrowTrend.current).toLocaleString()} funded in 30d · ${activeMilestoneCount} active`
-                : `${activeMilestoneCount} active · ${d.kpiEscrowMilestoneBacked}`}
+                : activeMilestoneCount > 0
+                  ? `${activeMilestoneCount} active · ${d.kpiEscrowMilestoneBacked}`
+                  : d.kpiEscrowMilestoneBacked}
             </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
@@ -758,6 +981,9 @@ export function MarketplaceShadcnDashboard({
               {deliveryStats.released > 0
                 ? `${deliveryStats.onTime}/${deliveryStats.released} · ${copy.acrossContracts(contractCount)}`
                 : copy.acrossContracts(contractCount)}
+              {attentionItems.length > 0
+                ? ` · ${extra.needActionCount(attentionItems.length)}`
+                : ""}
             </span>
             <ChevronDown size={14} className="sh-kpi-chev" />
           </div>
@@ -863,6 +1089,117 @@ export function MarketplaceShadcnDashboard({
          ===================================================================== */}
       {dashboardVariant === "dashboard-1" && (
         <>
+          {attentionItems.length > 0 && (
+            <section className="sh-card sh-attention-strip" aria-label={extra.attentionTitle} aria-live="polite">
+              <div className="sh-card-header" style={{ marginBottom: 8 }}>
+                <div>
+                  <h3 className="sh-card-title">{extra.attentionTitle}</h3>
+                  <p className="sh-card-desc">
+                    {extra.attentionDesc}
+                  </p>
+                </div>
+              </div>
+              <div className="sh-compact-list">
+                {attentionItems.map((item) => (
+                  <div key={item.id} className="sh-compact-row">
+                    <div className="sh-compact-row-main">
+                      <div className="sh-cell-primary">{item.title}</div>
+                      <div className="sh-cell-meta">
+                        <span>{item.counterparty}</span>
+                        <span aria-hidden="true">·</span>
+                        <span
+                          className={`sh-status-inline ${
+                            item.kind === "OVERDUE"
+                              ? "crimson"
+                              : item.kind === "REVIEW"
+                                ? "amber"
+                                : "emerald"
+                          }`}
+                        >
+                          {item.reason}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sh-compact-row-right">
+                      <strong className="sh-mono">
+                        ETB {(item.amountMinor / 100).toLocaleString()}
+                      </strong>
+                      {item.kind === "FUND" && onFundMilestone ? (
+                        <button
+                          type="button"
+                          className="sh-btn sh-btn-primary sh-btn-compact"
+                          onClick={() =>
+                            setFundTarget({
+                              id: item.id,
+                              title: item.title,
+                              counterparty: item.counterparty,
+                              amountMinor: item.amountMinor,
+                              clientFeeMinor: item.clientFeeMinor,
+                              clientTotalChargeMinor: item.clientTotalChargeMinor,
+                            })
+                          }
+                        >
+                          {item.actionLabel}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="sh-row-action-btn"
+                          onClick={() =>
+                            onOpenEscrow
+                              ? onOpenEscrow(item.id)
+                              : onNavigateView("escrow")
+                          }
+                        >
+                          {item.actionLabel} <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {isFirstRunClient && (
+            <div style={{ display: "grid", gap: 16 }}>
+              <FirstRunChecklist
+                kycVerified={kycVerified}
+                kycStatus={kycStatus}
+                hasBriefs={(myJobs?.length ?? 0) > 0 || proposalsCount > 0 || effectiveMilestones.length > 0}
+                hasFundsOrPending={
+                  effectiveWallet.balanceMinor > 0 ||
+                  pendingTopUpTotalMinor > 0 ||
+                  escrowSecuredMinor > 0 ||
+                  releasedMinor > 0
+                }
+                hasPendingTopUpOnly={
+                  effectiveWallet.balanceMinor === 0 && pendingTopUpTotalMinor > 0
+                }
+                pendingTopUpEtb={Math.round(pendingTopUpTotalMinor / 100)}
+                hasProposals={proposalsCount > 0 || effectiveMilestones.length > 0}
+                hasFundedMilestone={hasFundedMilestone}
+                onNavigateView={onNavigateView}
+                onOpenEscrow={() =>
+                  onOpenEscrow ? onOpenEscrow() : onNavigateView("escrow")
+                }
+                onHideChecklist={() => {
+                  setShowGettingStarted(false);
+                  setShowGettingStartedGuide(userId, false);
+                }}
+              />
+              {onSelectProfile && (
+                <FeaturedCarousel
+                  compact
+                  hideWhenEmpty
+                  onProfileClick={onSelectProfile}
+                  onOpenChat={onOpenChat}
+                  onBrowseGigs={() => onNavigateView("gigs")}
+                />
+              )}
+            </div>
+          )}
+
           {/* 2-Column Interactive Chart Row */}
           <div className="sh-charts-split">
             <InteractiveCashflowAreaChart
@@ -958,7 +1295,10 @@ export function MarketplaceShadcnDashboard({
                   className="sh-btn sh-btn-secondary"
                   onClick={() => onNavigateView("jobs")}
                 >
-                  {d.viewAll} ({effectiveJobs.length}) <ArrowRight size={13} />
+                  {effectiveJobs.length > 0
+                    ? `${d.viewAll} (${effectiveJobs.length})`
+                    : d.viewAll}{" "}
+                  <ArrowRight size={13} />
                 </button>
               </div>
 
@@ -1004,7 +1344,7 @@ export function MarketplaceShadcnDashboard({
             </div>
           </div>
 
-          {(canHire || !canWork) && onSelectProfile && (
+          {(canHire || !canWork) && onSelectProfile && !isFirstRunClient && (
             <div style={{ marginTop: 16 }}>
               <FeaturedCarousel
                 onProfileClick={onSelectProfile}

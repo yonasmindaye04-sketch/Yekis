@@ -29,6 +29,7 @@ import { gigsRouter } from "./modules/gigs/gig.routes.js";
 import { staffProfileRouter } from "./modules/profiles/staff-profile.routes.js";
 import { financeRouter } from "./modules/finance/finance.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
+import { remindersRouter } from "./modules/reminders/reminders.routes.js";
 import botRouter from "./modules/bot/bot.routes.js";
 import { mountStaticSite } from "./lib/staticSite.js";
 import { env } from "./config/env.js";
@@ -188,6 +189,7 @@ export function buildApp() {
   app.use("/api/v1/staff", staffProfileRouter);
   app.use("/api/v1/finance", financeRouter);
   app.use("/api/v1/admin", adminRouter);
+  app.use("/api/v1/reminders", remindersRouter);
 
   // The built frontend, when this deployment serves it. Mounted after the
   // API routes so an unknown API path still falls through to the JSON 404

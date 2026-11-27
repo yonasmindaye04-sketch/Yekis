@@ -6,7 +6,6 @@ import {
   X,
   CheckCircle2,
   Clock,
-  AlertCircle,
   AlertTriangle,
   PanelLeftClose,
   PanelLeftOpen,
@@ -199,17 +198,34 @@ export function KanbanBoardView({
   const [clientFilter, setClientFilter] = useState<string>("ALL");
   const [freelancerFilter, setFreelancerFilter] = useState<string>("ALL");
   const [contractFilter, setContractFilter] = useState<string>("ALL");
-  const [priorityFilter, setPriorityFilter] = useState<
-    "ALL" | "HIGH" | "MEDIUM" | "LOW"
+  const [urgencyFilter, setUrgencyFilter] = useState<
+    "ALL" | "overdue" | "due-soon" | "on-track"
   >("ALL");
   const [overdueOnly, setOverdueOnly] = useState(false);
 
   const [collapsedCols, setCollapsedCols] = useState<Set<KanbanColumnId>>(
-    () => new Set(),
+    () =>
+      new Set(
+        COLUMNS.filter((c) => !tasks.some((t) => t.column === c.id)).map(
+          (c) => c.id,
+        ),
+      ),
   );
+  const userToggledColsRef = useRef(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeMobileColumn, setActiveMobileColumn] =
     useState<KanbanColumnId>("ESCROW_HELD");
+
+  useEffect(() => {
+    if (userToggledColsRef.current) return;
+    setCollapsedCols(
+      new Set(
+        COLUMNS.filter((c) => !tasks.some((t) => t.column === c.id)).map(
+          (c) => c.id,
+        ),
+      ),
+    );
+  }, [tasks]);
 
   // Horizontal scroll affordance state
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -262,7 +278,7 @@ export function KanbanBoardView({
       clientFilter !== "ALL" ||
       freelancerFilter !== "ALL" ||
       contractFilter !== "ALL" ||
-      priorityFilter !== "ALL" ||
+      urgencyFilter !== "ALL" ||
       overdueOnly,
   );
 
@@ -274,10 +290,19 @@ export function KanbanBoardView({
         return false;
       if (contractFilter !== "ALL" && t.contractTitle !== contractFilter)
         return false;
-      if (priorityFilter !== "ALL" && t.priority !== priorityFilter) return false;
-      if (overdueOnly) {
+      if (urgencyFilter !== "ALL" || overdueOnly) {
         const dueStatus = getKanbanDueStatus(t.dueDate, t.column, todayIso);
-        if (dueStatus.state !== "overdue") return false;
+        if (overdueOnly && dueStatus.state !== "overdue") return false;
+        if (urgencyFilter === "overdue" && dueStatus.state !== "overdue")
+          return false;
+        if (
+          urgencyFilter === "due-soon" &&
+          dueStatus.state !== "due-today" &&
+          dueStatus.state !== "due-soon"
+        )
+          return false;
+        if (urgencyFilter === "on-track" && dueStatus.state !== "on-track")
+          return false;
       }
       if (!q) return true;
       return (
@@ -295,7 +320,7 @@ export function KanbanBoardView({
     clientFilter,
     freelancerFilter,
     contractFilter,
-    priorityFilter,
+    urgencyFilter,
     overdueOnly,
     todayIso,
   ]);
@@ -382,6 +407,7 @@ export function KanbanBoardView({
   };
 
   const toggleCollapseCol = (colId: KanbanColumnId) => {
+    userToggledColsRef.current = true;
     setCollapsedCols((prev) => {
       const next = new Set(prev);
       if (next.has(colId)) next.delete(colId);
@@ -391,6 +417,7 @@ export function KanbanBoardView({
   };
 
   const collapseEmptyCols = () => {
+    userToggledColsRef.current = true;
     setCollapsedCols((prev) => {
       const next = new Set(prev);
       for (const id of emptyColumnIds) next.add(id);
@@ -399,6 +426,7 @@ export function KanbanBoardView({
   };
 
   const expandAllCols = () => {
+    userToggledColsRef.current = true;
     setCollapsedCols(new Set());
   };
 
@@ -407,7 +435,7 @@ export function KanbanBoardView({
     setClientFilter("ALL");
     setFreelancerFilter("ALL");
     setContractFilter("ALL");
-    setPriorityFilter("ALL");
+    setUrgencyFilter("ALL");
     setOverdueOnly(false);
   };
 
@@ -498,73 +526,83 @@ export function KanbanBoardView({
             />
           </div>
 
-          <div className="sh-kanban-selects">
-            <select
-              name="kanban-client-filter"
-              className="sh-select sh-kanban-filter-select"
-              value={clientFilter}
-              onChange={(e) => setClientFilter(e.target.value)}
-              aria-label={copy.clientFilterAria}
-            >
-              <option value="ALL">{copy.allClients}</option>
-              {clientOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+          {(clientOptions.length > 1 ||
+            freelancerOptions.length > 1 ||
+            contractOptions.length > 1) && (
+            <div className="sh-kanban-selects">
+              {clientOptions.length > 1 && (
+                <select
+                  name="kanban-client-filter"
+                  className="sh-select sh-kanban-filter-select"
+                  value={clientFilter}
+                  onChange={(e) => setClientFilter(e.target.value)}
+                  aria-label={copy.clientFilterAria}
+                >
+                  <option value="ALL">{copy.allClients}</option>
+                  {clientOptions.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-            <select
-              name="kanban-freelancer-filter"
-              className="sh-select sh-kanban-filter-select"
-              value={freelancerFilter}
-              onChange={(e) => setFreelancerFilter(e.target.value)}
-              aria-label={copy.freelancerFilterAria}
-            >
-              <option value="ALL">{copy.allFreelancers}</option>
-              {freelancerOptions.map((f) => (
-                <option key={f} value={f}>
-                  {f}
-                </option>
-              ))}
-            </select>
+              {freelancerOptions.length > 1 && (
+                <select
+                  name="kanban-freelancer-filter"
+                  className="sh-select sh-kanban-filter-select"
+                  value={freelancerFilter}
+                  onChange={(e) => setFreelancerFilter(e.target.value)}
+                  aria-label={copy.freelancerFilterAria}
+                >
+                  <option value="ALL">{copy.allFreelancers}</option>
+                  {freelancerOptions.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+              )}
 
-            <select
-              name="kanban-contract-filter"
-              className="sh-select sh-kanban-filter-select"
-              value={contractFilter}
-              onChange={(e) => setContractFilter(e.target.value)}
-              aria-label={copy.contractFilterAria}
-            >
-              <option value="ALL">{copy.allContracts}</option>
-              {contractOptions.map((ct) => (
-                <option key={ct} value={ct}>
-                  {ct}
-                </option>
-              ))}
-            </select>
-          </div>
+              {contractOptions.length > 1 && (
+                <select
+                  name="kanban-contract-filter"
+                  className="sh-select sh-kanban-filter-select"
+                  value={contractFilter}
+                  onChange={(e) => setContractFilter(e.target.value)}
+                  aria-label={copy.contractFilterAria}
+                >
+                  <option value="ALL">{copy.allContracts}</option>
+                  {contractOptions.map((ct) => (
+                    <option key={ct} value={ct}>
+                      {ct}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="sh-kanban-filter-row">
           <div
             className="sh-segmented"
             role="group"
-            aria-label={copy.priorityAria}
+            aria-label="Filter by schedule urgency"
           >
             {(
               [
-                ["ALL", copy.priorityAll],
-                ["HIGH", copy.priorityHighFilter],
-                ["MEDIUM", copy.priorityMediumFilter],
-                ["LOW", copy.priorityLowFilter],
+                ["ALL", "All schedules"],
+                ["overdue", "Overdue"],
+                ["due-soon", "Due soon (<=3d)"],
+                ["on-track", "On schedule"],
               ] as const
             ).map(([key, label]) => (
               <button
                 key={key}
                 type="button"
-                className={`sh-seg-btn ${priorityFilter === key ? "active" : ""}`}
-                onClick={() => setPriorityFilter(key)}
+                className={`sh-seg-btn ${urgencyFilter === key ? "active" : ""}`}
+                onClick={() => setUrgencyFilter(key)}
               >
                 {label}
               </button>
@@ -875,21 +913,6 @@ export function KanbanBoardView({
                                 <span className="sh-mono">{task.code}</span>
                                 <span aria-hidden="true">·</span>
                                 <span>{railLabel(task.rail)}</span>
-                                <span aria-hidden="true">·</span>
-                                <span
-                                  className={`sh-priority-inline ${task.priority.toLowerCase()}`}
-                                >
-                                  {task.priority === "HIGH" && (
-                                    <AlertCircle size={11} aria-hidden="true" />
-                                  )}
-                                  {task.priority === "MEDIUM" && (
-                                    <Clock size={11} aria-hidden="true" />
-                                  )}
-                                  {task.priority === "LOW" && (
-                                    <CheckCircle2 size={11} aria-hidden="true" />
-                                  )}
-                                  {copy.priorityLabels[task.priority]}
-                                </span>
                               </span>
                             </div>
 

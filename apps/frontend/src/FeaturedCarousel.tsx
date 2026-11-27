@@ -54,25 +54,19 @@ export interface TalentItem {
 }
 
 const SAVED_TALENTS_KEY = "yekis_saved_talents";
+const SAVED_TALENTS_MIGRATED_KEY = "yekis_saved_talents_imported";
 
-function getSavedTalentIds(): Set<string> {
-  if (typeof window === "undefined") return new Set();
+function getLocalSavedTalentIds(): string[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(SAVED_TALENTS_KEY);
-    if (!raw) return new Set();
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return new Set(Array.isArray(parsed) ? parsed : []);
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+      : [];
   } catch {
-    return new Set();
-  }
-}
-
-function persistSavedTalentIds(ids: Set<string>): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SAVED_TALENTS_KEY, JSON.stringify(Array.from(ids)));
-  } catch {
-    // ignore storage error
+    return [];
   }
 }
 
@@ -114,11 +108,13 @@ export const FeaturedCarousel = ({
   onOpenChat,
   onBrowseGigs,
   compact = false,
+  hideWhenEmpty = false,
 }: {
   onProfileClick?: (id: string) => void;
   onOpenChat?: (userId: string, userName?: string) => void;
   onBrowseGigs?: () => void;
   compact?: boolean;
+  hideWhenEmpty?: boolean;
 }) => {
   const { language } = useI18n();
   const copy = FEATURED_CAROUSEL_COPY[language] ?? FEATURED_CAROUSEL_COPY.en;
@@ -127,7 +123,7 @@ export const FeaturedCarousel = ({
   const [error, setError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
   const [activeFilter, setActiveFilter] = useState<"all" | "saved">("all");
-  const [savedIds, setSavedIds] = useState<Set<string>>(() => getSavedTalentIds());
+  const [savedIds, setSavedIds] = useState<Set<string>>(() => new Set());
   const [selectedTalent, setSelectedTalent] = useState<TalentItem | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -213,7 +209,42 @@ export const FeaturedCarousel = ({
     };
   }, [reloadNonce, copy.errorTitle, copy.professionalFreelancerFallback, copy.verifiedFreelancerFallback]);
 
-  // Toggle Shortlist Bookmark
+  // Load saved talents from server and import legacy localStorage once on first login
+  useEffect(() => {
+    let cancelled = false;
+    const localIds = getLocalSavedTalentIds();
+    const alreadyMigrated =
+      typeof window !== "undefined" &&
+      window.localStorage.getItem(SAVED_TALENTS_MIGRATED_KEY) === "1";
+
+    const syncSaved = async () => {
+      try {
+        if (localIds.length > 0 && !alreadyMigrated) {
+          const imported = await api.saveTalents(localIds);
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(SAVED_TALENTS_MIGRATED_KEY, "1");
+            window.localStorage.removeItem(SAVED_TALENTS_KEY);
+          }
+          if (!cancelled) setSavedIds(new Set(imported.talentIds));
+          return;
+        }
+        const server = await api.getSavedTalents();
+        if (!cancelled) setSavedIds(new Set(server.talentIds));
+      } catch {
+        // Fallback silently for anonymous or offline contexts without overwriting state
+        if (!cancelled && localIds.length > 0) {
+          setSavedIds(new Set(localIds));
+        }
+      }
+    };
+
+    void syncSaved();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Toggle Shortlist Bookmark (persisted server-side)
   const toggleSaveTalent = (e: React.MouseEvent, talent: TalentItem) => {
     e.stopPropagation();
     const next = new Set(savedIds);
@@ -221,12 +252,13 @@ export const FeaturedCarousel = ({
     if (isNowSaved) {
       next.add(talent.id);
       showToast(copy.savedToast(talent.displayName.split(" ")[0]));
+      void api.saveTalents([talent.id]).then((res) => setSavedIds(new Set(res.talentIds))).catch(() => {});
     } else {
       next.delete(talent.id);
       showToast(copy.removedToast(talent.displayName.split(" ")[0]));
+      void api.removeSavedTalent(talent.id).then((res) => setSavedIds(new Set(res.talentIds))).catch(() => {});
     }
     setSavedIds(next);
-    persistSavedTalentIds(next);
   };
 
   // Quick share profile link
@@ -264,6 +296,10 @@ export const FeaturedCarousel = ({
       onProfileClick(talentId);
     }
   };
+
+  if (hideWhenEmpty && !loading && !error && talents.length === 0) {
+    return null;
+  }
 
   return (
     <section className="ft-wrap" aria-label={copy.sectionAria}>

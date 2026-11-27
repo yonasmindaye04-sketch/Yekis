@@ -1,12 +1,15 @@
 // === IMPORTS ===
 import { Router } from "express";
 import { z } from "zod";
-import { requireAuth } from "../../middleware/auth.js";
+import { requireAuth, type AuthedRequest } from "../../middleware/auth.js";
 import { requireStaffRole } from "../../middleware/staffRole.js";
 import {
   getFeaturedTalent,
   refreshFeaturedCarousel,
   pinUser,
+  getSavedTalentIdsForUser,
+  saveTalentsForUser,
+  removeSavedTalentForUser,
 } from "./featured.service.js";
 import { logger } from "../../lib/logger.js";
 
@@ -22,6 +25,56 @@ featuredRouter.get("/", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch featured talent" });
   }
 });
+
+featuredRouter.get("/saved", requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const talentIds = await getSavedTalentIdsForUser(req.user!.id);
+    return res.json({ talentIds });
+  } catch (error) {
+    logger.error({ err: error }, "GET /featured/saved error");
+    return res.status(500).json({ error: "Failed to fetch saved talents" });
+  }
+});
+
+const SaveTalentInput = z.object({
+  talentId: z.string().trim().min(1).optional(),
+  talentIds: z.array(z.string().trim().min(1)).max(50).optional(),
+});
+
+featuredRouter.post("/saved", requireAuth, async (req: AuthedRequest, res) => {
+  const parsed = SaveTalentInput.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "VALIDATION_ERROR" });
+  }
+  const ids = [
+    ...(parsed.data.talentId ? [parsed.data.talentId] : []),
+    ...(parsed.data.talentIds ?? []),
+  ];
+  try {
+    const talentIds = await saveTalentsForUser(req.user!.id, ids);
+    return res.json({ talentIds });
+  } catch (error) {
+    logger.error({ err: error }, "POST /featured/saved error");
+    return res.status(500).json({ error: "Failed to save talent" });
+  }
+});
+
+featuredRouter.delete(
+  "/saved/:talentId",
+  requireAuth,
+  async (req: AuthedRequest, res) => {
+    try {
+      const talentIds = await removeSavedTalentForUser(
+        req.user!.id,
+        req.params.talentId as string,
+      );
+      return res.json({ talentIds });
+    } catch (error) {
+      logger.error({ err: error }, "DELETE /featured/saved/:talentId error");
+      return res.status(500).json({ error: "Failed to remove saved talent" });
+    }
+  },
+);
 
 const pinUserSchema = z.object({
   userId: z.string(),

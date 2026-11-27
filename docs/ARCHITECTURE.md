@@ -83,7 +83,8 @@ The payment webhook routes are deliberately mounted before `express.json()` so r
 | `privacy` | N/A (Internal service) | PDPP data-subject rights: full personal-data export, and erasure that destroys personal content while retaining the AML and financial records the law requires (`modules/privacy/privacy.service.ts`) |
 | `skills` | `/api/v1/skills` | Standardized skill taxonomy |
 | `reviews` | `/api/v1/reviews` | Double-blind contract review system, Bayesian rating averages, public responses |
-| `featured` | `/api/v1/featured` | Talent carousel (staff-pinned, top-rated, recently verified algorithm) |
+| `featured` | `/api/v1/featured` | Talent carousel (staff-pinned, completed-jobs/Bayesian-rating ranking, recently verified algorithm) and user-scoped `SavedTalent` bookmark shortlist (`/saved`) |
+| `reminders` | `/api/v1/reminders` | User-scoped personal calendar reminder CRUD (`GET`/`POST`/`PATCH`/`DELETE`), strictly isolated per `userId` and kept separate from escrow pipeline KPIs |
 | `portfolio` | `/api/v1/portfolio` | Freelancer portfolio items |
 | `finance` | `/api/v1/finance` | Finance reconciliation read models, platform fee credit ledger, monthly withholding tax remittance reports |
 | `admin` | `/api/v1/admin` | Phase 1 RBAC permission matrix, users/contracts/payments/escrow/payouts/ledger/reconciliation/reports/risk/monitoring staff surfaces |

@@ -101,6 +101,7 @@ export function JobsWorkspace({
   categoryLabels = DEFAULT_CATEGORY_LABELS,
   section = "jobs",
   onBrowseJobs,
+  onOpenChat,
 }: {
   role: MarketplaceRole;
   openJobs: Job[];
@@ -119,6 +120,8 @@ export function JobsWorkspace({
   section?: "jobs" | "proposals";
   /** Called when the person asks to go back to the briefs board. */
   onBrowseJobs?: () => void;
+  /** Opens a direct chat thread with a freelancer / applicant. */
+  onOpenChat?: (recipientId: string, recipientName?: string) => void;
 }) {
   const { language, t } = useI18n();
   const copy = WORKFLOW_WORKSPACE_COPY[language] ?? WORKFLOW_WORKSPACE_COPY.en;
@@ -394,6 +397,20 @@ export function JobsWorkspace({
                       </div>
                       {["SUBMITTED", "SHORTLISTED"].includes(proposal.status) && (
                         <div className="workflow-actions" style={{ flexShrink: 0, marginTop: 4 }}>
+                          {onOpenChat && proposal.freelancerId && (
+                            <button
+                              type="button"
+                              className="sh-btn sh-btn-secondary"
+                              onClick={() =>
+                                onOpenChat(
+                                  proposal.freelancerId,
+                                  proposal.freelancer?.email ?? undefined,
+                                )
+                              }
+                            >
+                              <MessageSquare size={13} /> Chat
+                            </button>
+                          )}
                           {proposal.status === "SUBMITTED" && (
                             <button
                               className="sh-btn sh-btn-secondary"
@@ -663,7 +680,7 @@ export function JobsWorkspace({
         </section>
       )}
 
-      {!showProposals && (
+      {!showProposals && isWorking(role) && (
         <div className="sh-card" data-tour="jobs-board-list">
           <div className="sh-card-header">
             <div>

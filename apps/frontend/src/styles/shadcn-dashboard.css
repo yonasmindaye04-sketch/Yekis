@@ -1974,6 +1974,13 @@
   display: grid;
   grid-template-columns: 1.55fr 1fr;
   gap: 14px;
+  align-items: stretch;
+}
+
+.sh-charts-split > .sh-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .sh-chart-summary-bar {
@@ -4901,5 +4908,356 @@ dialog.sh-kanban-dialog::backdrop {
     font-size: 0.68rem;
   }
 }
+
+/* ─── P1: First-run checklist, pending top-up banner, switch & timeline ─── */
+.sh-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: var(--sh-radius, 10px);
+  border: 1px solid var(--sh-border);
+  background: var(--sh-card);
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.sh-pending-banner > svg {
+  color: var(--color-warning, #b45309);
+  flex-shrink: 0;
+}
+
+.sh-first-run-card {
+  display: grid;
+  gap: 14px;
+}
+
+.sh-first-run-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sh-first-run-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.sh-first-run-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sh-first-run-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.sh-first-run-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-sm, 8px);
+  border: 1px solid var(--sh-border);
+  background: var(--color-bg-subtle);
+}
+
+.sh-first-run-step-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.sh-first-run-step.is-done .sh-first-run-step-icon {
+  color: var(--color-success, #15803d);
+}
+
+.sh-first-run-step-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.sh-first-run-step-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.sh-first-run-step-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sh-first-run-done-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--color-success, #15803d);
+}
+
+.sh-first-run-step-hint {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.sh-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: var(--sh-radius-sm, 8px);
+  border: 1px solid var(--sh-border);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sh-switch-label input[type="checkbox"] {
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.bw-status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.bw-status-text.is-success {
+  color: var(--color-success, #15803d);
+}
+
+.bw-status-text.is-warning {
+  color: var(--color-warning, #b45309);
+}
+
+.bw-status-text.is-danger {
+  color: var(--color-danger, #b91c1c);
+}
+
+.bw-timeline {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.bw-timeline-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bw-timeline-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--sh-border);
+  flex-shrink: 0;
+}
+
+.bw-timeline-step.is-done {
+  color: var(--color-success, #15803d);
+  font-weight: 600;
+}
+
+.bw-timeline-step.is-done .bw-timeline-dot {
+  background: var(--color-success, #15803d);
+}
+
+.bw-timeline-step.is-current {
+  color: var(--color-warning, #b45309);
+  font-weight: 600;
+}
+
+.bw-timeline-step.is-current .bw-timeline-dot {
+  background: var(--color-warning, #b45309);
+}
+
+.bw-timeline-step.is-danger {
+  color: var(--color-danger, #b91c1c);
+  font-weight: 600;
+}
+
+.bw-timeline-step.is-danger .bw-timeline-dot {
+  background: var(--color-danger, #b91c1c);
+}
+
+/* ─── P2: Header hit targets, KYC text+icon status, Attention strip, Calendar legend & Reminders ─── */
+.sh-topbar .sh-icon-only-btn,
+.platform-topbar .theme-toggle,
+.platform-topbar .notification-trigger,
+.platform-topbar .user-menu {
+  min-width: 40px;
+  min-height: 40px;
+}
+
+.sh-kyc-inline,
+.sh-kyc-header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  padding: 2px 4px;
+  cursor: pointer;
+}
+
+.sh-kyc-inline.is-verified,
+.sh-kyc-header-link.is-verified {
+  color: var(--color-success, #15803d);
+}
+
+.sh-kyc-inline.is-required,
+.sh-kyc-header-link.is-required {
+  color: var(--color-warning, #b45309);
+}
+
+.sh-attention-strip {
+  margin-bottom: 16px;
+}
+
+.sh-cal-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 6px 2px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+
+.sh-cal-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sh-cal-legend-item.is-due {
+  color: var(--color-warning, #b45309);
+}
+
+.sh-cal-legend-item.is-released {
+  color: var(--color-success, #15803d);
+}
+
+.sh-cal-legend-item.is-proposal {
+  color: var(--color-info-text, #1d4ed8);
+}
+
+.sh-cal-legend-item.is-compliance {
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-cal-legend-item.is-reminder {
+  color: #7c3aed;
+}
+
+.sh-cal-event-line.due {
+  color: var(--color-warning, #b45309);
+  font-weight: 600;
+}
+
+.sh-cal-event-line.released {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.sh-cal-event-line.proposal {
+  color: var(--color-info-text, #1d4ed8);
+  font-weight: 600;
+}
+
+.sh-cal-event-line.compliance {
+  color: var(--color-neutral-text, #64748b);
+  font-weight: 600;
+}
+
+.sh-cal-event-line.reminder {
+  color: #7c3aed;
+  font-weight: 600;
+}
+
+.sh-status-inline.reminder {
+  color: #7c3aed;
+}
+
+.sh-reminder-form {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: var(--sh-radius-sm, 8px);
+  border: 1px solid var(--sh-border);
+  background: var(--color-bg-subtle);
+}
+
+.sh-reminder-form-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px;
+}
+
+.sidebar-nav-group {
+  display: grid;
+  gap: 2px;
+}
+
+.sidebar-group-label {
+  padding: 10px 12px 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-neutral-text, #64748b);
+}
+
+.sh-tabular,
+.sh-kpi-value,
+.sh-kanban-amount,
+.sh-mono {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .refresh-spin,
+  .sh-kpi-card,
+  .sh-kanban-card,
+  .sh-cal-cell,
+  .sh-seg-btn {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+
+
+
 
 

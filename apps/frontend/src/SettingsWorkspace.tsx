@@ -44,6 +44,11 @@ import { useOptionalGuide } from "./components/guide/GuideContext";
 import { MODULE_TOURS } from "./components/guide/guideConfig";
 import { GUIDE_MODULE_IDS } from "./components/guide/guideTypes";
 import {
+  GETTING_STARTED_CHANGED_EVENT,
+  getShowGettingStartedGuide,
+  setShowGettingStartedGuide,
+} from "./lib/onboardingGuidePref";
+import {
   playSound,
   setSoundCategoryEnabled,
   setSoundEnabled,
@@ -178,6 +183,15 @@ export function SettingsWorkspace({
   );
   const [prefSaving, setPrefSaving] = useState(false);
   const [prefSuccess, setPrefSuccess] = useState<string | null>(null);
+  const [showGettingStarted, setShowGettingStarted] = useState(() =>
+    getShowGettingStartedGuide(user.id),
+  );
+  useEffect(() => {
+    setShowGettingStarted(getShowGettingStartedGuide(user.id));
+    const onSync = () => setShowGettingStarted(getShowGettingStartedGuide(user.id));
+    window.addEventListener(GETTING_STARTED_CHANGED_EVENT, onSync);
+    return () => window.removeEventListener(GETTING_STARTED_CHANGED_EVENT, onSync);
+  }, [user.id]);
 
   // Privacy State
   const [isAvailable, setIsAvailable] = useState(true);
@@ -1450,6 +1464,26 @@ export function SettingsWorkspace({
                   </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <label className="sh-switch-label" htmlFor="setting-show-getting-started">
+                    <input
+                      id="setting-show-getting-started"
+                      type="checkbox"
+                      role="switch"
+                      aria-checked={showGettingStarted}
+                      checked={showGettingStarted}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        setShowGettingStarted(next);
+                        setShowGettingStartedGuide(user.id, next);
+                        setPrefSuccess(
+                          next
+                            ? "Getting-started guide enabled on the dashboard."
+                            : "Getting-started guide hidden from the dashboard.",
+                        );
+                      }}
+                    />
+                    <span>Show getting-started guide</span>
+                  </label>
                   <button
                     type="button"
                     className="sh-btn sh-btn-secondary"
