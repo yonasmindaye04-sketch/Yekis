@@ -35,6 +35,7 @@ import {
   recordMilestoneReleaseLedger,
   recordDisputeRefundLedger,
   recordWithdrawalDisbursementLedger,
+  resolveClientFeeAtRelease,
   getUserAccountCode,
 } from "../finance/ledger.service.js";
 
@@ -959,9 +960,21 @@ export async function releaseMilestoneFunds(
       data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
     });
 
-    // Platform-side ledger entries â€” without these, platform revenue and
-    // withholding remittance reports would permanently read zero.
-    await recordPlatformEarnings(tx, fees, milestoneId);
+    // Platform-side ledger entries — without these, platform revenue and
+    // withholding remittance reports would permanently read zero. Derive the
+    // client-side fee from the ESCROW_FUND journal (interim pre-snapshot path)
+    // so mid-flight rate changes cannot skew PlatformFeeCredit/POA vs GL 4000.
+    const effectiveClientFeeMinor = await resolveClientFeeAtRelease(
+      tx,
+      milestoneId,
+      fees.platformFeeFromClientMinor,
+      "releaseMilestoneFunds",
+    );
+    await recordPlatformEarnings(
+      tx,
+      { ...fees, platformFeeFromClientMinor: effectiveClientFeeMinor },
+      milestoneId,
+    );
 
     // Double-entry general ledger posting
     await recordMilestoneReleaseLedger(tx, {

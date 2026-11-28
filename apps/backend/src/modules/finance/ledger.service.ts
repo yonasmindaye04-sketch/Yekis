@@ -413,6 +413,28 @@ export async function readEscrowFundClientFeeMinor(
 }
 
 /**
+ * Resolves the client-side platform fee to record at release/settlement.
+ * Uses the client fee actually posted to GL 4000 by `ESCROW_FUND` so an
+ * env rate change between funding and release cannot skew POA/PlatformFeeCredit.
+ * Logs a warning and falls back to `fallbackClientFeeMinor` only for legacy
+ * unjournaled rows.
+ */
+export async function resolveClientFeeAtRelease(
+  tx: Prisma.TransactionClient,
+  referenceId: string,
+  fallbackClientFeeMinor: number,
+  context: string,
+): Promise<number> {
+  const fromFundJournal = await readEscrowFundClientFeeMinor(tx, referenceId);
+  if (fromFundJournal !== null) return fromFundJournal;
+  logger.warn(
+    { referenceId, context, fallbackClientFeeMinor },
+    "No ESCROW_FUND journal found at release — falling back to current client fee rate",
+  );
+  return fallbackClientFeeMinor;
+}
+
+/**
  * Milestone released to freelancer.
  * Debit:  LIABILITY (Escrow Pool)
  * Credit: LIABILITY (Freelancer wallet account — net)

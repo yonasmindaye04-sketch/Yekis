@@ -718,6 +718,8 @@ describe("ESC-003 gig invariant: no gig funding/release path reaches RELEASED or
 
   async function cleanupGigOrder(fixture: { gig: { id: string }; pkg: { id: string }; order: { id: string } }) {
     await prisma.platformFeeCredit.deleteMany({ where: { gigOrderId: fixture.order.id } });
+    await prisma.ledgerEntry.deleteMany({ where: { journal: { referenceId: fixture.order.id } } });
+    await prisma.ledgerJournal.deleteMany({ where: { referenceId: fixture.order.id } });
     await prisma.dispute.deleteMany({ where: { gigOrderId: fixture.order.id } });
     await prisma.gigOrder.deleteMany({ where: { id: fixture.order.id } });
     await prisma.gigPackage.deleteMany({ where: { id: fixture.pkg.id } });

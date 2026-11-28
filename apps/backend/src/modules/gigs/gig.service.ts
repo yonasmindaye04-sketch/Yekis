@@ -9,6 +9,11 @@ import type {
 import { prisma } from "../../lib/prisma.js";
 import { recordAuditEvent } from "../../lib/audit.js";
 import { calculateFees, type FeeBreakdown } from "../escrow/fees.js";
+import {
+  recordEscrowFundingLedger,
+  recordMilestoneReleaseLedger,
+  resolveClientFeeAtRelease,
+} from "../finance/ledger.service.js";
 import { env } from "../../config/env.js";
 import { notificationQueue, gigAutoReleaseQueue } from "../../queue/queues.js";
 import { createHash } from "node:crypto";
@@ -40,37 +45,35 @@ function autoReleaseDate(from: Date = new Date()): Date {
 }
 
 /** Upsert platform revenue + create an append-only fee credit for a gig order
- * release. Mirrors escrow.service.ts recordPlatformEarnings but keys the
- * PlatformFeeCredit by gigOrderId instead of milestoneId. Exported for the
- * gig-dispute resolution path (gigDispute.service.ts). */
+ * release inside the caller's transaction, so POA, PlatformFeeCredit, and the
+ * GL release journal always commit or roll back atomically. */
 export async function recordGigPlatformEarnings(
+  tx: Prisma.TransactionClient,
   fees: FeeBreakdown,
   gigOrderId: string,
 ) {
   const totalFeeMinor =
     fees.platformFeeFromFreelancerMinor + fees.platformFeeFromClientMinor;
-  await prisma.$transaction([
-    prisma.platformOperatingAccount.upsert({
-      where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        accumulatedFeeMinor: totalFeeMinor,
-        accumulatedWithholdingMinor: fees.withholdingTaxMinor,
-      },
-      update: {
-        accumulatedFeeMinor: { increment: totalFeeMinor },
-        accumulatedWithholdingMinor: { increment: fees.withholdingTaxMinor },
-      },
-    }),
-    prisma.platformFeeCredit.create({
-      data: {
-        gigOrderId,
-        feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-        feeFromClientMinor: fees.platformFeeFromClientMinor,
-        withholdingMinor: fees.withholdingTaxMinor,
-      },
-    }),
-  ]);
+  await tx.platformOperatingAccount.upsert({
+    where: { id: "singleton" },
+    create: {
+      id: "singleton",
+      accumulatedFeeMinor: totalFeeMinor,
+      accumulatedWithholdingMinor: fees.withholdingTaxMinor,
+    },
+    update: {
+      accumulatedFeeMinor: { increment: totalFeeMinor },
+      accumulatedWithholdingMinor: { increment: fees.withholdingTaxMinor },
+    },
+  });
+  await tx.platformFeeCredit.create({
+    data: {
+      gigOrderId,
+      feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      feeFromClientMinor: fees.platformFeeFromClientMinor,
+      withholdingMinor: fees.withholdingTaxMinor,
+    },
+  });
 }
 
 // === GIG CRUD ===
@@ -454,13 +457,30 @@ export async function fundGigOrderFromWallet(params: {
     // credited by acceptGigOrder (client acceptance) or by the gig
     // auto-release worker, after the delivery has been submitted for review.
     // The wallet is only where the money came from.
-    await tx.gigOrder.update({
-      where: { id: order.id },
+    const held = await tx.gigOrder.updateMany({
+      where: {
+        id: order.id,
+        escrowState: "PAYMENT_PENDING",
+        status: "PENDING_PAYMENT",
+      },
       data: {
         totalChargeMinor: fees.clientTotalChargeMinor,
         escrowState: "ESCROW_HELD",
         status: "ESCROW_HELD",
       },
+    });
+    if (held.count !== 1) {
+      throw new GigInvalidStateError("This gig order is no longer awaiting payment.");
+    }
+
+    await recordEscrowFundingLedger(tx, {
+      clientId: params.clientId,
+      milestoneId: order.id,
+      idempotencyKey: `escrow-fund-gig-${order.id}`,
+      description: `Gig order escrow funding from wallet`,
+      totalChargedMinor: fees.clientTotalChargeMinor,
+      milestoneGrossMinor: order.package.priceMinor,
+      platformFeeFromClientMinor: fees.platformFeeFromClientMinor,
     });
   });
 
@@ -613,12 +633,12 @@ export async function acceptGigOrder(params: {
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  await prisma.$transaction(async (tx) => {
+  const claimed = await prisma.$transaction(async (tx) => {
     const claim = await tx.gigOrder.updateMany({
       where: { id: order.id, escrowState: "SUBMITTED_FOR_REVIEW" },
       data: { escrowState: "RELEASED", status: "COMPLETED", releasedAt: new Date() },
     });
-    if (claim.count === 0) return;
+    if (claim.count !== 1) return false;
 
     await tx.wallet.update({
       where: { userId: order.gig.freelancerId },
@@ -628,24 +648,48 @@ export async function acceptGigOrder(params: {
       where: { id: order.gig.freelancerId },
       data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
     });
+
+    const effectiveClientFeeMinor = await resolveClientFeeAtRelease(
+      tx,
+      order.id,
+      fees.platformFeeFromClientMinor,
+      "acceptGigOrder",
+    );
+    await recordGigPlatformEarnings(
+      tx,
+      { ...fees, platformFeeFromClientMinor: effectiveClientFeeMinor },
+      order.id,
+    );
+    await recordMilestoneReleaseLedger(tx, {
+      freelancerId: order.gig.freelancerId,
+      milestoneId: order.id,
+      idempotencyKey: `escrow-release-gig-${order.id}`,
+      description: `Gig order release to freelancer wallet`,
+      milestoneGrossMinor: order.package.priceMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
+      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      paymentProviderFeeMinor: fees.paymentProviderFeeMinor,
+      withholdingTaxMinor: fees.withholdingTaxMinor,
+    });
+    return true;
   });
 
-  await recordGigPlatformEarnings(fees, order.id);
+  if (claimed) {
+    await gigAutoReleaseQueue.remove(`release-${order.id}`);
 
-  await gigAutoReleaseQueue.remove(`release-${order.id}`);
+    await recordAuditEvent({
+      userId: params.clientId,
+      eventType: "GIG_ORDER_ACCEPTED",
+      entityType: "GigOrder",
+      entityId: order.id,
+    });
 
-  await recordAuditEvent({
-    userId: params.clientId,
-    eventType: "GIG_ORDER_ACCEPTED",
-    entityType: "GigOrder",
-    entityId: order.id,
-  });
-
-  await notificationQueue.add("gig-order-completed", {
-    userId: order.gig.freelancerId,
-    gigOrderId: order.id,
-    message: "A gig order was accepted and funds were released.",
-  });
+    await notificationQueue.add("gig-order-completed", {
+      userId: order.gig.freelancerId,
+      gigOrderId: order.id,
+      message: "A gig order was accepted and funds were released.",
+    });
+  }
 
   return prisma.gigOrder.findUniqueOrThrow({ where: { id: order.id } });
 }

@@ -5,6 +5,11 @@ import { recordAuditEvent } from "../../lib/audit.js";
 import { notificationQueue, gigAutoReleaseQueue } from "../../queue/queues.js";
 import { calculateFees } from "../escrow/fees.js";
 import { recordGigPlatformEarnings } from "../gigs/gig.service.js";
+import {
+  recordDisputeRefundLedger,
+  recordMilestoneReleaseLedger,
+  resolveClientFeeAtRelease,
+} from "../finance/ledger.service.js";
 import { logger } from "../../lib/logger.js";
 
 /**
@@ -195,95 +200,164 @@ export async function resolveGigDispute(params: {
     }
   }
 
-  if (params.outcome === "RELEASE_TO_FREELANCER") {
-    const freelancerKyc = await prisma.kycRecord.findUnique({
-      where: { userId: order.gig.freelancerId },
+  const resolved = await prisma.$transaction(async (tx) => {
+    const disputeClaim = await tx.dispute.updateMany({
+      where: { id: dispute.id, stage: { not: "RESOLVED" }, resolvedAt: null },
+      data: {
+        stage: "RESOLVED",
+        resolvedByStaffId: params.staffUserId,
+        resolutionOutcome: params.outcome,
+        mediatorRecommendation: params.recommendation,
+        freelancerShareMinor: params.freelancerShareMinor,
+        resolvedAt: new Date(),
+      },
     });
-    const fees = calculateFees({
-      milestoneAmountMinor: grossMinor,
-      freelancerHasTin: !!freelancerKyc?.tin,
-    });
-
-    const claim = await prisma.gigOrder.updateMany({
-      where: { id: order.id, escrowState: "DISPUTED" },
-      data: { escrowState: "RELEASED", status: "COMPLETED", releasedAt: new Date() },
-    });
-    if (claim.count === 0) {
-      throw new InvalidGigDisputeStateError(
-        "Another path already settled this gig order.",
-      );
+    if (disputeClaim.count !== 1) {
+      throw new InvalidGigDisputeStateError("Dispute is already resolved.");
     }
 
-    await prisma.wallet.update({
-      where: { userId: order.gig.freelancerId },
-      data: { balanceMinor: { increment: fees.freelancerNetMinor } },
-    });
-    await prisma.user.update({
-      where: { id: order.gig.freelancerId },
-      data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
-    });
-    await recordGigPlatformEarnings(fees, order.id);
-  } else if (params.outcome === "REFUND_TO_CLIENT") {
-    const claim = await prisma.gigOrder.updateMany({
-      where: { id: order.id, escrowState: "DISPUTED" },
-      data: { escrowState: "REFUNDED", status: "CANCELLED" },
-    });
-    if (claim.count === 0) {
-      throw new InvalidGigDisputeStateError(
-        "Another path already settled this gig order.",
-      );
-    }
-    await prisma.wallet.update({
-      where: { userId: order.clientId },
-      data: { balanceMinor: { increment: order.totalChargeMinor } },
-    });
-  } else {
-    // PARTIAL_SPLIT
-    const freelancerShare = params.freelancerShareMinor!;
-    const clientShare = grossMinor - freelancerShare;
-
-    const claim = await prisma.gigOrder.updateMany({
-      where: { id: order.id, escrowState: "DISPUTED" },
-      data: { escrowState: "PARTIAL_REFUND", status: "CANCELLED" },
-    });
-    if (claim.count === 0) {
-      throw new InvalidGigDisputeStateError(
-        "Another path already settled this gig order.",
-      );
-    }
-
-    if (freelancerShare > 0) {
-      const freelancerKyc = await prisma.kycRecord.findUnique({
+    if (params.outcome === "RELEASE_TO_FREELANCER") {
+      const freelancerKyc = await tx.kycRecord.findUnique({
         where: { userId: order.gig.freelancerId },
       });
       const fees = calculateFees({
-        milestoneAmountMinor: freelancerShare,
+        milestoneAmountMinor: grossMinor,
         freelancerHasTin: !!freelancerKyc?.tin,
       });
-      await prisma.wallet.update({
+
+      const claim = await tx.gigOrder.updateMany({
+        where: { id: order.id, escrowState: "DISPUTED" },
+        data: { escrowState: "RELEASED", status: "COMPLETED", releasedAt: new Date() },
+      });
+      if (claim.count !== 1) {
+        throw new InvalidGigDisputeStateError(
+          "Another path already settled this gig order.",
+        );
+      }
+
+      await tx.wallet.update({
         where: { userId: order.gig.freelancerId },
         data: { balanceMinor: { increment: fees.freelancerNetMinor } },
       });
-      await recordGigPlatformEarnings(fees, order.id);
-    }
-    if (clientShare > 0) {
-      await prisma.wallet.update({
-        where: { userId: order.clientId },
-        data: { balanceMinor: { increment: clientShare } },
+      await tx.user.update({
+        where: { id: order.gig.freelancerId },
+        data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
       });
-    }
-  }
 
-  const resolved = await prisma.dispute.update({
-    where: { id: dispute.id },
-    data: {
-      stage: "RESOLVED",
-      resolvedByStaffId: params.staffUserId,
-      resolutionOutcome: params.outcome,
-      mediatorRecommendation: params.recommendation,
-      freelancerShareMinor: params.freelancerShareMinor,
-      resolvedAt: new Date(),
-    },
+      const effectiveClientFeeMinor = await resolveClientFeeAtRelease(
+        tx,
+        order.id,
+        fees.platformFeeFromClientMinor,
+        "resolveGigDispute",
+      );
+      await recordGigPlatformEarnings(
+        tx,
+        { ...fees, platformFeeFromClientMinor: effectiveClientFeeMinor },
+        order.id,
+      );
+      await recordMilestoneReleaseLedger(tx, {
+        freelancerId: order.gig.freelancerId,
+        milestoneId: order.id,
+        idempotencyKey: `escrow-release-gig-${order.id}`,
+        description: `Gig dispute release to freelancer wallet`,
+        milestoneGrossMinor: grossMinor,
+        freelancerNetMinor: fees.freelancerNetMinor,
+        platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+        paymentProviderFeeMinor: fees.paymentProviderFeeMinor,
+        withholdingTaxMinor: fees.withholdingTaxMinor,
+      });
+    } else if (params.outcome === "REFUND_TO_CLIENT") {
+      const claim = await tx.gigOrder.updateMany({
+        where: { id: order.id, escrowState: "DISPUTED" },
+        data: { escrowState: "REFUNDED", status: "CANCELLED" },
+      });
+      if (claim.count !== 1) {
+        throw new InvalidGigDisputeStateError(
+          "Another path already settled this gig order.",
+        );
+      }
+      await tx.wallet.update({
+        where: { userId: order.clientId },
+        data: { balanceMinor: { increment: grossMinor } },
+      });
+      await recordDisputeRefundLedger(tx, {
+        clientId: order.clientId,
+        milestoneId: order.id,
+        idempotencyKey: `dispute-refund-gig-${order.id}`,
+        description: `Gig dispute refund to client wallet`,
+        amountMinor: grossMinor,
+      });
+    } else {
+      // PARTIAL_SPLIT
+      const freelancerShare = params.freelancerShareMinor!;
+      const clientShare = grossMinor - freelancerShare;
+
+      const claim = await tx.gigOrder.updateMany({
+        where: { id: order.id, escrowState: "DISPUTED" },
+        data: { escrowState: "PARTIAL_REFUND", status: "CANCELLED" },
+      });
+      if (claim.count !== 1) {
+        throw new InvalidGigDisputeStateError(
+          "Another path already settled this gig order.",
+        );
+      }
+
+      if (freelancerShare > 0) {
+        const freelancerKyc = await tx.kycRecord.findUnique({
+          where: { userId: order.gig.freelancerId },
+        });
+        const fees = calculateFees({
+          milestoneAmountMinor: freelancerShare,
+          freelancerHasTin: !!freelancerKyc?.tin,
+        });
+        await tx.wallet.update({
+          where: { userId: order.gig.freelancerId },
+          data: { balanceMinor: { increment: fees.freelancerNetMinor } },
+        });
+        await tx.user.update({
+          where: { id: order.gig.freelancerId },
+          data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
+        });
+
+        const effectiveClientFeeMinor = await resolveClientFeeAtRelease(
+          tx,
+          order.id,
+          fees.platformFeeFromClientMinor,
+          "resolveGigDispute",
+        );
+        await recordGigPlatformEarnings(
+          tx,
+          { ...fees, platformFeeFromClientMinor: effectiveClientFeeMinor },
+          order.id,
+        );
+        await recordMilestoneReleaseLedger(tx, {
+          freelancerId: order.gig.freelancerId,
+          milestoneId: order.id,
+          idempotencyKey: `escrow-release-gig-${order.id}`,
+          description: `Gig dispute partial release to freelancer wallet`,
+          milestoneGrossMinor: freelancerShare,
+          freelancerNetMinor: fees.freelancerNetMinor,
+          platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+          paymentProviderFeeMinor: fees.paymentProviderFeeMinor,
+          withholdingTaxMinor: fees.withholdingTaxMinor,
+        });
+      }
+      if (clientShare > 0) {
+        await tx.wallet.update({
+          where: { userId: order.clientId },
+          data: { balanceMinor: { increment: clientShare } },
+        });
+        await recordDisputeRefundLedger(tx, {
+          clientId: order.clientId,
+          milestoneId: order.id,
+          idempotencyKey: `dispute-refund-gig-${order.id}`,
+          description: `Gig dispute partial refund to client wallet`,
+          amountMinor: clientShare,
+        });
+      }
+    }
+
+    return tx.dispute.findUniqueOrThrow({ where: { id: dispute.id } });
   });
 
   await recordAuditEvent({

@@ -4,6 +4,11 @@ import { recordAuditEvent } from "../lib/audit.js";
 import { notificationQueue } from "./queues.js";
 import { logger } from "../lib/logger.js";
 import { calculateFees } from "../modules/escrow/fees.js";
+import { recordGigPlatformEarnings } from "../modules/gigs/gig.service.js";
+import {
+  recordMilestoneReleaseLedger,
+  resolveClientFeeAtRelease,
+} from "../modules/finance/ledger.service.js";
 
 /**
  * The gig auto-release job body, extracted from `gigAutoRelease.worker.ts` so
@@ -38,12 +43,12 @@ export async function handleGigAutoReleaseJob(job: {
     freelancerHasTin: !!freelancerKyc?.tin,
   });
 
-  await prisma.$transaction(async (tx) => {
+  const claimed = await prisma.$transaction(async (tx) => {
     const claim = await tx.gigOrder.updateMany({
       where: { id: order.id, escrowState: "SUBMITTED_FOR_REVIEW" },
       data: { escrowState: "RELEASED", status: "COMPLETED", releasedAt: new Date() },
     });
-    if (claim.count === 0) return;
+    if (claim.count !== 1) return false;
 
     await tx.wallet.update({
       where: { userId: order.gig.freelancerId },
@@ -54,29 +59,32 @@ export async function handleGigAutoReleaseJob(job: {
       data: { totalEarnedNetMinor: { increment: fees.freelancerNetMinor } },
     });
 
-    const totalFeeMinor =
-      fees.platformFeeFromFreelancerMinor + fees.platformFeeFromClientMinor;
-    await tx.platformOperatingAccount.upsert({
-      where: { id: "singleton" },
-      create: {
-        id: "singleton",
-        accumulatedFeeMinor: totalFeeMinor,
-        accumulatedWithholdingMinor: fees.withholdingTaxMinor,
-      },
-      update: {
-        accumulatedFeeMinor: { increment: totalFeeMinor },
-        accumulatedWithholdingMinor: { increment: fees.withholdingTaxMinor },
-      },
+    const effectiveClientFeeMinor = await resolveClientFeeAtRelease(
+      tx,
+      order.id,
+      fees.platformFeeFromClientMinor,
+      "handleGigAutoReleaseJob",
+    );
+    await recordGigPlatformEarnings(
+      tx,
+      { ...fees, platformFeeFromClientMinor: effectiveClientFeeMinor },
+      order.id,
+    );
+    await recordMilestoneReleaseLedger(tx, {
+      freelancerId: order.gig.freelancerId,
+      milestoneId: order.id,
+      idempotencyKey: `escrow-release-gig-${order.id}`,
+      description: `Gig order auto-release to freelancer wallet`,
+      milestoneGrossMinor: order.package.priceMinor,
+      freelancerNetMinor: fees.freelancerNetMinor,
+      platformFeeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
+      paymentProviderFeeMinor: fees.paymentProviderFeeMinor,
+      withholdingTaxMinor: fees.withholdingTaxMinor,
     });
-    await tx.platformFeeCredit.create({
-      data: {
-        gigOrderId: order.id,
-        feeFromFreelancerMinor: fees.platformFeeFromFreelancerMinor,
-        feeFromClientMinor: fees.platformFeeFromClientMinor,
-        withholdingMinor: fees.withholdingTaxMinor,
-      },
-    });
+    return true;
   });
+
+  if (!claimed) return;
 
   await recordAuditEvent({
     eventType: "GIG_ORDER_AUTO_RELEASED",
