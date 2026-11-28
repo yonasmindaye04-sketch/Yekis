@@ -83,10 +83,17 @@ export async function getUserSummary(userId: string) {
       select: { id: true, subject: true, status: true, updatedAt: true },
     }),
     prisma.auditLog.findMany({
-      where: { userId },
+      where: {
+        OR: [
+          { userId },
+          { entityType: "User", entityId: userId },
+          { metadata: { path: ["targetUserId"], equals: userId } },
+          { metadata: { path: ["creditedTo"], equals: userId } },
+        ],
+      },
       orderBy: { createdAt: "desc" },
       take: 12,
-      select: { id: true, eventType: true, entityType: true, entityId: true, createdAt: true, actorRole: true },
+      select: { id: true, eventType: true, entityType: true, entityId: true, createdAt: true, actorRole: true, userId: true, metadata: true },
     }),
   ]);
 

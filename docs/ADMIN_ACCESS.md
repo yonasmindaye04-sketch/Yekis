@@ -288,7 +288,7 @@ pnpm --filter backend exec tsx scripts/purge-demo-data.ts --confirm  # delete
 | `ADMIN` | All 30 permissions (legacy full-access). |
 | `OPERATIONS_ADMIN` | Support desk, contracts, payments, payouts settlement, users/suspensions, system health; view-only disputes and escrow. |
 | `FINANCE_ADMIN` | Payments, payouts settlement, reconciliation, ERCA withholding, ledger, reports & analytics, audit logs, view-only users and escrow. |
-| `COMPLIANCE_ADMIN` | KYC review, Risk/AML (`TMS`), profile reports moderation, top-up receipts, audit logs, system health, dispute view/claim, assigned support threads. |
+| `COMPLIANCE_ADMIN` | KYC review, Risk/AML (`TMS`), profile reports moderation (including atomic `RESOLVED_PROFILE_BANNED` suspension of non-staff accounts and session revocation under `profiles.moderate`), top-up receipts, audit logs, system health, dispute view/claim, assigned support threads. |
 | `DISPUTE_MEDIATOR` | Dispute claiming and binding settlement, plus read-only contracts and users. |
 | `COMPLIANCE_OFFICER` | Legacy compliance permission set matching `COMPLIANCE_ADMIN`. |
 | `SUPPORT` | Full support desk queue visibility and handling, read-only user directory, own profile. |

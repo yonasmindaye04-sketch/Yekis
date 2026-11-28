@@ -1771,7 +1771,7 @@ Two further guards apply to the Telebirr handler: the webhook is **idempotent** 
 
 `PERMISSIONS` (`permissions.ts:14-48`) is a list of 30 `domain.action` keys, with a documented action ladder: **VIEW < CREATE < EDIT < APPROVE < EXECUTE < MANAGE**.
 
-`requirePermission(key)` **re-reads `staffRole` from the database on every request** and never trusts the JWT claim, which can be stale after a role change. Failure is `403 {"error":"PERMISSION_DENIED","required":"<key>"}`. It is enforced across `/admin/*` as well as KYC (`kyc.review`), TMS (`tms.review`), wallet top-ups (`topups.review`), finance (`reconciliation.view`, `ledger.view`, `reports.view`), staff profile reports (`profiles.moderate`), featured talent (`featured.manage`), and Telegram bot management (`bot.manage`).
+`requirePermission(key)` **re-reads `staffRole` from the database on every request** and never trusts the JWT claim, which can be stale after a role change. Failure is `403 {"error":"PERMISSION_DENIED","required":"<key>"}`. It is enforced across `/admin/*` as well as KYC (`kyc.review`), TMS (`tms.review`), wallet top-ups (`topups.review`), finance (`reconciliation.view`, `ledger.view`, `reports.view`), staff profile reports (`profiles.moderate`, widened so `RESOLVED_PROFILE_BANNED` atomically suspends non-staff reported accounts, increments `sessionVersion` to revoke refresh tokens, and refuses staff targets with `403 CANNOT_SUSPEND_STAFF`), featured talent (`featured.manage`), and Telegram bot management (`bot.manage`).
 
 `requireStaffRole(...roles)` is reserved for support chat administration (`/chat/admin/*`, accepting `COMPLIANCE_OFFICER`, `ADMIN`, `SUPPORT`, `SUPER_ADMIN`, `OPERATIONS_ADMIN`, `COMPLIANCE_ADMIN`). It also re-reads from the database and treats `ADMIN` and `SUPER_ADMIN` as full-access exceptions.
 
@@ -1796,7 +1796,7 @@ Six keys are held by **nobody except `SUPER_ADMIN`/`ADMIN`**: `gigs.moderate`, `
 
 Eleven admin routes additionally require `requireFreshAuth(300)`: gig moderation, escrow release/hold/unhold, user suspend/unsuspend, force KYC re-review, staff role assignment, staff status change, payout settlement, and opening a breach incident.
 
-`requireFreshAuth` returns `401 REAUTH_REQUIRED` when the credential's `auth_time` is missing or older than 300 seconds, and `403 STEP_UP_REQUIRED` when the credential is recent but not "strong" — a Telegram or OAuth session is not sufficient for a step-up, only a password session is.
+`requireFreshAuth` returns `401 REAUTH_REQUIRED` when the credential's `auth_time` is missing or older than 300 seconds, and `403 STEP_UP_REQUIRED` when the credential is recent but not "strong" — a Telegram or OAuth session is not sufficient for a step-up, only a password session is. `POST /api/v1/auth/reauth` shares the `loginLimiter` IP rate limiter, verifies the current password, records `USER_REAUTHENTICATED` or `USER_REAUTH_FAILED` audit events, and issues fresh `auth_time` / `amr: ["pwd"]` tokens without clearing active console session state.
 
 #### The privileged actions
 

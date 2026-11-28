@@ -834,6 +834,14 @@ export function assertProductionSafety(
     );
   }
 
+  // Containment gate: PARTIAL_SPLIT_ENABLED must stay fail-closed (false) in
+  // production until approved for rollout.
+  if (isProd && cfg.PARTIAL_SPLIT_ENABLED === true) {
+    violations.push(
+      "PARTIAL_SPLIT_ENABLED is true while NODE_ENV=production. Partial split containment requires PARTIAL_SPLIT_ENABLED to remain false in production.",
+    );
+  }
+
   return violations;
 }
 

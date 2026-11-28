@@ -665,6 +665,8 @@ model DisputeEvidence {
   disputeId         String
   dispute           Dispute  @relation(fields: [disputeId], references: [id])
   submittedByUserId String
+  submittedByRole   String   @default("PARTY")
+  isInternal        Boolean  @default(false)
   statement         String
   createdAt         DateTime @default(now())
 

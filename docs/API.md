@@ -425,11 +425,11 @@ The secured mounted API uses these paths; legacy `/raise`, `/contract/:id`, and 
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
-| `GET` | `/api/v1/disputes` | Authenticated | List disputes for current user's contracts |
+| `GET` | `/api/v1/disputes` | Authenticated | List disputes for current user's contracts (`isInternal: true` staff notes omitted) |
 | `POST` | `/api/v1/disputes` | Contract party | Raise a dispute for a submitted milestone |
-| `GET` | `/api/v1/disputes/:disputeId` | Dispute party or staff (`disputes.view`) | Get dispute and evidence |
+| `GET` | `/api/v1/disputes/:disputeId` | Dispute party or staff (`disputes.view`) | Get dispute and evidence (`isInternal: true` staff notes hidden from parties; each item includes `submittedByRole` and `isInternal`) |
 | `POST` | `/api/v1/disputes/:disputeId/escalate` | Dispute party or staff (`disputes.mediate`) | Move `STAGE_1_NEGOTIATION` to `STAGE_2_EVIDENCE` |
-| `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party (Stage 1–2) or staff (`disputes.mediate`, Stage 1–3) | Add evidence statement (or mediator note in Stage 3) with audit attribution |
+| `POST` | `/api/v1/disputes/:disputeId/evidence` | Dispute party (Stage 1–2) or staff (`disputes.mediate`, Stage 1–3) | Add evidence statement or optional staff-only `{ isInternal: true }` note with `submittedByRole` and audit attribution |
 | `POST` | `/api/v1/disputes/:disputeId/arbitration` | Dispute party or staff (`disputes.mediate`) | Escalate `STAGE_3_MEDIATION` to `STAGE_4_ARBITRATION` |
 | `GET` | `/api/v1/disputes/staff/queue` | Staff | List mediation/arbitration queue. Each row carries `disputedAmountMinor`, `disputedMilestone`, and an `sla` object (all computed server-side); response includes `partialSplitEnabled` |
 | `POST` | `/api/v1/disputes/:disputeId/resolve` | Staff | Release, refund, or partially split (when `PARTIAL_SPLIT_ENABLED=true`, accepts unambiguous `freelancerSharePct` or `freelancerShareMinor`) |
@@ -586,7 +586,7 @@ All staged behind `requirePermission(...)` or narrower staff roles.
 
 | Method | Path | Permission | Purpose |
 |---|---|---|---|
-| `GET` | `/api/v1/admin/audit-logs` | `audit.view` | Immutable audit log viewer |
+| `GET` | `/api/v1/admin/audit-logs` | `audit.view` | Immutable audit log viewer (`?userId=` matches actor `userId` as well as target `entityId` / `metadata.targetUserId` / `metadata.creditedTo`) |
 | `GET` | `/api/v1/admin/users/search` | `users.view` | Search users by email/phone/UCID/display name |
 | `POST` | `/api/v1/admin/users/:id/suspend` | `users.suspend` | Suspend an account (writes USER_SUSPENDED audit) |
 | `POST` | `/api/v1/admin/users/:id/unsuspend` | `users.suspend` | Reactivate a suspended account |

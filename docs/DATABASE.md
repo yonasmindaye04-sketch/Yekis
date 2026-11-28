@@ -69,7 +69,7 @@ erDiagram
 | `WalletTopUp` | Receipt-backed manual credit request and staff decision (also covers automated checkout flows) |
 | `PayoutTransaction` | Freelancer withdrawal record tracking Telebirr B2C disbursement lifecycle (PENDING → PROCESSING → CONFIRMED/FAILED/REVERSED); wallet balance is rolled back automatically on FAILED |
 | `Dispute` | Polymorphic dispute: linked to either one `milestoneId` (contract milestone) or one `gigOrderId` (gig order) — a DB CHECK enforces exactly one subject per row. Unique per subject. Staged deadlines, resolution outcome, and optional split. Carries the SLA fact `firstRespondedAt` (the mediator claimed the case or recorded a recommendation) |
-| `DisputeEvidence` | Party statement tied to a dispute |
+| `DisputeEvidence` | Statement or staff mediation note tied to a dispute; tracks `submittedByRole` (`CLIENT`, `FREELANCER`, or staff role) and `isInternal` (staff-only notes excluded from party views and evidence bundles) |
 | `TransactionFlag` | AML/TMS rule result and staff review/STR metadata (includes `strDeadlineAt` — 24h STR SLA clock set at detection) |
 | `Notification` | User notification ledger and delivery metadata |
 | `Conversation` | Support thread with participant relations, `creatorId`, and `assignedStaffId` for scoped staff access; creator and auto-assigned staff are registered as participants upon ticket creation. Carries the SLA facts `firstRespondedAt` (staff's first reply) and `resolvedAt` (the ticket was closed) |
@@ -123,7 +123,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 - A dispute also retains `contractId` for efficient party and queue queries.
 - A wallet and KYC record are each one-to-one with a user.
 - Release/refund/split services combine guarded updates with Prisma transactions; constraints support, but do not replace, service state checks.
-- `AuditLog` is insert-only by application convention and database privileges.
+- `AuditLog` is insert-only by application convention and database privileges. Historical rows appended prior to Phase A hardening (where KYC reviews, STR/compliance lifts, background SLA alerts, and webhook top-up/escrow callbacks recorded the subject/target `userId` in `AuditLog.userId` instead of `staffUserId` or `actorRole: "SYSTEM"` + `metadata.targetUserId`) are **never modified or deleted** per ten-year AML immutability; query paths (`GET /api/v1/admin/audit-logs?userId=` and `getUserSummary`) match both actor `userId` and `entityId`/`metadata.targetUserId`.
 - `AuditLog.retentionUntil` is NOT NULL: an audit row without a defined expiry is the ambiguity the ten-year retention requirement exists to remove. The purge runs through the `SECURITY DEFINER` function `purge_expired_audit_logs()`, which the application role may call but through which it holds no `DELETE` privilege on the table. The function deletes a row only when **both** its stamp has expired **and** it is at least ten years old, so a misconfigured retention period cannot shorten a statutory obligation.
 - A contract has at most two reviews, one from each party, enforcing the double-blind system.
 - Reviews are only visible once both parties have submitted them, or the 14-day window expires.
@@ -198,6 +198,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 | `20261113120000_email_verification_otp` | Adds the `EmailVerificationCode` table (the onboarding OTP channel: lower-cased address, purpose, salted SHA-256 of the code, attempts, expiry) and `User.emailVerifiedAt`. `User.emailVerified` already existed and is also set by the OAuth path, where the provider — not the platform — proved the address |
 | `20261127112200_add_workspace_reminders_and_saved_talents` | Adds `WorkspaceReminder` (indexed on `(userId, dueAt)`) and `SavedTalent` (`@@unique([userId, talentId])`) with cascade deletes on `User` |
 | `20261201120000_telegram_broadcasts` | Adds the admin broadcast center: `BroadcastAudience`/`BroadcastStatus`/`BroadcastDeliveryStatus` enums, `TelegramBroadcast` (indexed on `(status, createdAt)` and `createdById`) and `TelegramBroadcastDelivery` (unique `(broadcastId, userId)`, indexed on `(broadcastId, status)`) with cascade deletes from the broadcast and the user |
+| `20261202120000_add_dispute_evidence_role_and_visibility` | Adds `DisputeEvidence.submittedByRole` (default `'PARTY'`) and `DisputeEvidence.isInternal` (default `false`) so staff mediation notes track author role and stay hidden from dispute parties when internal |
 
 ### Re-runnable migrations
 

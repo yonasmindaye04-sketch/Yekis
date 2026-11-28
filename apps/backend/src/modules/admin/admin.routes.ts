@@ -235,17 +235,20 @@ adminRouter.get(
       const { page, limit, skip } = parsePagination(
         req.query as Record<string, unknown>,
       );
-      const where: {
-        eventType?: string;
-        entityType?: string;
-        entityId?: string;
-        userId?: string;
-      } = {};
+      const where: Record<string, unknown> = {};
 
       if (req.query.eventType) where.eventType = String(req.query.eventType);
       if (req.query.entityType) where.entityType = String(req.query.entityType);
       if (req.query.entityId) where.entityId = String(req.query.entityId);
-      if (req.query.userId) where.userId = String(req.query.userId);
+      if (req.query.userId) {
+        const targetUid = String(req.query.userId);
+        where.OR = [
+          { userId: targetUid },
+          { entityType: "User", entityId: targetUid },
+          { metadata: { path: ["targetUserId"], equals: targetUid } },
+          { metadata: { path: ["creditedTo"], equals: targetUid } },
+        ];
+      }
 
       const [total, items] = await Promise.all([
         prisma.auditLog.count({ where }),

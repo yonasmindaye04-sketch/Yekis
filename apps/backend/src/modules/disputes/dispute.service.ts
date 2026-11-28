@@ -358,12 +358,16 @@ export async function submitEvidence(params: {
   userId: string;
   disputeId: string;
   statement: string;
+  isInternal?: boolean;
 }) {
-  const { dispute, isParty, isAuthorizedStaff } = await getDisputeForActor(
-    params.disputeId,
-    params.userId,
-    "disputes.mediate",
-  );
+  const { dispute, isParty, isAuthorizedStaff, actorRole } =
+    await getDisputeForActor(params.disputeId, params.userId, "disputes.mediate");
+
+  if (params.isInternal && (!isAuthorizedStaff || isParty)) {
+    throw new NotDisputePartyError(
+      "Only non-party mediation staff can create internal mediation notes.",
+    );
+  }
 
   const allowedStages = isAuthorizedStaff
     ? ["STAGE_1_NEGOTIATION", "STAGE_2_EVIDENCE", "STAGE_3_MEDIATION"]
@@ -375,53 +379,71 @@ export async function submitEvidence(params: {
     );
   }
 
+  const submittedByRole =
+    isAuthorizedStaff && !isParty
+      ? actorRole ?? "STAFF"
+      : dispute.contract
+        ? params.userId === dispute.contract.clientId
+          ? "CLIENT"
+          : "FREELANCER"
+        : params.userId === dispute.gigOrder?.clientId
+          ? "CLIENT"
+          : "FREELANCER";
+
   await prisma.disputeEvidence.create({
     data: {
       disputeId: dispute.id,
       submittedByUserId: params.userId,
+      submittedByRole,
+      isInternal: Boolean(params.isInternal),
       statement: params.statement,
     },
   });
 
-  const alreadyMediation = dispute.stage === "STAGE_3_MEDIATION";
-  const mediationDeadline = alreadyMediation
-    ? dispute.mediationDeadlineAt ?? daysFromNow(MEDIATION_WINDOW_DAYS)
+  const keepStageUnchanged = Boolean(params.isInternal) || dispute.stage === "STAGE_3_MEDIATION";
+  const nextStage = params.isInternal ? dispute.stage : "STAGE_3_MEDIATION";
+  const mediationDeadline = keepStageUnchanged
+    ? dispute.mediationDeadlineAt
     : daysFromNow(MEDIATION_WINDOW_DAYS);
 
   const updated = await prisma.dispute.update({
     where: { id: dispute.id },
     data: {
-      stage: "STAGE_3_MEDIATION",
-      mediationDeadlineAt: mediationDeadline,
+      stage: nextStage,
+      ...(mediationDeadline !== undefined ? { mediationDeadlineAt: mediationDeadline } : {}),
     },
   });
 
   await recordAuditEvent({
     userId: params.userId,
+    actorRole,
     eventType: "DISPUTE_EVIDENCE_SUBMITTED",
     entityType: "Dispute",
     entityId: dispute.id,
     metadata: {
       staffMediationNote: isAuthorizedStaff && !isParty,
+      isInternal: Boolean(params.isInternal),
+      submittedByRole,
       stage: updated.stage,
     },
   });
 
-  // T2-G: Compile evidence bundle asynchronously â€” do not block the evidence
-  // submission response if the object-store upload fails. The mediator queue
-  // shows cases even without a compiled bundle; bundle just enriches the view.
-  compileEvidenceBundle(dispute.id).catch((err) =>
-    logger.error(
-      { err, disputeId: dispute.id },
-      "Evidence bundle compilation failed â€” mediator will see raw statements only",
-    ),
-  );
+  // T2-G: Compile evidence bundle asynchronously — internal staff notes are
+  // excluded from the party-visible bundle.
+  if (!params.isInternal) {
+    compileEvidenceBundle(dispute.id).catch((err) =>
+      logger.error(
+        { err, disputeId: dispute.id },
+        "Evidence bundle compilation failed — mediator will see raw statements only",
+      ),
+    );
+  }
 
   return updated;
 }
 
 /**
- * T2-G: Pulls contract terms, all DisputeEvidence statements, milestone detail,
+ * T2-G: Pulls contract terms, all public DisputeEvidence statements, milestone detail,
  * and the direct message thread (if it exists for this job) into a single JSON
  * document, uploads it to the object store, and sets evidenceBundlePath.
  * Called from submitEvidence(); also safe to call standalone for recompilation.
@@ -430,7 +452,10 @@ export async function compileEvidenceBundle(disputeId: string): Promise<void> {
   const dispute = await prisma.dispute.findUnique({
     where: { id: disputeId },
     include: {
-      evidence: { orderBy: { createdAt: "asc" } },
+      evidence: {
+        where: { isInternal: false },
+        orderBy: { createdAt: "asc" },
+      },
       contract: {
         include: {
           job: true,
@@ -1257,23 +1282,30 @@ async function getDisputeForActor<TIncludeEvidence extends boolean = false>(
     where: { id: userId },
     select: { staffRole: true },
   });
-  const isAuthorizedStaff = hasPermission(actor?.staffRole, requiredStaffPermission);
+  const actorRole = actor?.staffRole ?? null;
+  const isAuthorizedStaff = hasPermission(actorRole, requiredStaffPermission);
 
   if (!isParty && !isAuthorizedStaff) {
     throw new NotDisputePartyError(
       `Only dispute parties or staff with ${requiredStaffPermission} permission can perform this action.`,
     );
   }
-  return { dispute, isParty, isAuthorizedStaff };
+  return { dispute, isParty, isAuthorizedStaff, actorRole };
 }
 
 export async function getDispute(userId: string, disputeId: string) {
-  const { dispute } = await getDisputeForActor(
+  const { dispute, isAuthorizedStaff } = await getDisputeForActor(
     disputeId,
     userId,
     "disputes.view",
     true,
   );
+  if (!isAuthorizedStaff && Array.isArray(dispute.evidence)) {
+    return {
+      ...dispute,
+      evidence: dispute.evidence.filter((e) => !e.isInternal),
+    };
+  }
   return dispute;
 }
 
@@ -1290,7 +1322,10 @@ export async function getDisputesForUser(userId: string) {
       ],
     },
     include: {
-      evidence: true,
+      evidence: {
+        where: { isInternal: false },
+        orderBy: { createdAt: "asc" },
+      },
       contract: {
         select: {
           id: true,

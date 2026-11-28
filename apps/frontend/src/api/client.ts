@@ -2535,8 +2535,18 @@ export class ApiClient {
   async escalateDispute(disputeId: string): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/escalate`, { method: "POST" });
   }
-  async submitDisputeEvidence(disputeId: string, statement: string): Promise<Dispute> {
-    return this.request(`/api/v1/disputes/${disputeId}/evidence`, { method: "POST", body: JSON.stringify({ statement }) });
+  async submitDisputeEvidence(
+    disputeId: string,
+    statement: string,
+    isInternal?: boolean,
+  ): Promise<Dispute> {
+    return this.request(`/api/v1/disputes/${disputeId}/evidence`, {
+      method: "POST",
+      body: JSON.stringify({
+        statement,
+        ...(typeof isInternal === "boolean" ? { isInternal } : {}),
+      }),
+    });
   }
   async escalateDisputeToArbitration(disputeId: string): Promise<Dispute> {
     return this.request(`/api/v1/disputes/${disputeId}/arbitration`, { method: "POST" });

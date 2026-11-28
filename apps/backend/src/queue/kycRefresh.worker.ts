@@ -34,11 +34,14 @@ export const kycRefreshWorker = new Worker(
       });
 
       await recordAuditEvent({
-        userId: record.userId,
+        actorRole: "SYSTEM",
         eventType: "KYC_PERIODIC_REVIEW_TRIGGERED",
         entityType: "KycRecord",
         entityId: record.id,
-        metadata: { previousReviewDueAt: record.nextReviewDueAt },
+        metadata: {
+          targetUserId: record.userId,
+          previousReviewDueAt: record.nextReviewDueAt,
+        },
       });
 
       // T2-J: Notify the user so they know re-submission is needed.

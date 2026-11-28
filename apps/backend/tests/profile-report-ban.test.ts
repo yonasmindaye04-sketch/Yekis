@@ -81,6 +81,10 @@ describe("OPS-06: transactional profile ban + account suspension under profiles.
       { id: staff.id, role: "CLIENT", ucid: null },
       ["pwd"],
     );
+    const targetSession = await createAuthTokens(
+      { id: target.id, role: "FREELANCER", ucid: null },
+      ["pwd"],
+    );
 
     const res = await request(app)
       .patch(`/api/v1/staff/reports/${report.id}`)
@@ -100,6 +104,13 @@ describe("OPS-06: transactional profile ban + account suspension under profiles.
     });
     expect(updatedTarget.isSuspended).toBe(true);
     expect(updatedTarget.sessionVersion).toBeGreaterThanOrEqual(1);
+
+    // Existing refresh token for banned user must immediately fail
+    const refreshRes = await request(app)
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken: targetSession.refreshToken });
+    expect(refreshRes.status).toBe(401);
+    expect(refreshRes.body.error).toBe("INVALID_REFRESH_TOKEN");
 
     const [suspendAudit, reportAudit] = await Promise.all([
       prisma.auditLog.findFirst({

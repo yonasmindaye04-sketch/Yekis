@@ -425,11 +425,15 @@ async function sweepOverdueStrFlags(): Promise<number> {
     });
 
     await recordAuditEvent({
-      userId: flag.userId,
+      actorRole: "SYSTEM",
       eventType: "STR_SLA_BREACH",
       entityType: "TransactionFlag",
       entityId: flag.id,
-      metadata: { deadline: flag.strDeadlineAt?.toISOString(), alertedAt },
+      metadata: {
+        targetUserId: flag.userId,
+        deadline: flag.strDeadlineAt?.toISOString(),
+        alertedAt,
+      },
     });
 
     await notifyStaffOfEvent({

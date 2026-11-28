@@ -380,6 +380,7 @@ export type RaiseDisputeInput = z.infer<typeof RaiseDisputeInput>;
 
 export const SubmitEvidenceInput = z.object({
   statement: z.string().min(10).max(5000),
+  isInternal: z.boolean().optional(),
 });
 export type SubmitEvidenceInput = z.infer<typeof SubmitEvidenceInput>;
 

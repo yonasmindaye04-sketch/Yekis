@@ -440,6 +440,8 @@ export interface RawDisputeItem {
   evidence: Array<{
     id: string;
     submittedByUserId: string;
+    submittedByRole?: string;
+    isInternal?: boolean;
     statement: string;
     createdAt: string;
   }>;

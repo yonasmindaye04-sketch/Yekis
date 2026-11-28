@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import type { Express } from "express";
 import request from "supertest";
 import { prisma } from "../src/lib/prisma.js";
-import { env } from "../src/config/env.js";
+import { assertProductionSafety, env } from "../src/config/env.js";
 import { buildApp } from "../src/app.js";
 import { createAuthTokens } from "../src/modules/auth/auth.service.js";
 import { computeDisputeSplit } from "../src/modules/disputes/dispute.service.js";
@@ -243,6 +243,36 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
     expect(odd33.freelancerGrossMinor + odd33.clientRefundMinor).toBe(10_050);
     expect(odd33.totalFeeMinor).toBe(232 + 17);
     expect(odd33.freelancerNetMinor).toBe(3_317 - 249);
+
+    // Explicit rounding check on 12,345 minor @ 33%: fee components sum exactly to totalFeeMinor
+    const odd12345 = computeDisputeSplit({
+      disputedAmountMinor: 12_345,
+      outcome: "PARTIAL_SPLIT",
+      freelancerSharePct: 33,
+    });
+    expect(odd12345.freelancerGrossMinor).toBe(4_074);
+    expect(odd12345.clientRefundMinor).toBe(8_271);
+    expect(odd12345.freelancerGrossMinor + odd12345.clientRefundMinor).toBe(12_345);
+    expect(odd12345.platformFeeMinor + odd12345.providerFeeMinor).toBe(odd12345.totalFeeMinor);
+    expect(odd12345.freelancerNetMinor).toBe(
+      odd12345.freelancerGrossMinor - odd12345.totalFeeMinor - odd12345.withholdingTaxMinor,
+    );
+  });
+
+  it("refuses PARTIAL_SPLIT_ENABLED=true when NODE_ENV=production", () => {
+    const violations = assertProductionSafety({
+      NODE_ENV: "production",
+      PARTIAL_SPLIT_ENABLED: true,
+      TELEGRAM_BOT_TOKEN: "tok",
+      GUEST_SUPPORT_JWT_SECRET: "guest-secret-that-differs-from-access",
+      JWT_ACCESS_SECRET: "access-secret-different-from-guest",
+      TELEGRAM_WEBHOOK_SECRET: "webhook-secret-32-chars-minimum",
+      TELEGRAM_WEBHOOK_URL: "https://api.yekis.example/webhook",
+      API_PUBLIC_URL: "https://api.yekis.example",
+      STAFF_CONSOLE_URL: "https://ops.yekis.example",
+      TELEGRAM_ENV: "prod",
+    });
+    expect(violations.some((v) => v.includes("PARTIAL_SPLIT_ENABLED"))).toBe(true);
   });
 
   it("rejects ambiguous or out-of-range split inputs", async () => {
@@ -332,6 +362,10 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
       .send({
         outcome: "PARTIAL_SPLIT",
         freelancerSharePct: 50,
+        // Client-injected money fields must be ignored; DB milestone.amountMinor governs
+        disputedAmountMinor: 999_999,
+        freelancerNetMinor: 999_999,
+        totalFeeMinor: 0,
         recommendation: "50% split on disputed ETB 1,000 milestone",
       });
     expect(resolveRes.status).toBe(200);
@@ -340,12 +374,12 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
       prisma.wallet.findUniqueOrThrow({ where: { userId: f.clientId } }),
       prisma.wallet.findUniqueOrThrow({ where: { userId: f.freelancerId } }),
     ]);
-    expect(clientWallet.balanceMinor).toBe(previewRes.body.clientRefundMinor);
-    expect(freelancerWallet.balanceMinor).toBe(previewRes.body.freelancerNetMinor);
+    expect(clientWallet.balanceMinor).toBe(50_000);
+    expect(freelancerWallet.balanceMinor).toBe(46_250);
 
     const journals = await prisma.ledgerJournal.findMany({
       where: { referenceId: f.disputedMsId },
-      include: { entries: true },
+      include: { entries: { include: { account: true } } },
     });
     expect(journals.length).toBeGreaterThanOrEqual(3);
     for (const j of journals) {
@@ -353,5 +387,71 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
       const credits = j.entries.reduce((s, e) => s + e.creditMinor, 0);
       expect(debits).toBe(credits);
     }
+
+    // Assert exact settlement ledger entries for the ETB 1,000 (100,000 minor) 50% split
+    const releaseAndRefund = journals.filter((j) =>
+      ["MILESTONE_RELEASE", "DISPUTE_REFUND"].includes(j.referenceType),
+    );
+    const byAccount = new Map<string, { debit: number; credit: number }>();
+    for (const j of releaseAndRefund) {
+      for (const e of j.entries) {
+        const cur = byAccount.get(e.account.code) ?? { debit: 0, credit: 0 };
+        cur.debit += e.debitMinor;
+        cur.credit += e.creditMinor;
+        byAccount.set(e.account.code, cur);
+      }
+    }
+    expect(byAccount.get("2000-LIABILITY-ESCROW")).toEqual({ debit: 100_000, credit: 0 });
+    expect(byAccount.get(`2100-USER-${f.clientId}`)).toEqual({ debit: 0, credit: 50_000 });
+    expect(byAccount.get(`2100-USER-${f.freelancerId}`)).toEqual({ debit: 0, credit: 46_250 });
+    expect(byAccount.get("4000-REVENUE-PLATFORM-FEES")).toEqual({ debit: 0, credit: 3_500 });
+    expect(byAccount.get("4010-REVENUE-DISBURSEMENT-FEES")).toEqual({ debit: 0, credit: 250 });
+  });
+
+  it("isolates two disputes on different milestones of the same contract in queue and split-preview", async () => {
+    const f = await seedDisputeFixture({
+      disputedAmountMinor: 2_200_000,
+      extraMilestoneAmountMinor: 900_000,
+    });
+    const secondMs = await prisma.milestone.findFirstOrThrow({
+      where: { contract: { milestones: { some: { id: f.disputedMsId } } }, NOT: { id: f.disputedMsId } },
+    });
+    await prisma.milestone.update({
+      where: { id: secondMs.id },
+      data: { escrowState: "DISPUTED" },
+    });
+    const secondDispute = await prisma.dispute.create({
+      data: {
+        contractId: secondMs.contractId,
+        milestoneId: secondMs.id,
+        category: "SCOPE_CREEP",
+        stage: "STAGE_3_MEDIATION",
+        raisedByUserId: f.clientId,
+        description: "Second disputed milestone on same contract",
+      },
+    });
+    cleanupIds.disputeIds.push(secondDispute.id);
+
+    const queueRes = await request(app)
+      .get(`/api/v1/disputes/staff/queue?search=ops01-client-${seq}`)
+      .set("Authorization", f.authHeader);
+    expect(queueRes.status).toBe(200);
+    const d1 = queueRes.body.items.find((d: { id: string }) => d.id === f.disputeId);
+    const d2 = queueRes.body.items.find((d: { id: string }) => d.id === secondDispute.id);
+    expect(d1?.disputedAmountMinor).toBe(2_200_000);
+    expect(d2?.disputedAmountMinor).toBe(900_000);
+
+    const [p1, p2] = await Promise.all([
+      request(app)
+        .post(`/api/v1/admin/disputes/${f.disputeId}/split-preview`)
+        .set("Authorization", f.authHeader)
+        .send({ outcome: "PARTIAL_SPLIT", freelancerSharePct: 50 }),
+      request(app)
+        .post(`/api/v1/admin/disputes/${secondDispute.id}/split-preview`)
+        .set("Authorization", f.authHeader)
+        .send({ outcome: "PARTIAL_SPLIT", freelancerSharePct: 50 }),
+    ]);
+    expect(p1.body.disputedAmountMinor).toBe(2_200_000);
+    expect(p2.body.disputedAmountMinor).toBe(900_000);
   });
 });

@@ -35,7 +35,24 @@ describe("OPS-02: disputed amounts reflect only disputed milestones", () => {
         escrowState: "DISPUTED",
         deliverableUrl: null,
       },
-      evidence: [],
+      evidence: [
+        {
+          id: "ev-1",
+          submittedByUserId: "c1",
+          submittedByRole: "CLIENT",
+          isInternal: false,
+          statement: "Client evidence statement",
+          createdAt: "2026-11-16T00:00:00.000Z",
+        },
+        {
+          id: "ev-2",
+          submittedByUserId: "med-1",
+          submittedByRole: "DISPUTE_MEDIATOR",
+          isInternal: true,
+          statement: "Internal mediator note",
+          createdAt: "2026-11-17T00:00:00.000Z",
+        },
+      ],
       contract: sharedContract,
     };
 
@@ -56,13 +73,35 @@ describe("OPS-02: disputed amounts reflect only disputed milestones", () => {
         escrowState: "DISPUTED",
         deliverableUrl: null,
       },
-      evidence: [],
+      evidence: [
+        {
+          id: "ev-1",
+          submittedByUserId: "c1",
+          submittedByRole: "CLIENT",
+          isInternal: false,
+          statement: "Client evidence statement",
+          createdAt: "2026-11-16T00:00:00.000Z",
+        },
+        {
+          id: "ev-2",
+          submittedByUserId: "med-1",
+          submittedByRole: "DISPUTE_MEDIATOR",
+          isInternal: true,
+          statement: "Internal mediator note",
+          createdAt: "2026-11-17T00:00:00.000Z",
+        },
+      ],
       contract: sharedContract,
     };
 
     const mapped = [toDispute(d1), toDispute(d2)];
     expect(mapped[0].amt).toBe(2_200_000);
     expect(mapped[0].ms).toBe("Brand guidelines");
+    expect(mapped[0].ev[0].roleLabel).toBe("Client");
+    expect(mapped[0].ev[0].internal).toBe(false);
+    expect(mapped[0].ev[1].side).toBe("mediator");
+    expect(mapped[0].ev[1].roleLabel).toBe("Staff (DISPUTE_MEDIATOR)");
+    expect(mapped[0].ev[1].internal).toBe(true);
     expect(mapped[1].amt).toBe(900_000);
     expect(mapped[1].ms).toBe("Packaging templates");
     expect(mapped.reduce((s, d) => s + d.amt, 0)).toBe(3_100_000);

@@ -64,4 +64,48 @@ describe("OPS-08: ApiClient handles 401 REAUTH_REQUIRED without signing user out
     ).rejects.toThrow(/cancelled|expired/i);
     expect(unauthorizedSpy).not.toHaveBeenCalled();
   });
+
+  it("opens only one reauth dialog when several simultaneous requests return 401 REAUTH_REQUIRED and keeps form state", async () => {
+    const client = new ApiClient();
+    client.setSession({ accessToken: "stale-jwt", refreshToken: "refresh-jwt" });
+
+    const unauthorizedSpy = vi.fn();
+    client.onUnauthorized(unauthorizedSpy);
+
+    // Simulated React form input in progress
+    const formState = { reason: "Repeated abusive spam reports from this account" };
+
+    let reauthCalls = 0;
+    client.setReauthHandler(async () => {
+      reauthCalls += 1;
+      await new Promise((r) => setTimeout(r, 15));
+      client.setSession({ accessToken: "fresh-jwt", refreshToken: "fresh-refresh" });
+      return true;
+    });
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+      const auth = (init?.headers as Record<string, string>)?.Authorization;
+      if (auth === "Bearer stale-jwt") {
+        return new Response(
+          JSON.stringify({ error: "REAUTH_REQUIRED", code: "REAUTH_REQUIRED" }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(JSON.stringify({ ok: true, id: "done" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+
+    const results = await Promise.all([
+      client.adminHoldEscrow("ms-1", formState.reason),
+      client.adminHoldEscrow("ms-2", formState.reason),
+      client.adminHoldEscrow("ms-3", formState.reason),
+    ]);
+
+    expect(results).toHaveLength(3);
+    expect(reauthCalls).toBe(1);
+    expect(unauthorizedSpy).not.toHaveBeenCalled();
+    expect(formState.reason).toBe("Repeated abusive spam reports from this account");
+  });
 });

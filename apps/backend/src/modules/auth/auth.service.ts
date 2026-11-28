@@ -467,7 +467,17 @@ export async function reauthenticateUser(userId: string, password: string) {
   } catch {
     valid = false;
   }
-  if (!valid) throw new InvalidCredentialsError();
+  if (!valid) {
+    await recordAuditEvent({
+      userId: user.id,
+      actorRole: user.staffRole ?? null,
+      eventType: "USER_REAUTH_FAILED",
+      entityType: "User",
+      entityId: user.id,
+      metadata: { reason: "invalid_password" },
+    });
+    throw new InvalidCredentialsError();
+  }
 
   const result = await createAuthTokens(user, ["pwd"]);
   await recordAuditEvent({

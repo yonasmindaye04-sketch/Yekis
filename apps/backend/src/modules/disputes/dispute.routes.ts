@@ -195,6 +195,7 @@ disputesRouter.post(
         userId: req.user!.id,
         disputeId: req.params.disputeId as string,
         statement: parsed.data.statement,
+        isInternal: parsed.data.isInternal,
       });
       return res.json(dispute);
     } catch (err) {

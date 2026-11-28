@@ -507,12 +507,13 @@ export async function handlePaymentWebhook(params: {
       // whose destination is in doubt, and this is the path a duplicate or
       // out-of-order delivery would take.
       await recordAuditEvent({
-        userId: transaction.milestone.contract.clientId,
+        actorRole: "SYSTEM",
         eventType: "ESCROW_FUNDING_ORPHANED",
         entityType: "Milestone",
         entityId: transaction.milestoneId,
         amountMinor: transaction.amountMinor,
         metadata: {
+          targetUserId: transaction.milestone.contract.clientId,
           transactionId: transaction.id,
           provider: params.provider,
           observedEscrowState: transaction.milestone.escrowState,

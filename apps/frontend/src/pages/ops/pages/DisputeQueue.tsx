@@ -203,12 +203,22 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
     }
   };
 
-  const submitEvidenceNote = async ({ values }: { values: Record<string, string> }) => {
+  const submitEvidenceNote = async ({
+    values,
+    checked,
+  }: {
+    values: Record<string, string>;
+    checked: boolean;
+  }) => {
     if (!sel) return;
     setBusy(true);
     try {
-      await opsApi.submitDisputeEvidence(sel.id, values.statement);
-      toast("Evidence statement attached to the case.");
+      await opsApi.submitDisputeEvidence(sel.id, values.statement, checked);
+      toast(
+        checked
+          ? "Internal staff note attached (hidden from parties)."
+          : "Evidence statement attached to the case.",
+      );
       setEvidenceModalOpen(false);
       reload();
     } catch (e) {
@@ -435,7 +445,15 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
                       sel.ev.map((ev, i) => (
                         <div className={`ev-bubble ${ev.side}`} key={i}>
                           <div className="ev-b-head">
-                            <strong>{ev.side === "client" ? "Client" : "Freelancer"}</strong>
+                            <strong>
+                              {ev.roleLabel ||
+                                (ev.side === "client"
+                                  ? "Client"
+                                  : ev.side === "freelancer"
+                                    ? "Freelancer"
+                                    : "Mediator")}
+                              {ev.internal ? " · Internal Only" : ""}
+                            </strong>
                             <span>{dts(ev.at)}</span>
                           </div>
                           <p>{ev.s}</p>
@@ -636,6 +654,11 @@ export default function DisputeQueue({ focusId }: { focusId?: string }) {
             maxLength: 2000,
           },
         ]}
+        checkbox={{
+          label: "Internal staff-only note (hidden from client and freelancer)",
+          hint: "Internal notes are visible only in the Ops Console and excluded from party evidence views and bundles.",
+          defaultChecked: true,
+        }}
         onConfirm={submitEvidenceNote}
         onCancel={() => !busy && setEvidenceModalOpen(false)}
       />

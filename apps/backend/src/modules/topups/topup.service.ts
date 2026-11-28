@@ -651,11 +651,14 @@ export async function handleTopUpWebhook(params: {
     if (rejected.count === 0) return;
 
     await recordAuditEvent({
-      userId: topUp.userId,
+      actorRole: "SYSTEM",
       eventType: "TOPUP_CHECKOUT_FAILED",
       entityType: "WalletTopUp",
       entityId: topUp.id,
-      metadata: { providerTransactionId: params.providerTransactionId },
+      metadata: {
+        targetUserId: topUp.userId,
+        providerTransactionId: params.providerTransactionId,
+      },
     });
 
     await notificationQueue.add("topup-failed", {
@@ -702,11 +705,12 @@ export async function handleTopUpWebhook(params: {
   if (!credited) return;
 
   await recordAuditEvent({
-    userId: topUp.userId,
+    actorRole: "SYSTEM",
     eventType: "TOPUP_AUTO_APPROVED",
     entityType: "WalletTopUp",
     entityId: topUp.id,
     metadata: {
+      targetUserId: topUp.userId,
       amountMinor: topUp.amountMinor,
       providerTransactionId: params.providerTransactionId,
     },

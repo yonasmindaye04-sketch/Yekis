@@ -516,11 +516,32 @@ export const toDispute = (r: RawDisputeItem): DisputeItem => {
       : hoursUntil(r.mediationDeadlineAt),
     sla: r.sla ?? null,
     created: r.createdAt,
-    ev: r.evidence.map((e) => ({
-      side: e.submittedByUserId === r.contract?.freelancer.id ? ("freelancer" as const) : ("client" as const),
-      s: e.statement,
-      at: e.createdAt,
-    })),
+    ev: r.evidence.map((e) => {
+      const rawRole = e.submittedByRole;
+      const isFreelancer =
+        rawRole === "FREELANCER" ||
+        e.submittedByUserId === r.contract?.freelancer.id;
+      const isClient =
+        rawRole === "CLIENT" ||
+        e.submittedByUserId === r.contract?.client.id;
+      const isMediator =
+        !isFreelancer && !isClient && Boolean(rawRole && rawRole !== "PARTY");
+      return {
+        side: isMediator
+          ? ("mediator" as const)
+          : isFreelancer
+            ? ("freelancer" as const)
+            : ("client" as const),
+        roleLabel: isMediator
+          ? `Staff (${rawRole})`
+          : isFreelancer
+            ? "Freelancer"
+            : "Client",
+        internal: Boolean(e.isInternal),
+        s: e.statement,
+        at: e.createdAt,
+      };
+    }),
   };
 };
 
@@ -1343,8 +1364,8 @@ export const opsApi = {
   claimDispute: (id: string) => api.claimDispute(id),
   escalateDispute: (id: string) => api.escalateDispute(id),
   escalateToArbitration: (id: string) => api.escalateDisputeToArbitration(id),
-  submitDisputeEvidence: (id: string, statement: string) =>
-    api.submitDisputeEvidence(id, statement),
+  submitDisputeEvidence: (id: string, statement: string, isInternal?: boolean) =>
+    api.submitDisputeEvidence(id, statement, isInternal),
   awardDispute: (
     id: string,
     input: {

@@ -394,7 +394,9 @@ export interface KycItem {
 export type KycDecision = "VERIFIED" | "REJECTED" | "CLEARER";
 
 export interface EvidenceMsg {
-  side: "client" | "freelancer";
+  side: "client" | "freelancer" | "mediator";
+  roleLabel?: string;
+  internal?: boolean;
   s: string;
   at: string;
 }
