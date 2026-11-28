@@ -31,6 +31,7 @@ interface AdvancedDataTableProps {
   records: LedgerContractRecord[];
   viewerRole?: "CLIENT" | "FREELANCER" | "ADMIN";
   feeConfig?: EscrowFeeConfig | null;
+  onNavigateView?: (view: string) => void;
   onOpenContracts?: (contractId?: string) => void;
   onOpenEscrow?: (milestoneId?: string) => void;
   onRequestFundMilestone?: (record: LedgerContractRecord) => void;
@@ -66,6 +67,7 @@ export function AdvancedDataTable({
   records,
   viewerRole = "CLIENT",
   feeConfig,
+  onNavigateView,
   onOpenContracts,
   onOpenEscrow,
   onRequestFundMilestone,
@@ -242,6 +244,42 @@ export function AdvancedDataTable({
 
   const totalFilteredMinor = filtered.reduce((acc, r) => acc + r.amountMinor, 0);
 
+  if (records.length === 0) {
+    return (
+      <div className="sh-card" data-tour="dashboard-data-table">
+        <div className="sh-card-header">
+          <div>
+            <h3 className="sh-card-title">{copy.title}</h3>
+            <p className="sh-card-desc">{copy.emptyDesc}</p>
+          </div>
+        </div>
+        <div className="sh-kanban-empty" style={{ padding: "28px 20px", textAlign: "center" }}>
+          <p className="sh-kanban-empty-title" style={{ marginBottom: 6 }}>
+            {copy.emptyTitle}
+          </p>
+          <p className="sh-kanban-empty-hint" style={{ maxWidth: 460, margin: "0 auto 16px" }}>
+            {copy.emptyDesc}
+          </p>
+          <button
+            type="button"
+            className="sh-btn sh-btn-primary"
+            onClick={() => {
+              if (isClientView && onNavigateView) {
+                onNavigateView("jobs");
+              } else if (onOpenContracts) {
+                onOpenContracts();
+              } else if (onNavigateView) {
+                onNavigateView("contracts");
+              }
+            }}
+          >
+            {isClientView && onNavigateView ? copy.emptyPostJobCta : copy.emptyContractsCta}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sh-card" data-tour="dashboard-data-table">
       <div className="sh-card-header">
@@ -252,7 +290,7 @@ export function AdvancedDataTable({
           </div>
           <p className="sh-card-desc">
             {copy.subtitle(filtered.length)}{" "}
-            <strong className="sh-mono">
+            <strong className="sh-tabular">
               ETB {(totalFilteredMinor / 100).toLocaleString()}
             </strong>
           </p>
@@ -440,9 +478,9 @@ export function AdvancedDataTable({
                       onChange={() => toggleRow(row.id)}
                       aria-label={copy.selectItemAria(row.title)}
                     />
-                    <span className="sh-mono sh-cell-meta">{row.code}</span>
+                    <span className="sh-tabular sh-cell-meta">{row.code}</span>
                     <span aria-hidden="true" className="sh-cell-meta">·</span>
-                    <span className="sh-mono sh-cell-meta">
+                    <span className="sh-tabular sh-cell-meta">
                       {railLabel(row.rail)}
                     </span>
                   </div>
@@ -464,14 +502,14 @@ export function AdvancedDataTable({
 
                 <div className="sh-mobile-ledger-foot">
                   <div>
-                    <strong className="sh-mono sh-mobile-ledger-amount">
+                    <strong className="sh-tabular sh-mobile-ledger-amount">
                       ETB{" "}
                       {(row.amountMinor / 100).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
                     </strong>
-                    <span className="sh-cell-meta sh-mono" style={{ display: "block" }}>
+                    <span className="sh-cell-meta sh-tabular" style={{ display: "block" }}>
                       {isClientView
                         ? `${copy.duePrefix(row.dueDate)} · ${copy.thClientFee}: ETB ${(row.clientFeeMinor / 100).toLocaleString()}`
                         : `${copy.duePrefix(row.dueDate)} · ${copy.feePrefix} ${(totalFeeMinor / 100).toLocaleString()} · ${copy.thNetPayout} ${(row.netPayoutMinor / 100).toLocaleString()}`}
@@ -659,7 +697,7 @@ export function AdvancedDataTable({
                     <td>
                       <div className="sh-cell-primary">{row.title}</div>
                       <div className="sh-cell-meta">
-                        <span className="sh-mono">{row.code}</span>
+                        <span className="sh-tabular">{row.code}</span>
                         <span aria-hidden="true">·</span>
                         <span>{row.contractTitle}</span>
                       </div>
@@ -677,7 +715,7 @@ export function AdvancedDataTable({
                           {visibleCols.rail && (
                             <>
                               <span aria-hidden="true">·</span>
-                              <span className="sh-mono">{railLabel(row.rail)}</span>
+                              <span className="sh-tabular">{railLabel(row.rail)}</span>
                             </>
                           )}
                         </div>
@@ -693,9 +731,9 @@ export function AdvancedDataTable({
                       </span>
                     </td>
                     {visibleCols.dueDate && (
-                      <td className="sh-mono sh-cell-date">{row.dueDate}</td>
+                      <td className="sh-tabular sh-cell-date">{row.dueDate}</td>
                     )}
-                    <td className="sh-num-col sh-mono sh-font-semibold">
+                    <td className="sh-num-col sh-tabular sh-font-semibold">
                       {(row.amountMinor / 100).toLocaleString(undefined, {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -703,13 +741,13 @@ export function AdvancedDataTable({
                     </td>
                     {visibleCols.fee && isClientView && (
                       <>
-                        <td className="sh-num-col sh-mono sh-text-muted">
+                        <td className="sh-num-col sh-tabular sh-text-muted">
                           {(row.clientFeeMinor / 100).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="sh-num-col sh-mono sh-font-semibold">
+                        <td className="sh-num-col sh-tabular sh-font-semibold">
                           {(row.clientTotalChargeMinor / 100).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -719,19 +757,19 @@ export function AdvancedDataTable({
                     )}
                     {visibleCols.fee && !isClientView && (
                       <>
-                        <td className="sh-num-col sh-mono sh-text-muted">
+                        <td className="sh-num-col sh-tabular sh-text-muted">
                           {(row.platformFeeMinor / 100).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="sh-num-col sh-mono sh-text-muted">
+                        <td className="sh-num-col sh-tabular sh-text-muted">
                           {(row.providerFeeMinor / 100).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </td>
-                        <td className="sh-num-col sh-mono sh-font-semibold">
+                        <td className="sh-num-col sh-tabular sh-font-semibold">
                           {(row.netPayoutMinor / 100).toLocaleString(undefined, {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -821,7 +859,7 @@ export function AdvancedDataTable({
         </div>
 
         <div className="sh-pagination-controls">
-          <span className="sh-mono" style={{ fontSize: "0.78rem" }}>
+          <span className="sh-tabular" style={{ fontSize: "0.78rem" }}>
             {copy.pageOf(safePage, totalPages)}
           </span>
           <button
@@ -860,7 +898,7 @@ export function AdvancedDataTable({
           >
             <div className="sh-sheet-header">
               <div>
-                <span className="sh-mono sh-text-muted" style={{ fontSize: "0.76rem" }}>
+                <span className="sh-tabular sh-text-muted" style={{ fontSize: "0.76rem" }}>
                   {inspectedRecord.code} · {railLabel(inspectedRecord.rail)}
                 </span>
                 <h3 className="sh-sheet-title">{inspectedRecord.title}</h3>
@@ -896,7 +934,7 @@ export function AdvancedDataTable({
                 </div>
                 <div className="sh-kv-row">
                   <span>{copy.detailGross}</span>
-                  <strong className="sh-mono">
+                  <strong className="sh-tabular">
                     ETB {(inspectedRecord.amountMinor / 100).toLocaleString()}
                   </strong>
                 </div>
@@ -904,13 +942,13 @@ export function AdvancedDataTable({
                   <>
                     <div className="sh-kv-row">
                       <span>{copy.detailClientFee}</span>
-                      <strong className="sh-mono">
+                      <strong className="sh-tabular">
                         ETB {(inspectedRecord.clientFeeMinor / 100).toLocaleString()}
                       </strong>
                     </div>
                     <div className="sh-kv-row">
                       <span>{copy.detailClientTotal}</span>
-                      <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                      <strong className="sh-tabular" style={{ color: "var(--color-primary)" }}>
                         ETB {(inspectedRecord.clientTotalChargeMinor / 100).toLocaleString()}
                       </strong>
                     </div>
@@ -922,19 +960,19 @@ export function AdvancedDataTable({
                   <>
                     <div className="sh-kv-row">
                       <span>{copy.detailFee}</span>
-                      <strong className="sh-mono">
+                      <strong className="sh-tabular">
                         ETB {(inspectedRecord.platformFeeMinor / 100).toLocaleString()}
                       </strong>
                     </div>
                     <div className="sh-kv-row">
                       <span>{copy.detailProviderFee}</span>
-                      <strong className="sh-mono">
+                      <strong className="sh-tabular">
                         ETB {(inspectedRecord.providerFeeMinor / 100).toLocaleString()}
                       </strong>
                     </div>
                     <div className="sh-kv-row">
                       <span>{copy.detailNet}</span>
-                      <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                      <strong className="sh-tabular" style={{ color: "var(--color-primary)" }}>
                         ETB {(inspectedRecord.netPayoutMinor / 100).toLocaleString()}
                       </strong>
                     </div>
@@ -942,7 +980,7 @@ export function AdvancedDataTable({
                 )}
                 <div className="sh-kv-row">
                   <span>{copy.detailDueDate}</span>
-                  <strong className="sh-mono">{inspectedRecord.dueDate}</strong>
+                  <strong className="sh-tabular">{inspectedRecord.dueDate}</strong>
                 </div>
                 <div className="sh-kv-row">
                   <span>{copy.detailState}</span>

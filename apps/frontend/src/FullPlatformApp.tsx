@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import {
   api,
+  type ChatConversation,
+  type Contract,
   type EscrowFeeConfig,
   type Job,
   type MeResponse,
@@ -22,7 +24,6 @@ import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
-import { SoundToggle } from "./components/SoundToggle";
 import { OnboardingVerification } from "./OnboardingVerification";
 import {
   ContractsWorkspace,
@@ -39,6 +40,7 @@ import {
   FileCheck,
   Wallet,
   MessageCircle,
+  ShieldAlert,
   ShieldCheck,
   Scale,
   Settings,
@@ -721,6 +723,8 @@ function FullPlatformAppInner() {
   /** The caller's own posted briefs — the hiring side of the workspace. */
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [feeConfig, setFeeConfig] = useState<EscrowFeeConfig | null>(null);
   const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
   const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
@@ -986,6 +990,8 @@ const loadWorkspace = async () => {
       jobsResult,
       myJobsResult,
       milestonesResult,
+      contractsResult,
+      conversationsResult,
       topUpsResult,
       completenessResult,
       feeConfigResult,
@@ -995,6 +1001,8 @@ const loadWorkspace = async () => {
       api.getJobFeed(),
       api.getMyJobs(),
       api.getMilestones(),
+      api.getContracts(),
+      api.getChatConversations(),
       api.getTopUpRequests(),
       api.getProfileCompleteness(),
       api.getEscrowFeeConfig(),
@@ -1012,10 +1020,14 @@ const loadWorkspace = async () => {
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
     if (myJobsResult.status === "fulfilled") setMyJobs(myJobsResult.value);
     if (milestonesResult.status === "fulfilled")
-    setMilestones(milestonesResult.value);
+      setMilestones(milestonesResult.value);
+    if (contractsResult.status === "fulfilled")
+      setContracts(contractsResult.value);
+    if (conversationsResult.status === "fulfilled")
+      setConversations(conversationsResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
     if (completenessResult.status === "fulfilled")
-    setProfileCompleteness(completenessResult.value.profileCompleteness);
+      setProfileCompleteness(completenessResult.value.profileCompleteness);
     if (feeConfigResult.status === "fulfilled") setFeeConfig(feeConfigResult.value);
     setLastUpdatedAt(new Date());
   };
@@ -1502,14 +1514,32 @@ const loadWorkspace = async () => {
     group: "HIRE" | "MONEY" | "TALK" | "ACCOUNT";
   };
 
+  const unreadMessagesCount = useMemo(
+    () => conversations.filter((c) => c.unread).length,
+    [conversations],
+  );
+
+  const clientHasActivity = useMemo(
+    () =>
+      myJobs.length > 0 ||
+      contracts.length > 0 ||
+      milestones.length > 0 ||
+      topUps.some((t) => t.status === "APPROVED"),
+    [contracts.length, milestones.length, myJobs.length, topUps],
+  );
+
+  const isZeroStateClientHome =
+    view === "overview" && canHire && !canWork && !clientHasActivity;
+
   const navItems = useMemo<SidebarNavItem[]>(() => {
     const jobsLabel = canWork ? t.nav.findWork : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
+    const servicesLabel = !canWork && canHire ? copy.servicesNavLabel : t.workspace.nav.gigs;
     const hireItems: SidebarNavItem[] = [
       { view: "overview", iconKey: "overview", label: t.nav.dashboard, group: "HIRE" },
       { view: "jobs", iconKey: jobsIconKey, label: jobsLabel, group: "HIRE" },
       { view: "proposals", iconKey: "proposals", label: t.nav.proposals, group: "HIRE" },
-      { view: "gigs", iconKey: "gigs", label: t.workspace.nav.gigs, group: "HIRE" },
+      { view: "gigs", iconKey: "gigs", label: servicesLabel, group: "HIRE" },
       ...(canWork
         ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" as const }]
         : []),
@@ -2597,17 +2627,15 @@ const loadWorkspace = async () => {
                   <span className="nm">
                     {user.displayName?.trim() || roleLabel(platformRole, language)}
                   </span>
-                  <span className="em">
-                    {roleLabel(platformRole, language)} ·{" "}
-                    <span
-                      className={`sh-kyc-inline ${
-                        user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
-                      }`}
-                    >
-                      {user.kyc?.status === "VERIFIED"
-                        ? "KYC: Verified"
-                        : "KYC: Required"}
-                    </span>
+                  <span
+                    className="em"
+                    title={
+                      user.email
+                        ? `${roleLabel(platformRole, language)} · ${user.email}`
+                        : roleLabel(platformRole, language)
+                    }
+                  >
+                    {user.email || roleLabel(platformRole, language)}
                   </span>
                 </span>
               )}
@@ -2647,32 +2675,34 @@ const loadWorkspace = async () => {
                 <Menu size={17} />
               </button>
             )}
-            {/* Universal back button */}
-            <button
-              type="button"
-              className="sh-icon-only-btn sh-topbar-back-btn"
-              onClick={handleUniversalBack}
-              title={copy.goBackAria}
-              aria-label={copy.goBackAria}
-            >
-              <ArrowLeft size={17} />
-            </button>
+            {/* Show back button and breadcrumb only on detail sub-views */}
+            {((view === "profile" && !viewingOwnProfile) ||
+              view === "profile-edit") && (
+              <button
+                type="button"
+                className="sh-icon-only-btn sh-topbar-back-btn"
+                onClick={handleUniversalBack}
+                title={copy.goBackAria}
+                aria-label={copy.goBackAria}
+              >
+                <ArrowLeft size={17} />
+              </button>
+            )}
             <div className="sh-breadcrumb">
-              <span className="sh-breadcrumb-muted">
-                {roleLabel(platformRole, language)} {t.workspace.nav.workspaceLabel}
-              </span>
-              <span className="sh-breadcrumb-sep">/</span>
+              {((view === "profile" && !viewingOwnProfile) ||
+                view === "profile-edit") && (
+                <>
+                  <span className="sh-breadcrumb-muted">
+                    {roleLabel(platformRole, language)} {t.workspace.nav.workspaceLabel}
+                  </span>
+                  <span className="sh-breadcrumb-sep">/</span>
+                </>
+              )}
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
                   ? t.workspace.nav.overview
                   : view === "profile" && !viewingOwnProfile
-                    ? // Somebody else's profile: name the person. The
-                      // sidebar item's label ("My Profile") would say the
-                      // page is mine, which it is not.
-                      // `||` and not `??`: a profile with no display name
-                      // reports an empty string, and an empty heading is
-                      // worse than the generic one.
-                      viewedProfileName || t.workspace.profile.memberProfileLabel
+                    ? viewedProfileName || t.workspace.profile.memberProfileLabel
                     : view === "profile-edit"
                       ? t.workspace.profile.editHeading
                       : navItems.find((item) => item.view === view)?.label ||
@@ -2718,7 +2748,6 @@ const loadWorkspace = async () => {
             )}
 
             <LanguageSelector variant="dropdown" />
-            <SoundToggle className="sh-icon-only-btn" size={16} />
             <button
               type="button"
               className="sh-icon-only-btn theme-toggle"
@@ -2733,25 +2762,27 @@ const loadWorkspace = async () => {
             </button>
             <NotificationCenter onNavigate={(v) => navigateToView(v as View)} />
             <GlobalHelpMenu />
-            <button
-              type="button"
-              className={`sh-kyc-header-link ${
+            <span
+              className={`sh-kyc-header-link sh-kyc-plain-status ${
                 user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
               }`}
-              onClick={() =>
-                setView(user.kyc?.status === "VERIFIED" ? "profile" : "verification")
-              }
               title={
                 user.kyc?.status === "VERIFIED"
-                  ? "Identity verified"
-                  : "Complete identity verification"
+                  ? copy.kycVerifiedTooltip
+                  : copy.kycVerifyTooltip
               }
             >
-              <ShieldCheck size={14} aria-hidden="true" />
+              {user.kyc?.status === "VERIFIED" ? (
+                <ShieldCheck size={14} aria-hidden="true" />
+              ) : (
+                <ShieldAlert size={14} aria-hidden="true" />
+              )}
               <span>
-                {user.kyc?.status === "VERIFIED" ? "KYC: Verified" : "KYC: Required"}
+                {user.kyc?.status === "VERIFIED"
+                  ? copy.kycStatusVerified
+                  : copy.kycStatusRequired}
               </span>
-            </button>
+            </span>
             <button
               type="button"
               className="user-menu"
@@ -2851,7 +2882,7 @@ const loadWorkspace = async () => {
             </div>
           )}
 
-        <FirstVisitWelcomeBar />
+        {!isZeroStateClientHome && <FirstVisitWelcomeBar />}
 
         <ProfileCompletionDialog
           user={user}
@@ -2867,11 +2898,13 @@ const loadWorkspace = async () => {
               kycVerified={user.kyc?.status === "VERIFIED"}
               kycStatus={user.kyc?.status ?? "NOT_STARTED"}
               proposalsCount={myJobs.reduce((sum, j) => sum + (j.proposalsCount ?? 0), 0)}
+              unreadMessagesCount={unreadMessagesCount}
               lastUpdatedAt={lastUpdatedAt}
               workspaceError={error || null}
               wallet={wallet}
               jobs={jobs}
               myJobs={myJobs}
+              contracts={contracts}
               milestones={milestones}
               topUps={topUps}
               feeConfig={feeConfig}
@@ -2954,10 +2987,10 @@ const loadWorkspace = async () => {
                   <div className="sh-pending-banner" role="alert" style={{ marginBottom: 14 }}>
                     <ShieldCheck size={16} />
                     <span style={{ flex: 1 }}>
-                      <strong>Identity verification required before publishing a brief.</strong>{" "}
+                      <strong>{copy.jobKycGateTitle}</strong>{" "}
                       {user.kyc?.status === "UNDER_REVIEW"
-                        ? "Your KYC verification is currently under staff review. Posting unlocks once approved."
-                        : "Verify your identity first so freelancers know briefs come from verified clients."}
+                        ? copy.jobKycGateReview
+                        : copy.jobKycGateAction}
                     </span>
                     <button
                       type="button"
@@ -3055,7 +3088,7 @@ const loadWorkspace = async () => {
                   >
                     {user.kyc?.status === "VERIFIED"
                       ? copy.publishBriefBtn
-                      : "Verify identity first"}
+                      : copy.publishLockedBtn}
                   </button>
                 </div>
               </form>
@@ -3190,7 +3223,7 @@ const loadWorkspace = async () => {
                   {copy.walletDesc}
                 </p>
               </div>
-              <span className="sh-kbd sh-mono">
+              <span className="sh-kbd sh-tabular">
                 ETB {(wallet.balanceMinor / 100).toLocaleString()}
               </span>
             </div>

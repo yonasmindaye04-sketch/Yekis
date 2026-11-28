@@ -55,12 +55,19 @@ export function railLabel(rail: PaymentRail | null | undefined): string {
   return PAYMENT_RAIL_LABELS[rail] ?? rail;
 }
 
+export function getTodayAddisIso(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Addis_Ababa",
+  }).format(now);
+}
+
 export type KanbanColumnId =
   | "BACKLOG"
   | "ESCROW_HELD"
   | "WORK_IN_PROGRESS"
   | "SUBMITTED_FOR_REVIEW"
-  | "RELEASED";
+  | "RELEASED"
+  | "DISPUTED_REFUNDED";
 
 export interface KanbanTask {
   id: string;

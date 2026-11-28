@@ -19,11 +19,11 @@
 :root {
   /* Shape */
   --sh-radius-xs: 6px;
-  --sh-radius-control: 10px;
+  --sh-radius-control: 8px;
   --sh-radius-card: 14px;
   --sh-radius-panel: 18px;
   --sh-radius: 0.5rem; /* Legacy default; the overview opts into the card radius. */
-  --sh-radius-pill: 999px;
+  --sh-radius-pill: 8px;
 
   /* Spacing */
   --sh-card-pad-x: 20px;
@@ -60,17 +60,17 @@
   /* Text */
   --sh-text: #0f172a;
   --sh-text-secondary: #475569;
-  --sh-text-muted: #7c8794;
+  --sh-text-muted: #525e6f;
 
-  /* Accents — Yekis emerald stays the primary; the tones are for KPI icons. */
+  /* Accents — accessible WCAG AA (>=4.5:1 on white & subtle) */
   --sh-accent: var(--color-primary);
   --sh-accent-soft: var(--color-primary-light);
-  --sh-positive: var(--color-success);
-  --sh-tone-green: #16a34a;
-  --sh-tone-blue: #2f80ff;
-  --sh-tone-teal: #0d9488;
-  --sh-tone-amber: #d97706;
-  --sh-tone-violet: #7c3aed;
+  --sh-positive: var(--color-success-text, #166534);
+  --sh-tone-green: #15803d;
+  --sh-tone-blue: #1d4ed8;
+  --sh-tone-teal: #0f766e;
+  --sh-tone-amber: #b45309;
+  --sh-tone-violet: #6d28d9;
 }
 
 :root[data-theme="dark"],
@@ -85,16 +85,16 @@
 
   --sh-text: #f4f6f7;
   --sh-text-secondary: #c3ccd2;
-  --sh-text-muted: #8d99a2;
+  --sh-text-muted: #9ca3af;
 
   --sh-accent: var(--color-primary);
   --sh-accent-soft: var(--color-primary-light);
-  --sh-positive: var(--color-success);
-  --sh-tone-green: #4ade80;
-  --sh-tone-blue: #4d8dff;
-  --sh-tone-teal: #2dd4bf;
-  --sh-tone-amber: #f0b429;
-  --sh-tone-violet: #a78bfa;
+  --sh-positive: var(--color-success-text, #86efac);
+  --sh-tone-green: #86efac;
+  --sh-tone-blue: #93c5fd;
+  --sh-tone-teal: #5eead4;
+  --sh-tone-amber: #fde68a;
+  --sh-tone-violet: #c4b5fd;
 }
 
 /* The overview workspace opts into the block typography first. The shell,
@@ -107,7 +107,7 @@
 }
 
 .sh-mono {
-  font-family: var(--font-mono);
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1666,7 +1666,7 @@
   max-width: 100%;
   background: var(--color-bg-subtle);
   border: 1px solid var(--color-border);
-  border-radius: var(--sh-radius);
+  border-radius: var(--sh-radius-control, 8px);
 }
 
 .sh-seg-btn {
@@ -1674,15 +1674,15 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 28px;
+  height: 30px;
   padding: 0 10px;
   width: auto;
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-neutral-text, #64748b);
+  color: var(--color-neutral-text, #475569);
   background: transparent;
   border: none;
-  border-radius: calc(var(--sh-radius) - 2px);
+  border-radius: var(--sh-radius-control, 8px);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1704,12 +1704,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 34px;
-  padding: 0 12px;
+  height: 36px;
+  padding: 0 14px;
   width: auto;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
-  border-radius: var(--sh-radius);
+  border-radius: var(--sh-radius-control, 8px);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1717,13 +1717,13 @@
 }
 
 .sh-btn-primary {
-  background: var(--color-primary);
+  background: var(--color-primary-hover, #15803d);
   color: #ffffff;
-  border: 1px solid var(--color-primary);
+  border: 1px solid var(--color-primary-hover, #15803d);
 }
 
 .sh-btn-primary:hover {
-  background: var(--color-primary-hover);
+  background: var(--color-primary-active, #166534);
 }
 
 .sh-btn-secondary {
@@ -1741,7 +1741,7 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 34px;
+  height: 36px;
   padding: 0 11px;
   width: auto;
   font-size: 0.78rem;
@@ -1749,7 +1749,7 @@
   background: var(--color-bg-elevated);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: var(--sh-radius);
+  border-radius: var(--sh-radius-control, 8px);
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
@@ -1763,19 +1763,19 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   background: var(--color-bg-elevated);
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: var(--sh-radius);
+  border-radius: var(--sh-radius-control, 8px);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .sh-icon-only-btn.compact {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
 }
 
 .sh-icon-only-btn:disabled {
@@ -2414,19 +2414,28 @@
 }
 
 .sh-status-inline.emerald {
-  color: var(--color-primary);
+  color: var(--color-success-text, #166534);
+  font-weight: 700;
 }
 
 .sh-status-inline.amber {
-  color: var(--color-warning, #d97706);
+  color: var(--color-warning-text, #92400e);
+  font-weight: 700;
 }
 
 .sh-status-inline.crimson {
-  color: var(--color-error, #dc2626);
+  color: var(--color-error-text, #991b1b);
+  font-weight: 700;
+}
+
+.sh-status-inline.blue {
+  color: var(--color-info-text, #1e40af);
+  font-weight: 700;
 }
 
 .sh-status-inline.neutral {
-  color: var(--color-neutral-text, #64748b);
+  color: var(--color-neutral-text, #475569);
+  font-weight: 700;
 }
 
 .sh-row-action-btn {
@@ -3086,6 +3095,8 @@ dialog.sh-kanban-dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .sh-cal-month-label {
@@ -3129,12 +3140,14 @@ dialog.sh-kanban-dialog::backdrop {
 .sh-cal-grid-wrap {
   border: 1px solid var(--color-border);
   border-radius: var(--sh-radius);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
 }
 
 .sh-cal-weekdays {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
   background: var(--color-bg-subtle);
   border-bottom: 1px solid var(--color-border);
 }
@@ -3149,10 +3162,11 @@ dialog.sh-kanban-dialog::backdrop {
 
 .sh-cal-days {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
 }
 
 .sh-cal-cell {
+  min-width: 44px;
   min-height: 86px;
   padding: 7px 8px;
   background: var(--color-bg-elevated);
@@ -3192,7 +3206,7 @@ dialog.sh-kanban-dialog::backdrop {
 .sh-cal-today-tag {
   font-size: 0.64rem;
   font-weight: 700;
-  color: var(--color-warning);
+  color: var(--color-warning-text, #92400e);
   letter-spacing: 0.02em;
 }
 
@@ -3211,8 +3225,8 @@ dialog.sh-kanban-dialog::backdrop {
 
 .sh-cal-day-count {
   font-size: 0.66rem;
-  color: var(--color-primary);
-  font-weight: 600;
+  color: var(--color-success-text, #166534);
+  font-weight: 700;
 }
 
 .sh-cal-cell-events {
@@ -3232,17 +3246,17 @@ dialog.sh-kanban-dialog::backdrop {
 }
 
 .sh-cal-event-line.emerald {
-  color: var(--color-primary);
+  color: var(--color-success-text, #166534);
   font-weight: 600;
 }
 
 .sh-cal-event-line.crimson {
-  color: var(--color-error, #dc2626);
+  color: var(--color-error-text, #991b1b);
   font-weight: 600;
 }
 
 .sh-cal-event-line.muted {
-  color: var(--color-neutral-text, #64748b);
+  color: var(--color-neutral-text, #475569);
   text-decoration: line-through;
 }
 
@@ -3378,10 +3392,11 @@ dialog.sh-kanban-dialog::backdrop {
 }
 
 .sh-fiscal-year-greg {
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.76rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-success-text, #166534);
 }
 
 .sh-fiscal-range {
@@ -4197,23 +4212,38 @@ dialog.sh-kanban-dialog::backdrop {
   }
 
   .sh-topbar-right {
+    flex: 1 1 100%;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 6px;
+    justify-content: flex-start;
   }
 
   .sh-topbar-right > select.sh-select {
     display: none;
   }
 
+  .sh-kanban-mobile-tab,
+  .sh-cal-mobile-pill {
+    border-radius: var(--sh-radius-control, 8px);
+  }
+
   .sh-icon-only-btn,
   .sh-icon-btn,
   .sh-btn,
   .sh-seg-btn,
+  .sh-row-action-btn,
   .sh-topbar-back-btn,
   .sh-topbar-menu-btn,
   .platform-topbar .theme-toggle,
   .platform-topbar .notification-trigger,
   .platform-topbar .user-menu {
     min-height: 44px;
+  }
+
+  .sh-row-action-btn {
+    padding: 0 12px;
   }
 
   .sh-icon-only-btn,
@@ -4226,7 +4256,7 @@ dialog.sh-kanban-dialog::backdrop {
   }
 
   .sh-dashboard-wrap {
-    padding: 14px 14px 32px;
+    padding: 14px 12px 32px;
     gap: 14px;
   }
 
@@ -4238,6 +4268,7 @@ dialog.sh-kanban-dialog::backdrop {
   .sh-subnav-left,
   .sh-subnav-right {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .sh-subnav-left .sh-segmented {
@@ -4248,8 +4279,8 @@ dialog.sh-kanban-dialog::backdrop {
   }
 
   .sh-subnav-left .sh-seg-btn {
-    flex: 1 1 calc(50% - 4px);
-    min-width: 140px;
+    flex: 1 1 auto;
+    min-width: 96px;
     justify-content: center;
     white-space: normal;
     text-align: center;
@@ -4257,7 +4288,8 @@ dialog.sh-kanban-dialog::backdrop {
     padding: 8px 10px;
   }
 
-  .sh-kpi-grid {
+  .sh-kpi-grid,
+  .sh-kpi-grid.is-compact {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
@@ -4314,6 +4346,15 @@ dialog.sh-kanban-dialog::backdrop {
   .sh-table-toolbar .sh-segmented {
     width: 100%;
     overflow-x: auto;
+  }
+
+  .sh-cal-nav {
+    width: 100%;
+  }
+
+  .sh-cal-nav .sh-cal-month-label {
+    min-width: 112px;
+    flex: 1 1 auto;
   }
 
   .sh-card-header {
@@ -4903,6 +4944,15 @@ dialog.sh-kanban-dialog::backdrop {
     padding: 12px 10px 28px;
   }
 
+  .sh-card {
+    padding: 12px;
+  }
+
+  .sh-cal-cell {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .sh-cal-weekday {
     padding: 6px 2px;
     font-size: 0.68rem;
@@ -4946,7 +4996,7 @@ dialog.sh-kanban-dialog::backdrop {
   gap: 6px;
   font-size: 0.78rem;
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-success-text, #166534);
 }
 
 .sh-first-run-links {
@@ -4954,6 +5004,26 @@ dialog.sh-kanban-dialog::backdrop {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.sh-text-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--sh-radius-control, 8px);
+  background: transparent;
+  color: var(--color-primary-text-link, #15803d);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sh-text-action:hover {
+  text-decoration: underline;
 }
 
 .sh-first-run-steps {
@@ -4969,7 +5039,7 @@ dialog.sh-kanban-dialog::backdrop {
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: var(--sh-radius-sm, 8px);
+  border-radius: var(--sh-radius-control, 8px);
   border: 1px solid var(--sh-border);
   background: var(--color-bg-subtle);
 }
@@ -4978,12 +5048,16 @@ dialog.sh-kanban-dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-muted);
+  color: var(--color-neutral-text, #475569);
   flex-shrink: 0;
 }
 
 .sh-first-run-step.is-done .sh-first-run-step-icon {
-  color: var(--color-success, #15803d);
+  color: var(--color-success-text, #166534);
+}
+
+.sh-first-run-step.is-pending .sh-first-run-step-icon {
+  color: var(--color-warning-text, #92400e);
 }
 
 .sh-first-run-step-body {
@@ -5006,15 +5080,75 @@ dialog.sh-kanban-dialog::backdrop {
 }
 
 .sh-first-run-done-label {
-  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
   font-weight: 700;
-  color: var(--color-success, #15803d);
+  color: var(--color-success-text, #166534);
+}
+
+.sh-first-run-pending-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-warning-text, #92400e);
 }
 
 .sh-first-run-step-hint {
   margin: 2px 0 0;
   font-size: 0.8rem;
-  color: var(--color-text-muted);
+  color: var(--color-text-secondary, #475569);
+}
+
+.sh-inline-unlock-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-primary-text-link, #15803d);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.sh-kpi-grid.is-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sh-insights-details {
+  padding: 14px 18px;
+}
+
+.sh-insights-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sh-insights-summary::-webkit-details-marker {
+  display: none;
+}
+
+.sh-insights-summary-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sh-insights-chev {
+  transition: transform 160ms ease;
+  color: var(--color-neutral-text, #475569);
+}
+
+.sh-insights-details[open] .sh-insights-chev {
+  transform: rotate(180deg);
 }
 
 .sh-switch-label {
@@ -5127,17 +5261,17 @@ dialog.sh-kanban-dialog::backdrop {
   background: transparent;
   border: 0;
   padding: 2px 4px;
-  cursor: pointer;
+  white-space: nowrap;
 }
 
 .sh-kyc-inline.is-verified,
 .sh-kyc-header-link.is-verified {
-  color: var(--color-success, #15803d);
+  color: var(--color-success-text, #166534);
 }
 
 .sh-kyc-inline.is-required,
 .sh-kyc-header-link.is-required {
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning-text, #92400e);
 }
 
 .sh-attention-strip {
@@ -5151,7 +5285,7 @@ dialog.sh-kanban-dialog::backdrop {
   flex-wrap: wrap;
   padding: 6px 2px 12px;
   font-size: 0.76rem;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .sh-cal-legend-item {
@@ -5161,52 +5295,84 @@ dialog.sh-kanban-dialog::backdrop {
 }
 
 .sh-cal-legend-item.is-due {
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning-text, #92400e);
 }
 
 .sh-cal-legend-item.is-released {
-  color: var(--color-success, #15803d);
+  color: var(--color-success-text, #166534);
 }
 
 .sh-cal-legend-item.is-proposal {
-  color: var(--color-info-text, #1d4ed8);
+  color: var(--color-info-text, #1e40af);
 }
 
 .sh-cal-legend-item.is-compliance {
-  color: var(--color-neutral-text, #64748b);
+  color: var(--color-neutral-text, #475569);
 }
 
 .sh-cal-legend-item.is-reminder {
-  color: #7c3aed;
+  color: var(--sh-tone-violet, #6d28d9);
 }
 
 .sh-cal-event-line.due {
-  color: var(--color-warning, #b45309);
+  color: var(--color-warning-text, #92400e);
   font-weight: 600;
 }
 
 .sh-cal-event-line.released {
-  color: var(--color-primary);
+  color: var(--color-success-text, #166534);
   font-weight: 600;
 }
 
 .sh-cal-event-line.proposal {
-  color: var(--color-info-text, #1d4ed8);
+  color: var(--color-info-text, #1e40af);
   font-weight: 600;
 }
 
 .sh-cal-event-line.compliance {
-  color: var(--color-neutral-text, #64748b);
+  color: var(--color-neutral-text, #475569);
   font-weight: 600;
 }
 
 .sh-cal-event-line.reminder {
-  color: #7c3aed;
+  color: var(--sh-tone-violet, #6d28d9);
   font-weight: 600;
 }
 
 .sh-status-inline.reminder {
-  color: #7c3aed;
+  color: var(--sh-tone-violet, #6d28d9);
+  font-weight: 700;
+}
+
+@media (max-width: 480px) {
+  .sh-cal-weekday {
+    padding: 6px 2px;
+    font-size: 0.68rem;
+  }
+
+  .sh-cal-cell {
+    min-height: 46px;
+    padding: 4px 2px;
+  }
+
+  .sh-cal-day-num {
+    font-size: 0.72rem;
+  }
+
+  .sh-cal-alt-date {
+    font-size: 0.58rem;
+  }
+
+  .sh-first-run-step {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .sh-first-run-step > button {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
 }
 
 .sh-reminder-form {
@@ -5243,6 +5409,58 @@ dialog.sh-kanban-dialog::backdrop {
 .sh-kanban-amount,
 .sh-mono {
   font-variant-numeric: tabular-nums;
+}
+
+dialog.sh-confirm-dialog {
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: calc(var(--sh-radius, 12px) + 2px);
+  background: var(--color-bg);
+  color: var(--color-text);
+  width: min(calc(100vw - 32px), 520px);
+  max-width: 100%;
+  max-height: calc(100dvh - 110px);
+  margin: max(76px, 12vh) auto auto;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  overflow: hidden;
+}
+
+dialog.sh-confirm-dialog:modal {
+  overscroll-behavior: contain;
+}
+
+dialog.sh-confirm-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.sh-confirm-dialog::backdrop {
+  background: var(--color-backdrop, rgba(9, 13, 18, 0.55));
+  backdrop-filter: blur(4px);
+  overflow: hidden;
+  overscroll-behavior: contain;
+}
+
+.sh-dialog-surface {
+  padding: 20px 22px;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .sh-topbar .sh-icon-only-btn,
+  .platform-topbar .theme-toggle,
+  .platform-topbar .notification-trigger,
+  .platform-topbar .user-menu,
+  .platform-topbar .yk-guide-header-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .platform-topbar .yk-lang-trigger,
+  .sh-text-action,
+  .sh-unlock-btn {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

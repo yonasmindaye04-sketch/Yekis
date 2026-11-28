@@ -112,14 +112,38 @@ describe("KanbanBoardView", () => {
 
   it("renders collapse controls, meaningful task counts, and empty-stage calls to action", () => {
     const html = renderKanban();
-    expect(html).toContain('aria-label="Expand Scoping &amp; Awaiting Funding column"');
-    expect(html).toContain("Expand all");
+    expect(html).toContain('aria-label="Collapse Payment pending column"');
+    expect(html).toContain("Collapse empty");
     expect(html).toContain("1 task");
+    expect(html).toContain("0 tasks");
     expect(html).toContain("2 of 2 milestones");
-    // Useful empty columns start collapsed while populated columns render cards cleanly
-    expect(html).toContain("Live read-only projection of server escrow state");
-    expect(html).toContain("Expand Submitted for Review column");
-    expect(html).toContain("Expand Escrow Funded column");
+    // Useful stage-specific empty CTAs pointing to authoritative Contracts & Escrow workflows
+    expect(html).toContain("Live overview of milestone stages");
+    expect(html).toContain("View your contracts");
+    expect(html).toContain("View payments");
+  });
+
+  it("renders a single clean empty state with one action when zero milestones exist", () => {
+    const html = renderKanban([]);
+    expect(html).toContain("No milestones yet");
+    expect(html).toContain("Post a job");
+    expect(html).not.toContain("Collapse empty");
+    expect(html).not.toContain("Overdue only");
+    expect(html).not.toContain("sh-kanban-col-head");
+  });
+
+  it("places disputed milestones in their own In dispute / Refunded column instead of Payment pending", () => {
+    const html = renderKanban([
+      ...SAMPLE_TASKS,
+      {
+        ...SAMPLE_TASKS[0],
+        id: "t-disputed",
+        title: "Disputed deliverable",
+        column: "DISPUTED_REFUNDED",
+        escrowState: "DISPUTED",
+      },
+    ]);
+    expect(html).toContain("In dispute / Refunded");
   });
 
   it("renders native dialog for inline milestone details plus horizontal scroll sentinels", () => {
