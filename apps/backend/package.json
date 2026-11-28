@@ -18,6 +18,7 @@
     "route-audit:check": "tsx scripts/route-audit.ts --check",
     "route-audit:baseline": "tsx scripts/route-audit.ts --write-baseline",
     "ledger:check": "tsx scripts/check-ledger-balance.ts",
+    "ledger:repair-dev": "tsx scripts/repair-dev-ledger.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:check-fresh": "node ../../scripts/check-fresh-database.js",

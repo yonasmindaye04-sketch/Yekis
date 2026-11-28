@@ -255,6 +255,12 @@ pnpm --filter backend exec tsx scripts/purge-demo-data.ts            # dry run
 pnpm --filter backend exec tsx scripts/purge-demo-data.ts --confirm  # delete
 ```
 
+The manual runner reads `DATABASE_URL` like any other backend script and
+refuses a non-local host unless `--allow-remote` is passed, so pointing the
+shell at the hosted database by accident stops the command instead of purging
+it. The start-up cleanup inside the container is unaffected: it runs against
+the database the deployment was configured with.
+
 ---
 
 ## Step 2 — Log In

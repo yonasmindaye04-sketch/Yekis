@@ -21,6 +21,13 @@
 \set ON_ERROR_STOP on
 BEGIN;
 
+DO $$
+BEGIN
+  IF current_database() NOT IN ('marketplace', 'marketplace_test') THEN
+    RAISE EXCEPTION 'Refusing to run cleanup-dev-test-data.sql against database %', current_database();
+  END IF;
+END $$;
+
 CREATE TEMP TABLE purge_users ON COMMIT DROP AS
 SELECT "id" FROM "User"
 WHERE "email" LIKE 'cooling-%'

@@ -36,6 +36,22 @@ const BACKEND = path.resolve(__dirname, "..", "apps", "backend");
 const SCHEMA = path.join(BACKEND, "prisma", "schema.prisma");
 const DB_NAME = process.env.FRESH_DB_NAME || "yekis_migration_check";
 const KEEP = process.env.KEEP_FRESH_DB === "1";
+const ALLOW_REMOTE = process.argv.includes("--allow-remote");
+
+function assertSafeTarget(admin) {
+  const parsed = new URL(admin);
+  const host = parsed.hostname.toLowerCase();
+  if (!["localhost", "127.0.0.1", "::1"].includes(host) && !ALLOW_REMOTE) {
+    throw new Error(
+      `Refusing to drop/create "${DB_NAME}" on non-local host "${host}" without --allow-remote.`,
+    );
+  }
+  if (!/(_check|_test|test|scratch)/i.test(DB_NAME) || DB_NAME === "marketplace") {
+    throw new Error(
+      `Refusing to drop/create unsafe FRESH_DB_NAME="${DB_NAME}" (must include _check, _test, test, or scratch).`,
+    );
+  }
+}
 
 /** Reads the admin URL from the app's .env without echoing it. */
 function adminUrl() {
@@ -118,6 +134,7 @@ function psql(sql, admin, timeoutMs = 30_000) {
 
 function main() {
   const admin = adminUrl();
+  assertSafeTarget(admin);
   const { fresh } = derivedUrls(admin);
   console.log(`Fresh-database check against database "${DB_NAME}".`);
 

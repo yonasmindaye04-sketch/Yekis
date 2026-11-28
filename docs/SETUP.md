@@ -223,6 +223,26 @@ To populate a fresh database with the local demo accounts (requires
 pnpm --filter backend db:seed
 ```
 
+`db:seed` and every other destructive development script (`purge-demo-data`,
+`reset_proposal`, `ledger:repair-dev`, `scripts/migrate-to.js`,
+`scripts/check-fresh-database.js`, the `scripts/*.sql` rewrites) refuse to run
+against a non-local `DATABASE_URL` host unless `--allow-remote` is passed, and
+`db:seed` refuses `NODE_ENV=production` or `staging` outright. That is
+deliberate: a hosted `DATABASE_URL` in the shell should stop the command, not
+seed or purge a real database.
+
+Check the ledger invariants (zero-sum journals, cached account balances,
+`PlatformOperatingAccount` / `PlatformFeeCredit` / GL `4000` + `2050`
+reconciliation):
+
+```powershell
+pnpm --filter backend ledger:check
+```
+
+On a local `marketplace` / `marketplace_test` database, `pnpm --filter backend
+ledger:repair-dev` reports the drift and repairs it in one transaction when
+`--confirm` is passed.
+
 Check health:
 
 ```powershell

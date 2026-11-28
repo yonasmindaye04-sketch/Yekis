@@ -37,6 +37,7 @@ const path = require("node:path");
 
 const target = process.argv[2];
 const confirmed = process.argv.includes("--i-mean-it");
+const allowRemote = process.argv.includes("--allow-remote");
 
 if (target !== "test" && target !== "dev") {
   console.error(
@@ -82,7 +83,15 @@ if (target === "dev" && urlMentionsTest) {
   process.exit(2);
 }
 
-const databaseName = new URL(url).pathname.replace(/^\//, "");
+const parsedUrl = new URL(url);
+const dbHost = parsedUrl.hostname.toLowerCase();
+if (!["localhost", "127.0.0.1", "::1"].includes(dbHost) && !allowRemote) {
+  console.error(
+    `Refusing to run migrate-to against non-local host "${dbHost}" without --allow-remote.`,
+  );
+  process.exit(2);
+}
+const databaseName = parsedUrl.pathname.replace(/^\//, "");
 
 console.log(`Target      : ${target}`);
 console.log(`Database    : ${databaseName}`);

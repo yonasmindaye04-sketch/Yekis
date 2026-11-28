@@ -16,9 +16,16 @@ import {
   executeDemoPurge,
   planDemoPurge,
 } from "../src/bootstrap/demoCleanup.js";
+import { assertLocalDatabaseTarget } from "./_dbGuard.js";
 
 async function main(): Promise<void> {
   const confirm = process.argv.includes(`--${DEMO_CLEANUP_CONFIRM}`);
+  const allowRemote = process.argv.includes("--allow-remote");
+  assertLocalDatabaseTarget({
+    allowRemote,
+    forbidProduction: false,
+    scriptName: "purge-demo-data",
+  });
 
   const plan = await planDemoPurge();
 

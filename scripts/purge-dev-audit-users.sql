@@ -23,6 +23,13 @@
 
 BEGIN;
 
+DO $$
+BEGIN
+  IF current_database() NOT IN ('marketplace', 'marketplace_test') THEN
+    RAISE EXCEPTION 'Refusing to run purge-dev-audit-users.sql against database %', current_database();
+  END IF;
+END $$;
+
 -- Matched on the full address. The prefixes were checked first: five of the
 -- seven live at @yekis.et and two at @example.com / @gmail.com, so a
 -- prefix-only list would silently select nothing.

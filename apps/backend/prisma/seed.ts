@@ -3,6 +3,7 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/lib/password";
 import { seedDemoActivity } from "./demoActivity";
+import { assertLocalDatabaseTarget } from "../scripts/_dbGuard";
 
 const prisma = new PrismaClient();
 
@@ -45,6 +46,14 @@ const SKILLS = [
 
 // === MAIN ===
 async function main() {
+  const allowRemote = process.argv.includes("--allow-remote");
+  assertLocalDatabaseTarget({
+    allowRemote,
+    forbidProduction: true,
+    forbidStaging: true,
+    scriptName: "db:seed",
+  });
+
   // Hash once and reuse for every demo account instead of paying Argon2 eight
   // times, and never log the plaintext value.
   const demoPasswordHash = await hashPassword(resolveDemoPassword());
