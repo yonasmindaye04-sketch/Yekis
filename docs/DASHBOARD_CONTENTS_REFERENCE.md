@@ -2,7 +2,7 @@
 
 > **Canonical Scope**: This document specifies every widget, KPI card, chart, table, board, calendar schedule, talent carousel, command palette, and layout control inside the Client and Freelancer Workspace Dashboard (`apps/frontend/src/components/dashboard/MarketplaceShadcnDashboard.tsx` and child components). Every data source, calculation, interaction, and local-vs-server state boundary below is verified directly against the codebase.
 >
-> - For all 13 workspace sidebar navigation items, see [docs/SIDEBAR_FEATURES_REFERENCE.md](./SIDEBAR_FEATURES_REFERENCE.md).
+> - For the consolidated 6-item Client sidebar, mobile Option B bar, avatar menu, and all 14 alias-routed workspace views, see [docs/SIDEBAR_FEATURES_REFERENCE.md](./SIDEBAR_FEATURES_REFERENCE.md).
 > - For the Staff & Admin Operations Console dashboard (`apps/frontend/src/pages/ops/pages/Overview.tsx`) and its 23 sidebar pages, see [docs/ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md](./ADMIN_STAFF_DASHBOARD_CONTENTS_REFERENCE.md) and [docs/ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md](./ADMIN_STAFF_SIDEBAR_FEATURES_REFERENCE.md).
 
 ---

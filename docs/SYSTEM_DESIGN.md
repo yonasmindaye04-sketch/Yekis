@@ -2316,20 +2316,20 @@ FullPlatformApp.tsx
     ├── Header (user avatar, notifications bell, logout)
     ├── NotificationCenter.tsx    — Dropdown notification feed
     ├── FeaturedCarousel.tsx      — Featured freelancer cards
-    └── View Content (by view state):
+    └── View Content (by view state & merged sub-tabs):
         ├── "overview"        → Dashboard metrics, featured talent
-        ├── "jobs"            → JobsWorkspace section="jobs" (post + browse + my briefs)
-        ├── "proposals"       → JobsWorkspace section="proposals" (bids sent + pipeline received)
-        ├── "gigs"            → GigMarketplace (browse gigs)
+        ├── "jobs"            → Tabbed Jobs shell: My jobs / Find work + Proposals tab
+        ├── "proposals"       → Alias -> resolves to "jobs" + Proposals tab
+        ├── "gigs"            → GigMarketplace (browse gigs / Services)
         ├── "my-gigs"         → MyGigsWorkspace (a freelancer's own listings)
-        ├── "contracts"       → ContractsWorkspace (sign, fund, milestones)
-        ├── "escrow"          → EscrowWorkspace (milestone tracking)
+        ├── "contracts"       → Tabbed Contracts shell: Overview (`ContractsWorkspace`) + Payments (`EscrowWorkspace`) + Disputes (`DisputesWorkspace`)
+        ├── "escrow"          → Alias -> resolves to "contracts" + Payments tab (`EscrowWorkspace`)
         ├── "wallet"          → BrowserWallet (top-up, history, withdraw)
-        ├── "verification"    → BrowserVerification (KYC doc upload)
-        ├── "chat"            → SupportChat (customer support tickets)
-        ├── "cases"           → DisputesWorkspace (raise/track disputes)
-        ├── "settings"        → SettingsWorkspace (account, security, notifications)
-        ├── "profile"         → ProfilePage (public view)
+        ├── "verification"    → BrowserVerification (KYC doc upload, reachable from Avatar menu & mobile header drawer)
+        ├── "chat"            → SupportChat (customer support & direct messaging)
+        ├── "cases"           → Alias -> resolves to "contracts" + Disputes tab (`DisputesWorkspace`)
+        ├── "settings"        → SettingsWorkspace (account, security, notifications; Avatar menu & mobile drawer)
+        ├── "profile"         → ProfilePage (public view; Avatar menu & mobile drawer)
         └── "profile-edit"    → ProfileEditPage (edit bio, skills, portfolio)
 ```
 
