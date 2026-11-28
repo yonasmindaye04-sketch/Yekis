@@ -57,3 +57,6 @@ docs/security/zap/*.md
 apps/backend/fix_env.js
 apps/backend/test-webhook.js
 scratch/
+
+# Binary QA screenshots (400+ PNGs, ~41 MB) stay local; QA_REPORT.md is tracked.
+test-evidence/**/*.png

@@ -51,6 +51,7 @@ node_modules/.cache/
 # in docs/; the deployment runbook is docs/ALETCLOUD_DEPLOYMENT.md.
 docs/
 **/*.md
+test-evidence/
 security/
 apps/backend/tests/
 apps/frontend/src/**/*.test.ts
