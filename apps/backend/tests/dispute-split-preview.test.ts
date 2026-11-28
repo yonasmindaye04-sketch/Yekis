@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
 import type { Express } from "express";
 import request from "supertest";
 import { prisma } from "../src/lib/prisma.js";
@@ -7,6 +7,42 @@ import { buildApp } from "../src/app.js";
 import { createAuthTokens } from "../src/modules/auth/auth.service.js";
 import { computeDisputeSplit } from "../src/modules/disputes/dispute.service.js";
 import { recordEscrowFundingLedger } from "../src/modules/finance/ledger.service.js";
+
+/**
+ * Allows `0.3` WHT split verification tests to exercise the deferred statutory
+ * 3%/30% WHT path (`TAX-002`) without enabling live WHT deductions in `fees.ts`
+ * before ERA remittance sign-off. Inactive for all other tests.
+ */
+const whtTestOverride: { active: boolean; thresholdMinor?: number } = {
+  active: false,
+};
+
+vi.mock("../src/modules/escrow/fees.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../src/modules/escrow/fees.js")>();
+  return {
+    ...actual,
+    calculateFees: (params: { milestoneAmountMinor: number; freelancerHasTin?: boolean }) => {
+      const base = actual.calculateFees(params);
+      if (!whtTestOverride.active) return base;
+      const threshold = whtTestOverride.thresholdMinor ?? env.WITHHOLDING_THRESHOLD_MINOR;
+      const gross = params.milestoneAmountMinor;
+      if (gross < threshold) return base;
+      const rate = params.freelancerHasTin
+        ? env.WITHHOLDING_RATE_WITH_TIN
+        : env.WITHHOLDING_RATE_WITHOUT_TIN;
+      const withholdingTax = Math.round(gross * rate);
+      return {
+        ...base,
+        withholdingTaxMinor: withholdingTax,
+        freelancerNetMinor:
+          gross -
+          base.platformFeeFromFreelancerMinor -
+          base.paymentProviderFeeMinor -
+          withholdingTax,
+      };
+    },
+  };
+});
 
 /**
  * OPS-01 — Authoritative server-side Partial Split preview, unambiguous
@@ -28,6 +64,9 @@ const prevPartialSplit = env.PARTIAL_SPLIT_ENABLED;
 
 async function cleanup() {
   if (cleanupIds.milestoneIds.length > 0) {
+    await prisma.platformFeeCredit.deleteMany({
+      where: { milestoneId: { in: cleanupIds.milestoneIds } },
+    });
     await prisma.ledgerEntry.deleteMany({
       where: { journal: { referenceId: { in: cleanupIds.milestoneIds } } },
     });
@@ -66,6 +105,7 @@ async function cleanup() {
 async function seedDisputeFixture(params?: {
   disputedAmountMinor?: number;
   extraMilestoneAmountMinor?: number;
+  freelancerTin?: string;
 }) {
   seq += 1;
   const disputedAmountMinor = params?.disputedAmountMinor ?? 100_000;
@@ -87,6 +127,17 @@ async function seedDisputeFixture(params?: {
       passwordHash: "not-a-real-hash",
       role: "FREELANCER",
       wallet: { create: { balanceMinor: 0 } },
+      ...(params?.freelancerTin
+        ? {
+            kyc: {
+              create: {
+                tier: "TIER_2",
+                status: "VERIFIED",
+                tin: params.freelancerTin,
+              },
+            },
+          }
+        : {}),
     } as never,
   });
   const mediator = await prisma.user.create({
@@ -187,6 +238,11 @@ async function seedDisputeFixture(params?: {
 
 beforeEach(async () => {
   env.PARTIAL_SPLIT_ENABLED = true;
+});
+
+afterEach(() => {
+  whtTestOverride.active = false;
+  whtTestOverride.thresholdMinor = undefined;
 });
 
 afterAll(async () => {
@@ -453,5 +509,183 @@ describe("OPS-01: computeDisputeSplit & server preview", () => {
     ]);
     expect(p1.body.disputedAmountMinor).toBe(2_200_000);
     expect(p2.body.disputedAmountMinor).toBe(900_000);
+  });
+});
+
+describe("0.3: Partial split withholding tax verification", () => {
+  it("applies 3% WHT when freelancerHasTin=true, matches preview to actual release, and posts 2050-LIABILITY-WITHHOLDING-ERA", async () => {
+    whtTestOverride.active = true;
+    const f = await seedDisputeFixture({
+      disputedAmountMinor: 2_000_000, // ETB 20,000 -> 50% share = 1,000,000 (meets WHT threshold)
+      freelancerTin: "ET-TIN-009911",
+    });
+
+    const previewRes = await request(app)
+      .post(`/api/v1/admin/disputes/${f.disputeId}/split-preview`)
+      .set("Authorization", f.authHeader)
+      .send({ outcome: "PARTIAL_SPLIT", freelancerSharePct: 50 });
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.body.freelancerGrossMinor).toBe(1_000_000);
+    expect(previewRes.body.clientRefundMinor).toBe(1_000_000);
+    expect(previewRes.body.platformFeeMinor).toBe(70_000);
+    expect(previewRes.body.providerFeeMinor).toBe(5_000);
+    expect(previewRes.body.totalFeeMinor).toBe(75_000);
+    expect(previewRes.body.withholdingTaxMinor).toBe(30_000);
+    expect(previewRes.body.freelancerNetMinor).toBe(895_000);
+    expect(previewRes.body.freelancerNetMinor).toBe(
+      previewRes.body.freelancerGrossMinor -
+        previewRes.body.totalFeeMinor -
+        previewRes.body.withholdingTaxMinor,
+    );
+
+    const resolveRes = await request(app)
+      .post(`/api/v1/disputes/${f.disputeId}/resolve`)
+      .set("Authorization", f.authHeader)
+      .send({
+        outcome: "PARTIAL_SPLIT",
+        freelancerSharePct: 50,
+        recommendation: "50% split with 3% TIN WHT",
+      });
+    expect(resolveRes.status).toBe(200);
+
+    const [clientWallet, freelancerWallet, feeCredit, releaseJournal] = await Promise.all([
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.clientId } }),
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.freelancerId } }),
+      prisma.platformFeeCredit.findFirstOrThrow({ where: { milestoneId: f.disputedMsId } }),
+      prisma.ledgerJournal.findFirstOrThrow({
+        where: { referenceId: f.disputedMsId, referenceType: "MILESTONE_RELEASE" },
+        include: { entries: { include: { account: true } } },
+      }),
+    ]);
+
+    expect(clientWallet.balanceMinor).toBe(previewRes.body.clientRefundMinor);
+    expect(freelancerWallet.balanceMinor).toBe(previewRes.body.freelancerNetMinor);
+    expect(feeCredit.withholdingMinor).toBe(30_000);
+
+    const whtEntry = releaseJournal.entries.find(
+      (e) => e.account.code === "2050-LIABILITY-WITHHOLDING-ERA",
+    );
+    expect(whtEntry).toBeDefined();
+    expect(whtEntry!.debitMinor).toBe(0);
+    expect(whtEntry!.creditMinor).toBe(30_000);
+
+    const totalDr = releaseJournal.entries.reduce((s, e) => s + e.debitMinor, 0);
+    const totalCr = releaseJournal.entries.reduce((s, e) => s + e.creditMinor, 0);
+    expect(totalDr).toBe(1_000_000);
+    expect(totalCr).toBe(1_000_000);
+  });
+
+  it("applies 30% WHT when freelancerHasTin=false, matches preview to actual release, and posts 2050-LIABILITY-WITHHOLDING-ERA", async () => {
+    whtTestOverride.active = true;
+    const f = await seedDisputeFixture({
+      disputedAmountMinor: 2_000_000,
+    });
+
+    const previewRes = await request(app)
+      .post(`/api/v1/admin/disputes/${f.disputeId}/split-preview`)
+      .set("Authorization", f.authHeader)
+      .send({ outcome: "PARTIAL_SPLIT", freelancerSharePct: 50 });
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.body.freelancerGrossMinor).toBe(1_000_000);
+    expect(previewRes.body.clientRefundMinor).toBe(1_000_000);
+    expect(previewRes.body.totalFeeMinor).toBe(75_000);
+    expect(previewRes.body.withholdingTaxMinor).toBe(300_000);
+    expect(previewRes.body.freelancerNetMinor).toBe(625_000);
+    expect(previewRes.body.freelancerNetMinor).toBe(
+      previewRes.body.freelancerGrossMinor -
+        previewRes.body.totalFeeMinor -
+        previewRes.body.withholdingTaxMinor,
+    );
+
+    const resolveRes = await request(app)
+      .post(`/api/v1/disputes/${f.disputeId}/resolve`)
+      .set("Authorization", f.authHeader)
+      .send({
+        outcome: "PARTIAL_SPLIT",
+        freelancerSharePct: 50,
+        recommendation: "50% split with 30% non-TIN WHT",
+      });
+    expect(resolveRes.status).toBe(200);
+
+    const [clientWallet, freelancerWallet, releaseJournal] = await Promise.all([
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.clientId } }),
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.freelancerId } }),
+      prisma.ledgerJournal.findFirstOrThrow({
+        where: { referenceId: f.disputedMsId, referenceType: "MILESTONE_RELEASE" },
+        include: { entries: { include: { account: true } } },
+      }),
+    ]);
+
+    expect(clientWallet.balanceMinor).toBe(previewRes.body.clientRefundMinor);
+    expect(freelancerWallet.balanceMinor).toBe(previewRes.body.freelancerNetMinor);
+
+    const whtEntry = releaseJournal.entries.find(
+      (e) => e.account.code === "2050-LIABILITY-WITHHOLDING-ERA",
+    );
+    expect(whtEntry?.creditMinor).toBe(300_000);
+
+    const totalDr = releaseJournal.entries.reduce((s, e) => s + e.debitMinor, 0);
+    const totalCr = releaseJournal.entries.reduce((s, e) => s + e.creditMinor, 0);
+    expect(totalDr).toBe(totalCr);
+  });
+
+  it("preserves exact integer rounding across fees, WHT, and net payout on small odd amounts", async () => {
+    whtTestOverride.active = true;
+    whtTestOverride.thresholdMinor = 1; // Exercise WHT rounding on a small odd split
+
+    const withTin = computeDisputeSplit({
+      disputedAmountMinor: 333,
+      outcome: "PARTIAL_SPLIT",
+      freelancerSharePct: 33,
+      freelancerHasTin: true,
+    });
+    expect(withTin.freelancerGrossMinor).toBe(110);
+    expect(withTin.clientRefundMinor).toBe(223);
+    expect(withTin.platformFeeMinor).toBe(8);
+    expect(withTin.providerFeeMinor).toBe(1);
+    expect(withTin.totalFeeMinor).toBe(9);
+    expect(withTin.withholdingTaxMinor).toBe(3);
+    expect(withTin.freelancerNetMinor).toBe(98);
+    expect(withTin.platformFeeMinor + withTin.providerFeeMinor).toBe(withTin.totalFeeMinor);
+    expect(withTin.freelancerNetMinor).toBe(
+      withTin.freelancerGrossMinor - withTin.totalFeeMinor - withTin.withholdingTaxMinor,
+    );
+
+    const f = await seedDisputeFixture({
+      disputedAmountMinor: 333,
+    });
+    const previewRes = await request(app)
+      .post(`/api/v1/admin/disputes/${f.disputeId}/split-preview`)
+      .set("Authorization", f.authHeader)
+      .send({ outcome: "PARTIAL_SPLIT", freelancerSharePct: 33 });
+    expect(previewRes.status).toBe(200);
+    expect(previewRes.body.withholdingTaxMinor).toBe(33); // 30% of 110
+    expect(previewRes.body.totalFeeMinor).toBe(9);
+    expect(previewRes.body.freelancerNetMinor).toBe(68);
+
+    const resolveRes = await request(app)
+      .post(`/api/v1/disputes/${f.disputeId}/resolve`)
+      .set("Authorization", f.authHeader)
+      .send({
+        outcome: "PARTIAL_SPLIT",
+        freelancerSharePct: 33,
+        recommendation: "Odd small-amount WHT rounding check",
+      });
+    expect(resolveRes.status).toBe(200);
+
+    const [clientWallet, freelancerWallet, releaseJournal] = await Promise.all([
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.clientId } }),
+      prisma.wallet.findUniqueOrThrow({ where: { userId: f.freelancerId } }),
+      prisma.ledgerJournal.findFirstOrThrow({
+        where: { referenceId: f.disputedMsId, referenceType: "MILESTONE_RELEASE" },
+        include: { entries: true },
+      }),
+    ]);
+    expect(clientWallet.balanceMinor).toBe(223);
+    expect(freelancerWallet.balanceMinor).toBe(68);
+    const totalDr = releaseJournal.entries.reduce((s, e) => s + e.debitMinor, 0);
+    const totalCr = releaseJournal.entries.reduce((s, e) => s + e.creditMinor, 0);
+    expect(totalDr).toBe(110);
+    expect(totalCr).toBe(110);
   });
 });

@@ -164,8 +164,7 @@ export function computeDisputeSplit(params: {
   });
   const totalFeeMinor =
     fees.platformFeeFromFreelancerMinor +
-    fees.paymentProviderFeeMinor +
-    fees.withholdingTaxMinor;
+    fees.paymentProviderFeeMinor;
   const cfg = getEscrowFeeConfig();
 
   return {
