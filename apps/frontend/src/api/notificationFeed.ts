@@ -200,13 +200,17 @@ export function markNotificationsReadLocally(ids: Iterable<string>): void {
  * tab means something else happened, and the person has not been there.
  */
 export async function markViewNotificationsRead(
-  view: string,
+  viewOrViews: string | readonly string[],
   notifications: NotificationItem[],
 ): Promise<void> {
+  const viewSet = new Set(
+    typeof viewOrViews === "string" ? [viewOrViews] : viewOrViews,
+  );
   const ids = notifications
-    .filter(
-      (item) => !item.isRead && appTargetFor(item)?.page === view,
-    )
+    .filter((item) => {
+      const targetPage = appTargetFor(item)?.page;
+      return !item.isRead && Boolean(targetPage && viewSet.has(targetPage));
+    })
     .map((item) => item.id);
   if (!ids.length) return;
   // Clear the dot on this render pass, then let the server confirm.

@@ -67,7 +67,7 @@ describe("P5 redesign CI guards & parity", () => {
     }
   });
 
-  it("renders FirstRunChecklist steps in Decision 5 order with Browse gigs and escrow dialog", () => {
+  it("renders FirstRunChecklist steps in Decision 5 order with Browse services and escrow dialog", () => {
     const html = renderToStaticMarkup(
       <LanguageProvider>
         <FirstRunChecklist
@@ -87,7 +87,7 @@ describe("P5 redesign CI guards & parity", () => {
     );
 
     const kycPos = html.indexOf("Verify identity");
-    const briefPos = html.indexOf("Post your first brief");
+    const briefPos = html.indexOf("Post a job");
     const fundsPos = html.indexOf("Add funds (before you hire)");
     const proposalsPos = html.indexOf("Review proposals");
     const fundMsPos = html.indexOf("Fund your first milestone");
@@ -98,8 +98,35 @@ describe("P5 redesign CI guards & parity", () => {
     expect(proposalsPos).toBeGreaterThan(fundsPos);
     expect(fundMsPos).toBeGreaterThan(proposalsPos);
     expect(html).toContain("How escrow protects you");
-    expect(html).toContain("Browse gigs");
+    expect(html).toContain("Browse services");
     expect(html).not.toContain("Browse talent");
+  });
+
+  it("shows bold amber Waiting for approval (not Done) when only pending top-up exists and links locked step to KYC", () => {
+    const html = renderToStaticMarkup(
+      <LanguageProvider>
+        <FirstRunChecklist
+          kycVerified={false}
+          kycStatus="UNDER_REVIEW"
+          hasBriefs={false}
+          hasFundsOrPending={true}
+          hasPendingTopUpOnly={true}
+          pendingTopUpEtb={2500}
+          hasProposals={false}
+          hasFundedMilestone={false}
+          onNavigateView={() => {}}
+          onOpenEscrow={() => {}}
+          onHideChecklist={() => {}}
+        />
+      </LanguageProvider>,
+    );
+
+    expect(html).toContain("Under review");
+    expect(html).toContain("Verify identity to unlock");
+    expect(html).toContain("Waiting for approval");
+    expect(html).toContain("ETB 2,500 top-up submitted");
+    expect(html).toContain("We will notify you once approved");
+    expect(html).not.toContain("sh-first-run-done-label");
   });
 
   it("keeps DASHBOARD_EXTRAS_COPY aligned across all 4 locales", () => {

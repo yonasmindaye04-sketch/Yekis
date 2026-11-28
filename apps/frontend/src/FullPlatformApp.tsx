@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent } from "react";
 import {
   api,
+  type ChatConversation,
+  type Contract,
   type EscrowFeeConfig,
   type Job,
   type MeResponse,
@@ -16,13 +18,23 @@ import {
   useNotifications,
   useUnreadByView,
 } from "./api/notificationFeed";
+import {
+  getActiveGuideModule,
+  getAggregatedNavBadgeCount,
+  getAvatarMenuViews,
+  getNotificationReadViews,
+  getSidebarVisibleViews,
+  MOBILE_BOTTOM_NAV_VIEWS,
+  resolveViewAlias,
+  type ContractsTabKey,
+  type JobsTabKey,
+} from "./navigation/workspaceNavigation";
 import { LandingPageV2 as LandingPage } from "./LandingPageV2";
 import { ChatWorkspace } from "./ChatWorkspace";
 import { OpsConsole } from "./pages/ops/OpsConsole";
 import { BrowserWallet } from "./BrowserWallet";
 import { BrowserVerification } from "./BrowserVerification";
 import { NotificationCenter } from "./NotificationCenter";
-import { SoundToggle } from "./components/SoundToggle";
 import { OnboardingVerification } from "./OnboardingVerification";
 import {
   ContractsWorkspace,
@@ -39,6 +51,7 @@ import {
   FileCheck,
   Wallet,
   MessageCircle,
+  ShieldAlert,
   ShieldCheck,
   Scale,
   Settings,
@@ -606,6 +619,10 @@ function FullPlatformAppInner() {
   const [jobError, setJobError] = useState("");
   const [jobErrorNextAction, setJobErrorNextAction] = useState<string | null>(null);
   const [view, setView] = useState<View>("overview");
+  const [jobsTab, setJobsTab] = useState<JobsTabKey>("jobs");
+  const [contractsTab, setContractsTab] = useState<ContractsTabKey>("overview");
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
   /**
    * Whose profile the workspace is showing.
    *
@@ -721,6 +738,8 @@ function FullPlatformAppInner() {
   /** The caller's own posted briefs — the hiring side of the workspace. */
   const [myJobs, setMyJobs] = useState<Job[]>([]);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [feeConfig, setFeeConfig] = useState<EscrowFeeConfig | null>(null);
   const [wallet, setWallet] = useState<WalletResponse>({ balanceMinor: 0 });
   const [topUps, setTopUps] = useState<TopUpRequest[]>([]);
@@ -768,6 +787,24 @@ function FullPlatformAppInner() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileDrawerOpen]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAvatarMenuOpen(false);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [avatarMenuOpen]);
 
   const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER") => {
     if (user?.role !== "BOTH") return;
@@ -833,11 +870,16 @@ function FullPlatformAppInner() {
    * "profile" always means MY profile, whoever was last opened.
    */
   const navigateToView = (next: View) => {
-    if (next === "profile") {
+    const resolved = resolveViewAlias(next);
+    if (resolved.jobsTab) setJobsTab(resolved.jobsTab);
+    if (resolved.contractsTab) setContractsTab(resolved.contractsTab);
+    setAvatarMenuOpen(false);
+    setMobileDrawerOpen(false);
+    if (resolved.view === "profile") {
       openMyProfile();
       return;
     }
-    setView(next);
+    setView(resolved.view);
   };
 
   /**
@@ -986,6 +1028,8 @@ const loadWorkspace = async () => {
       jobsResult,
       myJobsResult,
       milestonesResult,
+      contractsResult,
+      conversationsResult,
       topUpsResult,
       completenessResult,
       feeConfigResult,
@@ -995,6 +1039,8 @@ const loadWorkspace = async () => {
       api.getJobFeed(),
       api.getMyJobs(),
       api.getMilestones(),
+      api.getContracts(),
+      api.getChatConversations(),
       api.getTopUpRequests(),
       api.getProfileCompleteness(),
       api.getEscrowFeeConfig(),
@@ -1012,10 +1058,14 @@ const loadWorkspace = async () => {
     if (jobsResult.status === "fulfilled") setJobs(jobsResult.value.jobs);
     if (myJobsResult.status === "fulfilled") setMyJobs(myJobsResult.value);
     if (milestonesResult.status === "fulfilled")
-    setMilestones(milestonesResult.value);
+      setMilestones(milestonesResult.value);
+    if (contractsResult.status === "fulfilled")
+      setContracts(contractsResult.value);
+    if (conversationsResult.status === "fulfilled")
+      setConversations(conversationsResult.value);
     if (topUpsResult.status === "fulfilled") setTopUps(topUpsResult.value);
     if (completenessResult.status === "fulfilled")
-    setProfileCompleteness(completenessResult.value.profileCompleteness);
+      setProfileCompleteness(completenessResult.value.profileCompleteness);
     if (feeConfigResult.status === "fulfilled") setFeeConfig(feeConfigResult.value);
     setLastUpdatedAt(new Date());
   };
@@ -1486,14 +1536,16 @@ const loadWorkspace = async () => {
 
   /** How much unlooked-at activity a sidebar tab is holding. */
   const navActivityCount = (tabView: string): number =>
-    tabView === "jobs" ? newBriefsCount : (unreadByView[tabView] ?? 0);
+    getAggregatedNavBadgeCount(tabView, { newBriefsCount, unreadByView });
 
-  // Opening a view IS looking at it: its notifications are marked read, so
-  // the dot means "not looked at yet" rather than "something happened once".
+  // Opening a view (or consolidated sub-tab) clears both direct and alias notifications.
   useEffect(() => {
     if (!user) return;
-    void markViewNotificationsRead(view, notifications);
-  }, [notifications, user, view]);
+    void markViewNotificationsRead(
+      getNotificationReadViews({ view, jobsTab, contractsTab }),
+      notifications,
+    );
+  }, [contractsTab, jobsTab, notifications, user, view]);
 
   type SidebarNavItem = {
     view: View;
@@ -1502,42 +1554,45 @@ const loadWorkspace = async () => {
     group: "HIRE" | "MONEY" | "TALK" | "ACCOUNT";
   };
 
+  const unreadMessagesCount = useMemo(
+    () => conversations.filter((c) => c.unread).length,
+    [conversations],
+  );
+
+  const clientHasActivity = useMemo(
+    () =>
+      myJobs.length > 0 ||
+      contracts.length > 0 ||
+      milestones.length > 0 ||
+      topUps.some((t) => t.status === "APPROVED"),
+    [contracts.length, milestones.length, myJobs.length, topUps],
+  );
+
+  const isZeroStateClientHome =
+    view === "overview" && canHire && !canWork && !clientHasActivity;
+
   const navItems = useMemo<SidebarNavItem[]>(() => {
     const jobsLabel = canWork ? t.nav.findWork : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
-    const hireItems: SidebarNavItem[] = [
+    const servicesLabel = !canWork && canHire ? copy.servicesNavLabel : t.workspace.nav.gigs;
+    const walletLabel = !canWork && canHire ? copy.walletClientNavLabel : t.nav.wallet;
+    const allItems: SidebarNavItem[] = [
       { view: "overview", iconKey: "overview", label: t.nav.dashboard, group: "HIRE" },
       { view: "jobs", iconKey: jobsIconKey, label: jobsLabel, group: "HIRE" },
-      { view: "proposals", iconKey: "proposals", label: t.nav.proposals, group: "HIRE" },
-      { view: "gigs", iconKey: "gigs", label: t.workspace.nav.gigs, group: "HIRE" },
-      ...(canWork
-        ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" as const }]
-        : []),
+      { view: "gigs", iconKey: "gigs", label: servicesLabel, group: "HIRE" },
+      { view: "my-gigs", iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" },
       { view: "contracts", iconKey: "contracts", label: t.nav.contracts, group: "HIRE" },
-    ];
-    const moneyItems: SidebarNavItem[] = [
-      { view: "escrow", iconKey: "escrow", label: t.nav.escrow, group: "MONEY" },
-      { view: "wallet", iconKey: "wallet", label: t.nav.wallet, group: "MONEY" },
-    ];
-    const talkItems: SidebarNavItem[] = [
+      { view: "wallet", iconKey: "wallet", label: walletLabel, group: "MONEY" },
       { view: "chat", iconKey: "chat", label: t.workspace.nav.chat, group: "TALK" },
-      {
-        view: "cases",
-        iconKey: "cases",
-        label: isStaff ? t.workspace.nav.cases : t.nav.disputes,
-        group: "TALK",
-      },
-    ];
-    const accountItems: SidebarNavItem[] = [
       { view: "profile", iconKey: "profile", label: t.workspace.nav.profile, group: "ACCOUNT" },
-      ...(!isStaff
-        ? [{ view: "verification" as View, iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" as const }]
-        : []),
+      { view: "verification", iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" },
       { view: "settings", iconKey: "settings", label: t.nav.settings, group: "ACCOUNT" },
     ];
-
-    return [...hireItems, ...moneyItems, ...talkItems, ...accountItems];
-  }, [canWork, isStaff, t]);
+    const allowedViews = new Set(
+      getSidebarVisibleViews({ canWork, isStaff, isMobileViewport }),
+    );
+    return allItems.filter((item) => allowedViews.has(item.view));
+  }, [canHire, canWork, copy.servicesNavLabel, copy.walletClientNavLabel, isMobileViewport, isStaff, t]);
 
   const navGroupLabels: Record<"HIRE" | "MONEY" | "TALK" | "ACCOUNT", string> = {
     HIRE: canWork && !canHire ? "Work" : "Hire",
@@ -1547,14 +1602,10 @@ const loadWorkspace = async () => {
   };
 
   const mobileBottomNavItems = useMemo(() => {
-    const preferred: View[] =
-      canWork && !canHire
-        ? ["overview", "jobs", "contracts", "wallet"]
-        : ["overview", "jobs", "escrow", "wallet"];
-    return preferred
+    return MOBILE_BOTTOM_NAV_VIEWS
       .map((v) => navItems.find((item) => item.view === v))
       .filter((item): item is SidebarNavItem => Boolean(item));
-  }, [canHire, canWork, navItems]);
+  }, [navItems]);
 
   if (user?.staffRole) {
     return (
@@ -2386,12 +2437,11 @@ const loadWorkspace = async () => {
     );
   }
 
-  const activeGuideModule: GuideModuleId =
-    view === "my-gigs"
-      ? "gigs"
-      : view === "profile-edit"
-        ? "profile"
-        : view;
+  const activeGuideModule: GuideModuleId = getActiveGuideModule({
+    view,
+    jobsTab,
+    contractsTab,
+  });
   const activeGuideRole: GuideRole =
     platformRole === "FREELANCER" ? "FREELANCER" : "CLIENT";
 
@@ -2408,7 +2458,7 @@ const loadWorkspace = async () => {
 
   const handleContactSupportFromGuide = () => {
     setMobileDrawerOpen(false);
-    setView("chat");
+    navigateToView("chat");
   };
 
   return (
@@ -2544,14 +2594,7 @@ const loadWorkspace = async () => {
                           ? "active"
                           : ""
                       }
-                      onClick={() => {
-                        if (item.view === "profile") {
-                          openMyProfile();
-                        } else {
-                          setView(item.view);
-                        }
-                        setMobileDrawerOpen(false);
-                      }}
+                      onClick={() => navigateToView(item.view)}
                       title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
                       aria-label={
                         activityLabel ? `${item.label} — ${activityLabel}` : undefined
@@ -2597,17 +2640,15 @@ const loadWorkspace = async () => {
                   <span className="nm">
                     {user.displayName?.trim() || roleLabel(platformRole, language)}
                   </span>
-                  <span className="em">
-                    {roleLabel(platformRole, language)} ·{" "}
-                    <span
-                      className={`sh-kyc-inline ${
-                        user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
-                      }`}
-                    >
-                      {user.kyc?.status === "VERIFIED"
-                        ? "KYC: Verified"
-                        : "KYC: Required"}
-                    </span>
+                  <span
+                    className="em"
+                    title={
+                      user.email
+                        ? `${roleLabel(platformRole, language)} · ${user.email}`
+                        : roleLabel(platformRole, language)
+                    }
+                  >
+                    {user.email || roleLabel(platformRole, language)}
                   </span>
                 </span>
               )}
@@ -2647,36 +2688,48 @@ const loadWorkspace = async () => {
                 <Menu size={17} />
               </button>
             )}
-            {/* Universal back button */}
-            <button
-              type="button"
-              className="sh-icon-only-btn sh-topbar-back-btn"
-              onClick={handleUniversalBack}
-              title={copy.goBackAria}
-              aria-label={copy.goBackAria}
-            >
-              <ArrowLeft size={17} />
-            </button>
+            {/* Show back button and breadcrumb only on detail sub-views */}
+            {((view === "profile" && !viewingOwnProfile) ||
+              view === "profile-edit") && (
+              <button
+                type="button"
+                className="sh-icon-only-btn sh-topbar-back-btn"
+                onClick={handleUniversalBack}
+                title={copy.goBackAria}
+                aria-label={copy.goBackAria}
+              >
+                <ArrowLeft size={17} />
+              </button>
+            )}
             <div className="sh-breadcrumb">
-              <span className="sh-breadcrumb-muted">
-                {roleLabel(platformRole, language)} {t.workspace.nav.workspaceLabel}
-              </span>
-              <span className="sh-breadcrumb-sep">/</span>
+              {((view === "profile" && !viewingOwnProfile) ||
+                view === "profile-edit") && (
+                <>
+                  <span className="sh-breadcrumb-muted">
+                    {roleLabel(platformRole, language)} {t.workspace.nav.workspaceLabel}
+                  </span>
+                  <span className="sh-breadcrumb-sep">/</span>
+                </>
+              )}
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
                   ? t.workspace.nav.overview
-                  : view === "profile" && !viewingOwnProfile
-                    ? // Somebody else's profile: name the person. The
-                      // sidebar item's label ("My Profile") would say the
-                      // page is mine, which it is not.
-                      // `||` and not `??`: a profile with no display name
-                      // reports an empty string, and an empty heading is
-                      // worse than the generic one.
-                      viewedProfileName || t.workspace.profile.memberProfileLabel
-                    : view === "profile-edit"
-                      ? t.workspace.profile.editHeading
-                      : navItems.find((item) => item.view === view)?.label ||
-                        t.nav.settings}
+                  : view === "jobs" && jobsTab === "proposals"
+                    ? t.nav.proposals
+                    : view === "contracts" && contractsTab === "payments"
+                      ? copy.contractsTabPayments
+                      : view === "contracts" && contractsTab === "disputes"
+                        ? copy.contractsTabDisputes
+                        : view === "verification"
+                          ? t.nav.kyc
+                          : view === "profile"
+                            ? viewingOwnProfile
+                              ? t.workspace.nav.profile
+                              : viewedProfileName || t.workspace.profile.memberProfileLabel
+                            : view === "profile-edit"
+                              ? t.workspace.profile.editHeading
+                              : navItems.find((item) => item.view === view)?.label ||
+                                t.nav.settings}
               </strong>
             </div>
           </div>
@@ -2718,7 +2771,6 @@ const loadWorkspace = async () => {
             )}
 
             <LanguageSelector variant="dropdown" />
-            <SoundToggle className="sh-icon-only-btn" size={16} />
             <button
               type="button"
               className="sh-icon-only-btn theme-toggle"
@@ -2733,43 +2785,121 @@ const loadWorkspace = async () => {
             </button>
             <NotificationCenter onNavigate={(v) => navigateToView(v as View)} />
             <GlobalHelpMenu />
-            <button
-              type="button"
-              className={`sh-kyc-header-link ${
+            <span
+              className={`sh-kyc-header-link sh-kyc-plain-status ${
                 user.kyc?.status === "VERIFIED" ? "is-verified" : "is-required"
               }`}
-              onClick={() =>
-                setView(user.kyc?.status === "VERIFIED" ? "profile" : "verification")
-              }
               title={
                 user.kyc?.status === "VERIFIED"
-                  ? "Identity verified"
-                  : "Complete identity verification"
+                  ? copy.kycVerifiedTooltip
+                  : copy.kycVerifyTooltip
               }
             >
-              <ShieldCheck size={14} aria-hidden="true" />
+              {user.kyc?.status === "VERIFIED" ? (
+                <ShieldCheck size={14} aria-hidden="true" />
+              ) : (
+                <ShieldAlert size={14} aria-hidden="true" />
+              )}
               <span>
-                {user.kyc?.status === "VERIFIED" ? "KYC: Verified" : "KYC: Required"}
+                {user.kyc?.status === "VERIFIED"
+                  ? copy.kycStatusVerified
+                  : copy.kycStatusRequired}
               </span>
-            </button>
-            <button
-              type="button"
-              className="user-menu"
-              onClick={openMyProfile}
-              title={`${user.displayName?.trim() || roleLabel(platformRole, language)} — ${user.email}`}
-              aria-label={copy.openProfileAria(user.email ?? "")}
-            >
-              <span className="avatar yk-topbar-avatar">
-                <YekisAvatar
-                  userId={user.id}
-                  email={user.email}
-                  displayName={user.displayName}
-                  avatarUrl={user.avatarUrl}
-                  size={32}
-                  animate="hover"
-                />
-              </span>
-            </button>
+            </span>
+            <div className="sh-user-menu-wrap" ref={avatarMenuRef}>
+              <button
+                type="button"
+                className="user-menu"
+                aria-haspopup="menu"
+                aria-expanded={avatarMenuOpen}
+                aria-controls="workspace-avatar-menu"
+                onClick={() => setAvatarMenuOpen((prev) => !prev)}
+                title={`${user.displayName?.trim() || roleLabel(platformRole, language)} — ${user.email}`}
+                aria-label={copy.openProfileAria(user.email ?? "")}
+              >
+                <span className="avatar yk-topbar-avatar">
+                  <YekisAvatar
+                    userId={user.id}
+                    email={user.email}
+                    displayName={user.displayName}
+                    avatarUrl={user.avatarUrl}
+                    size={32}
+                    animate="hover"
+                  />
+                </span>
+              </button>
+              {avatarMenuOpen && (
+                <div
+                  id="workspace-avatar-menu"
+                  className="sh-avatar-popover"
+                  role="menu"
+                  aria-label={copy.accountMenuAria}
+                  onKeyDown={(e) => {
+                    const items = Array.from(
+                      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+                    );
+                    if (!items.length) return;
+                    const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      items[(idx + 1) % items.length]?.focus();
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      items[(idx - 1 + items.length) % items.length]?.focus();
+                    } else if (e.key === "Home") {
+                      e.preventDefault();
+                      items[0]?.focus();
+                    } else if (e.key === "End") {
+                      e.preventDefault();
+                      items[items.length - 1]?.focus();
+                    }
+                  }}
+                >
+                  <div className="sh-avatar-menu-header">
+                    <span className="sh-avatar-menu-name">
+                      {user.displayName?.trim() || roleLabel(platformRole, language)}
+                    </span>
+                    <span className="sh-avatar-menu-email">{user.email}</span>
+                  </div>
+                  {getAvatarMenuViews(isStaff).map((menuView) => {
+                    const label =
+                      menuView === "profile"
+                        ? t.workspace.nav.profile
+                        : menuView === "verification"
+                          ? t.nav.kyc
+                          : t.nav.settings;
+                    const active =
+                      view === menuView &&
+                      !(menuView === "profile" && !viewingOwnProfile);
+                    return (
+                      <button
+                        key={menuView}
+                        type="button"
+                        role="menuitem"
+                        className={`sh-avatar-menu-item${active ? " active" : ""}`}
+                        onClick={() => navigateToView(menuView)}
+                      >
+                        {navIconMap[menuView]}
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                  <div className="sh-avatar-menu-divider" role="separator" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="sh-avatar-menu-item"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      logout();
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>{copy.signOutLabel}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -2851,7 +2981,7 @@ const loadWorkspace = async () => {
             </div>
           )}
 
-        <FirstVisitWelcomeBar />
+        {!isZeroStateClientHome && <FirstVisitWelcomeBar />}
 
         <ProfileCompletionDialog
           user={user}
@@ -2867,11 +2997,13 @@ const loadWorkspace = async () => {
               kycVerified={user.kyc?.status === "VERIFIED"}
               kycStatus={user.kyc?.status ?? "NOT_STARTED"}
               proposalsCount={myJobs.reduce((sum, j) => sum + (j.proposalsCount ?? 0), 0)}
+              unreadMessagesCount={unreadMessagesCount}
               lastUpdatedAt={lastUpdatedAt}
               workspaceError={error || null}
               wallet={wallet}
               jobs={jobs}
               myJobs={myJobs}
+              contracts={contracts}
               milestones={milestones}
               topUps={topUps}
               feeConfig={feeConfig}
@@ -2894,11 +3026,11 @@ const loadWorkspace = async () => {
                 } else {
                   setFocusContractId(null);
                 }
-                setView("escrow");
+                navigateToView("escrow");
               }}
               onOpenContract={(contractId) => {
                 setFocusContractId(contractId || null);
-                setView("contracts");
+                navigateToView("contracts");
               }}
               onFundMilestone={async (milestoneId) => {
                 await api.fundMilestoneFromWallet(milestoneId);
@@ -2910,201 +3042,278 @@ const loadWorkspace = async () => {
           </div>
         )}
 
-        {view === "jobs" && (
+        {(view === "jobs" || view === "proposals") && (() => {
+          const activeJobsTab: JobsTabKey =
+            view === "proposals" ? "proposals" : jobsTab;
+          const proposalsCount = myJobs.reduce(
+            (sum, j) => sum + (j.proposalsCount ?? 0),
+            0,
+          );
+          const selectJobsTab = (nextTab: JobsTabKey) => {
+            setJobsTab(nextTab);
+            if (view === "proposals") setView("jobs");
+          };
+          const handleJobsTabKeyDown = (
+            event: React.KeyboardEvent<HTMLDivElement>,
+          ) => {
+            if (
+              event.key === "ArrowRight" ||
+              event.key === "ArrowLeft" ||
+              event.key === "Home" ||
+              event.key === "End"
+            ) {
+              event.preventDefault();
+              const nextTab: JobsTabKey =
+                event.key === "Home"
+                  ? "jobs"
+                  : event.key === "End"
+                    ? "proposals"
+                    : activeJobsTab === "jobs"
+                      ? "proposals"
+                      : "jobs";
+              selectJobsTab(nextTab);
+              const nextId =
+                nextTab === "jobs" ? "jobs-tab-overview" : "jobs-tab-proposals";
+              document.getElementById(nextId)?.focus();
+            }
+          };
+          return (
           <section className="sh-dashboard-wrap">
             <div className="sh-card-header">
               <div>
                 <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {canHire && canWork
-                    ? copy.jobsTitleBoth
-                    : canHire
-                      ? copy.jobsTitleHire
-                      : copy.jobsTitleWork}
+                  {activeJobsTab === "proposals"
+                    ? canHire && canWork
+                      ? copy.proposalsTitleBoth
+                      : canHire
+                        ? copy.proposalsTitleHire
+                        : copy.proposalsTitleWork
+                    : canHire && canWork
+                      ? copy.jobsTitleBoth
+                      : canHire
+                        ? copy.jobsTitleHire
+                        : copy.jobsTitleWork}
                 </h2>
                 <p className="sh-card-desc">
-                  {canHire && canWork
-                    ? copy.jobsDescBoth
-                    : canHire
-                      ? copy.jobsDescHire
-                      : copy.jobsDescWork}
+                  {activeJobsTab === "proposals"
+                    ? canHire && canWork
+                      ? copy.proposalsDescBoth
+                      : canHire
+                        ? copy.proposalsDescHire
+                        : copy.proposalsDescWork
+                    : canHire && canWork
+                      ? copy.jobsDescBoth
+                      : canHire
+                        ? copy.jobsDescHire
+                        : copy.jobsDescWork}
                 </p>
               </div>
               <span className="sh-kbd">{copy.openBriefsCount(jobs.length)}</span>
             </div>
 
-            {canHire && (
-              <form
-                className="sh-card job-form"
-                onSubmit={submitJob}
-                data-tour="jobs-publish-form"
+            <div
+              className="sh-workspace-tablist"
+              role="tablist"
+              aria-label={copy.jobsTabsAria}
+              onKeyDown={handleJobsTabKeyDown}
+            >
+              <button
+                type="button"
+                id="jobs-tab-overview"
+                role="tab"
+                aria-selected={activeJobsTab === "jobs"}
+                tabIndex={activeJobsTab === "jobs" ? 0 : -1}
+                className="sh-workspace-tab"
+                onClick={() => selectJobsTab("jobs")}
               >
-                <div className="sh-card-header">
-                  <div>
-                    <div className="yk-help-heading-row">
-                      <h3 className="sh-card-title">{copy.publishBriefTitle}</h3>
-                      <ContextualHelpTrigger helpId="jobs-brief-publishing" />
-                    </div>
-                    <p className="sh-card-desc">
-                      {copy.publishBriefDesc}
-                    </p>
-                  </div>
-                  <span className="sh-kbd">{copy.escrowProtectedBadge}</span>
-                </div>
-                {user.kyc?.status !== "VERIFIED" && (
-                  <div className="sh-pending-banner" role="alert" style={{ marginBottom: 14 }}>
-                    <ShieldCheck size={16} />
-                    <span style={{ flex: 1 }}>
-                      <strong>Identity verification required before publishing a brief.</strong>{" "}
-                      {user.kyc?.status === "UNDER_REVIEW"
-                        ? "Your KYC verification is currently under staff review. Posting unlocks once approved."
-                        : "Verify your identity first so freelancers know briefs come from verified clients."}
-                    </span>
-                    <button
-                      type="button"
-                      className="sh-btn sh-btn-secondary"
-                      onClick={() => setView("verification")}
-                    >
-                      {copy.verifyIdentityBtn}
-                    </button>
-                  </div>
+                <span>
+                  {canHire ? copy.jobsTabMyJobs : copy.jobsTabFindWork}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="jobs-tab-proposals"
+                role="tab"
+                aria-selected={activeJobsTab === "proposals"}
+                tabIndex={activeJobsTab === "proposals" ? 0 : -1}
+                className="sh-workspace-tab"
+                onClick={() => selectJobsTab("proposals")}
+              >
+                <span>{copy.jobsTabProposals}</span>
+                {(proposalsCount > 0 || (unreadByView.proposals ?? 0) > 0) && (
+                  <span className="sh-workspace-tab-count">
+                    ({Math.max(proposalsCount, unreadByView.proposals ?? 0)})
+                  </span>
                 )}
-                <div className="form-grid">
-                  <label className="form-span-2">
-                    {copy.briefTitleLabel}
-                    <input
-                      value={jobTitle}
-                      onChange={(event) => setJobTitle(event.target.value)}
-                      placeholder={copy.briefTitlePlaceholder}
-                      required
-                    />
-                  </label>
-                  <label>
-                    {copy.categoryLabel}
-                    <select
-                      value={jobCategory}
-                      onChange={(event) => setJobCategory(event.target.value)}
-                    >
-                      {categories.map((category) => (
-                        <option key={category} value={category}>
-                          {localizedCategoryLabels[category] ?? categoryLabels[category]}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="form-wide">
-                    {copy.scopeLabel}
-                    <textarea
-                      value={jobDescription}
-                      onChange={(event) =>
-                        setJobDescription(event.target.value)
-                      }
-                      placeholder={copy.scopePlaceholder}
-                      minLength={20}
-                      required
-                    />
-                  </label>
-                  <label>
-                    {copy.minBudgetLabel}
-                    <input
-                      type="number"
-                      value={jobBudgetMin}
-                      onChange={(event) => setJobBudgetMin(event.target.value)}
-                      placeholder="45000"
-                      required
-                    />
-                  </label>
-                  <label>
-                    {copy.maxBudgetLabel}
-                    <input
-                      type="number"
-                      value={jobBudgetMax}
-                      onChange={(event) => setJobBudgetMax(event.target.value)}
-                      placeholder="85000"
-                      required
-                    />
-                  </label>
-                  <label>
-                    {copy.targetDeadlineLabel}
-                    <input
-                      type="date"
-                      value={jobDeadline}
-                      onChange={(event) => setJobDeadline(event.target.value)}
-                      required
-                    />
-                  </label>
-                </div>
-                {jobError && (
-                  <div className="form-error" style={{ marginTop: 8 }}>
-                    {jobError}
-                    {jobErrorNextAction === "verification" && (
-                      <button
-                        type="button"
-                        className="sh-btn sh-btn-secondary"
-                        style={{ marginTop: 10 }}
-                        onClick={() => setView("verification")}
-                      >
-                        {copy.verifyIdentityBtn}
-                      </button>
-                    )}
-                  </div>
-                )}
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button
-                    className="sh-btn sh-btn-primary"
-                    disabled={isLoading || user.kyc?.status !== "VERIFIED"}
-                  >
-                    {user.kyc?.status === "VERIFIED"
-                      ? copy.publishBriefBtn
-                      : "Verify identity first"}
-                  </button>
-                </div>
-              </form>
-            )}
-            <JobsWorkspace
-              role={marketplaceRole}
-              openJobs={jobs}
-              onChanged={loadWorkspace}
-              categories={categories}
-              categoryLabels={localizedCategoryLabels}
-              section="jobs"
-              onBrowseJobs={() => setView("jobs")}
-              onOpenChat={(id, name) => void openChatWithUser(id, name)}
-            />
-          </section>
-        )}
-
-        {view === "proposals" && (
-          <section className="sh-dashboard-wrap">
-            <div className="sh-card-header">
-              <div>
-                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {canHire && canWork
-                    ? copy.proposalsTitleBoth
-                    : canHire
-                      ? copy.proposalsTitleHire
-                      : copy.proposalsTitleWork}
-                </h2>
-                <p className="sh-card-desc">
-                  {canHire && canWork
-                    ? copy.proposalsDescBoth
-                    : canHire
-                      ? copy.proposalsDescHire
-                      : copy.proposalsDescWork}
-                </p>
-              </div>
+              </button>
             </div>
-            <JobsWorkspace
-              role={marketplaceRole}
-              openJobs={jobs}
-              onChanged={loadWorkspace}
-              categories={categories}
-              categoryLabels={localizedCategoryLabels}
-              section="proposals"
-              onBrowseJobs={() => setView("jobs")}
-              onOpenChat={(id, name) => void openChatWithUser(id, name)}
-            />
+
+            {activeJobsTab === "jobs" ? (
+              <div
+                role="tabpanel"
+                aria-labelledby="jobs-tab-overview"
+                className="sh-workspace-tabpanel"
+              >
+                {canHire && (
+                  <form
+                    className="sh-card job-form"
+                    onSubmit={submitJob}
+                    data-tour="jobs-publish-form"
+                  >
+                    <div className="sh-card-header">
+                      <div>
+                        <div className="yk-help-heading-row">
+                          <h3 className="sh-card-title">{copy.publishBriefTitle}</h3>
+                          <ContextualHelpTrigger helpId="jobs-brief-publishing" />
+                        </div>
+                        <p className="sh-card-desc">
+                          {copy.publishBriefDesc}
+                        </p>
+                      </div>
+                      <span className="sh-kbd">{copy.escrowProtectedBadge}</span>
+                    </div>
+                    {user.kyc?.status !== "VERIFIED" && (
+                      <div className="sh-pending-banner" role="alert" style={{ marginBottom: 14 }}>
+                        <ShieldCheck size={16} />
+                        <span style={{ flex: 1 }}>
+                          <strong>{copy.jobKycGateTitle}</strong>{" "}
+                          {user.kyc?.status === "UNDER_REVIEW"
+                            ? copy.jobKycGateReview
+                            : copy.jobKycGateAction}
+                        </span>
+                        <button
+                          type="button"
+                          className="sh-btn sh-btn-secondary"
+                          onClick={() => navigateToView("verification")}
+                        >
+                          {copy.verifyIdentityBtn}
+                        </button>
+                      </div>
+                    )}
+                    <div className="form-grid">
+                      <label className="form-span-2">
+                        {copy.briefTitleLabel}
+                        <input
+                          value={jobTitle}
+                          onChange={(event) => setJobTitle(event.target.value)}
+                          placeholder={copy.briefTitlePlaceholder}
+                          required
+                        />
+                      </label>
+                      <label>
+                        {copy.categoryLabel}
+                        <select
+                          value={jobCategory}
+                          onChange={(event) => setJobCategory(event.target.value)}
+                        >
+                          {categories.map((category) => (
+                            <option key={category} value={category}>
+                              {localizedCategoryLabels[category] ?? categoryLabels[category]}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="form-wide">
+                        {copy.scopeLabel}
+                        <textarea
+                          value={jobDescription}
+                          onChange={(event) =>
+                            setJobDescription(event.target.value)
+                          }
+                          placeholder={copy.scopePlaceholder}
+                          minLength={20}
+                          required
+                        />
+                      </label>
+                      <label>
+                        {copy.minBudgetLabel}
+                        <input
+                          type="number"
+                          value={jobBudgetMin}
+                          onChange={(event) => setJobBudgetMin(event.target.value)}
+                          placeholder="45000"
+                          required
+                        />
+                      </label>
+                      <label>
+                        {copy.maxBudgetLabel}
+                        <input
+                          type="number"
+                          value={jobBudgetMax}
+                          onChange={(event) => setJobBudgetMax(event.target.value)}
+                          placeholder="85000"
+                          required
+                        />
+                      </label>
+                      <label>
+                        {copy.targetDeadlineLabel}
+                        <input
+                          type="date"
+                          value={jobDeadline}
+                          onChange={(event) => setJobDeadline(event.target.value)}
+                          required
+                        />
+                      </label>
+                    </div>
+                    {jobError && (
+                      <div className="form-error" style={{ marginTop: 8 }}>
+                        {jobError}
+                        {jobErrorNextAction === "verification" && (
+                          <button
+                            type="button"
+                            className="sh-btn sh-btn-secondary"
+                            style={{ marginTop: 10 }}
+                            onClick={() => navigateToView("verification")}
+                          >
+                            {copy.verifyIdentityBtn}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        className="sh-btn sh-btn-primary"
+                        disabled={isLoading || user.kyc?.status !== "VERIFIED"}
+                      >
+                        {user.kyc?.status === "VERIFIED"
+                          ? copy.publishBriefBtn
+                          : copy.publishLockedBtn}
+                      </button>
+                    </div>
+                  </form>
+                )}
+                <JobsWorkspace
+                  role={marketplaceRole}
+                  openJobs={jobs}
+                  onChanged={loadWorkspace}
+                  categories={categories}
+                  categoryLabels={localizedCategoryLabels}
+                  section="jobs"
+                  onBrowseJobs={() => selectJobsTab("jobs")}
+                  onOpenChat={(id, name) => void openChatWithUser(id, name)}
+                />
+              </div>
+            ) : (
+              <div
+                role="tabpanel"
+                aria-labelledby="jobs-tab-proposals"
+                className="sh-workspace-tabpanel"
+              >
+                <JobsWorkspace
+                  role={marketplaceRole}
+                  openJobs={jobs}
+                  onChanged={loadWorkspace}
+                  categories={categories}
+                  categoryLabels={localizedCategoryLabels}
+                  section="proposals"
+                  onBrowseJobs={() => selectJobsTab("jobs")}
+                  onOpenChat={(id, name) => void openChatWithUser(id, name)}
+                />
+              </div>
+            )}
           </section>
-        )}
+          );
+        })()}
 
         {view === "gigs" && (
           <section className="sh-dashboard-wrap">
@@ -3119,65 +3328,179 @@ const loadWorkspace = async () => {
           </section>
         )}
 
-        {view === "contracts" && (
+        {(view === "contracts" || view === "escrow" || view === "cases") && (() => {
+          const activeContractsTab: ContractsTabKey =
+            view === "escrow"
+              ? "payments"
+              : view === "cases"
+                ? "disputes"
+                : contractsTab;
+          const selectContractsTab = (nextTab: ContractsTabKey) => {
+            setContractsTab(nextTab);
+            if (view === "escrow" || view === "cases") {
+              setView("contracts");
+            }
+          };
+          const handleContractsTabKeyDown = (
+            event: React.KeyboardEvent<HTMLDivElement>,
+          ) => {
+            const order: ContractsTabKey[] = ["overview", "payments", "disputes"];
+            const currentIdx = order.indexOf(activeContractsTab);
+            let nextIdx = -1;
+            if (event.key === "ArrowRight") nextIdx = (currentIdx + 1) % order.length;
+            if (event.key === "ArrowLeft")
+              nextIdx = (currentIdx - 1 + order.length) % order.length;
+            if (event.key === "Home") nextIdx = 0;
+            if (event.key === "End") nextIdx = order.length - 1;
+            if (nextIdx >= 0) {
+              event.preventDefault();
+              const nextTab = order[nextIdx];
+              selectContractsTab(nextTab);
+              document.getElementById(`contracts-tab-${nextTab}`)?.focus();
+            }
+          };
+          return (
           <section className="sh-dashboard-wrap">
             <div className="sh-card-header">
               <div>
-                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {copy.contractsTitle}
-                </h2>
+                <div className="yk-help-heading-row">
+                  <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
+                    {activeContractsTab === "payments"
+                      ? t.escrow.title
+                      : activeContractsTab === "disputes"
+                        ? copy.casesTitle
+                        : copy.contractsTitle}
+                  </h2>
+                  {activeContractsTab === "disputes" && (
+                    <ContextualHelpTrigger helpId="disputes-resolution" />
+                  )}
+                </div>
                 <p className="sh-card-desc">
-                  {copy.contractsDesc}
+                  {activeContractsTab === "payments"
+                    ? copy.escrowDesc
+                    : activeContractsTab === "disputes"
+                      ? copy.casesDesc
+                      : copy.contractsDesc}
                 </p>
               </div>
-              <span className="sh-kbd">{copy.aaccsaBadge}</span>
+              <span className="sh-kbd">
+                {activeContractsTab === "payments"
+                  ? copy.autoReleaseBadge
+                  : activeContractsTab === "disputes"
+                    ? copy.threeStageEscrowBadge
+                    : copy.aaccsaBadge}
+              </span>
             </div>
-            <ContractsWorkspace
-              userId={user.id}
-              onChanged={loadWorkspace}
-              focusContractId={focusContractId}
-              feeConfig={feeConfig}
-              onOpenEscrow={(contractId) => {
-                setFocusContractId(contractId || null);
-                setView("escrow");
-              }}
-              onOpenChat={(conversationId) => {
-                setFocusChatConversationId(conversationId);
-                setView("chat");
-              }}
-            />
-          </section>
-        )}
 
-        {view === "escrow" && (
-          <section className="sh-dashboard-wrap">
-            <div className="sh-card-header">
-              <div>
-                <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                  {t.escrow.title}
-                </h2>
-                <p className="sh-card-desc">
-                  {copy.escrowDesc}
-                </p>
-              </div>
-              <span className="sh-kbd">{copy.autoReleaseBadge}</span>
+            <div
+              className="sh-workspace-tablist"
+              role="tablist"
+              aria-label={copy.contractsTabsAria}
+              onKeyDown={handleContractsTabKeyDown}
+            >
+              <button
+                type="button"
+                id="contracts-tab-overview"
+                role="tab"
+                aria-selected={activeContractsTab === "overview"}
+                tabIndex={activeContractsTab === "overview" ? 0 : -1}
+                className="sh-workspace-tab"
+                onClick={() => selectContractsTab("overview")}
+              >
+                <span>{copy.contractsTabOverview}</span>
+              </button>
+              <button
+                type="button"
+                id="contracts-tab-payments"
+                role="tab"
+                aria-selected={activeContractsTab === "payments"}
+                tabIndex={activeContractsTab === "payments" ? 0 : -1}
+                className="sh-workspace-tab"
+                onClick={() => selectContractsTab("payments")}
+              >
+                <span>{copy.contractsTabPayments}</span>
+                {(unreadByView.escrow ?? 0) > 0 && (
+                  <span className="sh-workspace-tab-count">
+                    ({unreadByView.escrow})
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                id="contracts-tab-disputes"
+                role="tab"
+                aria-selected={activeContractsTab === "disputes"}
+                tabIndex={activeContractsTab === "disputes" ? 0 : -1}
+                className="sh-workspace-tab"
+                onClick={() => selectContractsTab("disputes")}
+              >
+                <span>{copy.contractsTabDisputes}</span>
+                {(unreadByView.cases ?? 0) > 0 && (
+                  <span className="sh-workspace-tab-count">
+                    ({unreadByView.cases})
+                  </span>
+                )}
+              </button>
             </div>
-            <EscrowWorkspace
-              userId={user.id}
-              onChanged={loadWorkspace}
-              focusContractId={focusContractId}
-              feeConfig={feeConfig}
-              onOpenContract={(contractId) => {
-                if (!contractId) {
-                  setFocusContractId(null);
-                } else {
-                  setFocusContractId(contractId);
-                  setView("contracts");
-                }
-              }}
-            />
+
+            {activeContractsTab === "overview" && (
+              <div
+                role="tabpanel"
+                aria-labelledby="contracts-tab-overview"
+                className="sh-workspace-tabpanel"
+              >
+                <ContractsWorkspace
+                  userId={user.id}
+                  onChanged={loadWorkspace}
+                  focusContractId={focusContractId}
+                  feeConfig={feeConfig}
+                  onOpenEscrow={(contractId) => {
+                    setFocusContractId(contractId || null);
+                    selectContractsTab("payments");
+                  }}
+                  onOpenChat={(conversationId) => {
+                    setFocusChatConversationId(conversationId);
+                    navigateToView("chat");
+                  }}
+                />
+              </div>
+            )}
+
+            {activeContractsTab === "payments" && (
+              <div
+                role="tabpanel"
+                aria-labelledby="contracts-tab-payments"
+                className="sh-workspace-tabpanel"
+              >
+                <EscrowWorkspace
+                  userId={user.id}
+                  onChanged={loadWorkspace}
+                  focusContractId={focusContractId}
+                  feeConfig={feeConfig}
+                  onOpenContract={(contractId) => {
+                    if (!contractId) {
+                      setFocusContractId(null);
+                    } else {
+                      setFocusContractId(contractId);
+                      selectContractsTab("overview");
+                    }
+                  }}
+                />
+              </div>
+            )}
+
+            {activeContractsTab === "disputes" && (
+              <div
+                role="tabpanel"
+                aria-labelledby="contracts-tab-disputes"
+                className="sh-workspace-tabpanel"
+              >
+                <DisputesWorkspace />
+              </div>
+            )}
           </section>
-        )}
+          );
+        })()}
 
         {view === "wallet" && (
           <section className="sh-dashboard-wrap">
@@ -3190,7 +3513,7 @@ const loadWorkspace = async () => {
                   {copy.walletDesc}
                 </p>
               </div>
-              <span className="sh-kbd sh-mono">
+              <span className="sh-kbd sh-tabular">
                 ETB {(wallet.balanceMinor / 100).toLocaleString()}
               </span>
             </div>
@@ -3233,26 +3556,6 @@ const loadWorkspace = async () => {
               </span>
             </div>
             <BrowserVerification />
-          </section>
-        )}
-
-        {view === "cases" && (
-          <section className="sh-dashboard-wrap">
-            <div className="sh-card-header">
-              <div>
-                <div className="yk-help-heading-row">
-                  <h2 className="sh-card-title" style={{ fontSize: "1.25rem" }}>
-                    {copy.casesTitle}
-                  </h2>
-                  <ContextualHelpTrigger helpId="disputes-resolution" />
-                </div>
-                <p className="sh-card-desc">
-                  {copy.casesDesc}
-                </p>
-              </div>
-              <span className="sh-kbd">{copy.threeStageEscrowBadge}</span>
-            </div>
-            <DisputesWorkspace />
           </section>
         )}
 
@@ -3354,11 +3657,8 @@ const loadWorkspace = async () => {
             <button
               key={item.view}
               type="button"
-              className={view === item.view && !mobileDrawerOpen ? "active" : ""}
-              onClick={() => {
-                setView(item.view);
-                setMobileDrawerOpen(false);
-              }}
+              className={view === item.view ? "active" : ""}
+              onClick={() => navigateToView(item.view)}
               aria-label={
                 activityLabel ? `${item.label} — ${activityLabel}` : undefined
               }
@@ -3371,18 +3671,6 @@ const loadWorkspace = async () => {
             </button>
           );
         })}
-        <button
-          type="button"
-          className={mobileDrawerOpen ? "active" : ""}
-          onClick={() => setMobileDrawerOpen((o) => !o)}
-          aria-expanded={mobileDrawerOpen}
-          aria-controls="workspace-mobile-drawer"
-        >
-          <span>
-            <Menu size={18} />
-          </span>
-          <small>{t.workspace.nav.menu}</small>
-        </button>
       </nav>
       <ProductTourOverlay />
     </div>

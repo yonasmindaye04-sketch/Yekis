@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ethiopianToGregorian,
+  formatEthiopianDate,
   getEthiopianMonthCells,
   getEthiopianMonthRange,
   getFiscalQuarter,
@@ -9,7 +10,7 @@ import {
   getFiscalYearInfo,
   gregorianToEthiopian,
 } from "../src/lib/ethiopianCalendar";
-import { getTodayAddisIso } from "../src/components/dashboard/KanbanBoardView";
+import { getTodayAddisIso } from "../src/components/dashboard/dashboardData";
 
 describe("Ethiopian calendar & fiscal arithmetic (Decision 12)", () => {
   it("converts Meskerem 1 as Sep 11 in normal years and Sep 12 in Gregorian leap-adjacent years", () => {
@@ -59,6 +60,14 @@ describe("Ethiopian calendar & fiscal arithmetic (Decision 12)", () => {
 
     expect(getFiscalQuarter("2026-10-10").quarter).toBe(1);
     expect(getFiscalQuarter("2026-10-11").quarter).toBe(2); // Tikimt 1, 2019 E.C.
+  });
+
+  it("formats 2026-11-27 as Hidar 18, 2019 E.C. and binds EFY 2019 to 2026-07-08 through 2027-07-07", () => {
+    expect(gregorianToEthiopian("2026-11-27")).toEqual({ year: 2019, month: 3, day: 18 });
+    expect(formatEthiopianDate("2026-11-27", "long")).toBe("Hidar 18, 2019 E.C.");
+    const efy2019 = getFiscalYearInfo(2019);
+    expect(efy2019.startIso).toBe("2026-07-08");
+    expect(efy2019.endIso).toBe("2027-07-07");
   });
 
   it("rolls over day boundaries according to Africa/Addis_Ababa (UTC+3)", () => {

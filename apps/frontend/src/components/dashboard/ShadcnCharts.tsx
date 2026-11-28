@@ -283,7 +283,7 @@ export function InteractiveCashflowAreaChart({
           <span className="sh-series-swatch emerald" />
           <span className="sh-series-meta">
             <small>{copy.escrowFunded(range.toUpperCase())}</small>
-            <strong className="sh-mono">ETB {totalInflow.toLocaleString()}</strong>
+            <strong className="sh-tabular">ETB {totalInflow.toLocaleString()}</strong>
           </span>
         </button>
 
@@ -298,13 +298,13 @@ export function InteractiveCashflowAreaChart({
           <span className="sh-series-swatch teal" />
           <span className="sh-series-meta">
             <small>{copy.releasedToTalent(range.toUpperCase())}</small>
-            <strong className="sh-mono">ETB {totalReleased.toLocaleString()}</strong>
+            <strong className="sh-tabular">ETB {totalReleased.toLocaleString()}</strong>
           </span>
         </button>
 
         <div className="sh-chart-live-readout">
           <small>{hoverIdx !== null ? copy.periodLabel(activePoint.label) : copy.latestLabel(activePoint.label)}</small>
-          <span className="sh-mono">
+          <span className="sh-tabular">
             {copy.inPrefix} ETB {activePoint.escrowInflowETB.toLocaleString()} · {copy.outPrefix} ETB{" "}
             {activePoint.payoutReleasedETB.toLocaleString()}
           </span>
@@ -508,7 +508,7 @@ export function InteractiveRailVelocityBarChart({
             {copy.railMixDesc(range.toUpperCase())}
           </p>
         </div>
-        <span className="sh-mono sh-text-muted" style={{ fontSize: "0.76rem" }}>
+        <span className="sh-tabular sh-text-muted" style={{ fontSize: "0.76rem" }}>
           {copy.milestonesSettled(active.milestonesCompleted)}
         </span>
       </div>
@@ -523,15 +523,15 @@ export function InteractiveRailVelocityBarChart({
       <div className="sh-rail-legend-row">
         <span className="sh-rail-legend-item">
           <i style={{ background: "#16a34a" }} /> Telebirr:{" "}
-          <b className="sh-mono">ETB {active.telebirrETB.toLocaleString()}</b>
+          <b className="sh-tabular">ETB {active.telebirrETB.toLocaleString()}</b>
         </span>
         <span className="sh-rail-legend-item">
           <i style={{ background: "#0d9488" }} /> CBE Birr:{" "}
-          <b className="sh-mono">ETB {active.cbeBirrETB.toLocaleString()}</b>
+          <b className="sh-tabular">ETB {active.cbeBirrETB.toLocaleString()}</b>
         </span>
         <span className="sh-rail-legend-item">
           <i style={{ background: "#64748b" }} /> M-Pesa:{" "}
-          <b className="sh-mono">ETB {active.mpesaETB.toLocaleString()}</b>
+          <b className="sh-tabular">ETB {active.mpesaETB.toLocaleString()}</b>
         </span>
       </div>
 

@@ -161,6 +161,16 @@ export type FullPlatformCopy = {
   targetDeadlineLabel: string;
   verifyIdentityBtn: string;
   publishBriefBtn: string;
+  publishLockedBtn: string;
+  jobKycGateTitle: string;
+  jobKycGateReview: string;
+  jobKycGateAction: string;
+  kycStatusVerified: string;
+  kycStatusRequired: string;
+  kycVerifyTooltip: string;
+  kycVerifiedTooltip: string;
+  servicesNavLabel: string;
+  walletClientNavLabel: string;
   proposalsTitleBoth: string;
   proposalsTitleHire: string;
   proposalsTitleWork: string;
@@ -177,6 +187,16 @@ export type FullPlatformCopy = {
   casesTitle: string;
   casesDesc: string;
   threeStageEscrowBadge: string;
+  jobsTabsAria: string;
+  jobsTabMyJobs: string;
+  jobsTabFindWork: string;
+  jobsTabProposals: string;
+  contractsTabsAria: string;
+  contractsTabOverview: string;
+  contractsTabPayments: string;
+  contractsTabDisputes: string;
+  accountMenuAria: string;
+  signOutLabel: string;
 };
 
 export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
@@ -222,7 +242,7 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     heroEyebrow: "Yekis jobs",
     heroTitle: "Work with clarity.",
     heroSubtitle:
-      "Find trusted talent, manage milestone work, and keep payments visible from brief to delivery.",
+      "Find trusted talent, manage milestone work, and keep payments visible from job post to delivery.",
     heroProof1: "Jobs, contracts, and escrow in one workspace.",
     heroProof2: "Built for Ethiopian clients and freelancers.",
     bothRoleTitle: "Hire talent and take on work with one account",
@@ -305,18 +325,18 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     editProfileBtn: "Edit profile",
     dismissBannerTitle: "Dismiss — it will not come back until your profile is complete",
     dismissBannerAria: "Dismiss profile setup banner",
-    jobsTitleBoth: "Marketplace Briefs & Your Posts",
-    jobsTitleHire: "Job Postings & Talent Pipeline",
-    jobsTitleWork: "Browse Open Marketplace Briefs",
+    jobsTitleBoth: "Marketplace Jobs & Your Posts",
+    jobsTitleHire: "Jobs & Talent Pipeline",
+    jobsTitleWork: "Browse Open Jobs",
     jobsDescBoth:
-      "Take on open escrow-backed opportunities, or post a brief and manage your own talent pipeline.",
-    jobsDescHire: "Publish structured milestone briefs and shortlist verified Ethiopian freelancers.",
+      "Take on open escrow-backed opportunities, or post a job and manage your own talent pipeline.",
+    jobsDescHire: "Post structured milestone jobs and shortlist verified Ethiopian freelancers.",
     jobsDescWork: "Apply to milestone-funded opportunities across Ethiopia's verified marketplace.",
-    openBriefsCount: (n) => `${n} Open Briefs`,
-    publishBriefTitle: "Publish New Job Brief",
+    openBriefsCount: (n) => `${n} Open Jobs`,
+    publishBriefTitle: "Post a Job",
     publishBriefDesc: "Define project scope, ETB budget range, and target milestone delivery date",
     escrowProtectedBadge: "Escrow Protected",
-    briefTitleLabel: "Brief Title",
+    briefTitleLabel: "Job Title",
     briefTitlePlaceholder: "e.g., Telebirr H5 Merchant Checkout & Reconciliation API",
     categoryLabel: "Category",
     scopeLabel: "Scope & Deliverable Specification",
@@ -325,11 +345,21 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     maxBudgetLabel: "Maximum Budget (ETB)",
     targetDeadlineLabel: "Target Deadline",
     verifyIdentityBtn: "Verify your identity",
-    publishBriefBtn: "Publish Job Brief",
+    publishBriefBtn: "Post Job",
+    publishLockedBtn: "Verify identity first",
+    jobKycGateTitle: "Identity verification required before posting a job.",
+    jobKycGateReview: "Your KYC verification is under staff review. Posting unlocks once approved — we will notify you.",
+    jobKycGateAction: "Verify your identity first so freelancers know jobs come from verified clients.",
+    kycStatusVerified: "KYC: Verified",
+    kycStatusRequired: "KYC: Required",
+    kycVerifyTooltip: "Complete identity verification",
+    kycVerifiedTooltip: "Identity verified",
+    servicesNavLabel: "Services",
+    walletClientNavLabel: "Wallet",
     proposalsTitleBoth: "Proposals You Sent & Received",
     proposalsTitleHire: "Talent Pipeline",
     proposalsTitleWork: "My Submitted Proposals",
-    proposalsDescBoth: "Track the bids you have sent, and review the proposals that came in against your own briefs.",
+    proposalsDescBoth: "Track the bids you have sent, and review the proposals that came in against your own jobs.",
     proposalsDescHire: "Review incoming proposals, shortlist candidates, and generate escrow contracts.",
     proposalsDescWork: "Track the milestone quotes you have sent and the client's decision on each one.",
     contractsTitle: "Contracts & Service Agreements",
@@ -345,6 +375,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesDesc:
       "Negotiate milestone adjustments, submit immutable evidence, and track staff mediation or AACCSA arbitration.",
     threeStageEscrowBadge: "3-Stage Escrow Protection",
+    jobsTabsAria: "Jobs sections",
+    jobsTabMyJobs: "My jobs",
+    jobsTabFindWork: "Find work",
+    jobsTabProposals: "Proposals",
+    contractsTabsAria: "Contracts sections",
+    contractsTabOverview: "Overview",
+    contractsTabPayments: "Payments",
+    contractsTabDisputes: "Disputes",
+    accountMenuAria: "Account menu",
+    signOutLabel: "Sign out",
   },
   am: {
     roles: {
@@ -469,14 +509,14 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     editProfileBtn: "መገለጫ አርትዕ",
     dismissBannerTitle: "አስወግድ — መገለጫዎ እስኪጠናቀቅ ድረስ አይመለስም",
     dismissBannerAria: "የመገለጫ ማጠናቀቂያ ማስታወቂያውን ዝጋ",
-    jobsTitleBoth: "የገበያ ቦታ ዝርዝሮች እና የእርስዎ ልጥፎች",
-    jobsTitleHire: "የሥራ ማስታወቂያዎች እና የባለሙያዎች ዝርዝር",
-    jobsTitleWork: "ክፍት የገበያ ቦታ ሥራዎችን ያስሱ",
-    jobsDescBoth: "በኤስክሮ የተደገፉ ክፍት ዕድሎችን ይቀበሉ ወይም ዝርዝር ለጥፈው የራስዎን ቡድን ያስተዳድሩ።",
-    jobsDescHire: "የተዋቀሩ የምዕራፍ ዝርዝሮችን ያትሙ እና የተረጋገጡ ኢትዮጵያውያን ባለሙያዎችን ይምረጡ።",
+    jobsTitleBoth: "የገበያ ቦታ ሥራዎች እና የእርስዎ ልጥፎች",
+    jobsTitleHire: "ሥራዎች እና የባለሙያዎች ዝርዝር",
+    jobsTitleWork: "ክፍት ሥራዎችን ያስሱ",
+    jobsDescBoth: "በኤስክሮ የተደገፉ ክፍት ዕድሎችን ይቀበሉ ወይም ሥራ ለጥፈው የራስዎን ቡድን ያስተዳድሩ።",
+    jobsDescHire: "የተዋቀሩ የምዕራፍ ሥራዎችን ይለጥፉ እና የተረጋገጡ ኢትዮጵያውያን ባለሙያዎችን ይምረጡ።",
     jobsDescWork: "በኢትዮጵያ በተረጋገጠ የገበያ ቦታ ላይ በምዕራፍ ለሚከፈሉ ዕድሎች ያመልክቱ።",
     openBriefsCount: (n) => `${n} ክፍት ሥራዎች`,
-    publishBriefTitle: "አዲስ የሥራ ዝርዝር ያትሙ",
+    publishBriefTitle: "አዲስ ሥራ ይለጥፉ",
     publishBriefDesc: "የፕሮጀክቱን ወሰን፣ የብር በጀት ክልል እና የምዕራፍ ማስረከቢያ ቀንን ይግለጹ",
     escrowProtectedBadge: "በኤስክሮ የተጠበቀ",
     briefTitleLabel: "የሥራ ርዕስ",
@@ -488,7 +528,17 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     maxBudgetLabel: "ከፍተኛ በጀት (ብር)",
     targetDeadlineLabel: "የታለመ የማጠናቀቂያ ቀን",
     verifyIdentityBtn: "ማንነትዎን ያረጋግጡ",
-    publishBriefBtn: "የሥራ ዝርዝሩን ያትሙ",
+    publishBriefBtn: "ሥራ ይለጥፉ",
+    publishLockedBtn: "መጀመሪያ ማንነትዎን ያረጋግጡ",
+    jobKycGateTitle: "ሥራ ከመለጠፍዎ በፊት የማንነት ማረጋገጫ ያስፈልጋል።",
+    jobKycGateReview: "የKYC ማረጋገጫዎ በባለሙያ እየተገመገመ ነው። ሲጸድቅ መለጠፍ ይከፈታል — እናሳውቅዎታለን።",
+    jobKycGateAction: "ባለሙያዎች ሥራው ከተረጋገጠ ደንበኛ መሆኑን እንዲያውቁ መጀመሪያ ማንነትዎን ያረጋግጡ።",
+    kycStatusVerified: "ማንነት፡ ተረጋግጧል",
+    kycStatusRequired: "ማንነት፡ ያስፈልጋል",
+    kycVerifyTooltip: "የማንነት ማረጋገጫን ያጠናቅቁ",
+    kycVerifiedTooltip: "ማንነት ተረጋግጧል",
+    servicesNavLabel: "አገልግሎቶች",
+    walletClientNavLabel: "ዋሌት",
     proposalsTitleBoth: "የላኳቸው እና የተቀበሏቸው የሥራ ሐሳቦች",
     proposalsTitleHire: "የባለሙያዎች ዝርዝር",
     proposalsTitleWork: "ያቀረብኳቸው የሥራ ሐሳቦች",
@@ -505,6 +555,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "የክርክር አፈታት እና የሽምግልና ማዕከል",
     casesDesc: "የምዕራፍ ማስተካከያዎችን ይደራደሩ፣ የማይለወጡ ማስረጃዎችን ያቅርቡ እና የሽምግልና ሂደትን ይከታተሉ።",
     threeStageEscrowBadge: "ባለ 3-ደረጃ የኤስክሮ ጥበቃ",
+    jobsTabsAria: "የሥራ ክፍሎች",
+    jobsTabMyJobs: "የእኔ ሥራዎች",
+    jobsTabFindWork: "ሥራ ፈልግ",
+    jobsTabProposals: "ፕሮፖዛሎች",
+    contractsTabsAria: "የውል ክፍሎች",
+    contractsTabOverview: "አጠቃላይ እይታ",
+    contractsTabPayments: "ክፍያዎች",
+    contractsTabDisputes: "ክርክሮች",
+    accountMenuAria: "የመለያ ዝርዝር",
+    signOutLabel: "ውጣ",
   },
   om: {
     roles: {
@@ -630,14 +690,14 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     editProfileBtn: "Piroofaayilii gulaali",
     dismissBannerTitle: "Balleessi — hanga piroofaayiliin kee guutamutti hin deebi'u",
     dismissBannerAria: "Beeksisa qophii piroofaayilii cufi",
-    jobsTitleBoth: "Ibsa Hojii Gabaa fi Maxxansa Keessan",
-    jobsTitleHire: "Maxxansa Hojii fi Tarree Ogeeyyii",
-    jobsTitleWork: "Ibsa Hojii Gabaa Banaa Sakatta'aa",
-    jobsDescBoth: "Carraawwan iskuuroon deeggaraman fudhadhaa, ykn ibsa maxxansaatii garee keessan bulchaa.",
-    jobsDescHire: "Ibsa boqonnaa qindaa'aa maxxansaatii ogeeyyii Itoophiyaa mirkanaa'an filadhaa.",
+    jobsTitleBoth: "Hojiiwwan Gabaa fi Maxxansa Keessan",
+    jobsTitleHire: "Hojiiwwan fi Tarree Ogeeyyii",
+    jobsTitleWork: "Hojiiwwan Banaa Sakatta'aa",
+    jobsDescBoth: "Carraawwan iskuuroon deeggaraman fudhadhaa, ykn hojii maxxansaatii garee keessan bulchaa.",
+    jobsDescHire: "Hojiiwwan boqonnaa qindaa'aa maxxansaatii ogeeyyii Itoophiyaa mirkanaa'an filadhaa.",
     jobsDescWork: "Carraawwan boqonnaadhaan kaffalaman irratti iyyadhaa.",
-    openBriefsCount: (n) => `Ibsa Hojii Banaa ${n}`,
-    publishBriefTitle: "Ibsa Hojii Haaraa Maxxansi",
+    openBriefsCount: (n) => `Hojii Banaa ${n}`,
+    publishBriefTitle: "Hojii Haaraa Maxxansi",
     publishBriefDesc: "Daangaa pirojektii, baajata ETB fi guyyaa boqonnaan itti dhiyaatu ibsaa",
     escrowProtectedBadge: "Iskuuroodhaan Eegame",
     briefTitleLabel: "Mataduree Hojii",
@@ -649,7 +709,17 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     maxBudgetLabel: "Baajata Guddaa (ETB)",
     targetDeadlineLabel: "Guyyaa Xumuraa Karoorfame",
     verifyIdentityBtn: "Eenyummaa keessan mirkaneessaa",
-    publishBriefBtn: "Ibsa Hojii Maxxansi",
+    publishBriefBtn: "Hojii Maxxansi",
+    publishLockedBtn: "Dura eenyummaa mirkaneessi",
+    jobKycGateTitle: "Hojii maxxansuuf dura mirkaneessi eenyummaa barbaachisa.",
+    jobKycGateReview: "Mirkaneessi KYC keessan gamaaggamamaa jira. Yeroo mirkanaa'u ni banama — isin beeksifna.",
+    jobKycGateAction: "Ogeeyyiin hojichi maamila mirkanaa'e irraa dhufuu isaa akka beekan dura eenyummaa keessan mirkaneessaa.",
+    kycStatusVerified: "KYC: Mirkanaa'e",
+    kycStatusRequired: "KYC: Barbaachisaa",
+    kycVerifyTooltip: "Mirkaneessa eenyummaa xumuraa",
+    kycVerifiedTooltip: "Eenyummaan mirkanaa'eera",
+    servicesNavLabel: "Tajaajiloota",
+    walletClientNavLabel: "Boorsaa",
     proposalsTitleBoth: "Yaada Hojii Ergitan fi Argattan",
     proposalsTitleHire: "Tarree Ogeeyyii",
     proposalsTitleWork: "Yaada Hojii Ani Erge",
@@ -666,6 +736,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "Wiirtuu Furmaata Waldiddaa fi Araaraa",
     casesDesc: "Sirreeffama boqonnaa irratti mari'adhaa, ragaa hin jijjiiramne dhiyeessaa, jaarsummaa hojjettootaa ykn araara AACCSA hordofaa.",
     threeStageEscrowBadge: "Eegumsa Iskuuroo Sadarkaa-3",
+    jobsTabsAria: "Kutaalee hojii",
+    jobsTabMyJobs: "Hojiiwwan koo",
+    jobsTabFindWork: "Hojii barbaadi",
+    jobsTabProposals: "Yaadolee",
+    contractsTabsAria: "Kutaalee waliigaltee",
+    contractsTabOverview: "Ilaalcha waliigalaa",
+    contractsTabPayments: "Kaffaltiiwwan",
+    contractsTabDisputes: "Falmiiwwan",
+    accountMenuAria: "Baafata herregaa",
+    signOutLabel: "Bahi",
   },
   ti: {
     roles: {
@@ -790,14 +870,14 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     editProfileBtn: "ፕሮፋይል ኣርትዕ",
     dismissBannerTitle: "ኣወግድ — ፕሮፋይልኩም ክሳብ ዝዛዘም ኣይምለስን እዩ",
     dismissBannerAria: "መፍለጢ ምድላው ፕሮፋይል ዕጾ",
-    jobsTitleBoth: "ዝርዝራት ስራሕ ዕዳጋን ልጥፋትኩምን",
-    jobsTitleHire: "ምልክታታት ስራሕን መስመር ክኢላታትን",
-    jobsTitleWork: "ክፉታት ስራሕቲ ዕዳጋ ዳህስሱ",
-    jobsDescBoth: "ብኤስክሮ ዝተሓገዙ ክፉታት ዕድላት ውሰዱ ወይ ዝርዝር ስራሕ ለጢፍኩም ጉጅለኹም ኣመሓድሩ።",
-    jobsDescHire: "ዝተዋደዱ ናይ ምዕራፍ ዝርዝራት ኣሕትሙ ከምኡ'ውን ዝተረጋገጹ ኢትዮጵያውያን ክኢላታት ምረጹ።",
+    jobsTitleBoth: "ስራሕቲ ዕዳጋን ልጥፋትኩምን",
+    jobsTitleHire: "ስራሕትን መስመር ክኢላታትን",
+    jobsTitleWork: "ክፉታት ስራሕቲ ዳህስሱ",
+    jobsDescBoth: "ብኤስክሮ ዝተሓገዙ ክፉታት ዕድላት ውሰዱ ወይ ስራሕ ለጢፍኩም ጉጅለኹም ኣመሓድሩ።",
+    jobsDescHire: "ዝተዋደዱ ናይ ምዕራፍ ስራሕቲ ለጥፉ ከምኡ'ውን ዝተረጋገጹ ኢትዮጵያውያን ክኢላታት ምረጹ።",
     jobsDescWork: "ኣብ ዝተረጋገጸ ዕዳጋ ኢትዮጵያ ብምዕራፍ ንዝኽፈሉ ዕድላት ኣመልክቱ።",
     openBriefsCount: (n) => `${n} ክፉታት ስራሕቲ`,
-    publishBriefTitle: "ሓድሽ ዝርዝር ስራሕ ኣሕትሙ",
+    publishBriefTitle: "ሓድሽ ስራሕ ለጥፉ",
     publishBriefDesc: "ወሰን ፕሮጀክት፣ ደረት ባጀት ብር ከምኡ'ውን ዕለት ርክክብ ምዕራፍ ግለጹ",
     escrowProtectedBadge: "ብኤስክሮ ዝተሓለወ",
     briefTitleLabel: "ኣርእስቲ ስራሕ",
@@ -809,7 +889,17 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     maxBudgetLabel: "ዝለዓለ ባጀት (ብር)",
     targetDeadlineLabel: "ዝተተለመ ዕለት መወዳእታ",
     verifyIdentityBtn: "መንነትኩም ኣረጋግጹ",
-    publishBriefBtn: "ዝርዝር ስራሕ ኣሕትም",
+    publishBriefBtn: "ስራሕ ለጥፍ",
+    publishLockedBtn: "መጀመርታ መንነትኩም ኣረጋግጹ",
+    jobKycGateTitle: "ስራሕ ቅድሚ ምልጣፍኩም ምርግጋጽ መንነት የድሊ።",
+    jobKycGateReview: "ምርግጋጽ KYCኩም ብሰራሕተኛታት ይምርመር ኣሎ። ምስ ጸደቐ ክኽፈት እዩ — ክንሕብረኩም ኢና።",
+    jobKycGateAction: "ክኢላታት ስራሕ ካብ ዝተረጋገጸ ዓሚል ከም ዝመጸ ክፈልጡ መጀመርታ መንነትኩም ኣረጋግጹ።",
+    kycStatusVerified: "KYC: ተረጋጊጹ",
+    kycStatusRequired: "KYC: የድሊ",
+    kycVerifyTooltip: "ምርግጋጽ መንነት ዛዝሙ",
+    kycVerifiedTooltip: "መንነት ተረጋጊጹ",
+    servicesNavLabel: "ኣገልግሎታት",
+    walletClientNavLabel: "ቦርሳ",
     proposalsTitleBoth: "ዝለኣኽኩምዎምን ዝተቐበልኩምዎምን እማመታት",
     proposalsTitleHire: "መስመር ክኢላታት",
     proposalsTitleWork: "ዝለኣኽክዎም እማመታት",
@@ -826,5 +916,15 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "ማእከል ምፍታሕ ክርክርን ሽምግልናን",
     casesDesc: "ኣብ ምትዕርራይ ምዕራፍ ተዘራረቡ፣ ዘይቅየር መርትዖ ኣቕርቡ፣ ሽምግልና ወይ ግልግል AACCSA ተኸታተሉ።",
     threeStageEscrowBadge: "ሓለዋ ኤስክሮ በዓል 3-ደረጃ",
+    jobsTabsAria: "ክፋላት ስራሕ",
+    jobsTabMyJobs: "ስራሕተይ",
+    jobsTabFindWork: "ስራሕ ድለ",
+    jobsTabProposals: "ፕሮፖዛላት",
+    contractsTabsAria: "ክፋላት ውዕል",
+    contractsTabOverview: "ሓፈሻዊ ትርኢት",
+    contractsTabPayments: "ክፍሊታት",
+    contractsTabDisputes: "ክርክራት",
+    accountMenuAria: "ዝርዝር ኣካውንት",
+    signOutLabel: "ውጻእ",
   },
 };
