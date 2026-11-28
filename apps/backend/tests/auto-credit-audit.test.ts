@@ -2,6 +2,12 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import request from "supertest";
+import type { Express } from "express";
+import { prisma } from "../src/lib/prisma.js";
+import { buildApp } from "../src/app.js";
+import { hasPermission, ROLE_PERMISSIONS, STAFF_ROLES } from "../src/modules/admin/permissions.js";
+import { createAuthTokens } from "../src/modules/auth/auth.service.js";
 import {
   assertTopUpIsCreditable,
   isSimulatedProviderTransactionId,
@@ -145,9 +151,86 @@ describe("LOCK (source text) — no auto-credit path is unguarded", () => {
     expect(TOPUP_SERVICE).toMatch(/NODE_ENV !== "production"/);
   });
 
-  it("the staff approval route is staff-only", () => {
-    const s = TOPUP_ROUTES.indexOf("/:topUpId/approve");
-    const segment = TOPUP_ROUTES.slice(s, s + 320);
-    expect(segment).toMatch(/requireStaffRole\(/);
+  it("grants topups.review strictly to COMPLIANCE_OFFICER, COMPLIANCE_ADMIN, ADMIN, and SUPER_ADMIN and enforces it on POST /api/v1/wallet/topups/:topUpId/approve", async () => {
+    const allowedRoles = ["SUPER_ADMIN", "ADMIN", "COMPLIANCE_ADMIN", "COMPLIANCE_OFFICER"];
+    const deniedRoles = ["OPERATIONS_ADMIN", "FINANCE_ADMIN", "DISPUTE_MEDIATOR", "SUPPORT"];
+
+    expect([...STAFF_ROLES].sort()).toEqual([...allowedRoles, ...deniedRoles].sort());
+    for (const role of allowedRoles) {
+      expect(hasPermission(role, "topups.review")).toBe(true);
+      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).toContain("topups.review");
+    }
+    for (const role of deniedRoles) {
+      expect(hasPermission(role, "topups.review")).toBe(false);
+      expect(ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS]).not.toContain("topups.review");
+    }
+
+    expect(TOPUP_ROUTES).toMatch(
+      /\/:topUpId\/approve[\s\S]{0,160}requirePermission\("topups\.review"\)/,
+    );
+
+    const app: Express = buildApp();
+    const stamp = Date.now();
+    const createdIds: string[] = [];
+    let phoneSeq = 0;
+
+    async function tokenForUser(staffRole: string | null) {
+      phoneSeq += 1;
+      const user = await prisma.user.create({
+        data: {
+          email: `audit-topup-${(staffRole ?? "client").toLowerCase()}-${stamp}@test.et`,
+          phone: `+2519${String(20000000 + ((stamp % 9000000) + phoneSeq * 13) % 9000000)}`,
+          passwordHash: "not-a-real-hash",
+          role: "CLIENT",
+          staffRole,
+          wallet: { create: { balanceMinor: 0 } },
+        } as never,
+      });
+      createdIds.push(user.id);
+      const { accessToken } = await createAuthTokens(
+        { id: user.id, role: "CLIENT", ucid: null, ...(staffRole ? { staffRole } : {}) },
+        ["pwd"],
+      );
+      return accessToken;
+    }
+
+    try {
+      const clientToken = await tokenForUser(null);
+      const clientRes = await request(app)
+        .post("/api/v1/wallet/topups/audit-nonexistent/approve")
+        .set("Authorization", `Bearer ${clientToken}`)
+        .send({});
+      expect(clientRes.status).toBe(403);
+      expect(clientRes.body.error).toBe("PERMISSION_DENIED");
+      expect(clientRes.body.required).toBe("topups.review");
+
+      for (const role of deniedRoles) {
+        const token = await tokenForUser(role);
+        const res = await request(app)
+          .post("/api/v1/wallet/topups/audit-nonexistent/approve")
+          .set("Authorization", `Bearer ${token}`)
+          .send({});
+        expect(res.status, `${role} must be refused on top-up approval`).toBe(403);
+        expect(res.body.error).toBe("PERMISSION_DENIED");
+        expect(res.body.required).toBe("topups.review");
+      }
+
+      for (const role of allowedRoles) {
+        const token = await tokenForUser(role);
+        const res = await request(app)
+          .post("/api/v1/wallet/topups/audit-nonexistent/approve")
+          .set("Authorization", `Bearer ${token}`)
+          .send({});
+        expect(res.status, `${role} holds topups.review and must pass the permission guard`).not.toBe(403);
+      }
+    } finally {
+      if (createdIds.length) {
+        await prisma.$transaction([
+          prisma.wallet.deleteMany({ where: { userId: { in: createdIds } } }),
+          prisma.auditLog.deleteMany({ where: { userId: { in: createdIds } } }),
+          prisma.user.deleteMany({ where: { id: { in: createdIds } } }),
+        ]);
+      }
+    }
   });
 });
