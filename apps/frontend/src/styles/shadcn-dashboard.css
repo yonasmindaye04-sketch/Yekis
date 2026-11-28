@@ -4516,7 +4516,7 @@ dialog.sh-kanban-dialog::backdrop {
     flex: 1 1 0%;
     min-width: 0 !important;
     min-height: 46px;
-    padding: 6px 4px !important;
+    padding: 6px 2px !important;
     border-radius: 10px;
     display: flex;
     flex-direction: column;
@@ -4526,10 +4526,15 @@ dialog.sh-kanban-dialog::backdrop {
   }
 
   .platform-shell.sh-shell .platform-mobile-nav button small {
-    font-size: 0.65rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    font-size: 0.6rem;
+    line-height: 1.15;
+    letter-spacing: 0;
+    text-transform: none;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: break-word;
+    overflow: visible;
+    text-overflow: clip;
     max-width: 100%;
   }
 }
@@ -5465,6 +5470,30 @@ dialog.sh-confirm-dialog::backdrop {
   }
 }
 
+@property --sh-tab-fade-start {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --sh-tab-fade-end {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes sh-reveal-tab-fade-start {
+  to {
+    --sh-tab-fade-start: var(--fade-size);
+  }
+}
+
+@keyframes sh-hide-tab-fade-end {
+  from {
+    --sh-tab-fade-end: var(--fade-size);
+  }
+}
+
 /* Workspace merged view tabs (Jobs -> My jobs/Proposals; Contracts -> Overview/Payments/Disputes) */
 .sh-workspace-tablist {
   display: flex;
@@ -5475,6 +5504,24 @@ dialog.sh-confirm-dialog::backdrop {
   border-bottom: 1px solid var(--sh-border-color);
   margin-bottom: 16px;
   scrollbar-width: thin;
+  scroll-padding-inline: 2.25rem;
+  --fade-size: 2.25rem;
+  --fade-dir: right;
+  --fade-start-pos: 0;
+  --fade-end-pos: 100%;
+  mask:
+    linear-gradient(#000, #000) no-clip subtract,
+    linear-gradient(to var(--fade-dir), #000, transparent) var(--fade-start-pos) 0 / var(--sh-tab-fade-start) 100% no-repeat no-clip,
+    linear-gradient(to var(--fade-dir), transparent, #000) var(--fade-end-pos) 0 / var(--sh-tab-fade-end) 100% no-repeat no-clip;
+  animation: sh-reveal-tab-fade-start linear both, sh-hide-tab-fade-end linear both;
+  animation-timeline: scroll(self inline);
+  animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
+}
+
+.sh-workspace-tablist:dir(rtl) {
+  --fade-dir: left;
+  --fade-start-pos: 100%;
+  --fade-end-pos: 0;
 }
 
 .sh-workspace-tab {

@@ -7,7 +7,8 @@ import { BrowserVerification } from "../src/BrowserVerification";
 import { GuideProvider } from "../src/components/guide/GuideContext";
 import { MODULE_TOURS } from "../src/components/guide/guideConfig";
 import { GUIDE_MODULE_IDS } from "../src/components/guide/guideTypes";
-import { LanguageProvider } from "../src/i18n";
+import { FULL_PLATFORM_COPY } from "../src/fullPlatformCopy";
+import { LanguageProvider, translations } from "../src/i18n";
 import {
   getActiveGuideModule,
   getAggregatedNavBadgeCount,
@@ -280,5 +281,29 @@ describe("Client UX Phase 2 navigation consolidation", () => {
     const verificationHtml = wrap(<BrowserVerification />);
     expect(verificationHtml).toContain('data-tour="kyc-status-header"');
     expect(verificationHtml).toContain('data-tour="kyc-form-card"');
+  });
+
+  it("applies navigation glossary across en, am, om, and ti (Home, client-only Wallet vs Wallet & Payouts, Identity verification)", () => {
+    expect(translations.en.nav.dashboard).toBe("Home");
+    expect(translations.en.workspace.nav.overview).toBe("Home");
+    expect(translations.en.nav.kyc).toBe("Identity verification");
+    expect(FULL_PLATFORM_COPY.en.walletClientNavLabel).toBe("Wallet");
+    expect(translations.en.nav.wallet).toBe("Wallet & Payouts");
+
+    expect(translations.am.nav.dashboard).toBe("መነሻ");
+    expect(translations.am.nav.kyc).toBe("የማንነት ማረጋገጫ");
+    expect(FULL_PLATFORM_COPY.am.walletClientNavLabel).toBe("ዋሌት");
+
+    expect(translations.om.nav.dashboard).toBe("Fuula Dura");
+    expect(translations.om.nav.kyc).toBe("Mirkaneessa eenyummaa");
+    expect(FULL_PLATFORM_COPY.om.walletClientNavLabel).toBe("Boorsaa");
+
+    expect(translations.ti.nav.dashboard).toBe("መበገሲ");
+    expect(translations.ti.nav.kyc).toBe("ምርግጋጽ መንነት");
+    expect(FULL_PLATFORM_COPY.ti.walletClientNavLabel).toBe("ቦርሳ");
+
+    for (const lang of ["en", "am", "om", "ti"] as const) {
+      expect(translations[lang].nav.kyc).not.toContain("KYC");
+    }
   });
 });

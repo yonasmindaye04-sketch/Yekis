@@ -16,11 +16,11 @@ The left sidebar (`<aside className="platform-sidebar">`) is sticky (`100vh`) on
    - A 2-way `Client` / `Freelancer` segmented switch in the topbar (and inside the mobile drawer on `<= 1024px`) remembers the user's last selection in `localStorage["yekis_dual_role_mode"]`, defaults to `CLIENT`, and automatically migrates any legacy stored `"BOTH"` value to `"CLIENT"`.
    - Switching mode immediately recalculates `canHire` and `canWork`, showing either the Client workspace or the full Freelancer workspace cleanly.
 3. **Grouped Primary Navigation (`navItems`)**:
-   - **Desktop (`>= 1024px`)**: Consolidated Client sidebar holds **6 core items** (`Dashboard`, `Jobs` [with `My jobs` & `Proposals` tabs], `Services`, `Contracts` [with `Overview`, `Payments` (`EscrowWorkspace`), and `Disputes` (`DisputesWorkspace`) tabs], `Wallet & Payouts`, and `Messages`). Freelancer / `BOTH` adds `My Gigs`. Account routes (`My Profile`, `KYC Verification`, `Settings`) live in the topbar **Avatar menu** (plus `user-chip`).
+   - **Desktop (`>= 1024px`)**: Consolidated Client sidebar holds **6 core items** (`Home`, `Jobs` [with `My jobs` & `Proposals` tabs], `Services`, `Contracts` [with `Overview`, `Payments` (`EscrowWorkspace`), and `Disputes` (`DisputesWorkspace`) tabs], `Wallet` [shown as `Wallet & Payouts` when `canWork` is true], and `Messages`). Freelancer / `BOTH` adds `My Gigs`. Account routes (`My Profile`, `Identity verification`, `Settings`) live in the topbar **Avatar menu** (plus `user-chip`).
    - **Mobile Header Menu Drawer (`#workspace-mobile-drawer` at `<= 1023px`, opened from the visible topbar Menu button at `360px`)**: Keeps core navigation plus `Services`, `Profile`, `Identity verification`, and `Settings` directly reachable.
    - **Unread Activity Badges (`navActivityCount`)**: Aggregated across merged sections (`Jobs` combines `jobs` + `proposals` + new briefs; `Contracts` combines `contracts` + `escrow` + `cases`). Opening a host tab clears the matching unread notifications via `markViewNotificationsRead()`.
 4. **Account Avatar Menu & Topbar KYC Status**: Topbar Avatar opens `#workspace-avatar-menu` (`Profile`, `Identity verification`, `Settings`, `Sign out`); `KYC: Verified` / `KYC: Required` renders as bold plain text+icon (`docs/rule.md` §2 — no pills, no clickable duplicate). Top-level views hide the universal back arrow and workspace breadcrumb prefix, keeping them on detail sub-views (`profile-edit`, another member's `profile`).
-5. **Mobile Bottom Navigation (`<= 1023px`, Option B)**: Pins **5** thumb-zone tabs across roles: **Home** (`overview`), **Jobs** (`jobs`), **Contracts** (`contracts`), **Wallet** (`wallet`), and **Messages** (`chat`, with unread `.nav-dot`). The header menu button remains visible at `360px` to reach **Services**, **Profile**, **Identity verification**, and **Settings**.
+5. **Mobile Bottom Navigation (`<= 1023px`, Option B)**: Pins **5** thumb-zone tabs across roles: **Home** (`overview`), **Jobs** (`jobs`), **Contracts** (`contracts`), **Wallet** (`wallet`, or `Wallet & Payouts` when `canWork`), and **Messages** (`chat`, with unread `.nav-dot`). The header menu button remains visible at `360px` to reach **Services**, **Profile**, **Identity verification**, and **Settings**.
 
 ---
 
@@ -30,18 +30,18 @@ The left sidebar (`<aside className="platform-sidebar">`) is sticky (`100vh`) on
 
 | # | View Key | Client (`CLIENT`) Surface | Freelancer (`FREELANCER`) Surface | Dual-Role (`BOTH`) Surface | Source Component(s) |
 |---|---|---|---|---|---|
-| 1 | `overview` | **Dashboard** (Sidebar + Mobile Bar) | **Dashboard** | **Dashboard** | `MarketplaceShadcnDashboard.tsx` |
+| 1 | `overview` | **Home** (Sidebar + Mobile Bar) | **Home** | **Home** | `MarketplaceShadcnDashboard.tsx` |
 | 2 | `jobs` | **Jobs** -> `My jobs` tab (Sidebar + Mobile Bar) | **Find Work** | **Find Work / Post a Job** | `FullPlatformApp.tsx`, `JobsWorkspace.tsx` |
 | 3 | `proposals` | *Alias -> `Jobs` -> `Proposals` tab* | *Alias -> `Jobs` -> `Proposals` tab* | *Alias -> `Jobs` -> `Proposals` tab* | `JobsWorkspace.tsx` |
 | 4 | `gigs` | **Services** (Sidebar + Mobile Drawer) | **Gigs** | **Gigs / Services** | `GigMarketplace.tsx` |
 | 5 | `my-gigs` | *Hidden* | **My Gigs** (Sidebar) | **My Gigs** | `GigSellerDashboard.tsx` |
 | 6 | `contracts` | **Contracts** -> `Overview` tab (Sidebar + Mobile Bar) | **Contracts** | **Contracts** | `WorkflowWorkspace.tsx` (`ContractsWorkspace`) |
 | 7 | `escrow` | *Alias -> `Contracts` -> `Payments` tab* | *Alias -> `Contracts` -> `Payments` tab* | *Alias -> `Contracts` -> `Payments` tab* | `WorkflowWorkspace.tsx` (`EscrowWorkspace`) |
-| 8 | `wallet` | **Wallet & Payouts** (Sidebar + Mobile Bar) | **Wallet & Payouts** | **Wallet & Payouts** | `BrowserWallet.tsx` |
+| 8 | `wallet` | **Wallet** (Sidebar + Mobile Bar) | **Wallet & Payouts** | **Wallet** / **Wallet & Payouts** | `BrowserWallet.tsx` |
 | 9 | `chat` | **Messages** (Sidebar + Mobile Bar) | **Messages** | **Messages** | `ChatWorkspace.tsx` |
 | 10 | `profile` | **Avatar Menu** + Mobile Drawer (`My Profile`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `ProfilePage.tsx` (+ `ProfileEditPage.tsx`) |
 | 11 | `cases` | *Alias -> `Contracts` -> `Disputes` tab* | *Alias -> `Contracts` -> `Disputes` tab* | *Alias -> `Contracts` -> `Disputes` tab* | `WorkflowWorkspace.tsx` (`DisputesWorkspace`) |
-| 12 | `verification` | **Avatar Menu** + Mobile Drawer (`KYC Verification`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `BrowserVerification.tsx` |
+| 12 | `verification` | **Avatar Menu** + Mobile Drawer (`Identity verification`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `BrowserVerification.tsx` |
 | 13 | `settings` | **Avatar Menu** + Mobile Drawer (`Settings`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `SettingsWorkspace.tsx` |
 
 > **Workspace-wide Topbar & Help Controls**: Outside the sidebar items themselves, the persistent topbar provides **Mobile Header Menu Button** (`<= 1023px`, including `360px`), **Universal Back** (on detail sub-views), **Command Palette** (`Cmd/Ctrl+K`, including `Proposals`, `Escrow / Payments`, `Disputes`, `Identity Verification`, `Profile`, and `Settings`), **Language Selector** (`en`/`am`/`om`/`ti`, synced via `PATCH /api/v1/users/me/profile`), **Theme Toggle** (single topbar theme switch for light/dark; Sound toggle lives in **Settings**), **Notification Center** (deep-linking into host tabs and clearing alias unread counts), **Global Help Menu** (`?` / `Shift+?` — interactive 12-module product tours synced via `getActiveGuideModule()`), and **Avatar Menu** (`Profile`, `Identity verification`, `Settings`, `Sign out`).

@@ -170,6 +170,7 @@ export type FullPlatformCopy = {
   kycVerifyTooltip: string;
   kycVerifiedTooltip: string;
   servicesNavLabel: string;
+  walletClientNavLabel: string;
   proposalsTitleBoth: string;
   proposalsTitleHire: string;
   proposalsTitleWork: string;
@@ -354,6 +355,7 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     kycVerifyTooltip: "Complete identity verification",
     kycVerifiedTooltip: "Identity verified",
     servicesNavLabel: "Services",
+    walletClientNavLabel: "Wallet",
     proposalsTitleBoth: "Proposals You Sent & Received",
     proposalsTitleHire: "Talent Pipeline",
     proposalsTitleWork: "My Submitted Proposals",
@@ -536,6 +538,7 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     kycVerifyTooltip: "የማንነት ማረጋገጫን ያጠናቅቁ",
     kycVerifiedTooltip: "ማንነት ተረጋግጧል",
     servicesNavLabel: "አገልግሎቶች",
+    walletClientNavLabel: "ዋሌት",
     proposalsTitleBoth: "የላኳቸው እና የተቀበሏቸው የሥራ ሐሳቦች",
     proposalsTitleHire: "የባለሙያዎች ዝርዝር",
     proposalsTitleWork: "ያቀረብኳቸው የሥራ ሐሳቦች",
@@ -716,6 +719,7 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     kycVerifyTooltip: "Mirkaneessa eenyummaa xumuraa",
     kycVerifiedTooltip: "Eenyummaan mirkanaa'eera",
     servicesNavLabel: "Tajaajiloota",
+    walletClientNavLabel: "Boorsaa",
     proposalsTitleBoth: "Yaada Hojii Ergitan fi Argattan",
     proposalsTitleHire: "Tarree Ogeeyyii",
     proposalsTitleWork: "Yaada Hojii Ani Erge",
@@ -895,6 +899,7 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     kycVerifyTooltip: "ምርግጋጽ መንነት ዛዝሙ",
     kycVerifiedTooltip: "መንነት ተረጋጊጹ",
     servicesNavLabel: "ኣገልግሎታት",
+    walletClientNavLabel: "ቦርሳ",
     proposalsTitleBoth: "ዝለኣኽኩምዎምን ዝተቐበልኩምዎምን እማመታት",
     proposalsTitleHire: "መስመር ክኢላታት",
     proposalsTitleWork: "ዝለኣኽክዎም እማመታት",

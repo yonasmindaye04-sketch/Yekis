@@ -1575,13 +1575,14 @@ const loadWorkspace = async () => {
     const jobsLabel = canWork ? t.nav.findWork : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const servicesLabel = !canWork && canHire ? copy.servicesNavLabel : t.workspace.nav.gigs;
+    const walletLabel = !canWork && canHire ? copy.walletClientNavLabel : t.nav.wallet;
     const allItems: SidebarNavItem[] = [
       { view: "overview", iconKey: "overview", label: t.nav.dashboard, group: "HIRE" },
       { view: "jobs", iconKey: jobsIconKey, label: jobsLabel, group: "HIRE" },
       { view: "gigs", iconKey: "gigs", label: servicesLabel, group: "HIRE" },
       { view: "my-gigs", iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" },
       { view: "contracts", iconKey: "contracts", label: t.nav.contracts, group: "HIRE" },
-      { view: "wallet", iconKey: "wallet", label: t.nav.wallet, group: "MONEY" },
+      { view: "wallet", iconKey: "wallet", label: walletLabel, group: "MONEY" },
       { view: "chat", iconKey: "chat", label: t.workspace.nav.chat, group: "TALK" },
       { view: "profile", iconKey: "profile", label: t.workspace.nav.profile, group: "ACCOUNT" },
       { view: "verification", iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" },
@@ -1591,7 +1592,7 @@ const loadWorkspace = async () => {
       getSidebarVisibleViews({ canWork, isStaff, isMobileViewport }),
     );
     return allItems.filter((item) => allowedViews.has(item.view));
-  }, [canHire, canWork, copy.servicesNavLabel, isMobileViewport, isStaff, t]);
+  }, [canHire, canWork, copy.servicesNavLabel, copy.walletClientNavLabel, isMobileViewport, isStaff, t]);
 
   const navGroupLabels: Record<"HIRE" | "MONEY" | "TALK" | "ACCOUNT", string> = {
     HIRE: canWork && !canHire ? "Work" : "Hire",
