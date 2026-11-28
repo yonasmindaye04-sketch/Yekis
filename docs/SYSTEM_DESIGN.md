@@ -2014,7 +2014,7 @@ BullMQ manages **ten** dedicated Redis queues:
 | Queue Name | Worker File | Schedule / Trigger | Action | Cancellation Rule |
 |---|---|---|---|---|
 | `auto-release` | `autoRelease.handler.ts` + `autoRelease.worker.ts` | Scheduled with a 24-hour (warn) and 7-day (release) delay upon milestone delivery submission | Warns client 24 h before the deadline; auto-releases escrow to the freelancer at day 7 | Job is marked stale & skipped if the milestone leaves `SUBMITTED_FOR_REVIEW` (e.g. accepted or disputed) or if the contract is still inside its cooling-off window |
-| `gig-auto-release` | `gigAutoRelease.worker.ts` | Same pattern for gig orders | Auto-releases a gig escrow when the review window elapses | Cancelled when a revision is requested or a gig dispute is raised |
+| `gig-auto-release` | `gigAutoRelease.handler.ts` + `gigAutoRelease.worker.ts` | Same pattern for gig orders | Auto-releases a gig escrow when the review window elapses | Cancelled when a revision is requested or a gig dispute is raised |
 | `kyc-refresh` | `kycRefresh.worker.ts` | Cron `0 3 * * *` (Daily at 03:00 UTC) | Sweeps verified KYC records where `nextReviewDueAt <= now()` and sets `periodicReviewPending = true`, notifying the user | N/A (Recurring idempotent sweep) |
 | `notifications` | `notification.worker.ts` | Event-triggered by domain modules (`escrow-funded`, `dispute-raised`, `security-breach`, etc.) | Persists the in-app record first, then pushes over the socket, and fans out to SMS (critical types), email and Telegram | N/A (Immediate execution) |
 | `review-reveal` | `reviewReveal.worker.ts` | Recurring sweep / 14-day delay | Reveals blind **contract** reviews older than 14 days and recalculates Bayesian rating scores | Skipped if already revealed by mutual review submission. **Gig reviews are not covered** — `GigReview.revealedAt` is never written |
@@ -3442,7 +3442,7 @@ All asynchronous processing runs via **BullMQ** queues backed by **Redis**. Work
 | Worker | File | What It Does |
 |---|---|---|
 | `autoRelease.handler.ts` / `autoRelease.worker.ts` | `queue/` | Listens on the `auto-release` queue. Fires a client warning notification 24 h before the deadline; auto-releases escrowed funds at day 7 if the client has not acted. Stale-checks the milestone state first, and skips the release while the contract is still inside its 7-day cooling-off window. |
-| `gigAutoRelease.worker.ts` | `queue/` | The same pattern for gig orders, keyed on `gigOrderId`. |
+| `gigAutoRelease.handler.ts` / `gigAutoRelease.worker.ts` | `queue/` | The same pattern for gig orders, keyed on `gigOrderId`. |
 | `kycRefresh.worker.ts` | `queue/` | Runs daily at 03:00 UTC (cron). Sweeps all `VERIFIED` KYC records where `nextReviewDueAt <= now()`, marks them `periodicReviewPending = true` and notifies the user that re-verification is due. |
 | `notification.worker.ts` | `queue/` | Processes notification events from all domain modules. Persists the in-app `Notification` record **first**, then pushes over the socket, then fans out to Telegram and the SMSEthiopia API for critical event types. |
 | `reviewReveal.worker.ts` | `queue/` | Recurring sweep. Sets `isBlind = false` on **contract** reviews older than 14 days. Recalculates Bayesian ratings for affected users. Gig reviews are not covered. |

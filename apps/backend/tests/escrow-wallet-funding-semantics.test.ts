@@ -10,7 +10,17 @@ import {
 import type { PaymentProvider } from "../src/schemas.js";
 import { raiseDispute } from "../src/modules/disputes/dispute.service.js";
 import { handleAutoReleaseJob } from "../src/queue/autoRelease.handler.js";
-import { fundGigOrderFromWallet } from "../src/modules/gigs/gig.service.js";
+import { handleGigAutoReleaseJob } from "../src/queue/gigAutoRelease.handler.js";
+import {
+  fundGigOrderFromWallet,
+  submitGigDelivery,
+  acceptGigOrder,
+  GigInvalidStateError,
+} from "../src/modules/gigs/gig.service.js";
+import {
+  raiseGigDispute,
+  resolveGigDispute,
+} from "../src/modules/gigs/gigDispute.service.js";
 import { calculateFees } from "../src/modules/escrow/fees.js";
 import { env, AUTO_RELEASE_WINDOW_DAYS_DEFAULT } from "../src/config/env.js";
 
@@ -666,4 +676,169 @@ describe("ESC-003 invariant: no funding method reaches RELEASED or credits freel
       expect(await freelancerBalance()).toBe(freelancerBefore + expectedNet);
     },
   );
+});
+
+describe("ESC-003 gig invariant: no gig funding/release path reaches RELEASED or credits freelancer without acceptance, auto-release, or admin dispute resolution", () => {
+  async function makeGigOrderFixture(initialState = "PAYMENT_PENDING", initialStatus = "PENDING_PAYMENT") {
+    const gig = await prisma.gig.create({
+      data: {
+        freelancerId,
+        title: `esc003 gig inv ${STAMP}-${Math.random().toString(36).slice(2, 6)}`,
+        category: "WEB_APP_DEVELOPMENT",
+        description: "A gig description long enough to satisfy the schema minimum.",
+        tags: [],
+        requirements: [],
+        mediaUrls: [],
+        status: "ACTIVE",
+      } as never,
+    });
+    const pkg = await prisma.gigPackage.create({
+      data: {
+        gigId: gig.id,
+        tier: "BASIC",
+        title: "Basic",
+        description: "The basic package.",
+        deliveryDays: 7,
+        revisionsIncluded: 1,
+        priceMinor: M,
+      } as never,
+    });
+    const order = await prisma.gigOrder.create({
+      data: {
+        gigId: gig.id,
+        packageId: pkg.id,
+        clientId,
+        status: initialStatus,
+        escrowState: initialState,
+        totalChargeMinor: M,
+      } as never,
+    });
+    return { gig, pkg, order };
+  }
+
+  async function cleanupGigOrder(fixture: { gig: { id: string }; pkg: { id: string }; order: { id: string } }) {
+    await prisma.platformFeeCredit.deleteMany({ where: { gigOrderId: fixture.order.id } });
+    await prisma.dispute.deleteMany({ where: { gigOrderId: fixture.order.id } });
+    await prisma.gigOrder.deleteMany({ where: { id: fixture.order.id } });
+    await prisma.gigPackage.deleteMany({ where: { id: fixture.pkg.id } });
+    await prisma.gig.deleteMany({ where: { id: fixture.gig.id } });
+  }
+
+  it("refuses acceptGigOrder and skips gig auto-release unless state is SUBMITTED_FOR_REVIEW", async () => {
+    const fx = await makeGigOrderFixture();
+    try {
+      const before = await freelancerBalance();
+
+      await expect(acceptGigOrder({ clientId, orderId: fx.order.id })).rejects.toThrow(
+        GigInvalidStateError,
+      );
+      await handleGigAutoReleaseJob({ data: { gigOrderId: fx.order.id } });
+      expect(await freelancerBalance()).toBe(before);
+
+      const funded = await fundGigOrderFromWallet({ clientId, orderId: fx.order.id });
+      expect(funded.escrowState).toBe("ESCROW_HELD");
+      expect(await freelancerBalance()).toBe(before);
+
+      await expect(acceptGigOrder({ clientId, orderId: fx.order.id })).rejects.toThrow(
+        GigInvalidStateError,
+      );
+      await handleGigAutoReleaseJob({ data: { gigOrderId: fx.order.id } });
+      expect((await prisma.gigOrder.findUniqueOrThrow({ where: { id: fx.order.id } })).escrowState).toBe(
+        "ESCROW_HELD",
+      );
+      expect(await freelancerBalance()).toBe(before);
+      expect(await prisma.platformFeeCredit.findFirst({ where: { gigOrderId: fx.order.id } })).toBeNull();
+
+      const delivered = await submitGigDelivery({
+        freelancerId,
+        orderId: fx.order.id,
+        deliverableUrl: "https://example.test/gig-delivery.zip",
+      });
+      expect(delivered.escrowState).toBe("SUBMITTED_FOR_REVIEW");
+      expect(await freelancerBalance()).toBe(before);
+
+      const released = await acceptGigOrder({ clientId, orderId: fx.order.id });
+      expect(released.escrowState).toBe("RELEASED");
+      expect(released.status).toBe("COMPLETED");
+      const expectedNet = calculateFees({
+        milestoneAmountMinor: M,
+        freelancerHasTin: false,
+      }).freelancerNetMinor;
+      expect(await freelancerBalance()).toBe(before + expectedNet);
+      expect(await prisma.platformFeeCredit.findFirst({ where: { gigOrderId: fx.order.id } })).not.toBeNull();
+    } finally {
+      await cleanupGigOrder(fx);
+    }
+  });
+
+  it("auto-releases a delivered gig order via gigAutoRelease handler and credits freelancer once", async () => {
+    const fx = await makeGigOrderFixture();
+    try {
+      await fundGigOrderFromWallet({ clientId, orderId: fx.order.id });
+      await submitGigDelivery({ freelancerId, orderId: fx.order.id });
+
+      const before = await freelancerBalance();
+      await handleGigAutoReleaseJob({ data: { gigOrderId: fx.order.id } });
+
+      const after = await prisma.gigOrder.findUniqueOrThrow({ where: { id: fx.order.id } });
+      expect(after.escrowState).toBe("RELEASED");
+      expect(after.status).toBe("COMPLETED");
+
+      const expectedNet = calculateFees({
+        milestoneAmountMinor: M,
+        freelancerHasTin: false,
+      }).freelancerNetMinor;
+      expect(await freelancerBalance()).toBe(before + expectedNet);
+
+      // Re-running auto-release after RELEASED is a no-op.
+      await handleGigAutoReleaseJob({ data: { gigOrderId: fx.order.id } });
+      expect(await freelancerBalance()).toBe(before + expectedNet);
+    } finally {
+      await cleanupGigOrder(fx);
+    }
+  });
+
+  it("holds gig escrow across disputes and releases/credits only upon admin dispute resolution", async () => {
+    const fx = await makeGigOrderFixture();
+    const staff = await makeUser(`gigstaff-${Date.now()}`, "CLIENT", 0);
+    extraUserIds.push(staff.id);
+    try {
+      await fundGigOrderFromWallet({ clientId, orderId: fx.order.id });
+      const before = await freelancerBalance();
+
+      const dispute = await raiseGigDispute({
+        raisedByUserId: clientId,
+        gigOrderId: fx.order.id,
+        category: "QUALITY_ISSUE",
+        description: "Gig order deliverable incomplete.",
+      });
+      expect(dispute.stage).toBe("STAGE_1_NEGOTIATION");
+      expect(await freelancerBalance()).toBe(before);
+
+      // Auto-release must skip DISPUTED gig orders.
+      await handleGigAutoReleaseJob({ data: { gigOrderId: fx.order.id } });
+      expect((await prisma.gigOrder.findUniqueOrThrow({ where: { id: fx.order.id } })).escrowState).toBe(
+        "DISPUTED",
+      );
+      expect(await freelancerBalance()).toBe(before);
+
+      await resolveGigDispute({
+        staffUserId: staff.id,
+        disputeId: dispute.id,
+        outcome: "RELEASE_TO_FREELANCER",
+        recommendation: "Verified gig deliverable satisfies requirements.",
+      });
+
+      const resolvedOrder = await prisma.gigOrder.findUniqueOrThrow({ where: { id: fx.order.id } });
+      expect(resolvedOrder.escrowState).toBe("RELEASED");
+      expect(resolvedOrder.status).toBe("COMPLETED");
+      const expectedNet = calculateFees({
+        milestoneAmountMinor: M,
+        freelancerHasTin: false,
+      }).freelancerNetMinor;
+      expect(await freelancerBalance()).toBe(before + expectedNet);
+    } finally {
+      await cleanupGigOrder(fx);
+    }
+  });
 });
