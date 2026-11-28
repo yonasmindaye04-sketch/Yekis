@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
+import {
+  postJournalEntry,
+  UnbalancedJournalError,
+} from "../src/modules/finance/ledger.service.js";
 
 /**
  * Ledger and payout invariants enforced BY THE DATABASE, not by a service.
@@ -192,6 +196,30 @@ describe("journal balancing", () => {
       prisma.$executeRaw`INSERT INTO "LedgerEntry" ("id","journalId","accountId","debitMinor","creditMinor","postedAt")
         VALUES (gen_random_uuid()::text, ${j.id}, ${credit.id}, 1, 0, now())`,
     ).rejects.toThrow(/unbalanced/i);
+  });
+
+  it("postJournalEntry rejects an unbalanced write at service layer before inserting any rows", async () => {
+    const debit = await account("ASSET", 0);
+    const credit = await account("LIABILITY", 0);
+    const key = `svc-unbal-${randomUUID()}`;
+
+    await expect(
+      prisma.$transaction((tx) =>
+        postJournalEntry(tx, {
+          idempotencyKey: key,
+          referenceType: "TEST",
+          description: "Write-time unbalanced journal rejection test",
+          entries: [
+            { accountCode: debit.code, accountName: "test", accountType: "ASSET", debitMinor: 5_000 },
+            { accountCode: credit.code, accountName: "test", accountType: "LIABILITY", creditMinor: 4_500 },
+          ],
+        }),
+      ),
+    ).rejects.toThrow(UnbalancedJournalError);
+
+    expect(await prisma.ledgerJournal.findUnique({ where: { idempotencyKey: key } })).toBeNull();
+    expect((await prisma.ledgerAccount.findUniqueOrThrow({ where: { id: debit.id } })).balanceMinor).toBe(0);
+    expect((await prisma.ledgerAccount.findUniqueOrThrow({ where: { id: credit.id } })).balanceMinor).toBe(0);
   });
 });
 
