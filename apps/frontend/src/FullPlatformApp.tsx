@@ -19,7 +19,13 @@ import {
   useUnreadByView,
 } from "./api/notificationFeed";
 import {
-  getTabSelectionForView,
+  getActiveGuideModule,
+  getAggregatedNavBadgeCount,
+  getAvatarMenuViews,
+  getNotificationReadViews,
+  getSidebarVisibleViews,
+  MOBILE_BOTTOM_NAV_VIEWS,
+  resolveViewAlias,
   type ContractsTabKey,
   type JobsTabKey,
 } from "./navigation/workspaceNavigation";
@@ -615,6 +621,8 @@ function FullPlatformAppInner() {
   const [view, setView] = useState<View>("overview");
   const [jobsTab, setJobsTab] = useState<JobsTabKey>("jobs");
   const [contractsTab, setContractsTab] = useState<ContractsTabKey>("overview");
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
   /**
    * Whose profile the workspace is showing.
    *
@@ -780,6 +788,24 @@ function FullPlatformAppInner() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [mobileDrawerOpen]);
 
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setAvatarMenuOpen(false);
+    };
+    const onPointerDown = (e: PointerEvent) => {
+      if (avatarMenuRef.current && !avatarMenuRef.current.contains(e.target as Node)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [avatarMenuOpen]);
+
   const switchDualRoleMode = (mode: "CLIENT" | "FREELANCER") => {
     if (user?.role !== "BOTH") return;
     if (mode === "CLIENT" || mode === "FREELANCER") {
@@ -844,14 +870,16 @@ function FullPlatformAppInner() {
    * "profile" always means MY profile, whoever was last opened.
    */
   const navigateToView = (next: View) => {
-    const tabSelection = getTabSelectionForView(next);
-    if (tabSelection.jobsTab) setJobsTab(tabSelection.jobsTab);
-    if (tabSelection.contractsTab) setContractsTab(tabSelection.contractsTab);
-    if (next === "profile") {
+    const resolved = resolveViewAlias(next);
+    if (resolved.jobsTab) setJobsTab(resolved.jobsTab);
+    if (resolved.contractsTab) setContractsTab(resolved.contractsTab);
+    setAvatarMenuOpen(false);
+    setMobileDrawerOpen(false);
+    if (resolved.view === "profile") {
       openMyProfile();
       return;
     }
-    setView(next);
+    setView(resolved.view);
   };
 
   /**
@@ -1508,14 +1536,16 @@ const loadWorkspace = async () => {
 
   /** How much unlooked-at activity a sidebar tab is holding. */
   const navActivityCount = (tabView: string): number =>
-    tabView === "jobs" ? newBriefsCount : (unreadByView[tabView] ?? 0);
+    getAggregatedNavBadgeCount(tabView, { newBriefsCount, unreadByView });
 
-  // Opening a view IS looking at it: its notifications are marked read, so
-  // the dot means "not looked at yet" rather than "something happened once".
+  // Opening a view (or consolidated sub-tab) clears both direct and alias notifications.
   useEffect(() => {
     if (!user) return;
-    void markViewNotificationsRead(view, notifications);
-  }, [notifications, user, view]);
+    void markViewNotificationsRead(
+      getNotificationReadViews({ view, jobsTab, contractsTab }),
+      notifications,
+    );
+  }, [contractsTab, jobsTab, notifications, user, view]);
 
   type SidebarNavItem = {
     view: View;
@@ -1545,39 +1575,23 @@ const loadWorkspace = async () => {
     const jobsLabel = canWork ? t.nav.findWork : t.nav.jobs;
     const jobsIconKey = canWork ? "find-work" : "jobs";
     const servicesLabel = !canWork && canHire ? copy.servicesNavLabel : t.workspace.nav.gigs;
-    const hireItems: SidebarNavItem[] = [
+    const allItems: SidebarNavItem[] = [
       { view: "overview", iconKey: "overview", label: t.nav.dashboard, group: "HIRE" },
       { view: "jobs", iconKey: jobsIconKey, label: jobsLabel, group: "HIRE" },
-      { view: "proposals", iconKey: "proposals", label: t.nav.proposals, group: "HIRE" },
       { view: "gigs", iconKey: "gigs", label: servicesLabel, group: "HIRE" },
-      ...(canWork
-        ? [{ view: "my-gigs" as View, iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" as const }]
-        : []),
+      { view: "my-gigs", iconKey: "gigs", label: t.workspace.nav.myGigs, group: "HIRE" },
       { view: "contracts", iconKey: "contracts", label: t.nav.contracts, group: "HIRE" },
-    ];
-    const moneyItems: SidebarNavItem[] = [
-      { view: "escrow", iconKey: "escrow", label: t.nav.escrow, group: "MONEY" },
       { view: "wallet", iconKey: "wallet", label: t.nav.wallet, group: "MONEY" },
-    ];
-    const talkItems: SidebarNavItem[] = [
       { view: "chat", iconKey: "chat", label: t.workspace.nav.chat, group: "TALK" },
-      {
-        view: "cases",
-        iconKey: "cases",
-        label: isStaff ? t.workspace.nav.cases : t.nav.disputes,
-        group: "TALK",
-      },
-    ];
-    const accountItems: SidebarNavItem[] = [
       { view: "profile", iconKey: "profile", label: t.workspace.nav.profile, group: "ACCOUNT" },
-      ...(!isStaff
-        ? [{ view: "verification" as View, iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" as const }]
-        : []),
+      { view: "verification", iconKey: "verification", label: t.nav.kyc, group: "ACCOUNT" },
       { view: "settings", iconKey: "settings", label: t.nav.settings, group: "ACCOUNT" },
     ];
-
-    return [...hireItems, ...moneyItems, ...talkItems, ...accountItems];
-  }, [canWork, isStaff, t]);
+    const allowedViews = new Set(
+      getSidebarVisibleViews({ canWork, isStaff, isMobileViewport }),
+    );
+    return allItems.filter((item) => allowedViews.has(item.view));
+  }, [canHire, canWork, copy.servicesNavLabel, isMobileViewport, isStaff, t]);
 
   const navGroupLabels: Record<"HIRE" | "MONEY" | "TALK" | "ACCOUNT", string> = {
     HIRE: canWork && !canHire ? "Work" : "Hire",
@@ -1587,14 +1601,10 @@ const loadWorkspace = async () => {
   };
 
   const mobileBottomNavItems = useMemo(() => {
-    const preferred: View[] =
-      canWork && !canHire
-        ? ["overview", "jobs", "contracts", "wallet"]
-        : ["overview", "jobs", "escrow", "wallet"];
-    return preferred
+    return MOBILE_BOTTOM_NAV_VIEWS
       .map((v) => navItems.find((item) => item.view === v))
       .filter((item): item is SidebarNavItem => Boolean(item));
-  }, [canHire, canWork, navItems]);
+  }, [navItems]);
 
   if (user?.staffRole) {
     return (
@@ -2426,18 +2436,11 @@ const loadWorkspace = async () => {
     );
   }
 
-  const activeGuideModule: GuideModuleId =
-    view === "my-gigs"
-      ? "gigs"
-      : view === "profile-edit"
-        ? "profile"
-        : view === "jobs" && jobsTab === "proposals"
-          ? "proposals"
-          : view === "contracts" && contractsTab === "payments"
-            ? "escrow"
-            : view === "contracts" && contractsTab === "disputes"
-              ? "cases"
-              : view;
+  const activeGuideModule: GuideModuleId = getActiveGuideModule({
+    view,
+    jobsTab,
+    contractsTab,
+  });
   const activeGuideRole: GuideRole =
     platformRole === "FREELANCER" ? "FREELANCER" : "CLIENT";
 
@@ -2454,7 +2457,7 @@ const loadWorkspace = async () => {
 
   const handleContactSupportFromGuide = () => {
     setMobileDrawerOpen(false);
-    setView("chat");
+    navigateToView("chat");
   };
 
   return (
@@ -2590,14 +2593,7 @@ const loadWorkspace = async () => {
                           ? "active"
                           : ""
                       }
-                      onClick={() => {
-                        if (item.view === "profile") {
-                          openMyProfile();
-                        } else {
-                          setView(item.view);
-                        }
-                        setMobileDrawerOpen(false);
-                      }}
+                      onClick={() => navigateToView(item.view)}
                       title={activityLabel ? `${item.label} — ${activityLabel}` : item.label}
                       aria-label={
                         activityLabel ? `${item.label} — ${activityLabel}` : undefined
@@ -2717,12 +2713,22 @@ const loadWorkspace = async () => {
               <strong className="sh-breadcrumb-current">
                 {view === "overview"
                   ? t.workspace.nav.overview
-                  : view === "profile" && !viewingOwnProfile
-                    ? viewedProfileName || t.workspace.profile.memberProfileLabel
-                    : view === "profile-edit"
-                      ? t.workspace.profile.editHeading
-                      : navItems.find((item) => item.view === view)?.label ||
-                        t.nav.settings}
+                  : view === "jobs" && jobsTab === "proposals"
+                    ? t.nav.proposals
+                    : view === "contracts" && contractsTab === "payments"
+                      ? copy.contractsTabPayments
+                      : view === "contracts" && contractsTab === "disputes"
+                        ? copy.contractsTabDisputes
+                        : view === "verification"
+                          ? t.nav.kyc
+                          : view === "profile"
+                            ? viewingOwnProfile
+                              ? t.workspace.nav.profile
+                              : viewedProfileName || t.workspace.profile.memberProfileLabel
+                            : view === "profile-edit"
+                              ? t.workspace.profile.editHeading
+                              : navItems.find((item) => item.view === view)?.label ||
+                                t.nav.settings}
               </strong>
             </div>
           </div>
@@ -2799,24 +2805,100 @@ const loadWorkspace = async () => {
                   : copy.kycStatusRequired}
               </span>
             </span>
-            <button
-              type="button"
-              className="user-menu"
-              onClick={openMyProfile}
-              title={`${user.displayName?.trim() || roleLabel(platformRole, language)} — ${user.email}`}
-              aria-label={copy.openProfileAria(user.email ?? "")}
-            >
-              <span className="avatar yk-topbar-avatar">
-                <YekisAvatar
-                  userId={user.id}
-                  email={user.email}
-                  displayName={user.displayName}
-                  avatarUrl={user.avatarUrl}
-                  size={32}
-                  animate="hover"
-                />
-              </span>
-            </button>
+            <div className="sh-user-menu-wrap" ref={avatarMenuRef}>
+              <button
+                type="button"
+                className="user-menu"
+                aria-haspopup="menu"
+                aria-expanded={avatarMenuOpen}
+                aria-controls="workspace-avatar-menu"
+                onClick={() => setAvatarMenuOpen((prev) => !prev)}
+                title={`${user.displayName?.trim() || roleLabel(platformRole, language)} — ${user.email}`}
+                aria-label={copy.openProfileAria(user.email ?? "")}
+              >
+                <span className="avatar yk-topbar-avatar">
+                  <YekisAvatar
+                    userId={user.id}
+                    email={user.email}
+                    displayName={user.displayName}
+                    avatarUrl={user.avatarUrl}
+                    size={32}
+                    animate="hover"
+                  />
+                </span>
+              </button>
+              {avatarMenuOpen && (
+                <div
+                  id="workspace-avatar-menu"
+                  className="sh-avatar-popover"
+                  role="menu"
+                  aria-label={copy.accountMenuAria}
+                  onKeyDown={(e) => {
+                    const items = Array.from(
+                      e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+                    );
+                    if (!items.length) return;
+                    const idx = items.indexOf(document.activeElement as HTMLButtonElement);
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault();
+                      items[(idx + 1) % items.length]?.focus();
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault();
+                      items[(idx - 1 + items.length) % items.length]?.focus();
+                    } else if (e.key === "Home") {
+                      e.preventDefault();
+                      items[0]?.focus();
+                    } else if (e.key === "End") {
+                      e.preventDefault();
+                      items[items.length - 1]?.focus();
+                    }
+                  }}
+                >
+                  <div className="sh-avatar-menu-header">
+                    <span className="sh-avatar-menu-name">
+                      {user.displayName?.trim() || roleLabel(platformRole, language)}
+                    </span>
+                    <span className="sh-avatar-menu-email">{user.email}</span>
+                  </div>
+                  {getAvatarMenuViews(isStaff).map((menuView) => {
+                    const label =
+                      menuView === "profile"
+                        ? t.workspace.nav.profile
+                        : menuView === "verification"
+                          ? t.nav.kyc
+                          : t.nav.settings;
+                    const active =
+                      view === menuView &&
+                      !(menuView === "profile" && !viewingOwnProfile);
+                    return (
+                      <button
+                        key={menuView}
+                        type="button"
+                        role="menuitem"
+                        className={`sh-avatar-menu-item${active ? " active" : ""}`}
+                        onClick={() => navigateToView(menuView)}
+                      >
+                        {navIconMap[menuView]}
+                        <span>{label}</span>
+                      </button>
+                    );
+                  })}
+                  <div className="sh-avatar-menu-divider" role="separator" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="sh-avatar-menu-item"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      logout();
+                    }}
+                  >
+                    <LogOut size={16} />
+                    <span>{copy.signOutLabel}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
@@ -2943,11 +3025,11 @@ const loadWorkspace = async () => {
                 } else {
                   setFocusContractId(null);
                 }
-                setView("escrow");
+                navigateToView("escrow");
               }}
               onOpenContract={(contractId) => {
                 setFocusContractId(contractId || null);
-                setView("contracts");
+                navigateToView("contracts");
               }}
               onFundMilestone={async (milestoneId) => {
                 await api.fundMilestoneFromWallet(milestoneId);
@@ -3574,11 +3656,8 @@ const loadWorkspace = async () => {
             <button
               key={item.view}
               type="button"
-              className={view === item.view && !mobileDrawerOpen ? "active" : ""}
-              onClick={() => {
-                setView(item.view);
-                setMobileDrawerOpen(false);
-              }}
+              className={view === item.view ? "active" : ""}
+              onClick={() => navigateToView(item.view)}
               aria-label={
                 activityLabel ? `${item.label} — ${activityLabel}` : undefined
               }
@@ -3591,18 +3670,6 @@ const loadWorkspace = async () => {
             </button>
           );
         })}
-        <button
-          type="button"
-          className={mobileDrawerOpen ? "active" : ""}
-          onClick={() => setMobileDrawerOpen((o) => !o)}
-          aria-expanded={mobileDrawerOpen}
-          aria-controls="workspace-mobile-drawer"
-        >
-          <span>
-            <Menu size={18} />
-          </span>
-          <small>{t.workspace.nav.menu}</small>
-        </button>
       </nav>
       <ProductTourOverlay />
     </div>
