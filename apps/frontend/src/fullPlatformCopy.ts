@@ -186,6 +186,16 @@ export type FullPlatformCopy = {
   casesTitle: string;
   casesDesc: string;
   threeStageEscrowBadge: string;
+  jobsTabsAria: string;
+  jobsTabMyJobs: string;
+  jobsTabFindWork: string;
+  jobsTabProposals: string;
+  contractsTabsAria: string;
+  contractsTabOverview: string;
+  contractsTabPayments: string;
+  contractsTabDisputes: string;
+  accountMenuAria: string;
+  signOutLabel: string;
 };
 
 export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
@@ -363,6 +373,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesDesc:
       "Negotiate milestone adjustments, submit immutable evidence, and track staff mediation or AACCSA arbitration.",
     threeStageEscrowBadge: "3-Stage Escrow Protection",
+    jobsTabsAria: "Jobs sections",
+    jobsTabMyJobs: "My jobs",
+    jobsTabFindWork: "Find work",
+    jobsTabProposals: "Proposals",
+    contractsTabsAria: "Contracts sections",
+    contractsTabOverview: "Overview",
+    contractsTabPayments: "Payments",
+    contractsTabDisputes: "Disputes",
+    accountMenuAria: "Account menu",
+    signOutLabel: "Sign out",
   },
   am: {
     roles: {
@@ -532,6 +552,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "የክርክር አፈታት እና የሽምግልና ማዕከል",
     casesDesc: "የምዕራፍ ማስተካከያዎችን ይደራደሩ፣ የማይለወጡ ማስረጃዎችን ያቅርቡ እና የሽምግልና ሂደትን ይከታተሉ።",
     threeStageEscrowBadge: "ባለ 3-ደረጃ የኤስክሮ ጥበቃ",
+    jobsTabsAria: "የሥራ ክፍሎች",
+    jobsTabMyJobs: "የእኔ ሥራዎች",
+    jobsTabFindWork: "ሥራ ፈልግ",
+    jobsTabProposals: "ፕሮፖዛሎች",
+    contractsTabsAria: "የውል ክፍሎች",
+    contractsTabOverview: "አጠቃላይ እይታ",
+    contractsTabPayments: "ክፍያዎች",
+    contractsTabDisputes: "ክርክሮች",
+    accountMenuAria: "የመለያ ዝርዝር",
+    signOutLabel: "ውጣ",
   },
   om: {
     roles: {
@@ -702,6 +732,16 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "Wiirtuu Furmaata Waldiddaa fi Araaraa",
     casesDesc: "Sirreeffama boqonnaa irratti mari'adhaa, ragaa hin jijjiiramne dhiyeessaa, jaarsummaa hojjettootaa ykn araara AACCSA hordofaa.",
     threeStageEscrowBadge: "Eegumsa Iskuuroo Sadarkaa-3",
+    jobsTabsAria: "Kutaalee hojii",
+    jobsTabMyJobs: "Hojiiwwan koo",
+    jobsTabFindWork: "Hojii barbaadi",
+    jobsTabProposals: "Yaadolee",
+    contractsTabsAria: "Kutaalee waliigaltee",
+    contractsTabOverview: "Ilaalcha waliigalaa",
+    contractsTabPayments: "Kaffaltiiwwan",
+    contractsTabDisputes: "Falmiiwwan",
+    accountMenuAria: "Baafata herregaa",
+    signOutLabel: "Bahi",
   },
   ti: {
     roles: {
@@ -871,5 +911,15 @@ export const FULL_PLATFORM_COPY: Record<Language, FullPlatformCopy> = {
     casesTitle: "ማእከል ምፍታሕ ክርክርን ሽምግልናን",
     casesDesc: "ኣብ ምትዕርራይ ምዕራፍ ተዘራረቡ፣ ዘይቅየር መርትዖ ኣቕርቡ፣ ሽምግልና ወይ ግልግል AACCSA ተኸታተሉ።",
     threeStageEscrowBadge: "ሓለዋ ኤስክሮ በዓል 3-ደረጃ",
+    jobsTabsAria: "ክፋላት ስራሕ",
+    jobsTabMyJobs: "ስራሕተይ",
+    jobsTabFindWork: "ስራሕ ድለ",
+    jobsTabProposals: "ፕሮፖዛላት",
+    contractsTabsAria: "ክፋላት ውዕል",
+    contractsTabOverview: "ሓፈሻዊ ትርኢት",
+    contractsTabPayments: "ክፍሊታት",
+    contractsTabDisputes: "ክርክራት",
+    accountMenuAria: "ዝርዝር ኣካውንት",
+    signOutLabel: "ውጻእ",
   },
 };
