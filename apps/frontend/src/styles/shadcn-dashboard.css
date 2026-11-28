@@ -4526,7 +4526,7 @@ dialog.sh-kanban-dialog::backdrop {
   }
 
   .platform-shell.sh-shell .platform-mobile-nav button small {
-    font-size: 0.6rem;
+    font-size: 0.7rem;
     line-height: 1.15;
     letter-spacing: 0;
     text-transform: none;
@@ -5504,24 +5504,29 @@ dialog.sh-confirm-dialog::backdrop {
   border-bottom: 1px solid var(--sh-border-color);
   margin-bottom: 16px;
   scrollbar-width: thin;
-  scroll-padding-inline: 2.25rem;
-  --fade-size: 2.25rem;
-  --fade-dir: right;
-  --fade-start-pos: 0;
-  --fade-end-pos: 100%;
-  mask:
-    linear-gradient(#000, #000) no-clip subtract,
-    linear-gradient(to var(--fade-dir), #000, transparent) var(--fade-start-pos) 0 / var(--sh-tab-fade-start) 100% no-repeat no-clip,
-    linear-gradient(to var(--fade-dir), transparent, #000) var(--fade-end-pos) 0 / var(--sh-tab-fade-end) 100% no-repeat no-clip;
-  animation: sh-reveal-tab-fade-start linear both, sh-hide-tab-fade-end linear both;
-  animation-timeline: scroll(self inline);
-  animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
 }
 
-.sh-workspace-tablist:dir(rtl) {
-  --fade-dir: left;
-  --fade-start-pos: 100%;
-  --fade-end-pos: 0;
+@supports (animation-timeline: scroll()) {
+  .sh-workspace-tablist {
+    scroll-padding-inline: 2.25rem;
+    --fade-size: 2.25rem;
+    --fade-dir: right;
+    --fade-start-pos: 0;
+    --fade-end-pos: 100%;
+    mask:
+      linear-gradient(#000, #000) no-clip subtract,
+      linear-gradient(to var(--fade-dir), #000, transparent) var(--fade-start-pos) 0 / var(--sh-tab-fade-start) 100% no-repeat no-clip,
+      linear-gradient(to var(--fade-dir), transparent, #000) var(--fade-end-pos) 0 / var(--sh-tab-fade-end) 100% no-repeat no-clip;
+    animation: sh-reveal-tab-fade-start linear both, sh-hide-tab-fade-end linear both;
+    animation-timeline: scroll(self inline);
+    animation-range: 0 var(--fade-size), calc(100% - var(--fade-size)) 100%;
+  }
+
+  .sh-workspace-tablist:dir(rtl) {
+    --fade-dir: left;
+    --fade-start-pos: 100%;
+    --fade-end-pos: 0;
+  }
 }
 
 .sh-workspace-tab {

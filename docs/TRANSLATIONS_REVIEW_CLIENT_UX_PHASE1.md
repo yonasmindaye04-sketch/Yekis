@@ -383,3 +383,108 @@ Generated from the Phase 1 diff (`feat/client-ux-simplification`) on 2026-11-28.
 | 1985 | `om` | `chartEmptyTitle: "Yeroo kana keessatti sochiin hin jiru",` | Pending native review |
 | 1986 | `om` | `chartEmptyDesc: "Boqonnaan yeroo kaffalamu ykn xumuramu sochiin maallaqaa kee asitti mul'ata.",` | Pending native review |
 | 1987 | `om` | `chartRailEmptyDesc: "Boorsaa kee Telebirr, CBE Birr ykn M-Pesa'n yoo guutte kaffaltiiwwan karaadhaan asitti mul'atu.",` | Pending native review |
+
+---
+
+## Phase 2 Navigation Glossary, Merged Tabs & Account Menu Strings (`en`, `am`, `om`, `ti`)
+
+Appended from `git diff 603dec5..HEAD` (`i18n.ts` and `fullPlatformCopy.ts`). Includes all changed/new Phase 2 navigation labels, sub-tab strips, and avatar menu items, alongside unchanged Phase 2 nav/menu destinations for full audit context.
+
+### Navigation Labels (`apps/frontend/src/i18n.ts` & `apps/frontend/src/fullPlatformCopy.ts`)
+
+| Key | Locale | Old Text (`603dec5`) | New Text (`HEAD`) | Native Review Status |
+|---|---|---|---|---|
+| `nav.dashboard` | `en` | `Dashboard` | `Home` | Source baseline |
+| `nav.dashboard` | `am` | `ዳሽቦርድ` | `መነሻ` | Pending native review |
+| `nav.dashboard` | `om` | `Daashboordii` | `Fuula Dura` | Pending native review |
+| `nav.dashboard` | `ti` | `ዳሽቦርድ` | `መበገሲ` | Pending native review |
+| `workspace.nav.overview` | `en` | `Dashboard Overview` | `Home` | Source baseline |
+| `workspace.nav.overview` | `am` | `አጠቃላይ ዳሽቦርድ` | `መነሻ` | Pending native review |
+| `workspace.nav.overview` | `om` | `Daashboordii Waliigalaa` | `Fuula Dura` | Pending native review |
+| `workspace.nav.overview` | `ti` | `ሓፈሻዊ ዳሽቦርድ` | `መበገሲ` | Pending native review |
+| `nav.kyc` | `en` | `KYC Verification` | `Identity verification` | Source baseline |
+| `nav.kyc` | `am` | `የማንነት ማረጋገጫ (KYC)` | `የማንነት ማረጋገጫ` | Pending native review |
+| `nav.kyc` | `om` | `Mirkaneessa Eenyummaa (KYC)` | `Mirkaneessa eenyummaa` | Pending native review |
+| `nav.kyc` | `ti` | `ምርግጋጽ መንነት (KYC)` | `ምርግጋጽ መንነት` | Pending native review |
+| `nav.jobs` | `en` | `Jobs` | `Jobs` | Unchanged |
+| `nav.jobs` | `am` | `ስራዎች` | `ስራዎች` | Unchanged |
+| `nav.jobs` | `om` | `Hojiiwwanii` | `Hojiiwwan` | Pending native review |
+| `nav.jobs` | `ti` | `ስራሕቲ` | `ስራሕቲ` | Unchanged |
+| `nav.contracts` | `en` | `Contracts` | `Contracts` | Unchanged |
+| `nav.contracts` | `am` | `ውሎች (Contracts)` | `ውሎች` | Pending native review |
+| `nav.contracts` | `om` | `Waliigalteewwan` | `Waliigaltee` | Pending native review |
+| `nav.contracts` | `ti` | `ውዕላት` | `ውዕላት` | Unchanged |
+| `walletClientNavLabel` (`!canWork && canHire`) | `en` | `Wallet & Payouts` (reused `nav.wallet`) | `Wallet` (`nav.wallet` kept when `canWork`) | Source baseline |
+| `walletClientNavLabel` (`!canWork && canHire`) | `am` | `ዋሌት እና ክፍያዎች` (reused `nav.wallet`) | `ዋሌት` (`nav.wallet` kept when `canWork`) | Pending native review |
+| `walletClientNavLabel` (`!canWork && canHire`) | `om` | `Boorsaa fi Kaffaltii` (reused `nav.wallet`) | `Boorsaa` (`nav.wallet` kept when `canWork`) | Pending native review |
+| `walletClientNavLabel` (`!canWork && canHire`) | `ti` | `ቦርሳን ክፍሊታትን` (reused `nav.wallet`) | `ቦርሳ` (`nav.wallet` kept when `canWork`) | Pending native review |
+| `servicesNavLabel` (`!canWork && canHire`) | `en` | `Services` | `Services` | Unchanged in Phase 2 |
+| `servicesNavLabel` (`!canWork && canHire`) | `am` | `አገልግሎቶች` | `አገልግሎቶች` | Unchanged in Phase 2 |
+| `servicesNavLabel` (`!canWork && canHire`) | `om` | `Tajaajiloota` | `Tajaajiloota` | Unchanged in Phase 2 |
+| `servicesNavLabel` (`!canWork && canHire`) | `ti` | `ኣገልግሎታት` | `ኣገልግሎታት` | Unchanged in Phase 2 |
+| `workspace.nav.chat` | `en` | `Messages` | `Messages` | Unchanged in Phase 2 |
+| `workspace.nav.chat` | `am` | `መልዕክቶች` | `መልዕክቶች` | Unchanged in Phase 2 |
+| `workspace.nav.chat` | `om` | `Ergaawwan` | `Ergaawwan` | Unchanged in Phase 2 |
+| `workspace.nav.chat` | `ti` | `መልእኽትታት` | `መልእኽትታት` | Unchanged in Phase 2 |
+
+### Merged Jobs & Contracts Tab Labels (`apps/frontend/src/fullPlatformCopy.ts`)
+
+| Key | Locale | Old Text (`603dec5`) | New Text (`HEAD`) | Native Review Status |
+|---|---|---|---|---|
+| `jobsTabsAria` | `en` | *(new)* | `Jobs sections` | Source baseline |
+| `jobsTabsAria` | `am` | *(new)* | `የሥራ ክፍሎች` | Pending native review |
+| `jobsTabsAria` | `om` | *(new)* | `Kutaalee hojii` | Pending native review |
+| `jobsTabsAria` | `ti` | *(new)* | `ክፋላት ስራሕ` | Pending native review |
+| `jobsTabMyJobs` | `en` | *(new)* | `My jobs` | Source baseline |
+| `jobsTabMyJobs` | `am` | *(new)* | `የእኔ ሥራዎች` | Pending native review |
+| `jobsTabMyJobs` | `om` | *(new)* | `Hojiiwwan koo` | Pending native review |
+| `jobsTabMyJobs` | `ti` | *(new)* | `ስራሕተይ` | Pending native review |
+| `jobsTabFindWork` | `en` | *(new; `nav.findWork`: `Find Work`)* | `Find work` | Source baseline |
+| `jobsTabFindWork` | `am` | *(new; `nav.findWork`: `ስራ ፈልግ`)* | `ሥራ ፈልግ` | Pending native review |
+| `jobsTabFindWork` | `om` | *(new; `nav.findWork`: `Hojii Barbaadi`)* | `Hojii barbaadi` | Pending native review |
+| `jobsTabFindWork` | `ti` | *(new; `nav.findWork`: `ስራሕ ድለ`)* | `ስራሕ ድለ` | Pending native review |
+| `jobsTabProposals` | `en` | *(new; `nav.proposals`: `Proposals`)* | `Proposals` | Source baseline |
+| `jobsTabProposals` | `am` | *(new; `nav.proposals`: `ፕሮፖዛሎች`)* | `ፕሮፖዛሎች` | Pending native review |
+| `jobsTabProposals` | `om` | *(new; `nav.proposals`: `Yaadolee`)* | `Yaadolee` | Pending native review |
+| `jobsTabProposals` | `ti` | *(new; `nav.proposals`: `ፕሮፖዛላት`)* | `ፕሮፖዛላት` | Pending native review |
+| `contractsTabsAria` | `en` | *(new)* | `Contracts sections` | Source baseline |
+| `contractsTabsAria` | `am` | *(new)* | `የውል ክፍሎች` | Pending native review |
+| `contractsTabsAria` | `om` | *(new)* | `Kutaalee waliigaltee` | Pending native review |
+| `contractsTabsAria` | `ti` | *(new)* | `ክፋላት ውዕል` | Pending native review |
+| `contractsTabOverview` | `en` | *(new)* | `Overview` | Source baseline |
+| `contractsTabOverview` | `am` | *(new)* | `አጠቃላይ እይታ` | Pending native review |
+| `contractsTabOverview` | `om` | *(new)* | `Ilaalcha waliigalaa` | Pending native review |
+| `contractsTabOverview` | `ti` | *(new)* | `ሓፈሻዊ ትርኢት` | Pending native review |
+| `contractsTabPayments` | `en` | *(new)* | `Payments` | Source baseline |
+| `contractsTabPayments` | `am` | *(new)* | `ክፍያዎች` | Pending native review |
+| `contractsTabPayments` | `om` | *(new)* | `Kaffaltiiwwan` | Pending native review |
+| `contractsTabPayments` | `ti` | *(new)* | `ክፍሊታት` | Pending native review |
+| `contractsTabDisputes` | `en` | *(new)* | `Disputes` | Source baseline |
+| `contractsTabDisputes` | `am` | *(new)* | `ክርክሮች` | Pending native review |
+| `contractsTabDisputes` | `om` | *(new)* | `Falmiiwwan` | Pending native review |
+| `contractsTabDisputes` | `ti` | *(new)* | `ክርክራት` | Pending native review |
+
+### Avatar Menu (`apps/frontend/src/fullPlatformCopy.ts` & `apps/frontend/src/i18n.ts`)
+
+| Key | Locale | Old Text (`603dec5`) | New Text (`HEAD`) | Native Review Status |
+|---|---|---|---|---|
+| `accountMenuAria` | `en` | *(new)* | `Account menu` | Source baseline |
+| `accountMenuAria` | `am` | *(new)* | `የመለያ ዝርዝር` | Pending native review |
+| `accountMenuAria` | `om` | *(new)* | `Baafata herregaa` | Pending native review |
+| `accountMenuAria` | `ti` | *(new)* | `ዝርዝር ኣካውንት` | Pending native review |
+| `workspace.nav.profile` | `en` | `My Profile` | `My Profile` | Unchanged in Phase 2 |
+| `workspace.nav.profile` | `am` | `ፕሮፋይሌ` | `ፕሮፋይሌ` | Unchanged in Phase 2 |
+| `workspace.nav.profile` | `om` | `Piroofaayila Koo` | `Piroofaayila Koo` | Unchanged in Phase 2 |
+| `workspace.nav.profile` | `ti` | `ፕሮፋይለይ` | `ፕሮፋይለይ` | Unchanged in Phase 2 |
+| `nav.kyc` | `en` | `KYC Verification` | `Identity verification` | Updated (see Nav table) |
+| `nav.kyc` | `am` | `የማንነት ማረጋገጫ (KYC)` | `የማንነት ማረጋገጫ` | Pending native review |
+| `nav.kyc` | `om` | `Mirkaneessa Eenyummaa (KYC)` | `Mirkaneessa eenyummaa` | Pending native review |
+| `nav.kyc` | `ti` | `ምርግጋጽ መንነት (KYC)` | `ምርግጋጽ መንነት` | Pending native review |
+| `nav.settings` | `en` | `Settings` | `Settings` | Unchanged in Phase 2 |
+| `nav.settings` | `am` | `ቅንብሮች` | `ቅንብሮች` | Unchanged in Phase 2 |
+| `nav.settings` | `om` | `Qindaa'ina` | `Qindaa'ina` | Unchanged in Phase 2 |
+| `nav.settings` | `ti` | `ቅጥዕታት` | `ቅጥዕታት` | Unchanged in Phase 2 |
+| `signOutLabel` | `en` | `Sign out` (`nav.signOut`) | `Sign out` | Source baseline |
+| `signOutLabel` | `am` | `ውጣ` (`nav.signOut`) | `ውጣ` | Pending native review |
+| `signOutLabel` | `om` | `Ba'i` (`nav.signOut`) | `Bahi` | Pending native review (spelling difference vs `nav.signOut`) |
+| `signOutLabel` | `ti` | `ውጻእ` (`nav.signOut`) | `ውጻእ` | Pending native review |
