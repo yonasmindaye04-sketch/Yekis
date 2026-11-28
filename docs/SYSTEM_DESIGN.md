@@ -1611,12 +1611,13 @@ client is refunded the **full** charge including the client fee.
 
 #### The Chart of Accounts
 
-`CHART_OF_ACCOUNTS` (`ledger.service.ts:7-46`) — seven accounts, plus one generated account per user:
+`CHART_OF_ACCOUNTS` (`ledger.service.ts:7-46`) — eight accounts, plus one generated account per user:
 
 | Code | Name | Type |
 |---|---|---|
 | `1000-ASSET-TELEBIRR` | Telebirr Gateway Settlement Account | ASSET |
 | `1010-ASSET-CBE` | Commercial Bank of Ethiopia Settlement Account | ASSET |
+| `1020-ASSET-MPESA` | Safaricom M-Pesa Gateway Settlement Account *(accountant to confirm code and name)* | ASSET |
 | `2000-LIABILITY-ESCROW` | Customer Milestone Escrow Pool | LIABILITY |
 | `2050-LIABILITY-WITHHOLDING-ERA` | Withholding Tax Payable to ERA | LIABILITY |
 | `2060-LIABILITY-VAT-PAYABLE` | Value Added Tax Payable | LIABILITY |
@@ -1626,7 +1627,7 @@ client is refunded the **full** charge including the client fee.
 
 `2060-LIABILITY-VAT-PAYABLE` is **declared and never used** — VAT is not accrued anywhere, and `PlatformOperatingAccount.accumulatedVatMinor`, `env.VAT_RATE` and `env.VAT_REGISTERED` are likewise never written or read.
 
-`resolveSettlementAssetAccount(provider)` (`ledger.service.ts:62-66`) returns the CBE account **only** when `provider === "CBE_BIRR"`; the comment explains that an earlier version compared against the literal `"CBE"`, which the `PaymentProvider` enum never contains, so every CBE movement was collapsing into the Telebirr line.
+`resolveSettlementAssetAccount(provider)` (`ledger.service.ts`) is exhaustive over the active rails (`TELEBIRR`, `CBE_BIRR`, `M_PESA`) and throws `UnsupportedSettlementProviderError` on any removed or unknown provider (including legacy `CHAPA`) rather than silently falling back to `1000-ASSET-TELEBIRR`.
 
 #### The three pools
 

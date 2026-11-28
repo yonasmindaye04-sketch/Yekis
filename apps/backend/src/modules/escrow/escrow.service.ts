@@ -45,6 +45,8 @@ export class ContractNotFullyExecutedError extends Error {}
 export class InsufficientBalanceError extends Error {}
 export class ActiveContractWithdrawalBlockedError extends Error {}
 export class EscrowAdminHoldError extends Error {}
+/** Persisted rail transaction amount diverges from expected milestone charge. */
+export class PaymentAmountMismatchError extends Error {}
 /** The payout destination (user.phone) has never been proven by SMS. */
 export class PhoneNotVerifiedError extends Error {}
 /** Payout rail is not available or does not support automated disbursement. */
@@ -498,6 +500,53 @@ export async function handlePaymentWebhook(params: {
       milestoneId: transaction.milestoneId,
       totalChargedMinor: transaction.amountMinor,
     });
+
+    if (funded) {
+      const freelancerKyc = await tx.kycRecord.findUnique({
+        where: { userId: transaction.milestone.contract.freelancerId },
+        select: { tin: true },
+      });
+      const expectedFees = calculateFees({
+        milestoneAmountMinor: transaction.milestone.amountMinor,
+        freelancerHasTin: Boolean(freelancerKyc?.tin),
+      });
+      // Guard against posting an unbalanced or fabricated journal if the stored
+      // transaction amount diverges from expected milestone charge + client fee.
+      const clientFeeActual =
+        transaction.amountMinor - transaction.milestone.amountMinor;
+      if (
+        transaction.amountMinor !== expectedFees.clientTotalChargeMinor &&
+        clientFeeActual < 0
+      ) {
+        throw new PaymentAmountMismatchError(
+          `Payment transaction ${transaction.id} amount (${transaction.amountMinor}) is below milestone amount (${transaction.milestone.amountMinor}).`,
+        );
+      }
+      if (transaction.amountMinor !== expectedFees.clientTotalChargeMinor) {
+        logger.error(
+          {
+            transactionId: transaction.id,
+            providerTransactionId: params.providerTransactionId,
+            milestoneId: transaction.milestoneId,
+            transactionAmountMinor: transaction.amountMinor,
+            expectedChargeMinor: expectedFees.clientTotalChargeMinor,
+          },
+          "Rail payment amount does not match expected milestone charge — refusing to post unbalanced funding journal",
+        );
+        throw new PaymentAmountMismatchError(
+          `Payment transaction ${transaction.id} amount (${transaction.amountMinor}) does not match expected charge (${expectedFees.clientTotalChargeMinor}).`,
+        );
+      }
+
+      await recordEscrowFundingLedger(tx, {
+        clientId: transaction.milestone.contract.clientId,
+        milestoneId: transaction.milestoneId,
+        totalChargedMinor: transaction.amountMinor,
+        milestoneGrossMinor: transaction.milestone.amountMinor,
+        platformFeeFromClientMinor: expectedFees.platformFeeFromClientMinor,
+        fundingSource: { kind: "RAIL", provider: params.provider },
+      });
+    }
 
     if (!funded) {
       // The money is real and recorded on the transaction; the milestone is not

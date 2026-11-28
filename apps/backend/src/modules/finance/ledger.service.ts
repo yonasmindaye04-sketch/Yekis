@@ -16,6 +16,12 @@ export const CHART_OF_ACCOUNTS = {
     name: "Commercial Bank of Ethiopia Settlement Account",
     type: LedgerAccountType.ASSET,
   },
+  // Accountant to confirm code and name before production launch.
+  ASSET_MPESA_SETTLEMENT: {
+    code: "1020-ASSET-MPESA",
+    name: "Safaricom M-Pesa Gateway Settlement Account",
+    type: LedgerAccountType.ASSET,
+  },
   // Liabilities (2000s)
   LIABILITY_ESCROW_POOL: {
     code: "2000-LIABILITY-ESCROW",
@@ -49,20 +55,32 @@ export function getUserAccountCode(userId: string): string {
   return `2100-USER-${userId}`;
 }
 
+export class UnsupportedSettlementProviderError extends Error {
+  constructor(provider: string | null | undefined) {
+    super(
+      `Unsupported or removed settlement payment provider: ${provider ?? "(none)"}.`,
+    );
+    this.name = "UnsupportedSettlementProviderError";
+  }
+}
+
 /**
  * Resolves which settlement asset account a provider's cash moves through.
- *
- * The `PaymentProvider` enum values are TELEBIRR, CHAPA, CBE_BIRR and M_PESA.
- * Comparing against the literal "CBE" could never be true, so every CBE
- * top-up and every CBE payout was posting against the Telebirr asset account —
- * two different bank accounts collapsed into one ledger line. Match on the
- * enum member, and default anything unrecognised to Telebirr rather than
- * inventing a new account.
+ * Exhaustive over supported live rails (`TELEBIRR`, `CBE_BIRR`, `M_PESA`).
+ * Any removed or unknown provider (including legacy `CHAPA`) throws a typed
+ * error instead of silently collapsing balances into Telebirr.
  */
 export function resolveSettlementAssetAccount(provider: string | null | undefined) {
-  return provider === "CBE_BIRR"
-    ? CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT
-    : CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+  switch (provider) {
+    case "TELEBIRR":
+      return CHART_OF_ACCOUNTS.ASSET_TELEBIRR_SETTLEMENT;
+    case "CBE_BIRR":
+      return CHART_OF_ACCOUNTS.ASSET_CBE_SETTLEMENT;
+    case "M_PESA":
+      return CHART_OF_ACCOUNTS.ASSET_MPESA_SETTLEMENT;
+    default:
+      throw new UnsupportedSettlementProviderError(provider);
+  }
 }
 
 // === ERROR CLASSES ===
@@ -294,11 +312,14 @@ export async function recordWalletTopUpLedger(
   });
 }
 
+export type EscrowFundingSource =
+  | { kind: "WALLET" }
+  | { kind: "RAIL"; provider: string };
+
 /**
- * Client funds milestone from wallet into escrow.
- * Debit:  LIABILITY (Client wallet account)
- * Credit: LIABILITY (Escrow Pool)
- * Credit: REVENUE (Client fee add-on, if any)
+ * Client funds milestone or gig escrow from wallet or payment rail.
+ * WALLET: DR LIABILITY (Client wallet)  / CR LIABILITY (Escrow Pool) [+ CR REVENUE (Client fee)]
+ * RAIL:   DR ASSET (Settlement rail)    / CR LIABILITY (Escrow Pool) [+ CR REVENUE (Client fee)]
  */
 export async function recordEscrowFundingLedger(
   tx: Prisma.TransactionClient,
@@ -308,15 +329,36 @@ export async function recordEscrowFundingLedger(
     totalChargedMinor: number;
     milestoneGrossMinor: number;
     platformFeeFromClientMinor: number;
+    fundingSource?: EscrowFundingSource;
+    idempotencyKey?: string;
+    description?: string;
   },
 ) {
+  const expectedTotal = params.milestoneGrossMinor + params.platformFeeFromClientMinor;
+  if (params.totalChargedMinor !== expectedTotal) {
+    throw new UnbalancedJournalError(params.totalChargedMinor, expectedTotal);
+  }
+
+  const debitLine: JournalEntryLine =
+    params.fundingSource?.kind === "RAIL"
+      ? (() => {
+          const asset = resolveSettlementAssetAccount(params.fundingSource.provider);
+          return {
+            accountCode: asset.code,
+            accountName: asset.name,
+            accountType: asset.type,
+            debitMinor: params.totalChargedMinor,
+          };
+        })()
+      : {
+          accountCode: getUserAccountCode(params.clientId),
+          accountName: `User Wallet (${params.clientId})`,
+          accountType: LedgerAccountType.LIABILITY,
+          debitMinor: params.totalChargedMinor,
+        };
+
   const entries: JournalEntryLine[] = [
-    {
-      accountCode: getUserAccountCode(params.clientId),
-      accountName: `User Wallet (${params.clientId})`,
-      accountType: LedgerAccountType.LIABILITY,
-      debitMinor: params.totalChargedMinor,
-    },
+    debitLine,
     {
       accountCode: CHART_OF_ACCOUNTS.LIABILITY_ESCROW_POOL.code,
       accountName: CHART_OF_ACCOUNTS.LIABILITY_ESCROW_POOL.name,
@@ -335,12 +377,39 @@ export async function recordEscrowFundingLedger(
   }
 
   return postJournalEntry(tx, {
-    idempotencyKey: `escrow-fund-${params.milestoneId}`,
+    idempotencyKey: params.idempotencyKey ?? `escrow-fund-${params.milestoneId}`,
     referenceType: "ESCROW_FUND",
     referenceId: params.milestoneId,
-    description: `Milestone escrow funding from wallet`,
+    description:
+      params.description ??
+      (params.fundingSource?.kind === "RAIL"
+        ? `Milestone escrow funding via ${params.fundingSource.provider}`
+        : `Milestone escrow funding from wallet`),
     entries,
   });
+}
+
+/**
+ * Reads the client-side fee (4000-REVENUE-PLATFORM-FEES net credit) that was
+ * actually posted by an ESCROW_FUND journal for `referenceId`, or `null` when
+ * no funding journal exists (legacy/unjournaled rows).
+ */
+export async function readEscrowFundClientFeeMinor(
+  tx: Prisma.TransactionClient,
+  referenceId: string,
+): Promise<number | null> {
+  const journal = await tx.ledgerJournal.findFirst({
+    where: { referenceType: "ESCROW_FUND", referenceId },
+    include: {
+      entries: {
+        include: { account: { select: { code: true } } },
+      },
+    },
+  });
+  if (!journal) return null;
+  return journal.entries
+    .filter((e) => e.account.code === CHART_OF_ACCOUNTS.REVENUE_PLATFORM_FEES.code)
+    .reduce((sum, e) => sum + e.creditMinor - e.debitMinor, 0);
 }
 
 /**
@@ -361,6 +430,8 @@ export async function recordMilestoneReleaseLedger(
     platformFeeFromFreelancerMinor: number;
     paymentProviderFeeMinor: number;
     withholdingTaxMinor: number;
+    idempotencyKey?: string;
+    description?: string;
   },
 ) {
   const entries: JournalEntryLine[] = [
@@ -410,10 +481,10 @@ export async function recordMilestoneReleaseLedger(
   }
 
   return postJournalEntry(tx, {
-    idempotencyKey: `escrow-release-${params.milestoneId}`,
+    idempotencyKey: params.idempotencyKey ?? `escrow-release-${params.milestoneId}`,
     referenceType: "MILESTONE_RELEASE",
     referenceId: params.milestoneId,
-    description: `Milestone release to freelancer wallet`,
+    description: params.description ?? `Milestone release to freelancer wallet`,
     entries,
   });
 }
@@ -445,13 +516,15 @@ export async function recordDisputeRefundLedger(
     clientId: string;
     milestoneId: string;
     amountMinor: number;
+    idempotencyKey?: string;
+    description?: string;
   },
 ) {
   return postJournalEntry(tx, {
-    idempotencyKey: `dispute-refund-${params.milestoneId}`,
+    idempotencyKey: params.idempotencyKey ?? `dispute-refund-${params.milestoneId}`,
     referenceType: "DISPUTE_REFUND",
     referenceId: params.milestoneId,
-    description: `Dispute resolution refund to client wallet`,
+    description: params.description ?? `Dispute resolution refund to client wallet`,
     entries: [
       {
         accountCode: CHART_OF_ACCOUNTS.LIABILITY_ESCROW_POOL.code,
