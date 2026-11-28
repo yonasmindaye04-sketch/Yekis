@@ -15,62 +15,57 @@ The left sidebar (`<aside className="platform-sidebar">`) is sticky (`100vh`) on
 2. **Dual-Role Mode Switcher** (`basePlatformRole === "BOTH"`):
    - A 2-way `Client` / `Freelancer` segmented switch in the topbar (and inside the mobile drawer on `<= 1024px`) remembers the user's last selection in `localStorage["yekis_dual_role_mode"]`, defaults to `CLIENT`, and automatically migrates any legacy stored `"BOTH"` value to `"CLIENT"`.
    - Switching mode immediately recalculates `canHire` and `canWork`, showing either the Client workspace or the full Freelancer workspace cleanly.
-3. **Grouped Primary Navigation (`navItems`)**: Grouped into **Hire** (or **Work** for Freelancers: `Dashboard`, `Jobs`/`Find Work`, `Proposals`, `Gigs`, `My Gigs`, `Contracts`), **Money** (`Escrow Center`, `Wallet & Payouts`), **Talk** (`Messages`, `Disputes & Mediation`), and **Account** (`My Profile`, `KYC Verification`, `Settings`).
-   - **Unread Activity Dots (`navActivityCount`)**: Action-required indicator dots only (the numeric count lives in `aria-label` / `title`).
-4. **Account Chip (`user-chip`) & Topbar KYC Status**: Displays `YekisAvatar`, user `displayName` (fallback role label), bold text+icon `KYC: Verified` / `KYC: Required` indicator (`docs/rule.md` §2 — no pills), and Sign out button.
-5. **Role-Specific Mobile Bottom Navigation (`<= 1024px`)**: Pins role-tailored actions (`Dashboard`, `Jobs`, `Escrow Center`, `Wallet` for Client; `Dashboard`, `Find Work`, `Contracts`, `Wallet` for Freelancer) plus **Menu**.
+3. **Grouped Primary Navigation (`navItems`)**:
+   - **Desktop (`>= 1024px`)**: Consolidated Client sidebar holds **6 core items** (`Home`, `Jobs` [with `My jobs` & `Proposals` tabs], `Services`, `Contracts` [with `Overview`, `Payments` (`EscrowWorkspace`), and `Disputes` (`DisputesWorkspace`) tabs], `Wallet` [shown as `Wallet & Payouts` when `canWork` is true], and `Messages`). Freelancer / `BOTH` adds `My Gigs`. Account routes (`My Profile`, `Identity verification`, `Settings`) live in the topbar **Avatar menu** (plus `user-chip`).
+   - **Mobile Header Menu Drawer (`#workspace-mobile-drawer` at `<= 1023px`, opened from the visible topbar Menu button at `360px`)**: Keeps core navigation plus `Services`, `Profile`, `Identity verification`, and `Settings` directly reachable.
+   - **Unread Activity Badges (`navActivityCount`)**: Aggregated across merged sections (`Jobs` combines `jobs` + `proposals` + new briefs; `Contracts` combines `contracts` + `escrow` + `cases`). Opening a host tab clears the matching unread notifications via `markViewNotificationsRead()`.
+4. **Account Avatar Menu & Topbar KYC Status**: Topbar Avatar opens `#workspace-avatar-menu` (`Profile`, `Identity verification`, `Settings`, `Sign out`); `KYC: Verified` / `KYC: Required` renders as bold plain text+icon (`docs/rule.md` §2 — no pills, no clickable duplicate). Top-level views hide the universal back arrow and workspace breadcrumb prefix, keeping them on detail sub-views (`profile-edit`, another member's `profile`).
+5. **Mobile Bottom Navigation (`<= 1023px`, Option B)**: Pins **5** thumb-zone tabs across roles: **Home** (`overview`), **Jobs** (`jobs`), **Contracts** (`contracts`), **Wallet** (`wallet`, or `Wallet & Payouts` when `canWork`), and **Messages** (`chat`, with unread `.nav-dot`). The header menu button remains visible at `360px` to reach **Services**, **Profile**, **Identity verification**, and **Settings**.
 
 ---
 
 ## 2. Role Visibility & Route Map
 
-| # | View Key | Client (`CLIENT`) Label | Freelancer (`FREELANCER`) Label | Dual-Role (`BOTH`) Label | Source Component(s) |
-|---|---|---|---|---|---|
-| 1 | `overview` | **Dashboard** | **Dashboard** | **Dashboard** | `MarketplaceShadcnDashboard.tsx` |
-| 2 | `jobs` | **Jobs** | **Find Work** | **Find Work / Post a Job** | `FullPlatformApp.tsx`, `JobsWorkspace.tsx` |
-| 3 | `proposals` | **Proposals** | **Proposals** | **Proposals** | `JobsWorkspace.tsx` |
-| 4 | `gigs` | **Gigs** | **Gigs** | **Gigs** | `GigMarketplace.tsx` |
-| 5 | `my-gigs` | *Hidden* | **My Gigs** | **My Gigs** | `GigSellerDashboard.tsx` |
-| 6 | `contracts` | **Contracts** | **Contracts** | **Contracts** | `WorkflowWorkspace.tsx` (`ContractsWorkspace`) |
-| 7 | `escrow` | **Escrow Center** | **Escrow Center** | **Escrow Center** | `WorkflowWorkspace.tsx` (`EscrowWorkspace`) |
-| 8 | `wallet` | **Wallet & Payouts** | **Wallet & Payouts** | **Wallet & Payouts** | `BrowserWallet.tsx` |
-| 9 | `chat` | **Messages** | **Messages** | **Messages** | `ChatWorkspace.tsx` |
-| 10 | `profile` | **My Profile** | **My Profile** | **My Profile** | `ProfilePage.tsx` (+ `ProfileEditPage.tsx`) |
-| 11 | `cases` | **Disputes & Mediation** | **Disputes & Mediation** | **Disputes & Mediation** | `WorkflowWorkspace.tsx` (`DisputesWorkspace`) |
-| 12 | `verification` | **KYC Verification** | **KYC Verification** | **KYC Verification** | `BrowserVerification.tsx` |
-| 13 | `settings` | **Settings** | **Settings** | **Settings** | `SettingsWorkspace.tsx` |
+*(All 14 `View` keys remain valid deep-link aliases across notifications, `CommandPalette`, `FirstRunChecklist`, and the 12 Yekis Guide module tours via `resolveViewAlias()`.)*
 
-> **Workspace-wide Topbar & Help Controls**: Outside the sidebar items themselves, the persistent topbar provides **Universal Back**, **Command Palette** (`Cmd/Ctrl+K`, quick-jumping to views or switching dual-role mode), **Language Selector** (`en`/`am`/`om`/`ti`, synced via `PATCH /api/v1/users/me/profile`), **Sound Toggle**, **Theme Toggle** (light/dark), **Notification Center** (deep-linking into the relevant view), **Global Help Menu** (`?` / `Shift+?` — interactive product tours, page explanations, searchable help docs, shortcuts, and contact support), and **Avatar** (`openMyProfile()`).
+| # | View Key | Client (`CLIENT`) Surface | Freelancer (`FREELANCER`) Surface | Dual-Role (`BOTH`) Surface | Source Component(s) |
+|---|---|---|---|---|---|
+| 1 | `overview` | **Home** (Sidebar + Mobile Bar) | **Home** | **Home** | `MarketplaceShadcnDashboard.tsx` |
+| 2 | `jobs` | **Jobs** -> `My jobs` tab (Sidebar + Mobile Bar) | **Find Work** | **Find Work / Post a Job** | `FullPlatformApp.tsx`, `JobsWorkspace.tsx` |
+| 3 | `proposals` | *Alias -> `Jobs` -> `Proposals` tab* | *Alias -> `Jobs` -> `Proposals` tab* | *Alias -> `Jobs` -> `Proposals` tab* | `JobsWorkspace.tsx` |
+| 4 | `gigs` | **Services** (Sidebar + Mobile Drawer) | **Gigs** | **Gigs / Services** | `GigMarketplace.tsx` |
+| 5 | `my-gigs` | *Hidden* | **My Gigs** (Sidebar) | **My Gigs** | `GigSellerDashboard.tsx` |
+| 6 | `contracts` | **Contracts** -> `Overview` tab (Sidebar + Mobile Bar) | **Contracts** | **Contracts** | `WorkflowWorkspace.tsx` (`ContractsWorkspace`) |
+| 7 | `escrow` | *Alias -> `Contracts` -> `Payments` tab* | *Alias -> `Contracts` -> `Payments` tab* | *Alias -> `Contracts` -> `Payments` tab* | `WorkflowWorkspace.tsx` (`EscrowWorkspace`) |
+| 8 | `wallet` | **Wallet** (Sidebar + Mobile Bar) | **Wallet & Payouts** | **Wallet** / **Wallet & Payouts** | `BrowserWallet.tsx` |
+| 9 | `chat` | **Messages** (Sidebar + Mobile Bar) | **Messages** | **Messages** | `ChatWorkspace.tsx` |
+| 10 | `profile` | **Avatar Menu** + Mobile Drawer (`My Profile`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `ProfilePage.tsx` (+ `ProfileEditPage.tsx`) |
+| 11 | `cases` | *Alias -> `Contracts` -> `Disputes` tab* | *Alias -> `Contracts` -> `Disputes` tab* | *Alias -> `Contracts` -> `Disputes` tab* | `WorkflowWorkspace.tsx` (`DisputesWorkspace`) |
+| 12 | `verification` | **Avatar Menu** + Mobile Drawer (`Identity verification`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `BrowserVerification.tsx` |
+| 13 | `settings` | **Avatar Menu** + Mobile Drawer (`Settings`) | **Avatar Menu** + Mobile Drawer | **Avatar Menu** + Mobile Drawer | `SettingsWorkspace.tsx` |
+
+> **Workspace-wide Topbar & Help Controls**: Outside the sidebar items themselves, the persistent topbar provides **Mobile Header Menu Button** (`<= 1023px`, including `360px`), **Universal Back** (on detail sub-views), **Command Palette** (`Cmd/Ctrl+K`, including `Proposals`, `Escrow / Payments`, `Disputes`, `Identity Verification`, `Profile`, and `Settings`), **Language Selector** (`en`/`am`/`om`/`ti`, synced via `PATCH /api/v1/users/me/profile`), **Theme Toggle** (single topbar theme switch for light/dark; Sound toggle lives in **Settings**), **Notification Center** (deep-linking into host tabs and clearing alias unread counts), **Global Help Menu** (`?` / `Shift+?` — interactive 12-module product tours synced via `getActiveGuideModule()`), and **Avatar Menu** (`Profile`, `Identity verification`, `Settings`, `Sign out`).
 
 ---
 
 ## 3. Detailed Feature Reference (By Sidebar Item)
 
 ### 3.1 Dashboard (`overview`)
-- **Component**: `apps/frontend/src/components/dashboard/MarketplaceShadcnDashboard.tsx` (with `ShadcnCharts.tsx`, `AdvancedDataTable.tsx`, `KanbanBoardView.tsx`, `CalendarScheduleView.tsx`, and `FeaturedCarousel.tsx`).
+- **Component**: `apps/frontend/src/components/dashboard/MarketplaceShadcnDashboard.tsx` (with code-split lazy `ShadcnCharts.tsx`, `AdvancedDataTable.tsx`, `KanbanBoardView.tsx`, `CalendarScheduleView.tsx`, and `FeaturedCarousel.tsx`).
 - **Role Differences**:
-  - **Client (`canHire && !canWork`)**: Brief KPI card reads **Your Briefs** and uses `myJobs` (`GET /api/v1/jobs/mine`); right operational card shows **Active Hiring Briefs** with **Manage** buttons; **Featured Talent** carousel (`FeaturedCarousel`) renders below the two-column grid so clients can click into freelancer profiles or start direct chat. Primary topbar CTA is **Post a Job Brief** (routes to `jobs`).
-  - **Freelancer (`!canHire && canWork`)**: Brief KPI card reads **Open Marketplace Briefs** and uses `jobs` (`GET /api/v1/jobs`); right operational card shows **Recommended Briefs** with **Submit Proposal** buttons; **Featured Talent** carousel is hidden. Primary topbar CTA is **Browse Open Briefs** (routes to `jobs`).
-  - **Both (`canHire && canWork`)**: Uses marketplace `jobs` for the briefs card and **Featured Talent** carousel is shown alongside **Post a Job Brief**.
+  - **Client (`canHire && !canWork`)**: While `hasActivity === false` (zero jobs, contracts, milestones, or `APPROVED` top-ups), hides KPI strip, charts, and empty list cards so `FirstRunChecklist` renders immediately under the sub-header (`Verify identity` primary CTA when unverified, or `Post a job` when verified, plus `Browse services` once). Once active (`hasActivity === true`), orders Client Home as `Needs your attention` -> `Active contracts` -> `Your open jobs` -> compact KPIs (`Wallet balance`, `Held in escrow`) -> `Verified freelancers` (`FeaturedCarousel`) -> collapsible `Insights` (shown and lazy-loaded only when at least one `RELEASED` milestone or `APPROVED` top-up exists).
+  - **Freelancer (`!canHire && canWork`)**: Displays the 4 KPI cards (`Wallet balance`, `Held in escrow`, `Work in progress`, `Open jobs`), `Needs your attention`, collapsible `Insights` when settled/approved records exist, `Recent Escrow & Milestone Activity`, and `Recommended Jobs` with **Submit Proposal** buttons (`FeaturedCarousel` is hidden). Primary topbar CTA is **Browse Open Jobs** (routes to `jobs`).
+  - **Both (`canHire && canWork`)**: Uses the persisted 2-way `Client` / `Freelancer` mode switch to render the corresponding Client or Freelancer layout cleanly.
 - **What It Shows**:
-  - **Top Sub-Header**: View switcher between **Executive Analytics** (`dashboard-1`) and **Work Pipeline** (`dashboard-2`, with **Table**, **Kanban**, and **Calendar** sub-tabs showing record counts), plus **Quick Jump (`⌘K`)**, **Refresh**, and role-specific primary CTA.
-  - **4 Expandable KPI Cards** (all derived from real account data — no synthetic baselines; shows `"No prior baseline"` when prior-period history is empty):
-    1. **Available Wallet Balance**: Current balance in ETB, 30-day approved top-up delta; expands to show *Approved Top-Ups*, *Pending Receipt Verification*, and **Open Wallet Desk**.
-    2. **Protected in Escrow**: Sum of funded non-terminal milestones (`ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `ACCEPTED`, `DISPUTED`), 30-day funded trend; expands to show *Released YTD*, *Submitted for QA*, and **Inspect Contracts**.
-    3. **Active Milestone Velocity**: Count of non-terminal milestones (`!== RELEASED/REFUNDED/PARTIAL_REFUND`), on-time delivery rate; expands to show *In Active Delivery*, *Escrow Funded & Ready*, and **Open Kanban**.
-    4. **Your Briefs / Open Marketplace Briefs**: Open brief count and briefs created in last 7 days; expands to show *Combined Budget Pool* and **Explore Briefs**.
-  - **Executive Analytics Mode (`dashboard-1`)**:
-    - **Cashflow Area Chart**: Buckets milestone `fundedAt` (escrow inflow) and `releasedAt` (payouts) across selectable time windows (`7d`, `30d`, `90d`, etc.). Renders an empty state if no movements exist in the window.
-    - **Rail Velocity Bar Chart**: Buckets escrow funding + approved wallet top-ups by payment rail (`TELEBIRR`, `CBE_BIRR`, `M_PESA`, internal wallet).
-    - **Recent Milestone Escrow Activity**: Latest 5 milestones with `#id`, localized status, due date, ETB amount, and **Contract** button (`contracts`), plus **Open Full Table**.
-    - **Active Hiring Briefs / Recommended Briefs**: Latest 4 briefs with category, deadline, max budget, and action link to `jobs`.
-  - **Work Pipeline Mode (`dashboard-2`)** *(read-only projections of live server escrow state + server fee breakdowns)*:
-    - **Table (`AdvancedDataTable`)**: Searchable, sortable, paginated milestone ledger with CSV export, column visibility toggle, mobile card/table switch, role-aware fee columns (`Client fee` / `Total` vs. `Platform fee` / `Provider fee` / `Net payout`), and a row-inspector drawer with role-gated actions (**Fund Milestone**, **Review & Release**, **Submit Delivery**, **Dispute**, **Open in Escrow Center**, **Open Full Contract Room**).
-    - **Kanban (`KanbanBoardView`)**: 5 milestone columns (`BACKLOG`, `ESCROW_HELD`, `WORK_IN_PROGRESS`, `SUBMITTED_FOR_REVIEW`, `RELEASED`) with client/freelancer/contract/priority/overdue filters, column collapse, empty-stage navigation CTAs (**Open Contracts** / **Open Escrow Center**), and an inline native `<dialog>` inspector showing server fee breakdowns and role-gated escrow actions.
-    - **Calendar (`CalendarScheduleView`)**: Interactive schedule grid supporting **Gregorian** and **Ethiopian Fiscal Calendar** (`kenat`) modes, **Today** navigation (`Africa/Addis_Ababa`), plotting milestone due dates (`MILESTONE_DUE`, `PAYOUT_RELEASE`, `COMPLIANCE_KYC`) and brief deadlines (`PROPOSAL_DEADLINE`) with **Open in Escrow Center** links.
+  - **Top Sub-Header**: View switcher between **Overview** (`dashboard-1`) and **Pipeline** (`dashboard-2`, with **List**, **Board**, and **Calendar** sub-tabs), plus **Quick Jump (`⌘K`)**, **Refresh**, secondary **Browse services** (when checklist is not mounted), and role-specific primary CTA.
+  - **KPI Cards** (derived from real account data — `"No prior baseline"` when prior-period history is empty): **Wallet balance**, **Held in escrow**, and for Freelancer/Admin also **Work in progress** and **Open jobs**.
+  - **Pipeline Mode (`dashboard-2`)** *(code-split read-only projections of live server escrow state + server fee breakdowns)*:
+    - **List (`AdvancedDataTable`)**: Shows a single empty state + primary action when `records.length === 0`; when active, provides searchable/sortable/paginated milestone list with **View payments** and **View your contracts** actions.
+    - **Board (`KanbanBoardView`)**: Shows a single empty state + primary action when `tasks.length === 0`; when active, displays stage columns (**Payment pending**, **Escrow held**, **In progress**, **Ready for review**, **Paid**, and a dedicated **In dispute / Refunded** column whenever disputed/refunded milestones exist).
+    - **Calendar (`CalendarScheduleView`)**: Month grid, **Today**, and **Add Reminder** stay visible when empty (hiding filters, legend, and fiscal quarter cards until events exist); supports **Gregorian** and **Ethiopian Fiscal Calendar** (`kenat`, `tabular-nums`, `2026-11-27` = `Hidar 18, 2019 E.C.`) with **View payments** links.
 - **What It Executes**:
-  - Refresh calls `loadWorkspace()` (`GET /api/v1/auth/me`, `/escrow/wallet`, `/jobs`, `/jobs/mine`, `/escrow/milestones`, `/wallet/topups`, `/users/me/profile-completeness`).
-  - Card/button navigation jumps to `wallet`, `contracts`, `jobs`, `profile` (selected freelancer), or `chat` (`openChatWithUser()`).
+  - Refresh calls `loadWorkspace()` (`GET /api/v1/auth/me`, `/escrow/wallet`, `/jobs`, `/jobs/mine`, `/contracts`, `/chat/conversations`, `/escrow/milestones`, `/wallet/topups`, `/escrow/fee-config`, `/users/me/profile-completeness`).
+  - Card/button navigation jumps to `wallet`, `contracts`, `escrow`, `jobs`, `proposals`, `profile` (selected freelancer), or `chat` (`openChatWithUser()`).
 
 ---
 

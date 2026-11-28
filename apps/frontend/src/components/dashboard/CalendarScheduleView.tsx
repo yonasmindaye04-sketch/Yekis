@@ -17,9 +17,7 @@ import { api, type WorkspaceReminderItem } from "../../api/client";
 import type { ScheduleEvent, ScheduleEventType } from "./dashboardData";
 import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
-import { railLabel } from "./dashboardData";
-import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
-import { getTodayAddisIso } from "./KanbanBoardView";
+import { getTodayAddisIso, railLabel } from "./dashboardData";
 
 import {
   formatEthiopianDate,
@@ -409,10 +407,7 @@ export function CalendarScheduleView({
     <div className="sh-card" data-tour="dashboard-calendar">
       <div className="sh-card-header">
         <div>
-          <div className="yk-help-heading-row">
-            <h3 className="sh-card-title">{copy.title}</h3>
-            <ContextualHelpTrigger helpId="dashboard-calendar" />
-          </div>
+          <h3 className="sh-card-title">{copy.title}</h3>
           <p className="sh-card-desc">
             {copy.subtitle}
           </p>
@@ -479,55 +474,59 @@ export function CalendarScheduleView({
           </div>
         </div>
 
-        <div
-          className="sh-segmented"
-          role="group"
-          aria-label={copy.filterTypeAria}
-        >
-          {(
-            [
-              ["ALL", copy.filterAllEvents],
-              ["MILESTONE_DUE", copy.typeLabels.MILESTONE_DUE],
-              ["PAYOUT_RELEASE", copy.typeLabels.PAYOUT_RELEASE],
-              ["PROPOSAL_DEADLINE", copy.filterProposals],
-              ["COMPLIANCE_KYC", copy.typeLabels.COMPLIANCE_KYC],
-              ["PERSONAL_REMINDER", copy.typeLabels.PERSONAL_REMINDER],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              className={`sh-seg-btn ${typeFilter === key ? "active" : ""}`}
-              aria-pressed={typeFilter === key}
-              onClick={() => setTypeFilter(key)}
-            >
-              {label}
-            </button>
-          ))}
+        {combinedEvents.length > 0 && (
+          <div
+            className="sh-segmented"
+            role="group"
+            aria-label={copy.filterTypeAria}
+          >
+            {(
+              [
+                ["ALL", copy.filterAllEvents],
+                ["MILESTONE_DUE", copy.typeLabels.MILESTONE_DUE],
+                ["PAYOUT_RELEASE", copy.typeLabels.PAYOUT_RELEASE],
+                ["PROPOSAL_DEADLINE", copy.filterProposals],
+                ["COMPLIANCE_KYC", copy.typeLabels.COMPLIANCE_KYC],
+                ["PERSONAL_REMINDER", copy.typeLabels.PERSONAL_REMINDER],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={`sh-seg-btn ${typeFilter === key ? "active" : ""}`}
+                aria-pressed={typeFilter === key}
+                onClick={() => setTypeFilter(key)}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Event Type Color Legend — hidden until events exist */}
+      {combinedEvents.length > 0 && (
+        <div className="sh-cal-legend" aria-label="Schedule category legend">
+          <span className="sh-cal-legend-item is-due">
+            <Clock size={12} aria-hidden="true" /> {copy.typeLabels.MILESTONE_DUE}
+          </span>
+          <span className="sh-cal-legend-item is-released">
+            <CheckCircle2 size={12} aria-hidden="true" /> {copy.typeLabels.PAYOUT_RELEASE}
+          </span>
+          <span className="sh-cal-legend-item is-proposal">
+            <Briefcase size={12} aria-hidden="true" /> {copy.typeLabels.PROPOSAL_DEADLINE}
+          </span>
+          <span className="sh-cal-legend-item is-compliance">
+            <ShieldCheck size={12} aria-hidden="true" /> {copy.typeLabels.COMPLIANCE_KYC}
+          </span>
+          <span className="sh-cal-legend-item is-reminder">
+            <Bell size={12} aria-hidden="true" /> {copy.typeLabels.PERSONAL_REMINDER}
+          </span>
         </div>
-      </div>
+      )}
 
-      {/* Event Type Color Legend */}
-      <div className="sh-cal-legend" aria-label="Schedule category legend">
-        <span className="sh-cal-legend-item is-due">
-          <Clock size={12} aria-hidden="true" /> {copy.typeLabels.MILESTONE_DUE}
-        </span>
-        <span className="sh-cal-legend-item is-released">
-          <CheckCircle2 size={12} aria-hidden="true" /> {copy.typeLabels.PAYOUT_RELEASE}
-        </span>
-        <span className="sh-cal-legend-item is-proposal">
-          <Briefcase size={12} aria-hidden="true" /> {copy.typeLabels.PROPOSAL_DEADLINE}
-        </span>
-        <span className="sh-cal-legend-item is-compliance">
-          <ShieldCheck size={12} aria-hidden="true" /> {copy.typeLabels.COMPLIANCE_KYC}
-        </span>
-        <span className="sh-cal-legend-item is-reminder">
-          <Bell size={12} aria-hidden="true" /> {copy.typeLabels.PERSONAL_REMINDER}
-        </span>
-      </div>
-
-      {/* Ethiopian Fiscal Year Context */}
-      {fiscalView && (
+      {/* Ethiopian Fiscal Year Context — hidden until events exist */}
+      {combinedEvents.length > 0 && fiscalView && (
         <div className="sh-fiscal-bar">
           <div className="sh-fiscal-summary">
             <span className="sh-fiscal-eyebrow">{copy.fiscalYearEyebrow}</span>
@@ -601,12 +600,12 @@ export function CalendarScheduleView({
               aria-pressed={isSelected}
               onClick={() => selectDate(dateStr)}
             >
-              <span className="sh-mono">
+              <span className="sh-tabular">
                 {isFiscal
                   ? formatEthiopianDate(dateStr, "short")
                   : formatGregorianDate(dateStr, "short")}
               </span>
-              <span className="sh-mono sh-cal-mobile-pill-count">
+              <span className="sh-tabular sh-cal-mobile-pill-count">
                 {list.length}
               </span>
             </button>
@@ -656,18 +655,18 @@ export function CalendarScheduleView({
                 >
                   <div className="sh-cal-cell-head">
                     <span className="sh-cal-day-stack">
-                      <span className="sh-mono sh-cal-day-num">{cell.day}</span>
+                      <span className="sh-tabular sh-cal-day-num">{cell.day}</span>
                       {isToday && (
                         <span className="sh-cal-today-tag">{copy.todayBadge}</span>
                       )}
                       {isFiscal && cell.altLabel && (
-                        <span className="sh-mono sh-cal-alt-date">
+                        <span className="sh-tabular sh-cal-alt-date">
                           {cell.altLabel}
                         </span>
                       )}
                     </span>
                     {dayEvents.length > 0 && (
-                      <span className="sh-mono sh-cal-day-count">
+                      <span className="sh-tabular sh-cal-day-count">
                         {copy.itemsCount(dayEvents.length)}
                       </span>
                     )}
@@ -683,7 +682,7 @@ export function CalendarScheduleView({
                       </div>
                     ))}
                     {dayTotalMinor > 0 && (
-                      <div className="sh-cal-day-vol sh-mono">
+                      <div className="sh-cal-day-vol sh-tabular">
                         ETB {(dayTotalMinor / 100).toLocaleString()}
                       </div>
                     )}
@@ -699,7 +698,7 @@ export function CalendarScheduleView({
           <div className="sh-cal-agenda-head">
             <div>
               <span
-                className="sh-mono sh-text-muted"
+                className="sh-tabular sh-text-muted"
                 style={{ fontSize: "0.75rem" }}
               >
                 {copy.selectedDateLabel}
@@ -725,7 +724,7 @@ export function CalendarScheduleView({
             <span className="sh-cal-fiscal-context-months">
               {selectedFiscal.monthLabel}
             </span>
-            <span className="sh-mono sh-cal-fiscal-context-range">
+            <span className="sh-tabular sh-cal-fiscal-context-range">
               {formatGregorianDateRange(
                 selectedFiscal.startIso,
                 selectedFiscal.endIso,
@@ -802,11 +801,11 @@ export function CalendarScheduleView({
               return (
               <article key={ev.id} className={`sh-agenda-item ${ev.type === "PERSONAL_REMINDER" ? "is-reminder" : ""}`}>
                 <div className="sh-cell-meta">
-                  <span className="sh-mono">{ev.time}</span>
+                  <span className="sh-tabular">{ev.time}</span>
                   <span aria-hidden="true">·</span>
                   <span>{copy.typeLabels[ev.type]}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="sh-mono">{ev.contractRef}</span>
+                  <span className="sh-tabular">{ev.contractRef}</span>
                 </div>
 
                 <h5 className="sh-agenda-title">{ev.title}</h5>
@@ -823,7 +822,7 @@ export function CalendarScheduleView({
                   {ev.type === "PERSONAL_REMINDER" ? (
                     <span className="sh-cell-meta">Personal reminder</span>
                   ) : (
-                    <strong className="sh-mono">
+                    <strong className="sh-tabular">
                       ETB {(ev.amountMinor / 100).toLocaleString()}
                     </strong>
                   )}
@@ -900,7 +899,7 @@ export function CalendarScheduleView({
                 title={`${formatGregorianDate(ev.date, "long")} · ${formatEthiopianDate(ev.date, "long")}`}
                 onClick={() => selectDate(ev.date)}
               >
-                <span className="sh-mono sh-text-muted">
+                <span className="sh-tabular sh-text-muted">
                   {isFiscal
                     ? formatEthiopianDate(ev.date, "short")
                     : formatGregorianDate(ev.date, "short")}
@@ -911,7 +910,7 @@ export function CalendarScheduleView({
                 >
                   {ev.title}
                 </span>
-                <strong className="sh-mono">
+                <strong className="sh-tabular">
                   {ev.type === "PERSONAL_REMINDER"
                     ? copy.typeLabels.PERSONAL_REMINDER
                     : `ETB ${(ev.amountMinor / 100).toLocaleString()}`}

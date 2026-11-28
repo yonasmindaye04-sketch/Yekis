@@ -377,27 +377,46 @@ export const FeaturedCarousel = ({
       ) : displayedTalents.length === 0 ? (
         <div className="ft-empty">{copy.emptySaved}</div>
       ) : (
-        <section className="ft-grid" aria-label={copy.gridAria}>
+        <section
+          className="ft-grid"
+          data-compact-count={displayedTalents.length < 3 ? "true" : "false"}
+          aria-label={copy.gridAria}
+        >
           {displayedTalents.map((talent) => {
             const name = talent.displayName?.trim() || copy.verifiedFreelancerFallback;
             const role =
               talent.roleTitle ||
               talent.primarySkill?.nameEn ||
               copy.professionalFreelancerFallback;
+            const localizedRole = localizeSkillName(role, language).trim().toLowerCase();
             const isSaved = savedIds.has(talent.id);
             const initials = getInitials(name);
             const avatarBg = getAvatarColor(talent);
-            const skills = (
-              talent.skills && talent.skills.length > 0
-                ? talent.skills
-                : [role]
+            const dedupedSkills = Array.from(
+              new Map(
+                (talent.skills ?? [])
+                  .map((s) => ({
+                    raw: s,
+                    localized: localizeSkillName(s, language).trim(),
+                  }))
+                  .filter(
+                    ({ raw, localized }) =>
+                      localized.length > 0 &&
+                      localized.toLowerCase() !== localizedRole &&
+                      raw.trim().toLowerCase() !== role.trim().toLowerCase(),
+                  )
+                  .map((entry) => [entry.localized.toLowerCase(), entry]),
+              ).values(),
             ).slice(0, 3);
-            const isNew = talent.isNew || talent.totalJobsCompleted === 0;
+            const hasRating =
+              typeof talent.ratingAverage === "number" && talent.ratingAverage > 0;
+            const isNew = talent.isNew || (talent.totalJobsCompleted === 0 && !hasRating);
             const isTopRated = !isNew && (talent.ratingAverage ?? 0) >= 4.8;
-            const isAvailable = talent.totalJobsCompleted <= 0;
-            const statusText = !isAvailable
-              ? copy.jobsDelivered(talent.totalJobsCompleted)
-              : copy.statusAvailable;
+            const isAvailable = talent.isAvailableForWork ?? talent.totalJobsCompleted <= 0;
+            const statusText =
+              talent.totalJobsCompleted > 0
+                ? copy.jobsDelivered(talent.totalJobsCompleted)
+                : copy.statusAvailable;
 
             return (
               <article
@@ -449,7 +468,7 @@ export const FeaturedCarousel = ({
                 </div>
 
                 <h3 className="ft-card-name">
-                  {name}{" "}
+                  <span>{name}</span>{" "}
                   {isNew ? (
                     <span className="ft-badge new">{copy.badgeNew}</span>
                   ) : isTopRated ? (
@@ -457,32 +476,74 @@ export const FeaturedCarousel = ({
                   ) : null}
                 </h3>
 
-                <p className="ft-role">{role}</p>
+                <p className="ft-role">{localizeSkillName(role, language)}</p>
 
-                <p className="ft-skills">
-                  {skills.map((skill, idx) => (
-                    <React.Fragment key={skill}>
-                      {idx > 0 && <span className="dot">·</span>}
-                      {localizeSkillName(skill, language)}
-                    </React.Fragment>
-                  ))}
-                </p>
+                {dedupedSkills.length > 0 && (
+                  <p className="ft-skills">
+                    {dedupedSkills.map((skill, idx) => (
+                      <React.Fragment key={skill.raw}>
+                        {idx > 0 && <span aria-hidden="true"> · </span>}
+                        {skill.localized}
+                      </React.Fragment>
+                    ))}
+                  </p>
+                )}
+
+                <div className="ft-meta-row">
+                  <span className="ft-meta-item sh-tabular">
+                    <Star size={12} aria-hidden="true" />
+                    {hasRating
+                      ? Number(talent.ratingAverage).toFixed(1)
+                      : copy.statNew}
+                  </span>
+                  {talent.totalJobsCompleted > 0 && (
+                    <span className="ft-meta-item sh-tabular">
+                      <Briefcase size={12} aria-hidden="true" />
+                      {copy.jobsDelivered(talent.totalJobsCompleted)}
+                    </span>
+                  )}
+                  {typeof talent.hourlyRateETB === "number" && talent.hourlyRateETB > 0 && (
+                    <span className="ft-meta-item sh-tabular">
+                      ETB {talent.hourlyRateETB.toLocaleString()}{copy.perHourShort}
+                    </span>
+                  )}
+                  {talent.location && (
+                    <span className="ft-meta-item">
+                      <MapPin size={12} aria-hidden="true" />
+                      {talent.location}
+                    </span>
+                  )}
+                </div>
 
                 <div className="ft-foot">
                   <span className={`ft-status ${isAvailable ? "" : "neutral"}`}>
-                    <span className="dot" />
-                    {statusText}
+                    <CheckCircle size={13} aria-hidden="true" />
+                    <span>{statusText}</span>
                   </span>
-                  <button
-                    type="button"
-                    className="ft-view"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCardClick(talent);
-                    }}
-                  >
-                    {copy.viewProfileBtn} <ArrowRight size={13} strokeWidth={2} />
-                  </button>
+                  <div className="ft-foot-actions">
+                    {onOpenChat && (
+                      <button
+                        type="button"
+                        className="sh-row-action-btn ft-msg-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenChat(talent.id, name);
+                        }}
+                      >
+                        <MessageSquare size={13} aria-hidden="true" /> {copy.messageBtn}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="ft-view"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCardClick(talent);
+                      }}
+                    >
+                      {copy.viewProfileBtn} <ArrowRight size={13} strokeWidth={2} />
+                    </button>
+                  </div>
                 </div>
               </article>
             );
@@ -582,24 +643,6 @@ export const FeaturedCarousel = ({
                 <button
                   type="button"
                   className="ft-btn-primary"
-                  onClick={() => {
-                    const fn = selectedTalent.displayName.split(" ")[0];
-                    showToast(copy.startingProposalToast(fn));
-                    const id = selectedTalent.id;
-                    const name = selectedTalent.displayName;
-                    setSelectedTalent(null);
-                    if (onOpenChat) {
-                      onOpenChat(id, name);
-                    } else {
-                      handleOpenFullProfile(id);
-                    }
-                  }}
-                >
-                  <Briefcase size={16} /> {copy.hireBtn(selectedTalent.displayName.split(" ")[0])}
-                </button>
-                <button
-                  type="button"
-                  className="ft-btn-secondary"
                   onClick={() => {
                     const fn = selectedTalent.displayName.split(" ")[0];
                     showToast(copy.openingChatToast(fn));
@@ -750,9 +793,9 @@ export const FeaturedCarousel = ({
                     </div>
                   )}
 
-                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", fontWeight: 600, color: "var(--color-primary)", marginBottom: 14 }}>
-                    <span className="carousel-live-dot" />
-                    {copy.availableNewProjects}
+                  <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "0.82rem", fontWeight: 700, color: "var(--color-primary-text-link, var(--color-primary))", marginBottom: 14 }}>
+                    <CheckCircle size={14} aria-hidden="true" />
+                    <span>{copy.availableNewProjects}</span>
                   </div>
 
                   <div style={{ borderTop: "1px solid var(--color-border)", paddingTop: 10, fontSize: "0.82rem" }}>
@@ -776,7 +819,7 @@ export const FeaturedCarousel = ({
                     style={{ width: "100%", marginTop: 14 }}
                     onClick={() => {
                       const fn = selectedTalent.displayName.split(" ")[0];
-                      showToast(copy.startingProposalToast(fn));
+                      showToast(copy.openingChatToast(fn));
                       const id = selectedTalent.id;
                       const name = selectedTalent.displayName;
                       setSelectedTalent(null);
@@ -787,7 +830,7 @@ export const FeaturedCarousel = ({
                       }
                     }}
                   >
-                    {copy.hireBtn(selectedTalent.displayName.split(" ")[0])}
+                    <MessageSquare size={15} /> {copy.messageBtn}
                   </button>
                   <p style={{ fontSize: "0.74rem", color: "var(--color-text-tertiary)", textAlign: "center", margin: "10px 0 0", lineHeight: 1.4 }}>
                     {copy.escrowNote}

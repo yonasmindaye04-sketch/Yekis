@@ -1590,7 +1590,7 @@ export function ContractsWorkspace({
                         className="sh-btn sh-btn-secondary"
                         onClick={() => onOpenEscrow(contract.id)}
                       >
-                        <WalletCards size={14} /> Manage in Escrow Center
+                        <WalletCards size={14} /> View payments
                       </button>
                     )}
                     {onOpenChat && (
@@ -1644,7 +1644,7 @@ export function ContractsWorkspace({
                       className="flex items-center justify-between gap-3 mb-2.5"
                     >
                       <AlertTitle>
-                        Agreement signed by both parties. Fund the first milestone in Escrow Center to begin work.
+                        Agreement signed by both parties. Fund the first milestone in Payments to begin work.
                       </AlertTitle>
                       <button
                         type="button"
@@ -1715,7 +1715,7 @@ export function ContractsWorkspace({
                             className="sh-row-action-btn"
                             onClick={() => onOpenEscrow(contract.id)}
                           >
-                            <WalletCards size={13} /> Manage in Escrow Center
+                            <WalletCards size={13} /> View payments
                           </button>
                         )}
                       </div>
@@ -1784,7 +1784,7 @@ export function ContractsWorkspace({
             },
             () => {},
             willBeFullyExecuted
-              ? "Agreement signed by both parties. Fund the first milestone in Escrow Center when ready."
+              ? "Agreement signed by both parties. Fund the first milestone in Payments when ready."
               : "Agreement signed. Waiting for counterparty e-signature.",
           );
         }}

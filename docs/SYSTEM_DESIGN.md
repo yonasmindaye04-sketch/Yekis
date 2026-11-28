@@ -2433,20 +2433,20 @@ FullPlatformApp.tsx
     ├── Header (user avatar, notifications bell, logout)
     ├── NotificationCenter.tsx    — Dropdown notification feed
     ├── FeaturedCarousel.tsx      — Featured freelancer cards
-    └── View Content (by view state):
+    └── View Content (by view state & merged sub-tabs):
         ├── "overview"        → Dashboard metrics, featured talent
-        ├── "jobs"            → JobsWorkspace section="jobs" (post + browse + my briefs)
-        ├── "proposals"       → JobsWorkspace section="proposals" (bids sent + pipeline received)
-        ├── "gigs"            → GigMarketplace (browse gigs)
+        ├── "jobs"            → Tabbed Jobs shell: My jobs / Find work + Proposals tab
+        ├── "proposals"       → Alias -> resolves to "jobs" + Proposals tab
+        ├── "gigs"            → GigMarketplace (browse gigs / Services)
         ├── "my-gigs"         → MyGigsWorkspace (a freelancer's own listings)
-        ├── "contracts"       → ContractsWorkspace (sign, fund, milestones)
-        ├── "escrow"          → EscrowWorkspace (milestone tracking)
+        ├── "contracts"       → Tabbed Contracts shell: Overview (`ContractsWorkspace`) + Payments (`EscrowWorkspace`) + Disputes (`DisputesWorkspace`)
+        ├── "escrow"          → Alias -> resolves to "contracts" + Payments tab (`EscrowWorkspace`)
         ├── "wallet"          → BrowserWallet (top-up, history, withdraw)
-        ├── "verification"    → BrowserVerification (KYC doc upload)
-        ├── "chat"            → SupportChat (customer support tickets)
-        ├── "cases"           → DisputesWorkspace (raise/track disputes)
-        ├── "settings"        → SettingsWorkspace (account, security, notifications)
-        ├── "profile"         → ProfilePage (public view)
+        ├── "verification"    → BrowserVerification (KYC doc upload, reachable from Avatar menu & mobile header drawer)
+        ├── "chat"            → SupportChat (customer support & direct messaging)
+        ├── "cases"           → Alias -> resolves to "contracts" + Disputes tab (`DisputesWorkspace`)
+        ├── "settings"        → SettingsWorkspace (account, security, notifications; Avatar menu & mobile drawer)
+        ├── "profile"         → ProfilePage (public view; Avatar menu & mobile drawer)
         └── "profile-edit"    → ProfileEditPage (edit bio, skills, portfolio)
 ```
 
@@ -3013,23 +3013,23 @@ The fix, and where each fact now comes from:
 | Wallet trend | Approved top-ups, current 30d vs prior 30d | "No prior 30d baseline" — never a number |
 | Escrow trend | Escrow funded, current 30d vs prior 30d | "No prior 30d baseline" |
 | On-time rate | Released milestones with `releasedAt <= dueDate` | "Nothing settled yet" |
-| Briefs | `GET /api/v1/jobs/mine` for a client, `GET /api/v1/jobs` for a freelancer | `0`, with the matching empty state |
+| Jobs | `GET /api/v1/jobs/mine` for a client, `GET /api/v1/jobs` for a freelancer | `0`, with the matching empty state |
 
 Two rules follow from this table and are enforced by the code:
 
 1. **No derived fakes or client fee math.** `dashboardData.ts` ships zero demo fixtures, `FeaturedCarousel.tsx` ships zero `DEMO_TALENTS` (rendering empty/retry states + server-persisted `SavedTalent` bookmarks), landing/case-study pages strip fabricated testimonials and client claims, and all fee rows read server-computed amounts alongside `GET /api/v1/escrow/fee-config` (`0%` client surcharge; `7% + 0.5%` freelancer deduction shown only to freelancers).
-2. **Authoritative top-up & onboarding state.** `GET /api/v1/wallet/topups/methods` reports whether Telebirr instant checkout is genuinely configured (`telebirrInstantLive`), so `BrowserWallet` defaults cleanly to Manual Transfer when offline and shows an explicit submission timeline without unverified turnaround promises. Dual-role (`BOTH`) accounts default to `CLIENT` behind a 2-way `Client`/`Freelancer` toggle (migrating stored `BOTH`), and first-run Clients follow an ordered onboarding checklist (`Verify identity → Post brief → Add funds → Review proposals → Fund milestone`) with a persistent toggle in Settings.
+2. **Authoritative top-up & onboarding state.** `GET /api/v1/wallet/topups/methods` reports whether Telebirr instant checkout is genuinely configured (`telebirrInstantLive`), so `BrowserWallet` defaults cleanly to Manual Transfer when offline and shows an explicit submission timeline without unverified turnaround promises. Dual-role (`BOTH`) accounts default to `CLIENT` behind a 2-way `Client`/`Freelancer` toggle (migrating stored `BOTH`). First-run Clients (`hasActivity === false`) see `FirstRunChecklist` first (`Verify identity → Post a job → Add funds → Review proposals → Fund your first milestone`, with bold amber `Waiting for approval` when a pending top-up exists and an explicit notification promise because KYC review / top-up approval SLAs are not yet configured in `env.ts`), while KPIs, charts, and empty lists remain hidden until real activity exists; once active, Client Home prioritizes `Needs your attention`, `Active contracts`, `Your open jobs`, compact KPIs (`Wallet balance`, `Held in escrow`), `Verified freelancers`, and collapsible code-split `Insights` (loaded only when settled/approved records exist). Pipeline tabs (**List**, **Board** with dedicated `DISPUTED_REFUNDED` column when active, **Calendar** with `kenat` lazy-loaded) use single clean empty states when empty.
 3. **A percentage needs a denominator.** `periodChange()` returns `null`
    when the prior window is empty, and the KPI cards print a sentence instead
    of a rate. An account with one day of history gets "No prior 30d
    baseline", not "0.0%".
 
-**Which briefs belong to whom.** A freelancer competes for open marketplace
-briefs; a client hires against briefs they posted. The dashboard previously
-showed both roles the marketplace list, so a client saw other clients' briefs
-under the heading "Active Hiring Briefs". The workspace now loads
-`GET /api/v1/jobs/mine` alongside the marketplace search and gives each role
-the list that belongs to it.
+**Which jobs belong to whom.** A freelancer competes for open marketplace
+jobs; a client hires against jobs they posted. The dashboard previously
+showed both roles the marketplace list, so a client saw other clients' jobs
+under the heading "Your open jobs". The workspace now loads
+`GET /api/v1/jobs/mine`, `GET /api/v1/contracts`, and `GET /api/v1/chat/conversations` alongside the marketplace feed and gives each role
+the list and action signals that belong to it.
 
 **The operations console follows the same real-data rule.** `pages/ops/pages/Overview.tsx`, `Reports.tsx`, and `WithholdingReports.tsx` aggregate real payment, payout, escrow, and ERCA period records (syncing with `ShadcnLayoutContext` for `dashboardVariant` and `opsSubTab`) and render `.sh-chart-empty` / empty states when a window has no activity instead of synthetic multipliers, fallback arrays, or mocked contractor splits.
 

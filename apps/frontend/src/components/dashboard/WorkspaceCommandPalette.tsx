@@ -6,6 +6,7 @@ import {
   Kanban,
   Calendar,
   Briefcase,
+  FileCheck,
   Package,
   FileText,
   Wallet,
@@ -54,7 +55,7 @@ export function WorkspaceCommandPalette({
     setSidebarCollapsed,
   } = useShadcnLayout();
   const { theme, toggleTheme } = useTheme();
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const copy = (DASHBOARD_COPY[language] ?? DASHBOARD_COPY.en).palette;
 
   const [query, setQuery] = useState("");
@@ -138,6 +139,14 @@ export function WorkspaceCommandPalette({
         hint: copy.actions.jobsHint,
         icon: <Briefcase size={15} />,
         run: () => onNavigateView("jobs"),
+      },
+      {
+        id: "nav-proposals",
+        group: copy.groups.navigation,
+        label: t.nav.proposals,
+        hint: copy.actions.jobsHint,
+        icon: <FileCheck size={15} />,
+        run: () => onNavigateView("proposals"),
       },
       {
         id: "nav-gigs",
@@ -271,6 +280,7 @@ export function WorkspaceCommandPalette({
     setOpsSubTab,
     setCustomizerOpen,
     setSidebarCollapsed,
+    t.nav.proposals,
     theme,
     toggleTheme,
   ]);

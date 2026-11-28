@@ -241,3 +241,14 @@ DATABASE_URL=postgresql://marketplace:marketplace_dev_only@localhost:5433/market
 - Encrypt connections and backups, test restore procedures, and establish Ethiopian data residency.
 - Monitor migration duration and lock behavior before production rollout.
 - Reconcile wallet and payment transaction totals to provider settlement records.
+
+## Before-Production List (Action Required Before Launch)
+
+- **Deferred commit-time journal trigger**: implement and prove a commit-time non-empty `LedgerJournal` guard inside interactive Prisma transactions (`prisma.$transaction(async tx => ...)`).
+- **Negative-escrow guard on `2000-LIABILITY-ESCROW`**: add trigger/posting guard rejecting debits that drive `2000-LIABILITY-ESCROW` negative once all seeded/legacy fixtures use `seedFundedMilestone()` (requires funded ledger credits first; blocked on existing unbacked test fixtures and `seed-*` demo milestones today).
+- **Fee-snapshot backfill review**: review `fee-snapshot:backfill` output and verify snapshotted client/freelancer/provider fee amounts against historical `ESCROW_FUND` journals and `PlatformFeeCredit` rows.
+- **Clean launch database (no demo-seed migrations)**: initialize production from schema-only migrations (or a clean baseline) and move demo data strictly to a seed script that refuses `NODE_ENV=production` (`20261022120000_seed_demo_data`, `20261022150000_seed_demo_activity`, and `20261109120000_rotate_seeded_demo_passwords` currently run on any fresh `prisma migrate deploy`).
+- **Rotate all secrets**: JWT signing keys (`JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `GUEST_SUPPORT_JWT_SECRET`), object-store credentials, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, and payment provider keys.
+- **Withholding tax sign-off (`TAX-002`)**: existing WHT rates/thresholds (`3%`, `30%`, `1,000,000` minor) are config placeholders, not verified Ethiopian tax rules; obtain accountant and ERA remittance sign-off before enabling `TIN_FEATURE_ENABLED`.
+- **Legal sign-off for partial split**: obtain formal legal approval before `PARTIAL_SPLIT_ENABLED` can ever be turned on in production.
+- **Accountant chart-of-accounts review**: accountant to confirm all chart-of-accounts codes and names (including `1020-ASSET-MPESA`).

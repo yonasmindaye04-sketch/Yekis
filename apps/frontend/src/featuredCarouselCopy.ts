@@ -58,6 +58,7 @@ export type FeaturedCarouselCopy = {
   newVerifiedTalentDesc: (firstName: string) => string;
   engagementHeading: string;
   perHourUnit: string;
+  perHourShort: string;
   availableNewProjects: string;
   jobsCompletedLabel: string;
   onTimeRateLabel: string;
@@ -88,7 +89,7 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
     loadingLabel: "Loading verified freelancers...",
     emptyTalentsTitle: "No verified freelancers listed yet",
     emptyTalentsDesc: "Verified freelancers will appear here as they join.",
-    browseGigsBtn: "Browse Gigs",
+    browseGigsBtn: "Browse Services",
     errorTitle: "Could not load featured talent right now.",
     retryBtn: "Retry",
     gridAria: "Featured professionals",
@@ -138,6 +139,7 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
       `${first} recently completed Fayda identity verification. Be the first client to collaborate and leave a review.`,
     engagementHeading: "Engagement",
     perHourUnit: "/ hr starting",
+    perHourShort: "/hr",
     availableNewProjects: "Available for new projects",
     jobsCompletedLabel: "Jobs completed",
     onTimeRateLabel: "On-time rate",
@@ -217,6 +219,7 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
       `${first} በቅርቡ የፋይዳ ማንነት ማረጋገጫ አጠናቋል። በመጀመሪያ አብረው ይሥሩ እና ግምገማ ይስጡ።`,
     engagementHeading: "ውል እና ክፍያ",
     perHourUnit: "/ ሰዓት መነሻ",
+    perHourShort: "/ሰዓት",
     availableNewProjects: "ለአዲስ ፕሮጀክቶች ዝግጁ",
     jobsCompletedLabel: "የተጠናቀቁ ሥራዎች",
     onTimeRateLabel: "በሰዓቱ የማድረስ መጠን",
@@ -295,6 +298,7 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
       `${first} dhiyeenya mirkaneessa eenyummaa Fayda xumureera. Maamila jalqabaa ta'aatii waliin hojjedhaa.`,
     engagementHeading: "Qindaa'ina Hojii",
     perHourUnit: "/ sa'aatii irraa",
+    perHourShort: "/sa'aa",
     availableNewProjects: "Pirojektii haaraaf qophaa'aa",
     jobsCompletedLabel: "Hojiilee xumuraman",
     onTimeRateLabel: "Yeroon dhiyeessuu",
@@ -374,6 +378,7 @@ export const FEATURED_CAROUSEL_COPY: Record<Language, FeaturedCarouselCopy> = {
       `${first} ኣብ ቀረባ እዋን መረጋገጺ መንነት ፋይዳ ወዲኡ። ቀዳማይ ዓሚል ኮይንኩም ብሓባር ስርሑን ግምገማ ሃቡን።`,
     engagementHeading: "ውዕልን ክፍሊትን",
     perHourUnit: "/ ሰዓት መበገሲ",
+    perHourShort: "/ሰዓት",
     availableNewProjects: "ንሓደስቲ ፕሮጀክታት ድሉው",
     jobsCompletedLabel: "ዝተዛዘሙ ስራሕቲ",
     onTimeRateLabel: "ብሰዓቱ ምቕራብ",

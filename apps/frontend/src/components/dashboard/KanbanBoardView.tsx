@@ -14,11 +14,9 @@ import {
   Eye,
 } from "lucide-react";
 import type { EscrowFeeConfig } from "../../api/client";
-import type { KanbanColumnId, KanbanTask } from "./dashboardData";
+import { getTodayAddisIso, railLabel, type KanbanColumnId, type KanbanTask } from "./dashboardData";
 import { useI18n } from "../../i18n";
 import { DASHBOARD_COPY } from "./dashboardCopy";
-import { railLabel } from "./dashboardData";
-import { ContextualHelpTrigger } from "../guide/ContextualHelpTrigger";
 
 interface KanbanBoardViewProps {
   tasks: KanbanTask[];
@@ -30,7 +28,7 @@ interface KanbanBoardViewProps {
   onRequestFundMilestone?: (task: KanbanTask) => void;
 }
 
-const COLUMNS: {
+const BASE_COLUMNS: {
   id: KanbanColumnId;
 }[] = [
   { id: "BACKLOG" },
@@ -47,11 +45,7 @@ export type KanbanDueStatus =
   | { state: "due-soon"; diffDays: number }
   | { state: "on-track"; diffDays: number };
 
-export function getTodayAddisIso(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Africa/Addis_Ababa",
-  }).format(now);
-}
+export { getTodayAddisIso } from "./dashboardData";
 
 function parseIsoDateUtc(value: string): number | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
@@ -204,28 +198,11 @@ export function KanbanBoardView({
   const [overdueOnly, setOverdueOnly] = useState(false);
 
   const [collapsedCols, setCollapsedCols] = useState<Set<KanbanColumnId>>(
-    () =>
-      new Set(
-        COLUMNS.filter((c) => !tasks.some((t) => t.column === c.id)).map(
-          (c) => c.id,
-        ),
-      ),
+    () => new Set(),
   );
-  const userToggledColsRef = useRef(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeMobileColumn, setActiveMobileColumn] =
     useState<KanbanColumnId>("ESCROW_HELD");
-
-  useEffect(() => {
-    if (userToggledColsRef.current) return;
-    setCollapsedCols(
-      new Set(
-        COLUMNS.filter((c) => !tasks.some((t) => t.column === c.id)).map(
-          (c) => c.id,
-        ),
-      ),
-    );
-  }, [tasks]);
 
   // Horizontal scroll affordance state
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -333,12 +310,24 @@ export function KanbanBoardView({
     [filteredTasks, todayIso],
   );
 
+  const hasDisputedOrRefunded = useMemo(
+    () => tasks.some((t) => t.column === "DISPUTED_REFUNDED"),
+    [tasks],
+  );
+  const columns = useMemo(
+    () =>
+      hasDisputedOrRefunded
+        ? [...BASE_COLUMNS, { id: "DISPUTED_REFUNDED" as KanbanColumnId }]
+        : BASE_COLUMNS,
+    [hasDisputedOrRefunded],
+  );
+
   const emptyColumnIds = useMemo(
     () =>
-      COLUMNS.filter(
+      columns.filter(
         (col) => !filteredTasks.some((t) => t.column === col.id),
       ).map((col) => col.id),
-    [filteredTasks],
+    [columns, filteredTasks],
   );
 
   const hasUncollapsedEmpty = useMemo(
@@ -407,7 +396,6 @@ export function KanbanBoardView({
   };
 
   const toggleCollapseCol = (colId: KanbanColumnId) => {
-    userToggledColsRef.current = true;
     setCollapsedCols((prev) => {
       const next = new Set(prev);
       if (next.has(colId)) next.delete(colId);
@@ -417,7 +405,6 @@ export function KanbanBoardView({
   };
 
   const collapseEmptyCols = () => {
-    userToggledColsRef.current = true;
     setCollapsedCols((prev) => {
       const next = new Set(prev);
       for (const id of emptyColumnIds) next.add(id);
@@ -426,7 +413,6 @@ export function KanbanBoardView({
   };
 
   const expandAllCols = () => {
-    userToggledColsRef.current = true;
     setCollapsedCols(new Set());
   };
 
@@ -492,7 +478,7 @@ export function KanbanBoardView({
       );
     }
     return (
-      <span className="sh-cell-meta sh-mono">
+      <span className="sh-cell-meta sh-tabular">
         {copy.duePrefix(task.dueDate || "—")}
       </span>
     );
@@ -500,14 +486,45 @@ export function KanbanBoardView({
 
   const detailsTitleId = `${uid}-details-title`;
 
+  if (tasks.length === 0) {
+    return (
+      <div className="sh-card" data-tour="dashboard-kanban">
+        <div className="sh-card-header">
+          <div>
+            <h3 className="sh-card-title">{copy.title}</h3>
+            <p className="sh-card-desc">{copy.emptyBoardDesc}</p>
+          </div>
+        </div>
+        <div className="sh-kanban-empty" style={{ padding: "28px 20px", textAlign: "center" }}>
+          <p className="sh-kanban-empty-title" style={{ marginBottom: 6 }}>
+            {copy.emptyBoardTitle}
+          </p>
+          <p className="sh-kanban-empty-hint" style={{ maxWidth: 460, margin: "0 auto 16px" }}>
+            {copy.emptyBoardDesc}
+          </p>
+          <button
+            type="button"
+            className="sh-btn sh-btn-primary"
+            onClick={() => {
+              if (isClientView && onNavigateView) {
+                onNavigateView("jobs");
+              } else {
+                openContractsTarget();
+              }
+            }}
+          >
+            {isClientView && onNavigateView ? copy.emptyPostJobCta : copy.openContractsCta}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="sh-card" data-tour="dashboard-kanban">
       <div className="sh-card-header">
         <div>
-          <div className="yk-help-heading-row">
-            <h3 className="sh-card-title">{copy.title}</h3>
-            <ContextualHelpTrigger helpId="dashboard-kanban" />
-          </div>
+          <h3 className="sh-card-title">{copy.title}</h3>
           <p className="sh-card-desc">{copy.subtitle}</p>
         </div>
       </div>
@@ -637,7 +654,7 @@ export function KanbanBoardView({
       {/* Board Summary + Column Collapse & Intentional Horizontal Scroll Controls */}
       <div className="sh-kanban-board-bar">
         <div className="sh-kanban-summary-text">
-          <span className="sh-mono">
+          <span className="sh-tabular">
             {copy.boardSummary(
               filteredTasks.length,
               tasks.length,
@@ -708,7 +725,7 @@ export function KanbanBoardView({
         role="tablist"
         aria-label={copy.mobileTabsAria}
       >
-        {COLUMNS.map((col) => {
+        {columns.map((col) => {
           const colTasks = filteredTasks.filter((t) => t.column === col.id);
           const isActive = activeMobileColumn === col.id;
           return (
@@ -721,7 +738,7 @@ export function KanbanBoardView({
               onClick={() => setActiveMobileColumn(col.id)}
             >
               <span>{copy.columns[col.id].title}</span>
-              <span className="sh-mono sh-kanban-mobile-tab-count">
+              <span className="sh-tabular sh-kanban-mobile-tab-count">
                 {colTasks.length}
               </span>
             </button>
@@ -729,7 +746,7 @@ export function KanbanBoardView({
         })}
       </div>
 
-      {/* 5-Column Horizontal Scrollable Read-Only Kanban Projection */}
+      {/* Horizontal Scrollable Read-Only Board Projection */}
       <div
         ref={gridRef}
         className={`sh-kanban-grid ${moreStart ? "more-start" : ""} ${moreEnd ? "more-end" : ""}`}
@@ -740,7 +757,7 @@ export function KanbanBoardView({
           aria-hidden="true"
         />
 
-        {COLUMNS.map((col) => {
+        {columns.map((col) => {
           const colAllTasks = tasks.filter((t) => t.column === col.id);
           const colTasks = filteredTasks.filter((t) => t.column === col.id);
           const colTotalMinor = colTasks.reduce(
@@ -775,13 +792,13 @@ export function KanbanBoardView({
                     <PanelLeftOpen size={13} aria-hidden="true" />
                   </button>
 
-                  <span className="sh-mono sh-kanban-count">
+                  <span className="sh-tabular sh-kanban-count">
                     {colTasks.length}
                   </span>
 
                   {colOverdueCount > 0 && (
                     <span
-                      className="sh-kanban-overdue-flag sh-mono"
+                      className="sh-kanban-overdue-flag sh-tabular"
                       title={copy.overdueColCount(colOverdueCount)}
                     >
                       {colOverdueCount}!
@@ -803,7 +820,7 @@ export function KanbanBoardView({
                     <div className="sh-kanban-col-title-row">
                       <h4>{colTitle}</h4>
                       <div className="sh-kanban-col-head-actions">
-                        <span className="sh-mono sh-kanban-count">
+                        <span className="sh-tabular sh-kanban-count">
                           {copy.taskCountLabel(
                             colTasks.length,
                             colAllTasks.length,
@@ -825,7 +842,7 @@ export function KanbanBoardView({
                     <p className="sh-kanban-col-sub">
                       <span>{copy.columns[col.id].subtitle}</span>
                       <span aria-hidden="true"> · </span>
-                      <span className="sh-mono">
+                      <span className="sh-tabular">
                         ETB {(colTotalMinor / 100).toLocaleString()}
                       </span>
                       {colOverdueCount > 0 && (
@@ -910,7 +927,7 @@ export function KanbanBoardView({
                           >
                             <div className="sh-kanban-card-top">
                               <span className="sh-cell-meta">
-                                <span className="sh-mono">{task.code}</span>
+                                <span className="sh-tabular">{task.code}</span>
                                 <span aria-hidden="true">·</span>
                                 <span>{railLabel(task.rail)}</span>
                               </span>
@@ -939,7 +956,7 @@ export function KanbanBoardView({
 
                             <div className="sh-kanban-card-foot">
                               <div className="sh-kanban-card-metrics">
-                                <strong className="sh-mono sh-kanban-amount">
+                                <strong className="sh-tabular sh-kanban-amount">
                                   ETB {(task.amountMinor / 100).toLocaleString()}
                                 </strong>
                                 {renderDueIndicator(task, dueStatus)}
@@ -1016,7 +1033,7 @@ export function KanbanBoardView({
           <div className="sh-sheet-panel sh-kanban-dialog-panel">
             <div className="sh-sheet-header">
               <div className="sh-kanban-dialog-head-copy">
-                <span className="sh-mono sh-text-muted" style={{ fontSize: "0.76rem" }}>
+                <span className="sh-tabular sh-text-muted" style={{ fontSize: "0.76rem" }}>
                   {selectedTask.code} · {railLabel(selectedTask.rail)}
                 </span>
                 <h1 id={detailsTitleId} className="sh-sheet-title">
@@ -1064,7 +1081,7 @@ export function KanbanBoardView({
                     </div>
                     <div className="sh-kv-row">
                       <span>{copy.detailAmount}</span>
-                      <strong className="sh-mono">
+                      <strong className="sh-tabular">
                         ETB {(selectedTask.amountMinor / 100).toLocaleString()}
                       </strong>
                     </div>
@@ -1072,13 +1089,13 @@ export function KanbanBoardView({
                       <>
                         <div className="sh-kv-row">
                           <span>{copy.detailClientFee}</span>
-                          <strong className="sh-mono">
+                          <strong className="sh-tabular">
                             ETB {(selectedTask.clientFeeMinor / 100).toLocaleString()}
                           </strong>
                         </div>
                         <div className="sh-kv-row">
                           <span>{copy.detailClientTotal}</span>
-                          <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                          <strong className="sh-tabular" style={{ color: "var(--color-primary)" }}>
                             ETB {(selectedTask.clientTotalChargeMinor / 100).toLocaleString()}
                           </strong>
                         </div>
@@ -1090,19 +1107,19 @@ export function KanbanBoardView({
                       <>
                         <div className="sh-kv-row">
                           <span>{copy.detailPlatformFee}</span>
-                          <strong className="sh-mono">
+                          <strong className="sh-tabular">
                             ETB {(selectedTask.platformFeeMinor / 100).toLocaleString()}
                           </strong>
                         </div>
                         <div className="sh-kv-row">
                           <span>{copy.detailProviderFee}</span>
-                          <strong className="sh-mono">
+                          <strong className="sh-tabular">
                             ETB {(selectedTask.providerFeeMinor / 100).toLocaleString()}
                           </strong>
                         </div>
                         <div className="sh-kv-row">
                           <span>{copy.detailNetPayout}</span>
-                          <strong className="sh-mono" style={{ color: "var(--color-primary)" }}>
+                          <strong className="sh-tabular" style={{ color: "var(--color-primary)" }}>
                             ETB {(selectedTask.netPayoutMinor / 100).toLocaleString()}
                           </strong>
                         </div>
@@ -1110,7 +1127,7 @@ export function KanbanBoardView({
                     )}
                     <div className="sh-kv-row">
                       <span>{copy.detailDueDate}</span>
-                      <strong className="sh-mono">
+                      <strong className="sh-tabular">
                         {selectedTask.dueDate || "—"}
                       </strong>
                     </div>
@@ -1125,7 +1142,7 @@ export function KanbanBoardView({
                     {selectedTask.fundedAt && (
                       <div className="sh-kv-row">
                         <span>{copy.detailFundedAt}</span>
-                        <strong className="sh-mono">
+                        <strong className="sh-tabular">
                           {formatShortTimestamp(selectedTask.fundedAt)}
                         </strong>
                       </div>
@@ -1133,7 +1150,7 @@ export function KanbanBoardView({
                     {selectedTask.submittedAt && (
                       <div className="sh-kv-row">
                         <span>{copy.detailSubmittedAt}</span>
-                        <strong className="sh-mono">
+                        <strong className="sh-tabular">
                           {formatShortTimestamp(selectedTask.submittedAt)}
                         </strong>
                       </div>
@@ -1141,7 +1158,7 @@ export function KanbanBoardView({
                     {selectedTask.autoReleaseAt && (
                       <div className="sh-kv-row">
                         <span>{copy.detailAutoReleaseAt}</span>
-                        <strong className="sh-mono">
+                        <strong className="sh-tabular">
                           {formatShortTimestamp(selectedTask.autoReleaseAt)}
                         </strong>
                       </div>
@@ -1149,7 +1166,7 @@ export function KanbanBoardView({
                     {selectedTask.releasedAt && (
                       <div className="sh-kv-row">
                         <span>{copy.detailReleasedAt}</span>
-                        <strong className="sh-mono">
+                        <strong className="sh-tabular">
                           {formatShortTimestamp(selectedTask.releasedAt)}
                         </strong>
                       </div>

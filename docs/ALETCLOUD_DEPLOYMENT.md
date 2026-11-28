@@ -1939,3 +1939,14 @@ The staging app (`yekis-test`, `d40f8eff-...`) must be **stopped** before the
 production app registers the same bot's webhook — one bot can only have one
 webhook, and the staging app's `TELEGRAM_WEBHOOK_URL` points at the staging
 origin.
+
+---
+
+## 13. Pre-deploy checklist (shared test instance & production rollouts)
+
+Run this checklist before deploying backend ledger, webhook, or schema changes to `yekis.app.aletcloud.com` (the shared AletCloud **test** instance — not production) or any future production instance:
+
+1. **Back up the target database first** with `pg_dump -Fc` before running migrations or startup schema checks (never run dev-only scripts such as `ledger:repair-dev`, `purge-demo-data`, or `db:seed` against the deployed database).
+2. **Clear or cancel in-flight milestones with testers** on the shared test instance before deploying rail-funding ledger changes, so no pre-fix rail-funded milestone attempts settlement without a funding journal (or verify that negative-escrow triggers remain deferred on pre-production instances).
+3. **Verify provider credentials on the instance** are sandbox-only or absent (`TELEBIRR_ENV=sandbox` or unset, `CBE_BIRR_CHECKOUT_ENABLED` / `MPESA_CHECKOUT_ENABLED` unset/false unless real sandbox keys are configured).
+4. **Run a read-only ledger check after deploy** (against a tunneled/authorized connection with `--allow-remote`, making zero writes) to confirm zero unbalanced journals and expected account balances.
