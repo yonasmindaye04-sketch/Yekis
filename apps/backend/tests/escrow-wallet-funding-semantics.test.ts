@@ -2,10 +2,12 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vites
 import { prisma } from "../src/lib/prisma.js";
 import {
   fundMilestoneFromWallet,
+  handlePaymentWebhook,
   submitMilestone,
   acceptMilestone,
   releaseMilestoneFunds,
 } from "../src/modules/escrow/escrow.service.js";
+import type { PaymentProvider } from "../src/schemas.js";
 import { raiseDispute } from "../src/modules/disputes/dispute.service.js";
 import { handleAutoReleaseJob } from "../src/queue/autoRelease.handler.js";
 import { fundGigOrderFromWallet } from "../src/modules/gigs/gig.service.js";
@@ -142,6 +144,7 @@ async function cleanup() {
 
   await prisma.auditLog.deleteMany({ where: { userId: userFilter } });
   await prisma.transactionFlag.deleteMany({ where: { userId: userFilter } });
+  await prisma.paymentTransaction.deleteMany({ where: { milestoneId: milestoneFilter } });
   await prisma.payoutTransaction.deleteMany({ where: { userId: userFilter } });
   await prisma.notification.deleteMany({ where: { userId: userFilter } });
   await prisma.platformFeeCredit.deleteMany({ where: { milestoneId: milestoneFilter } });
@@ -591,4 +594,76 @@ describe("ESC-003: the auto-release window", () => {
   it("defaults to the seven calendar days in Service Agreement Clause 2.2(b)", () => {
     expect(AUTO_RELEASE_WINDOW_DAYS_DEFAULT).toBe(7);
   });
+});
+
+describe("ESC-003 invariant: no funding method reaches RELEASED or credits freelancer without acceptance, auto-release, or admin dispute resolution", () => {
+  it.each(["WALLET", "TELEBIRR", "CBE_BIRR", "M_PESA"] as const)(
+    "funding via %s ends in ESCROW_HELD, never writes RELEASED, and keeps freelancer balance at 0 until accept",
+    async (method) => {
+      const milestone = await makeContract("PAYMENT_PENDING");
+      const freelancerBefore = await freelancerBalance();
+      const expectedCharge = calculateFees({
+        milestoneAmountMinor: M,
+        freelancerHasTin: false,
+      }).clientTotalChargeMinor;
+
+      if (method === "WALLET") {
+        await fundMilestoneFromWallet({ clientId, milestoneId: milestone.id });
+      } else {
+        const providerTxId = `prov-${method}-${STAMP}-${Math.random().toString(36).slice(2, 8)}`;
+        await prisma.paymentTransaction.create({
+          data: {
+            milestoneId: milestone.id,
+            provider: method as PaymentProvider,
+            providerTransactionId: providerTxId,
+            amountMinor: expectedCharge,
+            status: "PENDING",
+            withholdingTaxMinor: 0,
+          },
+        });
+        await handlePaymentWebhook({
+          provider: method as PaymentProvider,
+          providerTransactionId: providerTxId,
+          status: "SUCCESS",
+          rawPayload: { mock: true },
+        });
+      }
+
+      const afterFunding = await prisma.milestone.findUniqueOrThrow({
+        where: { id: milestone.id },
+      });
+      expect(afterFunding.escrowState).toBe("ESCROW_HELD");
+      expect(afterFunding.releasedAt).toBeNull();
+      expect(await freelancerBalance()).toBe(freelancerBefore);
+
+      // Direct release attempt without delivery/acceptance or dispute must be rejected.
+      await releaseMilestoneFunds(milestone.id, freelancerId, M);
+      expect(await milestoneState(milestone.id)).toBe("ESCROW_HELD");
+      expect(await freelancerBalance()).toBe(freelancerBefore);
+
+      const feeCreditBeforeAccept = await prisma.platformFeeCredit.findFirst({
+        where: { milestoneId: milestone.id },
+      });
+      expect(feeCreditBeforeAccept).toBeNull();
+
+      // Only delivery + client acceptance transitions to RELEASED and credits freelancer.
+      await submitMilestone({
+        freelancerId,
+        milestoneId: milestone.id,
+        deliverableUrl: `https://example.test/${method.toLowerCase()}-deliverable.pdf`,
+      });
+      expect(await milestoneState(milestone.id)).toBe("SUBMITTED_FOR_REVIEW");
+      expect(await freelancerBalance()).toBe(freelancerBefore);
+
+      const released = await acceptMilestone({ clientId, milestoneId: milestone.id });
+      expect(released.escrowState).toBe("RELEASED");
+      expect(released.releasedAt).not.toBeNull();
+
+      const expectedNet = calculateFees({
+        milestoneAmountMinor: M,
+        freelancerHasTin: false,
+      }).freelancerNetMinor;
+      expect(await freelancerBalance()).toBe(freelancerBefore + expectedNet);
+    },
+  );
 });
