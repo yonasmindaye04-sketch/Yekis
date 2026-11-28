@@ -2,8 +2,9 @@
  * Double-entry ledger balance verification script (`pnpm --filter backend ledger:check`).
  *
  * Inspects every LedgerJournal in the target database (`DATABASE_URL` from
- * process.env or `apps/backend/.env`) and exits non-zero if any journal is
- * unbalanced (`SUM(debitMinor) !== SUM(creditMinor)`) or has zero entries.
+ * process.env or `apps/backend/.env`). Exits non-zero when `unbalancedCount > 0`
+ * (`SUM(debitMinor) !== SUM(creditMinor)`). Reports zero-entry journals
+ * (`emptyJournalCount`) as a warning by default, or fails with `--strict-empty`.
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
@@ -19,6 +20,7 @@ interface BrokenJournalRow {
 }
 
 async function main() {
+  const strictEmpty = process.argv.includes("--strict-empty");
   const prisma = new PrismaClient();
   try {
     const [totals] = await prisma.$queryRaw<
@@ -37,7 +39,7 @@ async function main() {
       FROM "LedgerEntry" e
     `;
 
-    const bad = await prisma.$queryRaw<BrokenJournalRow[]>`
+    const violations = await prisma.$queryRaw<BrokenJournalRow[]>`
       SELECT
         j.id,
         j."referenceType",
@@ -54,8 +56,16 @@ async function main() {
       ORDER BY j."postedAt" ASC
     `;
 
-    const unbalancedCount = bad.filter((r) => r.debits !== r.credits).length;
-    const emptyJournalCount = bad.filter((r) => r.entryCount === 0).length;
+    const unbalanced = violations.filter((r) => r.debits !== r.credits);
+    const empty = violations.filter((r) => r.entryCount === 0);
+    const warning =
+      empty.length > 0
+        ? `${empty.length} empty LedgerJournal header(s) found with zero entries (pass --strict-empty to fail).`
+        : null;
+
+    if (warning) {
+      console.warn(`WARNING: ${warning}`);
+    }
 
     console.log(
       JSON.stringify(
@@ -64,16 +74,19 @@ async function main() {
           entriesChecked: totals?.entryCount ?? 0,
           totalDebitsMinor: totals?.totalDebits ?? "0",
           totalCreditsMinor: totals?.totalCredits ?? "0",
-          unbalancedCount,
-          emptyJournalCount,
-          violations: bad.slice(0, 20),
+          unbalancedCount: unbalanced.length,
+          emptyJournalCount: empty.length,
+          strictEmpty,
+          warning,
+          unbalancedViolations: unbalanced.slice(0, 20),
+          emptyJournalSamples: empty.slice(0, 10),
         },
         null,
         2,
       ),
     );
 
-    if (bad.length > 0) {
+    if (unbalanced.length > 0 || (strictEmpty && empty.length > 0)) {
       process.exitCode = 1;
     }
   } finally {

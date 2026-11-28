@@ -128,7 +128,7 @@ All monetary values are integers in minor units. For ETB, `100` represents ETB 1
 - A contract has at most two reviews, one from each party, enforcing the double-blind system.
 - Reviews are only visible once both parties have submitted them, or the 14-day window expires.
 - Profile completeness percentage is dynamically calculated based on skills, bio, portfolio, and verified status.
-- `LedgerJournal` entries must sum to zero (zero-sum invariant enforced by application `postJournalEntry` before insert, PostgreSQL statement triggers in `20261013120000_ledger_journal_balance_guard`, and checked via `pnpm --filter backend ledger:check`).
+- `LedgerJournal` entries must sum to zero (zero-sum invariant enforced by application `postJournalEntry` before insert, PostgreSQL statement triggers in `20261013120000_ledger_journal_balance_guard`, and checked via `pnpm --filter backend ledger:check`). A `DEFERRABLE INITIALLY DEFERRED` commit-time guard rejecting zero-entry/empty `LedgerJournal` headers is deferred until before production and must be proven inside interactive `prisma.$transaction(async (tx) => ...)` transactions before shipping.
 - A broadcast has at most one delivery row per recipient (unique `(broadcastId, userId)`), so a worker retry cannot message the same member twice for the same run.
 - A delivered broadcast is evidence: `SENT` and `PARTIAL` rows are refused by the delete route, and `SENDING` rows are refused so a run cannot lose its log mid-delivery.
 

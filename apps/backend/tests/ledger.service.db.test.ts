@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { prisma } from "../src/lib/prisma.js";
 import { postJournalEntry } from "../src/modules/finance/ledger.service.js";
 import { scopedDelete } from "./helpers/scopedDelete.js";
@@ -39,6 +39,11 @@ async function accountBalance(accountCode: string): Promise<number | null> {
 
 beforeEach(async () => {
   // Clean this run's rows so each test starts from zero.
+  await cleanup();
+});
+
+afterEach(async () => {
+  // Ensure bare LedgerJournal headers created for error/CHECK tests never leak on abort.
   await cleanup();
 });
 

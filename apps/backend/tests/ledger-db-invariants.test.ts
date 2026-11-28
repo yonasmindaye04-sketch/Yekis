@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import {
@@ -36,6 +36,10 @@ async function account(type: "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXP
 }
 
 beforeEach(async () => {
+  await cleanup();
+});
+
+afterEach(async () => {
   await cleanup();
 });
 
