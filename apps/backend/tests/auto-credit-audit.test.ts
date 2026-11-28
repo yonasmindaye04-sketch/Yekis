@@ -148,6 +148,6 @@ describe("LOCK (source text) — no auto-credit path is unguarded", () => {
   it("the staff approval route is staff-only", () => {
     const s = TOPUP_ROUTES.indexOf("/:topUpId/approve");
     const segment = TOPUP_ROUTES.slice(s, s + 320);
-    expect(segment).toMatch(/requireStaffRole\(/);
+    expect(segment).toMatch(/requirePermission\("topups\.review"\)/);
   });
 });

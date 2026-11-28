@@ -3,6 +3,7 @@ import type { Express } from "express";
 import request from "supertest";
 import { prisma } from "../src/lib/prisma.js";
 import { buildApp } from "../src/app.js";
+import { env } from "../src/config/env.js";
 
 /**
  * Two-factor approval is mandatory for withdrawals.
@@ -140,21 +141,32 @@ describe("a withdrawal needs an SMS approval code", () => {
 
   it("answers 503, not 500, when the SMS provider cannot deliver the code", async () => {
     // The SMS gateway being down is the caller's problem to retry, not an
-    // internal fault. Answering 500 tells the user the platform broke when the
-    // gateway did — and, worse, it is what the route did until this test
-    // caught it.
+    // internal fault. In test/dev, `reason: "not_configured"` falls back to devCode
+    // disclosure unless running in staging/production, whereas a hard delivery
+    // error (`reason: "provider_error"`) or unconfigured SMS outside dev/test
+    // fails closed with 503 SMS_UNAVAILABLE.
     const user = await makeUser();
-    vi.mocked(sendSms).mockResolvedValueOnce({ sent: false, reason: "not_configured" });
+    const prevNodeEnv = env.NODE_ENV;
 
     try {
-      const res = await request(app)
+      vi.mocked(sendSms).mockResolvedValueOnce({ sent: false, reason: "provider_error" });
+      const hardErrRes = await request(app)
         .post("/api/v1/escrow/wallet/withdraw/otp")
         .set("Authorization", await authHeader(user.id))
         .send({});
+      expect(hardErrRes.status).toBe(503);
+      expect(hardErrRes.body.error).toBe("SMS_UNAVAILABLE");
 
-      expect(res.status).toBe(503);
-      expect(res.body.error).toBe("SMS_UNAVAILABLE");
+      env.NODE_ENV = "staging";
+      vi.mocked(sendSms).mockResolvedValueOnce({ sent: false, reason: "not_configured" });
+      const stagingRes = await request(app)
+        .post("/api/v1/escrow/wallet/withdraw/otp")
+        .set("Authorization", await authHeader(user.id))
+        .send({});
+      expect(stagingRes.status).toBe(503);
+      expect(stagingRes.body.error).toBe("SMS_UNAVAILABLE");
     } finally {
+      env.NODE_ENV = prevNodeEnv;
       vi.mocked(sendSms).mockResolvedValue({ sent: true });
     }
   });

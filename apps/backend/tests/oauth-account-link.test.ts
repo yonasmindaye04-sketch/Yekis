@@ -3,6 +3,7 @@ import request from "supertest";
 import type { Express } from "express";
 import { prisma } from "../src/lib/prisma.js";
 import { buildApp } from "../src/app.js";
+import { env } from "../src/config/env.js";
 import { hashPassword } from "../src/lib/password.js";
 import { createAuthTokens } from "../src/modules/auth/auth.service.js";
 import {
@@ -343,15 +344,20 @@ describe("the HTTP surface", () => {
   it("POST /oauth/google/link answers rather than falling over on an unverifiable credential", async () => {
     const user = await makePasswordUser();
     const { accessToken } = await createAuthTokens(user, ["pwd"]);
+    const prevGoogleClientId = env.GOOGLE_CLIENT_ID;
+    env.GOOGLE_CLIENT_ID = undefined;
 
-    const res = await request(app)
-      .post("/api/v1/auth/oauth/google/link")
-      .set("Authorization", `Bearer ${accessToken}`)
-      .send({ idToken: "not-a-real-id-token-but-long-enough" });
+    try {
+      const res = await request(app)
+        .post("/api/v1/auth/oauth/google/link")
+        .set("Authorization", `Bearer ${accessToken}`)
+        .send({ idToken: "not-a-real-id-token-but-long-enough" });
 
-    // No client id is configured in the test environment, so the credential
-    // cannot be verified and the route must say so — never 500.
-    expect(res.status).toBe(503);
-    expect(res.body.error).toBe("NOT_CONFIGURED");
+      // When Google client id is unset, the route must return 503 NOT_CONFIGURED cleanly — never 500.
+      expect(res.status).toBe(503);
+      expect(res.body.error).toBe("NOT_CONFIGURED");
+    } finally {
+      env.GOOGLE_CLIENT_ID = prevGoogleClientId;
+    }
   });
 });
